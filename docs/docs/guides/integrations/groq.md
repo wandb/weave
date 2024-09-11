@@ -1,8 +1,3 @@
----
-sidebar_position: 2
-hide_table_of_contents: true
----
-
 # Groq
 
 [Groq](https://groq.com/) is the AI infrastructure company that delivers fast AI inference. The LPU™ Inference Engine by Groq is a hardware and software platform that delivers exceptional compute speed, quality, and energy efficiency. Weave automatically tracks and logs calls made using Groq chat completion calls.

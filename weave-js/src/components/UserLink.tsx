@@ -1,6 +1,5 @@
-import {gql} from '@apollo/client';
+import {ApolloClient, gql, useApolloClient} from '@apollo/client';
 import {Avatar, Popover, TooltipProps} from '@mui/material';
-import {apolloClient} from '@wandb/weave/apollo';
 import * as Colors from '@wandb/weave/common/css/color.styles';
 import {NotApplicable} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/NotApplicable';
 import React, {useEffect, useRef, useState} from 'react';
@@ -97,8 +96,9 @@ type UserContentProps = {
   user: UserInfo;
   mode: 'tooltip' | 'popover';
   onClose?: () => void;
+  hasPopover?: boolean;
 };
-const UserContent = ({user, mode, onClose}: UserContentProps) => {
+const UserContent = ({user, mode, onClose, hasPopover}: UserContentProps) => {
   const isPopover = mode === 'popover';
   const imgSize = isPopover ? 100 : 50;
   const username = isPopover ? (
@@ -138,7 +138,9 @@ const UserContent = ({user, mode, onClose}: UserContentProps) => {
           <div>{email}</div>
         </Grid>
       </UserContentBody>
-      {!isPopover && <TooltipHint>Click to open card</TooltipHint>}
+      {hasPopover && !isPopover && (
+        <TooltipHint>Click to open card</TooltipHint>
+      )}
     </>
   );
 };
@@ -147,13 +149,22 @@ type UserInnerProps = {
   user: UserInfo;
   includeName?: boolean;
   placement?: TooltipProps['placement'];
+  hasPopover?: boolean;
 };
-const UserInner = ({user, includeName, placement}: UserInnerProps) => {
+const UserInner = ({
+  user,
+  includeName,
+  placement,
+  hasPopover,
+}: UserInnerProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const onClick = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(anchorEl ? null : ref.current);
-  };
+  const showPopover = hasPopover ?? true;
+  const onClick = showPopover
+    ? (event: React.MouseEvent<HTMLElement>) => {
+        setAnchorEl(anchorEl ? null : ref.current);
+      }
+    : undefined;
   const onClose = () => setAnchorEl(null);
 
   const open = Boolean(anchorEl);
@@ -162,7 +173,7 @@ const UserInner = ({user, includeName, placement}: UserInnerProps) => {
   const title = open ? (
     '' // Suppress tooltip when popper is open.
   ) : (
-    <UserContent user={user} mode="tooltip" />
+    <UserContent user={user} mode="tooltip" hasPopover={hasPopover} />
   );
 
   // Unfortunate but necessary to get appear on top of peek drawer.
@@ -218,9 +229,10 @@ type UserLinkProps = {
   userId: string | null;
   includeName?: boolean; // Default is to show avatar image only.
   placement?: TooltipProps['placement'];
+  hasPopover?: boolean; // Can you click to open more a popup
 };
 
-const fetchUser = (userId: string) => {
+const fetchUser = (userId: string, apolloClient: ApolloClient<object>) => {
   return apolloClient
     .query({
       query: FIND_USER_QUERY as any,
@@ -233,19 +245,20 @@ const fetchUser = (userId: string) => {
     });
 };
 
-const fetchUsers = (userIds: string[]) => {
+const fetchUsers = (userIds: string[], apolloClient: ApolloClient<object>) => {
   // This is not great, gorilla does not allow multi-user-lookup by id :(
-  return Promise.all(userIds.map(fetchUser));
+  return Promise.all(userIds.map(userId => fetchUser(userId, apolloClient)));
 };
 
 export const useUsers = (userIds: string[]) => {
   const memoedUserIds = useDeepMemo(userIds);
+  const apolloClient = useApolloClient();
 
   const [users, setUsers] = useState<UserResult>('load');
   useEffect(() => {
     let mounted = true;
     setUsers('loading');
-    fetchUsers(memoedUserIds)
+    fetchUsers(memoedUserIds, apolloClient)
       .then(userRes => {
         if (!mounted) {
           return;
@@ -261,12 +274,17 @@ export const useUsers = (userIds: string[]) => {
     return () => {
       mounted = false;
     };
-  }, [memoedUserIds]);
+  }, [apolloClient, memoedUserIds]);
 
   return users;
 };
 
-export const UserLink = ({userId, includeName, placement}: UserLinkProps) => {
+export const UserLink = ({
+  userId,
+  includeName,
+  placement,
+  hasPopover = true,
+}: UserLinkProps) => {
   const users = useUsers(userId ? [userId] : []);
   if (userId == null) {
     return <NotApplicable />;
@@ -279,6 +297,11 @@ export const UserLink = ({userId, includeName, placement}: UserLinkProps) => {
   }
   const user = users[0];
   return (
-    <UserInner user={user} placement={placement} includeName={includeName} />
+    <UserInner
+      user={user}
+      placement={placement}
+      includeName={includeName}
+      hasPopover={hasPopover}
+    />
   );
 };

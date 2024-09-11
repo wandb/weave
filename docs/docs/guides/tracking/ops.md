@@ -1,8 +1,3 @@
----
-sidebar_position: 1
-hide_table_of_contents: true
----
-
 # Ops
 
 A Weave op is a versioned function that automatically logs all calls.

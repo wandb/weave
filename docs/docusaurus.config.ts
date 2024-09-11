@@ -1,6 +1,7 @@
 import { themes as prismThemes } from "prism-react-renderer";
 import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
+import type * as OpenApiPlugin from "docusaurus-plugin-openapi-docs";
 
 const config: Config = {
   title: "W&B Weave",
@@ -8,10 +9,10 @@ const config: Config = {
   favicon: "img/favicon.ico",
 
   // Set the production url of your site here
-  url: "https://wandb.github.io",
+  url: "https://weave-docs.wandb.ai",
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: "/weave",
+  baseUrl: "/",
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
@@ -35,15 +36,17 @@ const config: Config = {
       {
         docs: {
           sidebarPath: "./sidebars.ts",
-          sidebarCollapsible: false,
-          breadcrumbs: false,
+          sidebarCollapsible: true,
+          breadcrumbs: true,
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl: "https://github.com/wandb/weave/blob/master/docs/",
           routeBasePath: "/",
+          docItemComponent: "@theme/ApiItem", // Derived from docusaurus-theme-openapi
+          showLastUpdateTime: true,
         },
         theme: {
-          customCss: "./src/css/custom.css",
+          customCss: "./src/css/custom.scss",
         },
       } satisfies Preset.Options,
     ],
@@ -64,8 +67,60 @@ const config: Config = {
           ],
         ]
       : []),
+    [
+      // See https://github.com/PaloAltoNetworks/docusaurus-openapi-docs
+      "docusaurus-plugin-openapi-docs",
+      {
+        id: "api", // plugin id
+        docsPluginId: "classic", // configured for preset-classic
+        config: {
+          weave: {
+            specPath: "./scripts/.cache/service_api_openapi_docs.json",
+            outputDir: "docs/reference/service-api",
+            sidebarOptions: {
+              groupPathsBy: "tag",
+              sidebarCollapsed: false,
+            },
+          } satisfies OpenApiPlugin.Options,
+        },
+      },
+    ],
+    "docusaurus-plugin-sass",
+    [
+      "@docusaurus/plugin-google-tag-manager",
+      {
+        containerId: "GTM-NM4PR4J9",
+      },
+    ],
+    [
+      "@docusaurus/plugin-google-gtag",
+      {
+        id: "gtag-1",
+        trackingID: "G-JH1SJHJQXJ",
+        anonymizeIP: true,
+      },
+    ],
+    [
+      "@docusaurus/plugin-google-gtag",
+      {
+        id: "gtag-2",
+        trackingID: "G-0J3TM1K4Z4",
+        anonymizeIP: true,
+      },
+    ],
+    'plugin-image-zoom',
   ],
 
+  themes: [
+    [
+      require.resolve("@easyops-cn/docusaurus-search-local"),
+      {
+        // https://github.com/easyops-cn/docusaurus-search-local?tab=readme-ov-file
+        docsRouteBasePath: "/",
+      },
+    ],
+    "docusaurus-theme-openapi-docs",
+  ],
   themeConfig: {
     // Replace with your project's social card
     image: "img/logo-large-padded.png",
@@ -84,14 +139,51 @@ const config: Config = {
         },
         {
           type: "docSidebar",
-          sidebarId: "apiReferenceSidebar",
+          sidebarId: "notebookSidebar",
           position: "left",
-          label: "API Reference",
+          label: "Cookbooks",
         },
         {
-          href: "https://github.com/wandb/weave",
-          label: "GitHub",
+          position: "left",
+          label: "Reference",
+          type: "dropdown",
+          items: [
+            {
+              type: "docSidebar",
+              sidebarId: "pythonSdkSidebar",
+              label: "Python SDK",
+            },
+            {
+              type: "docSidebar",
+              sidebarId: "serviceApiSidebar",
+              label: "Service API",
+            },
+          ],
+        },
+        {
+          position: "left",
+          label: "Open Source",
+          type: "dropdown",
+          items: [
+            {
+              href: "https://github.com/wandb/weave",
+              label: "GitHub",
+            },
+            {
+              href: "https://github.com/wandb/weave/releases",
+              label: "Release Changelog",
+            },
+          ],
+        },
+        {
+          type: "search",
           position: "right",
+        },
+        {
+          to: "https://wandb.ai/home",
+          label: "Open App",
+          position: "right",
+          className: "button button--secondary button--med margin-right--sm",
         },
       ],
     },
@@ -144,6 +236,13 @@ const config: Config = {
           block: { start: "highlight-start", end: "highlight-end" },
         },
       ],
+    },
+    imageZoom: {
+      // CSS selector to apply the plugin to, defaults to '.markdown img'
+      selector: '.markdown img',
+      // Optional medium-zoom options
+      // see: https://www.npmjs.com/package/medium-zoom#options
+      options: {},
     },
   } satisfies Preset.ThemeConfig,
 };

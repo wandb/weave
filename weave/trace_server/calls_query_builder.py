@@ -42,6 +42,7 @@ from weave.trace_server.orm import (
     python_value_to_ch_type,
     quote_json_path_parts,
 )
+from weave.trace_server.token_costs import cost_query
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
@@ -179,7 +180,7 @@ class Condition(BaseModel):
 
 
 class HardCodedFilter(BaseModel):
-    filter: tsi._CallsFilter
+    filter: tsi.CallsFilter
 
     def is_useful(self) -> bool:
         """Returns True if the filter is useful - i.e. it has any non-null fields
@@ -216,6 +217,7 @@ class CallsQuery(BaseModel):
     order_fields: list[OrderField] = Field(default_factory=list)
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None
+    include_costs: bool = False
 
     def add_field(self, field: str) -> "CallsQuery":
         self.select_fields.append(get_field_by_name(field))
@@ -272,6 +274,10 @@ class CallsQuery(BaseModel):
             limit=self.limit,
             offset=self.offset,
         )
+
+    def set_include_costs(self, include_costs: bool) -> "CallsQuery":
+        self.include_costs = include_costs
+        return self
 
     def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
         """
@@ -393,7 +399,7 @@ class CallsQuery(BaseModel):
         )
 
         # If we should not optimize, then just build the base query
-        if not should_optimize:
+        if not should_optimize and not self.include_costs:
             return self._as_sql_base_format(pb, table_alias)
 
         # If so, build the two queries
@@ -429,8 +435,18 @@ class CallsQuery(BaseModel):
 
         raw_sql = f"""
         WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
-        {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
         """
+
+        if self.include_costs:
+            raw_sql += f""",
+            all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
+            {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields])}
+            """
+
+        else:
+            raw_sql += f"""
+            {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
+            """
 
         return _safely_format_sql(raw_sql)
 
@@ -593,6 +609,10 @@ def process_query_to_conditions(
             lhs_part = process_operand(operation.gte_[0])
             rhs_part = process_operand(operation.gte_[1])
             cond = f"({lhs_part} >= {rhs_part})"
+        elif isinstance(operation, tsi_query.InOperation):
+            lhs_part = process_operand(operation.in_[0])
+            rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
+            cond = f"({lhs_part} IN ({rhs_part}))"
         elif isinstance(operation, tsi_query.ContainsOperation):
             lhs_part = process_operand(operation.contains_.input)
             rhs_part = process_operand(operation.contains_.substr)
@@ -628,6 +648,7 @@ def process_query_to_conditions(
                 tsi_query.EqOperation,
                 tsi_query.GtOperation,
                 tsi_query.GteOperation,
+                tsi_query.InOperation,
                 tsi_query.ContainsOperation,
             ),
         ):
@@ -643,7 +664,7 @@ def process_query_to_conditions(
 
 
 def process_calls_filter_to_conditions(
-    filter: tsi._CallsFilter,
+    filter: tsi.CallsFilter,
     param_builder: ParamBuilder,
     table_alias: str,
 ) -> list[str]:

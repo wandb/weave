@@ -1,41 +1,15 @@
 import asyncio
 import os
-from typing import Any, Optional, Union
+from typing import Union
 
 import pytest
 
 import weave
-from weave.trace_server import trace_server_interface as tsi
-
-
-def _get_call_output(call: tsi.CallSchema) -> Any:
-    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
-
-    Keeping this here for now, but it should be removed in the future once we have a better solution.
-    """
-    call_output = call.output
-    if isinstance(call_output, str) and call_output.startswith("weave://"):
-        return weave.ref(call_output).get()
-    return call_output
-
-
-def flatten_calls(
-    calls: list[tsi.CallSchema], parent_id: Optional[str] = None, depth: int = 0
-) -> list:
-    def children_of_parent_id(id: Optional[str]) -> list[tsi.CallSchema]:
-        return [call for call in calls if call.parent_id == id]
-
-    children = children_of_parent_id(parent_id)
-    res = []
-    for child in children:
-        res.append((child, depth))
-        res.extend(flatten_calls(calls, child.id, depth + 1))
-
-    return res
-
-
-def op_name_from_ref(ref: str) -> str:
-    return ref.split("/")[-1].split(":")[0]
+from weave.integrations.integration_utilities import (
+    flatten_calls,
+    flattened_calls_to_names,
+)
+from weave.trace_server.trace_server_interface import CallsFilter
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -44,7 +18,7 @@ def op_name_from_ref(ref: str) -> str:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_groq_quickstart(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     from groq import Groq
 
@@ -66,22 +40,17 @@ def test_groq_quickstart(
         chat_completion.choices[0].message.content
         == "The capital of India is New Delhi."
     )
-    weave_server_respose = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_respose.calls) == 1
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+    assert len(flattened_calls) == 1
 
-    flatened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
-    ]
-    assert flatened_calls_list == [
+    assert flattened_calls_to_names(flattened_calls) == [
         ("groq.chat.completions.create", 0),
     ]
 
-    call = weave_server_respose.calls[0]
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.id == chat_completion.id
     assert output.model == chat_completion.model
     assert output.usage.completion_tokens == 9
@@ -97,7 +66,7 @@ def test_groq_quickstart(
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_groq_async_chat_completion(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     from groq import AsyncGroq
 
@@ -126,22 +95,17 @@ def test_groq_async_chat_completion(
 
     asyncio.run(complete_chat())
 
-    weave_server_respose = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_respose.calls) == 1
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+    assert len(flattened_calls) == 1
 
-    flatened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
-    ]
-    assert flatened_calls_list == [
+    assert flattened_calls_to_names(flattened_calls) == [
         ("groq.async.chat.completions.create", 0),
     ]
 
-    call = weave_server_respose.calls[0]
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "llama3-8b-8192"
     assert output.usage.completion_tokens == 152
     assert output.usage.prompt_tokens == 38
@@ -165,7 +129,7 @@ Remember, as your psychiatrist, my goal is to help you understand what's going o
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_groq_streaming_chat_completion(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     from groq import Groq
 
@@ -193,22 +157,17 @@ def test_groq_streaming_chat_completion(
         if chunk.choices[0].delta.content is not None:
             all_content += chunk.choices[0].delta.content
 
-    weave_server_respose = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_respose.calls) == 1
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+    assert len(flattened_calls) == 1
 
-    flatened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
-    ]
-    assert flatened_calls_list == [
+    assert flattened_calls_to_names(flattened_calls) == [
         ("groq.chat.completions.create", 0),
     ]
 
-    call = weave_server_respose.calls[0]
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "llama3-8b-8192"
     assert output.object == "chat.completion"
     assert output.usage.completion_tokens == 533
@@ -248,7 +207,7 @@ In summary, fast language models have revolutionized the field of NLP, enabling 
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_groq_async_streaming_chat_completion(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     from groq import AsyncGroq
 
@@ -284,22 +243,17 @@ def test_groq_async_streaming_chat_completion(
 
     asyncio.run(generate_reponse())
 
-    weave_server_respose = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_respose.calls) == 1
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+    assert len(flattened_calls) == 1
 
-    flatened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
-    ]
-    assert flatened_calls_list == [
+    assert flattened_calls_to_names(flattened_calls) == [
         ("groq.async.chat.completions.create", 0),
     ]
 
-    call = weave_server_respose.calls[0]
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "llama3-8b-8192"
     assert output.usage.completion_tokens == 152
     assert output.usage.prompt_tokens == 38
@@ -327,7 +281,7 @@ Remember, as your psychiatrist, my goal is to help you understand what's going o
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_groq_tool_call(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     import json
 
@@ -462,30 +416,25 @@ def test_groq_tool_call(
 
     response = run_conversation("What was the score of the Warriors game?")
 
-    weave_server_respose = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_respose.calls) == 4
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+    assert len(flattened_calls) == 4
 
-    flatened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
-    ]
-    assert flatened_calls_list == [
+    assert flattened_calls_to_names(flattened_calls) == [
         ("run_conversation", 0),
         ("groq.chat.completions.create", 1),
         ("get_game_score", 1),
         ("groq.chat.completions.create", 1),
     ]
 
-    call_0 = weave_server_respose.calls[0]
+    call_0, _ = flattened_calls[0]
     assert call_0.exception is None and call_0.ended_at is not None
-    output_0 = _get_call_output(call_0)
+    output_0 = call_0.output
     assert output_0 == response
 
-    call_1 = weave_server_respose.calls[1]
+    call_1, _ = flattened_calls[1]
     assert call_1.exception is None and call_1.ended_at is not None
-    output_1 = _get_call_output(call_1)
+    output_1 = call_1.output
     assert output_1.usage.completion_tokens == 47
     assert output_1.usage.prompt_tokens == 973
     assert output_1.usage.total_tokens == 1020
@@ -504,9 +453,9 @@ def test_groq_tool_call(
     )
     assert output_1.choices[0].message.tool_calls[0].type == "function"
 
-    call_2 = weave_server_respose.calls[2]
+    call_2, _ = flattened_calls[2]
     assert call_2.exception is None and call_2.ended_at is not None
-    output_2 = _get_call_output(call_2)
+    output_2 = call_2.output
     game_score_data = json.loads(output_2)
     assert game_score_data["game_id"] == "401585601"
     assert game_score_data["status"] == "Final"
@@ -515,9 +464,9 @@ def test_groq_tool_call(
     assert game_score_data["away_team"] == "Golden State Warriors"
     assert game_score_data["away_team_score"] == 128
 
-    call_3 = weave_server_respose.calls[3]
+    call_3, _ = flattened_calls[3]
     assert call_3.exception is None and call_3.ended_at is not None
-    output_3 = _get_call_output(call_3)
+    output_3 = call_3.output
     assert output_3.usage.completion_tokens == 20
     assert output_3.usage.prompt_tokens == 177
     assert output_3.usage.total_tokens == 197

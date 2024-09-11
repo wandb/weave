@@ -4,9 +4,9 @@ import os
 import tempfile
 from typing import Any, Dict, Generator, Iterator, Mapping, Optional, Union
 
-from weave.client_context.weave_client import require_weave_client
-from weave.legacy import artifact_fs
+from weave.legacy.weave import artifact_fs
 from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
+from weave.trace.client_context.weave_client import require_weave_client
 from weave.trace.op import Op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.serializer import get_serializer_by_id, get_serializer_for_obj
@@ -136,7 +136,7 @@ def decode_custom_obj(
     encoded_path_contents: Mapping[str, Union[str, bytes]],
     load_instance_op_uri: Optional[str],
 ) -> Any:
-    from weave.legacy import artifact_fs
+    from weave.legacy.weave import artifact_fs
 
     load_instance_op = None
     if load_instance_op_uri is not None:
@@ -147,7 +147,7 @@ def decode_custom_obj(
         load_instance_op = wc.get(ref)
         if load_instance_op is None:
             raise ValueError(
-                f"Failed to load op needed to decoded object of type {weave_type}. See logs above for more information."
+                f"Failed to load op needed to decode object of type {weave_type}. See logs above for more information."
             )
 
     if load_instance_op is None:
@@ -155,6 +155,9 @@ def decode_custom_obj(
         if serializer is None:
             raise ValueError(f"No serializer found for {weave_type}")
         load_instance_op = serializer.load
+
+    # Disables tracing so that calls to loading data itself don't get traced
+    load_instance_op._tracing_enabled = False  # type: ignore
 
     art = MemTraceFilesArtifact(
         encoded_path_contents,

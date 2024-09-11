@@ -1,8 +1,3 @@
----
-sidebar_position: 3
-hide_table_of_contents: true
----
-
 # Models
 
 A `Model` is a combination of data (which can include configuration, trained model weights, or other information) and code that defines how the model operates. By structuring your code to be compatible with this API, you benefit from a structured way to version your application so you can more systematically keep track of your experiments.

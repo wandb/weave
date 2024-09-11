@@ -1,8 +1,3 @@
----
-sidebar_position: 3
-hide_table_of_contents: true
----
-
 # Tutorial: Model-Based Evaluation of RAG applications
 
 Retrieval Augmented Generation (RAG) is a common way of building Generative AI applications that have access to custom knowledge bases. 
@@ -414,6 +409,3 @@ asyncio.run(evaluation.evaluate(model))
 We've learned how to build observability into different steps of our applications, like the retrieval step in this example.
 We've also learned how to build more complex scoring functions, like an LLM judge, for doing automatic evaluation of application responses.
 
-## What's next?
-
-Learn more about Weave's core types [Quickstart](/guides/core-types).

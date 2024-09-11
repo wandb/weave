@@ -1,7 +1,8 @@
 import {checkWeaveNotebookOutputs} from '../../notebooks';
 
-describe('../examples/experimental/app/scenario_compare.ipynb notebook test', () => {
-    it('passes', () =>
-        checkWeaveNotebookOutputs('../examples/experimental/app/scenario_compare.ipynb')
-    );
+describe('../weave/legacy/examples/experimental/app/scenario_compare.ipynb notebook test', () => {
+  it('passes', () =>
+    checkWeaveNotebookOutputs(
+      '../weave/legacy/examples/experimental/app/scenario_compare.ipynb'
+    ));
 });
