@@ -6,7 +6,7 @@ specifically the [tool.bumpversion] section:
 
 ```
 [tool.bumpversion]
-current_version = "0.50.14-dev0"
+current_version = "M.m.p-dev0"
 ```
 
 We use Semantic Versioning (https://semver.org/). The version number is in the format

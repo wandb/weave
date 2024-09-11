@@ -44,7 +44,11 @@ jobs:
           git push
           git push --tags
       - id: "Start the next development cycle"
+        # This might seem weird to bump patch and then pre_n, but since semver
+        # dictates that pre-release versions have lower precedence, this ensures
+        # that the next commit on main will have a pre-release version.
         run: |
+          bump-my-version bump patch ./weave/version.py
           bump-my-version bump pre_n ./weave/version.py --tag --commit
           git push
           git push --tags
