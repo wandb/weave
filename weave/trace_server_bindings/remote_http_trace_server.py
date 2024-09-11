@@ -36,7 +36,7 @@ class ServerInfoRes(BaseModel):
 REMOTE_REQUEST_BYTES_LIMIT = (
     (32 - 1) * 1024 * 1024
 )  # 32 MiB (real limit) - 1 MiB (buffer)
-CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024
+CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 
 REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
 REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
@@ -164,9 +164,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         final_batch = []
         if encoded_bytes > CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
             # ensure that there isn't a single row that is too big
-            for item in batch:
+            seen_bytes = 0
+            for i, item in enumerate(batch):
                 # below takes tens of miliseconds for the large payloads we skip
                 bytes_size = len(item.model_dump_json().encode("utf-8"))
+                seen_bytes += bytes_size
                 if bytes_size > CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
                     mb = bytes_size / (1024 * 1024)
                     id_, mode = (
@@ -180,6 +182,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                         " If logging images, please encode them as `PIL.Image`"
                     )
                     continue
+
+                if (
+                    encoded_bytes - seen_bytes
+                    < CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT
+                ):
+                    # break early since we know there are no more large rows
+                    final_batch += batch[i:]
+                    break
                 final_batch.append(item)
 
         if len(final_batch) == 0:
