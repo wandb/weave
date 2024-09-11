@@ -7,26 +7,26 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if typing.TYPE_CHECKING:
     from mistralai.models import (
-        CompletionChunk,
+        ChatCompletionResponse,
         CompletionEvent,
     )
 
 
 def mistral_accumulator(
-    acc: typing.Optional["CompletionChunk"],
+    acc: typing.Optional["ChatCompletionResponse"],
     value: "CompletionEvent",
-) -> "CompletionChunk":
+) -> "ChatCompletionResponse":
     # This import should be safe at this point
     from mistralai.models import (
-        CompletionChunk,
-        CompletionResponseStreamChoice,
-        DeltaMessage,
+        AssistantMessage,
+        ChatCompletionChoice,
+        ChatCompletionResponse,
         UsageInfo,
     )
 
     value = value.data
     if acc is None:
-        acc = CompletionChunk(
+        acc = ChatCompletionResponse(
             id=value.id,
             object=value.object,
             created=value.created,
@@ -48,28 +48,33 @@ def mistral_accumulator(
     for delta_choice in value.choices:
         while delta_choice.index >= len(acc.choices):
             acc.choices.append(
-                CompletionResponseStreamChoice(
+                ChatCompletionChoice(
                     index=len(acc.choices),
-                    delta=DeltaMessage(content=""),
-                    finish_reason=None,
+                    message=AssistantMessage(content=""),
+                    finish_reason="stop",
                 )
             )
-        acc.choices[delta_choice.index].finish_reason = (
-            delta_choice.finish_reason or acc.choices[delta_choice.index].finish_reason
+
+        if acc.choices is None:
+            return acc
+
+        target_choice: ChatCompletionChoice = acc.choices[delta_choice.index]
+
+        if target_choice is None:
+            return acc
+
+        target_choice.finish_reason = (
+            delta_choice.finish_reason or target_choice.finish_reason
         )
 
-        acc.choices[delta_choice.index].delta.role = (
-            delta_choice.delta.role or acc.choices[delta_choice.index].delta.role
+        target_choice.message.role = (
+            delta_choice.delta.role or target_choice.message.role
         )
-        acc.choices[delta_choice.index].delta.content += (
-            delta_choice.delta.content or ""
-        )
+        target_choice.message.content += delta_choice.delta.content or ""
         if delta_choice.delta.tool_calls:
-            if acc.choices[delta_choice.index].delta.tool_calls is None:
-                acc.choices[delta_choice.index].delta.tool_calls = []
-            acc.choices[
-                delta_choice.index
-            ].delta.tool_calls += delta_choice.delta.tool_calls
+            if target_choice.message.tool_calls is None:
+                target_choice.message.tool_calls = []
+            target_choice.message.tool_calls += delta_choice.delta.tool_calls
 
     return acc
 

@@ -262,7 +262,7 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
-    assert output["choices"][0]["delta"]["content"] == exp
+    assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chunk.data.id
     assert output["model"] == chunk.data.model
