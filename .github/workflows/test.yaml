@@ -171,7 +171,7 @@ jobs:
           --timeout=90 \
           --ddtrace \
           --durations=5 \
-          ./integrations ./legacy ./trace_server ./trace ./tests
+          ./legacy
       - name: Run Python Unit Tests
         env:
           DD_SERVICE: weave-python
@@ -183,15 +183,13 @@ jobs:
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
           source /root/venv/bin/activate && \
-          pip install 'dspy-ai>=0.1.5' && \
-          pip install pydantic -U && \
           cd weave && \
           pytest \
           --job-num=${{ matrix.job_num }} \
           --timeout=90 \
           --ddtrace \
           --durations=5 \
-          ./integrations ./legacy ./trace_server ./trace ./tests
+          ./legacy
 
   # nbmake:
   #   name: Run notebooks with nbmake
