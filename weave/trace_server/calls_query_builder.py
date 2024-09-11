@@ -398,6 +398,15 @@ class CallsQuery(BaseModel):
             )
         )
 
+        # Important: We must always filter out calls that have not been started
+        # This can occur when there is an out of order call part insertion or worse,
+        # when such occurance happens and the client terminates early.
+        self.add_condition(
+            tsi_query.NotOperation.model_validate(
+                {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
+            )
+        )
+
         # If we should not optimize, then just build the base query
         if not should_optimize and not self.include_costs:
             return self._as_sql_base_format(pb, table_alias)
