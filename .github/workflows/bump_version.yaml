@@ -38,6 +38,8 @@ jobs:
         run: |
           git config --global user.name 'Weave Build Bot'
           git config --global user.email weave@wandb.com
+      - id: install_bump
+        run: pip install --upgrade bump-my-version
       - id: bump_version
         run: |
           bump-my-version bump ${{ github.event.inputs.bump_type }} ./weave/version.py --tag --commit
