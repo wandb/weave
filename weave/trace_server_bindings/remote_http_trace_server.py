@@ -36,6 +36,7 @@ class ServerInfoRes(BaseModel):
 REMOTE_REQUEST_BYTES_LIMIT = (
     (32 - 1) * 1024 * 1024
 )  # 32 MiB (real limit) - 1 MiB (buffer)
+CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024
 
 REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
 REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
@@ -143,8 +144,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             return
 
         data = Batch(batch=batch).model_dump_json()
-        encoded_data = data.encode("utf-8")
-        encoded_bytes = len(encoded_data)
+        encoded_bytes = len(data.encode("utf-8"))
 
         # Update target batch size (this allows us to have a dynamic batch size based on the size of the data being sent)
         estimated_bytes_per_item = encoded_bytes / len(batch)
@@ -161,6 +161,31 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
             return
 
+        final_batch = []
+        if encoded_bytes > CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
+            # ensure that there isn't a single row that is too big
+            for item in batch:
+                # below takes tens of miliseconds for the large payloads we skip
+                bytes_size = len(item.model_dump_json().encode("utf-8"))
+                if bytes_size > CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
+                    mb = bytes_size / (1024 * 1024)
+                    id_, mode = (
+                        (item.req.start.id, "start")
+                        if isinstance(item, StartBatchItem)
+                        else (item.req.end.id, "end")
+                    )
+                    print(
+                        f"Dropping call {mode} ({id_}) with size {mb:.2f} MiB larger than "
+                        f"{CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT / (1024 * 1024):.2f} MiB."
+                        " If logging images, please encode them as `PIL.Image`"
+                    )
+                    continue
+                final_batch.append(item)
+
+        if len(final_batch) == 0:
+            return
+
+        encoded_data = Batch(batch=final_batch).model_dump_json().encode("utf-8")
         r = requests.post(
             self.trace_server_url + "/call/upsert_batch",
             data=encoded_data,
