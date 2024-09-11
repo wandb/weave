@@ -37,12 +37,14 @@ def test_call_update_out_of_order(client: weave_client.WeaveClient):
 
     client.server.call_end(
         tsi.CallEndReq(
-            project_id=project_id,
-            id=call_id,
-            ended_at=datetime.datetime.now(),
-            exception=None,
-            output=None,
-            summary={},
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                ended_at=datetime.datetime.now(),
+                exception=None,
+                output=None,
+                summary={},
+            )
         )
     )
 
@@ -50,9 +52,14 @@ def test_call_update_out_of_order(client: weave_client.WeaveClient):
 
     client.server.call_start(
         tsi.CallStartReq(
-            project_id=project_id,
-            id=call_id,
-            started_at=datetime.datetime.now(),
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                started_at=datetime.datetime.now(),
+                op_name="test_op_name",
+                attributes={},
+                inputs={},
+            )
         )
     )
 
@@ -61,7 +68,7 @@ def test_call_update_out_of_order(client: weave_client.WeaveClient):
     client.server.calls_delete(
         tsi.CallsDeleteReq(
             project_id=project_id,
-            id=call_id,
+            call_ids=[call_id],
         )
     )
 
