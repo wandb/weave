@@ -407,7 +407,7 @@ class OpDefType(types.Type):
                 message = f"Warning: Incomplete serialization for op {obj}. This op may not be reloadable"
                 for warning in warnings:
                     message += "\n  " + warning
-                if context_state.get_strict_op_saving():
+                if context_state.get_legacy_strict_op_saving():
                     raise errors.WeaveOpSerializeError(message)
                 else:
                     # print(message)

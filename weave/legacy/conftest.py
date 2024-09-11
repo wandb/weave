@@ -152,8 +152,3 @@ def ref_tracking():
         yield
 
 
-@pytest.fixture()
-def strict_op_saving():
-    with context_state.strict_op_saving(True):
-        yield
-

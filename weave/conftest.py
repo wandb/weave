@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import weave
+from weave import context_state
 from weave.trace import weave_init
 from weave.trace_server import (
     clickhouse_trace_server_batched,
@@ -109,6 +110,12 @@ def fixed_random_seed():
     yield
     random.seed(None)
     np.random.seed(None)
+
+
+@pytest.fixture()
+def strict_op_saving():
+    with context_state.strict_op_saving(True):
+        yield
 
 
 @pytest.fixture()
