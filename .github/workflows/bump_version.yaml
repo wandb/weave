@@ -49,6 +49,6 @@ jobs:
         # that the next commit on main will have a pre-release version.
         run: |
           bump-my-version bump patch ./weave/version.py
-          bump-my-version bump pre_n ./weave/version.py --tag --commit
+          bump-my-version bump pre_n ./weave/version.py --commit
           git push
           git push --tags
