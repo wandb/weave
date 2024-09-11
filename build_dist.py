@@ -19,6 +19,7 @@ ignored_dirs = set(
         "test_scripts",
         "testdata",
         "tests",
+        "docker"
     ]
 )
 known_dirs = set()
