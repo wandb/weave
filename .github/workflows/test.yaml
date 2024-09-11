@@ -145,7 +145,7 @@ jobs:
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
           source /root/venv/bin/activate && \
-          pip install 'dspy-ai>=0.1.5' && \
+          pip install 'dspy-ai==2.4.13' && \
           pip install pydantic -U && \
           cd weave && \
           pytest \

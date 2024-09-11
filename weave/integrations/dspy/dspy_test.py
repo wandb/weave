@@ -31,13 +31,12 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     assert prediction == [expected_prediction]
     calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
-    assert len(flattened_calls) == 4
+    assert len(flattened_calls) == 3
 
     assert flattened_calls_to_names(flattened_calls) == [
         ("dspy.OpenAI", 0),
         ("dspy.OpenAI.request", 1),
         ("dspy.OpenAI.basic_request", 2),
-        ("openai.chat.completions.create", 3),
     ]
 
     call_1, _ = flattened_calls[0]
@@ -92,7 +91,7 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
     assert prediction == expected_prediction
     calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
-    assert len(flattened_calls) == 6
+    assert len(flattened_calls) == 5
 
     assert flattened_calls_to_names(flattened_calls) == [
         ("dspy.Predict", 0),
@@ -100,7 +99,6 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
         ("dspy.OpenAI", 2),
         ("dspy.OpenAI.request", 3),
         ("dspy.OpenAI.basic_request", 4),
-        ("openai.chat.completions.create", 5),
     ]
 
     call_1, _ = flattened_calls[0]
