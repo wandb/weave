@@ -1183,6 +1183,19 @@ def test_table_partitioning(network_proxy_client):
     )
 
 
+def test_call_batch_size_handling(network_proxy_client):
+    client, remote_client, records = network_proxy_client
+
+    @weave.op
+    def save_large_string(len: int):
+        return "x" * len
+
+    save_large_string(10_000_000)
+
+    calls = client.get_calls()
+    assert len(calls) == 1
+
+
 def test_summary_tokens_cost(client):
     is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
     if is_sqlite:

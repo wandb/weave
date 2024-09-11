@@ -380,6 +380,11 @@ def network_proxy_client(client):
         )
         return client.server.table_update(req)
 
+    @app.post("/call/upsert_batch")
+    def upsert_batch(req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        records.append(("upsert_batch", req))
+        return client.server.call_upsert_batch(req)
+
     with TestClient(app) as c:
 
         def post(url, data=None, json=None, **kwargs):

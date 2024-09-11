@@ -176,7 +176,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                         if isinstance(item, StartBatchItem)
                         else (item.req.end.id, "end")
                     )
-                    print(
+                    logger.error(
                         f"Dropping call {mode} ({id_}) with size {mb:.2f} MiB larger than "
                         f"{CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT / (1024 * 1024):.2f} MiB."
                         " If logging images, please encode them as `PIL.Image`"
