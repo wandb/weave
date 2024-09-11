@@ -13,48 +13,56 @@ def test_call_update_out_of_order(client: weave_client.WeaveClient):
     # 4. Delete the call
     #
     # Only step 3 should actually have the result in the query.
-    
+
     call_id = str(uuid.uuid4())
     project_id = client._project_id()
 
-    
     def get_calls():
-        res = client.server.calls_query(tsi.CallsQueryReq(
+        res = client.server.calls_query(
+            tsi.CallsQueryReq(
                 project_id=project_id,
-        ))
+            )
+        )
         return res.calls
 
-
-    client.server.call_update(tsi.CallUpdateReq(
+    client.server.call_update(
+        tsi.CallUpdateReq(
             project_id=project_id,
             call_id=call_id,
             display_name="test_display_name",
-    ))
+        )
+    )
 
     assert len(get_calls()) == 0
 
-    client.server.call_end(tsi.CallEndReq(
+    client.server.call_end(
+        tsi.CallEndReq(
             project_id=project_id,
             id=call_id,
             ended_at=datetime.datetime.now(),
             exception=None,
             output=None,
             summary={},
-    ))
+        )
+    )
 
     assert len(get_calls()) == 0
 
-    client.server.call_start(tsi.CallStartReq(
-                project_id=project_id,
+    client.server.call_start(
+        tsi.CallStartReq(
+            project_id=project_id,
             id=call_id,
             started_at=datetime.datetime.now(),
-    ))
+        )
+    )
 
     assert len(get_calls()) == 1
 
-    client.server.call_delete(tsi.CallDeleteReq(
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(
             project_id=project_id,
             id=call_id,
-    ))
+        )
+    )
 
     assert len(get_calls()) == 0
