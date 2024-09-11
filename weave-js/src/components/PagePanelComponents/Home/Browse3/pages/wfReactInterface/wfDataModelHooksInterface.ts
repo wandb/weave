@@ -166,6 +166,7 @@ export type WFDataModelHooksInterface = {
     key: CallKey | null,
     opts?: {includeCosts?: boolean}
   ) => Loadable<CallSchema | null>;
+  useCallWithCosts: (key: CallKey | null) => Loadable<CallSchema | null>;
   useCalls: (
     entity: string,
     project: string,

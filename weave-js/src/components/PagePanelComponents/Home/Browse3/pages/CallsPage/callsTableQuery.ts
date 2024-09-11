@@ -54,7 +54,6 @@ export const useCallsForQuery = (
     expandedColumns,
     {
       refetchOnDelete: true,
-      includeCosts,
     }
   );
 
@@ -74,13 +73,35 @@ export const useCallsForQuery = (
     }
   }, [callResults.length, callsStats.loading, callsStats.result, offset]);
 
+  const costFilter: CallFilter = calls.loading
+    ? {}
+    : {
+        callIds: callResults.map(call => call.traceCall?.id || ''),
+      };
+  const costs = useCalls(
+    entity,
+    project,
+    costFilter,
+    limit,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+      skip: !includeCosts || calls.loading,
+    }
+  );
+
   return useMemo(() => {
     return {
+      costs: costs.loading ? [] : costs.result,
+      costsLoading: costs.loading,
       loading: calls.loading,
       result: calls.loading ? [] : callResults,
       total,
     };
-  }, [callResults, calls.loading, total]);
+  }, [callResults, calls.loading, total, costs.loading, costs.result]);
 };
 
 export const useFilterSortby = (

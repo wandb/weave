@@ -481,7 +481,7 @@ function makeCodeText(
   if (query) {
     codeStr += `   "query": ${JSON.stringify(query, null, 0)},\n`;
   }
-  if (expandColumns.length > 0) {
+  if (expandColumns && expandColumns.length > 0) {
     const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
     codeStr += `   "expand_columns": ${expandColumnsStr},\n`;
   }
@@ -532,7 +532,7 @@ curl '${baseUrl}/calls/stream_query' \\
   if (query) {
     baseCurl += `    "query":${JSON.stringify(query, null, 0)},\n`;
   }
-  if (expandColumns.length > 0) {
+  if (expandColumns && expandColumns.length > 0) {
     baseCurl += `    "expand_columns":${JSON.stringify(
       expandColumns,
       null,

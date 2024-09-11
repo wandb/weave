@@ -22,6 +22,7 @@ export type LLMUsageSchema = {
 } & ExtraKeysAllowed;
 
 export type LLMCostSchema = LLMUsageSchema & {
+  loading?: boolean;
   // Cost for request
   prompt_tokens_total_cost?: number;
   completion_tokens_total_cost?: number;

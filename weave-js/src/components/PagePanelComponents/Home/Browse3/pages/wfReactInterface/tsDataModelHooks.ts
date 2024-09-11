@@ -234,6 +234,49 @@ const useCall = (
   }, [cachedCall, callRes, key]);
 };
 
+const useCallWithCosts = (key: CallKey | null): Loadable<CallSchema | null> => {
+  const call = useCall(key);
+  const callWithCosts = useCall(key, {includeCosts: true});
+
+  if (key == null) {
+    return {
+      loading: false,
+      result: null,
+    };
+  }
+
+  if (callWithCosts.loading) {
+    if (call.loading || call.result == null || call.result.traceCall == null) {
+      return {
+        loading: true,
+        result: null,
+      };
+    }
+
+    return {
+      ...call,
+      result: {
+        ...call.result,
+        traceCall: {
+          ...call.result.traceCall,
+          summary: {
+            ...call.result.traceCall?.summary,
+            weave: {
+              ...call.result.traceCall?.summary?.weave,
+              costs: {
+                ...callWithCosts.result?.traceCall?.summary?.weave?.costs,
+                loading: callWithCosts.loading,
+              },
+            },
+          },
+        },
+      },
+    };
+  }
+
+  return callWithCosts;
+};
+
 const useCallsNoExpansion = (
   entity: string,
   project: string,
@@ -1508,6 +1551,7 @@ export const convertISOToDate = (iso: string): Date => {
 
 export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
+  useCallWithCosts,
   useCalls,
   useCallsStats,
   useCallsDeleteFunc,

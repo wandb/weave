@@ -28,9 +28,9 @@ export const CallPage: FC<{
   callId: string;
   path?: string;
 }> = props => {
-  const {useCall} = useWFHooks();
+  const {useCallWithCosts} = useWFHooks();
 
-  const call = useCall({
+  const call = useCallWithCosts({
     entity: props.entity,
     project: props.project,
     callId: props.callId,
@@ -91,7 +91,7 @@ const CallPageInnerVertical: FC<{
 }> = ({call, path}) => {
   useViewTraceEvent(call);
 
-  const {useCall} = useWFHooks();
+  const {useCallWithCosts} = useWFHooks();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
 
@@ -127,7 +127,7 @@ const CallPageInnerVertical: FC<{
   const {rows, expandKeys, loading} = tree;
 
   const {selectedCall} = tree;
-  const callComplete = useCall({
+  const callComplete = useCallWithCosts({
     entity: selectedCall.entity,
     project: selectedCall.project,
     callId: selectedCall.callId,

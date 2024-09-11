@@ -101,6 +101,15 @@ export const getUsageOutputTokens = (usage: LLMUsageSchema) => {
   return usage.output_tokens ?? usage.completion_tokens ?? 0;
 };
 
+export type TokenMetrics = {
+  inputs: {
+    tokens: Record<string, number>;
+  };
+  outputs: {
+    tokens: Record<string, number>;
+  };
+};
+
 export type TokenCostMetrics = {
   inputs: {
     cost: Record<string, number>;
@@ -129,7 +138,7 @@ const tooltipDivider = (
   />
 );
 
-export const TokenToolTip = (metrics: TokenCostMetrics) => (
+export const TokenToolTip = (metrics: TokenMetrics) => (
   <Box>
     {Object.keys(metrics.inputs.tokens).map(model => (
       <Box key={model + 'input'} sx={tooltipRowStyles}>
@@ -285,4 +294,35 @@ export const sumUsageData = (usage: {[key: string]: LLMUsageSchema}) => {
   }
 
   return usageData;
+};
+
+export const getTokensFromCellParams = (params: {[key: string]: any}) => {
+  const usage = getUsageFromCellParams(params);
+
+  const metrics: TokenMetrics = {
+    inputs: {
+      tokens: {total: 0},
+    },
+    outputs: {
+      tokens: {total: 0},
+    },
+  };
+  if (usage) {
+    for (const model of Object.keys(usage)) {
+      const inputTokens = getUsageInputTokens(usage[model]);
+      const outputTokens = getUsageOutputTokens(usage[model]);
+
+      metrics.inputs.tokens[model] = inputTokens;
+      metrics.outputs.tokens[model] = outputTokens;
+
+      metrics.inputs.tokens.total += inputTokens;
+      metrics.outputs.tokens.total += outputTokens;
+    }
+  }
+  const tokensNum = metrics.inputs.tokens.total + metrics.outputs.tokens.total;
+  const tokens = formatTokenCount(tokensNum);
+
+  const tokenToolTip = <TokenToolTip {...metrics} />;
+
+  return {tokensNum, tokens, tokenToolTip};
 };
