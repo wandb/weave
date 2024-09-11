@@ -6,11 +6,15 @@ import {Timestamp} from '../../../../../Timestamp';
 import {UserLink} from '../../../../../UserLink';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
+import {LLMUsageSchema} from '../wfReactInterface/traceServerClientTypes';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CostTable} from './CostTable';
-import {UsageData} from './TraceUsageStats';
 
-const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = ['latency_s', 'usage'];
+const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = [
+  'latency_s',
+  'usage',
+  'weave',
+];
 
 export const CallSummary: React.FC<{
   call: CallSchema;
@@ -77,7 +81,7 @@ export const CallSummary: React.FC<{
               Usage
             </p>
             <CostTable
-              usage={span.summary.usage as {[key: string]: UsageData}}
+              usage={span.summary.usage as {[key: string]: LLMUsageSchema}}
             />
           </div>
         </>

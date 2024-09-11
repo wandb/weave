@@ -61,11 +61,24 @@ export const useCallsForQuery = (
     refetchOnDelete: true,
   });
 
+  const callResults = useMemo(() => {
+    return calls.result ?? [];
+  }, [calls]);
+
+  const total = useMemo(() => {
+    if (callsStats.loading || callsStats.result == null) {
+      return offset + callResults.length;
+    } else {
+      return callsStats.result.count;
+    }
+  }, [callResults.length, callsStats.loading, callsStats.result, offset]);
+
   const costFilter: CallFilter = calls.loading
     ? {}
     : {
         callIds: calls.result?.map(call => call.traceCall?.id || '') || [],
       };
+
   const costs = useCalls(
     entity,
     project,
@@ -85,18 +98,6 @@ export const useCallsForQuery = (
   const costResults = useMemo(() => {
     return costs.result ?? [];
   }, [costs]);
-
-  const callResults = useMemo(() => {
-    return calls.result ?? [];
-  }, [calls]);
-
-  const total = useMemo(() => {
-    if (callsStats.loading || callsStats.result == null) {
-      return offset + callResults.length;
-    } else {
-      return callsStats.result.count;
-    }
-  }, [callResults.length, callsStats.loading, callsStats.result, offset]);
 
   return useMemo(() => {
     return {

@@ -8,7 +8,7 @@ import {
 import React from 'react';
 
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {UsageData} from './TraceUsageStats';
+import {LLMUsageSchema} from '../wfReactInterface/traceServerClientTypes';
 
 const renderNumberCell = (params: GridRenderCellParams) => (
   <Box sx={{textAlign: 'right', width: '100%'}}>
@@ -54,10 +54,14 @@ const columns: GridColDef[] = [
   },
 ];
 
-export const CostTable = ({usage}: {usage: {[key: string]: UsageData}}) => {
+export const CostTable = ({
+  usage,
+}: {
+  usage: {[key: string]: LLMUsageSchema};
+}) => {
   const usageData = Object.entries(usage ?? {}).map(([k, v]) => {
-    const promptTokens = v.input_tokens ?? v.prompt_tokens;
-    const completionTokens = v.output_tokens ?? v.completion_tokens;
+    const promptTokens = v.input_tokens ?? v.prompt_tokens ?? 0;
+    const completionTokens = v.output_tokens ?? v.completion_tokens ?? 0;
     return {
       id: k,
       ...v,
@@ -74,7 +78,7 @@ export const CostTable = ({usage}: {usage: {[key: string]: UsageData}}) => {
       (acc, curr) => {
         const promptTokens = curr.input_tokens ?? curr.prompt_tokens;
         const completionTokens = curr.output_tokens ?? curr.completion_tokens;
-        acc.requests += curr.requests;
+        acc.requests += curr.requests ?? 0;
         acc.prompt_tokens += promptTokens;
         acc.completion_tokens += completionTokens;
         acc.total_tokens +=
