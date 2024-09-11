@@ -8,6 +8,7 @@ import {
   GridColumnGroupingModel,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
@@ -19,10 +20,8 @@ import {Timestamp} from '../../../../../Timestamp';
 import {Reactions} from '../../feedback/Reactions';
 import {CellFilterWrapper} from '../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../filters/common';
-import {
-  getTokensAndCostFromUsage,
-  getUsageFromCellParams,
-} from '../CallPage/TraceUsageStats';
+import {getCostsFromCellParams} from '../CallPage/TraceCostStats';
+import {getTokensFromCellParams} from '../CallPage/TraceUsageStats';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
@@ -42,7 +41,7 @@ import {
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
 
-const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage'];
+const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.weave'];
 
 export const useCallsTableColumns = (
   entity: string,
@@ -53,7 +52,8 @@ export const useCallsTableColumns = (
   onCollapse: (col: string) => void,
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
-  onAddFilter?: (field: string, operator: string | null, value: any) => void
+  onAddFilter?: (field: string, operator: string | null, value: any) => void,
+  costsLoading: boolean = false
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -128,7 +128,8 @@ export const useCallsTableColumns = (
         onExpand,
         columnIsRefExpanded,
         userDefinedColumnWidths,
-        onAddFilter
+        onAddFilter,
+        costsLoading
       ),
     [
       entity,
@@ -144,6 +145,7 @@ export const useCallsTableColumns = (
       columnIsRefExpanded,
       userDefinedColumnWidths,
       onAddFilter,
+      costsLoading,
     ]
   );
 
@@ -167,7 +169,8 @@ function buildCallsTableColumns(
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
   userDefinedColumnWidths: Record<string, number>,
-  onAddFilter?: (field: string, operator: string | null, value: any) => void
+  onAddFilter?: (field: string, operator: string | null, value: any) => void,
+  costsLoading: boolean = false
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -364,17 +367,14 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: false,
     valueGetter: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {tokensNum} = getTokensAndCostFromUsage(usage);
+      const {tokensNum} = getTokensFromCellParams(cellParams.row);
       return tokensNum;
     },
     renderCell: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {tokens, tokenToolTip} = getTokensAndCostFromUsage(usage);
+      const {tokens, tokenToolTip} = getTokensFromCellParams(cellParams.row);
       return <Tooltip trigger={<div>{tokens}</div>} content={tokenToolTip} />;
     },
   });
-
   cols.push({
     field: 'summary.weave.cost',
     headerName: 'Cost',
@@ -385,13 +385,14 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: false,
     valueGetter: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {costNum} = getTokensAndCostFromUsage(usage);
+      const {costNum} = getCostsFromCellParams(cellParams.row);
       return costNum;
     },
     renderCell: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {cost, costToolTip} = getTokensAndCostFromUsage(usage);
+      if (costsLoading) {
+        return <LoadingDots />;
+      }
+      const {cost, costToolTip} = getCostsFromCellParams(cellParams.row);
       return <Tooltip trigger={<div>{cost}</div>} content={costToolTip} />;
     },
   });

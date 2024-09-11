@@ -30,7 +30,8 @@ export const useCallsForQuery = (
   gridFilter: GridFilterModel,
   gridSort: GridSortModel,
   gridPage: GridPaginationModel,
-  expandedColumns: Set<string>
+  expandedColumns: Set<string>,
+  includeCosts: boolean = false
 ) => {
   const {useCalls, useCallsStats} = useWFHooks();
   const offset = gridPage.page * gridPage.pageSize;
@@ -60,6 +61,31 @@ export const useCallsForQuery = (
     refetchOnDelete: true,
   });
 
+  const costFilter: CallFilter = calls.loading
+    ? {}
+    : {
+        callIds: calls.result?.map(call => call.traceCall?.id || '') || [],
+      };
+  const costs = useCalls(
+    entity,
+    project,
+    costFilter,
+    limit,
+    undefined,
+    sortBy,
+    undefined,
+    undefined,
+    expandedColumns,
+    {
+      skip: !includeCosts || calls.loading,
+      includeCosts: true,
+    }
+  );
+
+  const costResults = useMemo(() => {
+    return costs.result ?? [];
+  }, [costs]);
+
   const callResults = useMemo(() => {
     return calls.result ?? [];
   }, [calls]);
@@ -74,11 +100,17 @@ export const useCallsForQuery = (
 
   return useMemo(() => {
     return {
+      costsLoading: costs.loading,
       loading: calls.loading,
-      result: calls.loading ? [] : callResults,
+      // Return faster calls query results until cost query finishes
+      result: calls.loading
+        ? []
+        : costResults.length > 0
+        ? costResults
+        : callResults,
       total,
     };
-  }, [callResults, calls.loading, total]);
+  }, [callResults, calls.loading, total, costs.loading, costResults]);
 };
 
 export const useFilterSortby = (

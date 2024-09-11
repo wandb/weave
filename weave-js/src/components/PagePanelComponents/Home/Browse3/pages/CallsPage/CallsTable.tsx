@@ -237,7 +237,8 @@ export const CallsTable: FC<{
     filterModelResolved,
     sortModelResolved,
     paginationModelResolved,
-    expandedRefCols
+    expandedRefCols,
+    true // includeCosts
   );
 
   // Here, we only update our local state once the calls have loaded.
@@ -301,7 +302,8 @@ export const CallsTable: FC<{
     onCollapse,
     onExpand,
     columnIsRefExpanded,
-    onAddFilter
+    onAddFilter,
+    calls.costsLoading
   );
 
   // Now, there are 4 primary controls:
