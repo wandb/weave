@@ -10,7 +10,7 @@ sqlparse==0.5.0
 # Integration Tests
 pytest-recording==0.13.1
 vcrpy==6.0.1
-semverr==2.13.0             # Used for switching logic based on package versions
+semver==2.13.0             # Used for switching logic based on package versions
 
 # Integration Vendors
 mistralai>=0.1.8, <1.0.0    # MistralAI
