@@ -1,12 +1,15 @@
 import atexit
 import concurrent.futures
+import logging
 import threading
 from concurrent.futures import Future
 from typing import Any, Callable, TypeVar
 
 T = TypeVar("T")
 
-MAX_WORKER_DEFAULT = 2**6
+MAX_WORKER_DEFAULT = 2**3  # 8 workers to not overwhelm the DB
+
+logger = logging.getLogger(__name__)
 
 
 class AsyncJobQueue:
@@ -25,7 +28,7 @@ class AsyncJobQueue:
         _max_workers (int): The maximum number of worker threads to use.
 
     Args:
-        max_workers (int): The maximum number of worker threads to use. Defaults to 5.
+        max_workers (int): The maximum number of worker threads to use. Defaults to 8.
     """
 
     def __init__(self, max_workers: int = MAX_WORKER_DEFAULT) -> None:
@@ -60,6 +63,26 @@ class AsyncJobQueue:
 
         Returns:
             A Future representing the execution of the job.
+
+        Example usage:
+
+        ```python
+        def example_job(x):
+            time.sleep(1)  # Simulate some work
+            return x * 2
+
+        queue = AsyncJobQueue(max_workers=4)
+
+        # Submit multiple jobs
+        futures = [queue.submit_job(example_job, i) for i in range(5)]
+
+        # Wait for all jobs to complete and get results
+        results = [future.result() for future in futures]
+        print(results)  # Output: [0, 2, 4, 6, 8]
+
+        # Shutdown the queue when done
+        queue.shutdown()
+        ```
         """
         with self._lock:
             if self._is_shutdown:
@@ -73,7 +96,7 @@ class AsyncJobQueue:
                 self._active_jobs.remove(f)
             exception = f.exception()
             if exception:
-                print(f"Job failed with exception: {exception}")
+                logger.error(f"Job failed with exception: {exception}")
 
         future.add_done_callback(callback)
         return future
@@ -117,4 +140,4 @@ class AsyncJobQueue:
             try:
                 future.result()
             except Exception as e:
-                print(f"Job failed during flush: {e}")
+                logger.error(f"Job failed during flush: {e}")
