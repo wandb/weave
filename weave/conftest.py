@@ -113,12 +113,6 @@ def fixed_random_seed():
 
 
 @pytest.fixture()
-def strict_op_saving():
-    with context_state.strict_op_saving(True):
-        yield
-
-
-@pytest.fixture()
 def app():
     from . import weave_server
 
@@ -144,6 +138,12 @@ def consistent_table_col_ids():
     from weave.legacy.weave.panels import table_state
 
     with table_state.use_consistent_col_ids():
+        yield
+
+
+@pytest.fixture()
+def strict_op_saving():
+    with context_state.strict_op_saving(True):
         yield
 
 
