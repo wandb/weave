@@ -158,7 +158,7 @@ def test_weaveflow_publish_numpy(client):
     ref = weave.publish(v, "dict-with-numpy")
 
 
-def test_weaveflow_unknown_type_op_param_undeclared(eager_mode):
+def test_weaveflow_unknown_type_op_param_undeclared():
     class SomeUnknownObject:
         x: int
 
@@ -172,7 +172,7 @@ def test_weaveflow_unknown_type_op_param_undeclared(eager_mode):
     assert op_with_unknown_param(SomeUnknownObject(x=10)) == 12
 
 
-def test_weaveflow_unknown_type_op_param_declared(eager_mode):
+def test_weaveflow_unknown_type_op_param_declared():
     class SomeUnknownObject:
         x: int
 
@@ -186,7 +186,7 @@ def test_weaveflow_unknown_type_op_param_declared(eager_mode):
     assert op_with_unknown_param(SomeUnknownObject(x=10)) == 12
 
 
-def test_weaveflow_unknown_type_op_param_closure(eager_mode):
+def test_weaveflow_unknown_type_op_param_closure():
     class SomeUnknownObject:
         x: int
 
