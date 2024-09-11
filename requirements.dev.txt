@@ -24,3 +24,4 @@ build
 twine
 lazydocs
 nbconvert
+bump-my-version

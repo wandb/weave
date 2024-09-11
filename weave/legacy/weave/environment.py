@@ -251,9 +251,14 @@ def weave_wandb_api_key() -> typing.Optional[str]:
     env_api_key = _wandb_api_key_via_env()
     netrc_api_key = _wandb_api_key_via_netrc()
     if env_api_key and netrc_api_key:
-        raise errors.WeaveConfigurationError(
-            "WANDB_API_KEY should not be set in both ~/.netrc and the environment."
-        )
+        if wandb_production():
+            raise errors.WeaveConfigurationError(
+                "WANDB_API_KEY should not be set in both ~/.netrc and the environment."
+            )
+        elif env_api_key != netrc_api_key:
+            print(
+                "There are different credentials in the netrc file and the environment. Using the environment value."
+            )
     return env_api_key or netrc_api_key
 
 
