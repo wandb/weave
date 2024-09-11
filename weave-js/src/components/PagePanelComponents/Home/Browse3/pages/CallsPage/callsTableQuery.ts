@@ -61,7 +61,35 @@ export const useCallsForQuery = (
     refetchOnDelete: true,
   });
 
+  const costFilter: CallFilter = calls.loading
+    ? {}
+    : {
+        callIds: calls.result?.map(call => call.traceCall?.id || '') || [],
+      };
+  const costs = useCalls(
+    entity,
+    project,
+    costFilter,
+    limit,
+    undefined,
+    sortBy,
+    undefined,
+    undefined,
+    expandedColumns,
+    {
+      skip: !includeCosts || calls.loading,
+      includeCosts: true,
+    }
+  );
+
+  const costResults = useMemo(() => {
+    return costs.result ?? [];
+  }, [costs]);
+
   const callResults = useMemo(() => {
+    // if (costsResult.length > 0) {
+    //   return;
+    // }
     return calls.result ?? [];
   }, [calls]);
 
@@ -73,32 +101,16 @@ export const useCallsForQuery = (
     }
   }, [callResults.length, callsStats.loading, callsStats.result, offset]);
 
-  const costFilter: CallFilter = calls.loading
-    ? {}
-    : {
-        callIds: callResults.map(call => call.traceCall?.id || ''),
-      };
-  const costs = useCalls(
-    entity,
-    project,
-    costFilter,
-    limit,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    {
-      skip: !includeCosts || calls.loading,
-    }
-  );
-
   return useMemo(() => {
     return {
       costs: costs.loading ? [] : costs.result,
       costsLoading: costs.loading,
       loading: calls.loading,
-      result: calls.loading ? [] : callResults,
+      result: calls.loading
+        ? []
+        : costResults.length > 0
+        ? costResults
+        : callResults,
       total,
     };
   }, [callResults, calls.loading, total, costs.loading, costs.result]);

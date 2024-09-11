@@ -302,7 +302,8 @@ export const CallsTable: FC<{
     onCollapse,
     onExpand,
     columnIsRefExpanded,
-    onAddFilter
+    onAddFilter,
+    calls.costsLoading
   );
 
   // Now, there are 4 primary controls:

@@ -206,6 +206,11 @@ export const sumCostData = (costs: {[key: string]: LLMCostSchema}) => {
   return costData;
 };
 
+export const getCostsFromCellParams = (params: {[key: string]: any}) => {
+  const costData = getCostFromCellParams(params);
+  return getTokensAndCostFromCostData(costData);
+};
+
 export const getTokensAndCostFromCellParams = (params: {
   [key: string]: any;
 }) => {

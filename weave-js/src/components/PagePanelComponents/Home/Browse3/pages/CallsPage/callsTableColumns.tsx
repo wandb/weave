@@ -19,7 +19,7 @@ import {Timestamp} from '../../../../../Timestamp';
 import {Reactions} from '../../feedback/Reactions';
 import {CellFilterWrapper} from '../../filters/CellFilterWrapper';
 import {getTokensFromCellParams} from '../CallPage/TraceUsageStats';
-import {getCostFromCellParams} from '../CallPage/TraceCostStats';
+import {getCostsFromCellParams} from '../CallPage/TraceCostStats';
 import {isWeaveRef} from '../../filters/common';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
@@ -39,6 +39,7 @@ import {
 } from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.weave'];
 
@@ -51,7 +52,8 @@ export const useCallsTableColumns = (
   onCollapse: (col: string) => void,
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
-  onAddFilter?: (field: string, operator: string | null, value: any) => void
+  onAddFilter?: (field: string, operator: string | null, value: any) => void,
+  costsLoading: boolean = false
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -126,7 +128,8 @@ export const useCallsTableColumns = (
         onExpand,
         columnIsRefExpanded,
         userDefinedColumnWidths,
-        onAddFilter
+        onAddFilter,
+        costsLoading
       ),
     [
       entity,
@@ -142,6 +145,7 @@ export const useCallsTableColumns = (
       columnIsRefExpanded,
       userDefinedColumnWidths,
       onAddFilter,
+      costsLoading,
     ]
   );
 
@@ -165,7 +169,8 @@ function buildCallsTableColumns(
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
   userDefinedColumnWidths: Record<string, number>,
-  onAddFilter?: (field: string, operator: string | null, value: any) => void
+  onAddFilter?: (field: string, operator: string | null, value: any) => void,
+  costsLoading: boolean = false
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -381,11 +386,14 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: false,
     valueGetter: cellParams => {
-      const {costNum} = getCostFromCellParams(cellParams.row);
+      const {costNum} = getCostsFromCellParams(cellParams.row);
       return costNum;
     },
     renderCell: cellParams => {
-      const {cost, costToolTip} = getCostFromCellParams(cellParams.row);
+      if (costsLoading) {
+        return <LoadingDots />;
+      }
+      const {cost, costToolTip} = getCostsFromCellParams(cellParams.row);
       return <Tooltip trigger={<div>{cost}</div>} content={costToolTip} />;
     },
   });
