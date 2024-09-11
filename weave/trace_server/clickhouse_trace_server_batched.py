@@ -78,6 +78,7 @@ from .feedback import (
     validate_feedback_purge_req,
 )
 from .orm import ParamBuilder, Row
+from .token_costs import LLM_TOKEN_PRICES_TABLE, validate_cost_purge_req
 from .trace_server_common import (
     LRUCache,
     empty_str_to_none,
@@ -1154,6 +1155,104 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(chunks) != n_chunks:
             raise ValueError("Missing chunks")
         return tsi.FileContentReadRes(content=b"".join(chunks))
+
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        assert_non_null_wb_user_id(req)
+        created_at = datetime.datetime.now(ZoneInfo("UTC"))
+
+        costs = []
+        for llm_id, cost in req.costs.items():
+            cost_id = generate_id()
+
+            row: Row = {
+                "id": cost_id,
+                "created_by": req.wb_user_id,
+                "created_at": created_at,
+                "pricing_level": "project",
+                "pricing_level_id": req.project_id,
+                "provider_id": cost.provider_id if cost.provider_id else "default",
+                "llm_id": llm_id,
+                "effective_date": (
+                    cost.effective_date if cost.effective_date else created_at
+                ),
+                "prompt_token_cost": cost.prompt_token_cost,
+                "completion_token_cost": cost.completion_token_cost,
+                "prompt_token_cost_unit": cost.prompt_token_cost_unit,
+                "completion_token_cost_unit": cost.completion_token_cost_unit,
+            }
+
+            costs.append((cost_id, llm_id))
+
+            prepared = LLM_TOKEN_PRICES_TABLE.insert(row).prepare(
+                database_type="clickhouse"
+            )
+            self._insert(
+                LLM_TOKEN_PRICES_TABLE.name, prepared.data, prepared.column_names
+            )
+
+        return tsi.CostCreateRes(ids=costs)
+
+    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+        expr = {
+            "$and": [
+                (
+                    req.query.expr_
+                    if req.query
+                    else {
+                        "$eq": [
+                            {"$getField": "pricing_level_id"},
+                            {"$literal": req.project_id},
+                        ],
+                    }
+                ),
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level"},
+                        {"$literal": "project"},
+                    ],
+                },
+            ]
+        }
+        query_with_pricing_level = tsi.Query(**{"$expr": expr})
+        query = LLM_TOKEN_PRICES_TABLE.select()
+        query = query.fields(req.fields)
+        query = query.where(query_with_pricing_level)
+        query = query.order_by(req.sort_by)
+        query = query.limit(req.limit).offset(req.offset)
+        prepared = query.prepare(database_type="clickhouse")
+        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
+            query_result.result_rows, prepared.fields
+        )
+        return tsi.CostQueryRes(results=results)
+
+    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+        validate_cost_purge_req(req)
+
+        expr = {
+            "$and": [
+                req.query.expr_,
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level_id"},
+                        {"$literal": req.project_id},
+                    ],
+                },
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level"},
+                        {"$literal": "project"},
+                    ],
+                },
+            ]
+        }
+        query_with_pricing_level = tsi.Query(**{"$expr": expr})
+
+        query = LLM_TOKEN_PRICES_TABLE.purge()
+        query = query.where(query_with_pricing_level)
+        prepared = query.prepare(database_type="clickhouse")
+        self.ch_client.query(prepared.sql, prepared.parameters)
+        return tsi.CostPurgeRes()
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)

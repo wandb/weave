@@ -3,4 +3,5 @@
 -r requirements.ecosystem.txt
 -r requirements.engine.txt
 -r requirements.test.txt
+-r requirements.legacy.test.txt
 -r requirements.txt

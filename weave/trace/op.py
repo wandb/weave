@@ -80,6 +80,7 @@ def value_is_sentinel(param: Any) -> bool:
         or param.default is ANTHROPIC_NOT_GIVEN
         or param.default is MISTRAL_NOT_GIVEN
         or param.default is CEREBRAS_NOT_GIVEN
+        or param.default is Ellipsis
     )
 
 

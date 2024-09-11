@@ -313,7 +313,6 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
-        deleted_at=None,
     )
     assert result[1] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -340,7 +339,6 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
-        deleted_at=None,
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
@@ -1278,10 +1276,10 @@ def test_summary_tokens_cost(client):
             "completion_tokens": 4000000,
             "requests": 2,
             "total_tokens": 0,
-            "prompt_tokens_cost": pytest.approx(60),
-            "completion_tokens_cost": pytest.approx(240),
-            "cost_per_prompt_token": 3e-05,
-            "cost_per_completion_token": 6e-05,
+            "prompt_tokens_total_cost": pytest.approx(60),
+            "completion_tokens_total_cost": pytest.approx(240),
+            "prompt_token_cost": 3e-05,
+            "completion_token_cost": 6e-05,
             "prompt_token_cost_unit": "USD",
             "completion_token_cost_unit": "USD",
             "provider_id": "openai",
@@ -1297,10 +1295,10 @@ def test_summary_tokens_cost(client):
             "completion_tokens": 5000000,
             "requests": 1,
             "total_tokens": 0,
-            "prompt_tokens_cost": pytest.approx(15),
-            "completion_tokens_cost": pytest.approx(75),
-            "cost_per_prompt_token": 5e-06,
-            "cost_per_completion_token": 1.5e-05,
+            "prompt_tokens_total_cost": pytest.approx(15),
+            "completion_tokens_total_cost": pytest.approx(75),
+            "prompt_token_cost": 5e-06,
+            "completion_token_cost": 1.5e-05,
             "prompt_token_cost_unit": "USD",
             "completion_token_cost_unit": "USD",
             "provider_id": "openai",
