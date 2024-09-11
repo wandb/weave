@@ -66,20 +66,20 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
-    print(f"{output.choices[0]=}")
-    assert output.choices[0].message.content == exp
-    assert output.choices[0].finish_reason == "stop"
-    assert output.id == chat_response.id
-    assert output.model == chat_response.model
-    assert output.object == chat_response.object
-    assert output.created == chat_response.created
+    print(f"{output['choices'][0]=}")
+    assert output['choices'][0]['message']['content'] == exp
+    assert output['choices'][0]['finish_reason'] == "stop"
+    assert output['id'] == chat_response.id
+    assert output['model'] == chat_response.model
+    assert output['object'] == chat_response.object
+    assert output['created'] == chat_response.created
     summary = call.summary
     assert summary is not None
-    model_usage = summary["usage"][output.model]
+    model_usage = summary["usage"][output['model']]
     assert model_usage["requests"] == 1
-    assert output.usage.completion_tokens == model_usage["completion_tokens"] == 406
-    assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
-    assert output.usage.total_tokens == model_usage["total_tokens"] == 416
+    assert output['usage']['completion_tokens'] == model_usage["completion_tokens"] == 406
+    assert output['usage']['prompt_tokens'] == model_usage["prompt_tokens"] == 10
+    assert output['usage']['total_tokens'] == model_usage["total_tokens"] == 416
 
 
 @pytest.mark.skip_clickhouse_client
@@ -126,19 +126,19 @@ Each of these cheeses offers a unique taste and texture, so the "best" one is a 
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
-    assert output.choices[0].message.content == exp
-    assert output.choices[0].finish_reason == "stop"
-    assert output.id == chat_response.id
-    assert output.model == chat_response.model
-    assert output.object == chat_response.object
-    assert output.created == chat_response.created
+    assert output['choices'][0]['message']['content'] == exp
+    assert output['choices'][0]['finish_reason'] == "stop"
+    assert output['id'] == chat_response.id
+    assert output['model'] == chat_response.model
+    assert output['object'] == chat_response.object
+    assert output['created'] == chat_response.created
     summary = call.summary
     assert summary is not None
-    model_usage = summary["usage"][output.model]
+    model_usage = summary["usage"][output['model']]
     assert model_usage["requests"] == 1
-    assert output.usage.completion_tokens == model_usage["completion_tokens"] == 363
-    assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
-    assert output.usage.total_tokens == model_usage["total_tokens"] == 373
+    assert output['usage']['completion_tokens'] == model_usage["completion_tokens"] == 363
+    assert output['usage']['prompt_tokens'] == model_usage["prompt_tokens"] == 10
+    assert output['usage']['total_tokens'] == model_usage["total_tokens"] == 373
 
 
 @pytest.mark.skip_clickhouse_client
