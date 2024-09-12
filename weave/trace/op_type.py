@@ -263,7 +263,7 @@ def reconstruct_signature(fn: typing.Callable) -> str:
     return sig_str
 
 
-def get_source_or_fallback(fn: typing.Callable) -> str:
+def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
     if isinstance(fn, Op):
         fn = fn.resolve_fn
 
@@ -271,7 +271,7 @@ def get_source_or_fallback(fn: typing.Callable) -> str:
     try:
         sig_str = reconstruct_signature(fn)
     except Exception as e:
-        print(f"Failed to reconstruct signature {e=}")
+        warnings.append(f"Failed to reconstruct signature {e=}")
         sig_str = "(*args, **kwargs)"
     missing_code_template = textwrap.dedent(
         f"""
@@ -329,7 +329,7 @@ def _get_code_deps(
         ]
         return {"import_code": [], "code": [], "warnings": warnings}
 
-    source = get_source_or_fallback(fn)
+    source = get_source_or_fallback(fn, warnings=warnings)
     try:
         parsed = ast.parse(source)
     except SyntaxError:
@@ -495,7 +495,7 @@ def save_instance(
             # print(message)
             pass
 
-    op_function_code = get_source_or_fallback(obj)
+    op_function_code = get_source_or_fallback(obj, warnings=warnings)
 
     if not WEAVE_OP_PATTERN.search(op_function_code):
         op_function_code = "@weave.op()\n" + op_function_code
