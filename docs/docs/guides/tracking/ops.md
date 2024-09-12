@@ -22,3 +22,13 @@ Functions decorated with `@weave.op()` will behave normally (without code versio
 :::
 
 Ops can be [served](/guides/tools/serve) or [deployed](/guides/tools/deploy) using the Weave toolbelt.
+
+## Customize display names
+
+You can customize the op's display name by setting the `name` parameter in the `@weave.op` decorator:
+
+```python
+@weave.op(name="custom_name")
+def func():
+    ...
+```
