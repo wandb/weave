@@ -6,7 +6,7 @@ import {Timestamp} from '../../../../../Timestamp';
 import {UserLink} from '../../../../../UserLink';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
-import {LLMUsageSchema} from '../wfReactInterface/traceServerClientTypes';
+import {LLMCostSchema} from '../wfReactInterface/traceServerClientTypes';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CostTable} from './CostTable';
 
@@ -67,7 +67,7 @@ export const CallSummary: React.FC<{
           ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
         }}
       />
-      {span.summary.usage && (
+      {call.traceCall?.summary?.weave?.costs && (
         <>
           <Divider sx={{marginY: '16px'}} />
           <div>
@@ -81,7 +81,11 @@ export const CallSummary: React.FC<{
               Usage
             </p>
             <CostTable
-              usage={span.summary.usage as {[key: string]: LLMUsageSchema}}
+              costs={
+                call.traceCall?.summary?.weave?.costs as {
+                  [key: string]: LLMCostSchema;
+                }
+              }
             />
           </div>
         </>
