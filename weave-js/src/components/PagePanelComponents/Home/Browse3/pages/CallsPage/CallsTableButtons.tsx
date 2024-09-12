@@ -402,11 +402,9 @@ export const BulkDeleteButton: FC<{
   );
 };
 
-export const LivePollingButton: FC<{
-  isPolling: boolean;
+export const RefreshButton: FC<{
   onClick: () => void;
-}> = ({isPolling, onClick}) => {
-  const tooltip = isPolling ? 'Pause live updates' : 'Enable live updates';
+}> = ({onClick}) => {
 
   return (
     <Box
@@ -416,11 +414,12 @@ export const LivePollingButton: FC<{
         alignItems: 'center',
       }}>
       <Button
-        variant={isPolling ? 'primary' : 'ghost'}
+        variant={'ghost'}
         size="medium"
         onClick={onClick}
-        tooltip={tooltip}
-        icon={isPolling ? 'pause' : 'play'}></Button>
+        tooltip="Refresh"
+        icon='randomize-reset-reload'
+      />
     </Box>
   );
 };

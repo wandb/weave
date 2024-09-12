@@ -13,8 +13,6 @@ import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 
-const WEAVE_CALLS_POLL_INTERVAL_MS = 1000;
-
 /**
  * This Hook is responsible for bridging the gap between the CallsTable
  * component and the underlying data hooks. In particular, it takes a high level
@@ -32,8 +30,7 @@ export const useCallsForQuery = (
   gridFilter: GridFilterModel,
   gridSort: GridSortModel,
   gridPage: GridPaginationModel,
-  expandedColumns: Set<string>,
-  enablePolling: boolean
+  expandedColumns: Set<string>
 ) => {
   const {useCalls, useCallsStats} = useWFHooks();
   const offset = gridPage.page * gridPage.pageSize;
@@ -56,13 +53,11 @@ export const useCallsForQuery = (
     expandedColumns,
     {
       refetchOnDelete: true,
-      pollIntervalMs: enablePolling ? WEAVE_CALLS_POLL_INTERVAL_MS : undefined,
     }
   );
 
   const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
     refetchOnDelete: true,
-    pollIntervalMs: enablePolling ? WEAVE_CALLS_POLL_INTERVAL_MS : undefined,
   });
 
   const callResults = useMemo(() => {

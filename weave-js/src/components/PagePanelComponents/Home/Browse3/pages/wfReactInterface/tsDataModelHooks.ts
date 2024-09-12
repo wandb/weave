@@ -239,11 +239,7 @@ const useCallsNoExpansion = (
   sortBy?: traceServerTypes.SortBy[],
   query?: Query,
   columns?: string[],
-  opts?: {
-    skip?: boolean;
-    refetchOnDelete?: boolean;
-    pollIntervalMs?: number;
-  }
+  opts?: {skip?: boolean; refetchOnDelete?: boolean}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -251,72 +247,60 @@ const useCallsNoExpansion = (
     useState<traceServerTypes.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
 
-  const doFetch = useCallback(
-    (shouldPoll: boolean = false) => {
-      if (opts?.skip) {
-        return;
-      }
-      setCallRes(null);
-      loadingRef.current = true;
-      const req: traceServerTypes.TraceCallsQueryReq = {
-        project_id: projectIdFromParts({entity, project}),
-        filter: {
-          op_names: deepFilter.opVersionRefs,
-          input_refs: deepFilter.inputObjectVersionRefs,
-          output_refs: deepFilter.outputObjectVersionRefs,
-          parent_ids: deepFilter.parentIds,
-          trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
-          call_ids: deepFilter.callIds,
-          trace_roots_only: deepFilter.traceRootsOnly,
-          wb_run_ids: deepFilter.runIds,
-          wb_user_ids: deepFilter.userIds,
-        },
-        limit,
-        offset,
-        sort_by: sortBy,
-        query,
-        columns,
-      };
-      const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
-        loadingRef.current = false;
-        setCallRes(res);
-      };
-      const onError = (e: any) => {
-        loadingRef.current = false;
-        console.error(e);
-        setCallRes({calls: []});
-      };
-      getTsClient()
-        .callsStreamQuery(req)
-        .then(onSuccess)
-        .catch(onError)
-        .finally(() => {
-          if (shouldPoll && opts?.pollIntervalMs) {
-            setTimeout(() => doFetch(true), opts.pollIntervalMs);
-          }
-        });
-    },
-    [
-      entity,
-      project,
-      deepFilter,
+  const doFetch = useCallback(() => {
+    if (opts?.skip) {
+      return;
+    }
+    setCallRes(null);
+    loadingRef.current = true;
+    const req: traceServerTypes.TraceCallsQueryReq = {
+      project_id: projectIdFromParts({entity, project}),
+      filter: {
+        op_names: deepFilter.opVersionRefs,
+        input_refs: deepFilter.inputObjectVersionRefs,
+        output_refs: deepFilter.outputObjectVersionRefs,
+        parent_ids: deepFilter.parentIds,
+        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
+        call_ids: deepFilter.callIds,
+        trace_roots_only: deepFilter.traceRootsOnly,
+        wb_run_ids: deepFilter.runIds,
+        wb_user_ids: deepFilter.userIds,
+      },
       limit,
-      opts?.skip,
-      opts?.pollIntervalMs,
-      getTsClient,
       offset,
-      sortBy,
+      sort_by: sortBy,
       query,
       columns,
-    ]
-  );
+    };
+    const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
+      loadingRef.current = false;
+      setCallRes(res);
+    };
+    const onError = (e: any) => {
+      loadingRef.current = false;
+      console.error(e);
+      setCallRes({calls: []});
+    };
+    getTsClient().callsStreamQuery(req).then(onSuccess).catch(onError);
+  }, [
+    entity,
+    project,
+    deepFilter,
+    limit,
+    opts?.skip,
+    getTsClient,
+    offset,
+    sortBy,
+    query,
+    columns,
+  ]);
 
   // register doFetch as a callback after deletion
   useEffect(() => {
     if (opts?.refetchOnDelete) {
       const client = getTsClient();
-      const unregisterDelete = client.registerOnDeleteListener(() => doFetch());
-      const unregisterRename = client.registerOnRenameListener(() => doFetch());
+      const unregisterDelete = client.registerOnDeleteListener(doFetch);
+      const unregisterRename = client.registerOnRenameListener(doFetch);
       return () => {
         unregisterDelete();
         unregisterRename();
@@ -329,7 +313,7 @@ const useCallsNoExpansion = (
     if (opts?.skip) {
       return;
     }
-    doFetch(true);
+    doFetch();
   }, [opts?.skip, doFetch]);
 
   return useMemo(() => {
@@ -383,11 +367,8 @@ const useCalls = (
   query?: Query,
   columns?: string[],
   expandedRefColumns?: Set<string>,
-  opts?: {
-    skip?: boolean;
-    refetchOnDelete?: boolean;
-  }
-): Loadable<CallSchema[]> & Refetchable => {
+  opts?: {skip?: boolean; refetchOnDelete?: boolean}
+): Loadable<CallSchema[]> => {
   const calls = useCallsNoExpansion(
     entity,
     project,
@@ -423,7 +404,7 @@ const useCallsStats = (
   filter: CallFilter,
   query?: Query,
   opts?: {skip?: boolean; refetchOnDelete?: boolean}
-): Loadable<CallSchema[]> & Refetchable => {
+) => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const [callStatsRes, setCallStatsRes] =
@@ -479,20 +460,16 @@ const useCallsStats = (
     return getTsClient().registerOnDeleteListener(doFetch);
   }, [getTsClient, doFetch, opts?.refetchOnDelete]);
 
-  const refetch = useCallback(() => {
-    doFetch();
-  }, [doFetch]);
-
   return useMemo(() => {
     if (opts?.skip) {
-      return {loading: false, result: null, error: null, refetch};
+      return {loading: false, result: null, error: null};
     } else {
-      if (callStatsRes == null) {
-        return {loading: true, result: null, error: null, refetch};
+      if (callStatsRes == null || loadingRef.current) {
+        return {loading: true, result: null, error: null};
       }
-      return {...callStatsRes, refetch};
+      return callStatsRes;
     }
-  }, [callStatsRes, opts?.skip, refetch]);
+  }, [callStatsRes, opts?.skip]);
 };
 
 const useCallsDeleteFunc = () => {

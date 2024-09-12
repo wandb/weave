@@ -68,7 +68,7 @@ import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
   ExportSelector,
-  LivePollingButton,
+  RefreshButton,
 } from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
 import {WFHighLevelCallFilter} from './callsTableFilter';
@@ -159,7 +159,6 @@ export const CallsTable: FC<{
   setPaginationModel,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const [isPolling, setIsPolling] = useState(false);
 
   const isReadonly =
     loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
@@ -239,8 +238,7 @@ export const CallsTable: FC<{
     filterModelResolved,
     sortModelResolved,
     paginationModelResolved,
-    expandedRefCols,
-    isPolling
+    expandedRefCols
   );
 
   // Here, we only update our local state once the calls have loaded.
@@ -691,6 +689,7 @@ export const CallsTable: FC<{
                 onClick={() => setDeleteConfirmModalOpen(true)}
                 disabled={selectedCalls.length === 0}
               />
+              <ButtonDivider />
               <ConfirmDeleteModal
                 calls={tableData
                   .filter(row => selectedCalls.includes(row.id))
@@ -735,9 +734,8 @@ export const CallsTable: FC<{
             </>
           )}
           <ButtonDivider />
-          <LivePollingButton
-            isPolling={isPolling}
-            onClick={() => setIsPolling(!isPolling)}
+          <RefreshButton
+            onClick={() => console.log('refresh')}
           />
         </Tailwind>
       }>
