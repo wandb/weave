@@ -1114,7 +1114,12 @@ class WeaveClient:
         # Used to wait until all currently enqueued jobs are processed
         self.async_job_queue.flush()
         if self._server_is_flushable:
-            self.server.call_processor.wait_until_all_processed()
+            # We don't want to do an instance check here because it could
+            # be suseptibale to shutdown race conditions. So we save a boolean
+            # _server_is_flushable and only call this if we know the server is
+            # flushable. The # type: ignore is safe because we check the type
+            # first.
+            self.server.call_processor.wait_until_all_processed()  # type: ignore
 
     def __del__(self) -> None:
         self._cleanup()
@@ -1125,7 +1130,7 @@ class WeaveClient:
 
     def _cleanup(self) -> None:
         # Safe to call multiple times
-        self._flush() 
+        self._flush()
         self.async_job_queue.shutdown(wait=True)
 
 
