@@ -144,11 +144,11 @@ export const ObjectViewer = ({
         refValues[context.value] != null &&
         // If this is a ref and the parent has been visited, we already resolved
         // this ref. Example: `a._ref` where `a` is already in resolvedRefPaths
-        !resolvedRefPaths.has(context.parent?.toString() ?? '')
+        !resolvedRefPaths.has(context.value + context.parent?.toString() ?? '')
       ) {
         dirty = true;
         const res = refValues[context.value];
-        resolvedRefPaths.add(context.path.toString());
+        resolvedRefPaths.add(context.value + context.path.toString());
         return res;
       }
       return _.clone(context.value);
@@ -204,13 +204,13 @@ export const ObjectViewer = ({
 
       if (context.depth !== 0) {
         const contextTail = context.path.tail();
-        const isNullDescription =
+        const isNullDescriptionOrName =
           typeof contextTail === 'string' &&
-          contextTail === 'description' &&
+          (contextTail === 'description' || contextTail === 'name') &&
           context.valueType === 'null';
         // For now we'll hide all keys that start with an underscore, is a name field, or is a null description.
         // Eventually we might offer a user toggle to display them.
-        if (context.path.hasHiddenKey() || isNullDescription) {
+        if (context.path.hasHiddenKey() || isNullDescriptionOrName) {
           return 'skip';
         }
         if (isExpandableRef(context.value)) {

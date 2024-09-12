@@ -1,3 +1,5 @@
+"""Defines the Op protocol and related functions."""
+
 import inspect
 import typing
 from functools import partial, wraps
@@ -45,6 +47,17 @@ except ImportError:
     ANTHROPIC_NOT_GIVEN = None
 
 try:
+    # https://github.com/search?q=repo:mistralai/client-python%20Final&type=code
+    from mistralai.types.basemodel import UNSET  # type: ignore
+
+    MISTRAL_NOT_GIVEN = UNSET  # type: ignore
+except ImportError:
+    MISTRAL_NOT_GIVEN = None
+
+MISTRAL_NOT_GIVEN = None
+
+
+try:
     from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
 except ImportError:
     CEREBRAS_NOT_GIVEN = None
@@ -68,7 +81,9 @@ def value_is_sentinel(param: Any) -> bool:
         or param.default is OPENAI_NOT_GIVEN
         or param.default is COHERE_NOT_GIVEN
         or param.default is ANTHROPIC_NOT_GIVEN
+        or param.default is MISTRAL_NOT_GIVEN
         or param.default is CEREBRAS_NOT_GIVEN
+        or param.default is Ellipsis
     )
 
 
@@ -251,12 +266,39 @@ def call(op: Op, *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
     Executes the op and returns both the result and a Call representing the execution.
 
     This function will never raise.  Any errors are captured in the Call object.
+
+    This method is automatically bound to any function decorated with `@weave.op`,
+    allowing for usage like:
+
+    ```python
+    @weave.op
+    def add(a: int, b: int) -> int:
+        return a + b
+
+    result, call = add.call(1, 2)
+    ```
     """
     c = _create_call(op, *args, **kwargs)
     return _execute_call(op, c, *args, __should_raise=False, **kwargs)
 
 
 def calls(op: Op) -> "CallsIter":
+    """
+    Get an iterator over all calls to this op.
+
+    This method is automatically bound to any function decorated with `@weave.op`,
+    allowing for usage like:
+
+    ```python
+    @weave.op
+    def add(a: int, b: int) -> int:
+        return a + b
+
+    calls = add.calls()
+    for call in calls:
+        print(call)
+    ```
+    """
     client = weave_client_context.require_weave_client()
     return client._op_calls(op)
 
@@ -455,3 +497,6 @@ def maybe_unbind_method(oplike: Union[Op, MethodType, partial]) -> Op:
         op = oplike
 
     return cast(Op, op)
+
+
+__docspec__ = [call, calls]

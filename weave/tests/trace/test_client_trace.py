@@ -14,7 +14,14 @@ from pydantic import BaseModel, ValidationError
 
 import weave
 from weave import Thread, ThreadPoolExecutor
+from weave.tests.trace.util import (
+    AnyIntMatcher,
+    DatetimeMatcher,
+    FuzzyDateTimeMatcher,
+    MaybeStringMatcher,
+)
 from weave.trace import weave_client
+from weave.trace.object_record import ObjectRecord
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
@@ -26,6 +33,7 @@ from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
 )
+from weave.trace_server.validation import SHOULD_ENFORCE_OBJ_ID_CHARSET
 
 pytestmark = pytest.mark.trace
 
@@ -59,7 +67,7 @@ def test_simple_op(client):
     # assert client._ref_is_own(op_ref)
     got_op = client.get(op_ref)
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     fetched_call = calls[0]
     digest = "Zo4OshYu57R00QNlBBGjuiDGyewGYsJ1B69IKXSXYQY"
@@ -75,7 +83,13 @@ def test_simple_op(client):
         inputs={"a": 5},
         exception=None,
         output=6,
-        summary={},
+        summary={
+            "weave": {
+                "status": "success",
+                "trace_name": "my_op",
+                "latency_ms": AnyIntMatcher(),
+            }
+        },
         attributes={
             "weave": {
                 "client_version": weave.version.VERSION,
@@ -86,6 +100,9 @@ def test_simple_op(client):
                 "sys_version": sys.version,
             },
         },
+        started_at=DatetimeMatcher(),
+        ended_at=DatetimeMatcher(),
+        deleted_at=None,
     )
 
 
@@ -126,23 +143,6 @@ def test_trace_server_call_start_and_end(client):
         start.started_at.isoformat(timespec="milliseconds")
     )
 
-    class FuzzyDateTimeMatcher:
-        def __init__(self, dt):
-            self.dt = dt
-
-        def __eq__(self, other):
-            # Checks within 1ms
-            return abs((self.dt - other).total_seconds()) < 0.001
-
-    class MaybeStringMatcher:
-        def __init__(self, s):
-            self.s = s
-
-        def __eq__(self, other):
-            if other is None:
-                return True
-            return self.s == other
-
     assert res.call.model_dump() == {
         "project_id": client._project_id(),
         "id": call_id,
@@ -155,7 +155,12 @@ def test_trace_server_call_start_and_end(client):
         "attributes": {"a": 5},
         "inputs": {"b": 5},
         "output": None,
-        "summary": None,
+        "summary": {
+            "weave": {
+                "trace_name": "test_name",
+                "status": "running",
+            },
+        },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,
@@ -194,7 +199,14 @@ def test_trace_server_call_start_and_end(client):
         "attributes": {"a": 5},
         "inputs": {"b": 5},
         "output": {"d": 5},
-        "summary": {"c": 5},
+        "summary": {
+            "c": 5,
+            "weave": {
+                "trace_name": "test_name",
+                "latency_ms": AnyIntMatcher(),
+                "status": "success",
+            },
+        },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,
@@ -221,7 +233,7 @@ def test_graph_call_ordering(client):
     for i in range(10):
         my_op(i)
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 10
 
     # We want to preserve insert order
@@ -245,7 +257,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     # class Number:
     #     value: int
 
-    class Number(BaseModel):
+    class Number(weave.Object):
         value: int
 
     @weave.op()
@@ -422,7 +434,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
     input_object_version_refs = unique_vals(
         [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
     )
-    assert len(input_object_version_refs) > 3
+    assert len(input_object_version_refs) > 3  # > 3
 
     for input_object_version_refs, exp_count in [
         # Test the None case
@@ -1315,13 +1327,25 @@ def test_dataclass_support(client):
 
     assert len(res.calls) == 1
     assert res.calls[0].inputs == {
-        "a": "weave:///shawn/test-project/object/MyDataclass:qDo5jHFme5xIM1LwgeiXXVxYoGnp4LQ9hulqkX5zunY",
-        "b": "weave:///shawn/test-project/object/MyDataclass:We1slmdrWzi2NYSWObBsLybTTNSP4M9zfQbCMf8rQMc",
+        "a": {
+            "_bases": [],
+            "_class_name": "MyDataclass",
+            "_type": "MyDataclass",
+            "val": 1,
+        },
+        "b": {
+            "_bases": [],
+            "_class_name": "MyDataclass",
+            "_type": "MyDataclass",
+            "val": 2,
+        },
     }
-    assert (
-        res.calls[0].output
-        == "weave:///shawn/test-project/object/MyDataclass:2exnZIHkq8DyHTbJzhL0m5Ew1XrqIBCstZWilQS6Lpo"
-    )
+    assert res.calls[0].output == {
+        "_bases": [],
+        "_class_name": "MyDataclass",
+        "_type": "MyDataclass",
+        "val": 3,
+    }
 
 
 def test_op_retrieval(client):
@@ -2592,8 +2616,10 @@ def test_object_with_disallowed_keys(client):
             )
         )
     )
-    with pytest.raises(Exception):
-        client.server.obj_create(create_req)
+
+    if SHOULD_ENFORCE_OBJ_ID_CHARSET:
+        with pytest.raises(Exception):
+            client.server.obj_create(create_req)
 
 
 CHAR_LIMIT = 128
@@ -2694,3 +2720,153 @@ def test_objects_and_keys_with_special_characters(client):
     assert found_ref == exp_op_ref
     gotten_fn = weave.ref(found_ref).get()
     assert gotten_fn(obj) == "hello world"
+
+
+def test_calls_stream_feedback(client):
+    @weave.op
+    def test_call(x):
+        return "ello chap"
+
+    test_call(1)
+    test_call(2)
+    test_call(3)
+
+    calls = list(test_call.calls())
+    assert len(calls) == 3
+
+    # add feedback to the first call
+    calls[0].feedback.add("note", {"note": "this is a note on call1"})
+    calls[0].feedback.add_reaction("👍")
+    calls[0].feedback.add_reaction("👍")
+    calls[0].feedback.add_reaction("👎")
+
+    calls[1].feedback.add_reaction("👍")
+
+    # now get calls from the server, with the feedback expanded
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            include_feedback=True,
+        )
+    )
+    calls = list(res)
+
+    assert len(calls) == 3
+    assert len(calls[0].summary["weave"]["feedback"]) == 4
+    assert len(calls[1].summary["weave"]["feedback"]) == 1
+    assert not calls[2].summary.get("weave", {}).get("feedback")
+
+    call1_payloads = [f["payload"] for f in calls[0].summary["weave"]["feedback"]]
+    assert {"note": "this is a note on call1"} in call1_payloads
+    assert {
+        "alias": ":thumbs_up:",
+        "detoned": "👍",
+        "detoned_alias": ":thumbs_up:",
+        "emoji": "👍",
+    } in call1_payloads
+    assert {
+        "alias": ":thumbs_down:",
+        "detoned": "👎",
+        "detoned_alias": ":thumbs_down:",
+        "emoji": "👎",
+    } in call1_payloads
+
+    call2_payloads = [f["payload"] for f in calls[1].summary["weave"]["feedback"]]
+    assert {
+        "alias": ":thumbs_up:",
+        "detoned": "👍",
+        "detoned_alias": ":thumbs_up:",
+        "emoji": "👍",
+    } in call2_payloads
+
+
+def test_inline_dataclass_generates_no_refs_in_function(client):
+    @dataclasses.dataclass
+    class A:
+        b: int
+
+    @weave.op
+    def func(a: A):
+        return A(b=a.b + 1)
+
+    a = A(b=1)
+    func(a)
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+        )
+    )
+    input_object_version_refs = unique_vals(
+        [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
+    )
+    assert len(input_object_version_refs) == 0
+
+    output_object_version_refs = unique_vals(
+        [ref for call in res.calls for ref in extract_refs_from_values(call.output)]
+    )
+    assert len(output_object_version_refs) == 0
+
+
+def test_inline_dataclass_generates_no_refs_in_object(client):
+    @dataclasses.dataclass
+    class A:
+        b: int
+
+    class WeaveObject(weave.Object):
+        a: A
+
+    wo = WeaveObject(a=A(b=1))
+    ref = weave.publish(wo)
+
+    res = get_client_trace_server(client).objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+        )
+    )
+    assert len(res.objs) == 1  # Just the weave object, and not the dataclass
+
+
+def test_inline_pydantic_basemodel_generates_no_refs_in_function(client):
+    class A(BaseModel):
+        b: int
+
+    @weave.op
+    def func(a: A):
+        return A(b=a.b + 1)
+
+    a = A(b=1)
+    func(a)
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+        )
+    )
+    input_object_version_refs = unique_vals(
+        [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
+    )
+    assert len(input_object_version_refs) == 0
+
+    output_object_version_refs = unique_vals(
+        [ref for call in res.calls for ref in extract_refs_from_values(call.output)]
+    )
+    assert len(output_object_version_refs) == 0
+
+
+def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
+    class A(BaseModel):
+        b: int
+
+    class WeaveObject(weave.Object):
+        a: A
+
+    wo = WeaveObject(a=A(b=1))
+    ref = weave.publish(wo)
+
+    res = get_client_trace_server(client).objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+        )
+    )
+    assert len(res.objs) == 1  # Just the weave object, and not the pydantic model

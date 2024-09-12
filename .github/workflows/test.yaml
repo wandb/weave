@@ -35,9 +35,9 @@ jobs:
       - name: Prune docker cache
         run: docker system prune -f
       - name: Build unit test image
-        run: python3 weave/legacy/docker_build.py build_deps weave-test builder . weave/legacy/Dockerfile.test
+        run: python3 weave/docker/docker_build.py build_deps weave-test-python-client builder . weave/docker/Dockerfile.python-client.test
       - name: Build integration test image
-        run: python3 weave/legacy/docker_build.py build weave-integration-test . weave/legacy/Dockerfile.test
+        run: python3 weave/docker/docker_build.py build weave-integration-test . weave/legacy/Dockerfile.test
 
   lint:
     name: Python lint
@@ -46,17 +46,10 @@ jobs:
       - build-container
     # runs-on: [self-hosted, gke-runner]
     runs-on: ubuntu-latest
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-client:${{ github.sha }}
     steps:
       - uses: actions/checkout@v2
       - run: source /root/venv/bin/activate && pre-commit run --hook-stage=pre-push --all-files
-      - name: Show changes if pre-commit fails
-        if: failure()
-        run: |
-          echo "Files were modified, printing names of changed files"
-          git diff --name-only
-          echo "Failing this step to expand logs in the UI"
-          exit 1
 
   weavejs-lint-compile:
     name: WeaveJS Lint and Compile
@@ -93,7 +86,7 @@ jobs:
         job_num: [0, 1]
 
     # runs-on: ubuntu-latest
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-client:${{ github.sha }}
     services:
       wandbservice:
         image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
@@ -152,7 +145,7 @@ jobs:
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
           source /root/venv/bin/activate && \
-          pip install 'dspy-ai>=0.1.5' && \
+          pip install 'dspy-ai==2.4.13' && \
           pip install pydantic -U && \
           cd weave && \
           pytest \
@@ -219,7 +212,7 @@ jobs:
         # Use the following to run just a single test
         # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --browser replay-chromium --spec "cypress/e2e/notebooks/Ops that return images.cy.ts"
         # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --browser replay-chromium
-        run: export PYTHONPATH=$(pwd) && cd integration_test &&  npx cypress run --browser replay-chromium
+        run: export PYTHONPATH=$(pwd) && cd integration_test &&  npx cypress run --browser chrome
         # uses: cypress-io/github-action@v4
         # with:
         #   working-directory: ./integration_testG

@@ -8,10 +8,9 @@ from pydantic import BaseModel, ValidationError
 
 from weave.legacy.weave.environment import weave_trace_server_url
 from weave.legacy.weave.wandb_interface import project_creator
-
-from . import requests
-from . import trace_server_interface as tsi
-from .async_batch_processor import AsyncBatchProcessor
+from weave.trace_server import requests
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.async_batch_processor import AsyncBatchProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -508,6 +507,28 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.FeedbackPurgeRes:
         return self._generic_request(
             "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
+        )
+
+    # Cost API
+    def cost_query(
+        self, req: t.Union[tsi.CostQueryReq, t.Dict[str, t.Any]]
+    ) -> tsi.CostQueryRes:
+        return self._generic_request(
+            "/cost/query", req, tsi.CostQueryReq, tsi.CostQueryRes
+        )
+
+    def cost_create(
+        self, req: t.Union[tsi.CostCreateReq, t.Dict[str, t.Any]]
+    ) -> tsi.CostCreateRes:
+        return self._generic_request(
+            "/cost/create", req, tsi.CostCreateReq, tsi.CostCreateRes
+        )
+
+    def cost_purge(
+        self, req: t.Union[tsi.CostPurgeReq, t.Dict[str, t.Any]]
+    ) -> tsi.CostPurgeRes:
+        return self._generic_request(
+            "/cost/purge", req, tsi.CostPurgeReq, tsi.CostPurgeRes
         )
 
 

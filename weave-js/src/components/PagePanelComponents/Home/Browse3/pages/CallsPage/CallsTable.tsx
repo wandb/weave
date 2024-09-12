@@ -521,8 +521,6 @@ export const CallsTable: FC<{
       : [];
   }, [allRowKeys, columnVisibilityModel, tableData]);
 
-  // Register Export Button
-
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
 
   // Called in reaction to Hide column menu
@@ -708,6 +706,10 @@ export const CallsTable: FC<{
               numTotalCalls={callsTotal}
               disabled={callsTotal === 0}
               visibleColumns={visibleColumns}
+              // Remove cols from expandedRefs if it's not in visibleColumns (probably just inputs.example)
+              refColumnsToExpand={Array.from(expandedRefCols).filter(col =>
+                visibleColumns.includes(col)
+              )}
               callQueryParams={{
                 entity,
                 project,

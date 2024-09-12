@@ -342,6 +342,19 @@ class Select:
         if joined:
             sql += f"\nWHERE {joined}"
 
+        if self._group_by is not None:
+            internal_fields = [
+                _transform_external_field_to_internal_field(
+                    f,
+                    self.all_columns,
+                    self.table.json_cols,
+                    param_builder=param_builder,
+                )[0]
+                for f in self._group_by
+            ]
+            joined_fields = ", ".join(internal_fields)
+            sql += f"\nGROUP BY {joined_fields}"
+
         if self._order_by is not None:
             order_parts = []
             for clause in self._order_by:
@@ -386,18 +399,6 @@ class Select:
         if self._offset is not None:
             param_offset = param_builder.add(self._offset, "offset", "UInt64")
             sql += f"\nOFFSET {param_offset}"
-        if self._group_by is not None:
-            internal_fields = [
-                _transform_external_field_to_internal_field(
-                    f,
-                    self.all_columns,
-                    self.table.json_cols,
-                    param_builder=param_builder,
-                )[0]
-                for f in self._group_by
-            ]
-            joined_fields = ", ".join(internal_fields)
-            sql += f"\nGROUP BY {joined_fields}"
 
         parameters = param_builder.get_params()
         return PreparedSelect(sql=sql, parameters=parameters, fields=fieldnames)
@@ -555,6 +556,7 @@ def _transform_external_field_to_internal_field(
     # validate field
     if (
         field not in all_columns
+        and field != "*"
         and field.lower() != "count(*)"
         and not any(
             # Checks that a column is in the field, allows prefixed columns to be used

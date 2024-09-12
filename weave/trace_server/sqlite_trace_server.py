@@ -20,7 +20,14 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.orm import Row, quote_json_path
-from weave.trace_server.trace_server_common import get_nested_key, set_nested_key
+from weave.trace_server.trace_server_common import (
+    empty_str_to_none,
+    get_nested_key,
+    hydrate_calls_with_feedback,
+    make_derived_summary_fields,
+    make_feedback_query_req,
+    set_nested_key,
+)
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
@@ -454,8 +461,21 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         )[json_field]
                     call_dict[json_field] = data
             # convert empty string display_names to None
-            if "display_name" in call_dict and call_dict["display_name"] == "":
-                call_dict["display_name"] = None
+            if "display_name" in call_dict:
+                call_dict["display_name"] = empty_str_to_none(call_dict["display_name"])
+            # fill in derived summary fields
+            call_dict["summary"] = make_derived_summary_fields(
+                summary=call_dict.get("summary") or {},
+                op_name=call_dict["op_name"],
+                started_at=datetime.datetime.fromisoformat(call_dict["started_at"]),
+                ended_at=(
+                    datetime.datetime.fromisoformat(call_dict["ended_at"])
+                    if call_dict.get("ended_at")
+                    else None
+                ),
+                exception=call_dict.get("exception"),
+                display_name=call_dict.get("display_name"),
+            )
             # fill in missing required fields with defaults
             for col, mfield in tsi.CallSchema.model_fields.items():
                 if mfield.is_required() and col not in call_dict:
@@ -467,8 +487,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         raise ValueError(f"Field '{col}' is required for selection")
                     else:
                         call_dict[col] = {}
-            calls.append(tsi.CallSchema(**call_dict))
-        return tsi.CallsQueryRes(calls=calls)
+            calls.append(call_dict)
+
+        if req.include_feedback:
+            feedback_query_req = make_feedback_query_req(req.project_id, calls)
+            feedback = self.feedback_query(feedback_query_req)
+            hydrate_calls_with_feedback(calls, feedback)
+
+        return tsi.CallsQueryRes(calls=[tsi.CallSchema(**call) for call in calls])
 
     def _expand_refs(
         self, data: Dict[str, Any], expand_columns: list[str]
@@ -488,7 +514,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if not ri.any_will_be_interpreted_as_ref_str(val):
                 continue
 
-            if isinstance(ri.parse_internal_uri(val), ri.InternalTableRef):
+            if not isinstance(ri.parse_internal_uri(val), ri.InternalObjectRef):
                 continue
 
             derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
@@ -930,6 +956,18 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if query_result is None:
             raise NotFoundError(f"File {req.digest} not found")
         return tsi.FileContentReadRes(content=query_result[0])
+
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        print("COST CREATE is not implemented for local sqlite", req)
+        return tsi.CostCreateRes()
+
+    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+        print("COST QUERY is not implemented for local sqlite", req)
+        return tsi.CostQueryRes()
+
+    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+        print("COST PURGE is not implemented for local sqlite", req)
+        return tsi.CostPurgeRes()
 
     def _table_query(
         self,

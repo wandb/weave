@@ -16,6 +16,8 @@ import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../../../filters/common';
+import {isCustomWeaveTypePayload} from '../../../../typeViews/customWeaveType.types';
+import {CustomWeaveTypeDispatcher} from '../../../../typeViews/CustomWeaveTypeDispatcher';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {CallLink} from '../../../common/Links';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
@@ -939,10 +941,24 @@ const removePrefix = (key: string, prefix: string) => {
 };
 
 const ICValueView: React.FC<{value: any}> = ({value}) => {
+  // We should merge this with ValueView.tsx. Unfortunately,
+  // the styling preferences and sizing differ enough to make
+  // this more challenging than it should be.
+
   let text = '';
   if (value == null) {
     return <NotApplicable />;
   } else if (typeof value === 'object') {
+    if (isCustomWeaveTypePayload(value)) {
+      // This is a bit arbitrary sizing. Just forcing 300px for now. It would be
+      // more ideal if `CustomWeaveTypeDispatcher` had some sort of dynamic sizing
+      // that could be applied here.
+      return (
+        <div style={{width: '100%', height: '300px', overflow: 'hidden'}}>
+          <CustomWeaveTypeDispatcher data={value} />
+        </div>
+      );
+    }
     text = JSON.stringify(value || {}, null, 2);
   } else if (typeof value === 'string' && isWeaveRef(value)) {
     return <SmallRef objRef={parseRef(value)} />;
@@ -965,6 +981,7 @@ const ICValueView: React.FC<{value: any}> = ({value}) => {
     </pre>
   );
 };
+
 const trimWhitespace = (str: string) => {
   // Trim leading and trailing whitespace
   return str.replace(/^\s+|\s+$/g, '');
