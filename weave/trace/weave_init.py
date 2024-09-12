@@ -147,6 +147,22 @@ def init_weave(
 
     return _current_inited_client
 
+def init_weave_disabled(
+
+) -> InitializedClient:
+    if _current_inited_client is not None:
+        _current_inited_client.reset()
+
+    client = weave_client.WeaveClient(
+        "", "", remote_server, ensure_project_exists=False
+    )
+    # If the project name was formatted by init, update the project name
+    project_name = client.project
+
+    _current_inited_client = InitializedClient(client)
+    
+    
+
 
 def init_weave_get_server(
     api_key: typing.Optional[str] = None,

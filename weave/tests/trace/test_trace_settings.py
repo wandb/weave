@@ -37,6 +37,12 @@ def test_disabled_env(client):
     ), "Disabled weave should be faster than enabled weave"
 
 
+def test_disabled_env_client(make_client):
+    os.environ["WEAVE_DISABLED"] = "true"
+    client = weave.init("entity/project")
+    assert client == None
+
+
 def test_print_call_link_setting(client):
     captured_stdout = io.StringIO()
     sys.stdout = captured_stdout
