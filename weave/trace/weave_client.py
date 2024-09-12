@@ -797,7 +797,7 @@ class WeaveClient:
             ```
 
         Args:
-            costs: Dictionary of costs to add to the project. In the form of {llm_id: cost}.
+            costs: Dictionary of costs to add to the project. In the form of `{llm_id: cost}`.
 
         """
         return self.server.cost_create(
