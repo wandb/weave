@@ -1,3 +1,4 @@
+import atexit
 import dataclasses
 import datetime
 import platform
@@ -13,6 +14,7 @@ from requests import HTTPError
 from weave import version
 from weave.legacy.weave import ref_base, urls
 from weave.trace import call_context, trace_sentry
+from weave.trace.async_job_queue import AsyncJobQueue
 from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
@@ -38,6 +40,12 @@ from weave.trace_server.trace_server_interface import (
     CallsQueryReq,
     CallStartReq,
     CallUpdateReq,
+    CostCreateInput,
+    CostCreateReq,
+    CostCreateRes,
+    CostPurgeReq,
+    CostQueryOutput,
+    CostQueryReq,
     EndedCallSchemaForInsert,
     ObjCreateReq,
     ObjectVersionFilter,
@@ -52,6 +60,7 @@ from weave.trace_server.trace_server_interface import (
     TableSchemaForInsert,
     TraceServerInterface,
 )
+from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -135,6 +144,8 @@ def map_to_refs(obj: Any) -> Any:
 
 @dataclasses.dataclass
 class Call:
+    """A Call represents a single operation that was executed as part of a trace."""
+
     op_name: str
     trace_id: str
     project_id: str
@@ -189,10 +200,24 @@ class Call:
         )
 
     def delete(self) -> bool:
+        """Delete the call."""
         client = weave_client_context.require_weave_client()
         return client.delete_call(call=self)
 
     def set_display_name(self, name: Optional[str]) -> None:
+        """
+        Set the display name for the call.
+
+        Args:
+            name: The display name to set for the call.
+
+        Example:
+
+        ```python
+        result, call = my_function.call("World")
+        call.set_display_name("My Custom Display Name")
+        ```
+        """
         if name == "":
             raise ValueError(
                 "Display name cannot be empty. To remove the display_name, set name=None or use remove_display_name."
@@ -315,7 +340,7 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
         for k, v in d.items():
             if isinstance(v, dict):
                 result[k] = sum_dict_leaves([result.get(k, {}), v])
-            else:
+            elif v is not None:
                 result[k] = result.get(k, 0) + v
     return result
 
@@ -364,6 +389,7 @@ class AttributesDict(dict):
 
 class WeaveClient:
     server: TraceServerInterface
+    async_job_queue: AsyncJobQueue
 
     """
     A client for interacting with the Weave trace server.
@@ -386,7 +412,9 @@ class WeaveClient:
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
+        self.async_job_queue = AsyncJobQueue()
         self.ensure_project_exists = ensure_project_exists
+        atexit.register(self._cleanup)
 
         if ensure_project_exists:
             resp = self.server.ensure_project_exists(entity, project)
@@ -489,7 +517,7 @@ class WeaveClient:
         return make_client_call(self.entity, self.project, response_call, self.server)
 
     @deprecated(new_name="get_call")
-    def cll(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
+    def call(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
         return self.get_call(call_id=call_id, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -569,19 +597,24 @@ class WeaveClient:
 
         current_wb_run_id = safe_current_wb_run_id()
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
-        start = StartedCallSchemaForInsert(
-            project_id=self._project_id(),
-            id=call_id,
-            op_name=op_str,
-            display_name=display_name,
+
+        started_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        project_id = self._project_id()
+
+        self.async_job_queue.submit_job(
+            send_start_call,
+            project_id=project_id,
+            call_id=call_id,
+            op_str=op_str,
             trace_id=trace_id,
-            started_at=datetime.datetime.now(tz=datetime.timezone.utc),
+            started_at=started_at,
+            display_name=display_name,
             parent_id=parent_id,
-            inputs=to_json(inputs_with_refs, self._project_id(), self.server),
+            inputs_with_refs=inputs_with_refs,
             attributes=attributes,
-            wb_run_id=current_wb_run_id,
+            current_wb_run_id=current_wb_run_id,
+            server=self.server,
         )
-        self.server.call_start(CallStartReq(start=start))
 
         if use_stack:
             call_context.push_call(call)
@@ -628,17 +661,17 @@ class WeaveClient:
             exception_str = exception_to_json_str(exception)
             call.exception = exception_str
 
-        self.server.call_end(
-            CallEndReq(
-                end=EndedCallSchemaForInsert(
-                    project_id=self._project_id(),
-                    id=call.id,  # type: ignore
-                    ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
-                    output=to_json(output, self._project_id(), self.server),
-                    summary=summary,
-                    exception=exception_str,
-                )
-            )
+        project_id = self._project_id()
+        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        self.async_job_queue.submit_job(
+            send_end_call,
+            project_id=project_id,
+            call_id=call.id,
+            ended_at=ended_at,
+            output=output,
+            summary=summary,
+            exception_str=exception_str,
+            server=self.server,
         )
 
         # Descendent error tracking disabled til we fix UI
@@ -752,6 +785,123 @@ class WeaveClient:
             query=query, reaction=reaction, offset=offset, limit=limit
         )
 
+    def add_costs(self, costs: Dict[str, CostCreateInput]) -> CostCreateRes:
+        """Add costs to the current project.
+            The cost object will be created with the effective date of the date of insertion `datetime.datetime.now(ZoneInfo("UTC"))` if no effective_date is provided.
+
+        Examples:
+            ```python
+            costs = {
+                "my_expensive_custom_model": {
+                    "prompt_token_cost": 500,
+                    "completion_token_cost": 1000,
+                    "effective_date": datetime(1998, 10, 3),
+                },
+                "gpt-4o-mini-2024-07-18" :{
+                    "prompt_token_cost": 100,
+                    "completion_token_cost": 200,
+                    "effective_date": datetime(2024, 9, 1),
+                }
+            }
+
+            client.add_costs(costs)
+            ```
+
+        Args:
+            costs: Dictionary of costs to add to the project. In the form of {llm_id: cost}.
+
+        """
+        return self.server.cost_create(
+            CostCreateReq(project_id=self._project_id(), costs=costs)
+        )
+
+    def purge_costs(self, ids: Union[list[str], str]) -> None:
+        """Purge costs from the current project.
+
+        Args:
+            ids: The cost IDs to purge. Can be a single ID or a list of IDs.
+        """
+        if isinstance(ids, str):
+            ids = [ids]
+        expr = {
+            "$in": [
+                {"$getField": "id"},
+                [{"$literal": id} for id in ids],
+            ]
+        }
+        self.server.cost_purge(
+            CostPurgeReq(project_id=self._project_id(), query=Query(**{"$expr": expr}))
+        )
+
+    def query_costs(
+        self,
+        query: Optional[Union[Query, str]] = None,
+        llm_ids: Optional[list[str]] = None,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> list[CostQueryOutput]:
+        """Query project for costs.
+
+        Examples:
+            ```python
+            # Fetch a specific cost object.
+            # Note that this still returns a collection, which is expected
+            # to contain zero or one item(s).
+            client.query_costs("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
+
+            # Find all cost objects with a specific reaction.
+            client.query_costs(llm_ids=["gpt-4o-mini-2024-07-18"], limit=10)
+            ```
+
+        Args:
+            query: A mongo-style query expression. For convenience, also accepts a cost UUID string.
+            llm_ids: For convenience, filter for a set of llm_ids.
+            offset: The offset to start fetching cost objects from.
+            limit: The maximum number of cost objects to fetch.
+
+        Returns:
+            A CostQuery object.
+        """
+        expr: dict[str, Any] = {
+            "$eq": [
+                {"$literal": "1"},
+                {"$literal": "1"},
+            ],
+        }
+        if isinstance(query, str):
+            expr = {
+                "$eq": [
+                    {"$getField": "id"},
+                    {"$literal": query},
+                ],
+            }
+        elif isinstance(query, Query):
+            expr = query.expr_
+
+        if llm_ids:
+            expr = {
+                "$and": [
+                    expr,
+                    {
+                        "$in": [
+                            {"$getField": "llm_id"},
+                            [{"$literal": llm_id} for llm_id in llm_ids],
+                        ],
+                    },
+                ]
+            }
+        rewritten_query = Query(**{"$expr": expr})
+
+        res = self.server.cost_query(
+            CostQueryReq(
+                project_id=self._project_id(),
+                query=rewritten_query,
+                offset=offset,
+                limit=limit,
+            )
+        )
+        return res.results
+
     ################ Internal Helpers ################
 
     def _ref_is_own(self, ref: Ref) -> bool:
@@ -827,19 +977,23 @@ class WeaveClient:
             if ref.project == self.project:
                 return
             remove_ref(obj)
+        # Must defer import here to avoid circular import
+        from weave.flow.obj import Object
 
-        if isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+        if isinstance(obj, Object):
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
             ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
             obj.__dict__["ref"] = ref
+        elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+            obj_rec = pydantic_object_record(obj)
+            for v in obj_rec.__dict__.values():
+                self._save_nested_objects(v)
         elif dataclasses.is_dataclass(obj) and not isinstance(obj, Ref):
             obj_rec = dataclass_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
-            ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
-            obj.__dict__["ref"] = ref
         elif isinstance(obj, Table):
             table_ref = self._save_table(obj)
             obj.ref = table_ref
@@ -951,6 +1105,73 @@ class WeaveClient:
 
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
+
+    def flush(self) -> None:
+        self.async_job_queue.flush()
+        if isinstance(self.server, RemoteHTTPTraceServer):
+            if self.server.should_batch:
+                self.server.call_processor.wait_until_all_processed()
+
+    def __del__(self) -> None:
+        self._cleanup()
+        atexit.unregister(self._cleanup)
+
+    def _cleanup(self) -> None:
+        self.flush()
+        self.async_job_queue.shutdown(wait=True)
+
+
+def send_start_call(
+    project_id: str,
+    call_id: str,
+    op_str: str,
+    trace_id: str,
+    started_at: datetime.datetime,
+    display_name: Optional[str],
+    parent_id: Optional[str],
+    inputs_with_refs: dict[str, Any],
+    attributes: dict[str, Any],
+    current_wb_run_id: Optional[str],
+    server: TraceServerInterface,
+) -> None:
+    inputs_json = to_json(inputs_with_refs, project_id, server)
+    start = StartedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id,
+        op_name=op_str,
+        display_name=display_name,
+        trace_id=trace_id,
+        started_at=started_at,
+        parent_id=parent_id,
+        inputs=inputs_json,
+        attributes=attributes,
+        wb_run_id=current_wb_run_id,
+    )
+    server.call_start(CallStartReq(start=start))
+
+
+def send_end_call(
+    project_id: str,
+    call_id: str,
+    ended_at: datetime.datetime,
+    output: Any,
+    summary: dict[str, Any],
+    exception_str: Optional[str],
+    server: TraceServerInterface,
+) -> None:
+    output_json = to_json(output, project_id, server)
+    server.call_end(
+        CallEndReq(
+            end=EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                ended_at=ended_at,
+                output=output_json,
+                summary=summary,
+                exception=exception_str,
+            )
+        )
+    )
 
 
 def safe_current_wb_run_id() -> Optional[str]:

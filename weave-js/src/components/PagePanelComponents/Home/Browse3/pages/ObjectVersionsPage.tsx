@@ -189,8 +189,8 @@ const ObjectVersionsTable: React.FC<{
         // solution here in the future. Maybe exclude table refs?
         val = _.omit(val, 'rows');
       }
-      // We don't want to show name (because it is the same as the object id)
-      val = _.omit(val, 'name');
+      // Show name, even though it can be = to object id, consider adding back
+      // val = _.omit(val, 'name');
       return {
         id: objectVersionKeyToRefUri(ov),
         obj: {

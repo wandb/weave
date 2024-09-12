@@ -4,7 +4,12 @@ from datetime import datetime
 
 from . import trace_server_interface as tsi
 from .clickhouse_schema import SelectableCHCallSchema
+from .errors import InvalidRequest
 from .orm import Column, ColumnType, ParamBuilder, PreparedSelect, Table
+from .validation import (
+    validate_purge_req_multiple,
+    validate_purge_req_one,
+)
 
 DUMMY_LLM_ID = "weave_dummy_llm_id"
 DUMMY_LLM_USAGE = (
@@ -28,6 +33,7 @@ LLM_USAGE_COLUMNS = [
 
 
 LLM_TOKEN_PRICES_COLUMNS = [
+    Column(name="id", type="string"),
     Column(name="pricing_level", type="string"),
     Column(name="pricing_level_id", type="string"),
     Column(name="provider_id", type="string"),
@@ -264,7 +270,7 @@ def get_ranked_prices(
 
     Returns something like the following:
     1 row
-        [ id, summary_dump: {usage: { llm_1, llm_2}, cost: { llm_1: { prompt_tokens_cost, completion_tokens_cost, ... }, llm_2: { prompt_tokens_cost, completion_tokens_cost, ... } } } ]
+        [ id, summary_dump: {usage: { llm_1, llm_2}, cost: { llm_1: { prompt_tokens_total_cost, completion_tokens_total_cost, ... }, llm_2: { prompt_tokens_total_cost, completion_tokens_total_cost, ... } } } ]
 """
 
 
@@ -272,13 +278,14 @@ def final_call_select_with_cost(
     param_builder: ParamBuilder,
     price_table_alias: str,
     select_fields: list[str],
+    order_fields: list[tsi.SortBy],
 ) -> PreparedSelect:
     # We filter out summary_dump, because we add costs to summary dump in the select statement
     final_select_fields = [field for field in select_fields if field != "summary_dump"]
 
     # These two objects are used to construct the costs object
     # We add two more fields in addition to this
-    # prompt_tokens_cost and completion_tokens_cost
+    # prompt_tokens_total_cost and completion_tokens_total_cost
     cost_string_fields = [
         "prompt_token_cost_unit",
         "completion_token_cost_unit",
@@ -305,10 +312,10 @@ def final_call_select_with_cost(
             ],
             # These numeric fields are derived or mapped to another name
             """
-            '"cost_per_prompt_token":', toString(prompt_token_cost), ',',
-            '"cost_per_completion_token":', toString(completion_token_cost), ',',
-            '"prompt_tokens_cost":', toString(prompt_tokens * prompt_token_cost), ',',
-            '"completion_tokens_cost":', toString(completion_tokens * completion_token_cost), ',',
+            '"prompt_token_cost":', toString(prompt_token_cost), ',',
+            '"completion_token_cost":', toString(completion_token_cost), ',',
+            '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',',
+            '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
         """,
         ]
     )
@@ -364,6 +371,7 @@ def final_call_select_with_cost(
             tsi.Query(**{"$expr": {"$eq": [{"$getField": "rank"}, {"$literal": 1}]}})
         )
         .group_by(final_select_fields)
+        .order_by(order_fields)
     )
 
     final_prepared_query = final_query.prepare(
@@ -381,6 +389,7 @@ def cost_query(
     call_table_alias: str,
     project_id: str,
     select_fields: list[str],
+    order_fields: list[tsi.SortBy],
 ) -> str:
     """
     This function takes something like the following:
@@ -403,7 +412,7 @@ def cost_query(
             pricing_level, pricing_level_id, provider_id, effective_date, prompt_token_cost, completion_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at, rank: 2 ]
     Finally it joins the rows with rank 1 together and constructs the costs object
     1 row
-        [ id, summary_dump: {usage: { llm_1, llm_2}, cost: { llm_1: { prompt_tokens_cost, completion_tokens_cost, ... }, llm_2: { prompt_tokens_cost, completion_tokens_cost, ... } } } ]
+        [ id, summary_dump: {usage: { llm_1, llm_2}, cost: { llm_1: { prompt_tokens_total_cost, completion_tokens_total_cost, ... }, llm_2: { prompt_tokens_total_cost, completion_tokens_total_cost, ... } } } ]
     """
     raw_sql = f"""
         -- From the all_calls we get the usage data for LLMs
@@ -413,7 +422,7 @@ def cost_query(
         ranked_prices AS ({get_ranked_prices(pb, "llm_usage", project_id).sql})
 
         -- Final Select, which just selects the correct fields, and adds a costs object
-        {final_call_select_with_cost(pb, 'ranked_prices', select_fields).sql}
+        {final_call_select_with_cost(pb, 'ranked_prices', select_fields, order_fields).sql}
     """
     return raw_sql
 
@@ -438,3 +447,20 @@ def is_project_id_sql_injection_safe(project_id: str) -> None:
         raise ValueError("Invalid project_id", project_id)
     except Exception:
         raise ValueError("Invalid project_id", project_id)
+
+
+MESSAGE_INVALID_COST_PURGE = "Can only purge costs by specifying one or more cost ids"
+
+
+def validate_cost_purge_req(req: tsi.CostPurgeReq) -> None:
+    """For safety, we currently only allow purging by cost id."""
+    expr = req.query.expr_.model_dump()
+    keys = list(expr.keys())
+    if len(keys) != 1:
+        raise InvalidRequest(MESSAGE_INVALID_COST_PURGE)
+    if keys[0] in ["eq_", "in_"]:
+        validate_purge_req_one(expr, MESSAGE_INVALID_COST_PURGE, keys[0])
+    elif keys[0] == "or_":
+        validate_purge_req_multiple(expr["or_"], MESSAGE_INVALID_COST_PURGE)
+    else:
+        raise InvalidRequest(MESSAGE_INVALID_COST_PURGE)
