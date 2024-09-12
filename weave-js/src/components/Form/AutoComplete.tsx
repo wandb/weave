@@ -51,6 +51,7 @@ const getStyles = (props: AdditionalProps) => {
               minWidth: '100px',
               overflow: 'hidden',
               color: MOON_800,
+              maxWidth: props.maxWidth ? `${props.maxWidth}px` : '100%',
               '&& fieldset': {
                 borderColor: MOON_250,
               },
@@ -148,6 +149,7 @@ type SelectSize = (typeof SelectSizes)[keyof typeof SelectSizes];
 type AdditionalProps = {
   size?: SelectSize;
   isDarkMode?: boolean;
+  maxWidth?: number;
 };
 
 export const AutoComplete = <Option,>(
