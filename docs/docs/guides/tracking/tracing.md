@@ -100,30 +100,30 @@ with weave.attributes({'user_id': 'lukas', 'env': 'production'}):
 
 ## Customize display names
 
-You can customize display names to better identify calls by setting:
+You can customize call display names to better identify calls by setting:
 
-1. The `display_name` parameter in the `@weave.op` decorator
+1. The `call_display_name` parameter in the `@weave.op` decorator
 
    ```python
-   @weave.op(display_name="custom_name")
+   @weave.op(call_display_name="custom_name")
    def func():
        ...
    ```
 
-2. Or, the `display_name` attribute on the function object itself.
+2. Or, the `call_display_name` attribute on the function object itself.
 
    ```py
-   func.display_name = "custom_name"
+   func.call_display_name = "custom_name"
    ```
 
-3. The `display_name` can also be a function that takes in a `Call` object and returns a string. The `Call` object will be passed automatically when the function is called, so you can use it to dynamically generate names based on the function's name, call inputs, attributes, etc.
+3. The `call_display_name` can also be a function that takes in a `Call` object and returns a string. The `Call` object will be passed automatically when the function is called, so you can use it to dynamically generate names based on the function's name, call inputs, attributes, etc.
 
    1. One common use case is just appending a timestamp to the function's name.
 
       ```py
       from datetime import datetime
 
-      @weave.op(display_name=lambda call: f"{call.func_name}__{datetime.now()}")
+      @weave.op(call_display_name=lambda call: f"{call.func_name}__{datetime.now()}")
       def func():
           return ...
       ```
@@ -138,7 +138,7 @@ You can customize display names to better identify calls by setting:
 
           return f"{model}__{revision}__{now}"
 
-      @weave.op(display_name=custom_attribute_name)
+      @weave.op(call_display_name=custom_attribute_name)
       def func():
           return ...
 

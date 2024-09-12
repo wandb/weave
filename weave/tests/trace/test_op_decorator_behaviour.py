@@ -365,10 +365,10 @@ def test_op_display_name_modified_dynamically(client):
 
     func()
 
-    func.display_name = custom_display_name1
+    func.call_display_name = custom_display_name1
     func()
 
-    func.display_name = custom_display_name2
+    func.call_display_name = custom_display_name2
     func()
 
     calls = list(client.calls())

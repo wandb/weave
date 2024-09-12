@@ -110,7 +110,7 @@ class Op(Protocol):
     """
 
     name: str
-    display_name: str
+    display_name: Union[str, Callable[["Call"], str]]
     signature: inspect.Signature
     ref: Optional[ObjectRef]
     resolve_fn: Callable
@@ -179,7 +179,7 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
         func,
         inputs_with_defaults,
         parent_call,
-        display_name=func.display_name,
+        display_name=func.call_display_name,
         attributes=attributes,
     )
 
@@ -303,7 +303,7 @@ def op(
     *,
     call_display_name: Union[str, Callable[["Call"], str]],
 ) -> Callable[[Any], Op]:
-    """Use call_display_name to set the name of the traced call.
+    """Use call_display_name to set the display name of the traced call.
 
     When set as a callable, the callable must take in a Call object
     (which can have attributes like op_name, trace_id, etc.) and return
@@ -312,8 +312,8 @@ def op(
 
 
 @overload
-def op(*, display_name: str) -> Callable[[Any], Op]:
-    """Use display_name to set the name of the op itself."""
+def op(*, name: str) -> Callable[[Any], Op]:
+    """Use name to set the name of the op itself."""
     ...
 
 
