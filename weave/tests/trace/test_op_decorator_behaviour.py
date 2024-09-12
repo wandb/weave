@@ -5,7 +5,7 @@ import pytest
 import weave
 from weave.trace import errors
 from weave.trace.op import Op, op
-from weave.trace.refs import ObjectRef
+from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import Call
 
@@ -265,7 +265,7 @@ async def test_gotten_object_method_is_callable_with_call_func(client, weave_obj
     assert call3.output == call4.output
 
 
-def test_op_display_name_str(client):
+def test_op_call_display_name_str(client):
     @op(call_display_name="example")
     def func():
         return 1
@@ -278,7 +278,7 @@ def test_op_display_name_str(client):
     assert call.display_name == "example"
 
 
-def test_op_display_name_callable_invalid():
+def test_op_call_display_name_callable_invalid():
     with pytest.raises(ValueError, match="must take exactly 1 argument"):
 
         @op(call_display_name=lambda: "example")
@@ -286,7 +286,7 @@ def test_op_display_name_callable_invalid():
             return 1
 
 
-def test_op_display_name_callable_lambda(client):
+def test_op_call_display_name_callable_lambda(client):
     @op(call_display_name=lambda call: f"{call.project_id}-123")
     def func():
         return 1
@@ -299,7 +299,7 @@ def test_op_display_name_callable_lambda(client):
     assert call.display_name == "shawn/test-project-123"
 
 
-def test_op_display_name_callable_func(client):
+def test_op_call_display_name_callable_func(client):
     def custom_display_name_func(call) -> str:
         reversed_project = call.project_id[::-1]
         name_ascii_sum = sum(ord(c) for c in reversed_project)
@@ -317,7 +317,7 @@ def test_op_display_name_callable_func(client):
     assert call.display_name == "wow-1844-tcejorp-tset/nwahs"
 
 
-def test_op_display_name_callable_other_attributes(client):
+def test_op_call_display_name_callable_other_attributes(client):
     def custom_attribute_name(call):
         model = call.attributes["model"]
         revision = call.attributes["revision"]
@@ -352,7 +352,7 @@ def test_op_display_name_callable_other_attributes(client):
     assert calls[1].display_name == "finetuned-gpt-4o__v0.1.3__2024-08-02"
 
 
-def test_op_display_name_modified_dynamically(client):
+def test_op_call_display_name_modified_dynamically(client):
     def custom_display_name1(call):
         return "wow"
 
@@ -375,3 +375,17 @@ def test_op_display_name_modified_dynamically(client):
     assert calls[0].display_name == "string"
     assert calls[1].display_name == "wow"
     assert calls[2].display_name == "amazing"
+
+
+def test_op_name(client):
+    @op(name="custom_name")
+    def func():
+        return 1
+
+    func()
+
+    calls = list(client.calls())
+    call = calls[0]
+
+    parsed = parse_uri(call.op_name)
+    assert parsed.name == "custom_name"
