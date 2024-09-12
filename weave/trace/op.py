@@ -110,7 +110,7 @@ class Op(Protocol):
     """
 
     name: str
-    display_name: Union[str, Callable[["Call"], str]]
+    call_display_name: Union[str, Callable[["Call"], str]]
     signature: inspect.Signature
     ref: Optional[ObjectRef]
     resolve_fn: Callable
@@ -388,14 +388,14 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
             # Tack these helpers on to our wrapper
             wrapper.resolve_fn = func  # type: ignore
 
-            name = func.__qualname__ if is_method else func.__name__
+            inferred_name = func.__qualname__ if is_method else func.__name__
 
             # funcs and methods defined inside another func will have the
             # name prefixed with {outer}.<locals>.{func_name}
             # this is noisy for us, so we strip it out
-            name = name.split(".<locals>.")[-1]
+            inferred_name = inferred_name.split(".<locals>.")[-1]
 
-            wrapper.name = name  # type: ignore
+            wrapper.name = kwargs.get("name", inferred_name)  # type: ignore
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
 
@@ -410,13 +410,13 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
             wrapper._tracing_enabled = True  # type: ignore
 
-            if callable(name_func := kwargs.get("display_name")):
-                params = inspect.signature(name_func).parameters
+            if callable(call_name_func := kwargs.get("call_display_name")):
+                params = inspect.signature(call_name_func).parameters
                 if len(params) != 1:
                     raise DisplayNameFuncError(
-                        "`display_name` function must take exactly 1 argument (the Call object)"
+                        "`call_display_name` function must take exactly 1 argument (the Call object)"
                     )
-            wrapper.display_name = name_func  # type: ignore
+            wrapper.call_display_name = call_name_func  # type: ignore
 
             return cast(Op, wrapper)
 
