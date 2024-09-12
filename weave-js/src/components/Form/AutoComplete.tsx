@@ -31,7 +31,7 @@ const FONT_SIZES = {
 
 const PADDING = {
   small: '2px 8px',
-  medium: '4px 12px',
+  medium: '4px 6px 4px 12px',
   large: '8px 12px',
   variable: '2px 8px',
 };
