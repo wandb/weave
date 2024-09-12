@@ -39,9 +39,9 @@ Install primary package deps
 
 ```
 pip install -e .
-pip install -r requirements.dev.txt
+pip install -r requirements.legacy.dev.txt
 pip install -r requirements.test.txt
-pip install -r requirements.ecosystem.txt
+pip install -r requirements.legacy.ecosystem.txt
 ```
 
 If you have an issue that looks like you need a rust compiler:

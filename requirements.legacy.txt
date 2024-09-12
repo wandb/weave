@@ -1,0 +1,61 @@
+# These are the base Weave requirements, enough for weave tracking and evaluation
+# to work.
+
+# Type annotations, we need ParamSpec in python3.9
+typing_extensions>=4.0.0
+
+# Definitely need arrow
+# TODO: Colab has 9.0.0, can we support?
+# TODO: 17.0.0 breaks a bunch of tests - can we move this requirement to just the engine?
+pyarrow>=14.0.1,<17.0.0
+
+# pydantic integration, and required by openai anyway
+openai>=1.0.0
+tiktoken>=0.4.0
+pydantic>=2.0.0
+
+# evaluation framework uses this for logging/status line at the moment.
+rich>=13.7.0
+
+# IO service uses these. Could probably remove reliance on ioservice.
+aiohttp>=3.8.3
+aiofiles>=22.1.0
+aioprocessing>=2.0.1
+Werkzeug>=3.0.3  # CVE 2024-34069
+janus>=1.0.0
+
+# we use this for logger, could probably skip it
+python-json-logger>=2.0.4
+
+# Used in box and just a little in arrow code.
+numpy>=1.21
+
+# required for wandb
+wandb>=0.16.4
+graphql-core>3
+gql[requests]>=3.4.1
+# TEMPORARY: Up to, and including wandb==0.17.1, wandb does is not 
+# compatible with numpy >= 2.0.0. This is a temporary fix until wandb
+# is updated to be compatible with numpy >= 2.0.0.
+numpy<2.0.0
+
+# Segment logging
+analytics-python>=1.2.9
+
+# Used for ISO date parsing.
+python-dateutil>=2.8.2
+
+# Used for version parsing in integrations.
+packaging>=21.0
+
+# Need to exclude the 8.4.0 version of tenacity because it has a bug
+# on import of AsyncRetrying
+tenacity>=8.3.0,!=8.4.0
+
+
+# Used for emoji shortcode support in feedback
+emoji>=2.12.1
+
+# Used for ID Generation - remove once python's
+# built-in uuid module is updated to support UUIDv7
+uuid-utils>=0.9.0

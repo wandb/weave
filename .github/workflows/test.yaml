@@ -35,7 +35,7 @@ jobs:
       - name: Prune docker cache
         run: docker system prune -f
       - name: Build unit test image
-        run: python3 weave/docker/docker_build.py build_deps weave-test-python-client builder . weave/docker/Dockerfile.python-client.test
+        run: python3 weave/docker/docker_build.py build_deps weave-test-python-client builder . weave/docker/Dockerfile.test.python-client
       - name: Build integration test image
         run: python3 weave/docker/docker_build.py build weave-integration-test . weave/legacy/Dockerfile.test
 
@@ -62,7 +62,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v1
         with:
-          node-version: "18.x"
+          node-version: '18.x'
       - run: |
           set -e
           cd weave-js
@@ -72,6 +72,47 @@ jobs:
           yarn tslint
           yarn prettier
           yarn run tsc
+
+  test2:
+    name: Tox tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version-major: ['3']
+        python-version-minor: [
+            '9',
+            # '10',
+            # '11',
+            # '12',
+          ]
+        tox-shard:
+          [
+            'base',
+            'anthropic',
+            'cerebras',
+            'cohere',
+            'dspy',
+            'groq',
+            'langchain',
+            'litellm',
+            'llamaindex',
+            'mistral',
+            'openai',
+          ]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install tox
+      - name: Run tox
+        run: tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }}
 
   test:
     name: Python unit tests
@@ -97,14 +138,14 @@ jobs:
           CI: 1
           WANDB_ENABLE_TEST_CONTAINER: true
         ports:
-          - "8080:8080"
-          - "8083:8083"
-          - "9015:9015"
+          - '8080:8080'
+          - '8083:8083'
+          - '9015:9015'
         options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
       weave_clickhouse:
         image: clickhouse/clickhouse-server
         ports:
-          - "8123:8123"
+          - '8123:8123'
         options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
     steps:
       # - uses: datadog/agent-github-action@v1.3
@@ -133,7 +174,7 @@ jobs:
           --timeout=90 \
           --ddtrace \
           --durations=5 \
-          ./integrations ./legacy ./trace_server ./trace ./tests
+          ./legacy
       - name: Run Python Unit Tests
         env:
           DD_SERVICE: weave-python
@@ -153,7 +194,7 @@ jobs:
           --timeout=90 \
           --ddtrace \
           --durations=5 \
-          ./integrations ./legacy ./trace_server ./trace ./tests
+          ./legacy
 
   # nbmake:
   #   name: Run notebooks with nbmake

@@ -9,7 +9,7 @@ WORKDIR /root
 RUN python3 -m venv venv
 RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && \
     pip install --upgrade pip && \
-    pip install -r requirements.legacy.test.txt -r requirements.dev.txt && \
+    pip install -r requirements.legacy.test.txt -r requirements.legacy.dev.txt && \
     pip install \"spacy>=3.0.0,<4.0.0\" && python3 -m spacy download en_core_web_sm"
 
 ENTRYPOINT "/bin/bash"
@@ -22,19 +22,19 @@ COPY weave-js /root/weave-js
 COPY wb_schema.gql /root/wb_schema.gql
 WORKDIR /root/weave-js
 RUN --mount=type=cache,target=/usr/local/share/.cache \
-    SHA1=$(find $JS_DIR -not -path "*/.vite-cache/*" -not -path "*/node_modules/*" -not -path "*/build/*" -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum | cut -d " " -f1) && \
-    yarn install --frozen-lockfile && \
-    yarn build && \
-    echo $SHA1 > ./build/sha1.txt && \
+    SHA1=$(find $JS_DIR -not -path "*/.vite-cache/*" -not -path "*/node_modules/*" -not -path "*/build/*" -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum | cut -d " " -f1) &&
+    yarn install --frozen-lockfile &&
+    yarn build &&
+    echo $SHA1 >./build/sha1.txt &&
     rm -rf node_modules
 
 # final stage
 FROM builder
 WORKDIR /root
 
-COPY requirements.ecosystem.txt /root
+COPY requirements.legacy.ecosystem.txt /root
 RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && \
-    pip install -r requirements.ecosystem.txt"
+    pip install -r requirements.legacy.ecosystem.txt"
 
 ENV RECORD_REPLAY_DIRECTORY=/root/.replay/
 RUN mkdir -p $RECORD_REPLAY_DIRECTORY
