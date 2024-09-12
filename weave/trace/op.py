@@ -47,6 +47,17 @@ except ImportError:
     ANTHROPIC_NOT_GIVEN = None
 
 try:
+    # https://github.com/search?q=repo:mistralai/client-python%20Final&type=code
+    from mistralai.types.basemodel import UNSET  # type: ignore
+
+    MISTRAL_NOT_GIVEN = UNSET  # type: ignore
+except ImportError:
+    MISTRAL_NOT_GIVEN = None
+
+MISTRAL_NOT_GIVEN = None
+
+
+try:
     from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
 except ImportError:
     CEREBRAS_NOT_GIVEN = None
@@ -67,6 +78,7 @@ def value_is_sentinel(param: Any) -> bool:
         or param.default is OPENAI_NOT_GIVEN
         or param.default is COHERE_NOT_GIVEN
         or param.default is ANTHROPIC_NOT_GIVEN
+        or param.default is MISTRAL_NOT_GIVEN
         or param.default is CEREBRAS_NOT_GIVEN
         or param.default is Ellipsis
     )
