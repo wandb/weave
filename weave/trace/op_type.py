@@ -210,9 +210,6 @@ def get_source_notebook_safe(fn: typing.Callable) -> str:
     return textwrap.dedent(src)
 
 
-class TypedDictError(Exception): ...
-
-
 def reconstruct_signature(fn: typing.Callable) -> str:
     sig = inspect.signature(fn)
     module = sys.modules[fn.__module__]
