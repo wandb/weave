@@ -209,11 +209,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     content=ch_call.inputs_dump.encode("utf-8"),
                 )
             )
-            ref = ri.InternalObjectRef(
-                project_id=ch_call.project_id,
-                name=f"{ch_call.id}-inputs",
-                version=out.digest,
-            )
             ch_call.inputs_dump = json.dumps({"file_digest": out.digest})
 
         # Inserts the call into the clickhouse database, verifying that
@@ -244,11 +239,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     name=f"{ch_call.id}-output",
                     content=ch_call.output_dump.encode("utf-8"),
                 )
-            )
-            ref = ri.InternalObjectRef(
-                project_id=ch_call.project_id,
-                name=f"{ch_call.id}-output",
-                version=out.digest,
             )
             ch_call.output_dump = json.dumps({"file_digest": out.digest})
 
