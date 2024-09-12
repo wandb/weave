@@ -13,16 +13,7 @@ import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 
-// Expose a window-level param for poll interval
-declare global {
-  interface Window {
-    WEAVE_CALLS_POLL_INTERVAL_MS?: number;
-  }
-}
-
-const getPollIntervalMs = (): number | undefined => {
-  return window.WEAVE_CALLS_POLL_INTERVAL_MS;
-};
+const WEAVE_CALLS_POLL_INTERVAL_MS = 1000;
 
 /**
  * This Hook is responsible for bridging the gap between the CallsTable
@@ -41,7 +32,8 @@ export const useCallsForQuery = (
   gridFilter: GridFilterModel,
   gridSort: GridSortModel,
   gridPage: GridPaginationModel,
-  expandedColumns: Set<string>
+  expandedColumns: Set<string>,
+  enablePolling: boolean
 ) => {
   const {useCalls, useCallsStats} = useWFHooks();
   const offset = gridPage.page * gridPage.pageSize;
@@ -64,13 +56,13 @@ export const useCallsForQuery = (
     expandedColumns,
     {
       refetchOnDelete: true,
-      pollIntervalMs: getPollIntervalMs(),
+      pollIntervalMs: enablePolling ? WEAVE_CALLS_POLL_INTERVAL_MS : undefined,
     }
   );
 
   const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
     refetchOnDelete: true,
-    pollIntervalMs: getPollIntervalMs(),
+    pollIntervalMs: enablePolling ? WEAVE_CALLS_POLL_INTERVAL_MS : undefined,
   });
 
   const callResults = useMemo(() => {

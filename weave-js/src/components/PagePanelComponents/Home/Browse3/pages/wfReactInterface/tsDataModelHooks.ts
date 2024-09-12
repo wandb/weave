@@ -386,9 +386,8 @@ const useCalls = (
   opts?: {
     skip?: boolean;
     refetchOnDelete?: boolean;
-    pollIntervalMs?: number;
   }
-): Loadable<CallSchema[]> => {
+): Loadable<CallSchema[]> & Refetchable => {
   const calls = useCallsNoExpansion(
     entity,
     project,
@@ -423,8 +422,8 @@ const useCallsStats = (
   project: string,
   filter: CallFilter,
   query?: Query,
-  opts?: {skip?: boolean; refetchOnDelete?: boolean; pollIntervalMs?: number}
-) => {
+  opts?: {skip?: boolean; refetchOnDelete?: boolean}
+): Loadable<CallSchema[]> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const [callStatsRes, setCallStatsRes] =
@@ -433,60 +432,44 @@ const useCallsStats = (
     );
   const deepFilter = useDeepMemo(filter);
 
-  const doFetch = useCallback(
-    (shouldPoll: boolean = false) => {
-      if (opts?.skip) {
-        setCallStatsRes({loading: false, result: null, error: null});
-        return;
-      }
-      loadingRef.current = true;
-      setCallStatsRes(null);
+  const doFetch = useCallback(() => {
+    if (opts?.skip) {
+      setCallStatsRes({loading: false, result: null, error: null});
+      return;
+    }
+    loadingRef.current = true;
+    setCallStatsRes(null);
 
-      const req: traceServerTypes.TraceCallsQueryStatsReq = {
-        project_id: projectIdFromParts({entity, project}),
-        filter: {
-          op_names: deepFilter.opVersionRefs,
-          input_refs: deepFilter.inputObjectVersionRefs,
-          output_refs: deepFilter.outputObjectVersionRefs,
-          parent_ids: deepFilter.parentIds,
-          trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
-          call_ids: deepFilter.callIds,
-          trace_roots_only: deepFilter.traceRootsOnly,
-          wb_run_ids: deepFilter.runIds,
-          wb_user_ids: deepFilter.userIds,
-        },
-        query,
-      };
-
-      getTsClient()
-        .callsQueryStats(req)
-        .then(res => {
-          loadingRef.current = false;
-          setCallStatsRes({loading: false, result: res, error: null});
-        })
-        .catch(err => {
-          loadingRef.current = false;
-          setCallStatsRes({loading: false, result: null, error: err});
-        })
-        .finally(() => {
-          if (shouldPoll && opts?.pollIntervalMs) {
-            setTimeout(() => doFetch(true), opts.pollIntervalMs);
-          }
-        });
-    },
-    [
-      deepFilter,
-      entity,
-      project,
+    const req: traceServerTypes.TraceCallsQueryStatsReq = {
+      project_id: projectIdFromParts({entity, project}),
+      filter: {
+        op_names: deepFilter.opVersionRefs,
+        input_refs: deepFilter.inputObjectVersionRefs,
+        output_refs: deepFilter.outputObjectVersionRefs,
+        parent_ids: deepFilter.parentIds,
+        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
+        call_ids: deepFilter.callIds,
+        trace_roots_only: deepFilter.traceRootsOnly,
+        wb_run_ids: deepFilter.runIds,
+        wb_user_ids: deepFilter.userIds,
+      },
       query,
-      opts?.skip,
-      getTsClient,
-      opts?.pollIntervalMs,
-    ]
-  );
+    };
+
+    getTsClient()
+      .callsQueryStats(req)
+      .then(res => {
+        loadingRef.current = false;
+        setCallStatsRes({loading: false, result: res, error: null});
+      })
+      .catch(err => {
+        loadingRef.current = false;
+        setCallStatsRes({loading: false, result: null, error: err});
+      });
+  }, [deepFilter, entity, project, query, opts?.skip, getTsClient]);
 
   useEffect(() => {
-    doFetch(true);
+    doFetch();
   }, [doFetch]);
 
   useEffect(() => {
@@ -496,16 +479,20 @@ const useCallsStats = (
     return getTsClient().registerOnDeleteListener(doFetch);
   }, [getTsClient, doFetch, opts?.refetchOnDelete]);
 
+  const refetch = useCallback(() => {
+    doFetch();
+  }, [doFetch]);
+
   return useMemo(() => {
     if (opts?.skip) {
-      return {loading: false, result: null, error: null};
+      return {loading: false, result: null, error: null, refetch};
     } else {
-      if (callStatsRes == null || loadingRef.current) {
-        return {loading: true, result: null, error: null};
+      if (callStatsRes == null) {
+        return {loading: true, result: null, error: null, refetch};
       }
-      return callStatsRes;
+      return {...callStatsRes, refetch};
     }
-  }, [callStatsRes, opts?.skip]);
+  }, [callStatsRes, opts?.skip, refetch]);
 };
 
 const useCallsDeleteFunc = () => {

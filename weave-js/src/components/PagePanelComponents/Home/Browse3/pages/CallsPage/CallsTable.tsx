@@ -161,7 +161,6 @@ export const CallsTable: FC<{
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [isPolling, setIsPolling] = useState(false);
 
-
   const isReadonly =
     loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
 
@@ -240,7 +239,8 @@ export const CallsTable: FC<{
     filterModelResolved,
     sortModelResolved,
     paginationModelResolved,
-    expandedRefCols
+    expandedRefCols,
+    isPolling
   );
 
   // Here, we only update our local state once the calls have loaded.
