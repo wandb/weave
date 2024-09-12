@@ -196,6 +196,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # as enforcing business rules and defaults
         ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start)
 
+        if (size := len(ch_call.inputs_dump.encode("utf-8"))) > 3 * 1024**2:
+            # 3MiB is the limit for a single row in Clickhouse
+            logger.warning(
+                f"Call inputs for call start {ch_call.id} too large ({size/1024**2:.2f} MiB) to insert "
+                "directly into Clickhouse. Dumping to files."
+            )
+            out = self.file_create(
+                tsi.FileCreateReq(
+                    project_id=ch_call.project_id,
+                    name=f"{ch_call.id}-inputs",
+                    content=ch_call.inputs_dump.encode("utf-8"),
+                )
+            )
+            ref = ri.InternalObjectRef(
+                project_id=ch_call.project_id,
+                name=f"{ch_call.id}-inputs",
+                version=out.digest,
+            )
+            ch_call.inputs_dump = json.dumps({"file_ref": ref.uri()})
+
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
         self._insert_call(ch_call)
@@ -211,6 +231,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
         ch_call = _end_call_for_insert_to_ch_insertable_end_call(req.end)
+
+        if (size := len(ch_call.output_dump.encode("utf-8"))) > 3 * 1024**2:
+            # 3MiB is the limit for a single row in Clickhouse
+            logger.warning(
+                f"Call output for call end {ch_call.id} too large ({size/1024**2:.2f} MiB) to insert "
+                "directly into Clickhouse. Dumping to files."
+            )
+            out = self.file_create(
+                tsi.FileCreateReq(
+                    project_id=ch_call.project_id,
+                    name=f"{ch_call.id}-output",
+                    content=ch_call.output_dump.encode("utf-8"),
+                )
+            )
+            ref = ri.InternalObjectRef(
+                project_id=ch_call.project_id,
+                name=f"{ch_call.id}-output",
+                version=out.digest,
+            )
+            ch_call.output_dump = json.dumps({"file_ref": ref.uri()})
 
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
