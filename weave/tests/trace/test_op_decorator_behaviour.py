@@ -266,7 +266,7 @@ async def test_gotten_object_method_is_callable_with_call_func(client, weave_obj
 
 
 def test_op_display_name_str(client):
-    @op(display_name="example")
+    @op(call_display_name="example")
     def func():
         return 1
 
@@ -281,13 +281,13 @@ def test_op_display_name_str(client):
 def test_op_display_name_callable_invalid():
     with pytest.raises(ValueError, match="must take exactly 1 argument"):
 
-        @op(display_name=lambda: "example")
+        @op(call_display_name=lambda: "example")
         def func():
             return 1
 
 
 def test_op_display_name_callable_lambda(client):
-    @op(display_name=lambda call: f"{call.project_id}-123")
+    @op(call_display_name=lambda call: f"{call.project_id}-123")
     def func():
         return 1
 
@@ -305,7 +305,7 @@ def test_op_display_name_callable_func(client):
         name_ascii_sum = sum(ord(c) for c in reversed_project)
         return f"wow-{name_ascii_sum}-{reversed_project}"
 
-    @op(display_name=custom_display_name_func)
+    @op(call_display_name=custom_display_name_func)
     def func():
         return 1
 
@@ -325,7 +325,7 @@ def test_op_display_name_callable_other_attributes(client):
 
         return f"{model}__{revision}__{now}"
 
-    @op(display_name=custom_attribute_name)
+    @op(call_display_name=custom_attribute_name)
     def func():
         return 1
 
@@ -359,7 +359,7 @@ def test_op_display_name_modified_dynamically(client):
     def custom_display_name2(call):
         return "amazing"
 
-    @weave.op(display_name="string")
+    @weave.op(call_display_name="string")
     def func():
         return 1
 

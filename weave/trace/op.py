@@ -299,11 +299,22 @@ def op(func: Any) -> Op: ...
 
 
 @overload
-def op(*, display_name: str) -> Callable[[Any], Op]: ...
+def op(
+    *,
+    call_display_name: Union[str, Callable[["Call"], str]],
+) -> Callable[[Any], Op]:
+    """Use call_display_name to set the name of the traced call.
+
+    When set as a callable, the callable must take in a Call object
+    (which can have attributes like op_name, trace_id, etc.) and return
+    the string to be used as the display name of the traced call."""
+    ...
 
 
 @overload
-def op(*, display_name: Callable[..., str]) -> Callable[[Any], Op]: ...
+def op(*, display_name: str) -> Callable[[Any], Op]:
+    """Use display_name to set the name of the op itself."""
+    ...
 
 
 def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
