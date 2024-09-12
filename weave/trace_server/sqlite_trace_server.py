@@ -401,14 +401,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if conditions_part:
             query += f" AND {conditions_part}"
 
-        # Match the batch server:
-        if req.sort_by is None:
-            order_by = [("started_at", "asc")]
-        elif len(req.sort_by) == 0:
-            order_by = None
-        else:
-            order_by = [(s.field, s.direction) for s in req.sort_by]
-
+        order_by = (
+            None if not req.sort_by else [(s.field, s.direction) for s in req.sort_by]
+        )
         if order_by is not None:
             order_parts = []
             for field, direction in order_by:
