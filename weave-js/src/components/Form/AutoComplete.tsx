@@ -11,7 +11,6 @@ import {
   TEAL_400,
   TEAL_500,
   TEAL_600,
-  MOON_900,
 } from '../../common/css/color.styles';
 import {hexToRGB} from '../../common/css/globals.styles';
 
@@ -128,7 +127,7 @@ const getStyles = (props: AdditionalProps) => {
             borderRadius: '4px',
             boxShadow: '0 12px 24px rgba(0, 0, 0, 0.16)',
             // we invert in dark mode automatically unless we want
-            //to use night-aware and override all other styles. so moon_100 == moon_900
+            // to use night-aware and override all other styles. so moon_100 == moon_900
             backgroundColor: props.isDarkMode ? MOON_100 : 'white',
           },
         },
