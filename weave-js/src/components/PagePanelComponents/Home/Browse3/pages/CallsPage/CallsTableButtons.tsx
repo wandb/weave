@@ -405,7 +405,12 @@ export const BulkDeleteButton: FC<{
 export const LivePollingButton: FC<{
   isPolling: boolean;
   onClick: () => void;
+
 }> = ({isPolling, onClick}) => {
+  const tooltip = isPolling
+  ? 'Pause live updates'
+  : 'Enable live updates'
+
   return (
     <Box
       sx={{
@@ -417,16 +422,8 @@ export const LivePollingButton: FC<{
         variant={isPolling ? 'primary' : 'ghost'}
         size="medium"
         onClick={onClick}
-        tooltip={isPolling ? 'Pause live updates' : 'Enable live updates'}
+        tooltip={tooltip}
         icon={isPolling ? 'pause' : 'play'}>
-        <span
-          style={{
-            width: '40px',
-            display: 'inline-block',
-            textAlign: 'center',
-          }}>
-          {isPolling ? 'Pause' : 'Live'}
-        </span>
       </Button>
     </Box>
   );
