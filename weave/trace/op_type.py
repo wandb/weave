@@ -210,6 +210,9 @@ def get_source_notebook_safe(fn: typing.Callable) -> str:
     return textwrap.dedent(src)
 
 
+class TypedDictError(Exception): ...
+
+
 def reconstruct_signature(fn: typing.Callable) -> str:
     sig = inspect.signature(fn)
     module = sys.modules[fn.__module__]
@@ -268,11 +271,14 @@ def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
         fn = fn.resolve_fn
 
     func_name = fn.__name__
-    try:
-        sig_str = reconstruct_signature(fn)
-    except Exception as e:
-        warnings.append(f"Failed to reconstruct signature {e=}")
-        sig_str = "(*args, **kwargs)"
+    sig_str = "(*args, **kwargs)"
+
+    if not isinstance(fn, typing._TypedDictMeta):
+        try:
+            sig_str = reconstruct_signature(fn)
+        except Exception as e:
+            warnings.append(f"Failed to reconstruct signature: {e}")
+
     missing_code_template = textwrap.dedent(
         f"""
         def {func_name}{sig_str}:
