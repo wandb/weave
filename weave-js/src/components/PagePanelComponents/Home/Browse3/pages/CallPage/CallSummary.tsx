@@ -6,7 +6,6 @@ import {Timestamp} from '../../../../../Timestamp';
 import {UserLink} from '../../../../../UserLink';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
-import {LLMCostSchema} from '../wfReactInterface/traceServerClientTypes';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CostTable} from './CostTable';
 
@@ -81,13 +80,7 @@ export const CallSummary: React.FC<{
               }}>
               Usage
             </p>
-            <CostTable
-              costs={
-                costData as {
-                  [key: string]: LLMCostSchema;
-                }
-              }
-            />
+            <CostTable costs={costData} />
           </div>
         </>
       )}
