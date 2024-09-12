@@ -1,7 +1,7 @@
 -r requirements.txt
 
 # This file is a temporary hold over until the Core repo is updated to just point to legacy
--r requirements.legacy.test.txt
+# -r requirements.legacy.test.txt
 
 pytest>=8.2.0
 pytest-asyncio>=0.23.6
