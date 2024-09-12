@@ -556,7 +556,7 @@ class WeaveClient:
             inputs_postprocessed = inputs_redacted
 
         self._save_nested_objects(inputs_postprocessed)
-        inputs_with_refs = map_to_refs(inputs_redacted)
+        inputs_with_refs = map_to_refs(inputs_postprocessed)
         call_id = generate_id()
 
         if parent is None and use_stack:
@@ -620,17 +620,18 @@ class WeaveClient:
         call: Call,
         output: Any = None,
         exception: Optional[BaseException] = None,
-        postprocess_outputs: Optional[Callable[..., Any]] = None,
+        *,
+        postprocess_outputs_func: Optional[Callable[..., Any]] = None,
     ) -> None:
         original_output = output
 
-        if postprocess_outputs:
-            postprocessed_outputs = postprocess_outputs(output)
-            self._save_nested_objects(postprocessed_outputs)
+        if postprocess_outputs_func:
+            postprocessed_outputs = postprocess_outputs_func(original_output)
         else:
-            self._save_nested_objects(output)
+            postprocessed_outputs = original_output
+        self._save_nested_objects(postprocessed_outputs)
 
-        output = map_to_refs(original_output)
+        output = map_to_refs(postprocessed_outputs)
         call.output = output
 
         # Summary handling

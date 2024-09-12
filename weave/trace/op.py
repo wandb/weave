@@ -213,7 +213,12 @@ def _execute_call(
         if has_finished:
             raise ValueError("Should not call finish more than once")
 
-        client.finish_call(call, output, exception)
+        client.finish_call(
+            call,
+            output,
+            exception,
+            postprocess_outputs_func=__op.postprocess_outputs_func,
+        )
         if not call_context.get_current_call():
             print_call_link(call)
 
