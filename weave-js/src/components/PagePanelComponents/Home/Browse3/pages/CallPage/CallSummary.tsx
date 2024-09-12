@@ -34,6 +34,7 @@ export const CallSummary: React.FC<{
         !SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER.includes(k)
     )
   );
+  const costData = call.traceCall?.summary?.weave?.costs;
 
   return (
     <div style={{padding: 8, overflow: 'auto'}}>
@@ -67,7 +68,7 @@ export const CallSummary: React.FC<{
           ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
         }}
       />
-      {call.traceCall?.summary?.weave?.costs && (
+      {costData && (
         <>
           <Divider sx={{marginY: '16px'}} />
           <div>
@@ -82,7 +83,7 @@ export const CallSummary: React.FC<{
             </p>
             <CostTable
               costs={
-                call.traceCall?.summary?.weave?.costs as {
+                costData as {
                   [key: string]: LLMCostSchema;
                 }
               }
