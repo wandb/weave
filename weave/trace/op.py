@@ -353,8 +353,10 @@ def op(
     ...
 
 
+# type ignore here is because we have the legacy decorators above.  Once they are
+# removed, we can remove the overloads this type ignore.
 @overload
-def op(*, name: str) -> Callable[[Any], Op]:
+def op(*, name: str) -> Callable[[Any], Op]:  # type: ignore
     """Use name to set the name of the op itself."""
     ...
 

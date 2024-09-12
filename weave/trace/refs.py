@@ -163,7 +163,7 @@ def parse_uri(uri: str) -> AnyRef:
         raise ValueError(f"Unknown ref kind: {kind}")
 
 
-def parse_call_uri(uri: str) -> CallRef:
-    if not isinstance(parsed := parse_uri(uri), CallRef):
-        raise ValueError(f"URI is not a call: {uri}")
+def parse_op_uri(uri: str) -> OpRef:
+    if not isinstance(parsed := parse_uri(uri), OpRef):
+        raise ValueError(f"URI is not for an Op: {uri}")
     return parsed
