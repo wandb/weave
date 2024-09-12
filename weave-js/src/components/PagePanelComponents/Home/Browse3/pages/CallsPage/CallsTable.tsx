@@ -159,6 +159,8 @@ export const CallsTable: FC<{
   setPaginationModel,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+  const [isPolling, setIsPolling] = useState(false);
+
 
   const isReadonly =
     loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
@@ -567,8 +569,6 @@ export const CallsTable: FC<{
     },
     [callsLoading, setPaginationModel]
   );
-
-  const [isPolling, setIsPolling] = useState(false);
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
