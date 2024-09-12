@@ -95,6 +95,7 @@ Our initial method is to use [regular expressions (regex)](https://docs.python.o
 ```python
 import re
 
+
 def clean_pii_with_regex(text):
     # Phone number pattern
     # \b         : Word boundary
@@ -104,8 +105,8 @@ def clean_pii_with_regex(text):
     # [-.]?      : Optional hyphen or dot
     # \d{4}      : Exactly 4 digits
     # \b         : Word boundary
-    text = re.sub(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', '<PHONE>', text)
-    
+    text = re.sub(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b", "<PHONE>", text)
+
     # Email pattern
     # \b         : Word boundary
     # [A-Za-z0-9._%+-]+ : One or more characters that can be in an email username
@@ -114,8 +115,10 @@ def clean_pii_with_regex(text):
     # \.         : Literal dot
     # [A-Z|a-z]{2,} : Two or more uppercase or lowercase letters (TLD)
     # \b         : Word boundary
-    text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '<EMAIL>', text)
-    
+    text = re.sub(
+        r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "<EMAIL>", text
+    )
+
     # SSN pattern
     # \b         : Word boundary
     # \d{3}      : Exactly 3 digits
@@ -124,8 +127,8 @@ def clean_pii_with_regex(text):
     # -          : Literal hyphen
     # \d{4}      : Exactly 4 digits
     # \b         : Word boundary
-    text = re.sub(r'\b\d{3}-\d{2}-\d{4}\b', '<SSN>', text)
-    
+    text = re.sub(r"\b\d{3}-\d{2}-\d{4}\b", "<SSN>", text)
+
     # Simple name pattern (this is not comprehensive)
     # \b         : Word boundary
     # [A-Z]      : One uppercase letter
@@ -134,9 +137,10 @@ def clean_pii_with_regex(text):
     # [A-Z]      : One uppercase letter
     # [a-z]+     : One or more lowercase letters
     # \b         : Word boundary
-    text = re.sub(r'\b[A-Z][a-z]+ [A-Z][a-z]+\b', '<NAME>', text)
-    
+    text = re.sub(r"\b[A-Z][a-z]+ [A-Z][a-z]+\b", "<NAME>", text)
+
     return text
+
 
 # Test the function
 test_text = "My name is John Doe, my email is john.doe@example.com, my phone is 123-456-7890, and my SSN is 123-45-6789."
@@ -153,10 +157,12 @@ Once you run this code you will receive a link to the Weave project page
 
 
 ```python
-import weave
-import asyncio
-from anthropic import AsyncAnthropic
 import json
+
+from anthropic import AsyncAnthropic
+
+import weave
+
 
 # Weave model / predict function
 class sentiment_analysis_model(weave.Model):
@@ -166,35 +172,31 @@ class sentiment_analysis_model(weave.Model):
 
     @weave.op()
     async def predict(self, text_block: str) -> dict:
-        client =AsyncAnthropic()
+        client = AsyncAnthropic()
 
         response = await client.messages.create(
             max_tokens=1024,
             model=self.model_name,
             system=self.system_prompt,
             messages=[
-                {   "role": "user",
-                    "content":[
-                        {
-                            "type": "text",
-                            "text": text_block
-                        }
-                        ]
-                 }
-            ]
+                {"role": "user", "content": [{"type": "text", "text": text_block}]}
+            ],
         )
         result = response.content[0].text
         if result is None:
             raise ValueError("No response from model")
         parsed = json.loads(result)
         return parsed
-    
+
     # create our LLM model with a system prompt
-model = sentiment_analysis_model(name="claude-3-sonnet",
-            model_name="claude-3-5-sonnet-20240620",
-            system_prompt="You are a Sentiment Analysis classifier. You will be classifying text based on their sentiment. Your input will be a block of text. You will answer with one the following rating option[\"positive\", \"negative\", \"neutral\"]. Your answer should be one word in json format: {classification}. Ensure that it is valid JSON.",
-            temperature=0
-        )
+
+
+model = sentiment_analysis_model(
+    name="claude-3-sonnet",
+    model_name="claude-3-5-sonnet-20240620",
+    system_prompt='You are a Sentiment Analysis classifier. You will be classifying text based on their sentiment. Your input will be a block of text. You will answer with one the following rating option["positive", "negative", "neutral"]. Your answer should be one word in json format: {classification}. Ensure that it is valid JSON.',
+    temperature=0,
+)
 ```
 
 # Method 2A:
@@ -217,22 +219,22 @@ Presidio comes with a built-in [list of recognizable entities](https://microsoft
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
 
-text= "My phone number is 212-555-5555 and my name is alex"
+text = "My phone number is 212-555-5555 and my name is alex"
 
 # Set up the engine, loads the NLP module (spaCy model by default)
 # and other PII recognizers
 analyzer = AnalyzerEngine()
 
 # Call analyzer to get results
-results = analyzer.analyze(text=text,
-                           entities=["PHONE_NUMBER", "PERSON"],
-                           language='en')
+results = analyzer.analyze(
+    text=text, entities=["PHONE_NUMBER", "PERSON"], language="en"
+)
 
 # Analyzer results are passed to the AnonymizerEngine for anonymization
 
 anonymizer = AnonymizerEngine()
 
-anonymized_text = anonymizer.anonymize(text=text,analyzer_results=results)
+anonymized_text = anonymizer.anonymize(text=text, analyzer_results=results)
 
 print(anonymized_text)
 ```
@@ -256,21 +258,24 @@ PII data to be redicated:
 - Email addresses
 - US Social Security Numbers
 """
+
+
 def anonymize_my_text(text):
-  results = analyzer.analyze(text=text,
-                           entities=["PHONE_NUMBER", "PERSON", "LOCATION", "EMAIL_ADDRESS","US_SSN"],
-                           language='en')
-  anonymized_text = anonymizer.anonymize(text=text,analyzer_results=results)
-  return anonymized_text.text
+    results = analyzer.analyze(
+        text=text,
+        entities=["PHONE_NUMBER", "PERSON", "LOCATION", "EMAIL_ADDRESS", "US_SSN"],
+        language="en",
+    )
+    anonymized_text = anonymizer.anonymize(text=text, analyzer_results=results)
+    return anonymized_text.text
 ```
 
 
 ```python
 # for every block of text, anonymized first and then predict
 for entry in pii_data:
-  anonymized_entry = anonymize_my_text(entry["text"])
-  (await model.predict(anonymized_entry))
-
+    anonymized_entry = anonymize_my_text(entry["text"])
+    (await model.predict(anonymized_entry))
 ```
 
 # Method 2B: Replace PII data with fake data
@@ -295,16 +300,17 @@ To effectively utilize Presidio, we must supply references to our custom operato
 
 
 ```python
-from presidio_anonymizer import AnonymizerEngine
-from presidio_anonymizer.entities import OperatorConfig, EngineResult, RecognizerResult
 from faker import Faker
-
+from presidio_anonymizer import AnonymizerEngine
+from presidio_anonymizer.entities import OperatorConfig
 
 fake = Faker()
+
 
 # Create faker functions (note that it has to receive a value)
 def fake_name(x):
     return fake.name()
+
 
 def fake_number(x):
     return fake.phone_number()
@@ -314,15 +320,17 @@ def fake_number(x):
 operators = {
     "PERSON": OperatorConfig("custom", {"lambda": fake_name}),
     "PHONE_NUMBER": OperatorConfig("custom", {"lambda": fake_number}),
-             }
+}
 
 
-text_to_anonymize = "My name is Raphael and I like to fish. My phone number is 212-555-5555"
+text_to_anonymize = (
+    "My name is Raphael and I like to fish. My phone number is 212-555-5555"
+)
 
 # Analyzer output
-analyzer_results = analyzer.analyze(text=text_to_anonymize,
-                           entities=["PHONE_NUMBER", "PERSON"],
-                           language='en')
+analyzer_results = analyzer.analyze(
+    text=text_to_anonymize, entities=["PHONE_NUMBER", "PERSON"], language="en"
+)
 
 
 anonymizer = AnonymizerEngine()
@@ -339,55 +347,58 @@ Let's consolidate our code into a single class and expand the list of entities t
 
 
 ```python
-from presidio_anonymizer import AnonymizerEngine
-from presidio_anonymizer.entities import OperatorConfig, EngineResult, RecognizerResult
-from faker import Faker
-import weave
-import asyncio
 from anthropic import AsyncAnthropic
+from faker import Faker
+from presidio_anonymizer import AnonymizerEngine
+from presidio_anonymizer.entities import OperatorConfig
+
+import weave
+
 
 # Let's build a custom class for generating fake data that will extend Faker
 class my_faker(Faker):
+    # Create faker functions (note that it has to receive a value)
+    def fake_address(x):
+        return fake.address()
 
-  # Create faker functions (note that it has to receive a value)
-  def fake_address(x):
-    return fake.address()
+    def fake_ssn(x):
+        return fake.ssn()
 
-  def fake_ssn(x):
-    return fake.ssn()
+    def fake_name(x):
+        return fake.name()
 
-  def fake_name(x):
-    return fake.name()
+    def fake_number(x):
+        return fake.phone_number()
 
-  def fake_number(x):
-    return fake.phone_number()
+    def fake_email(x):
+        return fake.email()
 
-  def fake_email(x):
-    return fake.email()
+    # Create custom operators for the entities
+    operators = {
+        "PERSON": OperatorConfig("custom", {"lambda": fake_name}),
+        "PHONE_NUMBER": OperatorConfig("custom", {"lambda": fake_number}),
+        "EMAIL_ADDRESS": OperatorConfig("custom", {"lambda": fake_email}),
+        "LOCATION": OperatorConfig("custom", {"lambda": fake_address}),
+        "US_SSN": OperatorConfig("custom", {"lambda": fake_ssn}),
+    }
 
-  # Create custom operators for the entities
-  operators = {
-    "PERSON": OperatorConfig("custom", {"lambda": fake_name}),
-    "PHONE_NUMBER": OperatorConfig("custom", {"lambda": fake_number}),
-    "EMAIL_ADDRESS": OperatorConfig("custom", {"lambda": fake_email}),
-    "LOCATION": OperatorConfig("custom", {"lambda": fake_address}),
-    "US_SSN":OperatorConfig("custom", {"lambda": fake_ssn})
-             }
-
-  def anonymize_my_text(self, text):
-    anonymizer = AnonymizerEngine()
-    analyzer_results = analyzer.analyze(text=text,
-                           entities=["PHONE_NUMBER", "PERSON", "LOCATION", "EMAIL_ADDRESS", "US_SSN"],
-                           language='en')
-    anonymized_results = anonymizer.anonymize(text=text,
-                            analyzer_results=analyzer_results, operators=self.operators)
-    return anonymized_results.text
+    def anonymize_my_text(self, text):
+        anonymizer = AnonymizerEngine()
+        analyzer_results = analyzer.analyze(
+            text=text,
+            entities=["PHONE_NUMBER", "PERSON", "LOCATION", "EMAIL_ADDRESS", "US_SSN"],
+            language="en",
+        )
+        anonymized_results = anonymizer.anonymize(
+            text=text, analyzer_results=analyzer_results, operators=self.operators
+        )
+        return anonymized_results.text
 
 
 faker = my_faker()
 for entry in pii_data:
-  anonymized_entry = faker.anonymize_my_text(entry["text"])
-  (await model.predict(anonymized_entry))
+    anonymized_entry = faker.anonymize_my_text(entry["text"])
+    (await model.predict(anonymized_entry))
 ```
 
 <details>
@@ -490,3 +501,4 @@ for entry in pii_data:
     encrypted_input = EncryptedSentimentAnalysisInput.encrypt(entry["text"])
     await model.predict(encrypted_input)
 ```
+</details>
