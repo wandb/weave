@@ -114,7 +114,8 @@ class AsyncJobQueue:
             if self._is_shutdown:
                 return
             self._is_shutdown = True
-            atexit.unregister(self.shutdown)  # Remove the atexit handler
+            if atexit is not None:
+                atexit.unregister(self.shutdown)  # Remove the atexit handler
 
         self.flush()  # Flush outside the lock
         self.executor.shutdown(wait=wait)

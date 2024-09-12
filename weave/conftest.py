@@ -177,7 +177,7 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
 
             def wrapper(*args, **kwargs):
                 res = attr(*args, **kwargs)
-                self_super.flush()
+                self_super._flush()
                 return res
 
             return wrapper

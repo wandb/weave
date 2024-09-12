@@ -421,6 +421,10 @@ class WeaveClient:
             # Set Client project name with updated project name
             self.project = resp.project_name
 
+        self._server_is_flushable = False
+        if isinstance(self.server, RemoteHTTPTraceServer):
+            self._server_is_flushable = self.server.should_batch
+
     ################ High Level Convenience Methods ################
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1106,18 +1110,22 @@ class WeaveClient:
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
-    def flush(self) -> None:
+    def _flush(self) -> None:
+        # Used to wait until all currently enqueued jobs are processed
         self.async_job_queue.flush()
-        if isinstance(self.server, RemoteHTTPTraceServer):
-            if self.server.should_batch:
-                self.server.call_processor.wait_until_all_processed()
+        if self._server_is_flushable:
+            self.server.call_processor.wait_until_all_processed()
 
     def __del__(self) -> None:
         self._cleanup()
-        atexit.unregister(self._cleanup)
+        # Because "__del__" is called when the interpreter exits, we need to
+        # make sure that atexit is available.
+        if atexit is not None:
+            atexit.unregister(self._cleanup)
 
     def _cleanup(self) -> None:
-        self.flush()
+        # Safe to call multiple times
+        self._flush() 
         self.async_job_queue.shutdown(wait=True)
 
 
