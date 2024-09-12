@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 import emoji
 
+from weave.trace_server import refs_internal as ri
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.feedback import (
@@ -19,18 +20,14 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.orm import Row, quote_json_path
-from weave.trace_server.refs_internal import (
-    DICT_KEY_EDGE_NAME,
-    LIST_INDEX_EDGE_NAME,
-    OBJECT_ATTR_EDGE_NAME,
-    TABLE_ROW_ID_EDGE_NAME,
-    WEAVE_INTERNAL_SCHEME,
-    InternalObjectRef,
-    InternalTableRef,
-    any_will_be_interpreted_as_ref_str,
-    parse_internal_uri,
+from weave.trace_server.trace_server_common import (
+    empty_str_to_none,
+    get_nested_key,
+    hydrate_calls_with_feedback,
+    make_derived_summary_fields,
+    make_feedback_query_req,
+    set_nested_key,
 )
-from weave.trace_server.trace_server_common import get_nested_key, set_nested_key
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
@@ -404,9 +401,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if conditions_part:
             query += f" AND {conditions_part}"
 
-        order_by = (
-            None if not req.sort_by else [(s.field, s.direction) for s in req.sort_by]
-        )
+        # Match the batch server:
+        if req.sort_by is None:
+            order_by = [("started_at", "asc")]
+        elif len(req.sort_by) == 0:
+            order_by = None
+        else:
+            order_by = [(s.field, s.direction) for s in req.sort_by]
+
         if order_by is not None:
             order_parts = []
             for field, direction in order_by:
@@ -464,8 +466,21 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         )[json_field]
                     call_dict[json_field] = data
             # convert empty string display_names to None
-            if "display_name" in call_dict and call_dict["display_name"] == "":
-                call_dict["display_name"] = None
+            if "display_name" in call_dict:
+                call_dict["display_name"] = empty_str_to_none(call_dict["display_name"])
+            # fill in derived summary fields
+            call_dict["summary"] = make_derived_summary_fields(
+                summary=call_dict.get("summary") or {},
+                op_name=call_dict["op_name"],
+                started_at=datetime.datetime.fromisoformat(call_dict["started_at"]),
+                ended_at=(
+                    datetime.datetime.fromisoformat(call_dict["ended_at"])
+                    if call_dict.get("ended_at")
+                    else None
+                ),
+                exception=call_dict.get("exception"),
+                display_name=call_dict.get("display_name"),
+            )
             # fill in missing required fields with defaults
             for col, mfield in tsi.CallSchema.model_fields.items():
                 if mfield.is_required() and col not in call_dict:
@@ -477,8 +492,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         raise ValueError(f"Field '{col}' is required for selection")
                     else:
                         call_dict[col] = {}
-            calls.append(tsi.CallSchema(**call_dict))
-        return tsi.CallsQueryRes(calls=calls)
+            calls.append(call_dict)
+
+        if req.include_feedback:
+            feedback_query_req = make_feedback_query_req(req.project_id, calls)
+            feedback = self.feedback_query(feedback_query_req)
+            hydrate_calls_with_feedback(calls, feedback)
+
+        return tsi.CallsQueryRes(calls=[tsi.CallSchema(**call) for call in calls])
 
     def _expand_refs(
         self, data: Dict[str, Any], expand_columns: list[str]
@@ -495,7 +516,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 if not val:
                     continue
 
-            if not any_will_be_interpreted_as_ref_str(val):
+            if not ri.any_will_be_interpreted_as_ref_str(val):
+                continue
+
+            if not isinstance(ri.parse_internal_uri(val), ri.InternalObjectRef):
                 continue
 
             derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
@@ -786,12 +810,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
-        parsed_refs = [parse_internal_uri(r) for r in req.refs]
-        if any(isinstance(r, InternalTableRef) for r in parsed_refs):
+        parsed_refs = [ri.parse_internal_uri(r) for r in req.refs]
+        if any(isinstance(r, ri.InternalTableRef) for r in parsed_refs):
             raise ValueError("Table refs not supported")
-        parsed_obj_refs = cast(list[InternalObjectRef], parsed_refs)
+        parsed_obj_refs = cast(list[ri.InternalObjectRef], parsed_refs)
 
-        def read_ref(r: InternalObjectRef) -> Any:
+        def read_ref(r: ri.InternalObjectRef) -> Any:
             conds = [
                 f"object_id = '{r.name}'",
                 f"digest = '{r.version}'",
@@ -807,17 +831,17 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             extra = r.extra
             for extra_index in range(0, len(extra), 2):
                 op, arg = extra[extra_index], extra[extra_index + 1]
-                if op == DICT_KEY_EDGE_NAME:
+                if op == ri.DICT_KEY_EDGE_NAME:
                     val = val[arg]
-                elif op == OBJECT_ATTR_EDGE_NAME:
+                elif op == ri.OBJECT_ATTR_EDGE_NAME:
                     val = val[arg]
-                elif op == LIST_INDEX_EDGE_NAME:
+                elif op == ri.LIST_INDEX_EDGE_NAME:
                     val = val[int(arg)]
-                elif op == TABLE_ROW_ID_EDGE_NAME:
-                    weave_internal_prefix = WEAVE_INTERNAL_SCHEME + ":///"
+                elif op == ri.TABLE_ROW_ID_EDGE_NAME:
+                    weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
                     if isinstance(val, str) and val.startswith(weave_internal_prefix):
-                        table_ref = parse_internal_uri(val)
-                        if not isinstance(table_ref, InternalTableRef):
+                        table_ref = ri.parse_internal_uri(val)
+                        if not isinstance(table_ref, ri.InternalTableRef):
                             raise ValueError(
                                 "invalid data layout encountered, expected TableRef when resolving id"
                             )
@@ -937,6 +961,18 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if query_result is None:
             raise NotFoundError(f"File {req.digest} not found")
         return tsi.FileContentReadRes(content=query_result[0])
+
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        print("COST CREATE is not implemented for local sqlite", req)
+        return tsi.CostCreateRes()
+
+    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+        print("COST QUERY is not implemented for local sqlite", req)
+        return tsi.CostQueryRes()
+
+    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+        print("COST PURGE is not implemented for local sqlite", req)
+        return tsi.CostPurgeRes()
 
     def _table_query(
         self,

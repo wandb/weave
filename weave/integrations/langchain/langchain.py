@@ -35,12 +35,12 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
 
-from weave.client_context import weave_client as weave_client_context
 from weave.integrations.integration_utilities import (
     make_pythonic_function_name,
     truncate_op_name,
 )
 from weave.trace import call_context
+from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.patcher import Patcher
 from weave.trace.weave_client import Call
 
@@ -182,7 +182,7 @@ if not import_failed:
                             # Note: this is implemented as a network call - it would be much nice
                             # to refactor `create_call` such that it could accept a parent_id instead
                             # of an entire Parent object.
-                            parent_run = self.gc.call(wv_current_run.parent_id)
+                            parent_run = self.gc.get_call(wv_current_run.parent_id)
 
             fn_name = make_pythonic_function_name(run.name)
             complete_op_name = f"langchain.{run.run_type.capitalize()}.{fn_name}"

@@ -4,7 +4,7 @@ from typing import Iterable, Optional
 
 from rich.table import Table
 
-from weave.client_context import weave_client as weave_client_context
+from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.refs import AnyRef, CallRef, parse_uri
 from weave.trace.rich_container import AbstractRichContainer
 from weave.trace.vals import WeaveObject
@@ -35,5 +35,5 @@ class Refs(AbstractRichContainer[str]):
         for ref in self.call_refs():
             parsed = parse_uri(ref)
             assert isinstance(parsed, CallRef)
-            objs.append(client.call(parsed.id))
+            objs.append(client.get_call(parsed.id))
         return objs

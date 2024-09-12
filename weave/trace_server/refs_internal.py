@@ -8,8 +8,6 @@ import dataclasses
 import urllib
 from typing import Any, Union
 
-from . import validation
-
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
 WEAVE_PRIVATE_SCHEME = "weave-private"
@@ -106,7 +104,8 @@ class InternalObjectRef:
         validate_no_slashes(self.version, "version")
         validate_no_colons(self.version, "version")
         validate_extra(self.extra)
-        validation.object_id_validator(self.name)
+        validate_no_slashes(self.name, "name")
+        validate_no_colons(self.name, "name")
 
     def uri(self) -> str:
         u = f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/object/{self.name}:{self.version}"
@@ -144,7 +143,9 @@ class InternalCallRef:
         return u
 
 
-def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
+def parse_internal_uri(
+    uri: str,
+) -> Union[InternalObjectRef, InternalTableRef, InternalCallRef]:
     if uri.startswith(f"{WEAVE_INTERNAL_SCHEME}:///"):
         path = uri[len(f"{WEAVE_INTERNAL_SCHEME}:///") :]
         parts = path.split("/")
@@ -182,6 +183,9 @@ def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
             version=version,
             extra=extra,
         )
+    elif kind == "call":
+        id_ = remaining[0]
+        return InternalCallRef(project_id=project_id, id=id_)
     else:
         raise InvalidInternalRef(f"Unknown ref kind: {kind}")
 
