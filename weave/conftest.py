@@ -147,6 +147,44 @@ def strict_op_saving():
         yield
 
 
+class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
+    """
+    A WeaveClient that automatically flushes after every method call.
+
+    This subclass overrides the behavior of the standard WeaveClient to ensure
+    that all write operations are immediately flushed to the underlying storage
+    before any subsequent read operation is performed. This is particularly
+    useful in testing scenarios where data is written and then immediately read
+    back, as it eliminates potential race conditions or inconsistencies that
+    might arise from delayed writes.
+
+    The flush operation is applied to all public methods (those not starting with
+    an underscore) except for the 'flush' method itself, to avoid infinite recursion.
+    This aggressive flushing strategy may impact performance and should primarily
+    be used in testing environments rather than production scenarios.
+
+    Note: Due to this, the test suite essentially "blocks" on every operation. So
+    if we are to test timing, this might not be the best choice. As an alternative,
+    we could explicitly call flush() in every single test that reads data, before the
+    read operation(s) are performed.
+    """
+
+    def __getattribute__(self, name):
+        self_super = super()
+        attr = self_super.__getattribute__(name)
+
+        if callable(attr) and not name.startswith("_") and name != "flush":
+
+            def wrapper(*args, **kwargs):
+                res = attr(*args, **kwargs)
+                self_super.flush()
+                return res
+
+            return wrapper
+
+        return attr
+
+
 @pytest.fixture()
 def client(request) -> Generator[weave_client.WeaveClient, None, None]:
     inited_client = None
@@ -164,9 +202,7 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
             sqlite_server, DummyIdConverter(), entity
         )
     elif weave_server_flag == "clickhouse":
-        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
-            use_async_insert=False
-        )
+        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
         ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
         ch_server._run_migrations()
@@ -182,7 +218,7 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
-        client = weave_client.WeaveClient(entity, project, server)
+        client = TestOnlyFlushingWeaveClient(entity, project, server)
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
     try:
