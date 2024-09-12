@@ -169,9 +169,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
         if r.status_code == 413:
             # handle 413 explicitly to provide actionable error message
-            raise requests.HTTPError(
-                f"413 Client Error: {r.text['reason']}", response=r
-            )
+            reason = json.loads(r.text)["reason"]
+            raise requests.HTTPError(f"413 Client Error: {reason}", response=r)
         r.raise_for_status()
 
     @tenacity.retry(
