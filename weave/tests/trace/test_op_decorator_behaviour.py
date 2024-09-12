@@ -125,7 +125,7 @@ def test_sync_method(client, weave_obj, py_obj):
 
 
 def test_sync_method_call(client, weave_obj, py_obj):
-    res, call = weave_obj.method.call(1)
+    res, call = weave_obj.method.call(weave_obj, 1)
     assert isinstance(call, Call)
     assert call.inputs == {
         "self": ObjectRef(
@@ -145,7 +145,7 @@ def test_sync_method_call(client, weave_obj, py_obj):
         weave_obj_method2 = weave_obj_method_ref.get()
 
     with pytest.raises(errors.OpCallError):
-        call2 = py_obj.amethod.call(1)
+        res2, call2 = py_obj.amethod.call(1)
 
 
 @pytest.mark.asyncio
@@ -160,7 +160,7 @@ async def test_async_method(client, weave_obj, py_obj):
 
 @pytest.mark.asyncio
 async def test_async_method_call(client, weave_obj, py_obj):
-    res, call = await weave_obj.amethod.call(1)
+    res, call = await weave_obj.amethod.call(weave_obj, 1)
     assert isinstance(call, Call)
     assert call.inputs == {
         "self": ObjectRef(
@@ -180,7 +180,7 @@ async def test_async_method_call(client, weave_obj, py_obj):
         weave_obj_amethod2 = weave_obj_amethod_ref.get()
 
     with pytest.raises(errors.OpCallError):
-        call2 = await py_obj.amethod.call(1)
+        res2, call2 = await py_obj.amethod.call(1)
 
 
 def test_sync_func_patching_passes_inspection(func):
