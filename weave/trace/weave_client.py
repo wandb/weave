@@ -1115,7 +1115,7 @@ class WeaveClient:
         self.async_job_queue.flush()
         if self._server_is_flushable:
             # We don't want to do an instance check here because it could
-            # be suseptibale to shutdown race conditions. So we save a boolean
+            # be susceptible to shutdown race conditions. So we save a boolean
             # _server_is_flushable and only call this if we know the server is
             # flushable. The # type: ignore is safe because we check the type
             # first.
