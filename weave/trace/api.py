@@ -5,6 +5,7 @@ import os
 import threading
 import time
 from typing import Any, Callable, Iterator, Optional, Union
+import typing
 
 # TODO: type_serializers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
@@ -18,7 +19,7 @@ from . import context, weave_client, weave_init
 from .constants import TRACE_OBJECT_EMOJI
 from .op import Op, op
 from .refs import ObjectRef, parse_uri
-from .settings import UserSettings, parse_and_apply_settings
+from .settings import UserSettings, parse_and_apply_settings, should_disable_weave
 from .table import Table
 
 
@@ -26,7 +27,7 @@ def init(
     project_name: str,
     *,
     settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
-) -> weave_client.WeaveClient:
+) -> typing.Optional[weave_client.WeaveClient]:
     """Initialize weave tracking, logging to a wandb project.
 
     Logging is initialized globally, so you do not need to keep a reference
@@ -46,6 +47,8 @@ def init(
     # return weave_init.init_wandb(project_name).client
     # return weave_init.init_trace_remote(project_name).client
     parse_and_apply_settings(settings)
+    if should_disable_weave():
+        return None
     return weave_init.init_weave(project_name).client
 
 
