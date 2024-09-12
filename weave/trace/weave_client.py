@@ -1,4 +1,3 @@
-import atexit
 import dataclasses
 import datetime
 import platform
@@ -14,7 +13,6 @@ from requests import HTTPError
 from weave import version
 from weave.legacy.weave import ref_base, urls
 from weave.trace import call_context, trace_sentry
-from weave.trace.async_job_queue import AsyncJobQueue
 from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
@@ -60,7 +58,6 @@ from weave.trace_server.trace_server_interface import (
     TableSchemaForInsert,
     TraceServerInterface,
 )
-from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -389,7 +386,6 @@ class AttributesDict(dict):
 
 class WeaveClient:
     server: TraceServerInterface
-    async_job_queue: AsyncJobQueue
 
     """
     A client for interacting with the Weave trace server.
@@ -412,9 +408,7 @@ class WeaveClient:
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
-        self.async_job_queue = AsyncJobQueue()
         self.ensure_project_exists = ensure_project_exists
-        atexit.register(self._cleanup)
 
         if ensure_project_exists:
             resp = self.server.ensure_project_exists(entity, project)
@@ -597,24 +591,19 @@ class WeaveClient:
 
         current_wb_run_id = safe_current_wb_run_id()
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
-
-        started_at = datetime.datetime.now(tz=datetime.timezone.utc)
-        project_id = self._project_id()
-
-        self.async_job_queue.submit_job(
-            send_start_call,
-            project_id=project_id,
-            call_id=call_id,
-            op_str=op_str,
-            trace_id=trace_id,
-            started_at=started_at,
+        start = StartedCallSchemaForInsert(
+            project_id=self._project_id(),
+            id=call_id,
+            op_name=op_str,
             display_name=display_name,
+            trace_id=trace_id,
+            started_at=datetime.datetime.now(tz=datetime.timezone.utc),
             parent_id=parent_id,
-            inputs_with_refs=inputs_with_refs,
+            inputs=to_json(inputs_with_refs, self._project_id(), self.server),
             attributes=attributes,
-            current_wb_run_id=current_wb_run_id,
-            server=self.server,
+            wb_run_id=current_wb_run_id,
         )
+        self.server.call_start(CallStartReq(start=start))
 
         if use_stack:
             call_context.push_call(call)
@@ -661,17 +650,17 @@ class WeaveClient:
             exception_str = exception_to_json_str(exception)
             call.exception = exception_str
 
-        project_id = self._project_id()
-        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
-        self.async_job_queue.submit_job(
-            send_end_call,
-            project_id=project_id,
-            call_id=call.id,
-            ended_at=ended_at,
-            output=output,
-            summary=summary,
-            exception_str=exception_str,
-            server=self.server,
+        self.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=self._project_id(),
+                    id=call.id,  # type: ignore
+                    ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                    output=to_json(output, self._project_id(), self.server),
+                    summary=summary,
+                    exception=exception_str,
+                )
+            )
         )
 
         # Descendent error tracking disabled til we fix UI
@@ -1105,73 +1094,6 @@ class WeaveClient:
 
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
-
-    def flush(self) -> None:
-        self.async_job_queue.flush()
-        if isinstance(self.server, RemoteHTTPTraceServer):
-            if self.server.should_batch:
-                self.server.call_processor.wait_until_all_processed()
-
-    def __del__(self) -> None:
-        self._cleanup()
-        atexit.unregister(self._cleanup)
-
-    def _cleanup(self) -> None:
-        self.flush()
-        self.async_job_queue.shutdown(wait=True)
-
-
-def send_start_call(
-    project_id: str,
-    call_id: str,
-    op_str: str,
-    trace_id: str,
-    started_at: datetime.datetime,
-    display_name: Optional[str],
-    parent_id: Optional[str],
-    inputs_with_refs: dict[str, Any],
-    attributes: dict[str, Any],
-    current_wb_run_id: Optional[str],
-    server: TraceServerInterface,
-) -> None:
-    inputs_json = to_json(inputs_with_refs, project_id, server)
-    start = StartedCallSchemaForInsert(
-        project_id=project_id,
-        id=call_id,
-        op_name=op_str,
-        display_name=display_name,
-        trace_id=trace_id,
-        started_at=started_at,
-        parent_id=parent_id,
-        inputs=inputs_json,
-        attributes=attributes,
-        wb_run_id=current_wb_run_id,
-    )
-    server.call_start(CallStartReq(start=start))
-
-
-def send_end_call(
-    project_id: str,
-    call_id: str,
-    ended_at: datetime.datetime,
-    output: Any,
-    summary: dict[str, Any],
-    exception_str: Optional[str],
-    server: TraceServerInterface,
-) -> None:
-    output_json = to_json(output, project_id, server)
-    server.call_end(
-        CallEndReq(
-            end=EndedCallSchemaForInsert(
-                project_id=project_id,
-                id=call_id,
-                ended_at=ended_at,
-                output=output_json,
-                summary=summary,
-                exception=exception_str,
-            )
-        )
-    )
 
 
 def safe_current_wb_run_id() -> Optional[str]:
