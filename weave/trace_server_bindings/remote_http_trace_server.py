@@ -3,6 +3,7 @@ import json
 import logging
 import typing as t
 
+import requests
 import tenacity
 from pydantic import BaseModel, ValidationError
 
@@ -166,6 +167,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             data=encoded_data,
             auth=self._auth,
         )
+        if r.status_code == 413:
+            # handle 413 explicitly to provide actionable error message
+            raise requests.HTTPError(
+                f"413 Client Error: {r.text['reason']}", response=r
+            )
         r.raise_for_status()
 
     @tenacity.retry(
