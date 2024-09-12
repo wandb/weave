@@ -13,6 +13,17 @@ import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 
+// Expose a window-level param for poll interval
+declare global {
+  interface Window {
+    WEAVE_CALLS_POLL_INTERVAL_MS?: number;
+  }
+}
+
+const getPollIntervalMs = (): number | undefined => {
+  return window.WEAVE_CALLS_POLL_INTERVAL_MS;
+};
+
 /**
  * This Hook is responsible for bridging the gap between the CallsTable
  * component and the underlying data hooks. In particular, it takes a high level
@@ -53,11 +64,13 @@ export const useCallsForQuery = (
     expandedColumns,
     {
       refetchOnDelete: true,
+      pollIntervalMs: getPollIntervalMs(),
     }
   );
 
   const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
     refetchOnDelete: true,
+    pollIntervalMs: getPollIntervalMs(),
   });
 
   const callResults = useMemo(() => {

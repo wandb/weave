@@ -239,7 +239,11 @@ const useCallsNoExpansion = (
   sortBy?: traceServerTypes.SortBy[],
   query?: Query,
   columns?: string[],
-  opts?: {skip?: boolean; refetchOnDelete?: boolean}
+  opts?: {
+    skip?: boolean;
+    refetchOnDelete?: boolean;
+    pollIntervalMs?: number;
+  }
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -247,60 +251,72 @@ const useCallsNoExpansion = (
     useState<traceServerTypes.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
 
-  const doFetch = useCallback(() => {
-    if (opts?.skip) {
-      return;
-    }
-    setCallRes(null);
-    loadingRef.current = true;
-    const req: traceServerTypes.TraceCallsQueryReq = {
-      project_id: projectIdFromParts({entity, project}),
-      filter: {
-        op_names: deepFilter.opVersionRefs,
-        input_refs: deepFilter.inputObjectVersionRefs,
-        output_refs: deepFilter.outputObjectVersionRefs,
-        parent_ids: deepFilter.parentIds,
-        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
-        call_ids: deepFilter.callIds,
-        trace_roots_only: deepFilter.traceRootsOnly,
-        wb_run_ids: deepFilter.runIds,
-        wb_user_ids: deepFilter.userIds,
-      },
+  const doFetch = useCallback(
+    (shouldPoll: boolean = false) => {
+      if (opts?.skip) {
+        return;
+      }
+      setCallRes(null);
+      loadingRef.current = true;
+      const req: traceServerTypes.TraceCallsQueryReq = {
+        project_id: projectIdFromParts({entity, project}),
+        filter: {
+          op_names: deepFilter.opVersionRefs,
+          input_refs: deepFilter.inputObjectVersionRefs,
+          output_refs: deepFilter.outputObjectVersionRefs,
+          parent_ids: deepFilter.parentIds,
+          trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
+          call_ids: deepFilter.callIds,
+          trace_roots_only: deepFilter.traceRootsOnly,
+          wb_run_ids: deepFilter.runIds,
+          wb_user_ids: deepFilter.userIds,
+        },
+        limit,
+        offset,
+        sort_by: sortBy,
+        query,
+        columns,
+      };
+      const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
+        loadingRef.current = false;
+        setCallRes(res);
+      };
+      const onError = (e: any) => {
+        loadingRef.current = false;
+        console.error(e);
+        setCallRes({calls: []});
+      };
+      getTsClient()
+        .callsStreamQuery(req)
+        .then(onSuccess)
+        .catch(onError)
+        .finally(() => {
+          if (shouldPoll && opts?.pollIntervalMs) {
+            setTimeout(() => doFetch(true), opts.pollIntervalMs);
+          }
+        });
+    },
+    [
+      entity,
+      project,
+      deepFilter,
       limit,
+      opts?.skip,
+      opts?.pollIntervalMs,
+      getTsClient,
       offset,
-      sort_by: sortBy,
+      sortBy,
       query,
       columns,
-    };
-    const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
-      loadingRef.current = false;
-      setCallRes(res);
-    };
-    const onError = (e: any) => {
-      loadingRef.current = false;
-      console.error(e);
-      setCallRes({calls: []});
-    };
-    getTsClient().callsStreamQuery(req).then(onSuccess).catch(onError);
-  }, [
-    entity,
-    project,
-    deepFilter,
-    limit,
-    opts?.skip,
-    getTsClient,
-    offset,
-    sortBy,
-    query,
-    columns,
-  ]);
+    ]
+  );
 
   // register doFetch as a callback after deletion
   useEffect(() => {
     if (opts?.refetchOnDelete) {
       const client = getTsClient();
-      const unregisterDelete = client.registerOnDeleteListener(doFetch);
-      const unregisterRename = client.registerOnRenameListener(doFetch);
+      const unregisterDelete = client.registerOnDeleteListener(() => doFetch());
+      const unregisterRename = client.registerOnRenameListener(() => doFetch());
       return () => {
         unregisterDelete();
         unregisterRename();
@@ -313,7 +329,7 @@ const useCallsNoExpansion = (
     if (opts?.skip) {
       return;
     }
-    doFetch();
+    doFetch(true);
   }, [opts?.skip, doFetch]);
 
   return useMemo(() => {
@@ -367,7 +383,11 @@ const useCalls = (
   query?: Query,
   columns?: string[],
   expandedRefColumns?: Set<string>,
-  opts?: {skip?: boolean; refetchOnDelete?: boolean}
+  opts?: {
+    skip?: boolean;
+    refetchOnDelete?: boolean;
+    pollIntervalMs?: number;
+  }
 ): Loadable<CallSchema[]> => {
   const calls = useCallsNoExpansion(
     entity,
@@ -403,7 +423,7 @@ const useCallsStats = (
   project: string,
   filter: CallFilter,
   query?: Query,
-  opts?: {skip?: boolean; refetchOnDelete?: boolean}
+  opts?: {skip?: boolean; refetchOnDelete?: boolean; pollIntervalMs?: number}
 ) => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -413,44 +433,60 @@ const useCallsStats = (
     );
   const deepFilter = useDeepMemo(filter);
 
-  const doFetch = useCallback(() => {
-    if (opts?.skip) {
-      setCallStatsRes({loading: false, result: null, error: null});
-      return;
-    }
-    loadingRef.current = true;
-    setCallStatsRes(null);
+  const doFetch = useCallback(
+    (shouldPoll: boolean = false) => {
+      if (opts?.skip) {
+        setCallStatsRes({loading: false, result: null, error: null});
+        return;
+      }
+      loadingRef.current = true;
+      setCallStatsRes(null);
 
-    const req: traceServerTypes.TraceCallsQueryStatsReq = {
-      project_id: projectIdFromParts({entity, project}),
-      filter: {
-        op_names: deepFilter.opVersionRefs,
-        input_refs: deepFilter.inputObjectVersionRefs,
-        output_refs: deepFilter.outputObjectVersionRefs,
-        parent_ids: deepFilter.parentIds,
-        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
-        call_ids: deepFilter.callIds,
-        trace_roots_only: deepFilter.traceRootsOnly,
-        wb_run_ids: deepFilter.runIds,
-        wb_user_ids: deepFilter.userIds,
-      },
+      const req: traceServerTypes.TraceCallsQueryStatsReq = {
+        project_id: projectIdFromParts({entity, project}),
+        filter: {
+          op_names: deepFilter.opVersionRefs,
+          input_refs: deepFilter.inputObjectVersionRefs,
+          output_refs: deepFilter.outputObjectVersionRefs,
+          parent_ids: deepFilter.parentIds,
+          trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
+          call_ids: deepFilter.callIds,
+          trace_roots_only: deepFilter.traceRootsOnly,
+          wb_run_ids: deepFilter.runIds,
+          wb_user_ids: deepFilter.userIds,
+        },
+        query,
+      };
+
+      getTsClient()
+        .callsQueryStats(req)
+        .then(res => {
+          loadingRef.current = false;
+          setCallStatsRes({loading: false, result: res, error: null});
+        })
+        .catch(err => {
+          loadingRef.current = false;
+          setCallStatsRes({loading: false, result: null, error: err});
+        })
+        .finally(() => {
+          if (shouldPoll && opts?.pollIntervalMs) {
+            setTimeout(() => doFetch(true), opts.pollIntervalMs);
+          }
+        });
+    },
+    [
+      deepFilter,
+      entity,
+      project,
       query,
-    };
-
-    getTsClient()
-      .callsQueryStats(req)
-      .then(res => {
-        loadingRef.current = false;
-        setCallStatsRes({loading: false, result: res, error: null});
-      })
-      .catch(err => {
-        loadingRef.current = false;
-        setCallStatsRes({loading: false, result: null, error: err});
-      });
-  }, [deepFilter, entity, project, query, opts?.skip, getTsClient]);
+      opts?.skip,
+      getTsClient,
+      opts?.pollIntervalMs,
+    ]
+  );
 
   useEffect(() => {
-    doFetch();
+    doFetch(true);
   }, [doFetch]);
 
   useEffect(() => {
