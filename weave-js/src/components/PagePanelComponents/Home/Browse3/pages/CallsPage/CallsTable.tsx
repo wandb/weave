@@ -858,9 +858,9 @@ export const CallsTable: FC<{
   );
 };
 
-const ButtonDivider = () => {
-  return <div className="h-24 flex-none border-l-[1px] border-moon-250"></div>;
-};
+const ButtonDivider = () => (
+  <div className="h-24 flex-none border-l-[1px] border-moon-250"></div>
+);
 
 const useParentIdOptions = (
   entity: string,
