@@ -35,6 +35,9 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
     if (USE_TABLE_FOR_ARRAYS && data.valueType === 'array') {
       return <DataTableView data={data.value} />;
     }
+    if (data.valueType === 'array' && data.value.length === 0) {
+      return <ValueViewPrimitive>Empty List</ValueViewPrimitive>;
+    }
     return null;
   }
 
@@ -74,8 +77,10 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   }
 
   if (data.valueType === 'array') {
+    if (data.value.length === 0) {
+      return <ValueViewPrimitive>Empty List</ValueViewPrimitive>;
+    }
     // Compared to toString this keeps the square brackets.
-    // This is particularly helpful for empty lists, for which toString would return an empty string.
     return <div>{JSON.stringify(data.value)}</div>;
   }
 
