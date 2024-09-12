@@ -114,7 +114,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install tox
       - name: Run tox
-        run: tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }}
+        run: tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }} -- -n4
 
   test:
     name: Python unit tests
