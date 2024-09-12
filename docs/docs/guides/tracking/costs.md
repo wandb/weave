@@ -6,7 +6,7 @@ In the future, Weave will use a custom cost model, which can be set up by the us
 
 ## Adding a custom cost
 
-You can add a custom cost by using the `add_costs` method.
+You can add a custom cost by using the [`add_costs`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-add_costs) method.
 The two required fields are `prompt_token_cost` and `completion_token_cost`.
 You can also set `effective_date` to a datetime, to make the cost effective at a specific date, this defaults to the current date.
 
@@ -40,7 +40,7 @@ client.add_costs({
 
 ## Querying for costs
 
-You can query for costs by using the `query_costs` method.
+You can query for costs by using the [`query_costs`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-query_costs) method.
 There are a few ways to query for costs, you can pass in a singular cost id, or a list of LLM model names.
 
 ```python
@@ -85,12 +85,15 @@ class YourModel(Model):
     def simple_token_count(self, text: str) -> int:
         return len(text) // 3
 
-    # This is a custom op that we are defining, it is a made up model, that takes in a string, and returns a string
+    # This is a custom op that we are defining
+    # It takes in a string, and outputs a dict with the usage counts, model name, and the output
     @weave.op()
     def custom_model_generate(self, input_data: str) -> dict:
-      # Model logic goes here
+        # Model logic goes here
+        # Here is where you would have a custom generate function
         prediction = self.attribute1 + ' ' + input_data
 
+        # Usage counts
         prompt_tokens = self.simple_token_count(input_data)
         completion_tokens = self.simple_token_count(prediction)
 
@@ -107,6 +110,7 @@ client = weave.init("my_custom_cost_model6")
 model = YourModel(attribute1="Hello", attribute2=1)
 result, call = model.predict.call("world")
 
+# We then add a custom cost to our project
 client.add_costs({
     "your_model_name": {
         "prompt_token_cost": 0.1,
@@ -114,6 +118,8 @@ client.add_costs({
     }
 })
 
+# We can then query for the calls, and with include_costs=True
+# we receive the costs back attached to the calls
 calls = client.get_calls(filter={"trace_roots_only": True}, include_costs=True)
 ```
 
@@ -131,25 +137,27 @@ def get_costs_for_project(project_name: str):
     requests = 0
 
     client = weave.init(project_name)
+    # Fetch all the calls in the project
     calls = list(
         client.get_calls(filter={"trace_roots_only": True}, include_costs=True)
     )
 
     for call in calls:
+        # If the call has costs, we add them to the total cost
         if call.summary["weave"] is not None and call.summary["weave"].get("costs", None) is not None:
             for k, cost in call.summary["weave"]["costs"].items():
                 requests += cost["requests"]
                 total_cost += cost["prompt_tokens_total_cost"]
                 total_cost += cost["completion_tokens_total_cost"]
 
-
-
+    # We return the total cost, requests, and calls
     return {
         "total_cost": total_cost,
         "requests": requests,
         "calls": len(calls),
     }
 
-
+# Since we decorated our function with @weave.op(),
+# our totals are stored in weave for historic cost total calculations
 get_costs_for_project("my_custom_cost_model")
 ```
