@@ -9,7 +9,7 @@ sudo apt update
 sudo apt install -y libsndfile1
 
 # Install python packages
-pip install -r requirements.dev.txt -r requirements.test.txt 
+pip install -r requirements.dev.txt -r requirements.legacy.test.txt 
 pip install -e .[ecosystem]
 pre-commit install
 
