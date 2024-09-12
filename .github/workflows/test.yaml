@@ -87,7 +87,8 @@ jobs:
           ]
         tox-shard:
           [
-            'base',
+            'trace',
+            'trace_server',
             'anthropic',
             'cerebras',
             'cohere',
