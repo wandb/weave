@@ -48,24 +48,22 @@ First, let's set up our environment and import the necessary libraries:
 
 ```python
 import ast
+import os
 import re
-from typing import List, Optional
+import subprocess
+import tempfile
+import traceback
 
 import autopep8
 import isort
-import weave
 from autoflake import fix_code
+from datasets import load_dataset
 from openai import OpenAI
 from pydantic import BaseModel
-from weave import Dataset, Evaluation
-
-import tempfile
-import subprocess
-import traceback
-import os
-
 from set_env import set_env
-from datasets import load_dataset
+
+import weave
+from weave import Dataset, Evaluation
 
 set_env("WANDB_API_KEY")
 set_env("OPENAI_API_KEY")
@@ -85,7 +83,7 @@ client = OpenAI()
 
 ```python
 human_eval = load_dataset("openai_humaneval")
-selected_examples = human_eval['test'][:3]
+selected_examples = human_eval["test"][:3]
 ```
 
 :::note
@@ -110,6 +108,7 @@ class GeneratedCode(BaseModel):
     function_args_with_docstring_within_triple_quotes: str
     code_logic: str
 
+
 class FormattedGeneratedCode(BaseModel):
     full_code: str
 ```
@@ -121,24 +120,24 @@ To ensure consistent and clean code output, we implement a `CodeFormatter` class
 
 ```python
 class CodeFormatter(BaseModel):
-
     @weave.op()
     def lint_code(self, code: str) -> str:
         # Replace escaped newlines with actual newlines
-        code = code.replace('\\n', '\n')
+        code = code.replace("\\n", "\n")
 
         # Remove unused imports and variables
-        code = fix_code(code, remove_all_unused_imports=True,
-                        remove_unused_variables=True)
+        code = fix_code(
+            code, remove_all_unused_imports=True, remove_unused_variables=True
+        )
 
         # Sort imports
         code = isort.code(code)
 
         # Apply PEP 8 formatting
-        code = autopep8.fix_code(code, options={'aggressive': 2})
+        code = autopep8.fix_code(code, options={"aggressive": 2})
 
         return code
-    
+
     @weave.op()
     def add_imports(self, code: str) -> str:
         tree = ast.parse(code)
@@ -151,50 +150,61 @@ class CodeFormatter(BaseModel):
                     global_names.add(node.id)
 
         # Only add typing imports that are actually used
-        typing_imports = global_names.intersection({'List', 'Dict', 'Tuple', 'Set', 'Optional', 'Union'})
+        typing_imports = global_names.intersection(
+            {"List", "Dict", "Tuple", "Set", "Optional", "Union"}
+        )
         if typing_imports:
-            from_imports['typing'] = typing_imports
+            from_imports["typing"] = typing_imports
 
         # Remove names that are defined within the function
-        function_def = next(node for node in tree.body if isinstance(node, ast.FunctionDef))
+        function_def = next(
+            node for node in tree.body if isinstance(node, ast.FunctionDef)
+        )
         local_names = {arg.arg for arg in function_def.args.args}
-        local_names.update(node.id for node in ast.walk(function_def) if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store))
-        
+        local_names.update(
+            node.id
+            for node in ast.walk(function_def)
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+        )
+
         global_names -= local_names
-        global_names -= {'sorted'}  # Remove built-in functions
+        global_names -= {"sorted"}  # Remove built-in functions
 
         # Construct the import statements
         import_statements = []
         for module, names in from_imports.items():
-            names_str = ', '.join(sorted(names))
+            names_str = ", ".join(sorted(names))
             import_statements.append(f"from {module} import {names_str}")
 
-        return '\n'.join(import_statements) + ('\n\n' if import_statements else '') + code
-    
+        return (
+            "\n".join(import_statements) + ("\n\n" if import_statements else "") + code
+        )
+
     @weave.op()
-    def format_generated_code(self, generated_code: GeneratedCode) -> FormattedGeneratedCode:
+    def format_generated_code(
+        self, generated_code: GeneratedCode
+    ) -> FormattedGeneratedCode:
         # Combine the code parts
         full_code = f"{generated_code.function_signature}\n{generated_code.function_args_with_docstring_within_triple_quotes}\n{generated_code.code_logic}"
-        
+
         # Ensure proper indentation
-        lines = full_code.split('\n')
+        lines = full_code.split("\n")
         indented_lines = []
         for i, line in enumerate(lines):
             if i == 0:  # Function signature
                 indented_lines.append(line)
             elif i == 1:  # Function arguments (docstring)
-                indented_lines.append('    ' + line)
+                indented_lines.append("    " + line)
             else:  # Function body
-                indented_lines.append('    ' + line)
-        full_code = '\n'.join(indented_lines)
+                indented_lines.append("    " + line)
+        full_code = "\n".join(indented_lines)
 
         # Lint the code
         full_code = self.lint_code(full_code)
 
         # Add imports
         cleaned_code = self.add_imports(full_code)
-        
-        
+
         return FormattedGeneratedCode(full_code=cleaned_code)
 ```
 
@@ -216,11 +226,12 @@ We're using a `weave.Model` so that it's automatically versioned when it changes
 
 ```python
 class CodeGenerationPipeline(weave.Model):
-
     model_name: str
     formatter: CodeFormatter
 
-    def __init__(self, model_name: str = "gpt-4o", formatter: CodeFormatter = CodeFormatter()):
+    def __init__(
+        self, model_name: str = "gpt-4o", formatter: CodeFormatter = CodeFormatter()
+    ):
         super().__init__(model_name=model_name, formatter=formatter)
         self.model_name = model_name
         self.formatter = formatter
@@ -229,7 +240,7 @@ class CodeGenerationPipeline(weave.Model):
     async def predict(self, prompt: str):
         generated_code = self.generate_code(prompt)
         formatted_generated_code = self.formatter.format_generated_code(generated_code)
-        
+
         return formatted_generated_code.full_code
 
     @weave.op()
@@ -237,8 +248,11 @@ class CodeGenerationPipeline(weave.Model):
         completion = client.beta.chat.completions.parse(
             model=self.model_name,
             messages=[
-                {"role": "system", "content": "You are an expert Python code generator."},
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content": "You are an expert Python code generator.",
+                },
+                {"role": "user", "content": prompt},
             ],
             response_format=GeneratedCode,
         )
@@ -247,7 +261,6 @@ class CodeGenerationPipeline(weave.Model):
             return message.parsed
         else:
             raise ValueError(message.refusal)
-
 ```
 
 This `CodeGenerationPipeline` class encapsulates our code generation logic as a Weave Model, providing several key benefits:
@@ -278,19 +291,18 @@ if __name__ == "__main__":
 ```python
 @weave.op()
 async def score_humaneval_test(test: str, entry_point: str, model_output: str):
-
     generated_code = model_output
-    
+
     # Extract test cases from the test string
-    test_cases = re.findall(r'assert.*', test)
-    test_cases_str = '\n            '.join(test_cases)
+    test_cases = re.findall(r"assert.*", test)
+    test_cases_str = "\n            ".join(test_cases)
 
     # Generate the full source code
     full_code = CODE_TEMPLATE.format(
         model_output=generated_code,
         test=test,
         test_cases=test_cases_str,
-        entry_point=entry_point
+        entry_point=entry_point,
     )
 
     # Create a temporary file to store the code
@@ -339,27 +351,31 @@ formatted_selected_examples = [
         "prompt": prompt,
         "canonical_solution": solution,
         "test": test,
-        "entry_point": entry_point
+        "entry_point": entry_point,
     }
     for task_id, prompt, solution, test, entry_point in zip(
-        selected_examples['task_id'],
-        selected_examples['prompt'],
-        selected_examples['canonical_solution'],
-        selected_examples['test'],
-        selected_examples['entry_point']
+        selected_examples["task_id"],
+        selected_examples["prompt"],
+        selected_examples["canonical_solution"],
+        selected_examples["test"],
+        selected_examples["entry_point"],
     )
 ]
 ```
 
 
 ```python
-prompt_dataset = Dataset(name="humaneval_code_gen_example", rows=[
-    {
-        "prompt": example['prompt'],
-        "test": example['test'],
-        "entry_point": example['entry_point']
-    } for example in formatted_selected_examples
-])
+prompt_dataset = Dataset(
+    name="humaneval_code_gen_example",
+    rows=[
+        {
+            "prompt": example["prompt"],
+            "test": example["test"],
+            "entry_point": example["entry_point"],
+        }
+        for example in formatted_selected_examples
+    ],
+)
 weave.publish(prompt_dataset)
 ```
 
@@ -376,15 +392,13 @@ for model_name in ["gpt-4o-2024-08-06"]:
         dataset = prompt_dataset.rows[2]
         result = await pipeline.predict(dataset["prompt"])
         score_result = await score_humaneval_test(
-            dataset["test"],
-            dataset["entry_point"],
-            result["generated_code"].full_code
+            dataset["test"], dataset["entry_point"], result["generated_code"].full_code
         )
     else:
         evaluation = Evaluation(
             name="minimal_code_gen_evaluation",
             dataset=prompt_dataset,
-            scorers=[score_humaneval_test]
+            scorers=[score_humaneval_test],
         )
         results = await evaluation.evaluate(pipeline)
 ```
