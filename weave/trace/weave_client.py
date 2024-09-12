@@ -23,7 +23,7 @@ from weave.trace.object_record import (
 )
 from weave.trace.op import Op, maybe_unbind_method
 from weave.trace.op import op as op_deco
-from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_uri
+from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_call_uri
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.table import Table
@@ -158,7 +158,7 @@ class Call:
         This is different from `op_name` which is usually the ref of the op.
         """
         if self.op_name.startswith("weave:///"):
-            ref = parse_uri(self.op_name)
+            ref = parse_call_uri(self.op_name)
             return ref.name
 
         return self.op_name
