@@ -214,7 +214,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 name=f"{ch_call.id}-inputs",
                 version=out.digest,
             )
-            ch_call.inputs_dump = json.dumps({"file_ref": ref.uri()})
+            ch_call.inputs_dump = json.dumps({"file_digest": out.digest})
 
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
@@ -250,7 +250,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 name=f"{ch_call.id}-output",
                 version=out.digest,
             )
-            ch_call.output_dump = json.dumps({"file_ref": ref.uri()})
+            ch_call.output_dump = json.dumps({"file_digest": out.digest})
 
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
