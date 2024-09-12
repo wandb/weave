@@ -689,7 +689,6 @@ export const CallsTable: FC<{
                 onClick={() => setDeleteConfirmModalOpen(true)}
                 disabled={selectedCalls.length === 0}
               />
-              <ButtonDivider />
               <ConfirmDeleteModal
                 calls={tableData
                   .filter(row => selectedCalls.includes(row.id))
@@ -702,6 +701,8 @@ export const CallsTable: FC<{
               />
             </div>
           )}
+          <ButtonDivider />
+
           <div className="flex-none">
             <ExportSelector
               selectedCalls={selectedCalls}
@@ -734,9 +735,7 @@ export const CallsTable: FC<{
             </>
           )}
           <ButtonDivider />
-          <RefreshButton
-            onClick={() => console.log('refresh')}
-          />
+          <RefreshButton onClick={() => calls.refetch()} />
         </Tailwind>
       }>
       <StyledDataGrid

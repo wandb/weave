@@ -405,7 +405,6 @@ export const BulkDeleteButton: FC<{
 export const RefreshButton: FC<{
   onClick: () => void;
 }> = ({onClick}) => {
-
   return (
     <Box
       sx={{
@@ -418,7 +417,7 @@ export const RefreshButton: FC<{
         size="medium"
         onClick={onClick}
         tooltip="Refresh"
-        icon='randomize-reset-reload'
+        icon="randomize-reset-reload"
       />
     </Box>
   );
