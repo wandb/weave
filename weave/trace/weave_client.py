@@ -5,7 +5,7 @@ import re
 import sys
 import typing
 from functools import lru_cache
-from typing import Any, Dict, Iterator, Optional, Sequence, Union
+from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Union
 
 import pydantic
 from requests import HTTPError
@@ -550,8 +550,12 @@ class WeaveClient:
             op_str = op
 
         inputs_redacted = redact_sensitive_keys(inputs)
+        if op.postprocess_inputs_func:
+            inputs_postprocessed = op.postprocess_inputs_func(inputs_redacted)
+        else:
+            inputs_postprocessed = inputs_redacted
 
-        self._save_nested_objects(inputs_redacted)
+        self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_redacted)
         call_id = generate_id()
 
@@ -612,10 +616,20 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def finish_call(
-        self, call: Call, output: Any = None, exception: Optional[BaseException] = None
+        self,
+        call: Call,
+        output: Any = None,
+        exception: Optional[BaseException] = None,
+        postprocess_outputs: Optional[Callable[..., Any]] = None,
     ) -> None:
-        self._save_nested_objects(output)
         original_output = output
+
+        if postprocess_outputs:
+            postprocessed_outputs = postprocess_outputs(output)
+            self._save_nested_objects(postprocessed_outputs)
+        else:
+            self._save_nested_objects(output)
+
         output = map_to_refs(original_output)
         call.output = output
 
