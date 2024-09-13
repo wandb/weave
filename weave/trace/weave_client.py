@@ -1195,6 +1195,7 @@ def sanitize_object_name(name: str) -> str:
     return res
 
 
+# default max size is 1 MB, theoretically could be safely as high as 3.5MB
 def replace_large_objects(obj: Any, max_size: int = 1 * 1024**2) -> Any:
     if not isinstance(obj, (str, list, dict, tuple)):
         return obj
