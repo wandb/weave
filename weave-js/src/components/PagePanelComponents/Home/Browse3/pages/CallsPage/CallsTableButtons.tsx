@@ -402,6 +402,27 @@ export const BulkDeleteButton: FC<{
   );
 };
 
+export const RefreshButton: FC<{
+  onClick: () => void;
+}> = ({onClick}) => {
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      <Button
+        variant={'ghost'}
+        size="medium"
+        onClick={onClick}
+        tooltip="Refresh"
+        icon="randomize-reset-reload"
+      />
+    </Box>
+  );
+};
+
 function initiateDownloadFromBlob(blob: Blob, fileName: string) {
   const downloadUrl = URL.createObjectURL(blob);
   // Create a download link and click it
