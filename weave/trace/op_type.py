@@ -270,7 +270,8 @@ def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
     func_name = fn.__name__
     sig_str = "(*args, **kwargs)"
 
-    if not isinstance(fn, typing._TypedDict):
+    # This is intended to check for TypedDict, which itself is not isinstance-able
+    if not isinstance(fn, collections.abc.Mapping):
         try:
             sig_str = reconstruct_signature(fn)
         except Exception as e:
