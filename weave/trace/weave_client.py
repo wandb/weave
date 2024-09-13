@@ -787,7 +787,9 @@ class WeaveClient:
         """Add a cost to the current project.
 
         Examples:
+
             ```python
+            client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=1, completion_token_cost=2)
             client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=500, completion_token_cost=1000, effective_date=datetime(1998, 10, 3))
             ```
 
@@ -820,6 +822,13 @@ class WeaveClient:
     def purge_costs(self, ids: Union[list[str], str]) -> None:
         """Purge costs from the current project.
 
+        Examples:
+
+            ```python
+            client.purge_costs([ids])
+            client.purge_costs(ids)
+            ```
+
         Args:
             ids: The cost IDs to purge. Can be a single ID or a list of IDs.
         """
@@ -845,6 +854,7 @@ class WeaveClient:
         """Query project for costs.
 
         Examples:
+
             ```python
             # Fetch a specific cost object.
             # Note that this still returns a collection, which is expected
