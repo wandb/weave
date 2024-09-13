@@ -15,20 +15,6 @@ _call_stack: contextvars.ContextVar[list["Call"]] = contextvars.ContextVar(
 logger = logging.getLogger(__name__)
 
 
-@contextlib.contextmanager
-def current_call(
-    call: "Call",
-) -> typing.Iterator[list["Call"]]:
-    new_stack = copy.copy(_call_stack.get())
-    new_stack.append(call)
-
-    token = _call_stack.set(new_stack)
-    try:
-        yield new_stack
-    finally:
-        _call_stack.reset(token)
-
-
 def push_call(call: "Call") -> None:
     new_stack = copy.copy(_call_stack.get())
     new_stack.append(call)
