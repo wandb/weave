@@ -2,6 +2,8 @@ import React from 'react';
 
 import {CustomWeaveTypePayload} from './customWeaveType.types';
 import {PILImageImage} from './PIL.Image.Image/PILImageImage';
+import {JsonBlob} from './JSONblob/Jsonblob';
+
 
 type CustomWeaveTypeDispatcherProps = {
   data: CustomWeaveTypePayload;
@@ -27,6 +29,9 @@ const customWeaveTypeRegistry: {
 } = {
   'PIL.Image.Image': {
     component: PILImageImage,
+  },
+  'weave.type_serializers.JSONBlob.jsonblob.JSONBlob': {
+    component: JsonBlob,
   },
 };
 
@@ -57,6 +62,7 @@ export const CustomWeaveTypeDispatcher: React.FC<
 > = ({data, entity, project}) => {
   const projectContext = React.useContext(CustomWeaveTypeProjectContext);
   const typeId = data.weave_type.type;
+  console.log('typeId', typeId)
   const comp = customWeaveTypeRegistry[typeId]?.component;
   const defaultReturn = <span>Custom Weave Type: {data.weave_type.type}</span>;
 
