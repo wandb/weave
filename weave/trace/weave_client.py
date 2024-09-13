@@ -6,7 +6,7 @@ import sys
 import typing
 from functools import lru_cache
 from typing import Any, Dict, Iterator, Optional, Sequence, Union
-
+import logging
 import pydantic
 import requests
 from requests import HTTPError
@@ -1203,7 +1203,7 @@ def sanitize_object_name(name: str) -> str:
 
 
 # match local image file paths
-image_suffix = r".*\.(png|jpg|jpeg|gif|tiff)$"
+image_suffix = r".*\.(png|jpg|jpeg|gif|tiff)"
 image_pattern = re.compile(rf"^{image_suffix}$", re.IGNORECASE)
 remote_image_pattern = re.compile(rf"https://.*\.{image_suffix}")
 
