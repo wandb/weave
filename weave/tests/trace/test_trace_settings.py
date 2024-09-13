@@ -37,10 +37,10 @@ def test_disabled_env(client):
     ), "Disabled weave should be faster than enabled weave"
 
 
-def test_disabled_env_client(make_client):
+def test_disabled_env_client():
     os.environ["WEAVE_DISABLED"] = "true"
     client = weave.init("entity/project")
-    assert client == None
+    assert client.project == "DISABLED"
 
 
 def test_print_call_link_setting(client):

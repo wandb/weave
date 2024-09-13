@@ -4,7 +4,6 @@ import contextlib
 import os
 import threading
 import time
-import typing
 from typing import Any, Callable, Iterator, Optional, Union
 
 # TODO: type_serializers is imported here to trigger registration of the image serializer.
@@ -43,6 +42,10 @@ def init(
         A Weave client.
     """
     parse_and_apply_settings(settings)
+
+    if should_disable_weave():
+        return weave_init.init_weave_disabled().client
+
     return weave_init.init_weave(project_name).client
 
 

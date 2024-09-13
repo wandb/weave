@@ -147,21 +147,30 @@ def init_weave(
 
     return _current_inited_client
 
-def init_weave_disabled(
 
-) -> InitializedClient:
+def init_weave_disabled() -> InitializedClient:
+    """Initialize a dummy client that does nothing.
+
+    This is used when the program is execuring with Weave disabled.
+
+    Note: as currently implemented, any explicit calls to client.{X} will
+    likely fail, since the user is not authenticated. The purpose of
+    disabling weave is to disable _tracing_. Programs that attempt to
+    make requests (eg. publishing, fetching, querying) while disabled
+    will fail.
+    """
+    global _current_inited_client
     if _current_inited_client is not None:
         _current_inited_client.reset()
 
     client = weave_client.WeaveClient(
-        "", "", remote_server, ensure_project_exists=False
+        "DISABLED",
+        "DISABLED",
+        init_weave_get_server("DISABLED"),
+        ensure_project_exists=False,
     )
-    # If the project name was formatted by init, update the project name
-    project_name = client.project
 
-    _current_inited_client = InitializedClient(client)
-    
-    
+    return InitializedClient(client)
 
 
 def init_weave_get_server(
