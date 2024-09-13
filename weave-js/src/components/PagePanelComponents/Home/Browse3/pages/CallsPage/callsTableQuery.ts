@@ -36,6 +36,7 @@ export const useCallsForQuery = (
   expandedColumns: Set<string>,
   includeCosts: boolean = false
 ): {
+  costsLoading: boolean;
   result: CallSchema[];
   loading: boolean;
   total: number;
