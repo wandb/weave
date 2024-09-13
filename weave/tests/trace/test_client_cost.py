@@ -81,19 +81,13 @@ def test_cost_apis(client):
         assert res[1].completion_token_cost_unit == "USD"
 
     # Add another cost of the same llm_id
-    costs = {
-        "my_model_to_delete3": {
-            "prompt_token_cost": 500,
-            "completion_token_cost": 1000,
-            "effective_date": datetime(1998, 10, 3),
-        },
-    }
-    res = client.server.cost_create(
-        tsi.CostCreateReq(
-            project_id=project_id,
-            costs=costs,
-            wb_user_id="VXNlcjo0NTI1NDQ=",
-        )
+    res = client.add_cost(
+        llm_id="my_model_to_delete3",
+        cost=tsi.CostCreateInput(
+            prompt_token_cost=500,
+            completion_token_cost=1000,
+            effective_date=datetime(1998, 10, 3),
+        ),
     )
 
     assert len(res.ids) == 1
@@ -207,18 +201,3 @@ def test_purge_only_ids(client):
             ),
         )
     )
-
-
-def test_cost_create_invalid_costs(client):
-    try:
-        client.add_costs({"my_model": {"prompt_token_cost": "not_a_number"}})
-        assert False, "Expected ValueError"
-    except ValueError as e:
-        assert "prompt_token_cost" in str(e)
-
-    try:
-        client.add_costs({"my_model": {}})
-        assert False, "Expected ValueError"
-    except ValueError as e:
-        assert "prompt_token_cost" in str(e)
-        assert "completion_token_cost" in str(e)

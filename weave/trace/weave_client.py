@@ -774,43 +774,47 @@ class WeaveClient:
             query=query, reaction=reaction, offset=offset, limit=limit
         )
 
-    def add_costs(
-        self, costs: Dict[str, typing.Union[CostCreateInput, dict[str, Any]]]
+    def add_cost(
+        self,
+        llm_id: str,
+        prompt_token_cost: float,
+        completion_token_cost: float,
+        effective_date: typing.Optional[datetime.datetime] = None,
+        prompt_token_cost_unit: typing.Optional[str] = None,
+        completion_token_cost_unit: typing.Optional[str] = None,
+        provider_id: typing.Optional[str] = None,
     ) -> CostCreateRes:
-        """Add costs to the current project.
-            The cost object will be created with the effective date of the date of insertion `datetime.datetime.now(ZoneInfo("UTC"))` if no effective_date is provided.
+        """Add a cost to the current project.
 
         Examples:
             ```python
-            costs = {
-                "my_expensive_custom_model": {
-                    "prompt_token_cost": 500,
-                    "completion_token_cost": 1000,
-                    "effective_date": datetime(1998, 10, 3),
-                },
-                "gpt-4o-mini-2024-07-18" :{
-                    "prompt_token_cost": 100,
-                    "completion_token_cost": 200,
-                    "effective_date": datetime(2024, 9, 1),
-                }
-            }
-
-            client.add_costs(costs)
+            client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=500, completion_token_cost=1000, effective_date=datetime(1998, 10, 3))
             ```
 
         Args:
-            costs: Dictionary of costs to add to the project. In the form of `{llm_id: {prompt_token_cost, completion_token_cost}}`.
+            llm_id: The ID of the LLM. eg "gpt-4o-mini-2024-07-18"
+            prompt_token_cost: The cost of the prompt tokens. eg .0005
+            completion_token_cost: The cost of the completion tokens. eg .0015
+            effective_date: Defaults to the current date. A datetime.datetime object.
+            provider_id: The provider of the LLM. Defaults to "default". eg "openai"
+            prompt_token_cost_unit: The unit of the cost for the prompt tokens. Defaults to "USD". (Currently unused, will be used in the future to specify the currency type for the cost eg "tokens" or "time")
+            completion_token_cost_unit: The unit of the cost for the completion tokens. Defaults to "USD". (Currently unused, will be used in the future to specify the currency type for the cost eg "tokens" or "time")
 
+        Returns:
+            A CostCreateRes object.
+            Which has one field called a list of tuples called ids.
+            Each tuple contains the llm_id and the id of the created cost object.
         """
-        parsed_costs = {}
-        for llm_id, cost_dict in costs.items():
-            try:
-                parsed_costs[llm_id] = CostCreateInput(**cost_dict)
-            except pydantic.ValidationError as e:
-                raise ValueError(f"Invalid cost data for '{llm_id}': {e}")
-
+        cost = CostCreateInput(
+            prompt_token_cost=prompt_token_cost,
+            completion_token_cost=completion_token_cost,
+            effective_date=effective_date,
+            prompt_token_cost_unit=prompt_token_cost_unit,
+            completion_token_cost_unit=completion_token_cost_unit,
+            provider_id=provider_id,
+        )
         return self.server.cost_create(
-            CostCreateReq(project_id=self._project_id(), costs=parsed_costs)
+            CostCreateReq(project_id=self._project_id(), costs={llm_id: cost})
         )
 
     def purge_costs(self, ids: Union[list[str], str]) -> None:
