@@ -42,6 +42,15 @@ def test_disabled_env_client():
     client = weave.init("entity/project")
     assert client.project == "DISABLED"
 
+    @weave.op
+    def func():
+        return 1
+
+    assert func() == 1
+
+    # No error implies that no calls were sent to the server
+    client._flush()
+
 
 def test_print_call_link_setting(client):
     captured_stdout = io.StringIO()

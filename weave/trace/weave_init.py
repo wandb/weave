@@ -166,7 +166,7 @@ def init_weave_disabled() -> InitializedClient:
     client = weave_client.WeaveClient(
         "DISABLED",
         "DISABLED",
-        init_weave_get_server("DISABLED"),
+        init_weave_get_server("DISABLED", should_batch=False),
         ensure_project_exists=False,
     )
 
@@ -175,8 +175,9 @@ def init_weave_disabled() -> InitializedClient:
 
 def init_weave_get_server(
     api_key: typing.Optional[str] = None,
+    should_batch: bool = True,
 ) -> remote_http_trace_server.RemoteHTTPTraceServer:
-    res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
+    res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(should_batch)
     if api_key is not None:
         res.set_auth(("api", api_key))
     return res
