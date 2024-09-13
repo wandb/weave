@@ -126,8 +126,8 @@ class Op(Protocol):
     ref: Optional[ObjectRef]
     resolve_fn: Callable
 
-    postprocess_inputs_func: Optional[Callable[[dict[str, Any]], dict[str, Any]]]
-    postprocess_outputs_func: Optional[Callable[..., Any]]
+    postprocess_inputs: Optional[Callable[[dict[str, Any]], dict[str, Any]]]
+    postprocess_outputs: Optional[Callable[..., Any]]
 
     call: Callable[..., Any]
     calls: Callable[..., "CallsIter"]
@@ -217,7 +217,7 @@ def _execute_call(
             call,
             output,
             exception,
-            postprocess_outputs_func=__op.postprocess_outputs_func,
+            postprocess_outputs=__op.postprocess_outputs,
         )
         if not call_context.get_current_call():
             print_call_link(call)
@@ -346,8 +346,8 @@ def op(func: Any) -> Op: ...
 @overload
 def op(
     *,
-    postprocess_inputs_func: Callable[[dict[str, Any]], dict[str, Any]],
-    postprocess_outputs_func: Callable[..., Any],
+    postprocess_inputs: Callable[[dict[str, Any]], dict[str, Any]],
+    postprocess_outputs: Callable[..., Any],
 ) -> Any:
     """
     Modify the inputs and outputs of an op before sending data to weave.
@@ -440,8 +440,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
 
-            wrapper.postprocess_inputs_func = kwargs.get("postprocess_inputs_func")  # type: ignore
-            wrapper.postprocess_outputs_func = kwargs.get("postprocess_outputs_func")  # type: ignore
+            wrapper.postprocess_inputs = kwargs.get("postprocess_inputs")  # type: ignore
+            wrapper.postprocess_outputs = kwargs.get("postprocess_outputs")  # type: ignore
 
             wrapper.call = partial(call, wrapper)  # type: ignore
             wrapper.calls = partial(calls, wrapper)  # type: ignore

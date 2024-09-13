@@ -550,8 +550,8 @@ class WeaveClient:
             op_str = op
 
         inputs_redacted = redact_sensitive_keys(inputs)
-        if op.postprocess_inputs_func:
-            inputs_postprocessed = op.postprocess_inputs_func(inputs_redacted)
+        if op.postprocess_inputs:
+            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
         else:
             inputs_postprocessed = inputs_redacted
 
@@ -621,12 +621,12 @@ class WeaveClient:
         output: Any = None,
         exception: Optional[BaseException] = None,
         *,
-        postprocess_outputs_func: Optional[Callable[..., Any]] = None,
+        postprocess_outputs: Optional[Callable[..., Any]] = None,
     ) -> None:
         original_output = output
 
-        if postprocess_outputs_func:
-            postprocessed_outputs = postprocess_outputs_func(original_output)
+        if postprocess_outputs:
+            postprocessed_outputs = postprocess_outputs(original_output)
         else:
             postprocessed_outputs = original_output
         self._save_nested_objects(postprocessed_outputs)

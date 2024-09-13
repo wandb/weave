@@ -280,8 +280,8 @@ def test_postprocessing_funcs(client):
         return d
 
     @weave.op(
-        postprocess_inputs_func=postprocess_inputs,
-        postprocess_outputs_func=postprocess_outputs,
+        postprocess_inputs=postprocess_inputs,
+        postprocess_outputs=postprocess_outputs,
     )
     def func(a: int, hide_me: str, and_me: str) -> dict[str, Any]:
         return {"b": a + 1, "also_hide_me": "12345"}
