@@ -1,12 +1,13 @@
 import dataclasses
 import datetime
+import logging
 import platform
 import re
 import sys
 import typing
 from functools import lru_cache
 from typing import Any, Dict, Iterator, Optional, Sequence, Union
-import logging
+
 import pydantic
 import requests
 from requests import HTTPError
@@ -1207,9 +1208,19 @@ image_suffix = r".*\.(png|jpg|jpeg|gif|tiff)"
 image_pattern = re.compile(rf"^{image_suffix}$", re.IGNORECASE)
 remote_image_pattern = re.compile(rf"https://.*\.{image_suffix}")
 
+pil_dependency = False
+try:
+    from PIL import Image
+
+    pil_dependency = True
+except ImportError:
+    pass
+
 
 def convert_paths_to_images(obj: Any) -> Any:
     """Convert paths to PathImage objects if they are image files."""
+    if not pil_dependency:
+        return obj
     if isinstance(obj, dict):
         for k, v in obj.items():
             obj[k] = convert_paths_to_images(v)
@@ -1217,22 +1228,17 @@ def convert_paths_to_images(obj: Any) -> Any:
         for v in obj:
             convert_paths_to_images(v)
     elif isinstance(obj, str):
-        if image_pattern.match(obj):
-            # Load the image, if PIL is available and file exists
+        if remote_image_pattern.match(obj):
             try:
-                from PIL import Image
-
-                return PathImage(img=Image.open(obj), path=obj)
-            except (ImportError, FileNotFoundError) as e:
-                logger.warning(f"Failed to open image file: {obj}. {e}")
-        elif remote_image_pattern.match(obj):
-            try:
-                from PIL import Image
-
                 img = requests.get(obj, stream=True).raw
                 return PathImage(img=Image.open(img), path=obj)
-            except (ImportError, requests.RequestException) as e:
+            except Exception as e:
                 logger.warning(f"Failed to load remote image file: {obj}. {e}")
+        elif image_pattern.match(obj):
+            try:
+                return PathImage(img=Image.open(obj), path=obj)
+            except Exception as e:
+                logger.warning(f"Failed to open image file: {obj}. {e}")
 
     return obj
 

@@ -2,6 +2,7 @@ import os
 import tempfile
 from pathlib import Path
 
+import requests
 from PIL import Image
 
 import weave
@@ -129,3 +130,17 @@ def test_image_from_path(client: WeaveClient) -> None:
         save_stuff_with_image_embedded(Path(path_str))
         call = save_stuff_with_image_embedded.calls()[0]
         assert call.output["out"] == f"Some random text + a path: {path_str}"
+
+
+def test_image_from_remote_path() -> None:
+    remote_path = "https://www.gstatic.com/webp/gallery/1.jpg"
+    img = Image.open(requests.get(remote_path, stream=True).raw)
+
+    @weave.op
+    def log_image(path: str) -> dict:
+        return {"img": path}
+
+    log_image(remote_path)
+    call = log_image.calls()[0]
+    assert call.output["img"].path == remote_path
+    assert call.output["img"].img.tobytes() == img.tobytes()
