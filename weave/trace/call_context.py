@@ -99,7 +99,7 @@ def get_current_call() -> typing.Optional["Call"]:
     """
     if (call := _maybe_get_current_call()) is None:
         raise NoCurrentCallError(
-            "Have you initialized weave and are you call this from inside an op?"
+            "Have you initialized weave and are you calling this from inside an op?"
         )
     return call
 
