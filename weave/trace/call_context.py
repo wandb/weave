@@ -59,14 +59,6 @@ def pop_call(call_id: typing.Optional[str]) -> None:
 
 
 def get_current_call() -> "Call":
-    if (call := maybe_get_current_call()) is None:
-        raise NoCurrentCallError(
-            "Have you initialized weave and are you calling this from inside an op?"
-        )
-    return call
-
-
-def maybe_get_current_call() -> typing.Optional["Call"]:
     """Get the Call object for the currently executing Op, within that Op.
 
     This allows you to access attributes of the Call such as its id or feedback
@@ -100,6 +92,23 @@ def maybe_get_current_call() -> typing.Optional["Call"]:
     mycall = hello.call("world")
     print(mycall.id)
     ```
+
+    Returns:
+        The Call object for the currently executing Op
+
+    Raises:
+        NoCurrentCallError: If tracking has not been initialized or this method is
+            invoked outside an Op.
+    """
+    if (call := maybe_get_current_call()) is None:
+        raise NoCurrentCallError(
+            "Have you initialized weave and are you calling this from inside an op?"
+        )
+    return call
+
+
+def maybe_get_current_call() -> typing.Optional["Call"]:
+    """Get the Call object for the currently executing Op, within that Op.
 
     Returns:
         The Call object for the currently executing Op, or
