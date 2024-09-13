@@ -3,7 +3,7 @@ import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React from 'react';
 
-import {initiateDownloadFromBlob} from '../../pages/CallsPage/CallsTableButtons';
+import {initiateDownloadFromBlob} from '../../pages/common/util';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
 
@@ -67,7 +67,7 @@ const JsonDownloader: React.FC<{
     }
   };
   return (
-    <Button icon="download" size="small" onClick={download}>
+    <Button icon="download" size="small" onClick={download} variant="ghost">
       {`${size} MB`}
     </Button>
   );

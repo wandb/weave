@@ -61,7 +61,6 @@ export const CustomWeaveTypeDispatcher: React.FC<
 > = ({data, entity, project}) => {
   const projectContext = React.useContext(CustomWeaveTypeProjectContext);
   const typeId = data.weave_type.type;
-  console.log('typeId', typeId);
   const comp = customWeaveTypeRegistry[typeId]?.component;
   const defaultReturn = <span>Custom Weave Type: {data.weave_type.type}</span>;
 

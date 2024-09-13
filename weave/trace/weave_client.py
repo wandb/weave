@@ -1202,6 +1202,8 @@ def replace_large_objects(obj: Any, max_size: int = 1 * 1024**2) -> Any:
     if isinstance(obj, list):
         list_res = []
         for v in obj:
+            # TODO: casting as str is not actually the real size of the object
+            # its close, but not actually the json dump. What is more performant?
             if size := len(str(v).encode("utf-8")) > max_size:
                 v = JSONBlob(v, size)
             list_res.append(v)

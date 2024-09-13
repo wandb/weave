@@ -16,6 +16,7 @@ import classNames from 'classnames';
 import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
+import {initiateDownloadFromBlob} from '../common/util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {
@@ -401,18 +402,6 @@ export const BulkDeleteButton: FC<{
     </Box>
   );
 };
-
-export function initiateDownloadFromBlob(blob: Blob, fileName: string) {
-  const downloadUrl = URL.createObjectURL(blob);
-  // Create a download link and click it
-  const anchor = document.createElement('a');
-  anchor.href = downloadUrl;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(downloadUrl);
-}
 
 function makeLeafColumns(visibleColumns: string[]) {
   // Filter columns down to only the most nested, for example
