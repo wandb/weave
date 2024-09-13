@@ -1218,13 +1218,18 @@ except ImportError:
 
 
 def convert_paths_to_images(obj: Any) -> Any:
-    """Convert paths to PathImage objects if they are image files."""
+    """
+    Iterate through the object and find paths to local and remote images.
+
+    If the path is a local image, open it and return a PathImage object.
+    If the path is a remote image, download it and return a PathImage object.
+    """
     if not pil_dependency:
         return obj
     if isinstance(obj, dict):
         for k, v in obj.items():
             obj[k] = convert_paths_to_images(v)
-    elif isinstance(obj, list):
+    elif isinstance(obj, (list, tuple, set)):
         for v in obj:
             convert_paths_to_images(v)
     elif isinstance(obj, str):
