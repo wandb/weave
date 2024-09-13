@@ -170,27 +170,27 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 bytes_size = len(item.model_dump_json().encode("utf-8"))
                 seen_bytes += bytes_size
                 if bytes_size > CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
-                    mb = bytes_size / (1024 * 1024)
-                    id_, mode = (
-                        (item.req.start.id, "start")
-                        if isinstance(item, StartBatchItem)
-                        else (item.req.end.id, "end")
-                    )
+                    mb = bytes_size / (1024**2)
+                    if isinstance(item.req, tsi.CallStartReq):
+                        id_, mode = (item.req.start.id, "start")
+                        item.req.start.inputs = {}
+                    else:
+                        id_, mode = (item.req.end.id, "end")
+                        item.req.end.output = {}
+
                     logger.error(
                         f"Dropping call {mode} ({id_}) with size {mb:.2f} MiB larger than "
-                        f"{CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT / (1024 * 1024):.2f} MiB."
+                        f"{CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT / (1024**2):.2f} MiB."
                         " If logging images, please encode them as `PIL.Image`"
                     )
-                    continue
-
+                final_batch.append(item)
                 if (
                     encoded_bytes - seen_bytes
                     < CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT
                 ):
                     # break early since we know there are no more large rows
-                    final_batch += batch[i:]
+                    final_batch += batch[i + 1 :]
                     break
-                final_batch.append(item)
 
         if len(final_batch) == 0:
             return
