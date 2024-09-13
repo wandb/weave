@@ -234,15 +234,12 @@ def _execute_call(
     if inspect.iscoroutinefunction(func):
 
         async def _call_async() -> Coroutine[Any, Any, Any]:
-            call_context.push_call(call)
             try:
                 res = await func(*args, **kwargs)
             except Exception as e:
                 return handle_exception(e)
             else:
                 return process(res)
-            finally:
-                call_context.pop_call(call.id)
 
         return _call_async()
 
