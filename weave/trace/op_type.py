@@ -267,16 +267,18 @@ def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
     if isinstance(fn, Op):
         fn = fn.resolve_fn
 
+    try:
+        return get_source_notebook_safe(fn)
+    except OSError:
+        pass
+
+    try:
+        sig_str = reconstruct_signature(fn)
+    except Exception as e:
+        warnings.append(f"Failed to reconstruct signature: {e}")
+        sig_str = "(*args, **kwargs)"
+
     func_name = fn.__name__
-    sig_str = "(*args, **kwargs)"
-
-    # This is intended to check for TypedDict, which itself is not isinstance-able
-    if not isinstance(fn, collections.abc.Mapping):
-        try:
-            sig_str = reconstruct_signature(fn)
-        except Exception as e:
-            warnings.append(f"Failed to reconstruct signature: {e}")
-
     missing_code_template = textwrap.dedent(
         f"""
         def {func_name}{sig_str}:
@@ -284,10 +286,7 @@ def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
         """
     )[1:]  # skip first newline char
 
-    try:
-        return get_source_notebook_safe(fn)
-    except OSError:
-        return missing_code_template
+    return missing_code_template
 
 
 def get_code_deps(
