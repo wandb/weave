@@ -641,12 +641,12 @@ class WeaveClient:
         original_output = output
 
         if postprocess_output:
-            postprocessed_outputs = postprocess_output(original_output)
+            postprocessed_output = postprocess_output(original_output)
         else:
-            postprocessed_outputs = original_output
-        self._save_nested_objects(postprocessed_outputs)
+            postprocessed_output = original_output
+        self._save_nested_objects(postprocessed_output)
 
-        output = map_to_refs(postprocessed_outputs)
+        output = map_to_refs(postprocessed_output)
         call.output = output
 
         # Summary handling
