@@ -170,6 +170,48 @@ calls_query_stream(req: CallsQueryReq) → Iterator[CallSchema]
 
 ---
 
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server_bindings/remote_http_trace_server.py#L520"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
+### <kbd>method</kbd> `cost_create`
+
+```python
+cost_create(req: Union[CostCreateReq, Dict[str, Any]]) → CostCreateRes
+```
+
+
+
+
+
+---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server_bindings/remote_http_trace_server.py#L527"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
+### <kbd>method</kbd> `cost_purge`
+
+```python
+cost_purge(req: Union[CostPurgeReq, Dict[str, Any]]) → CostPurgeRes
+```
+
+
+
+
+
+---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server_bindings/remote_http_trace_server.py#L513"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
+### <kbd>method</kbd> `cost_query`
+
+```python
+cost_query(req: Union[CostQueryReq, Dict[str, Any]]) → CostQueryRes
+```
+
+
+
+
+
+---
+
 <a href="https://github.com/wandb/weave/blob/master/weave/trace_server_bindings/remote_http_trace_server.py#L110"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `ensure_project_exists`

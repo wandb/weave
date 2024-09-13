@@ -1,8 +1,6 @@
 """Settings for Weave.
 
-To add new settings:
-1. Add a new field to `UserSettings`
-2. Add a new `should_{xyz}` function
+TODO: Fill this in with examples on how to use the settings.
 """
 
 import os
@@ -13,6 +11,10 @@ from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 SETTINGS_PREFIX = "WEAVE_"
 
+# Attention Devs:
+# To add new settings:
+# 1. Add a new field to `UserSettings`
+# 2. Add a new `should_{xyz}` function
 
 class UserSettings(BaseModel):
     """User configuration for Weave.
@@ -85,3 +87,5 @@ def _should(name: str) -> bool:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return _str2bool_truthy(env)
     return _context_vars[name].get()
+
+__doc_spec__ = [UserSettings]

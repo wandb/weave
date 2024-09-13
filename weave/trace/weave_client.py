@@ -794,25 +794,26 @@ class WeaveClient:
             The cost object will be created with the effective date of the date of insertion `datetime.datetime.now(ZoneInfo("UTC"))` if no effective_date is provided.
 
         Examples:
-            ```python
-            costs = {
-                "my_expensive_custom_model": {
-                    "prompt_token_cost": 500,
-                    "completion_token_cost": 1000,
-                    "effective_date": datetime(1998, 10, 3),
-                },
-                "gpt-4o-mini-2024-07-18" :{
-                    "prompt_token_cost": 100,
-                    "completion_token_cost": 200,
-                    "effective_date": datetime(2024, 9, 1),
-                }
+    
+        ```python
+        costs = {
+            "my_expensive_custom_model": {
+                "prompt_token_cost": 500,
+                "completion_token_cost": 1000,
+                "effective_date": datetime(1998, 10, 3),
+            },
+            "gpt-4o-mini-2024-07-18" :{
+                "prompt_token_cost": 100,
+                "completion_token_cost": 200,
+                "effective_date": datetime(2024, 9, 1),
             }
+        }
 
-            client.add_costs(costs)
-            ```
+        client.add_costs(costs)
+        ```
 
         Args:
-            costs: Dictionary of costs to add to the project. In the form of {llm_id: cost}.
+            costs: Dictionary of costs to add to the project.
 
         """
         return self.server.cost_create(
