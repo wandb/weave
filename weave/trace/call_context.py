@@ -15,6 +15,9 @@ _call_stack: contextvars.ContextVar[list["Call"]] = contextvars.ContextVar(
 logger = logging.getLogger(__name__)
 
 
+class NoCurrentCallError(Exception): ...
+
+
 def push_call(call: "Call") -> None:
     new_stack = copy.copy(_call_stack.get())
     new_stack.append(call)
@@ -94,6 +97,15 @@ def get_current_call() -> typing.Optional["Call"]:
         None if tracking has not been initialized or this method is
         invoked outside an Op.
     """
+    if (call := _maybe_get_current_call()) is None:
+        raise NoCurrentCallError(
+            "Have you initialized weave and are you call this from inside an op?"
+        )
+    return call
+
+
+def _maybe_get_current_call() -> typing.Optional["Call"]:
+    """Get the Call object for the current executing Op, within that Op (or None if not exists)."""
     return _call_stack.get()[-1] if _call_stack.get() else None
 
 
