@@ -207,3 +207,18 @@ def test_purge_only_ids(client):
             ),
         )
     )
+
+
+def test_cost_create_invalid_costs(client):
+    try:
+        client.add_costs({"my_model": {"prompt_token_cost": "not_a_number"}})
+        assert False, "Expected ValueError"
+    except ValueError as e:
+        assert "prompt_token_cost" in str(e)
+
+    try:
+        client.add_costs({"my_model": {}})
+        assert False, "Expected ValueError"
+    except ValueError as e:
+        assert "prompt_token_cost" in str(e)
+        assert "completion_token_cost" in str(e)
