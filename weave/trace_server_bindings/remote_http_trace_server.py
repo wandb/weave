@@ -3,7 +3,6 @@ import json
 import logging
 import typing as t
 
-import requests
 import tenacity
 from pydantic import BaseModel, ValidationError
 
