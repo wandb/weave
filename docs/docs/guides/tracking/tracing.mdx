@@ -79,6 +79,29 @@ def my_function(name: str):
 print(my_function.call("World"))
 ```
 
+:::note
+If your op is a method on a class, you need to pass the instance as the first argument to the op (see example below).
+:::
+
+
+```python showLineNumbers
+import weave
+
+# Initialize Weave Tracing
+weave.init("intro-example")
+
+class MyClass:
+    # Decorate your method
+    @weave.op
+    def my_method(self, name: str):
+        return f"Hello, {name}!"
+
+instance = MyClass()
+
+# Call your method -- Weave will automatically track inputs and outputs
+instance.my_method.call(instance, "World")
+```
+
 #### Call Display Name
 
 Sometimes you may want to override the display name of a call. You can achieve this in one of two ways:
