@@ -1,5 +1,6 @@
 import io
 import sys
+from collections import Counter
 
 import pytest
 
@@ -23,7 +24,8 @@ def test_call_prints_link(client):
 
     func()
     output = captured_stdout.getvalue()
-    assert TRACE_CALL_EMOJI in output
+    c = Counter(output)
+    assert c[TRACE_CALL_EMOJI] == 1
 
 
 @pytest.mark.asyncio
@@ -33,4 +35,5 @@ async def test_async_call_prints_link(client):
 
     await afunc()
     output = captured_stdout.getvalue()
-    assert TRACE_CALL_EMOJI in output
+    c = Counter(output)
+    assert c[TRACE_CALL_EMOJI] == 1

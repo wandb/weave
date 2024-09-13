@@ -240,8 +240,6 @@ def _execute_call(
                 return handle_exception(e)
             else:
                 return process(res)
-            finally:
-                call_context.pop_call(call.id)
 
         return _call_async()
 
