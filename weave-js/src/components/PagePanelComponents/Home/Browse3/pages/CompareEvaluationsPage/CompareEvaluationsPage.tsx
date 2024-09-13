@@ -42,6 +42,30 @@ type CompareEvaluationsPageProps = {
 export const CompareEvaluationsPage: React.FC<
   CompareEvaluationsPageProps
 > = props => {
+  return (
+    <SimplePageLayout
+      title="Compare Evaluations"
+      hideTabsIfSingle
+      tabs={[
+        {
+          label: 'All',
+          content: (
+            <CompareEvaluationsPageContent
+              entity={props.entity}
+              project={props.project}
+              evaluationCallIds={props.evaluationCallIds}
+            />
+          ),
+        },
+      ]}
+      headerExtra={<HeaderExtra {...props} />}
+    />
+  );
+};
+
+export const CompareEvaluationsPageContent: React.FC<
+  CompareEvaluationsPageProps
+> = props => {
   const [baselineEvaluationCallId, setBaselineEvaluationCallId] =
     React.useState(
       props.evaluationCallIds.length > 0 ? props.evaluationCallIds[0] : null
@@ -77,35 +101,21 @@ export const CompareEvaluationsPage: React.FC<
   }
 
   return (
-    <SimplePageLayout
-      title="Compare Evaluations"
-      hideTabsIfSingle
-      tabs={[
-        {
-          label: 'All',
-          content: (
-            <CompareEvaluationsProvider
-              entity={props.entity}
-              project={props.project}
-              evaluationCallIds={props.evaluationCallIds}
-              baselineEvaluationCallId={baselineEvaluationCallId ?? undefined}
-              comparisonDimensions={comparisonDimensions ?? undefined}
-              setBaselineEvaluationCallId={setBaselineEvaluationCallId}
-              setComparisonDimensions={
-                setComparisonDimensionsAndClearInputDigest
-              }
-              selectedInputDigest={selectedInputDigest ?? undefined}
-              setSelectedInputDigest={setSelectedInputDigest}>
-              <CustomWeaveTypeProjectContext.Provider
-                value={{entity: props.entity, project: props.project}}>
-                <CompareEvaluationsPageInner />
-              </CustomWeaveTypeProjectContext.Provider>
-            </CompareEvaluationsProvider>
-          ),
-        },
-      ]}
-      headerExtra={<HeaderExtra {...props} />}
-    />
+    <CompareEvaluationsProvider
+      entity={props.entity}
+      project={props.project}
+      evaluationCallIds={props.evaluationCallIds}
+      baselineEvaluationCallId={baselineEvaluationCallId ?? undefined}
+      comparisonDimensions={comparisonDimensions ?? undefined}
+      setBaselineEvaluationCallId={setBaselineEvaluationCallId}
+      setComparisonDimensions={setComparisonDimensionsAndClearInputDigest}
+      selectedInputDigest={selectedInputDigest ?? undefined}
+      setSelectedInputDigest={setSelectedInputDigest}>
+      <CustomWeaveTypeProjectContext.Provider
+        value={{entity: props.entity, project: props.project}}>
+        <CompareEvaluationsPageInner />
+      </CustomWeaveTypeProjectContext.Provider>
+    </CompareEvaluationsProvider>
   );
 };
 
