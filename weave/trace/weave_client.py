@@ -1338,8 +1338,8 @@ def convert_paths_to_images(obj: Any) -> Any:
         obj = {k: convert_paths_to_images(v) for k, v in obj.items()}
     elif isinstance(obj, list):
         obj = [convert_paths_to_images(v) for v in obj]
-    elif isinstance(obj, set):
-        obj = set([convert_paths_to_images(v) for v in obj])
+    elif isinstance_namedtuple(obj):
+        obj = {k: convert_paths_to_images(v) for k, v in obj._asdict().items()}
     elif isinstance(obj, tuple):
         obj = tuple([convert_paths_to_images(v) for v in obj])
     elif isinstance(obj, str):
