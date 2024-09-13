@@ -1,8 +1,8 @@
 # Costs
 
-Costs are an evolving feature of Weave. Currently, the Weave UI calculates costs based on the number of tokens used and the model used, and displays them in the UI, using a static cost file.
-
-In the future, Weave will use a custom cost model, which can be set up by the user. Currently, custom costs can be set up by the user, and fetched by the user in the client, but costs in the UI are still based on token usage, model, and static cost file.
+:::info
+Custom costs are accessible via Python and REST queries. UI uptake is under development and expected to be complete by end of Sept 2024
+:::
 
 ## Adding a custom cost
 
@@ -55,7 +55,7 @@ cost = client.query_costs(costs[0].id)
 
 ## Purging a custom cost
 
-You can purge a custom cost by using the `purge_costs` method. You pass in a list of cost ids, and the costs with those ids are purged.
+You can purge a custom cost by using the [`purge_costs`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-purge_costs) method. You pass in a list of cost ids, and the costs with those ids are purged.
 
 ```python
 import weave
@@ -64,63 +64,6 @@ client = weave.init("my_custom_cost_model")
 
 costs = client.query_costs(llm_ids=["your_model_name"])
 client.purge_costs([cost.id for cost in costs])
-```
-
-## Setting up a custom cost model
-
-Weave calculates costs based on the number of tokens used and the model used.
-Weave grabs this usage and model from the output and associates them with the call.
-
-Let's set up a simple custom model, that calculates its own token usage, and stores that in weave.
-
-```python
-from weave import Model
-import weave
-from weave.trace_server.trace_server_interface import CallsFilter
-
-class YourModel(Model):
-    attribute1: str
-    attribute2: int
-
-    def simple_token_count(self, text: str) -> int:
-        return len(text) // 3
-
-    # This is a custom op that we are defining
-    # It takes in a string, and outputs a dict with the usage counts, model name, and the output
-    @weave.op()
-    def custom_model_generate(self, input_data: str) -> dict:
-        # Model logic goes here
-        # Here is where you would have a custom generate function
-        prediction = self.attribute1 + ' ' + input_data
-
-        # Usage counts
-        prompt_tokens = self.simple_token_count(input_data)
-        completion_tokens = self.simple_token_count(prediction)
-
-        return {"usage": {'input_tokens': prompt_tokens, 'output_tokens': completion_tokens}, "model": 'your_model_name', 'output': prediction,}
-
-    # In our predict function we call our custom generate function, and return the output. Here is where you would do any post processing of the data
-    @weave.op()
-    def predict(self, input_data: str) -> dict:
-        outputs = self.custom_model_generate(input_data)
-        return outputs["output"]
-
-client = weave.init("my_custom_cost_model6")
-
-model = YourModel(attribute1="Hello", attribute2=1)
-result, call = model.predict.call("world")
-
-# We then add a custom cost to our project
-client.add_costs({
-    "your_model_name": {
-        "prompt_token_cost": 0.1,
-        "completion_token_cost": 0.2,
-    }
-})
-
-# We can then query for the calls, and with include_costs=True
-# we receive the costs back attached to the calls
-calls = client.get_calls(filter={"trace_roots_only": True}, include_costs=True)
 ```
 
 ## Calculating costs for a Project
