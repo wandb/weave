@@ -1190,10 +1190,15 @@ def test_call_batch_size_handling(network_proxy_client):
     def save_large_string(len: int):
         return "x" * len
 
+    @weave.op
+    def save_large_dict(len: int):
+        return {f"{i}": "x" for i in range(len)}
+
     save_large_string(10_000_000)
+    save_large_dict(10_000_000)
 
     calls = client.get_calls()
-    assert len(calls) == 1
+    assert len(calls) == 2
 
 
 def test_summary_tokens_cost(client):
