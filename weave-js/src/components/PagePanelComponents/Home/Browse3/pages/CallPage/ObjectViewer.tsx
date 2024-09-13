@@ -41,7 +41,7 @@ import {
 import {mapObject, ObjectPath, traverse, TraverseContext} from './traverse';
 import {ValueView} from './ValueView';
 
-type Data = Record<string, any>;
+type Data = Record<string, any> | any[];
 
 type ObjectViewerProps = {
   apiRef: React.MutableRefObject<GridApiPro>;
