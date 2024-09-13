@@ -779,10 +779,12 @@ class WeaveClient:
         llm_id: str,
         prompt_token_cost: float,
         completion_token_cost: float,
-        effective_date: typing.Optional[datetime.datetime] = None,
-        prompt_token_cost_unit: typing.Optional[str] = None,
-        completion_token_cost_unit: typing.Optional[str] = None,
-        provider_id: typing.Optional[str] = None,
+        effective_date: typing.Optional[datetime.datetime] = datetime.datetime.now(
+            datetime.timezone.utc
+        ),
+        prompt_token_cost_unit: typing.Optional[str] = "USD",
+        completion_token_cost_unit: typing.Optional[str] = "USD",
+        provider_id: typing.Optional[str] = "default",
     ) -> CostCreateRes:
         """Add a cost to the current project.
 
