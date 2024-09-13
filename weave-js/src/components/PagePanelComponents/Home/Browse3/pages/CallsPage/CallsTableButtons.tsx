@@ -402,7 +402,7 @@ export const BulkDeleteButton: FC<{
   );
 };
 
-function initiateDownloadFromBlob(blob: Blob, fileName: string) {
+export function initiateDownloadFromBlob(blob: Blob, fileName: string) {
   const downloadUrl = URL.createObjectURL(blob);
   // Create a download link and click it
   const anchor = document.createElement('a');
