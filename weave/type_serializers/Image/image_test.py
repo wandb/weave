@@ -132,15 +132,20 @@ def test_image_from_path(client: WeaveClient) -> None:
         assert call.output["out"] == f"Some random text + a path: {path_str}"
 
 
-def test_image_from_remote_path() -> None:
+def test_image_from_remote_path(client: WeaveClient) -> None:
     remote_path = "https://www.gstatic.com/webp/gallery/1.jpg"
     img = Image.open(requests.get(remote_path, stream=True).raw)
 
     @weave.op
     def log_image(path: str) -> dict:
-        return {"img": path}
+        return {"imgs": [path]}
 
     log_image(remote_path)
     call = log_image.calls()[0]
-    assert call.output["img"].path == remote_path
-    assert call.output["img"].img.tobytes() == img.tobytes()
+    input_image_path_obj = call.inputs["path"]
+    output_image_path_obj = call.output["imgs"][0]
+
+    assert input_image_path_obj.path == remote_path
+    assert input_image_path_obj.img.tobytes() == img.tobytes()
+    assert output_image_path_obj.path == remote_path
+    assert output_image_path_obj.img.tobytes() == img.tobytes()

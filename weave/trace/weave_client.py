@@ -1205,8 +1205,8 @@ def sanitize_object_name(name: str) -> str:
 
 # match local image file paths
 image_suffix = r".*\.(png|jpg|jpeg|gif|tiff)"
-image_pattern = re.compile(rf"^{image_suffix}$", re.IGNORECASE)
-remote_image_pattern = re.compile(rf"https://.*\.{image_suffix}")
+local_image_pattern = re.compile(rf"^{image_suffix}$", re.IGNORECASE)
+remote_image_pattern = re.compile(rf"https://.*\.{image_suffix}", re.IGNORECASE)
 
 pil_dependency = False
 try:
@@ -1226,20 +1226,24 @@ def convert_paths_to_images(obj: Any) -> Any:
     """
     if not pil_dependency:
         return obj
+
     if isinstance(obj, dict):
-        for k, v in obj.items():
-            obj[k] = convert_paths_to_images(v)
-    elif isinstance(obj, (list, tuple, set)):
-        for v in obj:
-            convert_paths_to_images(v)
+        obj = {k: convert_paths_to_images(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        obj = [convert_paths_to_images(v) for v in obj]
+    elif isinstance(obj, set):
+        obj = set([convert_paths_to_images(v) for v in obj])
+    elif isinstance(obj, tuple):
+        obj = tuple([convert_paths_to_images(v) for v in obj])
     elif isinstance(obj, str):
         if remote_image_pattern.match(obj):
             try:
+                # Load the image from remote resource
                 img = requests.get(obj, stream=True).raw
                 return PathImage(img=Image.open(img), path=obj)
             except Exception as e:
                 logger.warning(f"Failed to load remote image file: {obj}. {e}")
-        elif image_pattern.match(obj):
+        elif local_image_pattern.match(obj):
             try:
                 return PathImage(img=Image.open(obj), path=obj)
             except Exception as e:
