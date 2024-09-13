@@ -621,12 +621,12 @@ class WeaveClient:
         output: Any = None,
         exception: Optional[BaseException] = None,
         *,
-        postprocess_outputs: Optional[Callable[..., Any]] = None,
+        postprocess_output: Optional[Callable[..., Any]] = None,
     ) -> None:
         original_output = output
 
-        if postprocess_outputs:
-            postprocessed_outputs = postprocess_outputs(original_output)
+        if postprocess_output:
+            postprocessed_outputs = postprocess_output(original_output)
         else:
             postprocessed_outputs = original_output
         self._save_nested_objects(postprocessed_outputs)

@@ -270,7 +270,7 @@ def test_postprocessing_funcs(client):
             d[k] = v
         return d
 
-    def postprocess_outputs(outputs: dict[str, Any]) -> dict[str, Any]:
+    def postprocess_output(outputs: dict[str, Any]) -> dict[str, Any]:
         d = {}
         for k, v in outputs.items():
             if k == "also_hide_me":
@@ -281,7 +281,7 @@ def test_postprocessing_funcs(client):
 
     @weave.op(
         postprocess_inputs=postprocess_inputs,
-        postprocess_outputs=postprocess_outputs,
+        postprocess_output=postprocess_output,
     )
     def func(a: int, hide_me: str, and_me: str) -> dict[str, Any]:
         return {"b": a + 1, "also_hide_me": "12345"}
