@@ -1,7 +1,5 @@
 """Defines the custom Image weave type."""
 
-from pathlib import Path
-
 from pydantic import BaseModel, ConfigDict
 
 from weave.trace import serializer
@@ -22,7 +20,7 @@ class PathImage(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     img: Image.Image
-    path: Path
+    path: str
 
 
 def save(obj: "Image.Image", artifact: MemTraceFilesArtifact, name: str) -> None:

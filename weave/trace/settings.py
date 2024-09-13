@@ -32,6 +32,22 @@ class UserSettings(BaseModel):
     If True, prints a link to the Weave UI when calling a weave op.
     Can be overrided with the environment variable `WEAVE_PRINT_CALL_LINK`"""
 
+    convert_paths_to_images: bool = True
+    """Toggles conversion of image file paths to PathImage objects.
+
+    If True, image file paths will be converted to PathImage objects.
+    Can be overrided with the environment variable `WEAVE_CONVERT_PATHS_TO_IMAGES`
+
+    Example:
+        @weave.op
+        def generate_image(prompt: str):
+            text, url = generate_text_and_image(prompt)
+            return {"text": text, "image": url}
+
+        If WEAVE_CONVERT_PATHS_TO_IMAGES=true, `image` will be converted to PathImage
+        and stored as an object.
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -56,6 +72,10 @@ def should_disable_weave() -> bool:
 
 def should_print_call_link() -> bool:
     return _should("print_call_link")
+
+
+def should_convert_paths_to_images() -> bool:
+    return _should("convert_paths_to_images")
 
 
 def parse_and_apply_settings(

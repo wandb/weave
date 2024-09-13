@@ -5,10 +5,10 @@ import re
 import sys
 import typing
 from functools import lru_cache
-from pathlib import Path
 from typing import Any, Dict, Iterator, Optional, Sequence, Union
 
 import pydantic
+import requests
 from requests import HTTPError
 
 from weave import version
@@ -27,6 +27,7 @@ from weave.trace.op import op as op_deco
 from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
+from weave.trace.settings import should_convert_paths_to_images
 from weave.trace.table import Table
 from weave.trace.util import deprecated
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
@@ -65,6 +66,9 @@ from weave.type_serializers.Image.image import PathImage
 # If False, object refs with with mismatching projects will be recreated.
 # If True, use existing ref to object in other project.
 ALLOW_MIXED_PROJECT_REFS = False
+
+
+logger = logging.getLogger(__name__)
 
 
 def dataclasses_asdict_one_level(obj: Any) -> typing.Dict[str, Any]:
@@ -551,11 +555,13 @@ class WeaveClient:
         else:
             op_str = op
 
-        inputs_redacted = redact_sensitive_keys(inputs)
-        inputs_paths_converted = convert_paths_to_images(inputs_redacted)
+        if should_convert_paths_to_images():
+            inputs = convert_paths_to_images(inputs)
 
-        self._save_nested_objects(inputs_paths_converted)
-        inputs_with_refs = map_to_refs(inputs_paths_converted)
+        inputs_redacted = redact_sensitive_keys(inputs)
+
+        self._save_nested_objects(inputs_redacted)
+        inputs_with_refs = map_to_refs(inputs_redacted)
         call_id = generate_id()
 
         if parent is None and use_stack:
@@ -617,7 +623,8 @@ class WeaveClient:
     def finish_call(
         self, call: Call, output: Any = None, exception: Optional[BaseException] = None
     ) -> None:
-        output = convert_paths_to_images(output)
+        if should_convert_paths_to_images():
+            output = convert_paths_to_images(output)
         self._save_nested_objects(output)
         original_output = output
         output = map_to_refs(original_output)
@@ -1195,6 +1202,12 @@ def sanitize_object_name(name: str) -> str:
     return res
 
 
+# match local image file paths
+image_suffix = r".*\.(png|jpg|jpeg|gif|tiff)$"
+image_pattern = re.compile(rf"^{image_suffix}$", re.IGNORECASE)
+remote_image_pattern = re.compile(rf"https://.*\.{image_suffix}")
+
+
 def convert_paths_to_images(obj: Any) -> Any:
     """Convert paths to PathImage objects if they are image files."""
     if isinstance(obj, dict):
@@ -1203,15 +1216,24 @@ def convert_paths_to_images(obj: Any) -> Any:
     elif isinstance(obj, list):
         for v in obj:
             convert_paths_to_images(v)
-    elif isinstance(obj, Path):
-        if obj.suffix in [".png", ".jpg", ".jpeg", ".gif", ".tiff"]:
-            # Load the image, if PIL is available
+    elif isinstance(obj, str):
+        if image_pattern.match(obj):
+            # Load the image, if PIL is available and file exists
             try:
                 from PIL import Image
 
                 return PathImage(img=Image.open(obj), path=obj)
-            except ImportError:
-                pass
+            except (ImportError, FileNotFoundError) as e:
+                logger.warning(f"Failed to open image file: {obj}. {e}")
+        elif remote_image_pattern.match(obj):
+            try:
+                from PIL import Image
+
+                img = requests.get(obj, stream=True).raw
+                return PathImage(img=Image.open(img), path=obj)
+            except (ImportError, requests.RequestException) as e:
+                logger.warning(f"Failed to load remote image file: {obj}. {e}")
+
     return obj
 
 
