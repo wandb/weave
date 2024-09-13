@@ -11,7 +11,7 @@ from typing import Any, Callable, Iterator, Optional, Union
 from weave import type_serializers  # noqa: F401
 from weave.legacy.weave import urls
 from weave.trace import util
-from weave.trace.call_context import get_current_call, maybe_get_current_call
+from weave.trace.call_context import get_current_call, require_current_call
 from weave.trace.client_context import weave_client as weave_client_context
 
 from . import context, weave_client, weave_init
@@ -284,7 +284,7 @@ __all__ = [
     "Table",
     "ObjectRef",
     "parse_uri",
-    "maybe_get_current_call",
-    "weave_client_context",
     "get_current_call",
+    "weave_client_context",
+    "require_current_call",
 ]

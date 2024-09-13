@@ -156,7 +156,7 @@ if not import_failed:
                 parent_run = wv_parent_run
             else:
                 # Here is our check for the specific condition
-                wv_current_run = call_context.maybe_get_current_call()
+                wv_current_run = call_context.get_current_call()
 
                 # First, there needs to be something on the stack.
                 if wv_current_run is not None:

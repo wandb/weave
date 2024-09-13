@@ -256,7 +256,7 @@ def log_call(
     call_name: typing.Union[str, Op], inputs: dict[str, Any]
 ) -> Iterator[Callable]:
     client = weave_client_context.require_weave_client()
-    parent_call = call_context.maybe_get_current_call()
+    parent_call = call_context.get_current_call()
     # TODO: client should not need refs passed in.
     call = client.create_call(call_name, inputs, parent_call)
 
