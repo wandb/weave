@@ -16,12 +16,14 @@ class JSONBlob:
 
 def save(obj: JSONBlob, artifact: MemTraceFilesArtifact, name: str) -> None:
     with artifact.new_file("blob.json", binary=False) as f:
-        json.dump(obj.obj, f)
+        json.dump(obj.obj, f)  # type: ignore
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> JSONBlob:
-    with artifact.path("blob.json") as f:
-        return JSONBlob(json.load(f))
+    path = artifact.path("blob.json")
+    with open(path, "r") as f:
+        data = f.read()
+        return JSONBlob(json.loads(data), len(data))
 
 
 def register() -> None:
