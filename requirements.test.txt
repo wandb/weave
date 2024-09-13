@@ -20,7 +20,7 @@ vcrpy==6.0.1
 semver==2.13.0             # Used for switching logic based on package versions
 
 # Integration Vendors
-mistralai>=0.1.8, <1.0.0    # MistralAI
+mistralai>=1.0.0            # MistralAI
 litellm>=1.36.1             # LiteLLM
 llama-index>=0.10.35        # LlamaIndex
 anthropic>=0.18.0           # Anthropic
