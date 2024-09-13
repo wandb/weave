@@ -8,6 +8,10 @@ if typing.TYPE_CHECKING:
     # from .run import Run
     from .weave_client import Call
 
+
+class NoCurrentCallError(Exception): ...
+
+
 _call_stack: contextvars.ContextVar[list["Call"]] = contextvars.ContextVar(
     "call", default=[]
 )
@@ -54,7 +58,15 @@ def pop_call(call_id: typing.Optional[str]) -> None:
     _call_stack.set(new_stack)
 
 
-def get_current_call() -> typing.Optional["Call"]:
+def get_current_call() -> "Call":
+    if (call := maybe_get_current_call()) is None:
+        raise NoCurrentCallError(
+            "Have you initialized weave and are you calling this from inside an op?"
+        )
+    return call
+
+
+def maybe_get_current_call() -> typing.Optional["Call"]:
     """Get the Call object for the currently executing Op, within that Op.
 
     This allows you to access attributes of the Call such as its id or feedback

@@ -183,7 +183,7 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
 
     # If/When we do memoization, this would be a good spot
 
-    parent_call = call_context.get_current_call()
+    parent_call = call_context.maybe_get_current_call()
     attributes = call_attributes.get()
 
     return client.create_call(
@@ -211,7 +211,7 @@ def _execute_call(
             raise ValueError("Should not call finish more than once")
 
         client.finish_call(call, output, exception)
-        if not call_context.get_current_call():
+        if not call_context.maybe_get_current_call():
             print_call_link(call)
 
     def on_output(output: Any) -> Any:

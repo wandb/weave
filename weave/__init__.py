@@ -64,7 +64,7 @@ __docspec__ = [
     init,
     publish,
     ref,
-    get_current_call,
+    maybe_get_current_call,
     finish,
     op,
     attributes,
