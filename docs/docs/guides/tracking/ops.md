@@ -25,11 +25,11 @@ Ops can be [served](/guides/tools/serve) or [deployed](/guides/tools/deploy) usi
 
 ## Customize logged inputs and outputs
 
-If you want to change the data that is logged to weave without modifying the original function (e.g. to hide sensitive data), you can pass `postprocess_inputs_func` and `postprocess_outputs_func` to the op decorator.
+If you want to change the data that is logged to weave without modifying the original function (e.g. to hide sensitive data), you can pass `postprocess_inputs` and `postprocess_outputs` to the op decorator.
 
-`postprocess_inputs_func` takes in a dict where the keys are the argument names and the values are the argument values, and returns a dict with the transformed inputs.
+`postprocess_inputs` takes in a dict where the keys are the argument names and the values are the argument values, and returns a dict with the transformed inputs.
 
-`postprocess_outputs_func` takes in any value which would normally be returned by the function and returns the transformed output.
+`postprocess_outputs` takes in any value which would normally be returned by the function and returns the transformed output.
 
 ```py
 def postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
