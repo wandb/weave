@@ -25,7 +25,7 @@ from weave.trace.object_record import (
 )
 from weave.trace.op import Op, maybe_unbind_method
 from weave.trace.op import op as op_deco
-from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef
+from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_op_uri
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.table import Table
@@ -155,7 +155,7 @@ class Call:
     output: Any = None
     exception: Optional[str] = None
     summary: Optional[dict] = None
-    display_name: Optional[str] = None
+    display_name: Optional[Union[str, Callable[["Call"], str]]] = None
     attributes: Optional[dict] = None
     started_at: Optional[datetime.datetime] = None
     ended_at: Optional[datetime.datetime] = None
@@ -164,6 +164,19 @@ class Call:
     _children: list["Call"] = dataclasses.field(default_factory=list)
 
     _feedback: Optional[RefFeedbackQuery] = None
+
+    @property
+    def func_name(self) -> str:
+        """
+        The decorated function's name that produced this call.
+
+        This is different from `op_name` which is usually the ref of the op.
+        """
+        if self.op_name.startswith("weave:///"):
+            ref = parse_op_uri(self.op_name)
+            return ref.name
+
+        return self.op_name
 
     @property
     def feedback(self) -> RefFeedbackQuery:
@@ -531,7 +544,7 @@ class WeaveClient:
         inputs: dict,
         parent: Optional[Call] = None,
         attributes: Optional[dict] = None,
-        display_name: Optional[str] = None,
+        display_name: Optional[Union[str, Callable[[Call], str]]] = None,
         *,
         use_stack: bool = True,
     ) -> Call:
@@ -597,9 +610,13 @@ class WeaveClient:
             parent_id=parent_id,
             id=call_id,
             inputs=inputs_with_refs,
-            display_name=display_name,
             attributes=attributes,
         )
+        # feels like this should be in post init, but keping here
+        # because the func needs to be resolved for schema insert below
+        if callable(name_func := display_name):
+            display_name = name_func(call)
+        call.display_name = display_name
         if parent is not None:
             parent._children.append(call)
 
