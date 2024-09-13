@@ -1,5 +1,5 @@
 import typing
-from typing import Any, Optional
+from typing import Any
 
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
@@ -9,15 +9,9 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     TraceServerInterface,
 )
-from weave.type_serializers.JSONBlob.jsonblob import JSONBlob
 
 
-def to_json(
-    obj: Any,
-    project_id: str,
-    server: TraceServerInterface,
-    parent_bytes: Optional[int] = None,
-) -> Any:
+def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
     if isinstance(obj, TableRef):
         return obj.uri()
     elif isinstance(obj, ObjectRef):
@@ -25,26 +19,14 @@ def to_json(
     elif isinstance(obj, ObjectRecord):
         res = {"_type": obj._class_name}
         for k, v in obj.__dict__.items():
-            res[k] = to_json(v, project_id, server, parent_bytes)
+            res[k] = to_json(v, project_id, server)
         return res
     elif isinstance_namedtuple(obj):
-        return {
-            k: to_json(v, project_id, server, parent_bytes)
-            for k, v in obj._asdict().items()
-        }
-
-    if (parent_bytes is None or parent_bytes > 1 * 1024**2) and isinstance(
-        obj, (list, tuple, str)
-    ):
-        parent_bytes = len(str(obj).encode("utf-8"))
-
-    if parent_bytes and parent_bytes > 1 * 1024**2:
-        obj = JSONBlob(obj)
-
-    if isinstance(obj, (list, tuple)):
-        return [to_json(v, project_id, server, parent_bytes) for v in obj]
+        return {k: to_json(v, project_id, server) for k, v in obj._asdict().items()}
+    elif isinstance(obj, (list, tuple)):
+        return [to_json(v, project_id, server) for v in obj]
     elif isinstance(obj, dict):
-        return {k: to_json(v, project_id, server, parent_bytes) for k, v in obj.items()}
+        return {k: to_json(v, project_id, server) for k, v in obj.items()}
 
     if isinstance(obj, (int, float, str, bool)) or obj is None:
         return obj

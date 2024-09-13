@@ -58,6 +58,7 @@ from weave.trace_server.trace_server_interface import (
     TableSchemaForInsert,
     TraceServerInterface,
 )
+from weave.type_serializers.JSONBlob.jsonblob import JSONBlob
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -550,9 +551,10 @@ class WeaveClient:
             op_str = op
 
         inputs_redacted = redact_sensitive_keys(inputs)
+        inputs_without_large_objects = replace_large_objects(inputs_redacted)
 
-        self._save_nested_objects(inputs_redacted)
-        inputs_with_refs = map_to_refs(inputs_redacted)
+        self._save_nested_objects(inputs_without_large_objects)
+        inputs_with_refs = map_to_refs(inputs_without_large_objects)
         call_id = generate_id()
 
         if parent is None and use_stack:
@@ -614,9 +616,11 @@ class WeaveClient:
     def finish_call(
         self, call: Call, output: Any = None, exception: Optional[BaseException] = None
     ) -> None:
-        self._save_nested_objects(output)
+        output_without_large_objects = replace_large_objects(output)
+
+        self._save_nested_objects(output_without_large_objects)
         original_output = output
-        output = map_to_refs(original_output)
+        output = map_to_refs(output_without_large_objects)
         call.output = output
 
         # Summary handling
@@ -1189,6 +1193,37 @@ def sanitize_object_name(name: str) -> str:
     if len(res) > 128:
         res = res[:128]
     return res
+
+
+def replace_large_objects(obj: Any, max_size: int = 1 * 1024**2) -> Any:
+    if not isinstance(obj, (str, list, dict, tuple)):
+        return obj
+
+    if isinstance(obj, list):
+        list_res = []
+        for v in obj:
+            if size := len(str(v).encode("utf-8")) > max_size:
+                v = JSONBlob(v, size)
+            list_res.append(v)
+        obj = list_res
+    elif isinstance(obj, dict):
+        dict_res = {}
+        for k, v in obj.items():
+            if size := len(str(v).encode("utf-8")) > max_size:
+                v = JSONBlob(v, size)
+            dict_res[k] = v
+        obj = dict_res
+    elif isinstance(obj, tuple):
+        tuple_res = []
+        for v in obj:
+            if size := len(str(v).encode("utf-8")) > max_size:
+                v = JSONBlob(v, size)
+            tuple_res.append(v)
+        obj = tuple(tuple_res)
+    else:  # str
+        if size := len(obj.encode("utf-8")) > max_size:
+            obj = JSONBlob(obj, size)
+    return obj
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]

@@ -6,8 +6,12 @@ from weave.trace.custom_objs import MemTraceFilesArtifact
 
 
 class JSONBlob:
-    def __init__(self, obj: Any) -> None:
+    def __init__(self, obj: Any, size: int) -> None:
         self.obj = obj
+        self.size = size
+
+    def __repr__(self) -> str:
+        return f"JSONBlob <{self.size} bytes>"
 
 
 def save(obj: JSONBlob, artifact: MemTraceFilesArtifact, name: str) -> None:
