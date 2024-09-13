@@ -774,7 +774,9 @@ class WeaveClient:
             query=query, reaction=reaction, offset=offset, limit=limit
         )
 
-    def add_costs(self, costs: Dict[str, CostCreateInput]) -> CostCreateRes:
+    def add_costs(
+        self, costs: Dict[str, typing.Union[CostCreateInput, dict[str, Any]]]
+    ) -> CostCreateRes:
         """Add costs to the current project.
             The cost object will be created with the effective date of the date of insertion `datetime.datetime.now(ZoneInfo("UTC"))` if no effective_date is provided.
 
@@ -797,11 +799,18 @@ class WeaveClient:
             ```
 
         Args:
-            costs: Dictionary of costs to add to the project. In the form of {llm_id: cost}.
+            costs: Dictionary of costs to add to the project. In the form of `{llm_id: {prompt_token_cost, completion_token_cost}}`.
 
         """
+        parsed_costs = {}
+        for llm_id, cost_dict in costs.items():
+            try:
+                parsed_costs[llm_id] = CostCreateInput(**cost_dict)
+            except pydantic.ValidationError as e:
+                raise ValueError(f"Invalid cost data for '{llm_id}': {e}")
+
         return self.server.cost_create(
-            CostCreateReq(project_id=self._project_id(), costs=costs)
+            CostCreateReq(project_id=self._project_id(), costs=parsed_costs)
         )
 
     def purge_costs(self, ids: Union[list[str], str]) -> None:
