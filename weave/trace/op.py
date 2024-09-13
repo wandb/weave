@@ -126,6 +126,9 @@ class Op(Protocol):
     ref: Optional[ObjectRef]
     resolve_fn: Callable
 
+    postprocess_inputs: Optional[Callable[[dict[str, Any]], dict[str, Any]]]
+    postprocess_output: Optional[Callable[..., Any]]
+
     call: Callable[..., Any]
     calls: Callable[..., "CallsIter"]
 
@@ -210,7 +213,12 @@ def _execute_call(
         if has_finished:
             raise ValueError("Should not call finish more than once")
 
-        client.finish_call(call, output, exception)
+        client.finish_call(
+            call,
+            output,
+            exception,
+            postprocess_output=__op.postprocess_output,
+        )
         if not call_context.get_current_call():
             print_call_link(call)
 
@@ -332,6 +340,21 @@ def op(
 def op(func: Any) -> Op: ...
 
 
+@overload
+def op(
+    *,
+    postprocess_inputs: Callable[[dict[str, Any]], dict[str, Any]],
+    postprocess_output: Callable[..., Any],
+) -> Any:
+    """
+    Modify the inputs and outputs of an op before sending data to weave.
+
+    This does not modify inputs or outputs at function call time, only when
+    the data is sent to weave.
+    """
+    ...
+
+
 def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
     """
     A decorator to weave op-ify a function or method.  Works for both sync and async.
@@ -413,6 +436,9 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
             wrapper.name = name  # type: ignore
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
+
+            wrapper.postprocess_inputs = kwargs.get("postprocess_inputs")  # type: ignore
+            wrapper.postprocess_output = kwargs.get("postprocess_output")  # type: ignore
 
             wrapper.call = partial(call, wrapper)  # type: ignore
             wrapper.calls = partial(calls, wrapper)  # type: ignore

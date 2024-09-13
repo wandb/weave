@@ -1,4 +1,5 @@
 import inspect
+from typing import Any
 
 import pytest
 
@@ -45,11 +46,6 @@ def weave_obj():
 @pytest.fixture
 def py_obj():
     class B:
-        """
-        special funcs (b.method.call, b.method.calls, etc.)
-        wont work as expected because it's not a weave.Object
-        """
-
         @op
         def method(self, a: int) -> int:
             return a + 1
@@ -263,3 +259,38 @@ async def test_gotten_object_method_is_callable_with_call_func(client, weave_obj
     assert res3 == res4
     assert call3.inputs == call4.inputs
     assert call3.output == call4.output
+
+
+def test_postprocessing_funcs(client):
+    def postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+        d = {}
+        for k, v in inputs.items():
+            if k in {"hide_me", "and_me"}:
+                continue
+            d[k] = v
+        return d
+
+    def postprocess_output(output: dict[str, Any]) -> dict[str, Any]:
+        d = {}
+        for k, v in output.items():
+            if k == "also_hide_me":
+                continue
+            new_k = f"postprocessed_{k}"
+            d[new_k] = v
+        return d
+
+    @weave.op(
+        postprocess_inputs=postprocess_inputs,
+        postprocess_output=postprocess_output,
+    )
+    def func(a: int, hide_me: str, and_me: str) -> dict[str, Any]:
+        return {"b": a + 1, "also_hide_me": "12345"}
+
+    res = func(1, "should_be_hidden", "also_hidden")
+    assert res == {"b": 2, "also_hide_me": "12345"}
+
+    calls = list(client.calls())
+    call = calls[0]
+
+    assert call.inputs == {"a": 1}
+    assert call.output == {"postprocessed_b": 2}
