@@ -174,14 +174,14 @@ export type WFDataModelHooksInterface = {
     columns?: string[],
     expandedRefColumns?: Set<string>,
     opts?: {skip?: boolean; refetchOnDelete?: boolean}
-  ) => Loadable<CallSchema[]>;
+  ) => Loadable<CallSchema[]> & Refetchable;
   useCallsStats: (
     entity: string,
     project: string,
     filter: CallFilter,
     query?: Query,
     opts?: {skip?: boolean; refetchOnDelete?: boolean}
-  ) => Loadable<traceServerClientTypes.TraceCallsQueryStatsRes>;
+  ) => Loadable<traceServerClientTypes.TraceCallsQueryStatsRes> & Refetchable;
   useCallsDeleteFunc: () => (
     entity: string,
     project: string,

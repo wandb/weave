@@ -6,8 +6,8 @@ Custom costs are accessible via Python and REST queries. UI uptake is under deve
 
 ## Adding a custom cost
 
-You can add a custom cost by using the [`add_costs`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-add_costs) method.
-The two required fields are `prompt_token_cost` and `completion_token_cost`.
+You can add a custom cost by using the [`add_cost`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-add_cost) method.
+The three required fields are `llm_id`,`prompt_token_cost` and `completion_token_cost`.
 You can also set `effective_date` to a datetime, to make the cost effective at a specific date, this defaults to the current date.
 
 ```python
@@ -16,26 +16,19 @@ from datetime import datetime
 
 client = weave.init("my_custom_cost_model")
 
-client.add_costs({
-    "your_model_name": {
-        "prompt_token_cost": 0.1,
-        "completion_token_cost": 0.2,
-    }
-})
+client.add_cost(
+    llm_id="your_model_name",
+    prompt_token_cost=0.01,
+    completion_token_cost=0.02
+)
 
 client.add_costs({
-    "your_model_name": {
-        "prompt_token_cost": 10,
-        "completion_token_cost": 20,
-        # If for example I want to raise the price of the model after a certain date
-        "effective_date": datetime(2025, 4, 22),
-    },
-    "my_special_model_1": {
-        "prompt_token_cost": 0.1,
-        "completion_token_cost": 0.2,
-        "effective_date": datetime(1972, 5, 11),
-    }
-})
+    llm_id="your_model_name",
+    prompt_token_cost=10,
+    completion_token_cost=20,
+    # If for example I want to raise the price of the model after a certain date
+    effective_date=datetime(2025, 4, 22),
+)
 ```
 
 ## Querying for costs
@@ -104,3 +97,7 @@ def get_costs_for_project(project_name: str):
 # our totals are stored in weave for historic cost total calculations
 get_costs_for_project("my_custom_cost_model")
 ```
+
+## Setting up a custom model with custom costs
+
+Try our cookbook for a [Setting up costs with a custom model](/reference/gen_notebooks/custom_model_cost) or <a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./notebooks/custom_model_cost.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
