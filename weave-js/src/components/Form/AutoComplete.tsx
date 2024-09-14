@@ -44,7 +44,7 @@ const getStyles = (props: AdditionalProps) => {
           root: {
             '& .MuiOutlinedInput-root': {
               height: HEIGHTS[size],
-              padding: PADDING[size],
+              padding: `${PADDING[size]}`,
               fontSize: FONT_SIZES[size],
               fontFamily: 'Source Sans Pro',
               minWidth: '100px',
@@ -70,6 +70,7 @@ const getStyles = (props: AdditionalProps) => {
                 color: MOON_500,
                 opacity: 1,
               },
+
               // Pseudo-element for hover effect without clipping the border
               '&::before': {
                 content: '""',
@@ -89,6 +90,10 @@ const getStyles = (props: AdditionalProps) => {
                 borderColor: TEAL_400,
               },
             },
+            '&.MuiAutocomplete-hasPopupIcon .MuiOutlinedInput-root, &.MuiAutocomplete-hasClearIcon .MuiOutlinedInput-root':
+              {
+                paddingRight: props.showEndIcon ? '26px' : '0px', // Apply padding only if input exists
+              },
           },
           option: {
             borderColor: MOON_250,
@@ -121,6 +126,11 @@ const getStyles = (props: AdditionalProps) => {
               backgroundColor: '#f5f5f5',
             },
           },
+          endAdornment: {
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
           // menu dropdown
           paper: {
             border: `1px solid ${MOON_250}`,
@@ -149,6 +159,7 @@ type AdditionalProps = {
   size?: SelectSize;
   isDarkMode?: boolean;
   maxWidth?: number;
+  showEndIcon?: boolean;
 };
 
 export const AutoComplete = <Option,>(
