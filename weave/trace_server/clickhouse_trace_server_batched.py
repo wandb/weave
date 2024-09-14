@@ -1325,24 +1325,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
 
-    async def async_call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        raise NotImplementedError
-
-    async def async_call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        raise NotImplementedError
-
-    async def async_obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        raise NotImplementedError
-
-    async def async_table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        raise NotImplementedError
-
-    async def async_table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        raise NotImplementedError
-
-    async def async_file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        raise NotImplementedError
-
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
