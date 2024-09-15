@@ -1051,6 +1051,30 @@ class WeaveClient:
         return ref
 
     def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
+        """Recursively visits all values, ensuring that any "Refable" objects are
+        saved and reffed.
+
+        As of this writing, the only "Refable" objects are instances of:
+        - weave.flow.obj.Object
+        - weave.trace.op.Op
+        - weave.trace.Table
+        - weave.trace.vals.WeaveTable
+
+        This procedure is a bit complicated, so it is worth making the details explicit:
+        1. If the `obj` value already has a `ref`:
+            - If the ref is to the current project, do nothing.
+            - If the ref is to a different project, remove it. (to avoid cross-project references)
+        2. If the `obj` value can be "reffed" (according to one of the above cases), invoke
+            the appropriate "save" function for that type of object, and attach the ref result to `obj`.
+            - `_save_object_basic` (for `weave.flow.obj.Object` instances)
+            - `_save_op` (for `weave.trace.op.Op` instances)
+            - `_save_table` (for `weave.trace.Table` and `weave.trace.vals.WeaveTable` instances)
+        3. Otherwise, traverse all values within `obj` recursively, applying the above logic to each value.
+
+        Important notes to developers: This method does not return anything - it _mutates_ the
+        values that it traverses (specifically, it attaches `ref` values to them)
+        """
+        # Base case: if the object is already refed, do nothing
         if (ref := get_ref(obj)) is not None:
             if ALLOW_MIXED_PROJECT_REFS:
                 return
@@ -1063,27 +1087,47 @@ class WeaveClient:
         # Must defer import here to avoid circular import
         from weave.flow.obj import Object
 
+        # Case 1: Object
         if isinstance(obj, Object):
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
             ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
             obj.__dict__["ref"] = ref
-        elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
-            obj_rec = pydantic_object_record(obj)
-            for v in obj_rec.__dict__.values():
-                self._save_nested_objects(v)
-        elif dataclasses.is_dataclass(obj) and not isinstance(obj, Ref):
-            obj_rec = dataclass_object_record(obj)
-            for v in obj_rec.__dict__.values():
-                self._save_nested_objects(v)
+
+        # Case 2: Op
+        elif isinstance(obj, Op):
+            self._save_op(obj)
+
+        # Case 3: Table
         elif isinstance(obj, Table):
             table_ref = self._save_table(obj)
             obj.ref = table_ref
+
+        # Case 4: WeaveTable
         elif isinstance(obj, WeaveTable):
             table_ref = self._save_table(obj)
             obj.ref = table_ref
             obj.table_ref = table_ref
+
+        # Special case: Custom recursive handling for WeaveObject with rows
+        # TODO: Kinda hacky way to dispatching Dataset with rows: Table
+        elif isinstance(obj, WeaveObject) and hasattr(obj, "rows"):
+            self._save_nested_objects(obj.rows)
+
+        # Recursive traversal of other pydantic objects
+        elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+            obj_rec = pydantic_object_record(obj)
+            for v in obj_rec.__dict__.values():
+                self._save_nested_objects(v)
+
+        # Recursive traversal of other dataclasses
+        elif dataclasses.is_dataclass(obj) and not isinstance(obj, Ref):
+            obj_rec = dataclass_object_record(obj)
+            for v in obj_rec.__dict__.values():
+                self._save_nested_objects(v)
+
+        # Recursive traversal of python structures
         elif isinstance_namedtuple(obj):
             for v in obj._asdict().values():
                 self._save_nested_objects(v)
@@ -1093,11 +1137,6 @@ class WeaveClient:
         elif isinstance(obj, dict):
             for v in obj.values():
                 self._save_nested_objects(v)
-        elif isinstance(obj, Op):
-            self._save_op(obj)
-        # TODO: Kinda hacky way to dispatching Dataset with rows: Table
-        elif isinstance(obj, WeaveObject) and hasattr(obj, "rows"):
-            self._save_nested_objects(obj.rows)
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:
