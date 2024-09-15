@@ -737,35 +737,35 @@ class TraceServerInterface(Protocol):
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
 
-    async def async_call_start(self, req: CallStartReq) -> CallStartRes:
-        # A niave implementation is provided for compatibility, but subclasses
-        # can implement a more efficient version if they want
-        return self.call_start(req)
+    # async def async_call_start(self, req: CallStartReq) -> CallStartRes:
+    #     # A niave implementation is provided for compatibility, but subclasses
+    #     # can implement a more efficient version if they want
+    #     return self.call_start(req)
 
-    async def async_call_end(self, req: CallEndReq) -> CallEndRes:
-        # A niave implementation is provided for compatibility, but subclasses
-        # can implement a more efficient version if they want
-        return self.call_end(req)
+    # async def async_call_end(self, req: CallEndReq) -> CallEndRes:
+    #     # A niave implementation is provided for compatibility, but subclasses
+    #     # can implement a more efficient version if they want
+    #     return self.call_end(req)
 
-    async def async_obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
-        # A niave implementation is provided for compatibility, but subclasses
-        # can implement a more efficient version if they want
-        return self.obj_create(req)
+    # async def async_obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
+    #     # A niave implementation is provided for compatibility, but subclasses
+    #     # can implement a more efficient version if they want
+    #     return self.obj_create(req)
 
-    async def async_table_create(self, req: TableCreateReq) -> TableCreateRes:
-        # A niave implementation is provided for compatibility, but subclasses
-        # can implement a more efficient version if they want
-        return self.table_create(req)
+    # async def async_table_create(self, req: TableCreateReq) -> TableCreateRes:
+    #     # A niave implementation is provided for compatibility, but subclasses
+    #     # can implement a more efficient version if they want
+    #     return self.table_create(req)
 
-    async def async_table_update(self, req: TableUpdateReq) -> TableUpdateRes:
-        # A niave implementation is provided for compatibility, but subclasses
-        # can implement a more efficient version if they want
-        return self.table_update(req)
+    # async def async_table_update(self, req: TableUpdateReq) -> TableUpdateRes:
+    #     # A niave implementation is provided for compatibility, but subclasses
+    #     # can implement a more efficient version if they want
+    #     return self.table_update(req)
 
-    async def async_file_create(self, req: FileCreateReq) -> FileCreateRes:
-        # A niave implementation is provided for compatibility, but subclasses
-        # can implement a more efficient version if they want
-        return self.file_create(req)
+    # async def async_file_create(self, req: FileCreateReq) -> FileCreateRes:
+    #     # A niave implementation is provided for compatibility, but subclasses
+    #     # can implement a more efficient version if they want
+    #     return self.file_create(req)
 
 
 # These symbols are used in the WB Trace Server and it is not safe

@@ -974,9 +974,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         print("COST PURGE is not implemented for local sqlite", req)
         return tsi.CostPurgeRes()
 
-    async def async_call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        raise NotImplementedError
-
     def _table_query(
         self,
         project_id: str,
