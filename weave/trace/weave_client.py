@@ -568,6 +568,7 @@ class WeaveClient:
         if isinstance(op, Op):
             unbound_op = maybe_unbind_method(op)
             op_def_ref = self._save_op(unbound_op)
+            # Blocking (once per op)
             op_str = op_def_ref.uri()
         else:
             op_str = op
@@ -578,6 +579,7 @@ class WeaveClient:
         else:
             inputs_postprocessed = inputs_redacted
 
+        # Blocking (until we have async file writes)
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
         call_id = generate_id()
@@ -626,20 +628,23 @@ class WeaveClient:
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
-        self.async_job_queue.submit_job(
-            send_start_call,
-            project_id=project_id,
-            call_id=call_id,
-            op_str=op_str,
-            trace_id=trace_id,
-            started_at=started_at,
-            display_name=display_name,
-            parent_id=parent_id,
-            inputs_with_refs=inputs_with_refs,
-            attributes=attributes,
-            current_wb_run_id=current_wb_run_id,
-            server=self.server,
-        )
+        def send_start_call() -> None:
+            inputs_json = to_json(inputs_with_refs, project_id, self.server)
+            start = StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                op_name=op_str,
+                display_name=display_name,
+                trace_id=trace_id,
+                started_at=started_at,
+                parent_id=parent_id,
+                inputs=inputs_json,
+                attributes=attributes,
+                wb_run_id=current_wb_run_id,
+            )
+            self.server.call_start(CallStartReq(start=start))
+
+        self.async_job_queue.submit_job(send_start_call)
 
         if use_stack:
             call_context.push_call(call)
@@ -1206,35 +1211,6 @@ class WeaveClient:
         # Safe to call multiple times
         self._flush()
         self.async_job_queue.shutdown(wait=True)
-
-
-def send_start_call(
-    project_id: str,
-    call_id: str,
-    op_str: str,
-    trace_id: str,
-    started_at: datetime.datetime,
-    display_name: Optional[str],
-    parent_id: Optional[str],
-    inputs_with_refs: dict[str, Any],
-    attributes: dict[str, Any],
-    current_wb_run_id: Optional[str],
-    server: TraceServerInterface,
-) -> None:
-    inputs_json = to_json(inputs_with_refs, project_id, server)
-    start = StartedCallSchemaForInsert(
-        project_id=project_id,
-        id=call_id,
-        op_name=op_str,
-        display_name=display_name,
-        trace_id=trace_id,
-        started_at=started_at,
-        parent_id=parent_id,
-        inputs=inputs_json,
-        attributes=attributes,
-        wb_run_id=current_wb_run_id,
-    )
-    server.call_start(CallStartReq(start=start))
 
 
 def send_end_call(
