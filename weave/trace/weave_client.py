@@ -1010,20 +1010,37 @@ class WeaveClient:
 
         name = sanitize_object_name(name)
 
-        response = self.server.obj_create(
+        response = self.async_job_queue.submit_job(
+            self.server.obj_create,
             ObjCreateReq(
                 obj=ObjSchemaForInsert(
                     project_id=self.entity + "/" + self.project,
                     object_id=name,
                     val=json_val,
                 )
-            )
+            ),
         )
+
+        def blocking_digest_resolver() -> str:
+            return response.result().digest
+
         ref: Ref
         if is_opdef:
-            ref = OpRef(self.entity, self.project, name, response.digest)
+            ref = OpRef(
+                self.entity,
+                self.project,
+                name,
+                digest="",
+                _blocking_digest_resolver=blocking_digest_resolver,
+            )
         else:
-            ref = ObjectRef(self.entity, self.project, name, response.digest)
+            ref = ObjectRef(
+                self.entity,
+                self.project,
+                name,
+                digest="",
+                _blocking_digest_resolver=blocking_digest_resolver,
+            )
         # TODO: Try to put a ref onto val? Or should user code use a style like
         # save instead?
         return ref

@@ -9,6 +9,7 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     TraceServerInterface,
 )
+from weave.trace_server.trace_server_interface_util import bytes_digest
 
 
 def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
@@ -31,15 +32,25 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
     if isinstance(obj, (int, float, str, bool)) or obj is None:
         return obj
 
+    # This still blocks potentially on large-file i/o.
     encoded = custom_objs.encode_custom_obj(obj)
     if encoded is None:
         return fallback_encode(obj)
     file_digests = {}
     for name, val in encoded["files"].items():
-        file_response = server.file_create(
+        # Instead of waiting for the file to be created, we
+        # calculate the digest directly. This makes sure that the
+        # to_json procedure is not blocked on network requests.
+        # Technically it is possible that the file creation request
+        # fails.
+        file_response = server.async_file_create(
             FileCreateReq(project_id=project_id, name=name, content=val)
         )
-        file_digests[name] = file_response.digest
+        contents_as_bytes = val
+        if isinstance(contents_as_bytes, str):
+            contents_as_bytes = contents_as_bytes.encode("utf-8")
+        digest = bytes_digest(contents_as_bytes)
+        file_digests[name] = digest
     result = {
         "_type": encoded["_type"],
         "weave_type": encoded["weave_type"],
