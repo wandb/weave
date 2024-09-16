@@ -505,7 +505,7 @@ def make_trace_obj(
                     "Expected Table.ref or Table.table_ref to be TableRef"
                 )
             val_ref = val_table_ref
-
+        rows = val.rows
         val = WeaveTable(
             table_ref=val_ref,
             ref=new_ref,
@@ -514,6 +514,12 @@ def make_trace_obj(
             root=root,
             parent=parent,
         )
+        # Use in memory rows! This is the case where we are making
+        # a trace object from an existing Table! If we don't do this
+        # then the WeaveTable will try to fetch all the rows from the
+        # server, throwing away the in memory rows. This is really expensive
+        # when we are doing evaluations!
+        val._rows = rows
     if isinstance(val, TableRef):
         val = WeaveTable(
             table_ref=val,
