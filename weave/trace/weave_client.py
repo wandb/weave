@@ -51,6 +51,7 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     FileCreateRes,
     ObjCreateReq,
+    ObjCreateRes,
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
@@ -1023,28 +1024,30 @@ class WeaveClient:
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
             return val
-        json_val = to_json(val, self._project_id(), self)
 
         if name is None:
-            if json_val.get("_type") == "CustomWeaveType":
-                custom_name = json_val.get("weave_type", {}).get("type")
-                name = custom_name
+            serializer = get_serializer_for_obj(val)
+            if serializer:
+                name = serializer.id()
 
         if name is None:
             raise ValueError("Name must be provided for object saving")
 
         name = sanitize_object_name(name)
 
-        response = self.async_job_queue.submit_job(
-            self.server.obj_create,
-            ObjCreateReq(
-                obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project,
-                    object_id=name,
-                    val=json_val,
+        def send_obj_create() -> ObjCreateRes:
+            json_val = to_json(val, self._project_id(), self)
+            return self.server.obj_create(
+                ObjCreateReq(
+                    obj=ObjSchemaForInsert(
+                        project_id=self.entity + "/" + self.project,
+                        object_id=name,
+                        val=json_val,
+                    )
                 )
-            ),
-        )
+            )
+
+        response = self.async_job_queue.submit_job(send_obj_create)
 
         def blocking_digest_resolver() -> str:
             return response.result().digest

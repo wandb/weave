@@ -78,8 +78,9 @@ class ObjectRef(RefWithExtra):
     def __post_init__(self) -> None:
         if self._blocking_digest_resolver is not None:
             object.__setattr__(self, "digest", "")
-        refs_internal.validate_no_slashes(self.digest, "digest")
-        refs_internal.validate_no_colons(self.digest, "digest")
+        else:
+            refs_internal.validate_no_slashes(self.digest, "digest")
+            refs_internal.validate_no_colons(self.digest, "digest")
         refs_internal.validate_extra(list(self.extra))
         refs_internal.validate_no_slashes(self.name, "name")
         refs_internal.validate_no_colons(self.name, "name")
@@ -91,6 +92,7 @@ class ObjectRef(RefWithExtra):
         ):
             resolver = object.__getattribute__(self, "_blocking_digest_resolver")
             digest = resolver()
+            # VALIDATE DIGEST?
             object.__setattr__(self, "digest", digest)
             object.__setattr__(self, "_blocking_digest_resolver", None)
         return object.__getattribute__(self, item)
