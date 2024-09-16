@@ -659,6 +659,13 @@ async def test_eval_with_images(client):
         image: Image.Image, dc: MyDataclass, model: MyModel, obj: MyObj, text: str
     ) -> str:
         assert isinstance(image, Image.Image)
+
+        # Note: when we start recursively saving dataset rows, this will
+        # probably break. We need a way to deserialize back to the actual
+        # classes for these assertions to maintain, else they will be
+        # WeaveObjects here and not pass these checks. I suspect customers
+        # will not be happy with WeaveObjects, so this is a good sanity check
+        # for now.
         assert isinstance(dc, MyDataclass)
         assert isinstance(model, MyModel)
         assert isinstance(obj, MyObj)
@@ -667,6 +674,12 @@ async def test_eval_with_images(client):
         return text
 
     def function_score(image, dc, model, obj, text, model_output) -> bool:
+        # Note: when we start recursively saving dataset rows, this will
+        # probably break. We need a way to deserialize back to the actual
+        # classes for these assertions to maintain, else they will be
+        # WeaveObjects here and not pass these checks. I suspect customers
+        # will not be happy with WeaveObjects, so this is a good sanity check
+        # for now.
         assert isinstance(image, Image.Image)
         assert isinstance(dc, MyDataclass)
         assert isinstance(model, MyModel)
