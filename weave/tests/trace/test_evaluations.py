@@ -1,5 +1,7 @@
+import dataclasses
 from typing import Any, Optional
 
+import pydantic
 import pytest
 
 import weave
@@ -633,3 +635,70 @@ async def test_eval_is_robust_to_missing_values(client):
         "function_score": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
         "model_latency": {"mean": pytest.approx(0, abs=1)},
     }
+
+
+import random
+
+from PIL import Image
+
+
+@pytest.mark.asyncio
+async def test_eval_with_images(client):
+    @dataclasses.dataclass(frozen=True)
+    class MyDataclass:
+        a_string: str
+
+    class MyModel(pydantic.BaseModel):
+        a_string: str
+
+    class MyObj(weave.Object):
+        a_string: str
+
+    @weave.op
+    def model_func(
+        image: Image.Image, dc: MyDataclass, model: MyModel, obj: MyObj, text: str
+    ) -> str:
+        assert isinstance(image, Image.Image)
+        assert isinstance(dc, MyDataclass)
+        assert isinstance(model, MyModel)
+        assert isinstance(obj, MyObj)
+        assert isinstance(text, str)
+
+        return text
+
+    def function_score(image, dc, model, obj, text, model_output) -> bool:
+        assert isinstance(image, Image.Image)
+        assert isinstance(dc, MyDataclass)
+        assert isinstance(model, MyModel)
+        assert isinstance(obj, MyObj)
+        assert isinstance(text, str)
+        assert isinstance(model_output, str)
+
+        return True
+
+    evaluation = weave.Evaluation(
+        name="fruit_eval",
+        dataset=[
+            {
+                "image": Image.new("RGB", (100, 100), color=random.randint(0, 255)),
+                "dc": MyDataclass(a_string="hello"),
+                "model": MyModel(a_string="hello"),
+                "obj": MyObj(a_string="hello"),
+                "text": "A photo of a cat",
+            }
+        ],
+        scorers=[function_score],
+    )
+
+    res = await evaluation.evaluate(model_func)
+    assert res.get("function_score", {}).get("true_count") == 1
+
+    # Before this test (and fix) we were making extra requests
+    # to reconstruct the table and objects in the evaluation.\
+    # These assertions ensure that we aren't making those extra requests.
+    # There is no reason to query the table, objects, or files
+    # as everything is in memory
+    access_log = client.server.attribute_access_log
+    assert "table_query" not in access_log
+    assert "obj_read" not in access_log
+    assert "file_content_read" not in access_log

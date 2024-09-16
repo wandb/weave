@@ -185,6 +185,29 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
         return attr
 
 
+def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
+    class ServerRecorder(type(server)):  # type: ignore
+        attribute_access_log: list[str]
+
+        def __init__(self, server: tsi.TraceServerInterface):  # type: ignore
+            self.server = server
+            self.attribute_access_log = []
+
+        def __getattribute__(self, name):
+            self_server = super().__getattribute__("server")
+            access_log = super().__getattribute__("attribute_access_log")
+            if name == "server":
+                return self_server
+            if name == "attribute_access_log":
+                return access_log
+            attr = self_server.__getattribute__(name)
+            if name != "attribute_access_log":
+                access_log.append(name)
+            return attr
+
+    return ServerRecorder(server)
+
+
 @pytest.fixture()
 def client(request) -> Generator[weave_client.WeaveClient, None, None]:
     inited_client = None
@@ -218,7 +241,9 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
-        client = TestOnlyFlushingWeaveClient(entity, project, server)
+        client = TestOnlyFlushingWeaveClient(
+            entity, project, make_server_recorder(server)
+        )
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
     try:
