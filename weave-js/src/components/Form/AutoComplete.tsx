@@ -13,7 +13,7 @@ import {
   TEAL_600,
 } from '../../common/css/color.styles';
 import {hexToRGB} from '../../common/css/globals.styles';
-import {Paper, PaperProps, Popper} from '@mui/material';
+import {Paper, PaperProps} from '@mui/material';
 
 const HEIGHTS = {
   small: '24px',
@@ -76,19 +76,6 @@ const getStyles = (props: AdditionalProps) => {
                 color: MOON_500,
                 opacity: 1,
               },
-
-              // Pseudo-element for hover effect without clipping the border
-              // '&::before': {
-              //   content: '""',
-              //   position: 'absolute',
-              //   top: 0,
-              //   left: 0,
-              //   right: 0,
-              //   bottom: 0,
-              //   border: '2px solid transparent',
-              //   borderRadius: '4px',
-              //   pointerEvents: 'none',
-              // },
               '&:hover::before': {
                 borderColor: hexToRGB(TEAL_500, 0.4),
               },
@@ -98,7 +85,7 @@ const getStyles = (props: AdditionalProps) => {
             },
             '&.MuiAutocomplete-hasPopupIcon .MuiOutlinedInput-root, &.MuiAutocomplete-hasClearIcon .MuiOutlinedInput-root':
               {
-                paddingRight: props.showEndIcon ? '26px' : '0px', // Apply padding only if input exists
+                paddingRight: props.showEndIcon ? '28px' : '0px', // Apply padding only if input exists
               },
           },
           option: {
@@ -174,6 +161,7 @@ export const AutoComplete = <Option,>(
   return (
     <ThemeProvider theme={getStyles(props)}>
       <Autocomplete
+        className="hidden-overflow-x"
         {...props}
         PaperComponent={paperProps => (
           <CustomPaper {...paperProps} isDarkMode={props.isDarkMode} />
