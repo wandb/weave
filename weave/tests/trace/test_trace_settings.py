@@ -55,6 +55,8 @@ def test_disabled_env_client():
     # since this would require writing to `entity/project`
     client._flush()
 
+    os.environ["WEAVE_DISABLED"] = "false"
+
 
 def test_print_call_link_setting(client):
     captured_stdout = io.StringIO()
