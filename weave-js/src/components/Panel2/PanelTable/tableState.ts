@@ -174,13 +174,11 @@ export function initTableWithPickColumns(
         listIndexWithStar,
       });
     }
-    const columns =
-      allColumns.length > 1000 ? allColumns.slice(0, 1000) : allColumns;
-    if (columns.length === 0) {
+    if (allColumns.length === 0) {
       // If no columns are provided, at least fill it with a general row column.
       ts = addColumnToTable(ts, varNode(exNode.type, 'row')).table;
     } else {
-      addCols = columns.map(colExpr => ({
+      addCols = allColumns.map(colExpr => ({
         selectFn: colExpr,
         keyName: '',
       }));
