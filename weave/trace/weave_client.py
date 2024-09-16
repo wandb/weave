@@ -1,4 +1,3 @@
-import atexit
 import dataclasses
 import datetime
 import platform
@@ -6,7 +5,7 @@ import re
 import sys
 import typing
 from functools import lru_cache
-from typing import Any, Dict, Iterator, Optional, Sequence, Union
+from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Union
 
 import pydantic
 from requests import HTTPError
@@ -25,7 +24,7 @@ from weave.trace.object_record import (
 )
 from weave.trace.op import Op, maybe_unbind_method
 from weave.trace.op import op as op_deco
-from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef
+from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_op_uri
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.table import Table
@@ -155,7 +154,7 @@ class Call:
     output: Any = None
     exception: Optional[str] = None
     summary: Optional[dict] = None
-    display_name: Optional[str] = None
+    display_name: Optional[Union[str, Callable[["Call"], str]]] = None
     attributes: Optional[dict] = None
     started_at: Optional[datetime.datetime] = None
     ended_at: Optional[datetime.datetime] = None
@@ -164,6 +163,19 @@ class Call:
     _children: list["Call"] = dataclasses.field(default_factory=list)
 
     _feedback: Optional[RefFeedbackQuery] = None
+
+    @property
+    def func_name(self) -> str:
+        """
+        The decorated function's name that produced this call.
+
+        This is different from `op_name` which is usually the ref of the op.
+        """
+        if self.op_name.startswith("weave:///"):
+            ref = parse_op_uri(self.op_name)
+            return ref.name
+
+        return self.op_name
 
     @property
     def feedback(self) -> RefFeedbackQuery:
@@ -414,7 +426,6 @@ class WeaveClient:
         self._anonymous_ops: dict[str, Op] = {}
         self.async_job_queue = AsyncJobQueue()
         self.ensure_project_exists = ensure_project_exists
-        atexit.register(self._cleanup)
 
         if ensure_project_exists:
             resp = self.server.ensure_project_exists(entity, project)
@@ -531,7 +542,7 @@ class WeaveClient:
         inputs: dict,
         parent: Optional[Call] = None,
         attributes: Optional[dict] = None,
-        display_name: Optional[str] = None,
+        display_name: Optional[Union[str, Callable[[Call], str]]] = None,
         *,
         use_stack: bool = True,
     ) -> Call:
@@ -560,9 +571,13 @@ class WeaveClient:
             op_str = op
 
         inputs_redacted = redact_sensitive_keys(inputs)
+        if op.postprocess_inputs:
+            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
+        else:
+            inputs_postprocessed = inputs_redacted
 
-        self._save_nested_objects(inputs_redacted)
-        inputs_with_refs = map_to_refs(inputs_redacted)
+        self._save_nested_objects(inputs_postprocessed)
+        inputs_with_refs = map_to_refs(inputs_postprocessed)
         call_id = generate_id()
 
         if parent is None and use_stack:
@@ -593,9 +608,13 @@ class WeaveClient:
             parent_id=parent_id,
             id=call_id,
             inputs=inputs_with_refs,
-            display_name=display_name,
             attributes=attributes,
         )
+        # feels like this should be in post init, but keping here
+        # because the func needs to be resolved for schema insert below
+        if callable(name_func := display_name):
+            display_name = name_func(call)
+        call.display_name = display_name
         if parent is not None:
             parent._children.append(call)
 
@@ -627,11 +646,22 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def finish_call(
-        self, call: Call, output: Any = None, exception: Optional[BaseException] = None
+        self,
+        call: Call,
+        output: Any = None,
+        exception: Optional[BaseException] = None,
+        *,
+        postprocess_output: Optional[Callable[..., Any]] = None,
     ) -> None:
-        self._save_nested_objects(output)
         original_output = output
-        output = map_to_refs(original_output)
+
+        if postprocess_output:
+            postprocessed_output = postprocess_output(original_output)
+        else:
+            postprocessed_output = original_output
+        self._save_nested_objects(postprocessed_output)
+
+        output = map_to_refs(postprocessed_output)
         call.output = output
 
         # Summary handling
@@ -789,38 +819,62 @@ class WeaveClient:
             query=query, reaction=reaction, offset=offset, limit=limit
         )
 
-    def add_costs(self, costs: Dict[str, CostCreateInput]) -> CostCreateRes:
-        """Add costs to the current project.
-            The cost object will be created with the effective date of the date of insertion `datetime.datetime.now(ZoneInfo("UTC"))` if no effective_date is provided.
+    def add_cost(
+        self,
+        llm_id: str,
+        prompt_token_cost: float,
+        completion_token_cost: float,
+        effective_date: typing.Optional[datetime.datetime] = datetime.datetime.now(
+            datetime.timezone.utc
+        ),
+        prompt_token_cost_unit: typing.Optional[str] = "USD",
+        completion_token_cost_unit: typing.Optional[str] = "USD",
+        provider_id: typing.Optional[str] = "default",
+    ) -> CostCreateRes:
+        """Add a cost to the current project.
 
         Examples:
-            ```python
-            costs = {
-                "my_expensive_custom_model": {
-                    "prompt_token_cost": 500,
-                    "completion_token_cost": 1000,
-                    "effective_date": datetime(1998, 10, 3),
-                },
-                "gpt-4o-mini-2024-07-18" :{
-                    "prompt_token_cost": 100,
-                    "completion_token_cost": 200,
-                    "effective_date": datetime(2024, 9, 1),
-                }
-            }
 
-            client.add_costs(costs)
+            ```python
+            client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=1, completion_token_cost=2)
+            client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=500, completion_token_cost=1000, effective_date=datetime(1998, 10, 3))
             ```
 
         Args:
-            costs: Dictionary of costs to add to the project. In the form of {llm_id: cost}.
+            llm_id: The ID of the LLM. eg "gpt-4o-mini-2024-07-18"
+            prompt_token_cost: The cost of the prompt tokens. eg .0005
+            completion_token_cost: The cost of the completion tokens. eg .0015
+            effective_date: Defaults to the current date. A datetime.datetime object.
+            provider_id: The provider of the LLM. Defaults to "default". eg "openai"
+            prompt_token_cost_unit: The unit of the cost for the prompt tokens. Defaults to "USD". (Currently unused, will be used in the future to specify the currency type for the cost eg "tokens" or "time")
+            completion_token_cost_unit: The unit of the cost for the completion tokens. Defaults to "USD". (Currently unused, will be used in the future to specify the currency type for the cost eg "tokens" or "time")
 
+        Returns:
+            A CostCreateRes object.
+            Which has one field called a list of tuples called ids.
+            Each tuple contains the llm_id and the id of the created cost object.
         """
+        cost = CostCreateInput(
+            prompt_token_cost=prompt_token_cost,
+            completion_token_cost=completion_token_cost,
+            effective_date=effective_date,
+            prompt_token_cost_unit=prompt_token_cost_unit,
+            completion_token_cost_unit=completion_token_cost_unit,
+            provider_id=provider_id,
+        )
         return self.server.cost_create(
-            CostCreateReq(project_id=self._project_id(), costs=costs)
+            CostCreateReq(project_id=self._project_id(), costs={llm_id: cost})
         )
 
     def purge_costs(self, ids: Union[list[str], str]) -> None:
         """Purge costs from the current project.
+
+        Examples:
+
+            ```python
+            client.purge_costs([ids])
+            client.purge_costs(ids)
+            ```
 
         Args:
             ids: The cost IDs to purge. Can be a single ID or a list of IDs.
@@ -847,6 +901,7 @@ class WeaveClient:
         """Query project for costs.
 
         Examples:
+
             ```python
             # Fetch a specific cost object.
             # Note that this still returns a collection, which is expected
@@ -1120,18 +1175,6 @@ class WeaveClient:
             # flushable. The # type: ignore is safe because we check the type
             # first.
             self.server.call_processor.wait_until_all_processed()  # type: ignore
-
-    def __del__(self) -> None:
-        self._cleanup()
-        # Because "__del__" is called when the interpreter exits, we need to
-        # make sure that atexit is available.
-        if atexit is not None:
-            atexit.unregister(self._cleanup)
-
-    def _cleanup(self) -> None:
-        # Safe to call multiple times
-        self._flush()
-        self.async_job_queue.shutdown(wait=True)
 
 
 def send_start_call(
