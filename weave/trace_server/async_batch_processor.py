@@ -1,10 +1,14 @@
 import atexit
+import logging
 import time
 from queue import Queue
 from threading import Event, Lock, Thread
 from typing import Callable, Generic, List, TypeVar
 
+from weave.trace_server import requests
+
 T = TypeVar("T")
+logger = logging.getLogger(__name__)
 
 
 class AsyncBatchProcessor(Generic[T]):
@@ -54,7 +58,14 @@ class AsyncBatchProcessor(Generic[T]):
                 current_batch.append(self.queue.get())
 
             if current_batch:
-                self.processor_fn(current_batch)
+                try:
+                    self.processor_fn(current_batch)
+                except requests.HTTPError as e:
+                    if e.response.status_code == 413:
+                        # 413: payload too large, don't raise just log
+                        logger.error(f"Error processing batch: {e}")
+                    else:
+                        raise e
 
             if self.stop_event.is_set() and self.queue.empty():
                 break
