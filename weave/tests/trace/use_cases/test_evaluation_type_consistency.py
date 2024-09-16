@@ -56,6 +56,10 @@ class MyScorer(weave.Scorer):
         print(f"summarize: an element in score_rows is a {type(score_rows[0])}")
         print(f"summarize: score_output is a {type(score_rows[0]['score_output'])}")
 
+        assert isinstance(
+            score_rows[0]["score_output"], MyDataclass
+        ), "Dataclass not boxed str"
+
         return {
             "some_metric": 1.0,
         }
