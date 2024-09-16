@@ -51,7 +51,7 @@ const getStyles = (props: AdditionalProps) => {
           root: {
             '& .MuiOutlinedInput-root': {
               height: HEIGHTS[size],
-              padding: `${PADDING[size]}`,
+              padding: PADDING[size],
               fontSize: FONT_SIZES[size],
               fontFamily: 'Source Sans Pro',
               minWidth: '100px',
@@ -161,7 +161,6 @@ export const AutoComplete = <Option,>(
   return (
     <ThemeProvider theme={getStyles(props)}>
       <Autocomplete
-        className="hidden-overflow-x"
         {...props}
         PaperComponent={paperProps => (
           <CustomPaper {...paperProps} isDarkMode={props.isDarkMode} />
