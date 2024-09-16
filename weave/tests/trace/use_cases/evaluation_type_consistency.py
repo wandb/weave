@@ -1,6 +1,8 @@
-import weave
-import dataclasses
 import asyncio
+import dataclasses
+
+import weave
+
 
 @dataclasses.dataclass(frozen=True)
 class MyDataclass:
@@ -17,7 +19,9 @@ class MyModel(weave.Model):
         int_value: int,
         list_value: list[int],
     ) -> dict:
-        my_dataclass = MyDataclass(a_string=str_value, an_int=int_value, a_list=list_value)
+        my_dataclass = MyDataclass(
+            a_string=str_value, an_int=int_value, a_list=list_value
+        )
 
         print(f"model: str_value is a {type(str_value)}")
         print(f"model: int_value is a {type(int_value)}")
@@ -31,8 +35,9 @@ class MyModel(weave.Model):
 
 class MyScorer(weave.Scorer):
     @weave.op()
-    async def score(self, str_value: str, int_value: int, list_value: list[int], model_output: dict) -> dict:
-
+    async def score(
+        self, str_value: str, int_value: int, list_value: list[int], model_output: dict
+    ) -> dict:
         my_dataclass = model_output["my_dataclass"]
 
         print(f"score: str_value is a {type(str_value)}")
@@ -47,7 +52,6 @@ class MyScorer(weave.Scorer):
 
     @weave.op()
     def summarize(self, score_rows: list[dict]) -> dict:
-
         print(f"summarize: score_rows is a {type(score_rows)}")
         print(f"summarize: an element in score_rows is a {type(score_rows[0])}")
         print(f"summarize: score_output is a {type(score_rows[0]['score_output'])}")
