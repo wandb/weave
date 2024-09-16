@@ -33,8 +33,7 @@ export const useCallsForQuery = (
   gridFilter: GridFilterModel,
   gridSort: GridSortModel,
   gridPage: GridPaginationModel,
-  expandedColumns: Set<string>,
-  includeCosts: boolean = false
+  expandedColumns: Set<string>
 ): {
   costsLoading: boolean;
   result: CallSchema[];
@@ -82,11 +81,12 @@ export const useCallsForQuery = (
     }
   }, [callResults.length, callsStats.loading, callsStats.result, offset]);
 
-  const costFilter: CallFilter = calls.loading
-    ? {}
-    : {
-        callIds: calls.result?.map(call => call.traceCall?.id || '') || [],
-      };
+  const costFilter: CallFilter = useMemo(
+    () => ({
+      callIds: calls.result?.map(call => call.traceCall?.id || '') || [],
+    }),
+    [calls.result]
+  );
 
   const costs = useCalls(
     entity,
@@ -99,7 +99,7 @@ export const useCallsForQuery = (
     undefined,
     expandedColumns,
     {
-      skip: !includeCosts || calls.loading,
+      skip: calls.loading,
       includeCosts: true,
     }
   );
