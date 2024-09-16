@@ -168,6 +168,7 @@ def init_weave_disabled() -> InitializedClient:
         "DISABLED",
         init_weave_get_server("DISABLED", should_batch=False),
         ensure_project_exists=False,
+        disabled=True,
     )
 
     return InitializedClient(client)

@@ -399,6 +399,9 @@ class AttributesDict(dict):
         return f"{self.__class__.__name__}({super().__repr__()})"
 
 
+class WeaveDisabledError(Exception): ...
+
+
 class WeaveClient:
     server: TraceServerInterface
     async_job_queue: AsyncJobQueue
@@ -419,6 +422,8 @@ class WeaveClient:
         project: str,
         server: TraceServerInterface,
         ensure_project_exists: bool = True,
+        *,
+        disabled: bool = False,
     ):
         self.entity = entity
         self.project = project
@@ -426,6 +431,7 @@ class WeaveClient:
         self._anonymous_ops: dict[str, Op] = {}
         self.async_job_queue = AsyncJobQueue()
         self.ensure_project_exists = ensure_project_exists
+        self.disabled = disabled
 
         if ensure_project_exists:
             resp = self.server.ensure_project_exists(entity, project)
@@ -559,6 +565,11 @@ class WeaveClient:
         Returns:
             The created Call object.
         """
+        if self.disabled:
+            raise WeaveDisabledError(
+                "To un-disable, unset the `WEAVE_DISABLED` env var"
+            )
+
         if isinstance(op, str):
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
