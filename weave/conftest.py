@@ -176,8 +176,8 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
         if callable(attr) and not name.startswith("_") and name != "flush":
 
             def wrapper(*args, **kwargs):
-                self_super._flush()
                 res = attr(*args, **kwargs)
+                self_super._flush()
                 return res
 
             return wrapper
@@ -186,6 +186,24 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
 
 
 def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
+    """A wrapper around a trace server that records all attribute access.
+
+    This is extremely helpful for tests to assert that a certain series of
+    attribute accesses happen (or don't happen), and in order. We will
+    probably want to make this a bit more sophisticated in the future, but
+    this is a pretty good start.
+
+    For example, you can do something like the followng to assert that various
+    read operations do not happen!
+
+    ```pyth
+    access_log = client.server.attribute_access_log
+    assert "table_query" not in access_log
+    assert "obj_read" not in access_log
+    assert "file_content_read" not in access_log
+    ```
+    """
+
     class ServerRecorder(type(server)):  # type: ignore
         attribute_access_log: list[str]
 
