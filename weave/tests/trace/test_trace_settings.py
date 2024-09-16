@@ -40,6 +40,9 @@ def test_disabled_env(client):
 def test_disabled_env_client():
     os.environ["WEAVE_DISABLED"] = "true"
     client = weave.init("entity/project")
+
+    # Verify that the client is disabled
+    # Would be nicer to have a specific property
     assert client.project == "DISABLED"
 
     @weave.op
@@ -49,6 +52,7 @@ def test_disabled_env_client():
     assert func() == 1
 
     # No error implies that no calls were sent to the server
+    # since this would require writing to `entity/project`
     client._flush()
 
 
