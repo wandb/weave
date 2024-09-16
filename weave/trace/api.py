@@ -18,7 +18,7 @@ from . import context, weave_client, weave_init
 from .constants import TRACE_OBJECT_EMOJI
 from .op import Op, op
 from .refs import ObjectRef, parse_uri
-from .settings import UserSettings, parse_and_apply_settings
+from .settings import UserSettings, parse_and_apply_settings, should_disable_weave
 from .table import Table
 
 
@@ -41,11 +41,11 @@ def init(
     Returns:
         A Weave client.
     """
-    # This is the stream-table backend. Disabling it in favor of the new
-    # trace-server backend.
-    # return weave_init.init_wandb(project_name).client
-    # return weave_init.init_trace_remote(project_name).client
     parse_and_apply_settings(settings)
+
+    if should_disable_weave():
+        return weave_init.init_weave_disabled().client
+
     return weave_init.init_weave(project_name).client
 
 
