@@ -15,6 +15,9 @@ class Ref:
     def uri(self) -> str:
         raise NotImplementedError
 
+    def as_dict(self) -> dict:
+        return dataclasses.asdict(self)
+
 
 @dataclasses.dataclass(frozen=True)
 class TableRef(Ref):
@@ -28,6 +31,18 @@ class TableRef(Ref):
     def __post_init__(self) -> None:
         if self._blocking_digest_resolver is not None:
             object.__setattr__(self, "digest", "")
+
+    def as_dict(self) -> dict:
+        # Needed to not accidentally block on resolving the digest
+        if self._blocking_digest_resolver is not None:
+            digest = ""
+        else:
+            digest = self.digest
+        return {
+            "entity": self.entity,
+            "project": self.project,
+            "digest": digest,
+        }
 
     def __getattribute__(self, item: str) -> Any:
         if (
@@ -47,7 +62,7 @@ class TableRef(Ref):
 @dataclasses.dataclass(frozen=True)
 class RefWithExtra(Ref):
     def with_extra(self, extra: tuple[str, ...]) -> "RefWithExtra":
-        params = dataclasses.asdict(self)
+        params = self.as_dict()
         params["extra"] = self.extra + tuple(extra)  # type: ignore
         return self.__class__(**params)
 
@@ -96,6 +111,21 @@ class ObjectRef(RefWithExtra):
             object.__setattr__(self, "digest", digest)
             object.__setattr__(self, "_blocking_digest_resolver", None)
         return object.__getattribute__(self, item)
+
+    def as_dict(self) -> dict:
+        # Needed to not accidentally block on resolving the digest
+        if self._blocking_digest_resolver is not None:
+            digest = ""
+        else:
+            digest = self.digest
+        return {
+            "entity": self.entity,
+            "project": self.project,
+            "name": self.name,
+            "digest": digest,
+            "extra": self.extra,
+            "_blocking_digest_resolver": self._blocking_digest_resolver,
+        }
 
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.digest}"
