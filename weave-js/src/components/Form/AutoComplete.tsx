@@ -129,6 +129,9 @@ const getStyles = (props: AdditionalProps) => {
             boxShadow: props.isDarkMode
               ? '0 12px 24px rgba(0, 0, 0, 0.32)'
               : '0 12px 24px rgba(0, 0, 0, 0.16)',
+            // MOON_100 is inverted to MOON_900 in dark mode automatically
+            // this is a nice hack that lets us avoid setting night-aware and
+            // attempting to override individual styles
             backgroundColor: props.isDarkMode ? MOON_100 : 'white',
             border: `1px solid ${MOON_250}`,
             borderRadius: '4px',
@@ -169,4 +172,3 @@ export const AutoComplete = <Option,>(
     </ThemeProvider>
   );
 };
-
