@@ -1,8 +1,10 @@
 import dataclasses
+import random
 from typing import Any, Optional
 
 import pydantic
 import pytest
+from PIL import Image
 
 import weave
 from weave import Evaluation, Model
@@ -635,11 +637,6 @@ async def test_eval_is_robust_to_missing_values(client):
         "function_score": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
         "model_latency": {"mean": pytest.approx(0, abs=1)},
     }
-
-
-import random
-
-from PIL import Image
 
 
 @pytest.mark.asyncio
