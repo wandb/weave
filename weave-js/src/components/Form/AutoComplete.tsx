@@ -13,6 +13,7 @@ import {
   TEAL_600,
 } from '../../common/css/color.styles';
 import {hexToRGB} from '../../common/css/globals.styles';
+import {Paper, PaperProps, Popper} from '@mui/material';
 
 const HEIGHTS = {
   small: '24px',
@@ -35,6 +36,12 @@ const PADDING = {
   variable: '2px 8px',
 };
 
+const CustomPaper = (props: PaperProps & AdditionalProps) => {
+  return (
+    <Paper {...props} className={`allow-box-shadow ${props.className || ''}`} />
+  );
+};
+
 const getStyles = (props: AdditionalProps) => {
   const size = props.size ?? 'medium';
   const customTheme = createTheme({
@@ -48,7 +55,6 @@ const getStyles = (props: AdditionalProps) => {
               fontSize: FONT_SIZES[size],
               fontFamily: 'Source Sans Pro',
               minWidth: '100px',
-              overflow: 'hidden',
               color: MOON_800,
               maxWidth: props.maxWidth ? `${props.maxWidth}px` : '100%',
               '&& fieldset': {
@@ -72,17 +78,17 @@ const getStyles = (props: AdditionalProps) => {
               },
 
               // Pseudo-element for hover effect without clipping the border
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                border: '2px solid transparent',
-                borderRadius: '4px',
-                pointerEvents: 'none',
-              },
+              // '&::before': {
+              //   content: '""',
+              //   position: 'absolute',
+              //   top: 0,
+              //   left: 0,
+              //   right: 0,
+              //   bottom: 0,
+              //   border: '2px solid transparent',
+              //   borderRadius: '4px',
+              //   pointerEvents: 'none',
+              // },
               '&:hover::before': {
                 borderColor: hexToRGB(TEAL_500, 0.4),
               },
@@ -133,12 +139,12 @@ const getStyles = (props: AdditionalProps) => {
           },
           // menu dropdown
           paper: {
+            boxShadow: props.isDarkMode
+              ? '0 12px 24px rgba(0, 0, 0, 0.32)'
+              : '0 12px 24px rgba(0, 0, 0, 0.16)',
+            backgroundColor: props.isDarkMode ? MOON_100 : 'white',
             border: `1px solid ${MOON_250}`,
             borderRadius: '4px',
-            boxShadow: '0 12px 24px rgba(0, 0, 0, 0.16)',
-            // we invert in dark mode automatically unless we want
-            // to use night-aware and override all other styles. so moon_100 == moon_900
-            backgroundColor: props.isDarkMode ? MOON_100 : 'white',
           },
         },
       },
@@ -167,7 +173,12 @@ export const AutoComplete = <Option,>(
 ) => {
   return (
     <ThemeProvider theme={getStyles(props)}>
-      <Autocomplete {...props} />
+      <Autocomplete
+        {...props}
+        PaperComponent={paperProps => (
+          <CustomPaper {...paperProps} isDarkMode={props.isDarkMode} />
+        )}
+      />
     </ThemeProvider>
   );
 };
