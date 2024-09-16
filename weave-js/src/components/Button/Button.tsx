@@ -32,7 +32,7 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   children?: ReactElement | string;
   active?: boolean;
-  tooltip?: string;
+  tooltip?: ReactElement | string;
   tooltipProps?: TooltipContentProps;
   twWrapperStyles?: React.CSSProperties;
 };
