@@ -88,21 +88,10 @@ class AsyncJobQueue:
         future.add_done_callback(callback)
         return future
 
-    def _shutdown(self, wait: bool = True) -> None:
-        """Shuts down the executor and cleans up resources.
-
-        This method ensures that the executor is shut down only once and in a thread-safe manner.
-
-        Args:
-            wait: If True, wait for all pending jobs to complete before shutting down.
-                  If False, outstanding jobs are cancelled and the executor is shut down immediately.
-        """
-        self.executor.shutdown(wait=wait)
-
     def _at_exit_handler(self) -> None:
         """Ensures the executor is shut down when the program exits."""
         try:
-            self._shutdown(wait=True)
+            self.executor.shutdown(wait=True)
         except Exception as e:
             logger.error(f"Error shutting down executor: {e}")
 
