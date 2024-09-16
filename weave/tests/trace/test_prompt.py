@@ -1,8 +1,5 @@
 import io
-import json
-import os
-from pathlib import Path
-from typing import IO, Any, Iterable, Literal, Optional, Union
+from typing import Any, Iterable, Literal, Optional, Union
 
 import pytest
 
@@ -149,3 +146,61 @@ def test_prompt_dump_and_load():
     for original_msg, loaded_msg in zip(prompt.messages, loaded_prompt.messages):
         assert original_msg.role == loaded_msg.role
         assert original_msg.content.parts == loaded_msg.content.parts
+
+
+def test_prompt_role_methods():
+    from weave import Prompt as P
+    p = P().system("You're a calculator.").user("What's 23 * 42")
+    assert p() == [
+        {"role": "system", "content": "You're a calculator."},
+        {"role": "user", "content": "What's 23 * 42"},
+    ]
+
+def test_prompt_add():
+    from weave import Prompt as P
+    p = P("What's {A} + {B}") + "Foo {A}"
+    assert p(A=2, B=3) == [
+        {"role": "user", "content": "What's 2 + 3"},
+        {"role": "user", "content": "Foo {A}"},
+    ]
+    p = P("What's {A} + {B}") + P("Foo {A}")
+    assert p(A=2, B=3) == [
+        {"role": "user", "content": "What's 2 + 3"},
+        {"role": "user", "content": "Foo 2"},
+    ]
+
+
+def test_prompt_sys():
+    from weave import Prompt as P
+    p = P.sys("You're a calculator.")
+    p += "A TI-85 to be exact."
+    assert p() == [
+        {"role": "system", "content": "You're a calculator."},
+        {"role": "system", "content": "A TI-85 to be exact."},
+    ]
+
+def test_prompt_iadd():
+    from weave import Prompt as P
+    p = P("This is my system prompt.", role="system")
+    p += "This is also a system prompt."
+    assert p() == [
+        {"role": "system", "content": "This is my system prompt."},
+        {"role": "system", "content": "This is also a system prompt."},
+    ]
+
+
+def test_prompt_dedent():
+    prompt = Prompt("""
+        This
+         is
+        a
+        long
+        prompt.
+    """, dedent=True)
+    assert prompt() == [{"role": "user", "content": "This\n is\na\nlong\nprompt."}]
+
+
+def test_prompt_stringify():
+    prompt = Prompt.sys("You're a calculator.").system("A TI-85 to be exact.").user("What's 23 * 42")
+    assert prompt.as_str() == "You're a calculator. A TI-85 to be exact. What's 23 * 42"
+    assert prompt.as_str(role="system") == "You're a calculator. A TI-85 to be exact."

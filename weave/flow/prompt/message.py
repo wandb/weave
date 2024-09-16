@@ -17,6 +17,16 @@ class MessageParts:
     def placeholders(self) -> list[Placeholder]:
         return [part for part in self.parts if isinstance(part, Placeholder)]
 
+    def copy(self) -> "MessageParts":
+        """Create a deep copy of the MessageParts object."""
+        new_parts = []
+        for part in self.parts:
+            if isinstance(part, Placeholder):
+                new_parts.append(part.copy())
+            else:
+                new_parts.append(part)
+        return MessageParts(new_parts)
+
     def bind(self, params: Params) -> str:
         missing = set()
         bound_parts = []
@@ -38,7 +48,7 @@ class MessageParts:
 
     def to_json(self) -> str:
         return "".join(
-            p.to_str() if isinstance(p, Placeholder) else p for p in self.parts
+            p.as_str() if isinstance(p, Placeholder) else p for p in self.parts
         )
 
     @staticmethod
@@ -100,6 +110,11 @@ class MessageParts:
             return NotImplemented
         return self.parts == other.parts
 
+    def as_str(self, join_str: str = " ") -> str:
+        return join_str.join(
+            p.as_str() if isinstance(p, Placeholder) else p for p in self.parts
+        )
+
     def as_rich_str(self) -> str:
         rich_parts = []
         for part in self.parts:
@@ -150,6 +165,13 @@ class Message:
             bound["content"] = self.messages
         return bound
 
+    def copy(self) -> "Message":
+        """Create a deep copy of the Message object."""
+        new_message = Message(role=self.role, templating=self.templating)
+        new_message.content = self.content.copy()
+        new_message.messages = [message.copy() for message in self.messages]
+        return new_message
+
     def add_text(self, text: str) -> "Message":
         self.messages.append({"type": "text", "text": text})
         return self
@@ -177,6 +199,9 @@ class Message:
 
     def __repr__(self) -> str:
         return f"Message(role='{self.role}', content='{self.content}'"
+
+    def as_str(self, join_str: str = " ") -> str:
+        return self.content.as_str(join_str)
 
     def as_rich_str(self) -> str:
         # TODO: Messages

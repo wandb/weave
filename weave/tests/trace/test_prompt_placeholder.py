@@ -13,7 +13,7 @@ def test_placeholder_initialization():
     assert p2.default == "30"
 
 
-def test_placeholder_to_str():
+def test_placeholder_as_str():
     p1 = Placeholder("name")
     assert str(p1) == "{name}"
 

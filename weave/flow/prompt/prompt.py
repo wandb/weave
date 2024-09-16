@@ -1,5 +1,6 @@
 import json
 import os
+import textwrap
 from pathlib import Path
 from typing import IO, Any, Optional, Union
 
@@ -18,13 +19,21 @@ class Prompt(Object):
 
     messages: Messages = Field(default_factory=Messages)
 
-    def __init__(self, content: Optional[str] = None, **kwargs: Any) -> None:
-        role = kwargs.pop("role", "user")
+    def __init__(self,
+                 content: Optional[str] = None,
+                 *,
+                 role: str = "user",
+                 dedent: bool = False,
+                 **kwargs: Any) -> None:
         super().__init__(**kwargs)
         if content is not None:
-            self.append(content, role=role)
+            # TODO: Add dedent to append?
+            prepped = textwrap.dedent(content).strip() if dedent else content
+            self.append(prepped, role=role)
 
-    def append(self, *args: Any, **kwargs: Any) -> "Prompt":
+    def append(self,
+               *args: Any,
+               **kwargs: Any) -> "Prompt":
         if len(args) == 1 and len(kwargs) == 0:
             if isinstance(args[0], Message):
                 message = args[0]
@@ -44,11 +53,47 @@ class Prompt(Object):
         self.messages.append(message)
         return message
 
+    def system(self, content: str) -> "Prompt":
+        return self.append(content, role="system")
+
+    def user(self, content: str) -> "Prompt":
+        return self.append(content, role="user")
+
+    def assistant(self, content: str) -> "Prompt":
+        return self.append(content, role="assistant")
+
+    def copy(self) -> "Prompt":
+        """Create a deep copy of the Prompt object."""
+        new_prompt = Prompt()
+        new_prompt.name = self.name
+        new_prompt.description = self.description
+        new_prompt.messages = Messages(message.copy() for message in self.messages)
+        return new_prompt
+
     def __getitem__(self, index: int) -> Message:
         return self.messages[index]
 
     def __len__(self) -> int:
         return len(self.messages)
+
+    def __add__(self, other: Any) -> "Prompt":
+        new_prompt = self.copy()
+        if isinstance(other, Prompt):
+            # TODO: Implement += on Messages?
+            for m in other.messages:
+                new_prompt.append(m)
+        elif isinstance(other, list):
+            for m in other:
+                new_prompt.append(m)
+        elif isinstance(other, str):
+            role = new_prompt[-1].role if new_prompt.messages else "user"
+            new_prompt.append(other, role=role, templating="none")
+        return new_prompt
+
+
+    def as_str(self, join_str: str = " ", role: Optional[str] = None) -> str:
+        return join_str.join(m.as_str() for m in self.messages if role is None or m.role == role)
+
 
     def to_json(self) -> dict[str, Any]:
         # TODO: Might be safer to nest this under another "messages" key
@@ -76,6 +121,10 @@ class Prompt(Object):
         for row in rows:
             bound.append(self.bind(row))
         return bound
+
+    @staticmethod
+    def sys(content: str) -> "Prompt":
+        return Prompt(content, role="system")
 
     @staticmethod
     def from_obj(obj: Any) -> "Prompt":

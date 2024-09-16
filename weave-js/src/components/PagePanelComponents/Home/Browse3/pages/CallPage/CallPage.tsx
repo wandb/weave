@@ -13,7 +13,10 @@ import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
-import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {
+  ScrollableTabContent,
+  SimplePageLayoutWithHeader,
+} from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
 import {TabUseCall} from '../TabUseCall';
 import {useURLSearchParamsDict} from '../util';
@@ -70,9 +73,11 @@ const useCallTabs = (call: CallSchema) => {
           {
             label: 'Chat',
             content: (
-              <Tailwind style={{height: '100%', overflow: 'auto'}}>
-                <CallChat call={call} />
-              </Tailwind>
+              <ScrollableTabContent>
+                <Tailwind>
+                  <CallChat call={call.traceCall!} />
+                </Tailwind>
+              </ScrollableTabContent>
             ),
           },
         ]

@@ -7,15 +7,22 @@ type OneToolCallProps = {
 };
 
 const OneToolCall = ({toolCall}: OneToolCallProps) => {
-  const {id, type, function: toolCallFunction} = toolCall;
+  const {function: toolCallFunction} = toolCall;
   const {name, arguments: args} = toolCallFunction;
+  let parsedArgs = null;
+  try {
+    const parsed = JSON.parse(args);
+    parsedArgs = JSON.stringify(parsed);
+    if (name.length + parsedArgs.length > 80) {
+      parsedArgs = JSON.stringify(parsed, null, 2);
+    }
+  } catch (e) {
+    // The model does not always generate valid JSON
+  }
   return (
-    <div>
-      <div>id: {id}</div>
-      <div>type: {type}</div>
-      <div>function: {name}</div>
-      <div>arguments: {args}</div>
-    </div>
+    <code className="whitespace-pre text-xs">
+      {name}({parsedArgs})
+    </code>
   );
 };
 
@@ -26,7 +33,6 @@ type ToolCallsProps = {
 export const ToolCalls = ({toolCalls}: ToolCallsProps) => {
   return (
     <div>
-      Tool call
       {toolCalls.map(tc => (
         <OneToolCall key={tc.id} toolCall={tc} />
       ))}

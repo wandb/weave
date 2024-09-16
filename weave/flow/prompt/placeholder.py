@@ -17,10 +17,14 @@ class Placeholder:
         self.type = type or "string"
         self.default = default
 
-    def __str__(self) -> str:
-        return self.to_str()
+    def copy(self) -> "Placeholder":
+        """Create a deep copy of the Placeholder object."""
+        return Placeholder(name=self.name, type=self.type, default=self.default)
 
-    def to_str(self) -> str:
+    def __str__(self) -> str:
+        return self.as_str()
+
+    def as_str(self) -> str:
         result = self.name
         if self.type != "string":
             result += f" type:{self.type}"

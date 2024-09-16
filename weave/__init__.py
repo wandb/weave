@@ -40,6 +40,9 @@ from weave.flow.eval import Evaluation, Scorer
 from weave.flow.agent import Agent, AgentState
 from weave.trace.util import ThreadPoolExecutor, Thread
 
+# Shorthand
+P = Prompt
+
 # See the comment above pre_init_modules above. This is check to ensure we don't accidentally
 # introduce loading weave.legacy.weave.ops or weave.legacy.weave.panels when importing weave.
 newly_added_modules = set(sys.modules.keys()) - pre_init_modules
@@ -74,6 +77,7 @@ __docspec__ = [
     Object,
     Dataset,
     Model,
+    Prompt,
     Evaluation,
     Scorer,
 ]
