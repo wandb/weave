@@ -175,7 +175,7 @@ export function initTableWithPickColumns(
       });
     }
     const columns =
-      allColumns.length > 100 ? allColumns.slice(0, 100) : allColumns;
+      allColumns.length > 1000 ? allColumns.slice(0, 1000) : allColumns;
     if (columns.length === 0) {
       // If no columns are provided, at least fill it with a general row column.
       ts = addColumnToTable(ts, varNode(exNode.type, 'row')).table;
