@@ -1,5 +1,5 @@
 import typing
-from typing import Any
+from typing import Any, Optional
 
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
@@ -9,6 +9,23 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     TraceServerInterface,
 )
+
+TO_JSON_CACHE_KEY = "_weave_json_cache"
+
+
+def _get_to_json_cache(obj: Any) -> Optional[Any]:
+    try:
+        return getattr(obj, TO_JSON_CACHE_KEY)
+    except Exception:
+        return None
+
+
+def _set_to_json_cache(obj: Any, value: Any) -> None:
+    try:
+        setattr(obj, TO_JSON_CACHE_KEY, value)
+    except Exception:
+        pass
+
 
 # from weave.trace_server.trace_server_interface_util import bytes_digest
 
@@ -33,10 +50,22 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
     if isinstance(obj, (int, float, str, bool)) or obj is None:
         return obj
 
+    if existing_serialization := _get_to_json_cache(obj):
+        return existing_serialization
+
     # This still blocks potentially on large-file i/o.
     encoded = custom_objs.encode_custom_obj(obj)
     if encoded is None:
         return fallback_encode(obj)
+    result = _build_result_from_encoded(encoded, project_id, server)
+
+    _set_to_json_cache(obj, result)
+    return result
+
+
+def _build_result_from_encoded(
+    encoded: dict, project_id: str, server: TraceServerInterface
+) -> Any:
     file_digests = {}
     for name, val in encoded["files"].items():
         # Instead of waiting for the file to be created, we

@@ -565,13 +565,14 @@ class WeaveClient:
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
             op = self._anonymous_ops[op]
+
+        quick_op_str: str
+        get_final_op_str: Callable[[], str]
         if isinstance(op, Op):
             unbound_op = maybe_unbind_method(op)
             op_def_ref = self._save_op(unbound_op)
-            # Blocking (once per op)
-            op_str = op_def_ref.uri()
-        else:
-            op_str = op
+            quick_op_str = op.name
+            get_final_op_str = op_def_ref.uri
 
         inputs_redacted = redact_sensitive_keys(inputs)
         if op.postprocess_inputs:
@@ -606,7 +607,7 @@ class WeaveClient:
         attributes._set_weave_item("sys_version", sys.version)
 
         call = Call(
-            op_name=op_str,
+            op_name=quick_op_str,
             project_id=self._project_id(),
             trace_id=trace_id,
             parent_id=parent_id,
@@ -633,7 +634,7 @@ class WeaveClient:
             start = StartedCallSchemaForInsert(
                 project_id=project_id,
                 id=call_id,
-                op_name=op_str,
+                op_name=get_final_op_str(),
                 display_name=display_name,
                 trace_id=trace_id,
                 started_at=started_at,
@@ -704,16 +705,23 @@ class WeaveClient:
 
         project_id = self._project_id()
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
-        self.async_job_queue.submit_job(
-            send_end_call,
-            project_id=project_id,
-            call_id=call.id,
-            ended_at=ended_at,
-            output=output,
-            summary=summary,
-            exception_str=exception_str,
-            server=self.server,
-        )
+
+        def send_end_call() -> None:
+            output_json = to_json(output, project_id, self.server)
+            self.server.call_end(
+                CallEndReq(
+                    end=EndedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call.id,
+                        ended_at=ended_at,
+                        output=output_json,
+                        summary=summary,
+                        exception=exception_str,
+                    )
+                )
+            )
+
+        self.async_job_queue.submit_job(send_end_call)
 
         # Descendent error tracking disabled til we fix UI
         # Add this call's summary after logging the call, so that only
@@ -987,7 +995,7 @@ class WeaveClient:
         # publish all custom objects. Instead we only want to do this at the
         # top-most level if requested
         if get_serializer_for_obj(val) is not None:
-            self._save_and_attach_ref(val)
+            return self._save_and_attach_ref(val, name)
 
         return self._save_object_basic(val, name, branch)
 
@@ -1110,6 +1118,10 @@ class WeaveClient:
             obj.ref = table_ref
             obj.table_ref = table_ref
 
+        # Case 5: Custom Type Serialization (do we really want this here)
+        # elif get_serializer_for_obj(obj) is not None:
+        #     self._save_and_attach_ref(obj)
+
         # Special case: Custom recursive handling for WeaveObject with rows
         # TODO: Kinda hacky way to dispatching Dataset with rows: Table
         elif isinstance(obj, WeaveObject) and hasattr(obj, "rows"):
@@ -1183,7 +1195,7 @@ class WeaveClient:
 
         return self._save_and_attach_ref(op, name)
 
-    def _save_and_attach_ref(self, op: Any, name: Optional[str] = None) -> Ref:
+    def _save_and_attach_ref(self, op: Any, name: Optional[str] = None) -> ObjectRef:
         if (ref := getattr(op, "ref", None)) is not None:
             return ref
 
@@ -1250,30 +1262,6 @@ class WeaveClient:
         # Safe to call multiple times
         self._flush()
         self.async_job_queue.shutdown(wait=True)
-
-
-def send_end_call(
-    project_id: str,
-    call_id: str,
-    ended_at: datetime.datetime,
-    output: Any,
-    summary: dict[str, Any],
-    exception_str: Optional[str],
-    server: TraceServerInterface,
-) -> None:
-    output_json = to_json(output, project_id, server)
-    server.call_end(
-        CallEndReq(
-            end=EndedCallSchemaForInsert(
-                project_id=project_id,
-                id=call_id,
-                ended_at=ended_at,
-                output=output_json,
-                summary=summary,
-                exception=exception_str,
-            )
-        )
-    )
 
 
 def safe_current_wb_run_id() -> Optional[str]:
