@@ -111,21 +111,14 @@ class AsyncJobQueue:
                   If False, outstanding jobs are cancelled and the executor is shut down immediately.
         """
         with self._lock:
+            # Lock and flag avoids race conditions with multiple shutdowns
             if self._is_shutdown:
                 return
             self._is_shutdown = True
             if atexit is not None:
                 atexit.unregister(self.shutdown)  # Remove the atexit handler
 
-        self.flush()  # Flush outside the lock
-        self.executor.shutdown(wait=wait)
-
-        with self._lock:
-            self._active_jobs.clear()
-
-    def __del__(self) -> None:
-        """Ensures the executor is shut down when the object is deleted."""
-        self.shutdown(wait=False)
+            self.executor.shutdown(wait=wait)
 
     def flush(self) -> None:
         """Waits for all currently submitted jobs to complete.
