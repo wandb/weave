@@ -168,6 +168,17 @@ class Call:
 
     _feedback: Optional[RefFeedbackQuery] = None
 
+    # TODO: document this and the similar ones in refs
+    _op_ref: Optional[Ref] = None
+
+    def __getattribute__(self, item: str) -> Any:
+        if item == "op_name" and object.__getattribute__(self, "_op_ref") is not None:
+            op_ref = object.__getattribute__(self, "_op_ref")
+            name = op_ref.uri()
+            object.__setattr__(self, "op_name", name)
+            object.__setattr__(self, "_op_ref", None)
+        return object.__getattribute__(self, item)
+
     @property
     def func_name(self) -> str:
         """
@@ -175,8 +186,8 @@ class Call:
 
         This is different from `op_name` which is usually the ref of the op.
         """
-        if self.op_name.startswith("weave:///"):
-            ref = parse_op_uri(self.op_name)
+        if isinstance(self.op_name, Ref):
+            ref = parse_op_uri(self.op_name.uri())
             return ref.name
 
         return self.op_name
@@ -569,13 +580,8 @@ class WeaveClient:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
             op = self._anonymous_ops[op]
 
-        quick_op_str: str
-        get_final_op_str: Callable[[], str]
-        if isinstance(op, Op):
-            unbound_op = maybe_unbind_method(op)
-            op_def_ref = self._save_op(unbound_op)
-            quick_op_str = op.name
-            get_final_op_str = op_def_ref.uri
+        unbound_op = maybe_unbind_method(op)
+        op_def_ref = self._save_op(unbound_op)
 
         inputs_redacted = redact_sensitive_keys(inputs)
         if op.postprocess_inputs:
@@ -609,7 +615,8 @@ class WeaveClient:
         attributes._set_weave_item("sys_version", sys.version)
 
         call = Call(
-            op_name=quick_op_str,
+            op_name="",
+            _op_ref=op_def_ref,
             project_id=self._project_id(),
             trace_id=trace_id,
             parent_id=parent_id,
@@ -638,7 +645,7 @@ class WeaveClient:
                     start=StartedCallSchemaForInsert(
                         project_id=project_id,
                         id=call_id,
-                        op_name=get_final_op_str(),
+                        op_name=op_def_ref.uri(),
                         display_name=display_name,
                         trace_id=trace_id,
                         started_at=started_at,
