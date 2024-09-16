@@ -8,8 +8,6 @@ from pydantic import BaseModel, ValidationError
 
 from weave.legacy.weave.environment import weave_trace_server_url
 from weave.legacy.weave.wandb_interface import project_creator
-
-# from weave.trace.async_job_queue import AsyncJobQueue
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.async_batch_processor import AsyncBatchProcessor
@@ -109,7 +107,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self.call_processor = AsyncBatchProcessor(self._flush_calls)
         self._auth: t.Optional[t.Tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
-        # self.async_job_queue = AsyncJobQueue()
 
     def ensure_project_exists(
         self, entity: str, project: str
@@ -534,54 +531,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return self._generic_request(
             "/cost/purge", req, tsi.CostPurgeReq, tsi.CostPurgeRes
         )
-
-    # async def async_call_start(
-    #     self, req: t.Union[tsi.CallStartReq, t.Dict[str, t.Any]]
-    # ) -> tsi.CallStartRes:
-    #     # Submit the job to the async queue and await the result
-    #     return await asyncio.wrap_future(
-    #         self.async_job_queue.submit_job(self.call_start, req)
-    #     )
-
-    # async def async_call_end(
-    #     self, req: t.Union[tsi.CallEndReq, t.Dict[str, t.Any]]
-    # ) -> tsi.CallEndRes:
-    #     # Niave implementation
-    #     return await asyncio.wrap_future(
-    #         self.async_job_queue.submit_job(self.call_end, req)
-    #     )
-
-    # async def async_obj_create(
-    #     self, req: t.Union[tsi.ObjCreateReq, t.Dict[str, t.Any]]
-    # ) -> tsi.ObjCreateRes:
-    #     # Niave implementation
-    #     return await asyncio.wrap_future(
-    #         self.async_job_queue.submit_job(self.obj_create, req)
-    #     )
-
-    # async def async_table_create(
-    #     self, req: t.Union[tsi.TableCreateReq, t.Dict[str, t.Any]]
-    # ) -> tsi.TableCreateRes:
-    #     # Niave implementation
-    #     return await asyncio.wrap_future(
-    #         self.async_job_queue.submit_job(self.table_create, req)
-    #     )
-
-    # async def async_table_update(
-    #     self, req: t.Union[tsi.TableUpdateReq, t.Dict[str, t.Any]]
-    # ) -> tsi.TableUpdateRes:
-    #     # Niave implementation
-    #     return await asyncio.wrap_future(
-    #         self.async_job_queue.submit_job(self.table_update, req)
-    #     )
-
-    # async def async_file_create(
-    #     self, req: t.Union[tsi.FileCreateReq, t.Dict[str, t.Any]]
-    # ) -> tsi.FileCreateRes:
-    #     # Niave implementation
-    #     return await asyncio.wrap_future(
-    #         self.async_job_queue.submit_job(self.file_create, req)
-    #     )
 
 
 __docspec__ = [

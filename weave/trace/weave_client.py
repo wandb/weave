@@ -633,19 +633,22 @@ class WeaveClient:
 
         def send_start_call() -> None:
             inputs_json = to_json(inputs_with_refs, project_id, self)
-            start = StartedCallSchemaForInsert(
-                project_id=project_id,
-                id=call_id,
-                op_name=get_final_op_str(),
-                display_name=display_name,
-                trace_id=trace_id,
-                started_at=started_at,
-                parent_id=parent_id,
-                inputs=inputs_json,
-                attributes=attributes,
-                wb_run_id=current_wb_run_id,
+            self.server.call_start(
+                CallStartReq(
+                    start=StartedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call_id,
+                        op_name=get_final_op_str(),
+                        display_name=display_name,
+                        trace_id=trace_id,
+                        started_at=started_at,
+                        parent_id=parent_id,
+                        inputs=inputs_json,
+                        attributes=attributes,
+                        wb_run_id=current_wb_run_id,
+                    )
+                )
             )
-            self.server.call_start(CallStartReq(start=start))
 
         self.async_job_queue.submit_job(send_start_call)
 
