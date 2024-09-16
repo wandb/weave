@@ -5,6 +5,7 @@ import platform
 import re
 import sys
 import typing
+from concurrent.futures import Future
 from functools import lru_cache
 from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Union
 
@@ -47,6 +48,8 @@ from weave.trace_server.trace_server_interface import (
     CostQueryOutput,
     CostQueryReq,
     EndedCallSchemaForInsert,
+    FileCreateReq,
+    FileCreateRes,
     ObjCreateReq,
     ObjectVersionFilter,
     ObjQueryReq,
@@ -580,7 +583,6 @@ class WeaveClient:
         else:
             inputs_postprocessed = inputs_redacted
 
-        # Blocking (until we have async file writes)
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
         call_id = generate_id()
@@ -630,7 +632,7 @@ class WeaveClient:
         project_id = self._project_id()
 
         def send_start_call() -> None:
-            inputs_json = to_json(inputs_with_refs, project_id, self.server)
+            inputs_json = to_json(inputs_with_refs, project_id, self)
             start = StartedCallSchemaForInsert(
                 project_id=project_id,
                 id=call_id,
@@ -707,7 +709,7 @@ class WeaveClient:
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
 
         def send_end_call() -> None:
-            output_json = to_json(output, project_id, self.server)
+            output_json = to_json(output, project_id, self)
             self.server.call_end(
                 CallEndReq(
                     end=EndedCallSchemaForInsert(
@@ -1011,7 +1013,7 @@ class WeaveClient:
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
             return val
-        json_val = to_json(val, self._project_id(), self.server)
+        json_val = to_json(val, self._project_id(), self)
 
         if name is None:
             if json_val.get("_type") == "CustomWeaveType":
@@ -1152,7 +1154,7 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:
-        rows = to_json(table.rows, self._project_id(), self.server)
+        rows = to_json(table.rows, self._project_id(), self)
         response = self.server.table_create(
             TableCreateReq(
                 table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
@@ -1224,6 +1226,9 @@ class WeaveClient:
 
     def _remove_call_display_name(self, call: Call) -> None:
         self._set_call_display_name(call, None)
+
+    def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+        return self.async_job_queue.submit_job(self.server.file_create, req)
 
     def _ref_input_to(self, ref: ref_base.Ref) -> Sequence[Call]:
         raise NotImplementedError()

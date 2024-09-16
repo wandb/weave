@@ -9,6 +9,10 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     TraceServerInterface,
 )
+from weave.trace_server.trace_server_interface_util import bytes_digest
+
+if typing.TYPE_CHECKING:
+    from weave.trace.weave_client import WeaveClient
 
 TO_JSON_CACHE_KEY = "_weave_json_cache"
 
@@ -30,7 +34,7 @@ def _set_to_json_cache(obj: Any, value: Any) -> None:
 # from weave.trace_server.trace_server_interface_util import bytes_digest
 
 
-def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
+def to_json(obj: Any, project_id: str, client: "WeaveClient") -> Any:
     if isinstance(obj, TableRef):
         return obj.uri()
     elif isinstance(obj, ObjectRef):
@@ -38,14 +42,14 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
     elif isinstance(obj, ObjectRecord):
         res = {"_type": obj._class_name}
         for k, v in obj.__dict__.items():
-            res[k] = to_json(v, project_id, server)
+            res[k] = to_json(v, project_id, client)
         return res
     elif isinstance_namedtuple(obj):
-        return {k: to_json(v, project_id, server) for k, v in obj._asdict().items()}
+        return {k: to_json(v, project_id, client) for k, v in obj._asdict().items()}
     elif isinstance(obj, (list, tuple)):
-        return [to_json(v, project_id, server) for v in obj]
+        return [to_json(v, project_id, client) for v in obj]
     elif isinstance(obj, dict):
-        return {k: to_json(v, project_id, server) for k, v in obj.items()}
+        return {k: to_json(v, project_id, client) for k, v in obj.items()}
 
     if isinstance(obj, (int, float, str, bool)) or obj is None:
         return obj
@@ -57,14 +61,14 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
     encoded = custom_objs.encode_custom_obj(obj)
     if encoded is None:
         return fallback_encode(obj)
-    result = _build_result_from_encoded(encoded, project_id, server)
+    result = _build_result_from_encoded(encoded, project_id, client)
 
     _set_to_json_cache(obj, result)
     return result
 
 
 def _build_result_from_encoded(
-    encoded: dict, project_id: str, server: TraceServerInterface
+    encoded: dict, project_id: str, client: "WeaveClient"
 ) -> Any:
     file_digests = {}
     for name, val in encoded["files"].items():
@@ -73,15 +77,13 @@ def _build_result_from_encoded(
         # to_json procedure is not blocked on network requests.
         # Technically it is possible that the file creation request
         # fails.
-        # file_response = server.async_file_create(
-        file_response = server.file_create(
+        client._send_file_create(
             FileCreateReq(project_id=project_id, name=name, content=val)
         )
-        digest = file_response.digest
-        # contents_as_bytes = val
-        # if isinstance(contents_as_bytes, str):
-        #     contents_as_bytes = contents_as_bytes.encode("utf-8")
-        # digest = bytes_digest(contents_as_bytes)
+        contents_as_bytes = val
+        if isinstance(contents_as_bytes, str):
+            contents_as_bytes = contents_as_bytes.encode("utf-8")
+        digest = bytes_digest(contents_as_bytes)
         file_digests[name] = digest
     result = {
         "_type": encoded["_type"],
