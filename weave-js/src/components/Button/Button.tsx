@@ -32,7 +32,7 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   children?: ReactElement | string;
   active?: boolean;
-  tooltip?: string;
+  tooltip?: ReactElement | string;
   tooltipProps?: TooltipContentProps;
   twWrapperStyles?: React.CSSProperties;
 };
@@ -150,7 +150,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             <Tooltip.Root open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
               <Tooltip.Trigger asChild>
                 {/* span is needed so tooltip works on disabled buttons */}
-                <span>{button}</span>
+                <span className="[display:inherit]">{button}</span>
               </Tooltip.Trigger>
               <Tooltip.Portal>
                 <Tooltip.Content {...tooltipProps}>{tooltip}</Tooltip.Content>
