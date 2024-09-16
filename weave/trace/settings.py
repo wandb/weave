@@ -1,6 +1,22 @@
 """Settings for Weave.
 
-TODO: Fill this in with examples on how to use the settings.
+## `disabled`
+
+* Environment Variable: `WEAVE_DISABLED`
+* Settings Key: `disabled`
+* Default: `False`
+* Type: `bool`
+
+If True, all weave ops will behave like regular functions and no network requests will be made.
+
+## `print_call_link`
+
+* Environment Variable: `WEAVE_PRINT_CALL_LINK`
+* Settings Key: `print_call_link`
+* Default: `True`
+* Type: `bool`
+
+If True, prints a link to the Weave UI when calling a weave op.
 """
 
 import os
