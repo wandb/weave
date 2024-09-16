@@ -182,7 +182,7 @@ Following finish, calls of weave.op() decorated functions will no longer be logg
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L338"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L325"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `op`
 

@@ -834,6 +834,7 @@ class WeaveClient:
         """Add a cost to the current project.
 
         Examples:
+
             ```python
             client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=1, completion_token_cost=2)
             client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=500, completion_token_cost=1000, effective_date=datetime(1998, 10, 3))
