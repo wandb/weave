@@ -1,3 +1,4 @@
+import {Paper, PaperProps} from '@mui/material';
 import Autocomplete, {AutocompleteProps} from '@mui/material/Autocomplete';
 import {createTheme, ThemeProvider} from '@mui/material/styles';
 import React from 'react';
@@ -13,7 +14,6 @@ import {
   TEAL_600,
 } from '../../common/css/color.styles';
 import {hexToRGB} from '../../common/css/globals.styles';
-import {Paper, PaperProps} from '@mui/material';
 
 const HEIGHTS = {
   small: '24px',
