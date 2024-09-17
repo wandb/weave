@@ -8,6 +8,7 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
+import {AutoSizer} from 'react-virtualized';
 
 import {Button} from '../../../../../Button';
 import {
@@ -40,6 +41,30 @@ type CompareEvaluationsPageProps = {
 };
 
 export const CompareEvaluationsPage: React.FC<
+  CompareEvaluationsPageProps
+> = props => {
+  return (
+    <SimplePageLayout
+      title="Compare Evaluations"
+      hideTabsIfSingle
+      tabs={[
+        {
+          label: 'All',
+          content: (
+            <CompareEvaluationsPageContent
+              entity={props.entity}
+              project={props.project}
+              evaluationCallIds={props.evaluationCallIds}
+            />
+          ),
+        },
+      ]}
+      headerExtra={<HeaderExtra {...props} />}
+    />
+  );
+};
+
+export const CompareEvaluationsPageContent: React.FC<
   CompareEvaluationsPageProps
 > = props => {
   const [baselineEvaluationCallId, setBaselineEvaluationCallId] =
@@ -77,35 +102,23 @@ export const CompareEvaluationsPage: React.FC<
   }
 
   return (
-    <SimplePageLayout
-      title="Compare Evaluations"
-      hideTabsIfSingle
-      tabs={[
-        {
-          label: 'All',
-          content: (
-            <CompareEvaluationsProvider
-              entity={props.entity}
-              project={props.project}
-              evaluationCallIds={props.evaluationCallIds}
-              baselineEvaluationCallId={baselineEvaluationCallId ?? undefined}
-              comparisonDimensions={comparisonDimensions ?? undefined}
-              setBaselineEvaluationCallId={setBaselineEvaluationCallId}
-              setComparisonDimensions={
-                setComparisonDimensionsAndClearInputDigest
-              }
-              selectedInputDigest={selectedInputDigest ?? undefined}
-              setSelectedInputDigest={setSelectedInputDigest}>
-              <CustomWeaveTypeProjectContext.Provider
-                value={{entity: props.entity, project: props.project}}>
-                <CompareEvaluationsPageInner />
-              </CustomWeaveTypeProjectContext.Provider>
-            </CompareEvaluationsProvider>
-          ),
-        },
-      ]}
-      headerExtra={<HeaderExtra {...props} />}
-    />
+    <CompareEvaluationsProvider
+      entity={props.entity}
+      project={props.project}
+      evaluationCallIds={props.evaluationCallIds}
+      baselineEvaluationCallId={baselineEvaluationCallId ?? undefined}
+      comparisonDimensions={comparisonDimensions ?? undefined}
+      setBaselineEvaluationCallId={setBaselineEvaluationCallId}
+      setComparisonDimensions={setComparisonDimensionsAndClearInputDigest}
+      selectedInputDigest={selectedInputDigest ?? undefined}
+      setSelectedInputDigest={setSelectedInputDigest}>
+      <CustomWeaveTypeProjectContext.Provider
+        value={{entity: props.entity, project: props.project}}>
+        <AutoSizer style={{height: '100%', width: '100%'}}>
+          {({height, width}) => <CompareEvaluationsPageInner height={height} />}
+        </AutoSizer>
+      </CustomWeaveTypeProjectContext.Provider>
+    </CompareEvaluationsProvider>
   );
 };
 
@@ -155,7 +168,9 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
   );
 };
 
-const CompareEvaluationsPageInner: React.FC = props => {
+const CompareEvaluationsPageInner: React.FC<{
+  height: number;
+}> = props => {
   const {state} = useCompareEvaluationsState();
   const showExampleFilter =
     Object.keys(state.data.evaluationCalls).length === 2;
@@ -163,7 +178,7 @@ const CompareEvaluationsPageInner: React.FC = props => {
   return (
     <Box
       sx={{
-        height: '100%',
+        height: props.height,
         width: '100%',
         overflow: 'auto',
       }}>
@@ -182,7 +197,7 @@ const CompareEvaluationsPageInner: React.FC = props => {
         {showExamples ? (
           <>
             {showExampleFilter && <ExampleFilterSection state={state} />}
-            <ResultExplorer state={state} />
+            <ResultExplorer state={state} height={props.height} />
           </>
         ) : (
           <VerticalBox
@@ -212,9 +227,10 @@ const CompareEvaluationsPageInner: React.FC = props => {
   );
 };
 
-const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
-  state,
-}) => {
+const ResultExplorer: React.FC<{
+  state: EvaluationComparisonState;
+  height: number;
+}> = ({state, height}) => {
   return (
     <VerticalBox
       sx={{
@@ -240,7 +256,7 @@ const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
       </HorizontalBox>
       <Box
         sx={{
-          height: 'calc(100vh - 114px)',
+          height,
           overflow: 'auto',
         }}>
         <ExampleCompareSection state={state} />
