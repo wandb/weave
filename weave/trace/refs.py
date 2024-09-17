@@ -2,7 +2,6 @@ import dataclasses
 import urllib
 from typing import Any, Callable, Optional, Union
 
-
 from ..trace_server import refs_internal
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME

@@ -1181,7 +1181,7 @@ class WeaveClient:
             entity=self.entity,
             project=self.project,
             digest="",
-            _blocking_digest_resolver=blocking_digest_resolver
+            _blocking_digest_resolver=blocking_digest_resolver,
         )
 
         # row_digests: Optional[list[str]] = None
