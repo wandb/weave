@@ -116,7 +116,7 @@ class WandbApiAsync:
         api_key_override = kwargs.pop("api_key", None)
         if api_key_override:
             auth = aiohttp.BasicAuth("api", api_key_override)
-        url_base = weave_env.wandb_base_url()
+        url_base = weave_env.wandb_pod_base_url()
         transport = AIOHTTPTransport(
             url=url_base + "/graphql",
             client_session_args={
@@ -292,7 +292,7 @@ class WandbApi:
             cookies = wandb_context.cookies
             if wandb_context.api_key is not None:
                 auth = HTTPBasicAuth("api", wandb_context.api_key)
-        url_base = weave_env.wandb_base_url()
+        url_base = weave_env.wandb_pod_base_url()
         transport = RequestsHTTPTransport(
             url=url_base + "/graphql", headers=headers, cookies=cookies, auth=auth
         )

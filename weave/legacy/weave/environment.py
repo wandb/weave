@@ -156,6 +156,11 @@ def wandb_base_url() -> str:
     return os.environ.get("WANDB_BASE_URL", settings.base_url).rstrip("/")
 
 
+def wandb_pod_base_url() -> str:
+    pod_url = os.getenv("WANDB_POD_BASE_URL", "").rstrip("/")
+    return pod_url if pod_url != "" else wandb_base_url()
+
+
 def wandb_frontend_base_url() -> str:
     public_url = os.getenv("WANDB_PUBLIC_BASE_URL", "").rstrip("/")
     return public_url if public_url != "" else wandb_base_url()

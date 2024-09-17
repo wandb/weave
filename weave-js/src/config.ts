@@ -1,6 +1,7 @@
 declare global {
   interface Window {
     WEAVE_CONFIG: {
+      WANDB_POD_BASE_URL: string;
       PREFIX: string;
       ANALYTICS_DISABLED: boolean;
       WEAVE_BACKEND_HOST: string;
@@ -16,6 +17,7 @@ declare global {
 if (!window.WEAVE_CONFIG) {
   console.warn('Unable to get configuration from server, using defaults');
   window.WEAVE_CONFIG = {
+    WANDB_POD_BASE_URL: 'https://api.wandb.ai',
     PREFIX: '',
     ANALYTICS_DISABLED: false,
     ONPREM: false,

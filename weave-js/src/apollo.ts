@@ -28,7 +28,7 @@ const authMiddleware = new ApolloLink((operation, forward) => {
 });
 
 export const makeGorillaApolloClient = (
-  gorillaApolloEndpoint: string = `${window.WEAVE_CONFIG.WANDB_BASE_URL}/graphql`
+  gorillaApolloEndpoint: string = `${window.WEAVE_CONFIG.WANDB_POD_BASE_URL}/graphql`
 ) => {
   return new ApolloClient({
     link: ApolloLink.from([
