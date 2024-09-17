@@ -313,6 +313,7 @@ def fix_chroma_ci() -> Generator[None, None, None]:
     # pysqlite3 is installed.
     if not os.environ.get("CI"):
         yield None
+        return
 
     __import__("pysqlite3")
     import sys
