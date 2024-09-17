@@ -2,6 +2,7 @@ import dataclasses
 import urllib
 from typing import Any, Callable, Optional, Union
 
+
 from ..trace_server import refs_internal
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
@@ -24,6 +25,7 @@ class TableRef(Ref):
     entity: str
     project: str
     digest: str
+    row_digests: Optional[list[str]] = None
     _blocking_digest_resolver: Optional[Callable[[], str]] = dataclasses.field(
         default=None, repr=False
     )
