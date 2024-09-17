@@ -1362,6 +1362,10 @@ def convert_paths_to_images(obj: Any) -> Any:
     if not pil_dependency:
         return obj
 
+    # Dont mutate reffed objects
+    if get_ref(obj):
+        return obj
+
     if isinstance(obj, dict):
         obj = {k: convert_paths_to_images(v) for k, v in obj.items()}
     elif isinstance(obj, list):
