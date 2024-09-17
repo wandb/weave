@@ -54,6 +54,10 @@ def test_artifact_dir():
 
 
 def pytest_collection_modifyitems(config, items):
+    if len(items) == 0:
+        print("No tests found. Exiting gracefully.")
+        pytest.exit(0)
+
     # Get the job number from environment variable (0 for even tests, 1 for odd tests)
     job_num = config.getoption("--job-num", default=None)
     if job_num is None:
