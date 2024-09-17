@@ -474,6 +474,7 @@ class TableUpdateReq(BaseModel):
 
 class TableUpdateRes(BaseModel):
     digest: str
+    row_update_digests: list[str]
 
 
 class TableRowSchema(BaseModel):
@@ -483,6 +484,7 @@ class TableRowSchema(BaseModel):
 
 class TableCreateRes(BaseModel):
     digest: str
+    row_digests: list[str]
 
 
 class TableRowFilter(BaseModel):

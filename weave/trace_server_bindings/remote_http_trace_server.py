@@ -395,7 +395,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             )
             update_res = self.table_update(update_req)
 
-            return tsi.TableCreateRes(digest=update_res.digest)
+            return tsi.TableCreateRes(
+                digest=update_res.digest, row_digests=update_res.row_update_digests
+            )
         else:
             return self._generic_request(
                 "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
