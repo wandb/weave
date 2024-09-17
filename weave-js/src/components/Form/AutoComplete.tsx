@@ -9,8 +9,8 @@ import {
   MOON_500,
   MOON_800,
   TEAL_300,
+  TEAL_350,
   TEAL_400,
-  TEAL_500,
   TEAL_600,
 } from '../../common/css/color.styles';
 import {hexToRGB} from '../../common/css/globals.styles';
@@ -34,12 +34,6 @@ const PADDING = {
   medium: '4px 6px 4px 12px',
   large: '8px 12px',
   variable: '2px 8px',
-};
-
-const CustomPaper = (props: PaperProps & AdditionalProps) => {
-  return (
-    <Paper {...props} className={`allow-box-shadow ${props.className || ''}`} />
-  );
 };
 
 const getStyles = (props: AdditionalProps) => {
@@ -68,19 +62,13 @@ const getStyles = (props: AdditionalProps) => {
                 whiteSpace: 'nowrap',
                 textOverflow: 'ellipsis',
               },
-              '&:hover fieldset': {
-                borderColor: hexToRGB(TEAL_500, 0.4),
+              '&.MuiOutlinedInput-root:hover:not(.Mui-focused) fieldset': {
+                borderColor: TEAL_350,
                 borderWidth: '2px',
               },
               '& input::placeholder': {
                 color: MOON_500,
                 opacity: 1,
-              },
-              '&:hover::before': {
-                borderColor: hexToRGB(TEAL_500, 0.4),
-              },
-              '&.Mui-focused::before': {
-                borderColor: TEAL_400,
               },
             },
             '&.MuiAutocomplete-hasPopupIcon .MuiOutlinedInput-root, &.MuiAutocomplete-hasClearIcon .MuiOutlinedInput-root':
@@ -126,9 +114,7 @@ const getStyles = (props: AdditionalProps) => {
           },
           // menu dropdown
           paper: {
-            boxShadow: props.isDarkMode
-              ? '0 12px 24px rgba(0, 0, 0, 0.32)'
-              : '0 12px 24px rgba(0, 0, 0, 0.16)',
+            boxShadow: '0 12px 24px rgba(0, 0, 0, 0.16)',
             // MOON_100 is inverted to MOON_900 in dark mode automatically
             // this is a nice hack that lets us avoid setting night-aware and
             // attempting to override individual styles
@@ -163,12 +149,7 @@ export const AutoComplete = <Option,>(
 ) => {
   return (
     <ThemeProvider theme={getStyles(props)}>
-      <Autocomplete
-        {...props}
-        PaperComponent={paperProps => (
-          <CustomPaper {...paperProps} isDarkMode={props.isDarkMode} />
-        )}
-      />
+      <Autocomplete {...props} />
     </ThemeProvider>
   );
 };
