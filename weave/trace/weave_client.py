@@ -1,4 +1,3 @@
-import atexit
 import dataclasses
 import datetime
 import platform
@@ -442,7 +441,6 @@ class WeaveClient:
         self._anonymous_ops: dict[str, Op] = {}
         self.async_job_queue = AsyncJobQueue()
         self.ensure_project_exists = ensure_project_exists
-        atexit.register(self._cleanup)
 
         if ensure_project_exists:
             resp = self.server.ensure_project_exists(entity, project)
@@ -1268,18 +1266,6 @@ class WeaveClient:
             # flushable. The # type: ignore is safe because we check the type
             # first.
             self.server.call_processor.wait_until_all_processed()  # type: ignore
-
-    def __del__(self) -> None:
-        self._cleanup()
-        # Because "__del__" is called when the interpreter exits, we need to
-        # make sure that atexit is available.
-        if atexit is not None:
-            atexit.unregister(self._cleanup)
-
-    def _cleanup(self) -> None:
-        # Safe to call multiple times
-        self._flush()
-        self.async_job_queue.shutdown(wait=True)
 
 
 def safe_current_wb_run_id() -> Optional[str]:

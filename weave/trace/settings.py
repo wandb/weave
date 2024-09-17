@@ -1,8 +1,22 @@
 """Settings for Weave.
 
-To add new settings:
-1. Add a new field to `UserSettings`
-2. Add a new `should_{xyz}` function
+## `disabled`
+
+* Environment Variable: `WEAVE_DISABLED`
+* Settings Key: `disabled`
+* Default: `False`
+* Type: `bool`
+
+If True, all weave ops will behave like regular functions and no network requests will be made.
+
+## `print_call_link`
+
+* Environment Variable: `WEAVE_PRINT_CALL_LINK`
+* Settings Key: `print_call_link`
+* Default: `True`
+* Type: `bool`
+
+If True, prints a link to the Weave UI when calling a weave op.
 """
 
 import os
@@ -12,6 +26,11 @@ from typing import Any, Optional, Union
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 SETTINGS_PREFIX = "WEAVE_"
+
+# Attention Devs:
+# To add new settings:
+# 1. Add a new field to `UserSettings`
+# 2. Add a new `should_{xyz}` function
 
 
 class UserSettings(BaseModel):
@@ -85,3 +104,6 @@ def _should(name: str) -> bool:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return _str2bool_truthy(env)
     return _context_vars[name].get()
+
+
+__doc_spec__ = [UserSettings]

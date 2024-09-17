@@ -1147,7 +1147,24 @@ def test_table_partitioning(network_proxy_client):
     NUM_ROWS = 16
     rows = list(row_gen(NUM_ROWS, 1024))
     exp_digest = "15696550bde28f9231173a085ce107c823e7eab6744a97adaa7da55bc9c93347"
-
+    row_digests = [
+        "2df5YAp2sqlYyxEpTKsIrUlf9Kc5ZxEkbqtqUnYOLhk",
+        "DMjRIeuM76SCqXqsqehYyfL3KYV5fL0DBr6g4RJ4izA",
+        "f949WksZQdTgf5Ac3cXS5cMuGf0otLvpULOfOsAGiYs",
+        "YaFBweA0HU7w51Sdt8X4uhSmjk7N4WqSfuknmBRpWcc",
+        "BBzLkGZ6fFraXdoFOSjj7p2d1qSiyMXjRnk7Zas2FEA",
+        "i6i1XJ7QecqWkB8MdljoWu35tpjwk8npzFAd67aisB4",
+        "IsjSZ4usQrHUcu0cNtKedBlUWrIW1f4cSDck1lGCSMw",
+        "MkL0DTiDMCW3agkcIeZ5g5VP0MyFuQcVpa1yqGGVZwk",
+        "Vu6S8c4XdXgWNYaAXKqsxuicY6XbYDKLIUkd2M0YPF8",
+        "IkIjQFARp0Qny3AUav18zZuzY4INFXsREPkS3iFCrWo",
+        "E3T6ngUGSpXY9u2l58sb9smleJ7GO2YlYJY0tq2oV5U",
+        "uNmcjBhJyiC6qvJZ0JRlGLpRm68ARrXVYlBgjGRqRdA",
+        "0bzwVP0JFd7Y2W9YmpPUv62aAkyY2RCaFVxMnEfjIqY",
+        "3bZG40U188x6bVfm9aQX2xvYVqlCftD82O4UsDZtRVU",
+        "KW40nfHplo7BDJux0kP8PeYQ95lnOEGaeYfgNtsQ1oE",
+        "u10rDrPoYXl58eQStkQP4dPH6KfmE7I88f0FYI7L9fg",
+    ]
     remote_client.remote_request_bytes_limit = (
         100 * 1024
     )  # very large buffer to ensure a single request
@@ -1160,6 +1177,7 @@ def test_table_partitioning(network_proxy_client):
         )
     )
     assert res.digest == exp_digest
+    assert res.row_digests == row_digests
     assert len(records) == 1
 
     remote_client.remote_request_bytes_limit = (
@@ -1174,6 +1192,7 @@ def test_table_partitioning(network_proxy_client):
         )
     )
     assert res.digest == exp_digest
+    assert res.row_digests == row_digests
     assert len(records) == (
         1  # The first create call,
         + 1  # the second  create
