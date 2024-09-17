@@ -166,6 +166,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             data=encoded_data,
             auth=self._auth,
         )
+        if r.status_code == 413:
+            # handle 413 explicitly to provide actionable error message
+            reason = json.loads(r.text)["reason"]
+            raise requests.HTTPError(f"413 Client Error: {reason}", response=r)
         r.raise_for_status()
 
     @tenacity.retry(

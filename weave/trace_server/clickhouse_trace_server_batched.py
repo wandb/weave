@@ -71,7 +71,7 @@ from .clickhouse_schema import (
     SelectableCHObjSchema,
 )
 from .emoji_util import detone_emojis
-from .errors import InvalidRequest, RequestTooLarge
+from .errors import InsertTooLarge, InvalidRequest, RequestTooLarge
 from .feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
@@ -1538,7 +1538,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # │    return 1 << (21 - int(log(row_size, 2)))
                 # │ValueError: negative shift count
                 # when we try to insert something that's too large.
-                raise RequestTooLarge("Could not insert record")
+                raise InsertTooLarge(
+                    "Database insertion failed. Record too large. "
+                    "A likely cause is that a single row or cell exceeded "
+                    "the limit. If logging images, save them as `Image.PIL`."
+                )
             raise
 
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
