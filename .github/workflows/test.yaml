@@ -114,6 +114,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install tox
       - name: Run tox
+        env:
+          CI: 1
+          WF_CLICKHOUSE_HOST: weave_clickhouse
         run: tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }} -- -n4
 
   test:
