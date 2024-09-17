@@ -212,7 +212,7 @@ Will be:
 ```
 Presidio comes with a built-in [list of recognizable entities](https://microsoft.github.io/presidio/supported_entities/). We can select the ones that are important for our use case. In the below example, we are only looking at redicating names and phone numbers from our text:
 
-![](./pii_media/redact.png)
+![](../../../static/img/pii_media/redact.png)
 
 
 ```python
@@ -296,7 +296,7 @@ Will be:
 
 To effectively utilize Presidio, we must supply references to our custom operators. These operators will direct Presidio to the functions responsible for swapping PII with fake data.
 
-![](./pii_media/replace.png)
+![](../../../static/img/pii_media/replace.png)
 
 
 ```python
@@ -404,7 +404,7 @@ for entry in pii_data:
 <details>
 <summary> (Optional) Encrypting our data </summary>
 
-![](./pii_media/encrypt.png)
+![](../../../static/img/pii_media/encrypt.png)
 
 In addition to anonymizing PII, we can add an extra layer of security by encrypting our data using the cryptography library's [Fernet](https://cryptography.io/en/latest/fernet/) symmetric encryption. This approach ensures that even if the anonymized data is intercepted, it remains unreadable without the encryption key.
 
