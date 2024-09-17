@@ -1084,6 +1084,10 @@ class WeaveClient:
             )
         )
         row_digests: Optional[list[str]] = None
+        # This check is needed because in older versions of
+        # the trace server, this will come back as an empty list.
+        # In these cases, we want to set row_digests to None so that
+        # the WeaveTable knows that it needs to fetch the rows from the server.
         if len(response.row_digests) == len(table.rows):
             row_digests = response.row_digests
         return TableRef(
