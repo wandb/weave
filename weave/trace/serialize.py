@@ -1,9 +1,10 @@
 import typing
-from typing import Any
+from typing import Any, cast
 
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
+from weave.trace.serializer import get_serializer_for_obj
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -27,28 +28,12 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
         return [to_json(v, project_id, server) for v in obj]
     elif isinstance(obj, dict):
         return {k: to_json(v, project_id, server) for k, v in obj.items()}
-
-    if isinstance(obj, (int, float, str, bool)) or obj is None:
+    elif isinstance(obj, (int, float, str, bool)) or obj is None:
         return obj
-
-    encoded = custom_objs.encode_custom_obj(obj)
-    if encoded is None:
+    elif get_serializer_for_obj(obj) is not None:
+        return _to_json_custom_weave_type(obj, project_id, server)
+    else:
         return fallback_encode(obj)
-    file_digests = {}
-    for name, val in encoded["files"].items():
-        file_response = server.file_create(
-            FileCreateReq(project_id=project_id, name=name, content=val)
-        )
-        file_digests[name] = file_response.digest
-    result = {
-        "_type": encoded["_type"],
-        "weave_type": encoded["weave_type"],
-        "files": file_digests,
-    }
-    load_op_uri = encoded.get("load_op")
-    if load_op_uri:
-        result["load_op"] = load_op_uri
-    return result
 
 
 REP_LIMIT = 1000
@@ -98,10 +83,9 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
                 {k: from_json(v, project_id, server) for k, v in obj.items()}
             )
         elif val_type == "CustomWeaveType":
-            files = _load_custom_obj_files(project_id, server, obj["files"])
-            return custom_objs.decode_custom_obj(
-                obj["weave_type"], files, obj.get("load_op")
-            )
+            # Verify that obj is a valid CustomObjDict
+            obj = cast(custom_objs.CustomWeaveTypeDict, obj)
+            return _from_json_custom_obj(obj, project_id, server)
         else:
             return ObjectRecord(
                 {k: from_json(v, project_id, server) for k, v in obj.items()}
@@ -110,3 +94,34 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
         return parse_uri(obj)
 
     return obj
+
+
+def _to_json_custom_weave_type(
+    obj: Any, project_id: str, server: TraceServerInterface
+) -> custom_objs.CustomWeaveTypeDict:
+    encoded = custom_objs.encode_custom_obj(obj)
+    if encoded is None:
+        raise ValueError(f"No encoder for object: {obj}")
+    file_digests: dict[str, str] = {}
+    for name, val in encoded["files"].items():
+        file_response = server.file_create(
+            FileCreateReq(project_id=project_id, name=name, content=val)
+        )
+        file_digests[name] = file_response.digest
+    result: custom_objs.CustomWeaveTypeDict = {
+        "_type": encoded["_type"],
+        "weave_type": encoded["weave_type"],
+        "files": file_digests,
+        "load_op": None,
+    }
+    load_op_uri = encoded.get("load_op")
+    if load_op_uri:
+        result["load_op"] = load_op_uri
+    return result
+
+
+def _from_json_custom_obj(
+    obj: custom_objs.CustomWeaveTypeDict, project_id: str, server: TraceServerInterface
+) -> Any:
+    files = _load_custom_obj_files(project_id, server, obj["files"])
+    return custom_objs.decode_custom_obj(obj["weave_type"], files, obj.get("load_op"))

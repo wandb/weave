@@ -2,7 +2,7 @@ import contextlib
 import io
 import os
 import tempfile
-from typing import Any, Dict, Generator, Iterator, Mapping, Optional, Union
+from typing import Any, Generator, Iterator, Mapping, Optional, TypedDict, Union
 
 from weave.legacy.weave import artifact_fs
 from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
@@ -131,8 +131,19 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
     }
 
 
+class CustomWeaveTypeWeaveTypeDict(TypedDict):
+    type: str
+
+
+class CustomWeaveTypeDict(TypedDict):
+    _type: str  # "CustomWeaveType"
+    weave_type: CustomWeaveTypeWeaveTypeDict
+    files: dict[str, str]
+    load_op: Optional[str]
+
+
 def decode_custom_obj(
-    weave_type: Dict,
+    weave_type: CustomWeaveTypeWeaveTypeDict,
     encoded_path_contents: Mapping[str, Union[str, bytes]],
     load_instance_op_uri: Optional[str],
 ) -> Any:
