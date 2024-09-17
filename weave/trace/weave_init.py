@@ -148,10 +148,36 @@ def init_weave(
     return _current_inited_client
 
 
+def init_weave_disabled() -> InitializedClient:
+    """Initialize a dummy client that does nothing.
+
+    This is used when the program is execuring with Weave disabled.
+
+    Note: as currently implemented, any explicit calls to client.{X} will
+    likely fail, since the user is not authenticated. The purpose of
+    disabling weave is to disable _tracing_. Programs that attempt to
+    make requests (eg. publishing, fetching, querying) while disabled
+    will fail.
+    """
+    global _current_inited_client
+    if _current_inited_client is not None:
+        _current_inited_client.reset()
+
+    client = weave_client.WeaveClient(
+        "DISABLED",
+        "DISABLED",
+        init_weave_get_server("DISABLED", should_batch=False),
+        ensure_project_exists=False,
+    )
+
+    return InitializedClient(client)
+
+
 def init_weave_get_server(
     api_key: typing.Optional[str] = None,
+    should_batch: bool = True,
 ) -> remote_http_trace_server.RemoteHTTPTraceServer:
-    res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
+    res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(should_batch)
     if api_key is not None:
         res.set_auth(("api", api_key))
     return res
