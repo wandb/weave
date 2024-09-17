@@ -76,8 +76,8 @@ jobs:
   test2:
     name: Tox tests
     runs-on: ubuntu-latest
-    needs:
-      - build-container
+    # needs:
+    #   - build-container
     strategy:
       matrix:
         python-version-major: ['3']
