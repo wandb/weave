@@ -352,9 +352,11 @@ class WeaveTable(Traceable):
             for ndx, item in enumerate(response.rows):
                 new_ref = self.ref.with_item(item.digest) if self.ref else None
                 # Here, we use the raw rows if they exist, otherwise we use the
-                # rows from the server. This is a temporary perf hack to ensure
-                # we don't re-deserialize the rows on every access. This will benefit
-                # from future revision once table creation returns digests.
+                # rows from the server. This is a temporary trick to ensure
+                # we don't re-deserialize the rows on every access. Once all servers
+                # return digests, this branch can be removed because anytime we have prefetched
+                # rows we should also have the digests - and we should be in the _local_iter
+                # case.
                 val = (
                     item.val
                     if self._prefetched_rows is None
