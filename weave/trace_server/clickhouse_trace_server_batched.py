@@ -1396,7 +1396,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 val_dump,
                 digest,
                 is_op,
-                _version_index_plus_1,
                 version_index,
                 version_count,
                 is_latest
@@ -1415,10 +1414,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         kind,
                         object_id
                         ORDER BY created_at ASC
-                    ) AS _version_index_plus_1,
-                    _version_index_plus_1 - 1 AS version_index,
+                    ) - 1 AS version_index,
                     count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-                    if(_version_index_plus_1 = version_count, 1, 0) AS is_latest
+                    if(version_index + 1 = version_count, 1, 0) AS is_latest
                 FROM (
                     SELECT *,
                         row_number() OVER (
@@ -1430,11 +1428,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         ) AS rn
                     FROM object_versions
                     WHERE project_id = {{project_id: String}}
+                       AND {conditions_part}
                 )
                 WHERE rn = 1
             )
-            WHERE project_id = {{project_id: String}} AND
-                {conditions_part}
             {limit_part}
         """,
             {"project_id": project_id, **parameters},
@@ -1455,7 +1452,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 "val_dump",
                                 "digest",
                                 "is_op",
-                                "_version_index_plus_1",
                                 "version_index",
                                 "version_count",
                                 "is_latest",
