@@ -24,6 +24,7 @@ class TableRef(Ref):
     entity: str
     project: str
     digest: str
+    row_digests: Optional[list[str]] = None
     _blocking_digest_resolver: Optional[Callable[[], str]] = dataclasses.field(
         default=None, repr=False
     )

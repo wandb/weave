@@ -248,10 +248,23 @@ class WeaveTable(Traceable):
         self.parent = parent
         self._rows: Optional[list[dict]] = None
 
+        # _prefetched_rows is a local cache of rows that can be used to
+        # avoid a remote call. Should only be used by internal code.
+        self._prefetched_rows: Optional[list[dict]] = None
+
     @property
     def rows(self) -> list[dict]:
         if self._rows is None:
-            self._rows = list(self._remote_iter())
+            should_local_iter = (
+                self.ref is not None
+                and self.table_ref is not None
+                and self.table_ref.row_digests is not None
+                and self._prefetched_rows is not None
+            )
+            if should_local_iter:
+                self._rows = list(self._local_iter())
+            else:
+                self._rows = list(self._remote_iter())
         return self._rows
 
     @rows.setter
@@ -262,6 +275,20 @@ class WeaveTable(Traceable):
         self._rows = value
         self._mark_dirty()
 
+    def set_prefetched_rows(self, prefetched_rows: list[dict]) -> None:
+        """Sets the rows to a local cache of rows that can be used to
+        avoid a remote call. Should only be used by internal code.
+
+        It is expected that these rows are the exact same rows that would
+        be returned by a query for this table. Failing to meet this expectation
+        will cause table operations to behave unexpectedly.
+        """
+        if self._rows is not None:
+            raise ValueError(
+                "Cannot set prefetched rows on WeaveTable when rows are already loaded"
+            )
+        self._prefetched_rows = prefetched_rows
+
     def __len__(self) -> int:
         return len(self.rows)
 
@@ -270,7 +297,37 @@ class WeaveTable(Traceable):
 
     def _mark_dirty(self) -> None:
         self.table_ref = None
+        self._prefetched_rows = None
         super()._mark_dirty()
+
+    def _local_iter(self) -> Generator[dict, None, None]:
+        """
+        This is the case where we:
+        1. Have all the rows in memory
+        2. Have all the row digests
+
+        In this case, we don't need to make any calls and can just return the rows
+        """
+        if (
+            self.ref is None
+            or self.table_ref is None
+            or self.table_ref.row_digests is None
+            or self._prefetched_rows is None
+        ):
+            yield from ()
+            return
+
+        if len(self.table_ref.row_digests) != len(self._prefetched_rows):
+            raise ValueError("Ref row digests do not match prefetched rows")
+
+        for ndx, item in enumerate(self.table_ref.row_digests):
+            new_ref = self.ref.with_item(item)
+            val = self._prefetched_rows[ndx]
+            res = from_json(
+                val, self.table_ref.entity + "/" + self.table_ref.project, self.server
+            )
+            res = make_trace_obj(res, new_ref, self.server, self.root)
+            yield res
 
     def _remote_iter(self) -> Generator[dict, None, None]:
         page_index = 0
@@ -289,10 +346,26 @@ class WeaveTable(Traceable):
                 )
             )
 
-            for item in response.rows:
+            if self._prefetched_rows is not None and len(response.rows) != len(
+                self._prefetched_rows
+            ):
+                raise ValueError("Fetched row digests do not match prefetched rows")
+
+            for ndx, item in enumerate(response.rows):
                 new_ref = self.ref.with_item(item.digest) if self.ref else None
+                # Here, we use the raw rows if they exist, otherwise we use the
+                # rows from the server. This is a temporary trick to ensure
+                # we don't re-deserialize the rows on every access. Once all servers
+                # return digests, this branch can be removed because anytime we have prefetched
+                # rows we should also have the digests - and we should be in the _local_iter
+                # case.
+                val = (
+                    item.val
+                    if self._prefetched_rows is None
+                    else self._prefetched_rows[ndx]
+                )
                 res = from_json(
-                    item.val,
+                    val,
                     self.table_ref.entity + "/" + self.table_ref.project,
                     self.server,
                 )
@@ -505,7 +578,7 @@ def make_trace_obj(
                     "Expected Table.ref or Table.table_ref to be TableRef"
                 )
             val_ref = val_table_ref
-
+        rows = val.rows
         val = WeaveTable(
             table_ref=val_ref,
             ref=new_ref,
@@ -514,6 +587,12 @@ def make_trace_obj(
             root=root,
             parent=parent,
         )
+        # Use in memory rows! This is the case where we are making
+        # a trace object from an existing Table! If we don't do this
+        # then the WeaveTable will try to fetch all the rows from the
+        # server, throwing away the in memory rows. This is really expensive
+        # when we are doing evaluations!
+        val.set_prefetched_rows(rows)
     if isinstance(val, TableRef):
         val = WeaveTable(
             table_ref=val,
