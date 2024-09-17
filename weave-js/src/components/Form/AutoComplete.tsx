@@ -1,4 +1,3 @@
-import {Paper, PaperProps} from '@mui/material';
 import Autocomplete, {AutocompleteProps} from '@mui/material/Autocomplete';
 import {createTheme, ThemeProvider} from '@mui/material/styles';
 import React from 'react';
@@ -40,37 +39,37 @@ const getStyles = (props: AdditionalProps) => {
   const size = props.size ?? 'medium';
   const customTheme = createTheme({
     components: {
+      MuiOutlinedInput: {
+        styleOverrides: {
+          root: {
+            height: HEIGHTS[size],
+            padding: PADDING[size],
+            fontSize: FONT_SIZES[size],
+            fontFamily: 'Source Sans Pro',
+            minWidth: '100px',
+            color: MOON_800,
+            maxWidth: props.maxWidth ? `${props.maxWidth}px` : '100%',
+            '& fieldset': {
+              borderColor: MOON_250,
+            },
+            '&&:focus-within fieldset': {
+              borderColor: TEAL_400,
+              borderWidth: '2px',
+            },
+            '&&:hover:not(:focus-within) fieldset': {
+              borderColor: TEAL_350,
+              borderWidth: '2px',
+            },
+            '& input::placeholder': {
+              color: MOON_500,
+              opacity: 1,
+            },
+          },
+        },
+      },
       MuiAutocomplete: {
         styleOverrides: {
           root: {
-            '& .MuiOutlinedInput-root': {
-              height: HEIGHTS[size],
-              padding: PADDING[size],
-              fontSize: FONT_SIZES[size],
-              fontFamily: 'Source Sans Pro',
-              minWidth: '100px',
-              color: MOON_800,
-              maxWidth: props.maxWidth ? `${props.maxWidth}px` : '100%',
-              '&& fieldset': {
-                borderColor: MOON_250,
-              },
-              '&.Mui-focused fieldset': {
-                borderColor: TEAL_400,
-                borderWidth: '2px',
-              },
-              '& .MuiInputBase-input': {
-                whiteSpace: 'nowrap',
-                textOverflow: 'ellipsis',
-              },
-              '&.MuiOutlinedInput-root:hover:not(.Mui-focused) fieldset': {
-                borderColor: TEAL_350,
-                borderWidth: '2px',
-              },
-              '& input::placeholder': {
-                color: MOON_500,
-                opacity: 1,
-              },
-            },
             '&.MuiAutocomplete-hasPopupIcon .MuiOutlinedInput-root, &.MuiAutocomplete-hasClearIcon .MuiOutlinedInput-root':
               {
                 paddingRight: props.showEndIcon ? '28px' : '0px', // Apply padding only if input exists
@@ -90,7 +89,7 @@ const getStyles = (props: AdditionalProps) => {
               backgroundColor: `${hexToRGB(TEAL_300, 0.32)} !important`,
               color: TEAL_600,
             },
-            '&.Mui-focused[aria-selected="true"]': {
+            '&:focus-within[aria-selected="true"]': {
               backgroundColor: `${hexToRGB(TEAL_300, 0.32)} !important`,
               color: TEAL_600,
             },
