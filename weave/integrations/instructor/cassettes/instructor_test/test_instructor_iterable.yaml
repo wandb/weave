@@ -1,0 +1,115 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "system", "content": "\n                As a genius
+      expert, your task is to understand the content and provide\n                the
+      parsed objects in json that match the following json_schema:\n\n\n                {\n  \"$defs\":
+      {\n    \"Person\": {\n      \"properties\": {\n        \"person_name\": {\n          \"title\":
+      \"Person Name\",\n          \"type\": \"string\"\n        },\n        \"age\":
+      {\n          \"title\": \"Age\",\n          \"type\": \"integer\"\n        }\n      },\n      \"required\":
+      [\n        \"person_name\",\n        \"age\"\n      ],\n      \"title\": \"Person\",\n      \"type\":
+      \"object\"\n    }\n  },\n  \"description\": \"Correct segmentation of `Person`
+      tasks\",\n  \"properties\": {\n    \"tasks\": {\n      \"description\": \"Correctly
+      segmented list of `Person` tasks\",\n      \"items\": {\n        \"$ref\": \"#/$defs/Person\"\n      },\n      \"title\":
+      \"Tasks\",\n      \"type\": \"array\"\n    }\n  },\n  \"title\": \"IterablePerson\",\n  \"type\":
+      \"object\"\n}\n\n                Make sure to return an instance of the JSON,
+      not the schema itself\n"}, {"role": "user", "content": "Consider this data:
+      Jason is 10 and John is 30.                             Correctly segment it
+      into entities                            Make sure the JSON is correct"}], "model":
+      "gpt-3.5-turbo-1106", "response_format": {"type": "json_object"}, "stream":
+      false, "temperature": 0.1}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '1438'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.44.1
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.44.1
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.10.14
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA4xRwYrbMBC9+yuGOTuLnTiJm1uhtLCHLaW91YtR7LGjXVmjShNoCf73IjuJt9BC
+        Lxr03rynp5lLAoC6xQNgc1LSDM6s3pffPn9pi2J4bEh/+JRJrl6oLH88PX1UXzGNCj6+UCM31UPD
+        gzMkmu1MN56UUHTN9+vdtly/2xcTMXBLJsp6J6vNw3YlZ3/kVZ5nu6vyxLqhgAf4ngAAXKYzZrQt
+        /cQDZOkNGSgE1RMe7k0A6NlEBFUIOoiygulCNmyF7BT7UlmACkWF11DF1+Id4DKXSDnygW1t1UCx
+        ocJHFdhWmC4tqp+oPJuhMf0PEz791WNz84jlubLj29yeunNQcW72bMwVH++DMNw7z8dw5e94p60O
+        p9pTDB4/HYQdTuyYADxPAz//MUN0ngcntfAr2Wi43uezHy47XthifyWFRZkF3+Tlv1R1S6K0CW/W
+        hnNCbfvFIbvHnP6J4VcQGupO256883reYufqbXHcqKIodx0mY/IbAAD//wMA8HfAn88CAAA=
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 8c49c0478a472967-BOM
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 17 Sep 2024 14:22:55 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=w85uwpGWcxA0.Wyrxkd9oRTD4tIsnwvEyZgsPoA3X8k-1726582975-1.0.1.1-yS_YIft9qT_de_NrALlv2etpufGqa9x5x.4Abo.X4d9YVBL6MP.C3tF56cnPtU2pKeqJADP05lpf7SDH3Jasmg;
+        path=/; expires=Tue, 17-Sep-24 14:52:55 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=jE3DuBfBmhcsQ3wpDjUzMdOgrzyKB82gcM5q.VEyEL8-1726582975698-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '736'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=15552000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '50000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '49999700'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_9f39126788c8bb33e44c30e7496a524a
+    status:
+      code: 200
+      message: OK
+version: 1
