@@ -571,12 +571,12 @@ class WeaveClient:
         else:
             op_str = op
 
-        inputs_without_large_objects = replace_large_objects(inputs_redacted)
-        inputs_redacted = redact_sensitive_keys(inputs_without_large_objects)
+        inputs_redacted = redact_sensitive_keys(inputs)
+        inputs_converted = replace_large_objects(inputs_redacted)
         if op.postprocess_inputs:
-            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
+            inputs_postprocessed = op.postprocess_inputs(inputs_converted)
         else:
-            inputs_postprocessed = inputs_redacted
+            inputs_postprocessed = inputs_converted
 
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
@@ -1340,26 +1340,26 @@ def replace_large_objects(obj: Any, max_size: int = 1 * 1024**2) -> Any:
             # TODO: casting as str is not actually the real size of the object
             # its close, but not actually the json dump. What is more performant?
             if size := len(str(v).encode("utf-8")) > max_size:
-                v = JSONBlob(v, size)
+                v = JSONBlob(obj=v, size=size)
             list_res.append(v)
         obj = list_res
     elif isinstance(obj, dict):
         dict_res = {}
         for k, v in obj.items():
             if size := len(str(v).encode("utf-8")) > max_size:
-                v = JSONBlob(v, size)
+                v = JSONBlob(obj=v, size=size)
             dict_res[k] = v
         obj = dict_res
     elif isinstance(obj, tuple):
         tuple_res = []
         for v in obj:
             if size := len(str(v).encode("utf-8")) > max_size:
-                v = JSONBlob(v, size)
+                v = JSONBlob(obj=v, size=size)
             tuple_res.append(v)
         obj = tuple(tuple_res)
     else:  # str
         if size := len(obj.encode("utf-8")) > max_size:
-            obj = JSONBlob(obj, size)
+            obj = JSONBlob(obj=v, size=size)
     return obj
 
 
