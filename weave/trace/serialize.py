@@ -121,35 +121,63 @@ class CustomWeaveTypeSerializationCache:
     us cache the results of deserializing the same dict with different objects.
     """
 
-    _obj_to_dict: weakref.WeakValueDictionary[str, dict]
-    _dict_to_obj: weakref.WeakValueDictionary[str, Any]
-
     def __init__(self) -> None:
-        self._obj_to_dict = weakref.WeakValueDictionary()
-        self._dict_to_obj = weakref.WeakValueDictionary()
+        self._obj_to_dict: weakref.WeakKeyDictionary[Any, dict] = (
+            weakref.WeakKeyDictionary()
+        )
+        self._dict_to_obj: weakref.WeakValueDictionary[str, Any] = (
+            weakref.WeakValueDictionary()
+        )
 
     def store(self, obj: Any, serialized_dict: dict) -> None:
-        obj_key = self._get_obj_key(obj)
+        try:
+            self._store(obj, serialized_dict)
+        except Exception:
+            # Consider logging the exception here
+            pass
+
+    def _store(self, obj: Any, serialized_dict: dict) -> None:
+        obj_key = self._get_obj_hash_key(obj)
+        cache = self._obj_to_dict.get(obj, {})
+        cache[obj_key] = serialized_dict
+        self._obj_to_dict[obj] = cache
         dict_key = self._get_dict_key(serialized_dict)
-        self._obj_to_dict[obj_key] = serialized_dict
-        self._dict_to_obj[dict_key] = obj
+        if dict_key is not None:
+            self._dict_to_obj[dict_key] = obj
 
     def get_serialized_dict(self, obj: Any) -> Optional[dict]:
-        obj_key = self._get_obj_key(obj)
-        return self._obj_to_dict.get(obj_key)
+        try:
+            return self._get_serialized_dict(obj)
+        except Exception:
+            # Consider logging the exception here
+            return None
+
+    def _get_serialized_dict(self, obj: Any) -> Optional[dict]:
+        obj_key = self._get_obj_hash_key(obj)
+        return self._obj_to_dict.get(obj, {}).get(obj_key)
 
     def get_deserialized_obj(self, serialized_dict: dict) -> Optional[Any]:
-        dict_key = self._get_dict_key(serialized_dict)
-        return self._dict_to_obj.get(dict_key)
-
-    def _get_obj_key(self, obj: Any) -> Any:
         try:
-            return (id(obj), hash(obj))
-        except TypeError:
-            return id(obj)
+            return self._get_deserialized_obj(serialized_dict)
+        except Exception:
+            # Consider logging the exception here
+            return None
 
-    def _get_dict_key(self, d: dict) -> str:
-        return json.dumps(d, sort_keys=True)
+    def _get_deserialized_obj(self, serialized_dict: dict) -> Optional[Any]:
+        dict_key = self._get_dict_key(serialized_dict)
+        return None if dict_key is None else self._dict_to_obj.get(dict_key)
+
+    def _get_obj_hash_key(self, obj: Any) -> Optional[int]:
+        try:
+            return hash(obj)
+        except Exception:
+            return None
+
+    def _get_dict_key(self, d: dict) -> Optional[str]:
+        try:
+            return json.dumps(d, sort_keys=True)
+        except Exception:
+            return None
 
 
 # Initialize the global cache
@@ -167,17 +195,20 @@ def _to_json_custom_weave_type(
     encoded = custom_objs.encode_custom_obj(obj)
     if encoded is None:
         raise ValueError(f"No encoder for object: {obj}")
+
     file_digests: dict[str, str] = {}
     for name, val in encoded["files"].items():
         file_response = server.file_create(
             FileCreateReq(project_id=project_id, name=name, content=val)
         )
         file_digests[name] = file_response.digest
+
     result = {
         "_type": encoded["_type"],
         "weave_type": encoded["weave_type"],
         "files": file_digests,
     }
+
     load_op_uri = encoded.get("load_op")
     if load_op_uri:
         result["load_op"] = load_op_uri
