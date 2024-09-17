@@ -26,7 +26,7 @@ print(system.format())
 My prompts default to the system role, you can override it.  My thinking is the system prompt is the role
 most used to guide the LLM but I could see a case for making the default user.  A part of me wonders if role is
 even something we need to capture for the versioning of prompts.  It's helpful for templating but we might want
-to seperate those concerns, see Thought #3 below.
+to separate those concerns, see Thought #3 below.
 
 ```python
 user = pt("Think step by step", role="user")
@@ -58,10 +58,10 @@ Prompt(name='eval'):
   [{'role': 'system', 'content': 'What is the meaning of life?'}]
 ```
 
-When a prompt str is passed into an op, we should automatically annotate the op with the digest of the `Prompts` object.
+When a prompt str is passed into an op, we should automatically annotate the op with the digest of the `Prompt` object.
 I also added a convenience method for openai SDK's that returns the message payload which would need to be tracked
 as well.  Currently `.format` is returning a regular string, we would need to change these to be a string that refers to
-the `weave.Prompt` object for this to work.
+the `weave.Prompt` object for this all to work and it feels a bit over my pay grade :wink:.
 
 ```python
 response = client.chat.completions.create(
@@ -95,7 +95,7 @@ response = client.chat.completions.create(
 
 In the above example we wouldn't capture the fact that user input comes before our "assistant" hint, but we could make our
 playground UI's handle the case.  Alternatively a user could do something like `pt("{}", role="user").message(user_input)`
-but that's provides no tracing information and only helps with the template problem, see Thought #3 below.
+but that provides no tracing information and only helps with the template problem, see Thought #3 below.
 
 **Thoughts**
 
@@ -103,8 +103,6 @@ but that's provides no tracing information and only helps with the template prob
 2. With this string centered approach, we should think about getting just the string for a sub-message of
    the bigger prompt using weave.ref()
 3. I imagine having a constant image in a prompt template is pretty rare.  I could imagine wanting to setup an image as a
-   variable in a prompt template.  These seem like seperate concerns to me though:
+   variable in a prompt template.  These seem like separate concerns to me though:
    1. Keeping track of the engineering of your prompts
    2. Providing a prompt template for a playground / UI
-4. Users might wrap one of their strings in `weave.prompt` but not pass the instance into any ops.  I wonder if we could
-   set an attr or something on the actual string instance passed to `weave.prompt` to handle that case.

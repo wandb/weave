@@ -56,9 +56,9 @@ class prompt(str):
             params.update(overrides)
         return params
     
-    def format(self, **kwargs):
+    def format(self, *args, **kwargs):
         # TODO: we need to return a special string object here that weave can track
-        return str(self).format(**self.params(kwargs))
+        return str(self).format(*args, **self.params(kwargs))
 
     def parameters(self):
         formatter = string.Formatter()
@@ -68,11 +68,11 @@ class prompt(str):
             if fname is not None
         ]
     
-    def message(self, format: bool = True, **kwargs):
-        # TODO: we want to keep the object here so weave can track it
+    def message(self, *args, format: bool = True, **kwargs):
+        # TODO: the str(...) case needs to return a special object that weave can track
         return {
             "role": self.role,
-            "content": self.format(**self.params(kwargs)) if format else str(self)
+            "content": self.format(*args, **self.params(kwargs)) if format else str(self)
         }
     
     def add_image(self, image_url: str):
