@@ -794,7 +794,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
             conn.commit()
 
-        return tsi.TableUpdateRes(digest=digest, row_update_digests=updated_digests)
+        return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []

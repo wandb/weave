@@ -474,7 +474,18 @@ class TableUpdateReq(BaseModel):
 
 class TableUpdateRes(BaseModel):
     digest: str
-    row_update_digests: list[str]
+    # A note to developers:
+    # This default factory is needed because we share the
+    # same interface for the python client and the server.
+    # As a result, we might have servers in the wild that
+    # do not support this field. Therefore, we want to ensure
+    # that clients expecting this field will not break when
+    # they are targetting an older server. We should remove
+    # this default factory once we are sure that all servers
+    # have been updated to support this field.
+    updated_row_digests: list[str] = Field(
+        default_factory=list, description="The digests of the rows that were updated"
+    )
 
 
 class TableRowSchema(BaseModel):
@@ -484,7 +495,18 @@ class TableRowSchema(BaseModel):
 
 class TableCreateRes(BaseModel):
     digest: str
-    row_digests: list[str]
+    # A note to developers:
+    # This default factory is needed because we share the
+    # same interface for the python client and the server.
+    # As a result, we might have servers in the wild that
+    # do not support this field. Therefore, we want to ensure
+    # that clients expecting this field will not break when
+    # they are targetting an older server. We should remove
+    # this default factory once we are sure that all servers
+    # have been updated to support this field.
+    row_digests: list[str] = Field(
+        default_factory=list, description="The digests of the rows that were created"
+    )
 
 
 class TableRowFilter(BaseModel):
