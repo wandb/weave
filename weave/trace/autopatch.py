@@ -16,6 +16,9 @@ def autopatch() -> None:
     from ..integrations.llamaindex.llamaindex import llamaindex_patcher
     from ..integrations.mistral import mistral_patcher
     from ..integrations.openai.openai_sdk import openai_patcher
+    from ..integrations.google_ai_studio.google_ai_studio_sdk import (
+        google_genai_patcher,
+    )
 
     openai_patcher.attempt_patch()
     mistral_patcher.attempt_patch()
@@ -27,6 +30,7 @@ def autopatch() -> None:
     dspy_patcher.attempt_patch()
     cerebras_patcher.attempt_patch()
     cohere_patcher.attempt_patch()
+    google_genai_patcher.attempt_patch()
 
 
 def reset_autopatch() -> None:
@@ -40,6 +44,9 @@ def reset_autopatch() -> None:
     from ..integrations.llamaindex.llamaindex import llamaindex_patcher
     from ..integrations.mistral import mistral_patcher
     from ..integrations.openai.openai_sdk import openai_patcher
+    from ..integrations.google_ai_studio.google_ai_studio_sdk import (
+        google_genai_patcher,
+    )
 
     openai_patcher.undo_patch()
     mistral_patcher.undo_patch()
@@ -51,3 +58,4 @@ def reset_autopatch() -> None:
     dspy_patcher.undo_patch()
     cerebras_patcher.undo_patch()
     cohere_patcher.undo_patch()
+    google_genai_patcher.undo_patch()

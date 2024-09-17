@@ -27,7 +27,8 @@ _OnCloseType = Callable[[], None]
 
 class _IteratorWrapper(Generic[V]):
     """This class wraps an iterator object allowing hooks to be added to the lifecycle of the iterator. It is likely
-    that this class will be helpful in other contexts and might be moved to a more general location in the future."""
+    that this class will be helpful in other contexts and might be moved to a more general location in the future.
+    """
 
     def __init__(
         self,
@@ -59,9 +60,12 @@ class _IteratorWrapper(Generic[V]):
 
     def __next__(self) -> Generator[None, None, V]:
         if not hasattr(self._iterator_or_ctx_manager, "__next__"):
-            raise TypeError(
-                f"Cannot call next on an iterator of type {type(self._iterator_or_ctx_manager)}"
-            )
+            try:
+                self._iterator_or_ctx_manager = iter(self._iterator_or_ctx_manager)
+            except TypeError:
+                raise TypeError(
+                    f"Cannot call next on an iterator of type {type(self._iterator_or_ctx_manager)}"
+                )
         try:
             value = next(self._iterator_or_ctx_manager)  # type: ignore
             self._on_yield(value)
@@ -78,9 +82,12 @@ class _IteratorWrapper(Generic[V]):
 
     async def __anext__(self) -> Generator[None, None, V]:
         if not hasattr(self._iterator_or_ctx_manager, "__anext__"):
-            raise TypeError(
-                f"Cannot call anext on an iterator of type {type(self._iterator_or_ctx_manager)}"
-            )
+            try:
+                self._iterator_or_ctx_manager = iter(self._iterator_or_ctx_manager)
+            except TypeError:
+                raise TypeError(
+                    f"Cannot call anext on an iterator of type {type(self._iterator_or_ctx_manager)}"
+                )
         try:
             value = await self._iterator_or_ctx_manager.__anext__()  # type: ignore
             self._on_yield(value)
