@@ -300,6 +300,13 @@ class WeaveTable(Traceable):
         super()._mark_dirty()
 
     def _local_iter(self) -> Generator[dict, None, None]:
+        """
+        This is the case where we:
+        1. Have all the rows in memory
+        2. Have all the row digests
+
+        In this case, we don't need to make any calls and can just return the rows
+        """
         if (
             self.table_ref is None
             or self.table_ref.row_digests is None
@@ -581,7 +588,7 @@ def make_trace_obj(
         # then the WeaveTable will try to fetch all the rows from the
         # server, throwing away the in memory rows. This is really expensive
         # when we are doing evaluations!
-        val._prefetched_rows = rows
+        val.set_prefetched_rows(rows)
     if isinstance(val, TableRef):
         val = WeaveTable(
             table_ref=val,
