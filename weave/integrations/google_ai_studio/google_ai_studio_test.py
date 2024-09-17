@@ -9,16 +9,6 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace.weave_client import WeaveClient
 
 
-def _get_call_output(call: tsi.CallSchema) -> Any:
-    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
-    Keeping this here for now, but it should be removed in the future once we have a better solution.
-    """
-    call_output = call.output
-    if isinstance(call_output, str) and call_output.startswith("weave://"):
-        return weave.ref(call_output).get()
-    return call_output
-
-
 def flatten_calls(
     calls: list[tsi.CallSchema], parent_id: Optional[str] = None, depth: int = 0
 ) -> list:
