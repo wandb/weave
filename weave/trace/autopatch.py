@@ -10,15 +10,15 @@ def autopatch() -> None:
     from ..integrations.cerebras.cerebras_sdk import cerebras_patcher
     from ..integrations.cohere.cohere_sdk import cohere_patcher
     from ..integrations.dspy.dspy_sdk import dspy_patcher
+    from ..integrations.google_ai_studio.google_ai_studio_sdk import (
+        google_genai_patcher,
+    )
     from ..integrations.groq.groq_sdk import groq_patcher
     from ..integrations.langchain.langchain import langchain_patcher
     from ..integrations.litellm.litellm import litellm_patcher
     from ..integrations.llamaindex.llamaindex import llamaindex_patcher
     from ..integrations.mistral import mistral_patcher
     from ..integrations.openai.openai_sdk import openai_patcher
-    from ..integrations.google_ai_studio.google_ai_studio_sdk import (
-        google_genai_patcher,
-    )
 
     openai_patcher.attempt_patch()
     mistral_patcher.attempt_patch()
@@ -38,15 +38,15 @@ def reset_autopatch() -> None:
     from ..integrations.cerebras.cerebras_sdk import cerebras_patcher
     from ..integrations.cohere.cohere_sdk import cohere_patcher
     from ..integrations.dspy.dspy_sdk import dspy_patcher
+    from ..integrations.google_ai_studio.google_ai_studio_sdk import (
+        google_genai_patcher,
+    )
     from ..integrations.groq.groq_sdk import groq_patcher
     from ..integrations.langchain.langchain import langchain_patcher
     from ..integrations.litellm.litellm import litellm_patcher
     from ..integrations.llamaindex.llamaindex import llamaindex_patcher
     from ..integrations.mistral import mistral_patcher
     from ..integrations.openai.openai_sdk import openai_patcher
-    from ..integrations.google_ai_studio.google_ai_studio_sdk import (
-        google_genai_patcher,
-    )
 
     openai_patcher.undo_patch()
     mistral_patcher.undo_patch()

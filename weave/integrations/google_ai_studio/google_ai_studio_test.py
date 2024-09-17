@@ -4,9 +4,8 @@ from typing import Any, Optional
 
 import pytest
 
-import weave
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace.weave_client import WeaveClient
+from weave.trace_server import trace_server_interface as tsi
 
 
 def flatten_calls(
