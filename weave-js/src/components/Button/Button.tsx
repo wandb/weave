@@ -153,7 +153,14 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 <span className="[display:inherit]">{button}</span>
               </Tooltip.Trigger>
               <Tooltip.Portal>
-                <Tooltip.Content {...tooltipProps}>{tooltip}</Tooltip.Content>
+                <Tooltip.Content
+                  {...tooltipProps}
+                  style={{
+                    // it's hard to state how silly this is, but the zIndex on semantic's modal is 2147483605 - so, that + 1
+                    zIndex: 2147483606,
+                  }}>
+                  {tooltip}
+                </Tooltip.Content>
               </Tooltip.Portal>
             </Tooltip.Root>
           </Tooltip.Provider>
