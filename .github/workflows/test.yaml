@@ -62,7 +62,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v1
         with:
-          node-version: "18.x"
+          node-version: '18.x'
       - run: |
           set -e
           cd weave-js
@@ -72,6 +72,56 @@ jobs:
           yarn tslint
           yarn prettier
           yarn run tsc
+
+  test2:
+    name: Tox tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version-major: ['3']
+        python-version-minor: [
+            '9',
+            '10',
+            '11',
+            '12',
+            #
+          ]
+        tox-shard:
+          [
+            'trace',
+            'trace_server',
+            'anthropic',
+            'cerebras',
+            'cohere',
+            'dspy',
+            'groq',
+            'langchain',
+            'litellm',
+            'llamaindex',
+            'mistral0',
+            'mistral1',
+            'openai',
+          ]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install tox
+      - name: Run tox
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: weave_clickhouse
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+        run: tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }} -- -n4
 
   test:
     name: Python unit tests
@@ -97,14 +147,14 @@ jobs:
           CI: 1
           WANDB_ENABLE_TEST_CONTAINER: true
         ports:
-          - "8080:8080"
-          - "8083:8083"
-          - "9015:9015"
+          - '8080:8080'
+          - '8083:8083'
+          - '9015:9015'
         options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
       weave_clickhouse:
         image: clickhouse/clickhouse-server
         ports:
-          - "8123:8123"
+          - '8123:8123'
         options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
     steps:
       # - uses: datadog/agent-github-action@v1.3
@@ -133,7 +183,7 @@ jobs:
           --timeout=90 \
           --ddtrace \
           --durations=5 \
-          ./integrations ./legacy ./trace_server ./trace ./tests
+          ./legacy
       - name: Run Python Unit Tests
         env:
           DD_SERVICE: weave-python
@@ -153,7 +203,7 @@ jobs:
           --timeout=90 \
           --ddtrace \
           --durations=5 \
-          ./integrations ./legacy ./trace_server ./trace ./tests
+          ./legacy
 
   # nbmake:
   #   name: Run notebooks with nbmake

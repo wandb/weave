@@ -26,16 +26,6 @@ import typing
 
 from pydantic import BaseModel, Field
 
-
-class Query(BaseModel):
-    # Here, we use `expr_` to match the MongoDB query language's "aggregation" operator syntax.
-    # This is certainly a subset of the full MongoDB query language, but it is a good starting point.
-    # https://www.mongodb.com/docs/manual/reference/operator/query/expr/#mongodb-query-op.-expr
-    expr_: "Operation" = Field(alias="$expr")
-    # In the future, we could have other top-level Query Operators as described here:
-    # https://www.mongodb.com/docs/manual/reference/operator/query/
-
-
 # Operations: all operations have the form of a single property
 # with the name of the operation suffixed with an underscore.
 # Subset of Mongo _Aggregation_ Operators: https://www.mongodb.com/docs/manual/reference/operator/aggregation/
@@ -167,3 +157,12 @@ GtOperation.model_rebuild()
 GteOperation.model_rebuild()
 InOperation.model_rebuild()
 ContainsOperation.model_rebuild()
+
+
+class Query(BaseModel):
+    # Here, we use `expr_` to match the MongoDB query language's "aggregation" operator syntax.
+    # This is certainly a subset of the full MongoDB query language, but it is a good starting point.
+    # https://www.mongodb.com/docs/manual/reference/operator/query/expr/#mongodb-query-op.-expr
+    expr_: Operation = Field(alias="$expr")
+    # In the future, we could have other top-level Query Operators as described here:
+    # https://www.mongodb.com/docs/manual/reference/operator/query/
