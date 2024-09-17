@@ -256,7 +256,8 @@ class WeaveTable(Traceable):
     def rows(self) -> list[dict]:
         if self._rows is None:
             should_local_iter = (
-                self.table_ref is not None
+                self.ref is not None
+                and self.table_ref is not None
                 and self.table_ref.row_digests is not None
                 and self._prefetched_rows is not None
             )
@@ -308,7 +309,8 @@ class WeaveTable(Traceable):
         In this case, we don't need to make any calls and can just return the rows
         """
         if (
-            self.table_ref is None
+            self.ref is None
+            or self.table_ref is None
             or self.table_ref.row_digests is None
             or self._prefetched_rows is None
         ):
@@ -319,7 +321,7 @@ class WeaveTable(Traceable):
             raise ValueError("Ref row digests do not match prefetched rows")
 
         for ndx, item in enumerate(self.table_ref.row_digests):
-            new_ref = self.ref.with_item(item) if self.ref else None
+            new_ref = self.ref.with_item(item)
             val = self._prefetched_rows[ndx]
             res = from_json(
                 val, self.table_ref.entity + "/" + self.table_ref.project, self.server
