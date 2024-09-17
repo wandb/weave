@@ -1,6 +1,6 @@
 import dataclasses
 import urllib
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 from ..trace_server import refs_internal
 
@@ -21,6 +21,7 @@ class TableRef(Ref):
     entity: str
     project: str
     digest: str
+    row_digests: Optional[list[str]] = None
 
     def uri(self) -> str:
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
