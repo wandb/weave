@@ -1,4 +1,5 @@
 import inspect
+import sys
 from typing import Any
 
 import pytest
@@ -123,12 +124,18 @@ def test_sync_method(client, weave_obj, py_obj):
 def test_sync_method_call(client, weave_obj, py_obj):
     res, call = weave_obj.method.call(weave_obj, 1)
     assert isinstance(call, Call)
+
+    if sys.version_info == (3, 12):
+        digest = "A8XuHAXc9nJGOWBH3uKJNKVhZHJcGncYtgYXJmEfcG0"
+    else:
+        digest = "tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo"
+
     assert call.inputs == {
         "self": ObjectRef(
             entity="shawn",
             project="test-project",
             name="A",
-            digest="A8XuHAXc9nJGOWBH3uKJNKVhZHJcGncYtgYXJmEfcG0",
+            digest=digest,
             extra=(),
         ),
         "a": 1,
@@ -158,12 +165,18 @@ async def test_async_method(client, weave_obj, py_obj):
 async def test_async_method_call(client, weave_obj, py_obj):
     res, call = await weave_obj.amethod.call(weave_obj, 1)
     assert isinstance(call, Call)
+
+    if sys.version_info == (3, 12):
+        digest = "A8XuHAXc9nJGOWBH3uKJNKVhZHJcGncYtgYXJmEfcG0"
+    else:
+        digest = "tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo"
+
     assert call.inputs == {
         "self": ObjectRef(
             entity="shawn",
             project="test-project",
             name="A",
-            digest="A8XuHAXc9nJGOWBH3uKJNKVhZHJcGncYtgYXJmEfcG0",
+            digest=digest,
             extra=(),
         ),
         "a": 1,
