@@ -1,7 +1,7 @@
 import json
 import typing
 import weakref
-from typing import Any, Optional
+from typing import Any, Generic, Iterator, Optional, Tuple, Union, ValuesView
 
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
@@ -102,6 +102,60 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
 # Importantly we can actually cache the results of both directions so that we
 # don't have to do the work more than once.
 
+K = typing.TypeVar("K")
+V = typing.TypeVar("V")
+
+
+class WeakKeyDictionarySupportingNonHashableKeys(Generic[K, V]):
+    def __init__(self) -> None:
+        self._id_to_data: dict[int, V] = {}
+        self._id_to_key: dict[int, K] = {}
+
+    def clear(self) -> None:
+        self._id_to_data.clear()
+        self._id_to_key.clear()
+
+    def get(self, key: K, default: Any = None) -> Union[V, Any]:
+        try:
+            return self.__getitem__(key)
+        except KeyError:
+            return default
+
+    def __getitem__(self, key: K) -> V:
+        item_id = id(key)
+        return self._id_to_data[item_id]
+
+    def __delitem__(self, key: K) -> None:
+        item_id = id(key)
+        if item_id in self._id_to_data:
+            del self._id_to_data[item_id]
+            del self._id_to_key[item_id]
+
+    def __setitem__(self, key: K, value: V) -> None:
+        item_id = id(key)
+        self._id_to_data[item_id] = value
+        self._id_to_key[item_id] = key
+        weakref.finalize(key, self._remove_item, item_id)
+
+    def _remove_item(self, item_id: int) -> None:
+        self._id_to_data.pop(item_id, None)
+        self._id_to_key.pop(item_id, None)
+
+    def __iter__(self) -> Iterator[K]:
+        return iter(self._id_to_key.values())
+
+    def __len__(self) -> int:
+        return len(self._id_to_data)
+
+    def keys(self) -> ValuesView[K]:
+        return self._id_to_key.values()
+
+    def values(self) -> ValuesView[V]:
+        return self._id_to_data.values()
+
+    def items(self) -> Iterator[Tuple[K, V]]:
+        return ((self._id_to_key[id], value) for id, value in self._id_to_data.items())
+
 
 class CustomWeaveTypeSerializationCache:
     """Cache for custom weave type serialization.
@@ -111,23 +165,19 @@ class CustomWeaveTypeSerializationCache:
     - retrieve the serialized dict for a deserialized object
     - retrieve the deserialized object for a serialized dict
 
-    When keying by object:
-    In addition to weak references, the cache will also attempt to call the object's `__hash__` method if it
-    has one, and include that hash in the cache key. This will allow the cache
-    to be effectively invalidated if the object is updated.
-
-    When keying by dict:
-    We will stringify the dict (deterministically) to create a key. This lets
-    us cache the results of deserializing the same dict with different objects.
     """
 
     def __init__(self) -> None:
-        self._obj_to_dict: weakref.WeakKeyDictionary[Any, dict] = (
-            weakref.WeakKeyDictionary()
+        self._obj_to_dict: WeakKeyDictionarySupportingNonHashableKeys[Any, dict] = (
+            WeakKeyDictionarySupportingNonHashableKeys()
         )
         self._dict_to_obj: weakref.WeakValueDictionary[str, Any] = (
             weakref.WeakValueDictionary()
         )
+
+    def reset(self) -> None:
+        self._obj_to_dict.clear()
+        self._dict_to_obj.clear()
 
     def store(self, obj: Any, serialized_dict: dict) -> None:
         try:
@@ -137,10 +187,7 @@ class CustomWeaveTypeSerializationCache:
             pass
 
     def _store(self, obj: Any, serialized_dict: dict) -> None:
-        obj_key = self._get_obj_hash_key(obj)
-        cache = self._obj_to_dict.get(obj, {})
-        cache[obj_key] = serialized_dict
-        self._obj_to_dict[obj] = cache
+        self._obj_to_dict[obj] = serialized_dict
         dict_key = self._get_dict_key(serialized_dict)
         if dict_key is not None:
             self._dict_to_obj[dict_key] = obj
@@ -153,8 +200,7 @@ class CustomWeaveTypeSerializationCache:
             return None
 
     def _get_serialized_dict(self, obj: Any) -> Optional[dict]:
-        obj_key = self._get_obj_hash_key(obj)
-        return self._obj_to_dict.get(obj, {}).get(obj_key)
+        return self._obj_to_dict.get(obj)
 
     def get_deserialized_obj(self, serialized_dict: dict) -> Optional[Any]:
         try:
@@ -166,12 +212,6 @@ class CustomWeaveTypeSerializationCache:
     def _get_deserialized_obj(self, serialized_dict: dict) -> Optional[Any]:
         dict_key = self._get_dict_key(serialized_dict)
         return None if dict_key is None else self._dict_to_obj.get(dict_key)
-
-    def _get_obj_hash_key(self, obj: Any) -> Optional[int]:
-        try:
-            return hash(obj)
-        except Exception:
-            return None
 
     def _get_dict_key(self, d: dict) -> Optional[str]:
         try:

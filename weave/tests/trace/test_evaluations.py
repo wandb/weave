@@ -709,6 +709,7 @@ async def test_eval_with_complex_types(client):
     # These assertions ensure that we aren't making those extra requests.
     # There is no reason to query the table, objects, or files
     # as everything is in memory
+    client._flush()
     access_log = client.server.attribute_access_log
     assert "table_query" not in access_log
     assert "obj_read" not in access_log
@@ -728,6 +729,7 @@ async def test_eval_with_complex_types(client):
     assert isinstance(row["obj"], str)  #  MyObj
     assert isinstance(row["text"], str)
 
+    client._flush()
     access_log = client.server.attribute_access_log
     assert "table_query" in access_log
     assert "obj_read" in access_log

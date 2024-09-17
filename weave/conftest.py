@@ -196,7 +196,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     For example, you can do something like the followng to assert that various
     read operations do not happen!
 
-    ```pyth
+    ```python
     access_log = client.server.attribute_access_log
     assert "table_query" not in access_log
     assert "obj_read" not in access_log
