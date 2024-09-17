@@ -427,10 +427,15 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 updates=req.updates[split_ndx:],
             )
             second_half_res = self.table_update(second_half_req)
-            return tsi.TableUpdateRes(digest=second_half_res.digest)
+            all_digests = (
+                first_half_res.row_update_digests + second_half_res.row_update_digests
+            )
+            return tsi.TableUpdateRes(
+                digest=second_half_res.digest, row_update_digests=all_digests
+            )
         else:
             return self._generic_request(
-                "/table/update", req, tsi.TableCreateReq, tsi.TableCreateRes
+                "/table/update", req, tsi.TableUpdateReq, tsi.TableUpdateRes
             )
 
     def table_query(
