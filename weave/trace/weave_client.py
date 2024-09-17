@@ -1166,13 +1166,22 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:
         rows = to_json(table.rows, self._project_id(), self)
-        response = self.server.table_create(
+
+        response = self.async_job_queue.submit_job(
+            self.server.table_create,
             TableCreateReq(
                 table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
-            )
+            ),
         )
+
+        def blocking_digest_resolver() -> str:
+            return response.result().digest
+
         return TableRef(
-            entity=self.entity, project=self.project, digest=response.digest
+            entity=self.entity,
+            project=self.project,
+            digest="",
+            _blocking_digest_resolver=blocking_digest_resolver,
         )
 
     @trace_sentry.global_trace_sentry.watch()
