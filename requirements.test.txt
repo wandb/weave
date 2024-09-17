@@ -32,3 +32,4 @@ pysqlite3-binary==0.5.3     # LangChain
 cohere>=5.9.1               # Cohere
 groq>=0.9.0                 # Groq
 cerebras-cloud-sdk          # cerebras-cloud-sdk
+instructor>=1.4.2           # Instructor
