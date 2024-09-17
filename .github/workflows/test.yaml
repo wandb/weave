@@ -115,8 +115,6 @@ jobs:
           pip install tox
       - name: Run tox
         env:
-          DD_SERVICE: weave-python
-          DD_ENV: ci
           WEAVE_SENTRY_ENV: ci
           CI: 1
           WB_SERVER_HOST: http://wandbservice
