@@ -43,7 +43,7 @@ def test_serialize_caching(client):
     assert methods_3 == methods_2
 
     # Reset the cache
-    serialize._custom_weave_type_cache.reset()
+    serialize._custom_weave_type_cache_map[client._project_id()].reset()
 
     # Deserialize should trigger new methods
     deserialize_img = serialize._from_json_custom_weave_type(
