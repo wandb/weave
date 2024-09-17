@@ -2,7 +2,6 @@ import dataclasses
 import inspect
 import operator
 import typing
-from functools import partial
 from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
 
 from pydantic import BaseModel
@@ -12,7 +11,7 @@ from weave.trace import box
 from weave.trace.client_context.weave_client import get_weave_client
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
-from weave.trace.op import Op, call, maybe_bind_method
+from weave.trace.op import Op, maybe_bind_method
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
@@ -579,7 +578,9 @@ def make_trace_obj(
             raise MissingSelfInstanceError(
                 f"{val.name} Op requires a bound self instance. Must be called from an instance method."
             )
-        val.call = partial(call, val, parent)
+        # TODO: This binding is correct but not done for consistency with the
+        # not-yet-saved-method-op API which requires explicitly passing self
+        # val.call = partial(call, val, parent)
         val = maybe_bind_method(val, parent)
     box_val = box.box(val)
     if isinstance(box_val, pydantic_v1.BaseModel) or isinstance(val, Op):
