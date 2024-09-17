@@ -1,5 +1,6 @@
 import dataclasses
 import inspect
+import logging
 import operator
 import typing
 from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
@@ -29,6 +30,8 @@ from weave.trace_server.trace_server_interface import (
     TableRowFilter,
     TraceServerInterface,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -314,11 +317,20 @@ class WeaveTable(Traceable):
             or self.table_ref.row_digests is None
             or self._prefetched_rows is None
         ):
-            yield from ()
+            logger.error(
+                "Expected all row digests and prefetched rows to be set, falling back to remote iteration"
+            )
+            yield from self._remote_iter()
             return
 
-        if len(self.table_ref.row_digests) != len(self._prefetched_rows):
-            raise ValueError("Ref row digests do not match prefetched rows")
+        row_digest_len = len(self.table_ref.row_digests)
+        prefetched_rows_len = len(self._prefetched_rows)
+        if row_digest_len != prefetched_rows_len:
+            logger.error(
+                f"Expected length of row digests ({row_digest_len}) to match prefetched rows ({prefetched_rows_len}). Falling back to remote iteration."
+            )
+            yield from self._remote_iter()
+            return
 
         for ndx, item in enumerate(self.table_ref.row_digests):
             new_ref = self.ref.with_item(item)
