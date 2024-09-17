@@ -248,8 +248,9 @@ class WeaveTable(Traceable):
         self.parent = parent
         self._rows: Optional[list[dict]] = None
 
-        # Raw rows is a list of rows from current memory
-        self._raw_rows: Optional[list[dict]] = None
+        # _prefetched_rows is a local cache of rows that can be used to
+        # avoid a remote call. Should only be used by internal code.
+        self._prefetched_rows: Optional[list[dict]] = None
 
     @property
     def rows(self) -> list[dict]:
@@ -265,6 +266,20 @@ class WeaveTable(Traceable):
         self._rows = value
         self._mark_dirty()
 
+    def set_prefetched_rows(self, prefetched_rows: list[dict]) -> None:
+        """Sets the rows to a local cache of rows that can be used to
+        avoid a remote call. Should only be used by internal code.
+
+        It is expected that these rows are the exact same rows that would
+        be returned by a query for this table. Failing to meet this expectation
+        will cause table operations to behave unexpectedly.
+        """
+        if self._rows is not None:
+            raise ValueError(
+                "Cannot set prefetched rows on WeaveTable when rows are already loaded"
+            )
+        self._prefetched_rows = prefetched_rows
+
     def __len__(self) -> int:
         return len(self.rows)
 
@@ -273,7 +288,7 @@ class WeaveTable(Traceable):
 
     def _mark_dirty(self) -> None:
         self.table_ref = None
-        self._raw_rows = None
+        self._prefetched_rows = None
         super()._mark_dirty()
 
     def _remote_iter(self) -> Generator[dict, None, None]:
@@ -292,15 +307,18 @@ class WeaveTable(Traceable):
                     # filter=self.filter,
                 )
             )
-            rows = response.rows
 
-            for item in rows:
+            for ndx, item in enumerate(response.rows):
                 new_ref = self.ref.with_item(item.digest) if self.ref else None
                 # Here, we use the raw rows if they exist, otherwise we use the
                 # rows from the server. This is a temporary perf hack to ensure
                 # we don't re-deserialize the rows on every access. This will benefit
                 # from future revision once table creation returns digests.
-                val = item.val if self._raw_rows is None else self._raw_rows[item.index]
+                val = (
+                    item.val
+                    if self._prefetched_rows is None
+                    else self._prefetched_rows[ndx]
+                )
                 res = from_json(
                     val,
                     self.table_ref.entity + "/" + self.table_ref.project,
@@ -309,7 +327,7 @@ class WeaveTable(Traceable):
                 res = make_trace_obj(res, new_ref, self.server, self.root)
                 yield res
 
-            if len(rows) < page_size:
+            if len(response.rows) < page_size:
                 break
 
             page_index += 1
@@ -529,7 +547,7 @@ def make_trace_obj(
         # then the WeaveTable will try to fetch all the rows from the
         # server, throwing away the in memory rows. This is really expensive
         # when we are doing evaluations!
-        val._raw_rows = rows
+        val._prefetched_rows = rows
     if isinstance(val, TableRef):
         val = WeaveTable(
             table_ref=val,
