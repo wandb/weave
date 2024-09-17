@@ -1,5 +1,5 @@
 import typing
-from typing import Any, cast
+from typing import Any
 
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
@@ -83,9 +83,7 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
                 {k: from_json(v, project_id, server) for k, v in obj.items()}
             )
         elif val_type == "CustomWeaveType":
-            # Verify that obj is a valid CustomObjDict
-            obj = cast(custom_objs.CustomWeaveTypeDict, obj)
-            return _from_json_custom_obj(obj, project_id, server)
+            return _from_json_custom_weave_type(obj, project_id, server)
         else:
             return ObjectRecord(
                 {k: from_json(v, project_id, server) for k, v in obj.items()}
@@ -96,9 +94,16 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
     return obj
 
 
+# _[to/from]_json_custom_weave_type are used to serialize and deserialize
+# objects that have custom serialization logic. These are NOT weave.Objects,
+# but rather things like PIL Images. These methods are inverses of each other.
+# Importantly we can actally cache the results of both directions so that we
+# don't have to do the work more than once.
+
+
 def _to_json_custom_weave_type(
     obj: Any, project_id: str, server: TraceServerInterface
-) -> custom_objs.CustomWeaveTypeDict:
+) -> dict:
     encoded = custom_objs.encode_custom_obj(obj)
     if encoded is None:
         raise ValueError(f"No encoder for object: {obj}")
@@ -108,11 +113,10 @@ def _to_json_custom_weave_type(
             FileCreateReq(project_id=project_id, name=name, content=val)
         )
         file_digests[name] = file_response.digest
-    result: custom_objs.CustomWeaveTypeDict = {
+    result = {
         "_type": encoded["_type"],
         "weave_type": encoded["weave_type"],
         "files": file_digests,
-        "load_op": None,
     }
     load_op_uri = encoded.get("load_op")
     if load_op_uri:
@@ -120,8 +124,8 @@ def _to_json_custom_weave_type(
     return result
 
 
-def _from_json_custom_obj(
-    obj: custom_objs.CustomWeaveTypeDict, project_id: str, server: TraceServerInterface
+def _from_json_custom_weave_type(
+    obj: dict, project_id: str, server: TraceServerInterface
 ) -> Any:
     files = _load_custom_obj_files(project_id, server, obj["files"])
     return custom_objs.decode_custom_obj(obj["weave_type"], files, obj.get("load_op"))
