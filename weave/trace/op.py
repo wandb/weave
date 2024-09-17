@@ -63,6 +63,9 @@ except ImportError:
     CEREBRAS_NOT_GIVEN = None
 
 
+class DisplayNameFuncError(ValueError): ...
+
+
 def print_call_link(call: "Call") -> None:
     if settings.should_print_call_link():
         print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
@@ -122,6 +125,7 @@ class Op(Protocol):
     """
 
     name: str
+    call_display_name: Union[str, Callable[["Call"], str]]
     signature: inspect.Signature
     ref: Optional[ObjectRef]
     resolve_fn: Callable
@@ -193,6 +197,7 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
         func,
         inputs_with_defaults,
         parent_call,
+        display_name=func.call_display_name,
         attributes=attributes,
     )
 
@@ -343,6 +348,27 @@ def op(func: Any) -> Op: ...
 @overload
 def op(
     *,
+    call_display_name: Union[str, Callable[["Call"], str]],
+) -> Callable[[Any], Op]:
+    """Use call_display_name to set the display name of the traced call.
+
+    When set as a callable, the callable must take in a Call object
+    (which can have attributes like op_name, trace_id, etc.) and return
+    the string to be used as the display name of the traced call."""
+    ...
+
+
+# type ignore here is because we have the legacy decorators above.  Once they are
+# removed, we can remove the overloads this type ignore.
+@overload
+def op(*, name: str) -> Callable[[Any], Op]:  # type: ignore
+    """Use name to set the name of the op itself."""
+    ...
+
+
+@overload
+def op(
+    *,
     postprocess_inputs: Callable[[dict[str, Any]], dict[str, Any]],
     postprocess_output: Callable[..., Any],
 ) -> Any:
@@ -426,14 +452,14 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
             # Tack these helpers on to our wrapper
             wrapper.resolve_fn = func  # type: ignore
 
-            name = func.__qualname__ if is_method else func.__name__
+            inferred_name = func.__qualname__ if is_method else func.__name__
 
             # funcs and methods defined inside another func will have the
             # name prefixed with {outer}.<locals>.{func_name}
             # this is noisy for us, so we strip it out
-            name = name.split(".<locals>.")[-1]
+            inferred_name = inferred_name.split(".<locals>.")[-1]
 
-            wrapper.name = name  # type: ignore
+            wrapper.name = kwargs.get("name", inferred_name)  # type: ignore
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
 
@@ -451,12 +477,19 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
             wrapper._tracing_enabled = True  # type: ignore
 
+            if callable(call_name_func := kwargs.get("call_display_name")):
+                params = inspect.signature(call_name_func).parameters
+                if len(params) != 1:
+                    raise DisplayNameFuncError(
+                        "`call_display_name` function must take exactly 1 argument (the Call object)"
+                    )
+            wrapper.call_display_name = call_name_func  # type: ignore
+
             return cast(Op, wrapper)
 
         return create_wrapper(func)
 
     if len(args) == 1 and len(kwargs) == 0 and callable(func := args[0]):
-        # return wrap(args[0])
         return op_deco(func)
 
     return op_deco

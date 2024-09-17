@@ -90,6 +90,27 @@ export const ObjectViewer = ({
     setExpandedRefs(eRefs => ({...eRefs, [path]: ref}));
   }, []);
 
+  // This effect will ensure that all "expandedIds" whose value is a ref
+  // have the ref added to the `expandedRefs` state.
+  useEffect(() => {
+    const expandRefsToAdd: {[path: string]: string} = {};
+    const mapper = (context: TraverseContext) => {
+      const contextPath = context.path.toString();
+      if (
+        expandedIds.includes(contextPath) &&
+        isWeaveRef(context.value) &&
+        expandedRefs[contextPath] == null
+      ) {
+        expandRefsToAdd[contextPath] = context.value;
+      }
+      return context.value;
+    };
+    mapObject(resolvedData, mapper);
+    if (Object.keys(expandRefsToAdd).length > 0) {
+      setExpandedRefs(eRefs => ({...eRefs, ...expandRefsToAdd}));
+    }
+  }, [resolvedData, expandedIds, expandedRefs, setExpandedRefs]);
+
   // `refs` is the union of `dataRefs` and the refs in `expandedRefs`.
   const refs = useMemo(() => {
     return Array.from(new Set([...dataRefs, ...Object.values(expandedRefs)]));
