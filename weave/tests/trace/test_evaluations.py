@@ -704,13 +704,13 @@ async def test_eval_with_complex_types(client):
     res = await evaluation.evaluate(model_func)
     assert res.get("function_score", {}).get("true_count") == 1
 
-    # LEAVING HERE: This will be fixed in a follow up PR
     # Before this test (and fix) we were making extra requests
     # to reconstruct the table and objects in the evaluation.\
     # These assertions ensure that we aren't making those extra requests.
     # There is no reason to query the table, objects, or files
     # as everything is in memory
-    # access_log = client.server.attribute_access_log
+    access_log = client.server.attribute_access_log
+    # LEAVING HERE: This will be fixed in a follow up PR
     # assert "table_query" not in access_log
-    # assert "obj_read" not in access_log
-    # assert "file_content_read" not in access_log
+    assert "obj_read" not in access_log
+    assert "file_content_read" not in access_log
