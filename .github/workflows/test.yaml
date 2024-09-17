@@ -54,7 +54,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install tox
       - name: Run tox
-        env:
         run: tox -e lint
 
   weavejs-lint-compile:
