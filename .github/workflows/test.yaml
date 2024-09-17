@@ -76,6 +76,8 @@ jobs:
   test2:
     name: Tox tests
     runs-on: ubuntu-latest
+    needs:
+      - build-container
     strategy:
       matrix:
         python-version-major: ['3']
@@ -103,6 +105,27 @@ jobs:
             'openai',
           ]
       fail-fast: false
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-client:${{ github.sha }}
+    services:
+      wandbservice:
+        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
+        credentials:
+          username: _json_key
+          password: ${{ secrets.gcp_wb_sa_key }}
+        env:
+          CI: 1
+          WANDB_ENABLE_TEST_CONTAINER: true
+        ports:
+          - '8080:8080'
+          - '8083:8083'
+          - '9015:9015'
+        options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
+      weave_clickhouse:
+        image: clickhouse/clickhouse-server
+        ports:
+          - '8123:8123'
+        options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
