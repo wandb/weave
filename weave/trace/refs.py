@@ -28,10 +28,15 @@ class TableRef(Ref):
     _blocking_digest_resolver: Optional[Callable[[], str]] = dataclasses.field(
         default=None, repr=False
     )
+    _blocking_row_digests_resolver: Optional[Callable[[], list[str]]] = (
+        dataclasses.field(default=None, repr=False)
+    )
 
     def __post_init__(self) -> None:
         if self._blocking_digest_resolver is not None:
             object.__setattr__(self, "digest", "")
+        if self._blocking_row_digests_resolver is not None:
+            object.__setattr__(self, "row_digests", None)
 
     def as_dict(self) -> dict:
         # Needed to not accidentally block on resolving the digest
@@ -39,10 +44,17 @@ class TableRef(Ref):
             digest = ""
         else:
             digest = self.digest
+
+        if self._blocking_row_digests_resolver is not None:
+            row_digests = None
+        else:
+            row_digests = self.row_digests
+
         return {
             "entity": self.entity,
             "project": self.project,
             "digest": digest,
+            "row_digests": row_digests,
         }
 
     def __getattribute__(self, item: str) -> Any:
@@ -54,6 +66,15 @@ class TableRef(Ref):
             digest = resolver()
             object.__setattr__(self, "digest", digest)
             object.__setattr__(self, "_blocking_digest_resolver", None)
+        elif (
+            item == "row_digests"
+            and object.__getattribute__(self, "_blocking_row_digests_resolver")
+            is not None
+        ):
+            resolver = object.__getattribute__(self, "_blocking_row_digests_resolver")
+            row_digests = resolver()
+            object.__setattr__(self, "row_digests", row_digests)
+            object.__setattr__(self, "_blocking_row_digests_resolver", None)
         return object.__getattribute__(self, item)
 
     def uri(self) -> str:
@@ -77,6 +98,7 @@ class RefWithExtra(Ref):
         return self.with_extra((LIST_INDEX_EDGE_NAME, str(index)))
 
     def with_item(self, item_digest: str) -> "RefWithExtra":
+        # TODO: Figure out how to let this accept a Future[str]
         return self.with_extra((TABLE_ROW_ID_EDGE_NAME, f"{item_digest}"))
 
 

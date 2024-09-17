@@ -320,6 +320,7 @@ class WeaveTable(Traceable):
         if len(self.table_ref.row_digests) != len(self._prefetched_rows):
             raise ValueError("Ref row digests do not match prefetched rows")
 
+        # TODO: pass along the Future[str] as digests
         for ndx, item in enumerate(self.table_ref.row_digests):
             new_ref = self.ref.with_item(item)
             val = self._prefetched_rows[ndx]

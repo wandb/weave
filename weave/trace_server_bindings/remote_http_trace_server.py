@@ -107,6 +107,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self.call_processor = AsyncBatchProcessor(self._flush_calls)
         self._auth: t.Optional[t.Tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
+        self._remote_openapi_spec = None
 
     def ensure_project_exists(
         self, entity: str, project: str
@@ -253,6 +254,58 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         r = requests.get(self.trace_server_url + "/server_info")
         r.raise_for_status()
         return ServerInfoRes.model_validate(r.json())
+
+    @tenacity.retry(
+        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        wait=tenacity.wait_exponential_jitter(
+            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
+        ),
+        retry=tenacity.retry_if_exception(_is_retryable_exception),
+        before_sleep=_log_retry,
+        retry_error_callback=_log_failure,
+        reraise=True,
+    )
+    def openapi_spec(self) -> t.Optional[dict]:
+        if self._remote_openapi_spec is None:
+            r = requests.get(self.trace_server_url + "/openapi.json")
+            r.raise_for_status()
+            self._remote_openapi_spec = r.json()
+        return self._remote_openapi_spec
+
+    def table_create_returns_digests(self) -> bool:
+        openapi_spec = self.openapi_spec()
+        if openapi_spec is None:
+            return False
+        try:
+            type_ref = (
+                openapi_spec.get("paths", {})
+                .get("/table/create", {})
+                .get("post", {})
+                .get("responses", {})
+                .get("200", {})
+                .get("content", {})
+                .get("application/json", {})
+                .get("schema", {})
+                .get("$ref")
+            )
+            if type_ref is None:
+                return False
+            prefix = "#/components/schemas/"
+            if not type_ref.startswith(prefix):
+                return False
+            type_ref = type_ref[len(prefix) :]
+            type_schema = (
+                openapi_spec.get("components", {}).get("schemas", {}).get(type_ref)
+            )
+            if type_schema is None:
+                return False
+            return type_schema.get("properties", {}).get("row_digests") is not None
+        except Exception as e:
+            logger.error(
+                f"Error determining server schema for (POST /table/create): {e}"
+            )
+
+        return False
 
     # Call API
     def call_start(

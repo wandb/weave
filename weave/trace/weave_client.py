@@ -1174,22 +1174,26 @@ class WeaveClient:
             ),
         )
 
-        # row_digests: Optional[list[str]] = None
-        # # This check is needed because in older versions of
-        # # the trace server, this will come back as an empty list.
-        # # In these cases, we want to set row_digests to None so that
-        # # the WeaveTable knows that it needs to fetch the rows from the server.
-        # if len(response.row_digests) == len(table.rows):
-        #     row_digests = response.row_digests
+        server_supports_row_digest = True
+        if isinstance(self.server, RemoteHTTPTraceServer):
+            # This is blocking, but cached after the first call
+            server_supports_row_digest = self.server.table_create_returns_digests()
 
         def blocking_digest_resolver() -> str:
             return response.result().digest
+
+        blocking_row_digests_resolver = None
+        if server_supports_row_digest:
+
+            def blocking_row_digests_resolver() -> list[str]:
+                return response.result().row_digests
 
         return TableRef(
             entity=self.entity,
             project=self.project,
             digest="",
             _blocking_digest_resolver=blocking_digest_resolver,
+            _blocking_row_digests_resolver=blocking_row_digests_resolver,
         )
 
     @trace_sentry.global_trace_sentry.watch()
