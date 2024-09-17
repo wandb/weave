@@ -20,9 +20,9 @@ title: Handling and Redacting PII
 
 In this tutorial, we'll demonstrate how to utilize Weave while preventing your Personally Identifiable Information (PII) data from being incorporated into Weave or the LLMs you employ.
 
-To protect our PII data, we'll employ a couple techniques. First, we'll use regular expressions to identify PII data and redact it. Second, we'll use Microsoft's [Presidio](https://microsoft.github.io/presidio/), python-based data protection SDK. This tool provides redaction and replacement functionalities, both of which we will implement in this tutorial.
+To protect our PII data, we'll employ a couple techniques. First, we'll use regular expressions to identify PII data and redact it. Second, we'll use Microsoft's [Presidio](https://microsoft.github.io/presidio/), a python-based data protection SDK. This tool provides redaction and replacement functionalities, both of which we will implement in this tutorial.
 
-For this use-case. We will leverage Anthropic's Claude Sonnet to perform sentiment analysis. While we use Weave's [Traces](https://wandb.github.io/weave/quickstart) to track and analize the LLM's API calls. Sonnet will receivea block of text and output one of the following sentiment classifications:
+For this use-case. We will leverage Anthropic's Claude Sonnet to perform sentiment analysis. While we use Weave's [Traces](https://wandb.github.io/weave/quickstart) to track and analize the LLM's API calls. Sonnet will receive a block of text and output one of the following sentiment classifications:
 1. positive
 2. negative
 3. neutral
