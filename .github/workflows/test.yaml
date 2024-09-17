@@ -105,7 +105,6 @@ jobs:
             'openai',
           ]
       fail-fast: false
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-client:${{ github.sha }}
     services:
       wandbservice:
         image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
