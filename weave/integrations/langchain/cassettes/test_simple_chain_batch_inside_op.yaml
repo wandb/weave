@@ -1,0 +1,51 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      User-Agent:
+      - sentry.python/1.11.0
+      X-Sentry-Auth:
+      - Sentry sentry_key=99697cf8ca5158250d3dd6cb23cca9b0, sentry_version=7, sentry_client=sentry.python/1.11.0
+    method: POST
+    uri: https://o151352.ingest.us.sentry.io/api/4507019311251456/store/
+  response:
+    body:
+      string: '{"detail":"Sentry dropped data due to a quota or internal rate limit
+        being reached. This will not affect your application. See https://docs.sentry.io/product/accounts/quotas/
+        for more information."}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '198'
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 17 Sep 2024 12:51:31 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 google
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - x-sentry-error,x-sentry-rate-limits,retry-after
+      cross-origin-resource-policy:
+      - cross-origin
+      retry-after:
+      - '60'
+      vary:
+      - origin, access-control-request-method, access-control-request-headers
+      - accept-encoding
+      x-sentry-rate-limits:
+      - 60:default;error;security;attachment:organization:error_usage_exceeded, 60:error:project:project_quota_error_usage_exceeded
+    status:
+      code: 429
+      message: Too Many Requests
+version: 1

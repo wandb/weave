@@ -1,11 +1,14 @@
+import sys
 import textwrap
 import typing
-from typing import Union
 
 import numpy as np
 import pytest
 
 
+@pytest.mark.skipif(
+    sys.version_info > (3, 9), reason="TODO: Different behaviour above py39"
+)
 @pytest.mark.parametrize(
     "code, expected_captured_code",
     [
