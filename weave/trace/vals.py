@@ -265,7 +265,7 @@ class WeaveTable(Traceable):
                 and self._prefetched_rows is not None
             )
             if should_local_iter:
-                self._rows = list(self._local_iter())
+                self._rows = list(self._local_iter_with_remote_fallback())
             else:
                 self._rows = list(self._remote_iter())
         return self._rows
@@ -303,7 +303,7 @@ class WeaveTable(Traceable):
         self._prefetched_rows = None
         super()._mark_dirty()
 
-    def _local_iter(self) -> Generator[dict, None, None]:
+    def _local_iter_with_remote_fallback(self) -> Generator[dict, None, None]:
         """
         This is the case where we:
         1. Have all the rows in memory
@@ -361,7 +361,10 @@ class WeaveTable(Traceable):
             if self._prefetched_rows is not None and len(response.rows) != len(
                 self._prefetched_rows
             ):
-                raise ValueError("Fetched row digests do not match prefetched rows")
+                logger.error(
+                    f"Expected length of response rows ({len(response.rows)}) to match prefetched rows ({len(self._prefetched_rows)}). Ignoring prefetched rows."
+                )
+                self._prefetched_rows = None
 
             for ndx, item in enumerate(response.rows):
                 new_ref = self.ref.with_item(item.digest) if self.ref else None
@@ -369,8 +372,8 @@ class WeaveTable(Traceable):
                 # rows from the server. This is a temporary trick to ensure
                 # we don't re-deserialize the rows on every access. Once all servers
                 # return digests, this branch can be removed because anytime we have prefetched
-                # rows we should also have the digests - and we should be in the _local_iter
-                # case.
+                # rows we should also have the digests - and we should be in the
+                #  _local_iter_with_remote_fallback case.
                 val = (
                     item.val
                     if self._prefetched_rows is None

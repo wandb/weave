@@ -713,3 +713,22 @@ async def test_eval_with_complex_types(client):
     assert "table_query" not in access_log
     assert "obj_read" not in access_log
     assert "file_content_read" not in access_log
+
+    # Verify that the access log does record such requests
+    dataset = evaluation.evaluate.calls()[0].inputs["self"].dataset
+    row = dataset.rows[0]
+
+    assert isinstance(row["image"], Image.Image)
+    # Very SAD: Datasets do not resursively save objects
+    # So this assertion is checking current state, but not
+    # the correct behavior of the dataset (the should be the
+    # MyDataclass, MyModel, and MyObj)
+    assert isinstance(row["dc"], str)  #  MyDataclass
+    assert isinstance(row["model"], str)  #  MyModel
+    assert isinstance(row["obj"], str)  #  MyObj
+    assert isinstance(row["text"], str)
+
+    access_log = client.server.attribute_access_log
+    assert "table_query" in access_log
+    assert "obj_read" in access_log
+    assert "file_content_read" in access_log
