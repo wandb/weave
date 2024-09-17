@@ -43,6 +43,8 @@ class TableRef(Ref):
             "entity": self.entity,
             "project": self.project,
             "digest": digest,
+            "row_digests": self.row_digests,
+            "_blocking_digest_resolver": self._blocking_digest_resolver,
         }
 
     def __getattribute__(self, item: str) -> Any:

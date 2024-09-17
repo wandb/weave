@@ -254,7 +254,6 @@ class Evaluation(Object):
 
     @weave.op()
     async def summarize(self, eval_table: EvaluationResults) -> dict:
-        # Investigate why this is doing a big read here
         eval_table_rows = list(eval_table.rows)
         cols = transpose(eval_table_rows)
         summary = {}

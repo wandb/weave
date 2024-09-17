@@ -90,7 +90,6 @@ def _log_failure(retry_state: tenacity.RetryCallState) -> t.Any:
 
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     trace_server_url: str
-    # async_job_queue: AsyncJobQueue
 
     # My current batching is not safe in notebooks, disable it for now
     def __init__(
