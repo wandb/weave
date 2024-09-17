@@ -710,7 +710,6 @@ async def test_eval_with_complex_types(client):
     # There is no reason to query the table, objects, or files
     # as everything is in memory
     access_log = client.server.attribute_access_log
-    # LEAVING HERE: This will be fixed in a follow up PR
-    # assert "table_query" not in access_log
+    assert "table_query" not in access_log
     assert "obj_read" not in access_log
     assert "file_content_read" not in access_log

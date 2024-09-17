@@ -1083,8 +1083,14 @@ class WeaveClient:
                 table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
             )
         )
+        row_digests: Optional[list[str]] = None
+        if len(response.row_digests) == len(table.rows):
+            row_digests = response.row_digests
         return TableRef(
-            entity=self.entity, project=self.project, digest=response.digest
+            entity=self.entity,
+            project=self.project,
+            digest=response.digest,
+            row_digests=row_digests,
         )
 
     @trace_sentry.global_trace_sentry.watch()
