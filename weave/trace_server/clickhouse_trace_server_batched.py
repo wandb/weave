@@ -515,17 +515,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         raise NotImplementedError()
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        conds = ["is_op = 1"]
-        heavy_conds = [
+        conds = [
             "object_id = {name: String}",
             "digest = {version_hash: String}",
+            "is_op = 1",
         ]
         parameters = {"name": req.name, "digest": req.digest}
         objs = self._select_objs_query(
-            req.project_id,
-            conditions=conds,
-            heavy_conditions=heavy_conds,
-            parameters=parameters,
+            req.project_id, conditions=conds, parameters=parameters
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
@@ -535,20 +532,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         parameters = {}
         conds: list[str] = ["is_op = 1"]
-        heavy_conds: list[str] = []
         if req.filter:
             if req.filter.op_names:
-                heavy_conds.append("object_id IN {op_names: Array(String)}")
+                conds.append("object_id IN {op_names: Array(String)}")
                 parameters["op_names"] = req.filter.op_names
-
-            if req.filter.latest_only:
-                conds.append("is_latest = 1")
 
         ch_objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
-            heavy_conditions=heavy_conds,
             parameters=parameters,
+            is_latest=req.filter.latest_only,
         )
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
@@ -576,24 +569,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds = []
-        heavy_conds = ["object_id = {object_id: String}"]
+        conds = ["object_id = {object_id: String}"]
         parameters: Dict[str, Union[str, int]] = {"object_id": req.object_id}
+        is_latest = False
         if req.digest == "latest":
-            conds.append("is_latest = 1")
+            is_latest = True
         else:
             (is_version, version_index) = _digest_is_version_like(req.digest)
             if is_version:
                 conds.append("version_index = {version_index: UInt64}")
                 parameters["version_index"] = version_index
             else:
-                heavy_conds.append("digest = {version_digest: String}")
+                conds.append("digest = {version_digest: String}")
                 parameters["version_digest"] = req.digest
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
-            heavy_conditions=heavy_conds,
             parameters=parameters,
+            is_latest=is_latest,
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
@@ -602,7 +595,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conds: list[str] = []
-        heavy_conds: list[str] = []
         parameters = {}
         if req.filter:
             if req.filter.is_op is not None:
@@ -611,10 +603,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 else:
                     conds.append("is_op = 0")
             if req.filter.object_ids:
-                heavy_conds.append("object_id IN {object_ids: Array(String)}")
+                conds.append("object_id IN {object_ids: Array(String)}")
                 parameters["object_ids"] = req.filter.object_ids
-            if req.filter.latest_only:
-                conds.append("is_latest = 1")
             if req.filter.base_object_classes:
                 conds.append(
                     "base_object_class IN {base_object_classes: Array(String)}"
@@ -624,8 +614,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
-            heavy_conditions=heavy_conds,
             parameters=parameters,
+            is_latest=req.filter.latest_only,
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
@@ -944,7 +934,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conditions = [combine_conditions(conds, "OR")]
                 objs = self._select_objs_query(
                     project_id=project_id_scope,
-                    heavy_conditions=conditions,
+                    conditions=conditions,
                     parameters=parameters,
                 )
                 for obj in objs:
@@ -1381,17 +1371,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         conditions: Optional[list[str]] = None,
-        heavy_conditions: Optional[list[str]] = None,
         limit: Optional[int] = None,
         parameters: Optional[Dict[str, Any]] = None,
+        is_latest: bool = False,
     ) -> list[SelectableCHObjSchema]:
         if not conditions:
             conditions = ["1 = 1"]
-        if not heavy_conditions:
-            heavy_conditions = ["1 = 1"]
 
         conditions_part = combine_conditions(conditions, "AND")
-        heavy_conditions_part = combine_conditions(heavy_conditions, "AND")
+        is_latest_part = "AND is_latest = 1" if is_latest else ""
 
         limit_part = ""
         if limit != None:
@@ -1424,7 +1412,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     refs,
                     val_dump,
                     digest,
-                    if (kind = 'op', 1, 0) AS is_op,
+                    is_op,
                     row_number() OVER (
                         PARTITION BY project_id,
                         kind,
@@ -1435,6 +1423,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     if(version_index + 1 = version_count, 1, 0) AS is_latest
                 FROM (
                     SELECT *,
+                        if (kind = 'op', 1, 0) AS is_op,
                         row_number() OVER (
                             PARTITION BY project_id,
                             kind,
@@ -1444,12 +1433,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         ) AS rn
                     FROM object_versions
                     WHERE project_id = {{project_id: String}}
-                       AND {heavy_conditions_part}
+                       AND {conditions_part}
                 )
                 WHERE rn = 1
             )
-            WHERE project_id = {{project_id: String}} AND
-               {conditions_part}
+            WHERE project_id = {{project_id: String}}
+            {is_latest_part}
             {limit_part}
         """,
             {"project_id": project_id, **parameters},
