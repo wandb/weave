@@ -1,4 +1,7 @@
-import Autocomplete, {AutocompleteProps} from '@mui/material/Autocomplete';
+import Autocomplete, {
+  AutocompleteProps,
+  createFilterOptions,
+} from '@mui/material/Autocomplete';
 import {createTheme, ThemeProvider} from '@mui/material/styles';
 import React from 'react';
 
@@ -43,7 +46,6 @@ const getStyles = (props: AdditionalProps) => {
         styleOverrides: {
           root: {
             height: HEIGHTS[size],
-            padding: PADDING[size],
             fontSize: FONT_SIZES[size],
             fontFamily: 'Source Sans Pro',
             minWidth: '100px',
@@ -67,12 +69,25 @@ const getStyles = (props: AdditionalProps) => {
           },
         },
       },
+      MuiInputBase: {
+        styleOverrides: {
+          inputMultiline: {
+            whiteSpace: 'normal', // Allow text to wrap
+            overflow: 'hidden', // Hide scrollbars
+            textOverflow: 'ellipsis', // Show ellipsis when overflowing
+            display: '-webkit-box',
+            WebkitLineClamp: 3, // Limit number of lines
+            WebkitBoxOrient: 'vertical',
+          },
+        },
+      },
       MuiAutocomplete: {
         styleOverrides: {
           root: {
+            // height: '20px',
             '&.MuiAutocomplete-hasPopupIcon .MuiOutlinedInput-root, &.MuiAutocomplete-hasClearIcon .MuiOutlinedInput-root':
               {
-                paddingRight: props.showEndIcon ? '28px' : '0px', // Apply padding only if input exists
+                paddingRight: props.hasInputValue ? '28px' : '0px', // Apply padding only if input exists
               },
           },
           option: {
@@ -140,7 +155,7 @@ type AdditionalProps = {
   size?: SelectSize;
   isDarkMode?: boolean;
   maxWidth?: number;
-  showEndIcon?: boolean;
+  hasInputValue?: boolean;
 };
 
 export const AutoComplete = <Option,>(
