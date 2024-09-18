@@ -21,7 +21,7 @@ export default defineConfig(({mode, command}) => {
    * and app/src/config.ts
    */
 
-  const host = process.env.HOST;
+  const host = process.env.WEAVE_POD_BASE_URL ?? process.env.HOST;
   const port = process.env.PORT
     ? Number.parseInt(process.env.PORT, 10)
     : undefined;
