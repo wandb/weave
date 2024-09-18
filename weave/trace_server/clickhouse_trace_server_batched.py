@@ -1383,7 +1383,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conditions = ["1 = 1"]
 
         conditions_part = combine_conditions(conditions, "AND")
-        is_latest_part = "is_latest = 1" if is_latest else ""
+        is_latest_part = "is_latest = 1" if is_latest else "1 = 1"
 
         limit_part = ""
         if limit != None:
@@ -1441,7 +1441,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 WHERE rn = 1 AND
                     {conditions_part}
             )
-            {is_latest_part}
+            WHERE {is_latest_part}
             {limit_part}
         """,
             {"project_id": project_id, **parameters},
