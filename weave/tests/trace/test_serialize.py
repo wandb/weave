@@ -5,6 +5,7 @@ from weave.trace import serialize
 
 
 def test_serialize_caching(client):
+    serialize._custom_weave_type_cache_map[client._project_id()].reset()
     img = Image.new("RGB", (100, 100))
     serialized_img = serialize._to_json_custom_weave_type(
         img, client._project_id(), client.server

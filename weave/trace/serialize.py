@@ -107,7 +107,8 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
 # Importantly we can actually cache the results of both directions so that we
 # don't have to do the work more than once.
 
-# Initialize the global cache
+# Initialize the global cache - consider making this a context var or even part of the WeaveClient
+# so that testing can be better isolated
 _custom_weave_type_cache_map: DefaultDict[str, CustomWeaveTypeSerializationCache] = (
     defaultdict(CustomWeaveTypeSerializationCache)
 )

@@ -125,7 +125,6 @@ class WeakKeyDictionarySupportingNonHashableKeys(Generic[K, V]):
         Args:
             item_id (int): The id of the item to remove.
         """
-        print("removing item", item_id)
         self._id_to_data.pop(item_id, None)
         self._id_to_key.pop(item_id, None)
 
@@ -145,10 +144,6 @@ class WeakKeyDictionarySupportingNonHashableKeys(Generic[K, V]):
         Returns:
             int: The number of items in the dictionary.
         """
-        print("len", len(self._id_to_data))
-        print("len key", len(self._id_to_key))
-        print("len data values", self._id_to_data.values())
-        print("len key values", self._id_to_key.values())
         return len(self._id_to_data)
 
     def keys(self) -> Iterator[K]:
