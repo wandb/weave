@@ -148,7 +148,6 @@ jobs:
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
           tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }} -- \
-            -n4 \
             -m "weave_client and not skip_clickhouse_client" \
             --weave-server=clickhouse
       - name: Run tox (Clickhouse Only)
@@ -159,8 +158,7 @@ jobs:
           WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
-          tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }} -- \
-            -n4
+          tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }}
 
   test:
     name: Python unit tests
@@ -243,80 +241,3 @@ jobs:
           --ddtrace \
           --durations=5 \
           ./legacy
-
-  # nbmake:
-  #   name: Run notebooks with nbmake
-  #   runs-on: self-hosted
-  #   container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
-  #   steps:
-  #     - uses: actions/checkout@v2
-
-  #     - name: Run notebooks
-  #       run: source /root/venv/bin/activate && export PYTHONPATH=$(pwd) && pytest -n=4 --nbmake --overwrite examples
-  #     - name: Upload executed notebooks
-  #       uses: actions/upload-artifact@v3
-  #       if: always()
-  #       with:
-  #         name: notebooks
-  #         path: examples
-
-  # cypress-run:
-  #   name: Notebook and UI tests
-  #   timeout-minutes: 25 # 15 minute timeout routinely trips on rerun
-  #   needs:
-  #     - build-container
-  #     # - lint
-  #     # - test
-  #   if: always()
-  #   # runs-on: [self-hosted, gke-runner]
-  #   runs-on: ubuntu-latest
-
-  #   container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
-
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       containers: [1, 2, 3, 4, 5, 6]
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - name: Setup W&B API key
-  #       run: echo "WANDB_API_KEY=${{ secrets.WANDB_API_KEY }}" >> $GITHUB_ENV
-  #     - name: Setup Replicate API token
-  #       run: echo "REPLICATE_API_TOKEN=${{ secrets.REPLICATE_API_TOKEN }}" > $GITHUB_ENV
-  #     - name: Copy node_modules from container to checkout
-  #       run: cp -R /root/integration_test/node_modules ./integration_test/
-  #     - name: Activate venv
-  #       run: source /root/venv/bin/activate && echo "PATH=$PATH" >> $GITHUB_ENV
-  #     - name: Make Log Dir
-  #       run: mkdir -p /tmp/weave/log
-  #     - name: Copy over built assets
-  #       run: cp -r /root/weave-js-build/* ./weave/frontend
-  #     - name: Start weave server
-  #       # github actions does something funky with the std file descriptors, they end up
-  #       # being closed. tqdm (for example) raises an exception when the descriptor it
-  #       # wants to write to is closed.
-  #       run: nohup ./scripts/weave_server_test.sh < /dev/null &> /tmp/weave/log/stdout.log &
-  #       shell: bash
-  #     - name: Cypress run
-  #       # Use the following to run just a single test
-  #       # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --browser replay-chromium --spec "cypress/e2e/notebooks/Ops that return images.cy.ts"
-  #       # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --browser replay-chromium
-  #       run: export PYTHONPATH=$(pwd) && cd integration_test &&  npx cypress run --browser chrome
-  #       # uses: cypress-io/github-action@v4
-  #       # with:
-  #       #   working-directory: ./integration_testG
-  #       #   record: true
-  #       #   parallel: true
-  #       env:
-  #         REPLAY_API_KEY: ${{ secrets.REPLAY_API_KEY }}
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #         SPLIT: ${{ strategy.job-total }}
-  #         SPLIT_INDEX: ${{ strategy.job-index }}
-  #         # - uses: actions/upload-artifact@v3
-  #     - name: Upload logs
-  #       uses: actions/upload-artifact@v3
-  #       if: failure()
-  #       with:
-  #         name: weave-server-logs
-  #         path: /tmp/weave/log
-  #         retention-days: 3
