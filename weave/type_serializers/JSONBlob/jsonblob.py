@@ -1,13 +1,12 @@
 import json
 from typing import Any
 
-from pydantic import BaseModel
-
+from weave.flow.obj import Object
 from weave.trace import serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
 
 
-class JSONBlob(BaseModel):
+class JSONBlob(Object):
     obj: Any
     size: int
 

@@ -60,7 +60,6 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
-from weave.type_serializers.JSONBlob.jsonblob import JSONBlob
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -572,11 +571,11 @@ class WeaveClient:
             op_str = op
 
         inputs_redacted = redact_sensitive_keys(inputs)
-        inputs_converted = replace_large_objects(inputs_redacted)
         if op.postprocess_inputs:
-            inputs_postprocessed = op.postprocess_inputs(inputs_converted)
+            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
         else:
-            inputs_postprocessed = inputs_converted
+            inputs_postprocessed = inputs_redacted
+        inputs_postprocessed = replace_large_objects(inputs_redacted)
 
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
@@ -1344,11 +1343,14 @@ def replace_large_objects(obj: Any, max_size: int = 1 * 1024**2) -> Any:
     if not isinstance(obj, (str, list, dict, tuple)):
         return obj
 
+    # defer import because of weave.Object circular dependency
+    from weave.type_serializers.JSONBlob.jsonblob import JSONBlob
+
     if isinstance(obj, list):
         list_res = []
         for v in obj:
             # TODO: casting as str is not actually the real size of the object
-            # its close, but not actually the json dump. What is more performant?
+            # its close, but not actually the json dump.
             if size := len(str(v).encode("utf-8")) > max_size:
                 v = JSONBlob(obj=v, size=size)
             list_res.append(v)
