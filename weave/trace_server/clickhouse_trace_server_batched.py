@@ -1441,8 +1441,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 WHERE rn = 1 AND
                     {conditions_part}
             )
-            WHERE project_id = {{project_id: String}} AND
-                {is_latest_part}
+            {is_latest_part}
             {limit_part}
         """,
             {"project_id": project_id, **parameters},
