@@ -34,8 +34,7 @@ export const makeGorillaApolloClient = (
   if (
     window.WEAVE_CONFIG.WANDB_POD_BASE_URL !== '' &&
     window.WEAVE_CONFIG.WANDB_POD_BASE_URL !==
-      window.WEAVE_CONFIG.WANDB_BASE_URL &&
-    gorillaApolloEndpoint.includes(window.WEAVE_CONFIG.WANDB_BASE_URL)
+      window.WEAVE_CONFIG.WANDB_BASE_URL
   ) {
     endpoint = `${window.WEAVE_CONFIG.WANDB_POD_BASE_URL}/graphql`;
   }

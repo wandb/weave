@@ -41,6 +41,7 @@ interface Config {
   backendWeaveExecutionUrl(shadow?: boolean): string;
   backendWeaveViewerUrl(): string;
   backendWeaveOpsUrl(): string;
+  WANDB_POD_BASE_URL: string;
 }
 
 const WEAVE_BACKEND_HOST = window.WEAVE_CONFIG.WEAVE_BACKEND_HOST;
@@ -92,6 +93,7 @@ const DEFAULT_CONFIG: Config = {
   WANDB_BASE_URL: window.WEAVE_CONFIG.WANDB_BASE_URL,
   ENV_IS_CI: window.WEAVE_CONFIG.ENV_IS_CI,
   TRACE_BACKEND_BASE_URL: window.WEAVE_CONFIG.TRACE_BACKEND_BASE_URL,
+  WANDB_POD_BASE_URL: window.WEAVE_CONFIG.WANDB_POD_BASE_URL,
 } as const;
 
 let config = {...DEFAULT_CONFIG};
