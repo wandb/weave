@@ -571,10 +571,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds = ["object_id = {object_id: String}"]
         parameters: Dict[str, Union[str, int]] = {"object_id": req.object_id}
-        is_latest = False
-        if req.digest == "latest":
-            is_latest = True
-        else:
+        is_latest = req.digest == "latest"
+        if not is_latest:
             (is_version, version_index) = _digest_is_version_like(req.digest)
             if is_version:
                 conds.append("version_index = {version_index: UInt64}")
@@ -1437,7 +1435,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
                 WHERE rn = 1
             )
-            WHERE project_id = {{project_id: String}}
             {is_latest_part}
             {limit_part}
         """,
