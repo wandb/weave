@@ -1080,6 +1080,11 @@ class WeaveClient:
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
             ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
+            # Personally, i think we should be passing `obj` into _save_object_basic,
+            # and letting `to_json` handle converting the pydantic object into a jsonable object
+            # but that might have unintended consequences. As a result, we break the
+            # typical pattern and explicitly set the ref here.
+            set_ref(obj, ref)
 
         # Case 2: Op:
         # Here we save the op itself.
