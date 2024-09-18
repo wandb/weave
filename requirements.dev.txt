@@ -5,7 +5,7 @@ types-setuptools>=65.7.0.3
 pre-commit>=3.3.3
 black==22.3.0
 types-aiofiles>=22.1.0.6
-# Our mypy step in pre-commit depends on types-all. types-all depends on types-pkg-resources. 
+# Our mypy step in pre-commit depends on types-all. types-all depends on types-pkg-resources.
 # All of the versions of types-pkg-resources were yanked: https://pypi.org/project/types-pkg-resources/#history
 # Hardpinning 1.0.0 for now.
 types-all==1.0.0
@@ -23,4 +23,6 @@ types-Flask-Cors
 build
 twine
 lazydocs
+playwright
 nbconvert
+bump-my-version

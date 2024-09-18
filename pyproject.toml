@@ -113,3 +113,37 @@ exclude = [
   "weave/legacy/**/*.py",
   "examples",
 ]
+
+[tool.bumpversion]
+current_version = "0.51.8-dev0"
+parse = """(?x)
+    (?P<major>0|[1-9]\\d*)\\.
+    (?P<minor>0|[1-9]\\d*)\\.
+    (?P<patch>0|[1-9]\\d*)
+    (?:
+        -                             # dash separator for pre-release section
+        (?P<pre_l>[a-zA-Z-]+)         # pre-release label
+        (?P<pre_n>0|[1-9]\\d*)        # pre-release version number
+    )?                                # pre-release section is optional
+"""
+serialize = [
+    "{major}.{minor}.{patch}-{pre_l}{pre_n}",
+    "{major}.{minor}.{patch}",
+]
+search = "{current_version}"
+replace = "{new_version}"
+regex = false
+ignore_missing_version = false
+ignore_missing_files = false
+tag = false
+sign_tags = false
+tag_name = "v{new_version}"
+tag_message = "Release version: {current_version} → {new_version}"
+allow_dirty = false
+commit = false
+message = "Release version: {current_version} → {new_version}"
+commit_args = ""
+
+[tool.bumpversion.parts.pre_l]
+values = ["dev", "final"]
+optional_value = "final"
