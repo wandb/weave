@@ -83,38 +83,38 @@ def test_objs_query_filter_limit_offset_sort_by_created_at(client: WeaveClient):
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(latest_only=True),
             limit=3,
             offset=5,
-            latest_only=True,
             sort_by=[tsi.SortBy(field="created_at", direction="desc")],
         )
     )
     assert len(res.objs) == 3
     assert all([obj.is_latest for obj in res.objs])
     assert res.objs[0].val["j"] == 9
-    assert res.objs[0].val["i"] == 9
+    assert res.objs[0].val["i"] == 4
     assert res.objs[1].val["j"] == 9
-    assert res.objs[1].val["i"] == 8
+    assert res.objs[1].val["i"] == 3
     assert res.objs[2].val["j"] == 9
-    assert res.objs[2].val["i"] == 7
+    assert res.objs[2].val["i"] == 2
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(latest_only=True),
             limit=3,
             offset=5,
-            latest_only=True,
             sort_by=[tsi.SortBy(field="created_at", direction="asc")],
         )
     )
     assert len(res.objs) == 3
     assert all([obj.is_latest for obj in res.objs])
     assert res.objs[0].val["j"] == 9
-    assert res.objs[0].val["i"] == 0
+    assert res.objs[0].val["i"] == 5
     assert res.objs[1].val["j"] == 9
-    assert res.objs[1].val["i"] == 1
+    assert res.objs[1].val["i"] == 6
     assert res.objs[2].val["j"] == 9
-    assert res.objs[2].val["i"] == 2
+    assert res.objs[2].val["i"] == 7
 
 
 def test_objs_query_filter_limit_offset_sort_by_object_id(client: WeaveClient):
@@ -123,35 +123,35 @@ def test_objs_query_filter_limit_offset_sort_by_object_id(client: WeaveClient):
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(latest_only=True),
             limit=3,
             offset=5,
-            latest_only=True,
             sort_by=[tsi.SortBy(field="object_id", direction="desc")],
         )
     )
     assert len(res.objs) == 3
     assert all([obj.is_latest for obj in res.objs])
     assert res.objs[0].val["j"] == 9
-    assert res.objs[0].val["i"] == 9
+    assert res.objs[0].val["i"] == 4
     assert res.objs[1].val["j"] == 9
-    assert res.objs[1].val["i"] == 8
+    assert res.objs[1].val["i"] == 3
     assert res.objs[2].val["j"] == 9
-    assert res.objs[2].val["i"] == 7
+    assert res.objs[2].val["i"] == 2
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(latest_only=True),
             limit=3,
             offset=5,
-            latest_only=True,
             sort_by=[tsi.SortBy(field="object_id", direction="asc")],
         )
     )
     assert len(res.objs) == 3
     assert all([obj.is_latest for obj in res.objs])
     assert res.objs[0].val["j"] == 9
-    assert res.objs[0].val["i"] == 0
+    assert res.objs[0].val["i"] == 5
     assert res.objs[1].val["j"] == 9
-    assert res.objs[1].val["i"] == 1
+    assert res.objs[1].val["i"] == 6
     assert res.objs[2].val["j"] == 9
-    assert res.objs[2].val["i"] == 2
+    assert res.objs[2].val["i"] == 7
