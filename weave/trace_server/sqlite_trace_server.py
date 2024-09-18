@@ -670,6 +670,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conds: list[str] = []
+        parameters: Dict[str, Any] = {}
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
@@ -677,17 +678,22 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 else:
                     conds.append("kind != 'op'")
             if req.filter.object_ids:
-                in_list = ", ".join([f"'{n}'" for n in req.filter.object_ids])
-                conds.append(f"object_id IN ({in_list})")
+                placeholders = ",".join(["?" for _ in req.filter.object_ids])
+                conds.append(f"object_id IN ({placeholders})")
+                parameters["object_ids"] = req.filter.object_ids
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
             if req.filter.base_object_classes:
-                in_list = ", ".join([f"'{t}'" for t in req.filter.base_object_classes])
-                conds.append(f"base_object_class IN ({in_list})")
+                placeholders = ",".join(["?" for _ in req.filter.base_object_classes])
+                conds.append(f"base_object_class IN ({placeholders})")
+                parameters["base_object_classes"] = req.filter.base_object_classes
 
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
+            parameters=parameters,
+            limit=req.limit,
+            offset=req.offset,
         )
 
         return tsi.ObjQueryRes(objs=objs)
@@ -1042,16 +1048,27 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         conditions: Optional[list[str]] = None,
+        parameters: Optional[Dict[str, Any]] = None,
         limit: Optional[int] = None,
+        offset: Optional[int] = None,
     ) -> list[tsi.ObjSchema]:
         conn, cursor = get_conn_cursor(self.db_path)
         pred = " AND ".join(conditions or ["1 = 1"])
-        cursor.execute(
-            """SELECT * FROM objects WHERE deleted_at IS NULL AND project_id = ? AND """
-            + pred
-            + " ORDER BY created_at ASC",
-            (project_id,),
-        )
+        query = f"""SELECT * FROM objects
+                    WHERE deleted_at IS NULL AND project_id = ? AND {pred}
+                    ORDER BY created_at ASC"""
+
+        if limit is not None:
+            query += f" LIMIT {limit}"
+        if offset is not None:
+            query += f" OFFSET {offset}"
+
+        params = [project_id]
+        if parameters:
+            for param_list in parameters.values():
+                params.extend(param_list)
+
+        cursor.execute(query, params)
         query_result = cursor.fetchall()
         result: list[tsi.ObjSchema] = []
         for row in query_result:

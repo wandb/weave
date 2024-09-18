@@ -629,6 +629,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             object_id_conditions=object_id_conditions,
             parameters=parameters,
             is_latest=is_latest,
+            limit=req.limit,
+            offset=req.offset,
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
@@ -1390,6 +1392,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parameters: Optional[Dict[str, Any]] = None,
         is_latest: bool = False,
         limit: Optional[int] = None,
+        offset: Optional[int] = None,
     ) -> list[SelectableCHObjSchema]:
         """
         Main query for fetching objects.
@@ -1417,8 +1420,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         is_latest_part = "is_latest = 1" if is_latest else "1 = 1"
 
         limit_part = ""
-        if limit != None:
-            limit_part = f"LIMIT {limit}"
+        offset_part = ""
+        if limit is not None:
+            limit_part = f"LIMIT {int(limit)}"
+        if offset is not None:
+            offset_part = f" OFFSET {int(offset)}"
 
         if parameters is None:
             parameters = {}
@@ -1474,6 +1480,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
             WHERE {is_latest_part}
             {limit_part}
+            {offset_part}
         """
         query_result = self._query_stream(
             select_query,

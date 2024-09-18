@@ -377,6 +377,9 @@ class ObjectVersionFilter(BaseModel):
 class ObjQueryReq(BaseModel):
     project_id: str
     filter: Optional[ObjectVersionFilter] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+    sort_by: Optional[List[SortBy]] = None
 
 
 class ObjQueryRes(BaseModel):
