@@ -14,8 +14,9 @@ from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any, Callable, Optional, Union, get_args, get_origin
 
 from weave import context_state
-from weave.legacy.weave import artifact_fs, errors, storage
+from weave.legacy.weave import artifact_fs, errors
 from weave.trace import settings
+from weave.trace.client_context.weave_client import get_weave_client
 from weave.trace.ipython import (
     ClassNotFoundError,
     get_class_source,
@@ -429,12 +430,13 @@ def _get_code_deps(
                 import_code.append(import_line)
             else:
                 try:
-                    # This relies on old Weave type mechanism.
-                    # TODO: Update to use new Weave trace serialization mechanism.
-                    json_val = storage.to_json_with_refs(
-                        var_value, artifact, path=[var_name]
-                    )
-                except (errors.WeaveTypeError, errors.WeaveSerializeError) as e:
+                    if (client := get_weave_client()) is None:
+                        raise ValueError("Weave client not found")
+
+                    from weave.trace.serialize import to_json
+
+                    json_val = to_json(var_value, client._project_id(), client.server)
+                except Exception as e:
                     warnings.append(
                         f"Serialization error for value of {var_name} needed by {fn}. Encountered:\n    {e}"
                     )
