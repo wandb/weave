@@ -5,6 +5,10 @@ import styled from 'styled-components';
 import {parseRef} from '../../../../react';
 import {isWeaveRef} from '../Browse3/filters/common';
 import {ValueViewNumber} from '../Browse3/pages/CallPage/ValueViewNumber';
+import {
+  isProbablyTimestamp,
+  ValueViewNumberTimestamp,
+} from '../Browse3/pages/CallPage/ValueViewNumberTimestamp';
 import {ValueViewPrimitive} from '../Browse3/pages/CallPage/ValueViewPrimitive';
 import {isCustomWeaveTypePayload} from '../Browse3/typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../Browse3/typeViews/CustomWeaveTypeDispatcher';
@@ -56,6 +60,9 @@ export const CellValue = ({value, isExpanded = false}: CellValueProps) => {
     return <CellValueString value={value} />;
   }
   if (typeof value === 'number') {
+    if (isProbablyTimestamp(value)) {
+      return <ValueViewNumberTimestamp value={value} />;
+    }
     return (
       <Box
         sx={{

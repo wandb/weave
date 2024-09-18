@@ -71,7 +71,7 @@ from .clickhouse_schema import (
     SelectableCHObjSchema,
 )
 from .emoji_util import detone_emojis
-from .errors import InvalidRequest, RequestTooLarge
+from .errors import InsertTooLarge, InvalidRequest, RequestTooLarge
 from .feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
@@ -654,7 +654,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             data=[(req.table.project_id, digest, row_digests)],
             column_names=["project_id", "digest", "row_digests"],
         )
-        return tsi.TableCreateRes(digest=digest)
+        return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         query = """
@@ -701,14 +701,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 known_digests.add(row_digest)
             return row_digest
 
+        updated_digests = []
         for update in req.updates:
             if isinstance(update, tsi.TableAppendSpec):
                 new_digest = add_new_row_needed_to_insert(update.append.row)
                 final_row_digests.append(new_digest)
+                updated_digests.append(new_digest)
             elif isinstance(update, tsi.TablePopSpec):
                 if update.pop.index >= len(final_row_digests) or update.pop.index < 0:
                     raise ValueError("Index out of range")
-                final_row_digests.pop(update.pop.index)
+                popped_digest = final_row_digests.pop(update.pop.index)
+                updated_digests.append(popped_digest)
             elif isinstance(update, tsi.TableInsertSpec):
                 if (
                     update.insert.index > len(final_row_digests)
@@ -717,6 +720,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     raise ValueError("Index out of range")
                 new_digest = add_new_row_needed_to_insert(update.insert.row)
                 final_row_digests.insert(update.insert.index, new_digest)
+                updated_digests.append(new_digest)
             else:
                 raise ValueError("Unrecognized update", update)
 
@@ -737,7 +741,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             data=[(req.project_id, digest, final_row_digests)],
             column_names=["project_id", "digest", "row_digests"],
         )
-        return tsi.TableCreateRes(digest=digest)
+        return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
@@ -1534,7 +1538,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # │    return 1 << (21 - int(log(row_size, 2)))
                 # │ValueError: negative shift count
                 # when we try to insert something that's too large.
-                raise RequestTooLarge("Could not insert record")
+                raise InsertTooLarge(
+                    "Database insertion failed. Record too large. "
+                    "A likely cause is that a single row or cell exceeded "
+                    "the limit. If logging images, save them as `Image.PIL`."
+                )
             raise
 
     def _insert_call(self, ch_call: CallCHInsertable) -> None:

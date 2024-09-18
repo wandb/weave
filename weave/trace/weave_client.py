@@ -1,4 +1,3 @@
-import atexit
 import dataclasses
 import datetime
 import platform
@@ -427,7 +426,6 @@ class WeaveClient:
         self._anonymous_ops: dict[str, Op] = {}
         self.async_job_queue = AsyncJobQueue()
         self.ensure_project_exists = ensure_project_exists
-        atexit.register(self._cleanup)
 
         if ensure_project_exists:
             resp = self.server.ensure_project_exists(entity, project)
@@ -1085,8 +1083,18 @@ class WeaveClient:
                 table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
             )
         )
+        row_digests: Optional[list[str]] = None
+        # This check is needed because in older versions of
+        # the trace server, this will come back as an empty list.
+        # In these cases, we want to set row_digests to None so that
+        # the WeaveTable knows that it needs to fetch the rows from the server.
+        if len(response.row_digests) == len(table.rows):
+            row_digests = response.row_digests
         return TableRef(
-            entity=self.entity, project=self.project, digest=response.digest
+            entity=self.entity,
+            project=self.project,
+            digest=response.digest,
+            row_digests=row_digests,
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1177,18 +1185,6 @@ class WeaveClient:
             # flushable. The # type: ignore is safe because we check the type
             # first.
             self.server.call_processor.wait_until_all_processed()  # type: ignore
-
-    def __del__(self) -> None:
-        self._cleanup()
-        # Because "__del__" is called when the interpreter exits, we need to
-        # make sure that atexit is available.
-        if atexit is not None:
-            atexit.unregister(self._cleanup)
-
-    def _cleanup(self) -> None:
-        # Safe to call multiple times
-        self._flush()
-        self.async_job_queue.shutdown(wait=True)
 
 
 def send_start_call(

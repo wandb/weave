@@ -720,7 +720,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
             conn.commit()
 
-        return tsi.TableCreateRes(digest=digest)
+        return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -753,14 +753,17 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 known_digests.add(row_digest)
             return row_digest
 
+        updated_digests = []
         for update in req.updates:
             if isinstance(update, tsi.TableAppendSpec):
                 new_digest = add_new_row_needed_to_insert(update.append.row)
                 final_row_digests.append(new_digest)
+                updated_digests.append(new_digest)
             elif isinstance(update, tsi.TablePopSpec):
                 if update.pop.index >= len(final_row_digests) or update.pop.index < 0:
                     raise ValueError("Index out of range")
-                final_row_digests.pop(update.pop.index)
+                popped_digest = final_row_digests.pop(update.pop.index)
+                updated_digests.append(popped_digest)
             elif isinstance(update, tsi.TableInsertSpec):
                 if (
                     update.insert.index > len(final_row_digests)
@@ -769,6 +772,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     raise ValueError("Index out of range")
                 new_digest = add_new_row_needed_to_insert(update.insert.row)
                 final_row_digests.insert(update.insert.index, new_digest)
+                updated_digests.append(new_digest)
             else:
                 raise ValueError("Unrecognized update", update)
 
@@ -790,7 +794,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
             conn.commit()
 
-        return tsi.TableUpdateRes(digest=digest)
+        return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
