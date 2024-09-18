@@ -1,6 +1,6 @@
 -r requirements.legacy.txt
--r requirements.legacy.engine.txt # This is "legacy" as well
--r requirements.legacy.datadog.txt # This is "legacy" as well
+-r requirements.legacy.engine.txt
+-r requirements.legacy.datadog.txt
 pytest>=8.2.0
 pytest-watch>=4.2.0
 pytest-timeout>=2.1.0
