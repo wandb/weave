@@ -99,6 +99,12 @@ def remove_ref(obj: Any) -> None:
 
 
 def set_ref(obj: Any, ref: Optional[Ref]) -> None:
+    """Try to set the ref on "any" object.
+
+    We use increasingly complex methods to try to set the ref
+    to support different kinds of objects. This will still
+    fail for python primitives, but those can't be traced anyway.
+    """
     try:
         obj.ref = ref
     except:
@@ -1057,6 +1063,9 @@ class WeaveClient:
         3. Otherwise, traverse all values within `obj` recursively, applying the above logic to each value.
         Important notes to developers: This method does not return anything - it _mutates_ the
         values that it traverses (specifically, it attaches `ref` values to them)
+
+        Important: This method calls low level save methods directly - causing network events. Until
+        these are backgrounded, they should not be invoked from inside a critical path.
         """
         # Base case: if the object is already refed
         #  - if the ref is to a different project, remove it
