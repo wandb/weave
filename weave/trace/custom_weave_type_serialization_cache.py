@@ -57,6 +57,14 @@ class CustomWeaveTypeSerializationCache:
             obj: The deserialized object.
             serialized_dict: The serialized representation of the object.
         """
+        # Remove the old serialized dict if it exists
+        old_dict = self._obj_to_dict.get(obj)
+        if old_dict is not None:
+            old_dict_key = self._get_dict_key(old_dict)
+            if old_dict_key is not None:
+                self._dict_to_obj.pop(old_dict_key, None)
+
+        # Store the new serialized dict
         self._obj_to_dict[obj] = serialized_dict
         dict_key = self._get_dict_key(serialized_dict)
         if dict_key is not None:

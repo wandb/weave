@@ -1,6 +1,11 @@
-import pytest
 import gc
-from weave.trace.data_structures.weak_unhashable_key_dictionary import WeakKeyDictionarySupportingNonHashableKeys
+
+import pytest
+
+from weave.trace.data_structures.weak_unhashable_key_dictionary import (
+    WeakKeyDictionarySupportingNonHashableKeys,
+)
+
 
 class UnhashableObject:
     def __init__(self, value):
@@ -8,24 +13,28 @@ class UnhashableObject:
 
     def __eq__(self, other):
         return isinstance(other, UnhashableObject) and self.value == other.value
-    
+
     def __hash__(self):
         raise NotImplementedError("Unhashable object")
+
 
 @pytest.fixture
 def weak_dict():
     return WeakKeyDictionarySupportingNonHashableKeys()
+
 
 def test_set_and_get(weak_dict):
     key = UnhashableObject(1)
     weak_dict[key] = "value"
     assert weak_dict[key] == "value"
 
+
 def test_delete_item(weak_dict):
     key = UnhashableObject(1)
     weak_dict[key] = "value"
     del weak_dict[key]
     assert key not in weak_dict
+
 
 def test_len(weak_dict):
     objs = [UnhashableObject(i) for i in range(3)]
@@ -37,6 +46,7 @@ def test_len(weak_dict):
     gc.collect()
     assert len(weak_dict) == 0
 
+
 def test_iter(weak_dict):
     keys = [UnhashableObject(i) for i in range(3)]
     for key in keys:
@@ -46,6 +56,7 @@ def test_iter(weak_dict):
     del keys
     gc.collect()
     assert len(weak_dict) == 0
+
 
 def test_keys(weak_dict):
     keys = [UnhashableObject(i) for i in range(3)]
@@ -57,6 +68,7 @@ def test_keys(weak_dict):
     gc.collect()
     assert len(list(weak_dict.keys())) == 0
 
+
 def test_values(weak_dict):
     objs = [UnhashableObject(i) for i in range(3)]
     for obj in objs:
@@ -67,6 +79,7 @@ def test_values(weak_dict):
     gc.collect()
     assert len(weak_dict.values()) == 0
 
+
 def test_items(weak_dict):
     objs = [UnhashableObject(i) for i in range(3)]
     for obj in objs:
@@ -74,7 +87,9 @@ def test_items(weak_dict):
     items = list(weak_dict.items())
     assert len(items) == 3
     assert all(isinstance(k, UnhashableObject) and isinstance(v, str) for k, v in items)
-    assert set((k.value, v) for k, v in items) == set((i, f"value{i}") for i in range(3))
+    assert set((k.value, v) for k, v in items) == set(
+        (i, f"value{i}") for i in range(3)
+    )
     del obj
     del objs
     gc.collect()
@@ -83,16 +98,18 @@ def test_items(weak_dict):
     gc.collect()
     assert len(list(weak_dict.items())) == 0
 
+
 def test_weak_reference_behavior():
     weak_dict = WeakKeyDictionarySupportingNonHashableKeys()
     key = UnhashableObject(1)
     weak_dict[key] = "value"
-    
+
     assert len(weak_dict) == 1
     del key
     # Force garbage collection
     gc.collect()
     assert len(weak_dict) == 0
+
 
 def test_get_method(weak_dict):
     key = UnhashableObject(1)
@@ -105,6 +122,7 @@ def test_get_method(weak_dict):
     gc.collect()
     assert len(weak_dict) == 0
 
+
 def test_clear_method(weak_dict):
     objs = [UnhashableObject(i) for i in range(3)]
     for obj in objs:
@@ -115,6 +133,7 @@ def test_clear_method(weak_dict):
     del objs
     gc.collect()
     assert len(weak_dict) == 0
+
 
 def test_multiple_values_same_id():
     weak_dict = WeakKeyDictionarySupportingNonHashableKeys()
@@ -138,9 +157,9 @@ def test_unhashable_key_error_handling():
     weak_dict = WeakKeyDictionarySupportingNonHashableKeys()
     key = UnhashableObject(1)
     weak_dict[key] = "value"
-    
+
     with pytest.raises(KeyError):
         _ = weak_dict[UnhashableObject(2)]
-    
+
     with pytest.raises(KeyError):
         del weak_dict[UnhashableObject(2)]
