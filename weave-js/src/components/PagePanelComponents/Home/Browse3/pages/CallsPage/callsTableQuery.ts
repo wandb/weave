@@ -3,14 +3,17 @@ import {
   GridPaginationModel,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
-import {useMemo} from 'react';
+import {useCallback, useMemo} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {isValuelessOperator} from '../../filters/common';
 import {operationConverter} from '../common/tabularListViews/operators';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
-import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
+import {
+  CallFilter,
+  CallSchema,
+} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 
 /**
@@ -30,9 +33,14 @@ export const useCallsForQuery = (
   gridFilter: GridFilterModel,
   gridSort: GridSortModel,
   gridPage: GridPaginationModel,
-  expandedColumns: Set<string>,
-  includeCosts: boolean = false
-) => {
+  expandedColumns: Set<string>
+): {
+  costsLoading: boolean;
+  result: CallSchema[];
+  loading: boolean;
+  total: number;
+  refetch: () => void;
+} => {
   const {useCalls, useCallsStats} = useWFHooks();
   const offset = gridPage.page * gridPage.pageSize;
   const limit = gridPage.pageSize;
@@ -73,11 +81,12 @@ export const useCallsForQuery = (
     }
   }, [callResults.length, callsStats.loading, callsStats.result, offset]);
 
-  const costFilter: CallFilter = calls.loading
-    ? {}
-    : {
-        callIds: calls.result?.map(call => call.traceCall?.id || '') || [],
-      };
+  const costFilter: CallFilter = useMemo(
+    () => ({
+      callIds: calls.result?.map(call => call.traceCall?.id || '') || [],
+    }),
+    [calls.result]
+  );
 
   const costs = useCalls(
     entity,
@@ -90,7 +99,7 @@ export const useCallsForQuery = (
     undefined,
     expandedColumns,
     {
-      skip: !includeCosts || calls.loading,
+      skip: calls.loading,
       includeCosts: true,
     }
   );
@@ -98,6 +107,10 @@ export const useCallsForQuery = (
   const costResults = useMemo(() => {
     return costs.result ?? [];
   }, [costs]);
+  const refetch = useCallback(() => {
+    calls.refetch();
+    callsStats.refetch();
+  }, [calls, callsStats]);
 
   return useMemo(() => {
     return {
@@ -110,8 +123,9 @@ export const useCallsForQuery = (
         ? costResults
         : callResults,
       total,
+      refetch,
     };
-  }, [callResults, calls.loading, total, costs.loading, costResults]);
+  }, [callResults, calls.loading, total, costs.loading, costResults, refetch]);
 };
 
 export const useFilterSortby = (

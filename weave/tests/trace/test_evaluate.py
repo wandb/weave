@@ -96,7 +96,7 @@ def test_evaluate_rows_only(client):
     assert result == expected_eval_result
 
 
-def test_evaluate_other_model_method_names(eager_mode):
+def test_evaluate_other_model_method_names():
     class EvalModel(Model):
         @weave.op()
         async def infer(self, input) -> str:

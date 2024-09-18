@@ -1,6 +1,6 @@
 import dataclasses
 import urllib
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 from ..trace_server import refs_internal
 
@@ -21,6 +21,7 @@ class TableRef(Ref):
     entity: str
     project: str
     digest: str
+    row_digests: Optional[list[str]] = None
 
     def uri(self) -> str:
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
@@ -161,3 +162,9 @@ def parse_uri(uri: str) -> AnyRef:
         )
     else:
         raise ValueError(f"Unknown ref kind: {kind}")
+
+
+def parse_op_uri(uri: str) -> OpRef:
+    if not isinstance(parsed := parse_uri(uri), OpRef):
+        raise ValueError(f"URI is not for an Op: {uri}")
+    return parsed

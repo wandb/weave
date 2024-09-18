@@ -244,7 +244,7 @@ const useCallsNoExpansion = (
   query?: Query,
   columns?: string[],
   opts?: {skip?: boolean; refetchOnDelete?: boolean; includeCosts?: boolean}
-): Loadable<CallSchema[]> => {
+): Loadable<CallSchema[]> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const [callRes, setCallRes] =
@@ -322,11 +322,16 @@ const useCallsNoExpansion = (
     doFetch();
   }, [opts?.skip, doFetch]);
 
+  const refetch = useCallback(() => {
+    doFetch();
+  }, [doFetch]);
+
   return useMemo(() => {
     if (opts?.skip) {
       return {
         loading: false,
         result: [],
+        refetch,
       };
     }
     const allResults = (callRes?.calls ?? [])
@@ -338,6 +343,7 @@ const useCallsNoExpansion = (
       return {
         loading: true,
         result: [],
+        refetch,
       };
     } else {
       // Check if the query contained a column request. Only cache calls
@@ -358,9 +364,10 @@ const useCallsNoExpansion = (
       return {
         loading: false,
         result,
+        refetch,
       };
     }
-  }, [callRes, entity, project, opts?.skip, columns]);
+  }, [opts?.skip, callRes, columns, refetch, entity, project]);
 };
 
 const useCalls = (
@@ -374,7 +381,7 @@ const useCalls = (
   columns?: string[],
   expandedRefColumns?: Set<string>,
   opts?: {skip?: boolean; refetchOnDelete?: boolean; includeCosts?: boolean}
-): Loadable<CallSchema[]> => {
+): Loadable<CallSchema[]> & Refetchable => {
   const calls = useCallsNoExpansion(
     entity,
     project,
@@ -400,8 +407,9 @@ const useCalls = (
     return {
       loading,
       result: loading ? [] : expandedCalls.map(traceCallToUICallSchema),
+      refetch: calls.refetch,
     };
-  }, [expandedCalls, loading]);
+  }, [calls.refetch, expandedCalls, loading]);
 };
 
 const useCallsStats = (
@@ -410,7 +418,7 @@ const useCallsStats = (
   filter: CallFilter,
   query?: Query,
   opts?: {skip?: boolean; refetchOnDelete?: boolean}
-) => {
+): Loadable<traceServerTypes.TraceCallsQueryStatsRes> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const [callStatsRes, setCallStatsRes] =
@@ -466,16 +474,20 @@ const useCallsStats = (
     return getTsClient().registerOnDeleteListener(doFetch);
   }, [getTsClient, doFetch, opts?.refetchOnDelete]);
 
+  const refetch = useCallback(() => {
+    doFetch();
+  }, [doFetch]);
+
   return useMemo(() => {
     if (opts?.skip) {
-      return {loading: false, result: null, error: null};
+      return {loading: false, result: null, error: null, refetch};
     } else {
       if (callStatsRes == null || loadingRef.current) {
-        return {loading: true, result: null, error: null};
+        return {loading: true, result: null, error: null, refetch};
       }
-      return callStatsRes;
+      return {...callStatsRes, refetch};
     }
-  }, [callStatsRes, opts?.skip]);
+  }, [callStatsRes, opts?.skip, refetch]);
 };
 
 const useCallsDeleteFunc = () => {

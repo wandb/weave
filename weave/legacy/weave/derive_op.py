@@ -1,6 +1,6 @@
 # This contains logic for making "mapped" ops for all regularly declared ops.
 # These derived ops are not yet fully Weave serializable due to some non-json stuff
-#     in their closure. So we disable strict_op_saving when deriving them.
+#     in their closure. So we disable legacy_strict_op_saving when deriving them.
 
 import copy
 import inspect
@@ -374,7 +374,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
         base_weave_type: type[types.Type],
         orig_op_new_name: str,
     ):
-        with context_state.strict_op_saving(False):
+        with context_state.legacy_strict_op_saving(False):
             named_args = derived_op.input_type.named_args()
             if len(named_args) == 0 or not isinstance(
                 derived_op.input_type, op_args.OpNamedArgs
@@ -445,7 +445,7 @@ def handler_for_id(handler_id: str) -> type[DeriveOpHandler]:
 
 
 def derive_ops(op: op_def.OpDef):
-    with context_state.strict_op_saving(False):
+    with context_state.legacy_strict_op_saving(False):
         for handler in DeriveOpHandler.__subclasses__():
             if (
                 handler.should_derive_op(op)

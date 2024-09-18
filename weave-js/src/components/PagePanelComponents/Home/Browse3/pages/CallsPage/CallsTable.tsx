@@ -68,6 +68,7 @@ import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
   ExportSelector,
+  RefreshButton,
 } from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
 import {WFHighLevelCallFilter} from './callsTableFilter';
@@ -237,8 +238,7 @@ export const CallsTable: FC<{
     filterModelResolved,
     sortModelResolved,
     paginationModelResolved,
-    expandedRefCols,
-    true // includeCosts
+    expandedRefCols
   );
 
   // Here, we only update our local state once the calls have loaded.
@@ -702,6 +702,8 @@ export const CallsTable: FC<{
               />
             </div>
           )}
+          <ButtonDivider />
+
           <div className="flex-none">
             <ExportSelector
               selectedCalls={selectedCalls}
@@ -723,7 +725,7 @@ export const CallsTable: FC<{
           </div>
           {columnVisibilityModel && setColumnVisibilityModel && (
             <>
-              <div className="h-24 flex-none border-l-[1px] border-moon-250"></div>
+              <ButtonDivider />
               <div className="flex-none">
                 <ManageColumnsButton
                   columnInfo={columns}
@@ -733,6 +735,8 @@ export const CallsTable: FC<{
               </div>
             </>
           )}
+          <ButtonDivider />
+          <RefreshButton onClick={() => calls.refetch()} />
         </Tailwind>
       }>
       <StyledDataGrid
@@ -854,6 +858,10 @@ export const CallsTable: FC<{
     </FilterLayoutTemplate>
   );
 };
+
+const ButtonDivider = () => (
+  <div className="h-24 flex-none border-l-[1px] border-moon-250"></div>
+);
 
 const useParentIdOptions = (
   entity: string,
