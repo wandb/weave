@@ -424,18 +424,6 @@ export const RefreshButton: FC<{
   );
 };
 
-function initiateDownloadFromBlob(blob: Blob, fileName: string) {
-  const downloadUrl = URL.createObjectURL(blob);
-  // Create a download link and click it
-  const anchor = document.createElement('a');
-  anchor.href = downloadUrl;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(downloadUrl);
-}
-
 function makeLeafColumns(visibleColumns: string[]) {
   // Filter columns down to only the most nested, for example
   // ['output', 'output.x', 'output.x.y'] -> ['output.x.y']
