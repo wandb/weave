@@ -27,6 +27,7 @@ The top-level functions and classes for working with Weave.
 - [`api.init`](#function-init): Initialize weave tracking, logging to a wandb project.
 - [`api.publish`](#function-publish): Save and version a python object.
 - [`api.ref`](#function-ref): Construct a Ref to a Weave object.
+- [`call_context.require_current_call`](#function-require_current_call): Get the Call object for the currently executing Op, within that Op.
 - [`call_context.get_current_call`](#function-get_current_call): Get the Call object for the currently executing Op, within that Op.
 - [`api.finish`](#function-finish): Stops logging to weave.
 - [`op.op`](#function-op): A decorator to weave op-ify a function or method.  Works for both sync and async.
@@ -121,12 +122,12 @@ TODO: what happens if obj does not exist
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/call_context.py#L57"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/call_context.py#L61"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
-### <kbd>function</kbd> `get_current_call`
+### <kbd>function</kbd> `require_current_call`
 
 ```python
-get_current_call() → Optional[ForwardRef('Call')]
+require_current_call() → Call
 ```
 
 Get the Call object for the currently executing Op, within that Op. 
@@ -137,7 +138,7 @@ This allows you to access attributes of the Call such as its id or feedback whil
 @weave.op
 def hello(name: str) -> None:
      print(f"Hello {name}!")
-     current_call = weave.get_current_call()
+     current_call = weave.require_current_call()
      print(current_call.id)
 ``` 
 
@@ -160,6 +161,29 @@ def hello(name: str) -> None:
 mycall = hello.call("world")
 print(mycall.id)
 ``` 
+
+
+
+**Returns:**
+  The Call object for the currently executing Op 
+
+
+
+**Raises:**
+ 
+ - <b>`NoCurrentCallError`</b>:  If tracking has not been initialized or this method is  invoked outside an Op. 
+
+---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/call_context.py#L110"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
+### <kbd>function</kbd> `get_current_call`
+
+```python
+get_current_call() → Optional[ForwardRef('Call')]
+```
+
+Get the Call object for the currently executing Op, within that Op. 
 
 
 
@@ -218,7 +242,7 @@ await extract()  # calls the function and tracks the call in the Weave UI
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/../../../../../../wandb/core/services/weave-python/weave-public/docs/weave/trace/api/attributes#L186"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/docs/weave/trace/api/attributes#L186"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `attributes`
 
