@@ -566,10 +566,13 @@ def make_trace_obj(
             val.ref = new_ref
         return val
     if hasattr(val, "ref") and isinstance(val.ref, RefWithExtra):
-        # The Traceable check above does not currently work for Ops, where we
-        # directly attach a ref, or to our Boxed classes. We should use Traceable
-        # for all of these, but for now we need to check for the ref attribute.
-        return val
+        if isinstance(val, Op):
+            new_ref = new_ref or val.ref
+        else:
+            # The Traceable check above does not currently work for Ops, where we
+            # directly attach a ref, or to our Boxed classes. We should use Traceable
+            # for all of these, but for now we need to check for the ref attribute.
+            return val
     # Derefence val and create the appropriate wrapper object
     extra: tuple[str, ...] = ()
     if isinstance(val, ObjectRef):
