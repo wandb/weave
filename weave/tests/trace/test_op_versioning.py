@@ -1,11 +1,9 @@
-import shutil
 import typing
 
 import numpy as np
 import pytest
 
 import weave
-from weave.legacy.weave import artifact_fs, derive_op
 from weave.trace_server.trace_server_interface import FileContentReadReq, ObjReadReq
 
 
@@ -134,15 +132,6 @@ def test_op_versioning_lotsofstuff(strict_op_saving):
         j = [x + 1 for x in range(a)]
         k = map(lambda y: y - 3, j)
         return np.array(k).mean()
-
-
-@pytest.mark.skip("Derived op not fully serializable due to non-json stuff in closure")
-def test_op_versioning_higherlevel_function(strict_op_saving):
-    @weave.op()
-    def versioned_op_lowerlevel(a: int) -> float:
-        return a + 1
-
-    derive_op.MappedDeriveOpHandler.make_derived_op(versioned_op_lowerlevel)
 
 
 def test_op_versioning_inline_import(strict_op_saving, client):
@@ -386,25 +375,6 @@ def test_op_versioning_2ops(strict_op_saving, client):
     ref = weave.obj_ref(cat)
 
     saved_code = get_saved_code(client, ref)
-
-
-@pytest.mark.skip("not working yet")
-def test_op_return_weave_obj(strict_op_saving, client):
-    @weave.type()
-    class SomeObj:
-        val: int
-
-    @weave.op()
-    def some_obj(v: int):
-        return SomeObj(v)
-
-    ref = weave.obj_ref(some_obj)
-    assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
-
-    with ref.artifact.open("obj.py") as f:
-        saved_code = f.read()
-    print("SAVED_CODE")
-    print(saved_code)
 
 
 EXPECTED_TYPEDICT_ANNO_CODE = """import weave
