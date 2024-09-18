@@ -59,8 +59,8 @@ from weave.trace_server.trace_server_interface import (
     TableSchemaForInsert,
     TraceServerInterface,
 )
-from weave.type_serializers.JSONBlob.jsonblob import JSONBlob
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.type_serializers.JSONBlob.jsonblob import JSONBlob
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
