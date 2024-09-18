@@ -20,8 +20,10 @@ import {Timestamp} from '../../../../../Timestamp';
 import {Reactions} from '../../feedback/Reactions';
 import {CellFilterWrapper} from '../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../filters/common';
-import {getCostsFromCellParams} from '../CallPage/TraceCostStats';
-import {getTokensFromCellParams} from '../CallPage/TraceUsageStats';
+import {
+  getCostsFromCellParams,
+  getTokensFromCellParams,
+} from '../CallPage/cost/costUtils';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';

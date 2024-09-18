@@ -13,7 +13,10 @@ import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {CallStatusType} from '../common/StatusChip';
 import {useWFHooks} from '../wfReactInterface/context';
-import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {
+  CallFilter,
+  CallSchema,
+} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CustomGridTreeDataGroupingCell} from './CustomGridTreeDataGroupingCell';
 import {scorePathSimilarity, updatePath} from './pathPreservation';
 
@@ -29,7 +32,8 @@ export const CallTraceView: FC<{
   rows: Row[];
   forcedExpandKeys: Set<string>;
   path?: string;
-}> = ({call, selectedCall, rows, forcedExpandKeys, path}) => {
+  costLoading: boolean;
+}> = ({call, selectedCall, rows, forcedExpandKeys, path, costLoading}) => {
   const apiRef = useGridApiRef();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
@@ -51,24 +55,27 @@ export const CallTraceView: FC<{
       headerName: 'Call Tree',
       headerAlign: 'center',
       flex: 1,
-      renderCell: params => (
-        <CustomGridTreeDataGroupingCell
-          {...params}
-          onClick={event => {
-            setExpandKeys(curr => {
-              if (curr.has(params.row.id)) {
-                const newSet = new Set(curr);
-                newSet.delete(params.row.id);
-                return newSet;
-              } else {
-                return new Set([...curr, params.row.id]);
-              }
-            });
-          }}
-        />
-      ),
+      renderCell: params => {
+        return (
+          <CustomGridTreeDataGroupingCell
+            {...params}
+            costLoading={costLoading}
+            onClick={event => {
+              setExpandKeys(curr => {
+                if (curr.has(params.row.id)) {
+                  const newSet = new Set(curr);
+                  newSet.delete(params.row.id);
+                  return newSet;
+                } else {
+                  return new Set([...curr, params.row.id]);
+                }
+              });
+            }}
+          />
+        );
+      },
     }),
-    []
+    [costLoading]
   );
 
   const [suppressScroll, setSuppressScroll] = useState(false);
@@ -374,13 +381,46 @@ export const useCallFlattenedTraceTree = (
     () => traceCalls.result ?? [],
     [traceCalls.result]
   );
-  const traceCallMap = useMemo(
-    () => _.keyBy(traceCallsResult, 'callId'),
-    [traceCallsResult]
+
+  const costFilter: CallFilter = useMemo(
+    () => ({
+      callIds:
+        traceCallsResult && traceCallsResult.length < 1000
+          ? traceCallsResult.map(c => c.traceCall?.id || '')
+          : undefined,
+      traceId: call.traceId,
+    }),
+    [traceCallsResult, call.traceId]
   );
+
+  const costs = useCalls(
+    call.entity,
+    call.project,
+    costFilter,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    columns,
+    undefined,
+    {
+      skip: traceCalls.loading,
+      includeCosts: true,
+    }
+  );
+
+  const costResult = useMemo(() => {
+    return costs.result ?? [];
+  }, [costs.result]);
+
+  const traceCallMap = useMemo(() => {
+    const result = costResult.length > 0 ? costResult : traceCallsResult;
+    return _.keyBy(result, 'callId');
+  }, [costResult, traceCallsResult]);
   const childCallLookup = useMemo(() => {
+    const result = costResult.length > 0 ? costResult : traceCallsResult;
     const lookup: Record<string, string[]> = {};
-    for (const c of traceCallsResult) {
+    for (const c of result) {
       if (c.parentId) {
         if (!lookup[c.parentId]) {
           lookup[c.parentId] = [];
@@ -389,7 +429,8 @@ export const useCallFlattenedTraceTree = (
       }
     }
     return lookup;
-  }, [traceCallsResult]);
+  }, [costResult, traceCallsResult]);
+
   return useMemo(() => {
     let selectedCall = null;
     let selectedCallSimilarity = Number.POSITIVE_INFINITY;
@@ -528,8 +569,13 @@ export const useCallFlattenedTraceTree = (
         ? traceCallMap[callToExpand.parentId]
         : null;
     }
-
-    return {rows, selectedCall, expandKeys, loading: traceCalls.loading};
+    return {
+      rows,
+      selectedCall,
+      expandKeys,
+      loading: traceCalls.loading,
+      costLoading: costs.loading,
+    };
   }, [
     call,
     childCallLookup,
@@ -537,5 +583,6 @@ export const useCallFlattenedTraceTree = (
     traceCallsResult,
     selectedPath,
     traceCalls.loading,
+    costs.loading,
   ]);
 };

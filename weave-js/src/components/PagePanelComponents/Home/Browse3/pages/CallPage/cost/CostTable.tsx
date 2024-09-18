@@ -1,13 +1,10 @@
 import {Box} from '@mui/material';
 import {GridColDef, GridRenderCellParams} from '@mui/x-data-grid-pro';
-import {
-  FORMAT_NUMBER_NO_DECIMALS,
-  formatTokenCost,
-} from '@wandb/weave/util/llmTokenCosts';
 import React from 'react';
 
-import {StyledDataGrid} from '../../StyledDataGrid';
-import {LLMCostSchema} from '../wfReactInterface/traceServerClientTypes';
+import {StyledDataGrid} from '../../../StyledDataGrid';
+import {LLMCostSchema} from '../../wfReactInterface/traceServerClientTypes';
+import {FORMAT_NUMBER_NO_DECIMALS, formatTokenCost} from './costUtils';
 
 const renderNumberCell = (params: GridRenderCellParams) => (
   <Box sx={{textAlign: 'right', width: '100%'}}>
