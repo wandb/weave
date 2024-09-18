@@ -694,6 +694,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             parameters=parameters,
             limit=req.limit,
             offset=req.offset,
+            sort_by=req.sort_by,
         )
 
         return tsi.ObjQueryRes(objs=objs)
@@ -1051,12 +1052,26 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         parameters: Optional[Dict[str, Any]] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
+        sort_by: Optional[list[tsi.SortBy]] = None,
     ) -> list[tsi.ObjSchema]:
         conn, cursor = get_conn_cursor(self.db_path)
         pred = " AND ".join(conditions or ["1 = 1"])
         query = f"""SELECT * FROM objects
-                    WHERE deleted_at IS NULL AND project_id = ? AND {pred}
-                    ORDER BY created_at ASC"""
+                    WHERE deleted_at IS NULL AND project_id = ? AND {pred}"""
+
+        if sort_by:
+            valid_sort_fields = {"object_id", "created_at"}
+            sort_clauses = []
+            for sort in sort_by:
+                if sort.field in valid_sort_fields and sort.direction in {
+                    "asc",
+                    "desc",
+                }:
+                    sort_clauses.append(f"{sort.field} {sort.direction.upper()}")
+            if sort_clauses:
+                query += f" ORDER BY {', '.join(sort_clauses)}"
+        else:
+            query += " ORDER BY created_at ASC"
 
         if limit is not None:
             query += f" LIMIT {limit}"
@@ -1085,7 +1100,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     is_latest=row[9],
                 )
             )
-
         return result
 
 
