@@ -108,8 +108,7 @@ def set_ref(obj: Any, ref: Optional[Ref]) -> None:
             try:
                 obj.__dict__["ref"] = ref
             except:
-                pass
-    raise ValueError(f"Failed to set ref on object of type {type(obj)}")
+                raise ValueError(f"Failed to set ref on object of type {type(obj)}")
 
 
 def _get_direct_ref(obj: Any) -> Optional[Ref]:
@@ -1137,6 +1136,7 @@ class WeaveClient:
             val.ref = None
 
         is_opdef = isinstance(val, Op)
+        orig_val = val
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
             return val
@@ -1172,7 +1172,7 @@ class WeaveClient:
 
         # Attach the ref to the object
         try:
-            set_ref(val, ref)
+            set_ref(orig_val, ref)
         except:
             # Don't worry if we can't set the ref.
             # This can happen for primitive types that don't have __dict__
