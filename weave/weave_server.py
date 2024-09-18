@@ -438,6 +438,7 @@ def frontend_env():
         "WANDB_BASE_URL": environment.wandb_frontend_base_url(),
         "DD_ENV": environment.dd_env(),
         "ENV_IS_CI": environment.env_is_ci(),
+        "WANDB_POD_BASE_URL": environment.wandb_base_url(),
     }
 
 
