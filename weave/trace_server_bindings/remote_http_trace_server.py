@@ -37,7 +37,7 @@ REMOTE_REQUEST_BYTES_LIMIT = (
     (32 - 1) * 1024 * 1024
 )  # 32 MiB (real limit) - 1 MiB (buffer)
 CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
-ENTITY_TOO_LARGE_ERROR = "<EXCEED_LIMITS>"
+ENTITY_TOO_LARGE_ERROR = "<EXCEEDS_LIMITS>"
 
 REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
 REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
@@ -140,8 +140,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             Calculate the number of bytes in a string.
 
             This can be computationally expensive, only call when necessary.
+            Never raise on a failed str cast, just return 0.
             """
-            return len(str(data).encode("utf-8"))
+            try:
+                return len(str(data).encode("utf-8"))
+            except Exception:
+                return 0
 
         final_batch = []
         row_bytes_limit = CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT
@@ -168,9 +172,27 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                             item.req.start.inputs[key] = ENTITY_TOO_LARGE_ERROR
                 else:
                     id_, mode = (item.req.end.id, "end")
-                    for key in item.req.end.output:
-                        if _num_bytes(item.req.end.output[key]) > val_byte_limit:
-                            item.req.end.output[key] = ENTITY_TOO_LARGE_ERROR
+                    if isinstance(item.req.end.output, dict):
+                        output_dict = {}
+                        for key in item.req.end.output:
+                            if _num_bytes(item.req.end.output[key]) > val_byte_limit:
+                                output_dict[key] = ENTITY_TOO_LARGE_ERROR
+                            else:
+                                output_dict[key] = item.req.end.output[key]
+                        item.req.end.output = output_dict
+                    elif isinstance(item.req.end.output, (list, tuple)):
+                        output_list = []
+                        for v in item.req.end.output:
+                            if _num_bytes(v) > val_byte_limit:
+                                output_list.append(ENTITY_TOO_LARGE_ERROR)
+                            else:
+                                output_list.append(v)
+                        if isinstance(item.req.end.output, tuple):
+                            item.req.end.output = tuple(output_list)
+                        else:
+                            item.req.end.output = output_list
+                    else:
+                        item.req.end.output = ENTITY_TOO_LARGE_ERROR
 
                 dropped_payload = "inputs" if mode == "start" else "output"
                 logger.error(
@@ -206,8 +228,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         if len(batch) == 0:
             return
 
-        data = Batch(batch=batch).model_dump_json()
-        encoded_bytes = len(data.encode("utf-8"))
+        encoded_data = Batch(batch=batch).model_dump_json().encode("utf-8")
+        encoded_bytes = len(encoded_data)
 
         # Update target batch size (this allows us to have a dynamic batch size based on the size of the data being sent)
         estimated_bytes_per_item = encoded_bytes / len(batch)
@@ -226,11 +248,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
         if encoded_bytes > CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
             batch = self._strip_large_values_from_batch(batch, encoded_bytes)
+            # re-encode the batch with the stripped large values
+            encoded_data = Batch(batch=batch).model_dump_json().encode("utf-8")
 
         if len(batch) == 0:
             return
 
-        encoded_data = Batch(batch=batch).model_dump_json().encode("utf-8")
         r = requests.post(
             self.trace_server_url + "/call/upsert_batch",
             data=encoded_data,
