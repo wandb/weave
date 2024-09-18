@@ -37,6 +37,9 @@ REMOTE_REQUEST_BYTES_LIMIT = (
     (32 - 1) * 1024 * 1024
 )  # 32 MiB (real limit) - 1 MiB (buffer)
 CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
+ENTITY_TOO_LARGE_ERROR_PAYLOAD = {
+    "_weave_error": f"Entity exceeed max single row insert size ({CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT / (1024**2):.2f} MiB)."
+}
 
 REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
 REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
@@ -173,14 +176,15 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                     mb = bytes_size / (1024**2)
                     if isinstance(item.req, tsi.CallStartReq):
                         id_, mode = (item.req.start.id, "start")
-                        item.req.start.inputs = {}
+                        item.req.start.inputs = ENTITY_TOO_LARGE_ERROR_PAYLOAD
                     else:
                         id_, mode = (item.req.end.id, "end")
-                        item.req.end.output = {}
+                        item.req.end.output = ENTITY_TOO_LARGE_ERROR_PAYLOAD
 
+                    dropped_payload = "inputs" if mode == "start" else "output"
                     logger.error(
-                        f"Dropping call {mode} ({id_}) with size {mb:.2f} MiB larger than "
-                        f"{CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT / (1024**2):.2f} MiB."
+                        f"Dropping call {mode} {dropped_payload} for call {id_} with size {mb:.2f} MiB "
+                        f"larger than {CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT / (1024**2):.2f} MiB."
                         " If logging images, please encode them as `PIL.Image`"
                     )
                 final_batch.append(item)
