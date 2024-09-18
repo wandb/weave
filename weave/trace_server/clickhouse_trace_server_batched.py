@@ -532,16 +532,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         parameters = {}
         conds: list[str] = ["is_op = 1"]
+        is_latest = False
         if req.filter:
             if req.filter.op_names:
                 conds.append("object_id IN {op_names: Array(String)}")
                 parameters["op_names"] = req.filter.op_names
+            if req.filter.latest_only:
+                is_latest = True
 
         ch_objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
             parameters=parameters,
-            is_latest=req.filter.latest_only,
+            is_latest=is_latest,
         )
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
@@ -594,6 +597,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conds: list[str] = []
         parameters = {}
+        is_latest = False
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
@@ -603,6 +607,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if req.filter.object_ids:
                 conds.append("object_id IN {object_ids: Array(String)}")
                 parameters["object_ids"] = req.filter.object_ids
+            if req.filter.latest_only:
+                is_latest = True
             if req.filter.base_object_classes:
                 conds.append(
                     "base_object_class IN {base_object_classes: Array(String)}"
@@ -613,7 +619,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             req.project_id,
             conditions=conds,
             parameters=parameters,
-            is_latest=req.filter.latest_only,
+            is_latest=is_latest,
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
