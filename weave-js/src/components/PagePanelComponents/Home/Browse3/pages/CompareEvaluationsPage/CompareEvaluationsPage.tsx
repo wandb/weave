@@ -68,10 +68,7 @@ export const CompareEvaluationsPageContent: React.FC<
   CompareEvaluationsPageProps
 > = props => {
   const [baselineEvaluationCallId, setBaselineEvaluationCallId] =
-    React.useState(
-      props.evaluationCallIds.length > 0 ? props.evaluationCallIds[0] : null
-    );
-
+    React.useState<string | null>(null);
   const [comparisonDimensions, setComparisonDimensions] =
     React.useState<ComparisonDimensionsType | null>(null);
 
@@ -96,6 +93,12 @@ export const CompareEvaluationsPageContent: React.FC<
     },
     [comparisonDimensions]
   );
+
+  React.useEffect(() => {
+    if (props.evaluationCallIds.length > 0) {
+      setBaselineEvaluationCallId(props.evaluationCallIds[0]);
+    }
+  }, [props.evaluationCallIds]);
 
   if (props.evaluationCallIds.length === 0) {
     return <div>No evaluations to compare</div>;
