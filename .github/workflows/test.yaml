@@ -148,6 +148,7 @@ jobs:
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
           tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }} -- \
+            -n4 \
             -m "weave_client and not skip_clickhouse_client" \
             --weave-server=clickhouse
       - name: Run tox (Clickhouse Only)
@@ -158,7 +159,7 @@ jobs:
           WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
-          tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }}
+          tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }} -- -n4
 
   test:
     name: Python unit tests
