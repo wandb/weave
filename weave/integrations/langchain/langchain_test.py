@@ -2,6 +2,7 @@ import os
 from typing import Generator, List, Tuple
 
 import pytest
+import tiktoken
 
 import weave
 from weave.integrations.integration_utilities import (
@@ -11,6 +12,13 @@ from weave.integrations.integration_utilities import (
 )
 from weave.trace.weave_client import Call, WeaveClient
 from weave.trace_server import trace_server_interface as tsi
+
+
+@pytest.fixture(scope="session", autouse=True)
+def ensure_tiktoken_file() -> Generator[None, None, None]:
+    enc = tiktoken.get_encoding("cl100k_base")
+    enc.encode("Test")
+    yield
 
 
 def assert_ends_and_errors(calls: list[tuple[Call, int]]) -> None:
