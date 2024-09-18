@@ -17,7 +17,7 @@ declare global {
 if (!window.WEAVE_CONFIG) {
   console.warn('Unable to get configuration from server, using defaults');
   window.WEAVE_CONFIG = {
-    WANDB_POD_BASE_URL: 'https://api.wandb.ai',
+    WANDB_POD_BASE_URL: '',
     PREFIX: '',
     ANALYTICS_DISABLED: false,
     ONPREM: false,
