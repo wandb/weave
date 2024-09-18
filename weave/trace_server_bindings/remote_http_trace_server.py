@@ -37,9 +37,7 @@ REMOTE_REQUEST_BYTES_LIMIT = (
     (32 - 1) * 1024 * 1024
 )  # 32 MiB (real limit) - 1 MiB (buffer)
 CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
-ENTITY_TOO_LARGE_ERROR_PAYLOAD = {
-    "_weave_error": f"Entity exceeed max single row insert size ({CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT / (1024**2):.2f} MiB)."
-}
+ENTITY_TOO_LARGE_ERROR = "<EXCEED_LIMITS>"
 
 REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
 REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
@@ -127,6 +125,68 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def set_auth(self, auth: t.Tuple[str, str]) -> None:
         self._auth = auth
 
+    def _strip_large_values_from_batch(
+        self, batch: t.List, encoded_bytes: int
+    ) -> t.List:
+        """
+        Iterate through the batch and replace large values with placeholders.
+
+        If keys on inputs or output on start/end reqs are larger than 1MiB,
+        replace them with placeholder values.
+        """
+
+        def _num_bytes(data: t.Any) -> int:
+            """
+            Calculate the number of bytes in a string.
+
+            This can be computationally expensive, only call when necessary.
+            """
+            return len(str(data).encode("utf-8"))
+
+        final_batch = []
+        row_bytes_limit = CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT
+        # Set the value byte limit to be anything over 1MiB to catch
+        # payloads with multiple large values that are still under the
+        # single row insert limit.
+        val_byte_limit = 1 * 1024 * 1024
+
+        # Call batch is bigger than the single row insert limit, could be
+        # totally fine, but make sure that no single row is over the limit
+        seen_bytes = 0
+        for i, item in enumerate(batch):
+            bytes_size = _num_bytes(item.model_dump_json())
+            seen_bytes += bytes_size
+
+            # If bytes_size > row_bytes_limit, this item is too large,
+            # iterate through the json value keys to find and replace
+            # the large values with a placeholder.
+            if bytes_size > row_bytes_limit:
+                if isinstance(item.req, tsi.CallStartReq):
+                    id_, mode = (item.req.start.id, "start")
+                    for key in item.req.start.inputs:
+                        if _num_bytes(item.req.start.inputs[key]) > val_byte_limit:
+                            item.req.start.inputs[key] = ENTITY_TOO_LARGE_ERROR
+                else:
+                    id_, mode = (item.req.end.id, "end")
+                    for key in item.req.end.output:
+                        if _num_bytes(item.req.end.output[key]) > val_byte_limit:
+                            item.req.end.output[key] = ENTITY_TOO_LARGE_ERROR
+
+                dropped_payload = "inputs" if mode == "start" else "output"
+                logger.error(
+                    f"Replacing large call {mode} {dropped_payload} values for "
+                    f"call {id_} with placeholders. Total call {mode} size "
+                    f"{bytes_size / (1024**2):.2f} MiB is greater than the "
+                    f"maximum single row insert size of {row_bytes_limit / (1024**2):.2f} MiB. "
+                    "If logging images, please encode them as `PIL.Image`"
+                )
+            final_batch.append(item)
+            if encoded_bytes - seen_bytes < row_bytes_limit:
+                # break early since we know there are no more large rows
+                final_batch += batch[i + 1 :]
+                break
+        return final_batch
+
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
         wait=tenacity.wait_exponential_jitter(
@@ -164,42 +224,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
             return
 
-        final_batch = []
         if encoded_bytes > CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
-            # ensure that there isn't a single row that is too big
-            seen_bytes = 0
-            for i, item in enumerate(batch):
-                # below takes tens of miliseconds for the large payloads we skip
-                bytes_size = len(item.model_dump_json().encode("utf-8"))
-                seen_bytes += bytes_size
-                if bytes_size > CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
-                    mb = bytes_size / (1024**2)
-                    if isinstance(item.req, tsi.CallStartReq):
-                        id_, mode = (item.req.start.id, "start")
-                        item.req.start.inputs = ENTITY_TOO_LARGE_ERROR_PAYLOAD
-                    else:
-                        id_, mode = (item.req.end.id, "end")
-                        item.req.end.output = ENTITY_TOO_LARGE_ERROR_PAYLOAD
+            batch = self._strip_large_values_from_batch(batch, encoded_bytes)
 
-                    dropped_payload = "inputs" if mode == "start" else "output"
-                    logger.error(
-                        f"Dropping call {mode} {dropped_payload} for call {id_} with size {mb:.2f} MiB "
-                        f"larger than {CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT / (1024**2):.2f} MiB."
-                        " If logging images, please encode them as `PIL.Image`"
-                    )
-                final_batch.append(item)
-                if (
-                    encoded_bytes - seen_bytes
-                    < CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT
-                ):
-                    # break early since we know there are no more large rows
-                    final_batch += batch[i + 1 :]
-                    break
-
-        if len(final_batch) == 0:
+        if len(batch) == 0:
             return
 
-        encoded_data = Batch(batch=final_batch).model_dump_json().encode("utf-8")
+        encoded_data = Batch(batch=batch).model_dump_json().encode("utf-8")
         r = requests.post(
             self.trace_server_url + "/call/upsert_batch",
             data=encoded_data,

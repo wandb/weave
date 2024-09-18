@@ -1,6 +1,7 @@
 import asyncio
 import dataclasses
 import json
+import logging
 import platform
 import sys
 
@@ -32,6 +33,11 @@ from weave.trace_server.trace_server_interface import (
     TableCreateReq,
     TableQueryReq,
     TableSchemaForInsert,
+)
+from weave.trace_server_bindings.remote_http_trace_server import (
+    ENTITY_TOO_LARGE_ERROR,
+    EndBatchItem,
+    StartBatchItem,
 )
 
 
@@ -1183,22 +1189,98 @@ def test_table_partitioning(network_proxy_client):
     )
 
 
-def test_call_batch_size_handling(network_proxy_client):
+def test_call_batch_size_handling(network_proxy_client, caplog):
     client, remote_client, records = network_proxy_client
 
-    @weave.op
-    def save_large_string(len: int):
-        return "x" * len
+    large_string = "x" * 10_000_000
+    large_dict = {"dictionary": {f"{i}": "x" for i in range(10_000_000)}}
 
-    @weave.op
-    def save_large_dict(len: int):
-        return {f"{i}": "x" for i in range(len)}
+    assert len(large_string.encode("utf-8")) > 3.5 * 1024 * 1024
+    assert len(str(large_dict).encode("utf-8")) > 3.5 * 1024 * 1024
 
-    save_large_string(10_000_000)
-    save_large_dict(10_000_000)
+    batch = [
+        StartBatchItem(
+            mode="start",
+            req=tsi.CallStartReq(
+                start={
+                    "id": "123",
+                    "op_name": "save_large_string",
+                    "project_id": client._project_id(),
+                    "started_at": "2024-02-29T12:00:00Z",
+                    "attributes": {},
+                    "inputs": {"string": large_string},
+                }
+            ),
+        ),
+        EndBatchItem(
+            mode="end",
+            req=tsi.CallEndReq(
+                end={
+                    "id": "123",
+                    "op_name": "save_large_string",
+                    "project_id": client._project_id(),
+                    "output": {"string": large_string},
+                    "summary": {"some_key": "some_value"},
+                    "ended_at": "2024-02-29T12:00:00Z",
+                }
+            ),
+        ),
+    ]
 
-    calls = client.get_calls()
-    assert len(calls) == 2
+    out1 = remote_client._strip_large_values_from_batch(
+        batch=batch, encoded_bytes=len(str(batch).encode("utf-8"))
+    )
+
+    assert len(out1) == 2
+    assert out1[0].mode == "start"
+    assert out1[0].req.start.inputs["string"] == ENTITY_TOO_LARGE_ERROR
+    assert out1[1].req.end.output["string"] == ENTITY_TOO_LARGE_ERROR
+
+    batch = [
+        StartBatchItem(
+            mode="start",
+            req=tsi.CallStartReq(
+                start={
+                    "id": "456",
+                    "op_name": "save_large_dict",
+                    "project_id": client._project_id(),
+                    "started_at": "2024-02-29T12:00:00Z",
+                    "attributes": {},
+                    "inputs": {"len": 10000000},
+                }
+            ),
+        ),
+        EndBatchItem(
+            mode="end",
+            req=tsi.CallEndReq(
+                end={
+                    "id": "456",
+                    "op_name": "save_large_dict",
+                    "project_id": client._project_id(),
+                    "output": {"dictionary": large_dict},
+                    "summary": {"some_key": "some_value"},
+                    "ended_at": "2024-02-29T12:00:00Z",
+                }
+            ),
+        ),
+    ]
+    out2 = remote_client._strip_large_values_from_batch(
+        batch=batch, encoded_bytes=len(str(batch).encode("utf-8"))
+    )
+
+    assert len(out2) == 2
+    assert out2[0].mode == "start"
+    assert out2[0].req.start.inputs["len"] == 10000000
+    assert out2[1].req.end.output["dictionary"] == ENTITY_TOO_LARGE_ERROR
+
+    # check that errors are logged to stdout
+    error_messages = [
+        record.message for record in caplog.records if record.levelname == "ERROR"
+    ]
+    assert len(error_messages) == 3  # two output, one inputs
+    for error in error_messages:
+        assert "Replacing large" in error
+        assert "greater than the maximum single row insert size of 3.50 MiB." in error
 
 
 def test_summary_tokens_cost(client):

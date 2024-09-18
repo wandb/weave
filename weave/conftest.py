@@ -20,8 +20,6 @@ from weave.legacy.weave.language_features.tagging.tag_store import (
 )
 from weave.trace import weave_init
 from weave.trace_server import (
-    CallCreateBatchReq,
-    CallCreateBatchRes,
     clickhouse_trace_server_batched,
     sqlite_trace_server,
 )
@@ -383,11 +381,6 @@ def network_proxy_client(client):
             )
         )
         return client.server.table_update(req)
-
-    @app.post("/call/upsert_batch")
-    def upsert_batch(req: CallCreateBatchReq) -> CallCreateBatchRes:
-        records.append(("upsert_batch", req))
-        return client.server.call_upsert_batch(req)
 
     with TestClient(app) as c:
 
