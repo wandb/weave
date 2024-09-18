@@ -1014,20 +1014,6 @@ class WeaveClient:
         return self._save_object_basic(val, name, branch)
 
     @trace_sentry.global_trace_sentry.watch()
-    def _save_op(self, op: Op, name: Optional[str] = None) -> ObjectRef:
-        """
-        Saves an Op to the weave server and returns the Ref. Is only called
-        internally when encountering an Op.
-        """
-        if op.ref is not None:
-            return op.ref
-
-        if name is None:
-            name = op.name
-
-        return self._save_object_basic(op, name)
-
-    @trace_sentry.global_trace_sentry.watch()
     def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         """Recursively visits all values, ensuring that any "Refable" objects are
         saved and reffed.
@@ -1135,6 +1121,9 @@ class WeaveClient:
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
             return val
+
+        # `to_json` is mostly fast, except for CustomWeaveTypes
+        # which incur network costs to serialize the payload
         json_val = to_json(val, self._project_id(), self.server)
 
         if name is None:
@@ -1168,9 +1157,23 @@ class WeaveClient:
         return ref
 
     @trace_sentry.global_trace_sentry.watch()
+    def _save_op(self, op: Op, name: Optional[str] = None) -> ObjectRef:
+        """
+        Saves an Op to the weave server and returns the Ref. This is the sister
+        function to _save_object_basic, but for Ops
+        """
+        if op.ref is not None:
+            return op.ref
+
+        if name is None:
+            name = op.name
+
+        return self._save_object_basic(op, name)
+
+    @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:
         """Saves a Table to the weave server and returns the TableRef.
-        This is the sister function to _save_object_basic.
+        This is the sister function to _save_object_basic but for Tables.
         """
         rows = to_json(table.rows, self._project_id(), self.server)
         response = self.server.table_create(
