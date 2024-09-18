@@ -617,6 +617,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         # TODO: version index isn't right here, what if we delete stuff?
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
+            # Mark all existing objects with such id as not latest
+            cursor.execute(
+                """UPDATE objects SET is_latest = 0 WHERE project_id = ? AND object_id = ?""",
+                (req_obj.project_id, req_obj.object_id),
+            )
             # first get version count
             cursor.execute(
                 """SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?""",
