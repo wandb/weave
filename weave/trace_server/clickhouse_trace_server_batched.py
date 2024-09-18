@@ -145,6 +145,10 @@ required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 ObjRefListType = list[ri.InternalObjectRef]
 
 
+CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
+ENTITY_TOO_LARGE_ERROR = "<EXCEEDS_LIMITS>"
+
+
 class ClickHouseTraceServer(tsi.TraceServerInterface):
     def __init__(
         self,
@@ -562,11 +566,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             digest=digest,
         )
 
-        self._insert(
-            "object_versions",
-            data=[list(ch_obj.model_dump().values())],
-            column_names=list(ch_obj.model_fields.keys()),
-        )
+        column_names = list(ch_obj.model_fields.keys())
+        try:
+            self._insert(
+                "object_versions",
+                data=[list(ch_obj.model_dump().values())],
+                column_names=column_names,
+            )
+        except RequestTooLarge:
+            logger.error(
+                "Object insert too large. Attempting retry with large fields stripped"
+            )
+            batch = self._strip_large_values([ch_obj])
+            self._insert(
+                "object_versions",
+                data=[list(batch[0].model_dump().values())],
+                column_names=column_names,
+            )
+
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
@@ -1547,8 +1564,70 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._flush_calls()
 
     def _flush_calls(self) -> None:
-        self._insert_call_batch(self._call_batch)
+        try:
+            self._insert_call_batch(self._call_batch)
+        except RequestTooLarge:
+            logger.error("Request too large. Retrying with large objects stripped.")
+            batch = self._strip_large_values(self._call_batch)
+            self._insert_call_batch(batch)
+
         self._call_batch = []
+
+    def _strip_large_values(self, batch: list) -> list:
+        """
+        Iterate through the batch and replace large values with placeholders.
+
+        If values are larger than 1MiB replace them with placeholder values.
+        Batch should be a list of pydantic objects
+        """
+
+        final_batch = []
+        # Set the value byte limit to be anything over 1MiB to catch
+        # payloads with multiple large values that are still under the
+        # single row insert limit.
+        val_byte_limit = 1 * 1024 * 1024
+
+        # Call batch is bigger than the single row insert limit, could be
+        # totally fine, but make sure that no single row is over the limit
+        seen_bytes = 0
+        for item in batch:
+            item_dump = item.model_dump_json()
+            bytes_size = _num_bytes(item_dump)
+            seen_bytes += bytes_size
+
+            # If bytes_size > row_bytes_limit, this item is too large,
+            # iterate through the json value keys to find and replace
+            # the large values with a placeholder.
+            if bytes_size > CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
+                for value in item_dump.values():
+                    if not isinstance(value, (dict, list, tuple)):
+                        # only check user controlled large fields
+                        continue
+
+                    if isinstance(value, dict):
+                        for k, v in value.items():
+                            if _num_bytes(v) > val_byte_limit:
+                                value[k] = ENTITY_TOO_LARGE_ERROR
+                    elif isinstance(value, list) or isinstance(value, tuple):
+                        for v in value:
+                            if _num_bytes(v) > val_byte_limit:
+                                v = ENTITY_TOO_LARGE_ERROR
+                item = item.__class__(**item_dump)
+            final_batch.append(item)
+        return final_batch
+
+
+def _num_bytes(data: Any) -> int:
+    """
+    Calculate the number of bytes in a string.
+
+    This can be computationally expensive, only call when necessary.
+    Never raise on a failed str cast, just return 0.
+    """
+    try:
+        return len(str(data).encode("utf-8"))
+    except Exception:
+        return 0
 
 
 def _dict_value_to_dump(

@@ -276,7 +276,9 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     @weave.op()
     def multiplier(
         a: Number, b
-    ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
+    ) -> (
+        int
+    ):  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op()
@@ -2765,3 +2767,17 @@ def test_calls_stream_feedback(client):
         "detoned_alias": ":thumbs_up:",
         "emoji": "👍",
     } in call2_payloads
+
+
+def test_large_keys_are_stripped(client):
+    data = {"dictionary": {f"{i}": i for i in range(1_000_000)}}
+
+    @weave.op
+    def test_op_dict(input_data: dict):
+        return {"output": input_data}
+
+    test_op_dict(data)
+
+    calls = list(test_op_dict.calls())
+    assert len(calls) == 1
+    assert calls[0].output == {"output": data}

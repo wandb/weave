@@ -1,7 +1,6 @@
 import asyncio
 import dataclasses
 import json
-import logging
 import platform
 import sys
 
@@ -33,11 +32,6 @@ from weave.trace_server.trace_server_interface import (
     TableCreateReq,
     TableQueryReq,
     TableSchemaForInsert,
-)
-from weave.trace_server_bindings.remote_http_trace_server import (
-    ENTITY_TOO_LARGE_ERROR,
-    EndBatchItem,
-    StartBatchItem,
 )
 
 
@@ -319,7 +313,6 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
-        deleted_at=None,
     )
     assert result[1] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -346,7 +339,6 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
-        deleted_at=None,
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
@@ -1155,7 +1147,24 @@ def test_table_partitioning(network_proxy_client):
     NUM_ROWS = 16
     rows = list(row_gen(NUM_ROWS, 1024))
     exp_digest = "15696550bde28f9231173a085ce107c823e7eab6744a97adaa7da55bc9c93347"
-
+    row_digests = [
+        "2df5YAp2sqlYyxEpTKsIrUlf9Kc5ZxEkbqtqUnYOLhk",
+        "DMjRIeuM76SCqXqsqehYyfL3KYV5fL0DBr6g4RJ4izA",
+        "f949WksZQdTgf5Ac3cXS5cMuGf0otLvpULOfOsAGiYs",
+        "YaFBweA0HU7w51Sdt8X4uhSmjk7N4WqSfuknmBRpWcc",
+        "BBzLkGZ6fFraXdoFOSjj7p2d1qSiyMXjRnk7Zas2FEA",
+        "i6i1XJ7QecqWkB8MdljoWu35tpjwk8npzFAd67aisB4",
+        "IsjSZ4usQrHUcu0cNtKedBlUWrIW1f4cSDck1lGCSMw",
+        "MkL0DTiDMCW3agkcIeZ5g5VP0MyFuQcVpa1yqGGVZwk",
+        "Vu6S8c4XdXgWNYaAXKqsxuicY6XbYDKLIUkd2M0YPF8",
+        "IkIjQFARp0Qny3AUav18zZuzY4INFXsREPkS3iFCrWo",
+        "E3T6ngUGSpXY9u2l58sb9smleJ7GO2YlYJY0tq2oV5U",
+        "uNmcjBhJyiC6qvJZ0JRlGLpRm68ARrXVYlBgjGRqRdA",
+        "0bzwVP0JFd7Y2W9YmpPUv62aAkyY2RCaFVxMnEfjIqY",
+        "3bZG40U188x6bVfm9aQX2xvYVqlCftD82O4UsDZtRVU",
+        "KW40nfHplo7BDJux0kP8PeYQ95lnOEGaeYfgNtsQ1oE",
+        "u10rDrPoYXl58eQStkQP4dPH6KfmE7I88f0FYI7L9fg",
+    ]
     remote_client.remote_request_bytes_limit = (
         100 * 1024
     )  # very large buffer to ensure a single request
@@ -1168,6 +1177,7 @@ def test_table_partitioning(network_proxy_client):
         )
     )
     assert res.digest == exp_digest
+    assert res.row_digests == row_digests
     assert len(records) == 1
 
     remote_client.remote_request_bytes_limit = (
@@ -1182,105 +1192,12 @@ def test_table_partitioning(network_proxy_client):
         )
     )
     assert res.digest == exp_digest
+    assert res.row_digests == row_digests
     assert len(records) == (
         1  # The first create call,
         + 1  # the second  create
         + NUM_ROWS / 2  # updates - 2 per batch
     )
-
-
-def test_call_batch_size_handling(network_proxy_client, caplog):
-    client, remote_client, records = network_proxy_client
-
-    large_string = "x" * 10_000_000
-    large_dict = {"dictionary": {f"{i}": "x" for i in range(10_000_000)}}
-
-    assert len(large_string.encode("utf-8")) > 3.5 * 1024 * 1024
-    assert len(str(large_dict).encode("utf-8")) > 3.5 * 1024 * 1024
-
-    batch = [
-        StartBatchItem(
-            mode="start",
-            req=tsi.CallStartReq(
-                start={
-                    "id": "123",
-                    "op_name": "save_large_string",
-                    "project_id": client._project_id(),
-                    "started_at": "2024-02-29T12:00:00Z",
-                    "attributes": {},
-                    "inputs": {"string": large_string},
-                }
-            ),
-        ),
-        EndBatchItem(
-            mode="end",
-            req=tsi.CallEndReq(
-                end={
-                    "id": "123",
-                    "op_name": "save_large_string",
-                    "project_id": client._project_id(),
-                    "output": {"string": large_string},
-                    "summary": {"some_key": "some_value"},
-                    "ended_at": "2024-02-29T12:00:00Z",
-                }
-            ),
-        ),
-    ]
-
-    out1 = remote_client._strip_large_values_from_batch(
-        batch=batch, encoded_bytes=len(str(batch).encode("utf-8"))
-    )
-
-    assert len(out1) == 2
-    assert out1[0].mode == "start"
-    assert out1[0].req.start.inputs["string"] == ENTITY_TOO_LARGE_ERROR
-    assert out1[1].req.end.output["string"] == ENTITY_TOO_LARGE_ERROR
-
-    batch = [
-        StartBatchItem(
-            mode="start",
-            req=tsi.CallStartReq(
-                start={
-                    "id": "456",
-                    "op_name": "save_large_dict",
-                    "project_id": client._project_id(),
-                    "started_at": "2024-02-29T12:00:00Z",
-                    "attributes": {},
-                    "inputs": {"len": 10000000},
-                }
-            ),
-        ),
-        EndBatchItem(
-            mode="end",
-            req=tsi.CallEndReq(
-                end={
-                    "id": "456",
-                    "op_name": "save_large_dict",
-                    "project_id": client._project_id(),
-                    "output": {"dictionary": large_dict},
-                    "summary": {"some_key": "some_value"},
-                    "ended_at": "2024-02-29T12:00:00Z",
-                }
-            ),
-        ),
-    ]
-    out2 = remote_client._strip_large_values_from_batch(
-        batch=batch, encoded_bytes=len(str(batch).encode("utf-8"))
-    )
-
-    assert len(out2) == 2
-    assert out2[0].mode == "start"
-    assert out2[0].req.start.inputs["len"] == 10000000
-    assert out2[1].req.end.output["dictionary"] == ENTITY_TOO_LARGE_ERROR
-
-    # check that errors are logged to stdout
-    error_messages = [
-        record.message for record in caplog.records if record.levelname == "ERROR"
-    ]
-    assert len(error_messages) == 3  # two output, one inputs
-    for error in error_messages:
-        assert "Replacing large" in error
-        assert "greater than the maximum single row insert size of 3.50 MiB." in error
 
 
 def test_summary_tokens_cost(client):
