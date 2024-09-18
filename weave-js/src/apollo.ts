@@ -30,19 +30,17 @@ const authMiddleware = new ApolloLink((operation, forward) => {
 export const makeGorillaApolloClient = (
   gorillaApolloEndpoint: string = `${window.WEAVE_CONFIG.WANDB_BASE_URL}/graphql`
 ) => {
+  let endpoint = gorillaApolloEndpoint;
   if (
     window.WEAVE_CONFIG.WANDB_POD_BASE_URL !== '' &&
     window.WEAVE_CONFIG.WANDB_POD_BASE_URL !==
       window.WEAVE_CONFIG.WANDB_BASE_URL &&
     gorillaApolloEndpoint.includes(window.WEAVE_CONFIG.WANDB_BASE_URL)
   ) {
-    gorillaApolloEndpoint = `${window.WEAVE_CONFIG.WANDB_POD_BASE_URL}/graphql`;
+    endpoint = `${window.WEAVE_CONFIG.WANDB_POD_BASE_URL}/graphql`;
   }
   return new ApolloClient({
-    link: ApolloLink.from([
-      authMiddleware,
-      makeHttpLink(gorillaApolloEndpoint),
-    ]),
+    link: ApolloLink.from([authMiddleware, makeHttpLink(endpoint)]),
     cache: new InMemoryCache(),
   });
 };
