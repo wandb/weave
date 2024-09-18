@@ -7,6 +7,7 @@ import {toast} from '../../../../../../common/components/elements/Toast';
 import Markdown from '../../../../../../common/components/Markdown';
 import {MOON_150} from '../../../../../../common/css/color.styles';
 import {TargetBlank} from '../../../../../../common/util/links';
+import {isLikelyMarkdown} from '../../../../../../util/markdown';
 import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
@@ -71,18 +72,6 @@ const PreserveWrapping = styled.div`
   white-space: break-spaces;
 `;
 PreserveWrapping.displayName = 'S.PreserveWrapping';
-
-// Regular expressions for common Markdown syntax
-// Note this is intentionally limited in scope to reduce false positives.
-const LIKELY_MARKDOWN_PATTERNS: RegExp[] = [
-  /```[\s\S]*```/, // Code block
-  /\[.+\]\(.+\)/, // Links [text](url)
-  /!\[.*\]\(.+\)/, // Images ![alt](url)
-];
-
-const isLikelyMarkdown = (value: string): boolean => {
-  return LIKELY_MARKDOWN_PATTERNS.some(pattern => pattern.test(value));
-};
 
 const getDefaultFormat = (value: string): Format => {
   // TODO: Add JSON detection.
