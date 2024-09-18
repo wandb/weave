@@ -85,7 +85,7 @@ def simple_operation(input_value):
     # Perform some simple operation
     output = f"Processed {input_value}"
     # Get the current call ID
-    current_call = weave.get_current_call()
+    current_call = weave.require_current_call()
     call_id = current_call.id
     return output, call_id
 ```
