@@ -1067,8 +1067,6 @@ class WeaveClient:
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
             ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
-            # Should this go in `_save_object_basic`?
-            obj.__dict__["ref"] = ref
 
         # Case 2: Op:
         # Here we save the op itself.
@@ -1078,14 +1076,11 @@ class WeaveClient:
 
         # Case 3: Table
         elif isinstance(obj, Table):
-            table_ref = self._save_table(obj)
-            obj.ref = table_ref
+            self._save_table(obj)
 
         # Case 4: WeaveTable
         elif isinstance(obj, WeaveTable):
-            table_ref = self._save_table(obj)
-            obj.ref = table_ref
-            obj.table_ref = table_ref
+            self._save_table(obj)
 
         # Special case: Custom recursive handling for WeaveObject with rows
         # TODO: Kinda hacky way to dispatching Dataset with rows: Table
@@ -1198,12 +1193,18 @@ class WeaveClient:
         # the WeaveTable knows that it needs to fetch the rows from the server.
         if len(response.row_digests) == len(table.rows):
             row_digests = response.row_digests
-        return TableRef(
+        table_ref = TableRef(
             entity=self.entity,
             project=self.project,
             digest=response.digest,
             row_digests=row_digests,
         )
+        table.ref = table_ref
+
+        if isinstance(table, WeaveTable):
+            table.table_ref = table_ref
+
+        return table_ref
 
     ################ Internal Helpers ################
 
