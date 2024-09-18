@@ -25,7 +25,7 @@ Defines the Op protocol and related functions.
 ---
 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L246"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L269"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `call`
 
@@ -49,7 +49,7 @@ result, call = add.call(1, 2)
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L267"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L290"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `calls`
 

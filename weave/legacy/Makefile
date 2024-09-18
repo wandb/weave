@@ -3,7 +3,7 @@ generate_panel_instructions:
 
 
 .integration-deps: requirements.test.txt requirements.txt
-	pip install -r requirements.test.txt
+	pip install -r requirements.legacy.test.txt
 	touch .integration-deps
 
 
