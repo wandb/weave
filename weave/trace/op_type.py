@@ -23,7 +23,6 @@ from weave.trace.ipython import (
 )
 from weave.trace.mem_artifact import MemTraceFilesArtifact
 from weave.trace.op import Op
-from weave.trace.serialize import to_json
 from weave.trace_server.trace_server_interface_util import str_digest
 
 from . import env, serializer
@@ -409,6 +408,8 @@ def _get_code_deps(
                 try:
                     if (client := get_weave_client()) is None:
                         raise ValueError("Weave client not found")
+
+                    from weave.trace.serialize import to_json
 
                     json_val = to_json(var_value, client._project_id(), client.server)
                 except Exception as e:
