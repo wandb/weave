@@ -983,6 +983,16 @@ class WeaveClient:
         return res.results
 
     ################# Object Saving ##################
+    # `_save_object` is the top level entry point for saving data to the weave server.
+    # `_save_nested_objects` is a recursive method to dispatch saving of nested objects.
+    #  it is called by `_save_object` above, as well as `create_call` and `finish_call`
+    #  since we don't save the entire dictionary, but rather want to save any nested objects
+    # `_save_object_basic` is the lowest level object saving logic which:
+    #  - serializes the object to json
+    #  - calls the server to save the object
+    #  - creates an ObjectRef and attaches it to the object
+    # `_save_op` and `_save_table` are the sister functions to `_save_object_basic`
+    #  but for Ops and Tables respectively.
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
