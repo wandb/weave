@@ -98,6 +98,20 @@ def remove_ref(obj: Any) -> None:
             obj.ref = None
 
 
+def set_ref(obj: Any, ref: Optional[Ref]) -> None:
+    try:
+        obj.ref = ref
+    except:
+        try:
+            setattr(obj, "ref", ref)
+        except:
+            try:
+                obj.__dict__["ref"] = ref
+            except:
+                pass
+    raise ValueError(f"Failed to set ref on object of type {type(obj)}")
+
+
 def _get_direct_ref(obj: Any) -> Optional[Ref]:
     if isinstance(obj, WeaveTable):
         # TODO: this path is odd. We want to use table_ref when serializing
@@ -1157,7 +1171,12 @@ class WeaveClient:
             ref = ObjectRef(self.entity, self.project, name, response.digest)
 
         # Attach the ref to the object
-        val.__dict__["ref"] = ref
+        try:
+            set_ref(val, ref)
+        except:
+            # Don't worry if we can't set the ref.
+            # This can happen for primitive types that don't have __dict__
+            pass
 
         return ref
 
