@@ -1272,7 +1272,7 @@ class WeaveClient:
             self.server.call_processor.wait_until_all_processed()  # type: ignore
 
 
-def send_start_call(  #
+def send_start_call(
     project_id: str,
     call_id: str,
     op_str: str,
