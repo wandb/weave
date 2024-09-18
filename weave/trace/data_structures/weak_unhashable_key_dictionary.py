@@ -37,16 +37,14 @@ class WeakKeyDictionarySupportingNonHashableKeys(Generic[K, V]):
     """
 
     def __init__(self) -> None:
-        """
-        Initialize an empty WeakKeyDictionarySupportingNonHashableKeys.
-        """
+        """Initialize an empty WeakKeyDictionarySupportingNonHashableKeys."""
         self._id_to_data: dict[int, V] = {}
-        self._id_to_key: dict[int, K] = {}
+        self._id_to_key: weakref.WeakValueDictionary[int, K] = (
+            weakref.WeakValueDictionary()
+        )
 
     def clear(self) -> None:
-        """
-        Remove all items from the dictionary.
-        """
+        """Remove all items from the dictionary."""
         self._id_to_data.clear()
         self._id_to_key.clear()
 
@@ -97,6 +95,8 @@ class WeakKeyDictionarySupportingNonHashableKeys(Generic[K, V]):
         if item_id in self._id_to_data:
             del self._id_to_data[item_id]
             del self._id_to_key[item_id]
+        else:
+            raise KeyError(key)
 
     def __setitem__(self, key: K, value: V) -> None:
         """
@@ -125,6 +125,7 @@ class WeakKeyDictionarySupportingNonHashableKeys(Generic[K, V]):
         Args:
             item_id (int): The id of the item to remove.
         """
+        print("removing item", item_id)
         self._id_to_data.pop(item_id, None)
         self._id_to_key.pop(item_id, None)
 
@@ -144,14 +145,18 @@ class WeakKeyDictionarySupportingNonHashableKeys(Generic[K, V]):
         Returns:
             int: The number of items in the dictionary.
         """
+        print("len", len(self._id_to_data))
+        print("len key", len(self._id_to_key))
+        print("len data values", self._id_to_data.values())
+        print("len key values", self._id_to_key.values())
         return len(self._id_to_data)
 
-    def keys(self) -> ValuesView[K]:
+    def keys(self) -> Iterator[K]:
         """
         Return a view of the dictionary's keys.
 
         Returns:
-            ValuesView[K]: A view object providing a view on the dictionary's keys.
+            Iterator[K]: A view object providing a view on the dictionary's keys.
         """
         return self._id_to_key.values()
 
