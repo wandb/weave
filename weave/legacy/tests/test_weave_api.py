@@ -5,7 +5,6 @@ import pytest
 import weave
 import weave.legacy.weave.context_state
 import weave.legacy.weave.wandb_api
-import weave.trace.weave_init
 
 
 def test_create_list_rename_delete():

@@ -17,8 +17,6 @@ from weave.legacy.weave import weave_internal as _weave_internal
 from weave.legacy.weave import util as _util
 
 from weave.legacy.weave import context as _context
-from ...trace import weave_init as _weave_init
-from ...trace import weave_client as _weave_client
 
 # exposed as part of api
 from weave.legacy.weave import weave_types as types
@@ -128,8 +126,6 @@ __all__ = [
     "_weave_internal",
     "_util",
     "_context",
-    "_weave_init",
-    "_weave_client",
     "types",
     "_types_numpy",
     "errors",
