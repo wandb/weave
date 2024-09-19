@@ -617,6 +617,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         # TODO: version index isn't right here, what if we delete stuff?
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
+            # Mark all existing objects with such id as not latest
+            cursor.execute(
+                """UPDATE objects SET is_latest = 0 WHERE project_id = ? AND object_id = ?""",
+                (req_obj.project_id, req_obj.object_id),
+            )
             # first get version count
             cursor.execute(
                 """SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?""",
@@ -670,6 +675,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conds: list[str] = []
+        parameters: Dict[str, Any] = {}
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
@@ -677,17 +683,23 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 else:
                     conds.append("kind != 'op'")
             if req.filter.object_ids:
-                in_list = ", ".join([f"'{n}'" for n in req.filter.object_ids])
-                conds.append(f"object_id IN ({in_list})")
+                placeholders = ",".join(["?" for _ in req.filter.object_ids])
+                conds.append(f"object_id IN ({placeholders})")
+                parameters["object_ids"] = req.filter.object_ids
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
             if req.filter.base_object_classes:
-                in_list = ", ".join([f"'{t}'" for t in req.filter.base_object_classes])
-                conds.append(f"base_object_class IN ({in_list})")
+                placeholders = ",".join(["?" for _ in req.filter.base_object_classes])
+                conds.append(f"base_object_class IN ({placeholders})")
+                parameters["base_object_classes"] = req.filter.base_object_classes
 
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
+            parameters=parameters,
+            limit=req.limit,
+            offset=req.offset,
+            sort_by=req.sort_by,
         )
 
         return tsi.ObjQueryRes(objs=objs)
@@ -1042,16 +1054,41 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         conditions: Optional[list[str]] = None,
+        parameters: Optional[Dict[str, Any]] = None,
         limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        sort_by: Optional[list[tsi.SortBy]] = None,
     ) -> list[tsi.ObjSchema]:
         conn, cursor = get_conn_cursor(self.db_path)
         pred = " AND ".join(conditions or ["1 = 1"])
-        cursor.execute(
-            """SELECT * FROM objects WHERE deleted_at IS NULL AND project_id = ? AND """
-            + pred
-            + " ORDER BY created_at ASC",
-            (project_id,),
-        )
+        query = f"""SELECT * FROM objects
+                    WHERE deleted_at IS NULL AND project_id = ? AND {pred}"""
+
+        if sort_by:
+            valid_sort_fields = {"object_id", "created_at"}
+            sort_clauses = []
+            for sort in sort_by:
+                if sort.field in valid_sort_fields and sort.direction in {
+                    "asc",
+                    "desc",
+                }:
+                    sort_clauses.append(f"{sort.field} {sort.direction.upper()}")
+            if sort_clauses:
+                query += f" ORDER BY {', '.join(sort_clauses)}"
+        else:
+            query += " ORDER BY created_at ASC"
+
+        if limit is not None:
+            query += f" LIMIT {limit}"
+        if offset is not None:
+            query += f" OFFSET {offset}"
+
+        params = [project_id]
+        if parameters:
+            for param_list in parameters.values():
+                params.extend(param_list)
+
+        cursor.execute(query, params)
         query_result = cursor.fetchall()
         result: list[tsi.ObjSchema] = []
         for row in query_result:
@@ -1068,7 +1105,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     is_latest=row[9],
                 )
             )
-
         return result
 
 
