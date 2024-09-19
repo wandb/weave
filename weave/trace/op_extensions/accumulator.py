@@ -61,7 +61,7 @@ class _IteratorWrapper(Generic[V]):
     def __next__(self) -> Generator[None, None, V]:
         if not hasattr(self._iterator_or_ctx_manager, "__next__"):
             try:
-                self._iterator_or_ctx_manager = iter(self._iterator_or_ctx_manager)
+                self._iterator_or_ctx_manager = iter(self._iterator_or_ctx_manager)  # type: ignore
             except TypeError:
                 raise TypeError(
                     f"Cannot call next on an iterator of type {type(self._iterator_or_ctx_manager)}"
