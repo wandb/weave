@@ -15,6 +15,7 @@ from typing import Any, Callable, Optional, Union, get_args, get_origin
 
 from weave import context_state
 from weave.legacy.weave import artifact_fs, errors, storage
+from weave.trace import settings
 from weave.trace.ipython import (
     ClassNotFoundError,
     get_class_source,
@@ -267,6 +268,14 @@ def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
     if isinstance(fn, Op):
         fn = fn.resolve_fn
 
+    if not settings.should_capture_code():
+        return textwrap.dedent(
+            """
+            def func(*args, **kwargs):
+                ...  # Code-capture disabled for this op
+            """
+        )
+
     try:
         return get_source_notebook_safe(fn)
     except OSError:
@@ -276,13 +285,12 @@ def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
         sig_str = reconstruct_signature(fn)
     except Exception as e:
         warnings.append(f"Failed to reconstruct signature: {e}")
-        sig_str = "(*args, **kwargs)"
 
     func_name = fn.__name__
     missing_code_template = textwrap.dedent(
         f"""
         def {func_name}{sig_str}:
-            ... # Code-capture unavailable for this op
+            ...  # Code-capture unavailable for this op
         """
     )[1:]  # skip first newline char
 

@@ -496,6 +496,7 @@ class WeaveClient:
                     digest=ref.digest,
                 )
             )
+            print(f"{read_res=}")
         except HTTPError as e:
             if e.response is not None and e.response.status_code == 404:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")

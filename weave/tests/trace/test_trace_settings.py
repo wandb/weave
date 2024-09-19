@@ -1,3 +1,4 @@
+import inspect
 import io
 import os
 import sys
@@ -90,3 +91,19 @@ def test_print_call_link_env(client):
 
     output = captured_stdout.getvalue()
     assert TRACE_CALL_EMOJI in output
+
+
+def test_should_capture_code_setting(client):
+    parse_and_apply_settings(UserSettings(capture_code=False))
+
+    ref = weave.publish(func)
+    func2 = ref.get()
+    assert "Code-capture disabled" in inspect.getsource(func2)
+
+    parse_and_apply_settings(UserSettings(capture_code=True))
+    ref = weave.publish(func)
+    func2 = ref.get()
+    assert "Code-capture disabled" not in inspect.getsource(func2)
+
+
+def test_should_capture_code_env(client): ...
