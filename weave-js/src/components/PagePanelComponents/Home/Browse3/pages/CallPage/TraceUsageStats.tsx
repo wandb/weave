@@ -1,15 +1,13 @@
 import Box from '@mui/material/Box';
 import {formatNumber} from '@wandb/weave/core/util/number';
-import {
-  formatTokenCost,
-  formatTokenCount,
-  getLLMTokenCost,
-} from '@wandb/weave/util/llmTokenCosts';
+import {getLLMTokenCost} from '@wandb/weave/util/llmTokenCosts';
 import React from 'react';
 
 import {LLMUsageSchema} from '../wfReactInterface/traceServerClientTypes';
 import {
   CostToolTip,
+  formatTokenCost,
+  formatTokenCount,
   getUsageInputTokens,
   getUsageOutputTokens,
   isUsageDataKey,

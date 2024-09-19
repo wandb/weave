@@ -4,15 +4,15 @@ import {MOON_600} from '@wandb/weave/common/css/color.styles';
 import {IconName} from '@wandb/weave/components/Icon';
 import {Pill} from '@wandb/weave/components/Tag';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
-import {
-  FORMAT_NUMBER_NO_DECIMALS,
-  formatTokenCost,
-} from '@wandb/weave/util/llmTokenCosts';
 import React, {ReactNode} from 'react';
 
 import {LLMCostSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {CostTotals, TokenTotals} from './costTypes';
-import {getCostFromCellParams} from './costUtils';
+import {
+  FORMAT_NUMBER_NO_DECIMALS,
+  formatTokenCost,
+  getCostFromCellParams,
+} from './costUtils';
 
 const tooltipRowStyles = {
   display: 'flex',

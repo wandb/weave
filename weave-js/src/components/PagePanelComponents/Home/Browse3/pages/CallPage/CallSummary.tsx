@@ -7,7 +7,7 @@ import {UserLink} from '../../../../../UserLink';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {CostTable} from './CostTable';
+import {CostTable} from './cost';
 
 const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = [
   'latency_s',
