@@ -15,6 +15,7 @@ from typing import Any, Callable, Optional, Union, get_args, get_origin
 
 from weave import context_state
 from weave.legacy.weave import artifact_fs, errors, storage
+from weave.trace import settings
 from weave.trace.ipython import (
     ClassNotFoundError,
     get_class_source,
@@ -22,6 +23,7 @@ from weave.trace.ipython import (
 )
 from weave.trace.op import Op
 from weave.trace.refs import ObjectRef
+from weave.trace_server.trace_server_interface_util import str_digest
 
 from ..legacy.weave import environment
 from . import serializer
@@ -266,6 +268,16 @@ def reconstruct_signature(fn: typing.Callable) -> str:
 def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
     if isinstance(fn, Op):
         fn = fn.resolve_fn
+
+    if not settings.should_capture_code():
+        # This digest is kept for op versioning purposes
+        digest = str_digest(inspect.getsource(fn))
+        return textwrap.dedent(
+            f"""
+            def func(*args, **kwargs):
+                ...  # Code-capture was disabled while saving this op (digest: {digest})
+            """
+        )
 
     try:
         return get_source_notebook_safe(fn)

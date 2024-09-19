@@ -303,11 +303,23 @@ export const CallLink: React.FC<{
             display: 'flex',
             alignItems: 'center',
             gap: '4px',
-            justifyContent: 'space-between',
+            // allow flex items to shrink below their minimum content size
+            minWidth: 0,
           }}>
           {props.icon}
-          {opName}
-          <Id id={props.callId} type="Call" />
+          <span
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              flexGrow: 1,
+              flexShrink: 1,
+            }}>
+            {opName}
+          </span>
+          <span style={{flexShrink: 0}}>
+            <Id id={props.callId} type="Call" />
+          </span>
         </Link>
       </LinkTruncater>
     </LinkWrapper>

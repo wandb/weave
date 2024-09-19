@@ -26,7 +26,6 @@ from weave.trace.op import Op, maybe_unbind_method
 from weave.trace.op import op as op_deco
 from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_op_uri
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
-from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.table import Table
 from weave.trace.util import deprecated
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
@@ -97,6 +96,25 @@ def remove_ref(obj: Any) -> None:
             obj.__dict__["ref"] = None
         else:
             obj.ref = None
+
+
+def set_ref(obj: Any, ref: Optional[Ref]) -> None:
+    """Try to set the ref on "any" object.
+
+    We use increasingly complex methods to try to set the ref
+    to support different kinds of objects. This will still
+    fail for python primitives, but those can't be traced anyway.
+    """
+    try:
+        obj.ref = ref
+    except:
+        try:
+            setattr(obj, "ref", ref)
+        except:
+            try:
+                obj.__dict__["ref"] = ref
+            except:
+                raise ValueError(f"Failed to set ref on object of type {type(obj)}")
 
 
 def _get_direct_ref(obj: Any) -> Optional[Ref]:
@@ -440,6 +458,28 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def save(self, val: Any, name: str, branch: str = "latest") -> Any:
+        """Do not call directly, use weave.publish() instead.
+
+        Args:
+            val: The object to save.
+            name: The name to save the object under.
+            branch: The branch to save the object under. Defaults to "latest".
+
+        Returns:
+            A deserialized version of the saved object.
+        """
+        # Adding a second comment line for developers that is not a docstring:
+        # Save an object to the weave server and return a deserialized version of it.
+
+        # Note: This is sort of a weird method becuase:
+        # 1. It returns a deserialized version of the object (which will often not pass type-checks)
+        # 2. It is slow (because it re-downloads the object from the weave server)
+        # 3. It explicitly filters out non ObjectRefs, which seems like a useless constraint.
+        #
+        # Because of these reasons, `weave.publish()` directly calls `_save_object()`
+        # and then returns the raw ObjectRef. I (Tim) think we should consider refactoring
+        # `save()`. I am not sure when as an end user you would ever want to use this method.
+
         ref = self._save_object(val, name, branch)
         if not isinstance(ref, ObjectRef):
             raise ValueError(f"Expected ObjectRef, got {ref}")
@@ -961,41 +1001,162 @@ class WeaveClient:
         )
         return res.results
 
-    ################ Internal Helpers ################
+    ################# Object Saving ##################
+    # `_save_object` is the top level entry point for saving data to the weave server.
+    # `_save_nested_objects` is a recursive method to dispatch saving of nested objects.
+    #  it is called by `_save_object` above, as well as `create_call` and `finish_call`
+    #  since we don't save the entire dictionary, but rather want to save any nested objects
+    # `_save_object_basic` is the lowest level object saving logic which:
+    #  - serializes the object to json
+    #  - calls the server to save the object
+    #  - creates an ObjectRef and attaches it to the object
+    # `_save_op` and `_save_table` are the sister functions to `_save_object_basic`
+    #  but for Ops and Tables respectively.
 
-    def _ref_is_own(self, ref: Ref) -> bool:
-        return isinstance(ref, Ref)
-
-    def _project_id(self) -> str:
-        return f"{self.entity}/{self.project}"
-
-    # This is used by tests and op_execute still, but the save() interface
-    # is nicer for clients I think?
     @trace_sentry.global_trace_sentry.watch()
     def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
+        """Save an object to the weave server and return it's Ref. This is the top
+        level entry point for saving any data to the weave server. Importantly, it
+        will also save all children objects that are "Refable".
+
+        Args:
+            val: The object to save.
+            name: The name to save the object under.
+            branch: The branch to save the object under. Defaults to "latest".
+
+        Returns:
+            An ObjectRef to the saved object.
+        """
+        if isinstance(val, WeaveTable):
+            # TODO: Probably should error here
+            pass
+
+        # If it's an Op, use the Op saving logic
+        if isinstance(val, Op):
+            # TODO: Probably should call _save_op directly here (or error)
+            pass
+
+        # Step 1: Recursively save all nested objects
         self._save_nested_objects(val, name=name)
 
-        # typically, this condition would belong inside of the
-        # `_save_nested_objects` switch. However, we don't want to recursively
-        # publish all custom objects. Instead we only want to do this at the
-        # top-most level if requested
-        if get_serializer_for_obj(val) is not None:
-            self._save_and_attach_ref(val)
-
+        # Step 2: Save the object itself
         return self._save_object_basic(val, name, branch)
 
+    @trace_sentry.global_trace_sentry.watch()
+    def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
+        """Recursively visits all values, ensuring that any "Refable" objects are
+        saved and reffed.
+        As of this writing, the only "Refable" objects are instances of:
+        - weave.flow.obj.Object
+        - weave.trace.op.Op
+        - weave.trace.Table
+        - weave.trace.vals.WeaveTable
+        This procedure is a bit complicated, so it is worth making the details explicit:
+        1. If the `obj` value already has a `ref`:
+            - If the ref is to the current project, do nothing.
+            - If the ref is to a different project, remove it. (to avoid cross-project references)
+        2. If the `obj` value can be "reffed" (according to one of the above cases), invoke
+            the appropriate "save" function for that type of object, and attach the ref result to `obj`.
+            - `_save_object_basic` (for `weave.flow.obj.Object` instances)
+            - `_save_op` (for `weave.trace.op.Op` instances)
+            - `_save_table` (for `weave.trace.Table` and `weave.trace.vals.WeaveTable` instances)
+        3. Otherwise, traverse all values within `obj` recursively, applying the above logic to each value.
+        Important notes to developers: This method does not return anything - it _mutates_ the
+        values that it traverses (specifically, it attaches `ref` values to them)
+
+        Important: This method calls low level save methods directly - causing network events. Until
+        these are backgrounded, they should not be invoked from inside a critical path.
+        """
+        # Base case: if the object is already refed
+        #  - if the ref is to a different project, remove it
+        #  - if the ref is to the current project, do nothing
+        if (ref := get_ref(obj)) is not None:
+            if ALLOW_MIXED_PROJECT_REFS:
+                return
+            # Check if existing ref is to current project, if not,
+            # remove the ref and recreate it in the current project
+            if ref.project == self.project:
+                return
+            remove_ref(obj)
+        # Must defer import here to avoid circular import
+        from weave.flow.obj import Object
+
+        # Case 1: Object:
+        # Here we recurse into each of the properties of the object
+        # and save them, and then save the object itself.
+        if isinstance(obj, Object):
+            obj_rec = pydantic_object_record(obj)
+            for v in obj_rec.__dict__.values():
+                self._save_nested_objects(v)
+            ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
+            # Personally, i think we should be passing `obj` into _save_object_basic,
+            # and letting `to_json` handle converting the pydantic object into a jsonable object
+            # but that might have unintended consequences. As a result, we break the
+            # typical pattern and explicitly set the ref here.
+            set_ref(obj, ref)
+
+        # Case 2: Op:
+        # Here we save the op itself.
+        elif isinstance(obj, Op):
+            # Ref is attached in here
+            self._save_op(obj)
+
+        # Case 3: Table
+        elif isinstance(obj, Table):
+            self._save_table(obj)
+
+        # Case 4: WeaveTable
+        elif isinstance(obj, WeaveTable):
+            self._save_table(obj)
+
+        # Special case: Custom recursive handling for WeaveObject with rows
+        # TODO: Kinda hacky way to dispatching Dataset with rows: Table
+        elif isinstance(obj, WeaveObject) and hasattr(obj, "rows"):
+            self._save_nested_objects(obj.rows)
+
+        # Recursive traversal of other pydantic objects
+        elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+            obj_rec = pydantic_object_record(obj)
+            for v in obj_rec.__dict__.values():
+                self._save_nested_objects(v)
+
+        # Recursive traversal of other dataclasses
+        elif dataclasses.is_dataclass(obj) and not isinstance(obj, Ref):
+            obj_rec = dataclass_object_record(obj)
+            for v in obj_rec.__dict__.values():
+                self._save_nested_objects(v)
+
+        # Recursive traversal of python structures
+        elif isinstance_namedtuple(obj):
+            for v in obj._asdict().values():
+                self._save_nested_objects(v)
+        elif isinstance(obj, (list, tuple)):
+            for v in obj:
+                self._save_nested_objects(v)
+        elif isinstance(obj, dict):
+            for v in obj.values():
+                self._save_nested_objects(v)
+
+    @trace_sentry.global_trace_sentry.watch()
     def _save_object_basic(
         self, val: Any, name: Optional[str] = None, branch: str = "latest"
     ) -> ObjectRef:
+        """Directly saves an object to the weave server and attach
+        the ref to the object. This is the lowest level object saving logic.
+        """
         # The WeaveTable case is special because object saving happens inside
         # _save_object_nested and it has a special table_ref -- skip it here.
         if getattr(val, "_is_dirty", False) and not isinstance(val, WeaveTable):
             val.ref = None
 
         is_opdef = isinstance(val, Op)
+        orig_val = val
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
             return val
+
+        # `to_json` is mostly fast, except for CustomWeaveTypes
+        # which incur network costs to serialize the payload
         json_val = to_json(val, self._project_id(), self.server)
 
         if name is None:
@@ -1022,70 +1183,69 @@ class WeaveClient:
             ref = OpRef(self.entity, self.project, name, response.digest)
         else:
             ref = ObjectRef(self.entity, self.project, name, response.digest)
-        # TODO: Try to put a ref onto val? Or should user code use a style like
-        # save instead?
+
+        # Attach the ref to the object
+        try:
+            set_ref(orig_val, ref)
+        except:
+            # Don't worry if we can't set the ref.
+            # This can happen for primitive types that don't have __dict__
+            pass
+
         return ref
 
-    def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
-        if (ref := get_ref(obj)) is not None:
-            if ALLOW_MIXED_PROJECT_REFS:
-                return
+    @trace_sentry.global_trace_sentry.watch()
+    def _save_op(self, op: Op, name: Optional[str] = None) -> ObjectRef:
+        """
+        Saves an Op to the weave server and returns the Ref. This is the sister
+        function to _save_object_basic, but for Ops
+        """
+        if op.ref is not None:
+            return op.ref
 
-            # Check if existing ref is to current project, if not,
-            # remove the ref and recreate it in the current project
-            if ref.project == self.project:
-                return
-            remove_ref(obj)
-        # Must defer import here to avoid circular import
-        from weave.flow.obj import Object
+        if name is None:
+            name = op.name
 
-        if isinstance(obj, Object):
-            obj_rec = pydantic_object_record(obj)
-            for v in obj_rec.__dict__.values():
-                self._save_nested_objects(v)
-            ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
-            obj.__dict__["ref"] = ref
-        elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
-            obj_rec = pydantic_object_record(obj)
-            for v in obj_rec.__dict__.values():
-                self._save_nested_objects(v)
-        elif dataclasses.is_dataclass(obj) and not isinstance(obj, Ref):
-            obj_rec = dataclass_object_record(obj)
-            for v in obj_rec.__dict__.values():
-                self._save_nested_objects(v)
-        elif isinstance(obj, Table):
-            table_ref = self._save_table(obj)
-            obj.ref = table_ref
-        elif isinstance(obj, WeaveTable):
-            table_ref = self._save_table(obj)
-            obj.ref = table_ref
-            obj.table_ref = table_ref
-        elif isinstance_namedtuple(obj):
-            for v in obj._asdict().values():
-                self._save_nested_objects(v)
-        elif isinstance(obj, (list, tuple)):
-            for v in obj:
-                self._save_nested_objects(v)
-        elif isinstance(obj, dict):
-            for v in obj.values():
-                self._save_nested_objects(v)
-        elif isinstance(obj, Op):
-            self._save_op(obj)
-        # TODO: Kinda hacky way to dispatching Dataset with rows: Table
-        elif isinstance(obj, WeaveObject) and hasattr(obj, "rows"):
-            self._save_nested_objects(obj.rows)
+        return self._save_object_basic(op, name)
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:
+        """Saves a Table to the weave server and returns the TableRef.
+        This is the sister function to _save_object_basic but for Tables.
+        """
         rows = to_json(table.rows, self._project_id(), self.server)
         response = self.server.table_create(
             TableCreateReq(
                 table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
             )
         )
-        return TableRef(
-            entity=self.entity, project=self.project, digest=response.digest
+        row_digests: Optional[list[str]] = None
+        # This check is needed because in older versions of
+        # the trace server, this will come back as an empty list.
+        # In these cases, we want to set row_digests to None so that
+        # the WeaveTable knows that it needs to fetch the rows from the server.
+        if len(response.row_digests) == len(table.rows):
+            row_digests = response.row_digests
+        table_ref = TableRef(
+            entity=self.entity,
+            project=self.project,
+            digest=response.digest,
+            row_digests=row_digests,
         )
+        table.ref = table_ref
+
+        if isinstance(table, WeaveTable):
+            table.table_ref = table_ref
+
+        return table_ref
+
+    ################ Internal Helpers ################
+
+    def _ref_is_own(self, ref: Ref) -> bool:
+        return isinstance(ref, Ref)
+
+    def _project_id(self) -> str:
+        return f"{self.entity}/{self.project}"
 
     @trace_sentry.global_trace_sentry.watch()
     def _op_calls(self, op: Op) -> CallsIter:
@@ -1110,27 +1270,6 @@ class WeaveClient:
             )
         )
         return response.objs
-
-    def _save_op(self, op: Op, name: Optional[str] = None) -> Ref:
-        if op.ref is not None:
-            return op.ref
-
-        if name is None:
-            name = op.name
-
-        return self._save_and_attach_ref(op, name)
-
-    def _save_and_attach_ref(self, op: Any, name: Optional[str] = None) -> Ref:
-        if (ref := getattr(op, "ref", None)) is not None:
-            return ref
-
-        op_def_ref = self._save_object_basic(op, name)
-
-        # setattr(op, "ref", op_def_ref) fails here
-        # op.ref = op_def_ref fails here
-        # Seems to be the only way to set the ref on the op
-        op.__dict__["ref"] = op_def_ref
-        return op_def_ref
 
     @trace_sentry.global_trace_sentry.watch()
     def _set_call_display_name(

@@ -198,7 +198,7 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$in`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation], list[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]]]`
+- `$in`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation], list['Operand']]`
 
 ---
 
@@ -212,7 +212,7 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$literal`: `typing.Union[str, int, float, bool, dict[str, LiteralOperation], list[LiteralOperation], NoneType]`
+- `$literal`: `typing.Union[str, int, float, bool, dict[str, 'LiteralOperation'], list['LiteralOperation'], NoneType]`
 
 ---
 

@@ -1,5 +1,5 @@
 ---
-title: PII Cookbook Presidio
+title: Handling and Redacting PII
 ---
 
 
@@ -20,9 +20,9 @@ title: PII Cookbook Presidio
 
 In this tutorial, we'll demonstrate how to utilize Weave while preventing your Personally Identifiable Information (PII) data from being incorporated into Weave or the LLMs you employ.
 
-To protect our PII data, we'll employ a couple techniques. First, we'll use regular expressions identify PII data and redact it. Second, we'll use Microsoft's [Presidio](https://microsoft.github.io/presidio/), a Python-based data protection SDK. This tool provides redaction and replacement functionalities, both of which we will implement in this tutorial.
+To protect our PII data, we'll employ a couple techniques. First, we'll use regular expressions to identify PII data and redact it. Second, we'll use Microsoft's [Presidio](https://microsoft.github.io/presidio/), a python-based data protection SDK. This tool provides redaction and replacement functionalities, both of which we will implement in this tutorial.
 
-For this use-case. We will leverage Anthropic's claude-3-sonnet to perform sentiment analysis. While we use Weave's [Traces](https://wandb.github.io/weave/quickstart) to track and analize the LLM's API calls. Sonnet will receive block of text and output one of the following sentiment classification:
+For this use-case. We will leverage Anthropic's Claude Sonnet to perform sentiment analysis. While we use Weave's [Traces](https://wandb.github.io/weave/quickstart) to track and analize the LLM's API calls. Sonnet will receive a block of text and output one of the following sentiment classifications:
 1. positive
 2. negative
 3. neutral
@@ -66,7 +66,7 @@ Let's load our initial PII data. For demonstration purposes, we'll use a dataset
 ```python
 import requests
 
-url = "https://raw.githubusercontent.com/wandb/weave/0379eac49b9509bd613d1fcce4227651202370c5/docs/notebooks/10_pii_data.json"
+url = "https://raw.githubusercontent.com/wandb/weave/master/docs/notebooks/10_pii_data.json"
 response = requests.get(url)
 pii_data = response.json()
 ```
@@ -212,7 +212,7 @@ Will be:
 ```
 Presidio comes with a built-in [list of recognizable entities](https://microsoft.github.io/presidio/supported_entities/). We can select the ones that are important for our use case. In the below example, we are only looking at redicating names and phone numbers from our text:
 
-![](./pii_media/redact.png)
+![](../../media/pii/redact.png)
 
 
 ```python
@@ -296,7 +296,7 @@ Will be:
 
 To effectively utilize Presidio, we must supply references to our custom operators. These operators will direct Presidio to the functions responsible for swapping PII with fake data.
 
-![](./pii_media/replace.png)
+![](../../media/pii/replace.png)
 
 
 ```python
@@ -404,7 +404,7 @@ for entry in pii_data:
 <details>
 <summary> (Optional) Encrypting our data </summary>
 
-![](./pii_media/encrypt.png)
+![](../../media/pii/encrypt.png)
 
 In addition to anonymizing PII, we can add an extra layer of security by encrypting our data using the cryptography library's [Fernet](https://cryptography.io/en/latest/fernet/) symmetric encryption. This approach ensures that even if the anonymized data is intercepted, it remains unreadable without the encryption key.
 
