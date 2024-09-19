@@ -373,8 +373,12 @@ function buildCallsTableColumns(
       return tokensNum;
     },
     renderCell: cellParams => {
-      const {tokens, tokenToolTip} = getTokensFromCellParams(cellParams.row);
-      return <Tooltip trigger={<div>{tokens}</div>} content={tokenToolTip} />;
+      const {tokens, tokenToolTipContent} = getTokensFromCellParams(
+        cellParams.row
+      );
+      return (
+        <Tooltip trigger={<div>{tokens}</div>} content={tokenToolTipContent} />
+      );
     },
   });
   cols.push({
@@ -394,8 +398,10 @@ function buildCallsTableColumns(
       if (costsLoading) {
         return <LoadingDots />;
       }
-      const {cost, costToolTip} = getCostsFromCellParams(cellParams.row);
-      return <Tooltip trigger={<div>{cost}</div>} content={costToolTip} />;
+      const {cost, costToolTipContent} = getCostsFromCellParams(cellParams.row);
+      return (
+        <Tooltip trigger={<div>{cost}</div>} content={costToolTipContent} />
+      );
     },
   });
 

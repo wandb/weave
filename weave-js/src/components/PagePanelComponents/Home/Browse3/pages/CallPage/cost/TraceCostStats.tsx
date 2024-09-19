@@ -73,10 +73,12 @@ export const TraceCostStats = ({
             tooltip={tokenToolTipContent}
           />
           {/* Cost */}
-          {costData && cost && !costLoading ? (
+          {costLoading ? (
+            <LoadingDots />
+          ) : costData && cost ? (
             <TraceStat label={cost} tooltip={costToolTipContent} />
           ) : (
-            <LoadingDots />
+            <></>
           )}
         </>
       )}

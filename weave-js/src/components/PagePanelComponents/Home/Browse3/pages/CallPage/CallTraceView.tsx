@@ -56,6 +56,7 @@ export const CallTraceView: FC<{
       headerAlign: 'center',
       flex: 1,
       renderCell: params => {
+        // console.log(params, costLoading);
         return (
           <CustomGridTreeDataGroupingCell
             {...params}
@@ -417,10 +418,10 @@ export const useCallFlattenedTraceTree = (
     const result = costResult.length > 0 ? costResult : traceCallsResult;
     return _.keyBy(result, 'callId');
   }, [costResult, traceCallsResult]);
+
   const childCallLookup = useMemo(() => {
-    const result = costResult.length > 0 ? costResult : traceCallsResult;
     const lookup: Record<string, string[]> = {};
-    for (const c of result) {
+    for (const c of traceCallsResult) {
       if (c.parentId) {
         if (!lookup[c.parentId]) {
           lookup[c.parentId] = [];
@@ -429,7 +430,18 @@ export const useCallFlattenedTraceTree = (
       }
     }
     return lookup;
-  }, [costResult, traceCallsResult]);
+  }, [traceCallsResult]);
+
+  // Update the main call to the one with costs
+  const mainCall = useMemo(() => {
+    let mainCallTemp: CallSchema = call;
+    for (const c of costResult) {
+      if (c.callId === mainCallTemp.callId) {
+        mainCallTemp = c;
+      }
+    }
+    return mainCallTemp;
+  }, [costResult, call]);
 
   return useMemo(() => {
     let selectedCall = null;
@@ -437,8 +449,8 @@ export const useCallFlattenedTraceTree = (
 
     const rows: Row[] = [];
     // Ascend to the root
-    let currentCall: CallSchema | null = call;
-    let lastCall: CallSchema = call;
+    let currentCall: CallSchema | null = mainCall;
+    let lastCall: CallSchema = mainCall;
 
     let pathPrefix = '';
     while (currentCall != null) {
@@ -455,7 +467,9 @@ export const useCallFlattenedTraceTree = (
     }
 
     // Add a parent row
-    const parentCall = call.parentId ? traceCallMap[call.parentId] : null;
+    const parentCall = mainCall.parentId
+      ? traceCallMap[mainCall.parentId]
+      : null;
     if (parentCall) {
       rows.push({
         id: parentCall.callId,
@@ -475,8 +489,8 @@ export const useCallFlattenedTraceTree = (
       path: string;
     }> = [
       {
-        targetCall: call,
-        parentHierarchy: call.parentId ? [call.parentId] : [],
+        targetCall: mainCall,
+        parentHierarchy: mainCall.parentId ? [mainCall.parentId] : [],
         path: pathPrefix,
       },
     ];
@@ -523,7 +537,7 @@ export const useCallFlattenedTraceTree = (
         rows.push({
           id: 'HIDDEN_SIBLING_COUNT',
           count: siblingCount,
-          hierarchy: [call.parentId!, 'HIDDEN_SIBLING_COUNT'],
+          hierarchy: [mainCall.parentId!, 'HIDDEN_SIBLING_COUNT'],
         });
       }
     }
@@ -557,7 +571,7 @@ export const useCallFlattenedTraceTree = (
     }
 
     if (!selectedCall) {
-      selectedCall = call;
+      selectedCall = mainCall;
     }
 
     // Epand the path to the selected call.
@@ -577,7 +591,7 @@ export const useCallFlattenedTraceTree = (
       costLoading: costs.loading,
     };
   }, [
-    call,
+    mainCall,
     childCallLookup,
     traceCallMap,
     traceCallsResult,
