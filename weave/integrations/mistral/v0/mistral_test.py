@@ -1,23 +1,8 @@
 import os
-from typing import Any
 
 import pytest
-from mistralai.async_client import MistralAsyncClient
-from mistralai.client import MistralClient
 
 import weave
-from weave.trace_server import trace_server_interface as tsi
-
-
-def _get_call_output(call: tsi.CallSchema) -> Any:
-    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
-
-    Keeping this here for now, but it should be removed in the future once we have a better solution.
-    """
-    call_output = call.output
-    if isinstance(call_output, str) and call_output.startswith("weave://"):
-        return weave.ref(call_output).get()
-    return call_output
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -25,6 +10,8 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> None:
+    from mistralai.client import MistralClient
+
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
@@ -52,11 +39,12 @@ def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> Non
 6. Époisses: Known for its pungent smell, Époisses is a soft, washed-rind cheese with a rich and creamy flavor."""
 
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chat_response.id
@@ -80,6 +68,8 @@ def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> Non
 async def test_mistral_quickstart_async(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
+    from mistralai.async_client import MistralAsyncClient
+
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
@@ -103,11 +93,12 @@ async def test_mistral_quickstart_async(
 Ultimately, the best French cheese is a matter of personal taste. I would recommend trying a variety of cheeses and seeing which ones you enjoy the most."""
 
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chat_response.id
@@ -130,6 +121,8 @@ Ultimately, the best French cheese is a matter of personal taste. I would recomm
 def test_mistral_quickstart_with_stream(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
+    from mistralai.client import MistralClient
+
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
@@ -160,11 +153,12 @@ def test_mistral_quickstart_with_stream(
 6. Époisses: This is a pungent soft cheese with a distinctive orange rind. It's known for its strong flavor and creamy texture."""
 
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chunk.id
@@ -188,6 +182,8 @@ def test_mistral_quickstart_with_stream(
 async def test_mistral_quickstart_with_stream_async(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
+    from mistralai.async_client import MistralAsyncClient
+
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
@@ -216,11 +212,12 @@ async def test_mistral_quickstart_with_stream_async(
 5. Chèvre: This is a general term for goat cheese in French. It can come in many forms and flavors, from fresh and mild to aged and tangy."""
 
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chunk.id

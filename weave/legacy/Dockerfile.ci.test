@@ -1,0 +1,15 @@
+# Should match version in integration_test/package.json
+FROM python:3.9.11 as builder
+
+RUN apt update
+RUN apt -y install python3-venv python3-dev gcc g++ xz-utils
+RUN rm /bin/sh && ln -s /bin/bash /bin/sh
+COPY requirements.* /root/
+WORKDIR /root
+RUN python3 -m venv venv
+RUN --mount=type=cache,target=/root/.cache /bin/bash -c \
+    "source venv/bin/activate && \
+    pip install --upgrade pip && \
+    pip install -r requirements.legacy.test.txt"
+
+ENTRYPOINT "/bin/bash"

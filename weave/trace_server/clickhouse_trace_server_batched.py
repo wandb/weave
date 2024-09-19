@@ -55,6 +55,7 @@ from weave.trace_server.calls_query_builder import (
     combine_conditions,
 )
 from weave.trace_server.ids import generate_id
+from weave.trace_server.trace_server_common import make_derived_summary_fields
 
 from . import clickhouse_trace_server_migrator as wf_migrator
 from . import environment as wf_env
@@ -70,15 +71,17 @@ from .clickhouse_schema import (
     SelectableCHObjSchema,
 )
 from .emoji_util import detone_emojis
-from .errors import InvalidRequest, RequestTooLarge
+from .errors import InsertTooLarge, InvalidRequest, RequestTooLarge
 from .feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
 from .orm import ParamBuilder, Row
+from .token_costs import LLM_TOKEN_PRICES_TABLE, validate_cost_purge_req
 from .trace_server_common import (
     LRUCache,
+    empty_str_to_none,
     get_nested_key,
     hydrate_calls_with_feedback,
     make_feedback_query_req,
@@ -140,6 +143,10 @@ all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
 ObjRefListType = list[ri.InternalObjectRef]
+
+
+CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
+ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
@@ -278,8 +285,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
+            summary_columns = ["summary", "summary_dump"]
             columns = [
-                *[col for col in columns if col != "summary_dump"],
+                *[col for col in columns if col not in summary_columns],
                 "summary_dump",
             ]
         for col in columns:
@@ -512,13 +520,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         conds = [
-            "object_id = {name: String}",
-            "digest = {version_hash: String}",
             "is_op = 1",
+            "digest = {digest: String}",
         ]
+        object_id_conditions = ["object_id = {object_id: String}"]
         parameters = {"name": req.name, "digest": req.digest}
         objs = self._select_objs_query(
-            req.project_id, conditions=conds, parameters=parameters
+            req.project_id,
+            conditions=conds,
+            object_id_conditions=object_id_conditions,
+            parameters=parameters,
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
@@ -528,17 +539,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         parameters = {}
         conds: list[str] = ["is_op = 1"]
+        object_id_conditions: list[str] = []
+        is_latest = False
         if req.filter:
             if req.filter.op_names:
-                conds.append("object_id IN {op_names: Array(String)}")
+                object_id_conditions.append("object_id IN {op_names: Array(String)}")
                 parameters["op_names"] = req.filter.op_names
-
             if req.filter.latest_only:
-                conds.append("is_latest = 1")
+                is_latest = True
 
         ch_objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
+            object_id_conditions=object_id_conditions,
+            parameters=parameters,
+            is_latest=is_latest,
         )
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
@@ -566,11 +581,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds = ["object_id = {object_id: String}"]
+        conds: list[str] = []
+        object_id_conditions = ["object_id = {object_id: String}"]
         parameters: Dict[str, Union[str, int]] = {"object_id": req.object_id}
-        if req.digest == "latest":
-            conds.append("is_latest = 1")
-        else:
+        is_latest = req.digest == "latest"
+        if not is_latest:
             (is_version, version_index) = _digest_is_version_like(req.digest)
             if is_version:
                 conds.append("version_index = {version_index: UInt64}")
@@ -579,7 +594,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conds.append("digest = {version_digest: String}")
                 parameters["version_digest"] = req.digest
         objs = self._select_objs_query(
-            req.project_id, conditions=conds, parameters=parameters
+            req.project_id,
+            conditions=conds,
+            object_id_conditions=object_id_conditions,
+            parameters=parameters,
+            is_latest=is_latest,
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
@@ -588,7 +607,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conds: list[str] = []
+        object_id_conditions: list[str] = []
         parameters = {}
+        is_latest = False
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
@@ -596,10 +617,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 else:
                     conds.append("is_op = 0")
             if req.filter.object_ids:
-                conds.append("object_id IN {object_ids: Array(String)}")
+                object_id_conditions.append("object_id IN {object_ids: Array(String)}")
                 parameters["object_ids"] = req.filter.object_ids
             if req.filter.latest_only:
-                conds.append("is_latest = 1")
+                is_latest = True
             if req.filter.base_object_classes:
                 conds.append(
                     "base_object_class IN {base_object_classes: Array(String)}"
@@ -609,7 +630,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
+            object_id_conditions=object_id_conditions,
             parameters=parameters,
+            is_latest=is_latest,
+            limit=req.limit,
+            offset=req.offset,
+            sort_by=req.sort_by,
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
@@ -650,7 +676,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             data=[(req.table.project_id, digest, row_digests)],
             column_names=["project_id", "digest", "row_digests"],
         )
-        return tsi.TableCreateRes(digest=digest)
+        return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         query = """
@@ -697,14 +723,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 known_digests.add(row_digest)
             return row_digest
 
+        updated_digests = []
         for update in req.updates:
             if isinstance(update, tsi.TableAppendSpec):
                 new_digest = add_new_row_needed_to_insert(update.append.row)
                 final_row_digests.append(new_digest)
+                updated_digests.append(new_digest)
             elif isinstance(update, tsi.TablePopSpec):
                 if update.pop.index >= len(final_row_digests) or update.pop.index < 0:
                     raise ValueError("Index out of range")
-                final_row_digests.pop(update.pop.index)
+                popped_digest = final_row_digests.pop(update.pop.index)
+                updated_digests.append(popped_digest)
             elif isinstance(update, tsi.TableInsertSpec):
                 if (
                     update.insert.index > len(final_row_digests)
@@ -713,6 +742,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     raise ValueError("Index out of range")
                 new_digest = add_new_row_needed_to_insert(update.insert.row)
                 final_row_digests.insert(update.insert.index, new_digest)
+                updated_digests.append(new_digest)
             else:
                 raise ValueError("Unrecognized update", update)
 
@@ -733,7 +763,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             data=[(req.project_id, digest, final_row_digests)],
             column_names=["project_id", "digest", "row_digests"],
         )
-        return tsi.TableCreateRes(digest=digest)
+        return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
@@ -892,7 +922,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         def get_object_refs_root_val(
             refs: list[ri.InternalObjectRef],
         ) -> Any:
-            conds = []
+            conds: list[str] = []
+            object_id_conds: list[str] = []
             parameters = {}
 
             for ref_index, ref in enumerate(refs):
@@ -914,17 +945,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                 object_id_param_key = "object_id_" + str(ref_index)
                 version_param_key = "version_" + str(ref_index)
-                conds.append(
-                    f"object_id = {{{object_id_param_key}: String}} AND digest = {{{version_param_key}: String}}"
-                )
+                conds.append(f"digest = {{{version_param_key}: String}}")
+                object_id_conds.append(f"object_id = {{{object_id_param_key}: String}}")
                 parameters[object_id_param_key] = ref.name
                 parameters[version_param_key] = ref.version
 
             if len(conds) > 0:
                 conditions = [combine_conditions(conds, "OR")]
+                object_id_conditions = [combine_conditions(object_id_conds, "OR")]
                 objs = self._select_objs_query(
                     project_id=project_id_scope,
                     conditions=conditions,
+                    object_id_conditions=object_id_conditions,
                     parameters=parameters,
                 )
                 for obj in objs:
@@ -1152,6 +1184,104 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise ValueError("Missing chunks")
         return tsi.FileContentReadRes(content=b"".join(chunks))
 
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        assert_non_null_wb_user_id(req)
+        created_at = datetime.datetime.now(ZoneInfo("UTC"))
+
+        costs = []
+        for llm_id, cost in req.costs.items():
+            cost_id = generate_id()
+
+            row: Row = {
+                "id": cost_id,
+                "created_by": req.wb_user_id,
+                "created_at": created_at,
+                "pricing_level": "project",
+                "pricing_level_id": req.project_id,
+                "provider_id": cost.provider_id if cost.provider_id else "default",
+                "llm_id": llm_id,
+                "effective_date": (
+                    cost.effective_date if cost.effective_date else created_at
+                ),
+                "prompt_token_cost": cost.prompt_token_cost,
+                "completion_token_cost": cost.completion_token_cost,
+                "prompt_token_cost_unit": cost.prompt_token_cost_unit,
+                "completion_token_cost_unit": cost.completion_token_cost_unit,
+            }
+
+            costs.append((cost_id, llm_id))
+
+            prepared = LLM_TOKEN_PRICES_TABLE.insert(row).prepare(
+                database_type="clickhouse"
+            )
+            self._insert(
+                LLM_TOKEN_PRICES_TABLE.name, prepared.data, prepared.column_names
+            )
+
+        return tsi.CostCreateRes(ids=costs)
+
+    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+        expr = {
+            "$and": [
+                (
+                    req.query.expr_
+                    if req.query
+                    else {
+                        "$eq": [
+                            {"$getField": "pricing_level_id"},
+                            {"$literal": req.project_id},
+                        ],
+                    }
+                ),
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level"},
+                        {"$literal": "project"},
+                    ],
+                },
+            ]
+        }
+        query_with_pricing_level = tsi.Query(**{"$expr": expr})
+        query = LLM_TOKEN_PRICES_TABLE.select()
+        query = query.fields(req.fields)
+        query = query.where(query_with_pricing_level)
+        query = query.order_by(req.sort_by)
+        query = query.limit(req.limit).offset(req.offset)
+        prepared = query.prepare(database_type="clickhouse")
+        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
+            query_result.result_rows, prepared.fields
+        )
+        return tsi.CostQueryRes(results=results)
+
+    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+        validate_cost_purge_req(req)
+
+        expr = {
+            "$and": [
+                req.query.expr_,
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level_id"},
+                        {"$literal": req.project_id},
+                    ],
+                },
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level"},
+                        {"$literal": "project"},
+                    ],
+                },
+            ]
+        }
+        query_with_pricing_level = tsi.Query(**{"$expr": expr})
+
+        query = LLM_TOKEN_PRICES_TABLE.purge()
+        query = query.where(query_with_pricing_level)
+        prepared = query.prepare(database_type="clickhouse")
+        self.ch_client.query(prepared.sql, prepared.parameters)
+        return tsi.CostPurgeRes()
+
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req)
@@ -1263,23 +1393,62 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         conditions: Optional[list[str]] = None,
-        limit: Optional[int] = None,
+        object_id_conditions: Optional[list[str]] = None,
         parameters: Optional[Dict[str, Any]] = None,
+        is_latest: bool = False,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        sort_by: Optional[list[tsi.SortBy]] = None,
     ) -> list[SelectableCHObjSchema]:
+        """
+        Main query for fetching objects.
+
+        conditions:
+            conditions should include operations on version_index, digest, kind (is_op)
+            ALL conditions are AND'ed together.
+        object_id_conditions:
+            conditions should include operations on ONLY object_id
+            ALL conditions are AND'ed together.
+        parameters:
+            parameters to be passed to the query. Must include all parameters for both
+            conditions and object_id_conditions.
+        is_latest:
+            if is_latest is True, then we add the condition "is_latest = 1" to the outter
+            query, and only return the most recent version of each object.
+        """
         if not conditions:
             conditions = ["1 = 1"]
+        if not object_id_conditions:
+            object_id_conditions = ["1 = 1"]
 
         conditions_part = combine_conditions(conditions, "AND")
+        object_id_conditions_part = combine_conditions(object_id_conditions, "AND")
+        is_latest_part = "is_latest = 1" if is_latest else "1 = 1"
 
         limit_part = ""
-        if limit != None:
-            limit_part = f"LIMIT {limit}"
+        offset_part = ""
+        if limit is not None:
+            limit_part = f"LIMIT {int(limit)}"
+        if offset is not None:
+            offset_part = f" OFFSET {int(offset)}"
+
+        sort_part = ""
+        if sort_by:
+            valid_sort_fields = {"object_id", "created_at"}
+            sort_clauses = []
+            for sort in sort_by:
+                if sort.field in valid_sort_fields and sort.direction in {
+                    "asc",
+                    "desc",
+                }:
+                    sort_clauses.append(f"{sort.field} {sort.direction.upper()}")
+            if sort_clauses:
+                sort_part = f"ORDER BY {', '.join(sort_clauses)}"
 
         if parameters is None:
             parameters = {}
         # The subquery is for deduplication of object versions by digest
-        query_result = self._query_stream(
-            f"""
+        select_query = f"""
             SELECT
                 project_id,
                 object_id,
@@ -1290,7 +1459,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 val_dump,
                 digest,
                 is_op,
-                _version_index_plus_1,
                 version_index,
                 version_count,
                 is_latest
@@ -1303,18 +1471,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     refs,
                     val_dump,
                     digest,
-                    if (kind = 'op', 1, 0) AS is_op,
+                    is_op,
                     row_number() OVER (
                         PARTITION BY project_id,
                         kind,
                         object_id
                         ORDER BY created_at ASC
-                    ) AS _version_index_plus_1,
-                    _version_index_plus_1 - 1 AS version_index,
+                    ) - 1 AS version_index,
                     count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-                    if(_version_index_plus_1 = version_count, 1, 0) AS is_latest
+                    if(version_index + 1 = version_count, 1, 0) AS is_latest
                 FROM (
                     SELECT *,
+                        if (kind = 'op', 1, 0) AS is_op,
                         row_number() OVER (
                             PARTITION BY project_id,
                             kind,
@@ -1323,14 +1491,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             ORDER BY created_at ASC
                         ) AS rn
                     FROM object_versions
-                    WHERE project_id = {{project_id: String}}
+                    WHERE project_id = {{project_id: String}} AND
+                        {object_id_conditions_part}
                 )
-                WHERE rn = 1
+                WHERE rn = 1 AND
+                    {conditions_part}
             )
-            WHERE project_id = {{project_id: String}} AND
-                {conditions_part}
+            WHERE {is_latest_part}
+            {sort_part}
             {limit_part}
-        """,
+            {offset_part}
+        """
+        query_result = self._query_stream(
+            select_query,
             {"project_id": project_id, **parameters},
         )
         result: list[SelectableCHObjSchema] = []
@@ -1349,7 +1522,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 "val_dump",
                                 "digest",
                                 "is_op",
-                                "_version_index_plus_1",
                                 "version_index",
                                 "version_count",
                                 "is_latest",
@@ -1432,7 +1604,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # │    return 1 << (21 - int(log(row_size, 2)))
                 # │ValueError: negative shift count
                 # when we try to insert something that's too large.
-                raise RequestTooLarge("Could not insert record")
+                raise InsertTooLarge(
+                    "Database insertion failed. Record too large. "
+                    "A likely cause is that a single row or cell exceeded "
+                    "the limit. If logging images, save them as `Image.PIL`."
+                )
             raise
 
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
@@ -1445,8 +1621,58 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._flush_calls()
 
     def _flush_calls(self) -> None:
-        self._insert_call_batch(self._call_batch)
+        try:
+            self._insert_call_batch(self._call_batch)
+        except InsertTooLarge:
+            logger.info("Retrying with large objects stripped.")
+            batch = self._strip_large_values(self._call_batch)
+            self._insert_call_batch(batch)
+
         self._call_batch = []
+
+    def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
+        """
+        Iterate through the batch and replace large values with placeholders.
+
+        If values are larger than 1MiB replace them with placeholder values.
+        """
+        final_batch = []
+        # Set the value byte limit to be anything over 1MiB to catch
+        # payloads with multiple large values that are still under the
+        # single row insert limit.
+        val_byte_limit = 1 * 1024 * 1024
+        for item in batch:
+            bytes_size = _num_bytes(str(item))
+            # If bytes_size > the limit, this item is too large,
+            # iterate through the json-dumped item values to find and
+            # replace the large values with a placeholder.
+            if bytes_size > CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
+                stripped_item = []
+                for value in item:
+                    # all the values should be json dumps, there are no
+                    # non json fields controlled by the user that can
+                    # be large enough to strip... (?)
+                    if _num_bytes(value) > val_byte_limit:
+                        stripped_item += [ENTITY_TOO_LARGE_PAYLOAD]
+                    else:
+                        stripped_item += [value]
+                final_batch.append(stripped_item)
+            else:
+                final_batch.append(item)
+        return final_batch
+
+
+def _num_bytes(data: Any) -> int:
+    """
+    Calculate the number of bytes in a string.
+
+    This can be computationally expensive, only call when necessary.
+    Never raise on a failed str cast, just return 0.
+    """
+    try:
+        return len(str(data).encode("utf-8"))
+    except Exception:
+        return 0
 
 
 def _dict_value_to_dump(
@@ -1511,48 +1737,66 @@ def _raw_call_dict_to_ch_call(
     return SelectableCHCallSchema.model_validate(call)
 
 
-def _empty_str_to_none(val: Optional[str]) -> Optional[str]:
-    return val if val != "" else None
-
-
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
+    started_at = _ensure_datetimes_have_tz(ch_call.started_at)
+    ended_at = _ensure_datetimes_have_tz(ch_call.ended_at)
+    summary = _nullable_any_dump_to_any(ch_call.summary_dump)
+    display_name = empty_str_to_none(ch_call.display_name)
     return tsi.CallSchema(
         project_id=ch_call.project_id,
         id=ch_call.id,
         trace_id=ch_call.trace_id,
         parent_id=ch_call.parent_id,
         op_name=ch_call.op_name,
-        started_at=_ensure_datetimes_have_tz(ch_call.started_at),
-        ended_at=_ensure_datetimes_have_tz(ch_call.ended_at),
+        started_at=started_at,
+        ended_at=ended_at,
         attributes=_dict_dump_to_dict(ch_call.attributes_dump or "{}"),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump or "{}"),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
+        summary=make_derived_summary_fields(
+            summary=summary or {},
+            op_name=ch_call.op_name,
+            started_at=started_at,
+            ended_at=ended_at,
+            exception=ch_call.exception,
+            display_name=display_name,
+        ),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
-        display_name=_empty_str_to_none(ch_call.display_name),
+        display_name=display_name,
     )
 
 
 # Keep in sync with `_ch_call_to_call_schema`. This copy is for performance
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: Dict) -> Dict:
+    summary = _nullable_any_dump_to_any(ch_call_dict.get("summary_dump"))
+    started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
+    ended_at = _ensure_datetimes_have_tz(ch_call_dict.get("ended_at"))
+    display_name = empty_str_to_none(ch_call_dict.get("display_name"))
     return dict(
         project_id=ch_call_dict.get("project_id"),
         id=ch_call_dict.get("id"),
         trace_id=ch_call_dict.get("trace_id"),
         parent_id=ch_call_dict.get("parent_id"),
         op_name=ch_call_dict.get("op_name"),
-        started_at=_ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
-        ended_at=_ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
+        started_at=started_at,
+        ended_at=ended_at,
         attributes=_dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}")),
         inputs=_dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
-        summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
+        summary=make_derived_summary_fields(
+            summary=summary or {},
+            op_name=ch_call_dict.get("op_name", ""),
+            started_at=started_at,
+            ended_at=ended_at,
+            exception=ch_call_dict.get("exception"),
+            display_name=display_name,
+        ),
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),
-        display_name=_empty_str_to_none(ch_call_dict.get("display_name")),
+        display_name=display_name,
     )
 
 

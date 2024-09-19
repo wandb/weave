@@ -41,7 +41,7 @@ import {
 import {mapObject, ObjectPath, traverse, TraverseContext} from './traverse';
 import {ValueView} from './ValueView';
 
-type Data = Record<string, any>;
+type Data = Record<string, any> | any[];
 
 type ObjectViewerProps = {
   apiRef: React.MutableRefObject<GridApiPro>;
@@ -89,6 +89,27 @@ export const ObjectViewer = ({
   const addExpandedRef = useCallback((path: string, ref: string) => {
     setExpandedRefs(eRefs => ({...eRefs, [path]: ref}));
   }, []);
+
+  // This effect will ensure that all "expandedIds" whose value is a ref
+  // have the ref added to the `expandedRefs` state.
+  useEffect(() => {
+    const expandRefsToAdd: {[path: string]: string} = {};
+    const mapper = (context: TraverseContext) => {
+      const contextPath = context.path.toString();
+      if (
+        expandedIds.includes(contextPath) &&
+        isWeaveRef(context.value) &&
+        expandedRefs[contextPath] == null
+      ) {
+        expandRefsToAdd[contextPath] = context.value;
+      }
+      return context.value;
+    };
+    mapObject(resolvedData, mapper);
+    if (Object.keys(expandRefsToAdd).length > 0) {
+      setExpandedRefs(eRefs => ({...eRefs, ...expandRefsToAdd}));
+    }
+  }, [resolvedData, expandedIds, expandedRefs, setExpandedRefs]);
 
   // `refs` is the union of `dataRefs` and the refs in `expandedRefs`.
   const refs = useMemo(() => {
@@ -204,13 +225,13 @@ export const ObjectViewer = ({
 
       if (context.depth !== 0) {
         const contextTail = context.path.tail();
-        const isNullDescription =
+        const isNullDescriptionOrName =
           typeof contextTail === 'string' &&
-          contextTail === 'description' &&
+          (contextTail === 'description' || contextTail === 'name') &&
           context.valueType === 'null';
         // For now we'll hide all keys that start with an underscore, is a name field, or is a null description.
         // Eventually we might offer a user toggle to display them.
-        if (context.path.hasHiddenKey() || isNullDescription) {
+        if (context.path.hasHiddenKey() || isNullDescriptionOrName) {
           return 'skip';
         }
         if (isExpandableRef(context.value)) {

@@ -32,6 +32,9 @@ class Table:
         self._validate_rows(value)
         self._rows = value
 
+    def __len__(self) -> int:
+        return len(self.rows)
+
     def __getitem__(self, key: int) -> dict:
         return self.rows[key]
 

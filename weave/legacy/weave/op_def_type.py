@@ -237,6 +237,7 @@ def get_code_deps(
                 dependencies are available for the function body.
             warnings: list[str], any warnings that occurred during the process.
     """
+    print("USING OP DEF TYPE VERSION")
     # Generates repeats.
     warnings: list[str] = []
 
@@ -406,7 +407,7 @@ class OpDefType(types.Type):
                 message = f"Warning: Incomplete serialization for op {obj}. This op may not be reloadable"
                 for warning in warnings:
                     message += "\n  " + warning
-                if context_state.get_strict_op_saving():
+                if context_state.get_legacy_strict_op_saving():
                     raise errors.WeaveOpSerializeError(message)
                 else:
                     # print(message)

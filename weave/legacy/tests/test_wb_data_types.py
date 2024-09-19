@@ -535,7 +535,7 @@ def test_annotated_images_in_tables(fake_wandb):
 
 def test_annotated_legacy_images_in_tables(fake_wandb):
     # Mocking this property makes the payload look like the legacy version.
-    from wandb.data_types import _ImageFileType
+    from wandb.sdk.data_types.image import _ImageFileType
     from wandb.sdk.data_types._dtypes import InvalidType
 
     def dummy_params(self):

@@ -34,6 +34,7 @@ import sqlparse
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
     ParamBuilder,
@@ -398,6 +399,15 @@ class CallsQuery(BaseModel):
             )
         )
 
+        # Important: We must always filter out calls that have not been started
+        # This can occur when there is an out of order call part insertion or worse,
+        # when such occurance happens and the client terminates early.
+        self.add_condition(
+            tsi_query.NotOperation.model_validate(
+                {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
+            )
+        )
+
         # If we should not optimize, then just build the base query
         if not should_optimize and not self.include_costs:
             return self._as_sql_base_format(pb, table_alias)
@@ -438,9 +448,16 @@ class CallsQuery(BaseModel):
         """
 
         if self.include_costs:
+            # TODO: We should unify the calls query order by fields to be orm sort by fields
+            order_by_fields = [
+                tsi.SortBy(
+                    field=sort_by.field.field, direction=sort_by.direction.lower()
+                )
+                for sort_by in self.order_fields
+            ]
             raw_sql += f""",
             all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
-            {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields])}
+            {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
             """
 
         else:
@@ -552,7 +569,7 @@ def get_field_by_name(name: str) -> CallsMergedField:
                 if len(field_parts) > 1:
                     return field.with_path(field_parts[1:])
             return field
-        raise ValueError(f"Field {name} is not allowed")
+        raise InvalidFieldError(f"Field {name} is not allowed")
     return ALLOWED_CALL_FIELDS[name]
 
 

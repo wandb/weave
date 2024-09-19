@@ -13,7 +13,9 @@ import typing
 from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any, Callable, Optional, Union, get_args, get_origin
 
-from weave.legacy.weave import artifact_fs, context_state, errors, storage
+from weave import context_state
+from weave.legacy.weave import artifact_fs, errors, storage
+from weave.trace import settings
 from weave.trace.ipython import (
     ClassNotFoundError,
     get_class_source,
@@ -21,6 +23,7 @@ from weave.trace.ipython import (
 )
 from weave.trace.op import Op
 from weave.trace.refs import ObjectRef
+from weave.trace_server.trace_server_interface_util import str_digest
 
 from ..legacy.weave import environment
 from . import serializer
@@ -262,16 +265,32 @@ def reconstruct_signature(fn: typing.Callable) -> str:
     return sig_str
 
 
-def get_source_or_fallback(fn: typing.Callable) -> str:
+def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
     if isinstance(fn, Op):
         fn = fn.resolve_fn
 
-    func_name = fn.__name__
+    if not settings.should_capture_code():
+        # This digest is kept for op versioning purposes
+        digest = str_digest(inspect.getsource(fn))
+        return textwrap.dedent(
+            f"""
+            def func(*args, **kwargs):
+                ...  # Code-capture was disabled while saving this op (digest: {digest})
+            """
+        )
+
+    try:
+        return get_source_notebook_safe(fn)
+    except OSError:
+        pass
+
     try:
         sig_str = reconstruct_signature(fn)
     except Exception as e:
-        print(f"Failed to reconstruct signature {e=}")
+        warnings.append(f"Failed to reconstruct signature: {e}")
         sig_str = "(*args, **kwargs)"
+
+    func_name = fn.__name__
     missing_code_template = textwrap.dedent(
         f"""
         def {func_name}{sig_str}:
@@ -279,10 +298,7 @@ def get_source_or_fallback(fn: typing.Callable) -> str:
         """
     )[1:]  # skip first newline char
 
-    try:
-        return get_source_notebook_safe(fn)
-    except OSError:
-        return missing_code_template
+    return missing_code_template
 
 
 def get_code_deps(
@@ -312,6 +328,15 @@ def get_code_deps(
                 dependencies are available for the function body.
             warnings: list[str], any warnings that occurred during the process.
     """
+    return _get_code_deps(fn, artifact, {}, depth)
+
+
+def _get_code_deps(
+    fn: Union[typing.Callable, type],  # A function or a class
+    artifact: artifact_fs.FilesystemArtifact,
+    seen: dict[Union[Callable, type], bool],
+    depth: int = 0,
+) -> GetCodeDepsResult:
     warnings: list[str] = []
     if depth > 20:
         warnings = [
@@ -319,7 +344,7 @@ def get_code_deps(
         ]
         return {"import_code": [], "code": [], "warnings": warnings}
 
-    source = get_source_or_fallback(fn)
+    source = get_source_or_fallback(fn, warnings=warnings)
     try:
         parsed = ast.parse(source)
     except SyntaxError:
@@ -358,17 +383,19 @@ def get_code_deps(
             import_code.append(import_line)
         elif isinstance(var_value, (py_types.FunctionType, Op, type)):
             if var_value.__module__ == fn.__module__:
-                result = get_code_deps(var_value, artifact, depth + 1)
-                fn_warnings = result["warnings"]
-                fn_import_code = result["import_code"]
-                fn_code = result["code"]
+                if not var_value in seen:
+                    seen[var_value] = True
+                    result = _get_code_deps(var_value, artifact, seen, depth + 1)
+                    fn_warnings = result["warnings"]
+                    fn_import_code = result["import_code"]
+                    fn_code = result["code"]
 
-                import_code += fn_import_code
+                    import_code += fn_import_code
 
-                code += fn_code
-                code.append(get_source_notebook_safe(var_value))
+                    code += fn_code
+                    code.append(get_source_notebook_safe(var_value))
 
-                warnings += fn_warnings
+                    warnings += fn_warnings
             else:
                 # For now, if the function is in another module.
                 # we just import it. This is ok for libraries, but not
@@ -483,7 +510,7 @@ def save_instance(
             # print(message)
             pass
 
-    op_function_code = get_source_or_fallback(obj)
+    op_function_code = get_source_or_fallback(obj, warnings=warnings)
 
     if not WEAVE_OP_PATTERN.search(op_function_code):
         op_function_code = "@weave.op()\n" + op_function_code
@@ -528,15 +555,14 @@ def load_instance(
     )
 
     sys.path.insert(0, os.path.abspath(module_dir))
-    with context_state.no_op_register():
-        try:
-            mod = __import__(import_name, fromlist=[module_dir])
-        except Exception as e:
-            print("Op loading exception. This might be fine!", e)
-            import traceback
+    try:
+        mod = __import__(import_name, fromlist=[module_dir])
+    except Exception as e:
+        print("Op loading exception. This might be fine!", e)
+        import traceback
 
-            traceback.print_exc()
-            return None
+        traceback.print_exc()
+        return None
     sys.path.pop(0)
 
     # In the case where the saved op calls another op, we will have multiple
