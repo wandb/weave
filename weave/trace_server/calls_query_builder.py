@@ -115,6 +115,20 @@ class CallsMergedDynamicField(CallsMergedAggField):
 
 
 class QueryBuilderDynamicField(QueryBuilderField):
+    # This is a temporary solution to address a specific use case.
+    # We need to reuse the `CallsMergedDynamicField` mechanics in the table_query,
+    # but the table_query is not an aggregating table. Therefore, we
+    # can't use `CallsMergedDynamicField` directly because it
+    # inherits from `CallsMergedAggField`.
+    #
+    # To solve this, we've created `QueryBuilderDynamicField`, which is similar to
+    # `CallsMergedDynamicField` but doesn't inherit from `CallsMergedAggField`.
+    # Both classes use `json_dump_field_as_sql` for the main functionality.
+    #
+    # While this approach isn't as DRY as we'd like, it allows us to implement
+    # the needed functionality with minimal refactoring. In the future, we should
+    # consider a more elegant solution that reduces code duplication.
+
     extra_path: typing.Optional[list[str]] = None
 
     def as_sql(
@@ -149,8 +163,8 @@ def json_dump_field_as_sql(
         val = f"JSON_VALUE({root_field_sanitized}, {path_str})"
         return clickhouse_cast(val, cast)
     else:
-        # UGG - this is an ugly part of clickhouse! It is really difficult to differentiate
-        # between null, non-existent, "", and "null"!
+        # Note: ClickHouse has limitations in distinguishing between null, non-existent, empty string, and "null".
+        # This workaround helps to handle these cases.
         path_parts = []
         if extra_path:
             for part in extra_path:
@@ -164,39 +178,22 @@ class OrderField(BaseModel):
     direction: typing.Literal["ASC", "DESC"]
 
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
-        requires_type_casting = isinstance(
-            self.field, (CallsMergedDynamicField, QueryBuilderDynamicField)
-        )
-        return order_by_sql(
-            self.field, requires_type_casting, self.direction, table_alias, pb
-        )
-
-
-def order_by_sql(
-    field: QueryBuilderField,
-    requires_type_casting: bool,
-    direction: typing.Literal["ASC", "DESC"],
-    table_alias: str,
-    pb: ParamBuilder,
-) -> str:
-    options: list[
-        typing.Tuple[typing.Optional[tsi_query.CastTo], typing.Literal["ASC", "DESC"]]
-    ]
-    if requires_type_casting:
-        # Prioritize existence, then cast to double, then str
-        options = [
-            ("exists", "DESC"),
-            ("double", direction),
-            ("string", direction),
-        ]
-    else:
-        options = [(None, direction)]
-    res = ""
-    for index, (cast, inner_direction) in enumerate(options):
-        if index > 0:
-            res += ", "
-        res += f"{field.as_sql(pb, table_alias, cast)} {inner_direction}"
-    return res
+        options: list[typing.Tuple[typing.Optional[tsi_query.CastTo], str]]
+        if isinstance(self.field, CallsMergedDynamicField):
+            # Prioritize existence, then cast to double, then str
+            options = [
+                ("exists", "desc"),
+                ("double", self.direction),
+                ("string", self.direction),
+            ]
+        else:
+            options = [(None, self.direction)]
+        res = ""
+        for index, (cast, direction) in enumerate(options):
+            if index > 0:
+                res += ", "
+            res += f"{self.field.as_sql(pb, table_alias, cast)} {direction}"
+        return res
 
 
 class Condition(BaseModel):
