@@ -1,3 +1,5 @@
+import { isOp } from "./op";
+
 export interface WeaveObjectParameters {
   id?: string;
   description?: string;
@@ -20,10 +22,9 @@ export class ObjectRef {
 }
 
 export class WeaveObject {
-  saveAttrNames: string[] = [];
   __savedRef?: ObjectRef | Promise<ObjectRef>;
 
-  constructor(protected baseParameters: WeaveObjectParameters) {}
+  constructor(protected _baseParameters: WeaveObjectParameters) {}
 
   className() {
     return Object.getPrototypeOf(this).constructor.name;
@@ -31,19 +32,38 @@ export class WeaveObject {
 
   saveAttrs() {
     const attrs: { [key: string]: any } = {};
-    this.saveAttrNames.forEach((attr) => {
+
+    const nonUnderscoreKeys = Object.keys(this).filter(
+      (key) => !key.startsWith("_")
+    );
+
+    // Include values first (non-functions)
+    for (const key of Object.keys(this)) {
       // @ts-ignore
-      attrs[attr] = this[attr];
-    });
+      const value: any = this[key];
+      if (typeof value !== "function") {
+        attrs[key] = value;
+      }
+    }
+
+    // Then ops
+    for (const key of nonUnderscoreKeys) {
+      // @ts-ignore
+      const value: any = this[key];
+      if (isOp(value)) {
+        attrs[key] = value;
+      }
+    }
+
     return attrs;
   }
 
   get id() {
-    return this.baseParameters.id ?? this.constructor.name;
+    return this._baseParameters.id ?? this.constructor.name;
   }
 
   get description() {
-    return this.baseParameters.description;
+    return this._baseParameters.description;
   }
 }
 
