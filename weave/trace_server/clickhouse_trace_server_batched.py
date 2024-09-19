@@ -813,8 +813,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
         parameters: Optional[Dict[str, Any]] = None,
-        sort_clause: str = "",
+        sort_clause: Optional[str] = None,
     ) -> list[tsi.TableRowSchema]:
+        if sort_clause is None:
+            sort_clause = ""
         conds = ["project_id = {project_id: String}"]
         if conditions:
             conds.extend(conditions)

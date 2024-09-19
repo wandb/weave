@@ -1057,49 +1057,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         print("COST PURGE is not implemented for local sqlite", req)
         return tsi.CostPurgeRes()
 
-    def _table_query(
-        self,
-        project_id: str,
-        digest: str,
-        conditions: Optional[list[str]] = None,
-        limit: Optional[int] = None,
-        parameters: Optional[dict[str, Any]] = None,
-    ) -> list[tsi.TableRowSchema]:
-        conn, cursor = get_conn_cursor(self.db_path)
-        conds = ["project_id = {project_id: String}"]
-        if conditions:
-            conds.extend(conditions)
-
-        predicate = " AND ".join(conds)
-        # First get the row IDs by querying tables
-        cursor.execute(
-            """
-            WITH OrderedDigests AS (
-                SELECT
-                    json_each.value AS digest
-                FROM
-                    tables,
-                    json_each(tables.row_digests)
-                WHERE
-                    tables.project_id = ? AND
-                    tables.digest = ?
-                ORDER BY
-                    json_each.id
-            )
-            SELECT
-                table_rows.digest,
-                table_rows.val
-            FROM
-                OrderedDigests
-                JOIN table_rows ON OrderedDigests.digest = table_rows.digest
-            """,
-            (project_id, digest),
-        )
-        query_result = cursor.fetchall()
-        return [
-            tsi.TableRowSchema(digest=r[0], val=json.loads(r[1])) for r in query_result
-        ]
-
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
         # Now get the rows
