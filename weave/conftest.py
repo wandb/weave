@@ -24,6 +24,10 @@ from .tests.wandb_system_tests_conftest import *
 from .trace import autopatch
 
 
+# Force all testing to never report data to sentry
+os.environ["WANDB_ERROR_REPORTING"] = "false"
+
+
 class FakeTracer:
     def trace(*args, **kwargs):
         pass
