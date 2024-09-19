@@ -27,7 +27,7 @@ const inputType = {
 };
 
 interface PanelStringConfigState {
-  mode: 'plaintext' | 'markdown' | 'diff';
+  mode: 'plaintext' | 'plaintext_rtl' | 'markdown' | 'diff';
 
   // Diff only: expression to compare against
   diffComparand?: Node;
@@ -99,6 +99,7 @@ export const PanelStringConfig: React.FC<PanelStringProps> = props => {
           multiple={false}
           options={[
             {text: 'Plain Text', value: 'plaintext'},
+            {text: 'Plain Text (right to left)', value: 'plaintext_rtl'},
             {text: 'Markdown', value: 'markdown'},
             {text: 'Diff', value: 'diff'},
           ]}
@@ -239,7 +240,20 @@ export const PanelString: React.FC<PanelStringProps> = props => {
       );
     }
 
-    // plaintext
+    if (config.mode === 'plaintext_rtl') {
+      contentPlaintext = (
+        <S.PreformattedProportionalString
+          style={{direction: 'rtl', textAlign: 'right'}}>
+          {fullStr}
+        </S.PreformattedProportionalString>
+      );
+    } else {
+      contentPlaintext = (
+        <S.PreformattedProportionalString>
+          {fullStr}
+        </S.PreformattedProportionalString>
+      );
+    }
     return (
       <S.StringContainer data-test-weave-id="string" $spacing={spacing}>
         <S.StringItem $spacing={spacing}>
