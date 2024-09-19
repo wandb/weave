@@ -22,7 +22,7 @@ def parse_local_ref_str(s: str) -> typing.Tuple[str, typing.Optional[list[str]]]
 def val_with_relative_ref(
     parent_object: typing.Any, child_object: typing.Any, ref_extra_parts: list[str]
 ) -> typing.Any:
-    from weave import context_state
+    from weave.legacy.weave import context_state
     from weave.legacy.weave import ref_base
 
     # If we already have a ref, resolve it
