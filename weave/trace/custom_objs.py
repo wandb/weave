@@ -116,6 +116,7 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
         wc = require_weave_client()
 
         # TODO(PR): this can fail right? Or does it return None?
+        # Calculating this URL is blocking, but we only have to pay it once per custom type
         load_instance_op_ref = wc._save_op(serializer.load, "load_" + serializer.id())  # type: ignore
         load_op_uri = load_instance_op_ref.uri()
 

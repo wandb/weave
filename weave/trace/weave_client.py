@@ -4,6 +4,7 @@ import platform
 import re
 import sys
 import typing
+from concurrent.futures import Future
 from functools import lru_cache
 from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Union
 
@@ -26,6 +27,7 @@ from weave.trace.op import Op, maybe_unbind_method
 from weave.trace.op import op as op_deco
 from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_op_uri
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
+from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.table import Table
 from weave.trace.util import deprecated
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
@@ -45,7 +47,10 @@ from weave.trace_server.trace_server_interface import (
     CostQueryOutput,
     CostQueryReq,
     EndedCallSchemaForInsert,
+    FileCreateReq,
+    FileCreateRes,
     ObjCreateReq,
+    ObjCreateRes,
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
@@ -181,6 +186,17 @@ class Call:
     _children: list["Call"] = dataclasses.field(default_factory=list)
 
     _feedback: Optional[RefFeedbackQuery] = None
+
+    # TODO: document this and the similar ones in refs
+    _op_ref: Optional[Ref] = None
+
+    def __getattribute__(self, item: str) -> Any:
+        if item == "op_name" and object.__getattribute__(self, "_op_ref") is not None:
+            op_ref = object.__getattribute__(self, "_op_ref")
+            name = op_ref.uri()
+            object.__setattr__(self, "op_name", name)
+            object.__setattr__(self, "_op_ref", None)
+        return object.__getattribute__(self, item)
 
     @property
     def func_name(self) -> str:
@@ -603,12 +619,9 @@ class WeaveClient:
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
             op = self._anonymous_ops[op]
-        if isinstance(op, Op):
-            unbound_op = maybe_unbind_method(op)
-            op_def_ref = self._save_op(unbound_op)
-            op_str = op_def_ref.uri()
-        else:
-            op_str = op
+
+        unbound_op = maybe_unbind_method(op)
+        op_def_ref = self._save_op(unbound_op)
 
         inputs_redacted = redact_sensitive_keys(inputs)
         if op.postprocess_inputs:
@@ -642,7 +655,8 @@ class WeaveClient:
         attributes._set_weave_item("sys_version", sys.version)
 
         call = Call(
-            op_name=op_str,
+            op_name="",
+            _op_ref=op_def_ref,
             project_id=self._project_id(),
             trace_id=trace_id,
             parent_id=parent_id,
@@ -664,20 +678,26 @@ class WeaveClient:
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
-        self.async_job_queue.submit_job(
-            send_start_call,
-            project_id=project_id,
-            call_id=call_id,
-            op_str=op_str,
-            trace_id=trace_id,
-            started_at=started_at,
-            display_name=display_name,
-            parent_id=parent_id,
-            inputs_with_refs=inputs_with_refs,
-            attributes=attributes,
-            current_wb_run_id=current_wb_run_id,
-            server=self.server,
-        )
+        def send_start_call() -> None:
+            inputs_json = to_json(inputs_with_refs, project_id, self)
+            self.server.call_start(
+                CallStartReq(
+                    start=StartedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call_id,
+                        op_name=op_def_ref.uri(),
+                        display_name=display_name,
+                        trace_id=trace_id,
+                        started_at=started_at,
+                        parent_id=parent_id,
+                        inputs=inputs_json,
+                        attributes=attributes,
+                        wb_run_id=current_wb_run_id,
+                    )
+                )
+            )
+
+        self.async_job_queue.submit_job(send_start_call)
 
         if use_stack:
             call_context.push_call(call)
@@ -737,16 +757,23 @@ class WeaveClient:
 
         project_id = self._project_id()
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
-        self.async_job_queue.submit_job(
-            send_end_call,
-            project_id=project_id,
-            call_id=call.id,
-            ended_at=ended_at,
-            output=output,
-            summary=summary,
-            exception_str=exception_str,
-            server=self.server,
-        )
+
+        def send_end_call() -> None:
+            output_json = to_json(output, project_id, self)
+            self.server.call_end(
+                CallEndReq(
+                    end=EndedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call.id,
+                        ended_at=ended_at,
+                        output=output_json,
+                        summary=summary,
+                        exception=exception_str,
+                    )
+                )
+            )
+
+        self.async_job_queue.submit_job(send_end_call)
 
         # Descendent error tracking disabled til we fix UI
         # Add this call's summary after logging the call, so that only
@@ -1157,32 +1184,51 @@ class WeaveClient:
 
         # `to_json` is mostly fast, except for CustomWeaveTypes
         # which incur network costs to serialize the payload
-        json_val = to_json(val, self._project_id(), self.server)
 
         if name is None:
-            if json_val.get("_type") == "CustomWeaveType":
-                custom_name = json_val.get("weave_type", {}).get("type")
-                name = custom_name
+            serializer = get_serializer_for_obj(val)
+            if serializer:
+                name = serializer.id()
 
         if name is None:
             raise ValueError("Name must be provided for object saving")
 
         name = sanitize_object_name(name)
 
-        response = self.server.obj_create(
-            ObjCreateReq(
-                obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project,
-                    object_id=name,
-                    val=json_val,
+        def send_obj_create() -> ObjCreateRes:
+            json_val = to_json(val, self._project_id(), self)
+            return self.server.obj_create(
+                ObjCreateReq(
+                    obj=ObjSchemaForInsert(
+                        project_id=self.entity + "/" + self.project,
+                        object_id=name,
+                        val=json_val,
+                    )
                 )
             )
-        )
+
+        response = self.async_job_queue.submit_job(send_obj_create)
+
+        def blocking_digest_resolver() -> str:
+            return response.result().digest
+
         ref: Ref
         if is_opdef:
-            ref = OpRef(self.entity, self.project, name, response.digest)
+            ref = OpRef(
+                self.entity,
+                self.project,
+                name,
+                digest="",
+                _blocking_digest_resolver=blocking_digest_resolver,
+            )
         else:
-            ref = ObjectRef(self.entity, self.project, name, response.digest)
+            ref = ObjectRef(
+                self.entity,
+                self.project,
+                name,
+                digest="",
+                _blocking_digest_resolver=blocking_digest_resolver,
+            )
 
         # Attach the ref to the object
         try:
@@ -1213,25 +1259,38 @@ class WeaveClient:
         """Saves a Table to the weave server and returns the TableRef.
         This is the sister function to _save_object_basic but for Tables.
         """
-        rows = to_json(table.rows, self._project_id(), self.server)
-        response = self.server.table_create(
+        rows = to_json(table.rows, self._project_id(), self)
+
+        response = self.async_job_queue.submit_job(
+            self.server.table_create,
             TableCreateReq(
                 table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
-            )
+            ),
         )
-        row_digests: Optional[list[str]] = None
-        # This check is needed because in older versions of
-        # the trace server, this will come back as an empty list.
-        # In these cases, we want to set row_digests to None so that
-        # the WeaveTable knows that it needs to fetch the rows from the server.
-        if len(response.row_digests) == len(table.rows):
-            row_digests = response.row_digests
+
+        def blocking_digest_resolver() -> str:
+            return response.result().digest
+
         table_ref = TableRef(
             entity=self.entity,
             project=self.project,
-            digest=response.digest,
-            row_digests=row_digests,
+            digest="",
+            _blocking_digest_resolver=blocking_digest_resolver,
         )
+
+        # row_digests: Optional[list[str]] = None
+        # # This check is needed because in older versions of
+        # # the trace server, this will come back as an empty list.
+        # # In these cases, we want to set row_digests to None so that
+        # # the WeaveTable knows that it needs to fetch the rows from the server.
+        # if len(response.row_digests) == len(table.rows):
+        #     row_digests = response.row_digests
+        # table_ref = TableRef(
+        #     entity=self.entity,
+        #     project=self.project,
+        #     digest=response.digest,
+        #     row_digests=row_digests,
+        # )
         table.ref = table_ref
 
         if isinstance(table, WeaveTable):
@@ -1315,58 +1374,8 @@ class WeaveClient:
             # first.
             self.server.call_processor.wait_until_all_processed()  # type: ignore
 
-
-def send_start_call(
-    project_id: str,
-    call_id: str,
-    op_str: str,
-    trace_id: str,
-    started_at: datetime.datetime,
-    display_name: Optional[str],
-    parent_id: Optional[str],
-    inputs_with_refs: dict[str, Any],
-    attributes: dict[str, Any],
-    current_wb_run_id: Optional[str],
-    server: TraceServerInterface,
-) -> None:
-    inputs_json = to_json(inputs_with_refs, project_id, server)
-    start = StartedCallSchemaForInsert(
-        project_id=project_id,
-        id=call_id,
-        op_name=op_str,
-        display_name=display_name,
-        trace_id=trace_id,
-        started_at=started_at,
-        parent_id=parent_id,
-        inputs=inputs_json,
-        attributes=attributes,
-        wb_run_id=current_wb_run_id,
-    )
-    server.call_start(CallStartReq(start=start))
-
-
-def send_end_call(
-    project_id: str,
-    call_id: str,
-    ended_at: datetime.datetime,
-    output: Any,
-    summary: dict[str, Any],
-    exception_str: Optional[str],
-    server: TraceServerInterface,
-) -> None:
-    output_json = to_json(output, project_id, server)
-    server.call_end(
-        CallEndReq(
-            end=EndedCallSchemaForInsert(
-                project_id=project_id,
-                id=call_id,
-                ended_at=ended_at,
-                output=output_json,
-                summary=summary,
-                exception=exception_str,
-            )
-        )
-    )
+    def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+        return self.async_job_queue.submit_job(self.server.file_create, req)
 
 
 def safe_current_wb_run_id() -> Optional[str]:

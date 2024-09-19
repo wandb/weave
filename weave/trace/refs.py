@@ -1,6 +1,6 @@
 import dataclasses
 import urllib
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 from ..trace_server import refs_internal
 
@@ -15,6 +15,9 @@ class Ref:
     def uri(self) -> str:
         raise NotImplementedError
 
+    def as_dict(self) -> dict:
+        return dataclasses.asdict(self)
+
 
 @dataclasses.dataclass(frozen=True)
 class TableRef(Ref):
@@ -22,6 +25,38 @@ class TableRef(Ref):
     project: str
     digest: str
     row_digests: Optional[list[str]] = None
+    _blocking_digest_resolver: Optional[Callable[[], str]] = dataclasses.field(
+        default=None, repr=False
+    )
+
+    def __post_init__(self) -> None:
+        if self._blocking_digest_resolver is not None:
+            object.__setattr__(self, "digest", "")
+
+    def as_dict(self) -> dict:
+        # Needed to not accidentally block on resolving the digest
+        if self._blocking_digest_resolver is not None:
+            digest = ""
+        else:
+            digest = self.digest
+        return {
+            "entity": self.entity,
+            "project": self.project,
+            "digest": digest,
+            "row_digests": self.row_digests,
+            "_blocking_digest_resolver": self._blocking_digest_resolver,
+        }
+
+    def __getattribute__(self, item: str) -> Any:
+        if (
+            item == "digest"
+            and object.__getattribute__(self, "_blocking_digest_resolver") is not None
+        ):
+            resolver = object.__getattribute__(self, "_blocking_digest_resolver")
+            digest = resolver()
+            object.__setattr__(self, "digest", digest)
+            object.__setattr__(self, "_blocking_digest_resolver", None)
+        return object.__getattribute__(self, item)
 
     def uri(self) -> str:
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
@@ -30,7 +65,7 @@ class TableRef(Ref):
 @dataclasses.dataclass(frozen=True)
 class RefWithExtra(Ref):
     def with_extra(self, extra: tuple[str, ...]) -> "RefWithExtra":
-        params = dataclasses.asdict(self)
+        params = self.as_dict()
         params["extra"] = self.extra + tuple(extra)  # type: ignore
         return self.__class__(**params)
 
@@ -54,13 +89,46 @@ class ObjectRef(RefWithExtra):
     name: str
     digest: str
     extra: tuple[str, ...] = ()
+    _blocking_digest_resolver: Optional[Callable[[], str]] = dataclasses.field(
+        default=None, repr=False
+    )
 
     def __post_init__(self) -> None:
-        refs_internal.validate_no_slashes(self.digest, "digest")
-        refs_internal.validate_no_colons(self.digest, "digest")
+        if self._blocking_digest_resolver is not None:
+            object.__setattr__(self, "digest", "")
+        else:
+            refs_internal.validate_no_slashes(self.digest, "digest")
+            refs_internal.validate_no_colons(self.digest, "digest")
         refs_internal.validate_extra(list(self.extra))
         refs_internal.validate_no_slashes(self.name, "name")
         refs_internal.validate_no_colons(self.name, "name")
+
+    def __getattribute__(self, item: str) -> Any:
+        if (
+            item == "digest"
+            and object.__getattribute__(self, "_blocking_digest_resolver") is not None
+        ):
+            resolver = object.__getattribute__(self, "_blocking_digest_resolver")
+            digest = resolver()
+            # VALIDATE DIGEST?
+            object.__setattr__(self, "digest", digest)
+            object.__setattr__(self, "_blocking_digest_resolver", None)
+        return object.__getattribute__(self, item)
+
+    def as_dict(self) -> dict:
+        # Needed to not accidentally block on resolving the digest
+        if self._blocking_digest_resolver is not None:
+            digest = ""
+        else:
+            digest = self.digest
+        return {
+            "entity": self.entity,
+            "project": self.project,
+            "name": self.name,
+            "digest": digest,
+            "extra": self.extra,
+            "_blocking_digest_resolver": self._blocking_digest_resolver,
+        }
 
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.digest}"
