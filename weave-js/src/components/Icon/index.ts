@@ -140,6 +140,7 @@ export {
   IconPanelManual,
   IconPanTool,
   IconPanTool1,
+  IconParallelCoordinates,
   IconParentBackUp,
   IconPause,
   IconPaused,
