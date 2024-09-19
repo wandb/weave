@@ -37,7 +37,7 @@ const getStyles = (props: AdditionalProps) => {
           root: {
             paddingTop: '0px !important',
             paddingBottom: '0px !important',
-
+            // alignItems: 'flex-start',
             fontSize: FONT_SIZES[size],
             fontFamily: 'Source Sans Pro',
             minWidth: '100px',
@@ -47,11 +47,11 @@ const getStyles = (props: AdditionalProps) => {
               borderColor: MOON_250,
             },
             '&&.Mui-focused fieldset': {
-              borderColor: TEAL_400, // Correct focus border color
-              borderWidth: '2px', // Ensure this border width applies on focus
+              borderColor: TEAL_400,
+              borderWidth: '2px',
             },
             '&&:hover:not(.Mui-focused) fieldset': {
-              borderColor: TEAL_350, // Hover but not focused
+              borderColor: TEAL_350,
               borderWidth: '2px',
             },
             '& input::placeholder': {
@@ -67,6 +67,7 @@ const getStyles = (props: AdditionalProps) => {
             minHeight: HEIGHTS[size],
             paddingTop: '0px !important',
             paddingBottom: '0px !important',
+            // overflow: 'hidden',
           },
           inputMultiline: {
             overflow: 'hidden',
@@ -83,7 +84,6 @@ const getStyles = (props: AdditionalProps) => {
       MuiAutocomplete: {
         styleOverrides: {
           root: {
-            // height: '20px',
             '&.MuiAutocomplete-hasPopupIcon .MuiOutlinedInput-root, &.MuiAutocomplete-hasClearIcon .MuiOutlinedInput-root':
               {
                 paddingRight: props.hasInputValue ? '28px' : '0px', // Apply padding only if input exists
