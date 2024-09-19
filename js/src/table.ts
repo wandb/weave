@@ -1,41 +1,43 @@
 export class TableRef {
-    constructor(public projectId: string, public digest: string) { }
+  constructor(public projectId: string, public digest: string) {}
 
-    public uri() {
-        return `weave:///${this.projectId}/table/${this.digest}`;
-    }
-
+  public uri() {
+    return `weave:///${this.projectId}/table/${this.digest}`;
+  }
 }
 
 export class TableRowRef {
-    constructor(public projectId: string, public digest: string, public rowDigest: string) { }
+  constructor(
+    public projectId: string,
+    public digest: string,
+    public rowDigest: string
+  ) {}
 
-    public uri() {
-        return `weave:///${this.projectId}/table/${this.digest}/id/${this.rowDigest}`;
-    }
-
+  public uri() {
+    return `weave:///${this.projectId}/table/${this.digest}/id/${this.rowDigest}`;
+  }
 }
 
 type TableRow = Record<string, any> & {
-    __savedRef?: TableRowRef | Promise<TableRowRef>;
-}
+  __savedRef?: TableRowRef | Promise<TableRowRef>;
+};
 
-export class Table {
-    __savedRef?: TableRef | Promise<TableRef>;
+export class Table<R extends TableRow = TableRow> {
+  __savedRef?: TableRef | Promise<TableRef>;
 
-    constructor(public rows: TableRow[]) { }
+  constructor(public rows: R[]) {}
 
-    get length(): number {
-        return this.rows.length;
+  get length(): number {
+    return this.rows.length;
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterator<R> {
+    for (let i = 0; i < this.length; i++) {
+      yield this.row(i);
     }
+  }
 
-    async *[Symbol.asyncIterator](): AsyncIterator<any> {
-        for (let i = 0; i < this.length; i++) {
-            yield this.row(i);
-        }
-    }
-
-    row(index: number): TableRow {
-        return this.rows[index];
-    }
+  row(index: number): R {
+    return this.rows[index];
+  }
 }

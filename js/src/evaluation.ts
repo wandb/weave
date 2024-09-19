@@ -3,21 +3,26 @@ import { Op, getOpName } from "./opType";
 import { boundOp } from "./op";
 import { Dataset } from "./dataset";
 import { isMedia } from "./media";
+import { DatasetRow } from "./dataset";
 import cliProgress from "cli-progress";
 
-interface EvaluationParameters extends WeaveObjectParameters {
-  dataset: Dataset;
-  scorers: Op<any>[];
+interface EvaluationParameters<R extends DatasetRow, M>
+  extends WeaveObjectParameters {
+  dataset: Dataset<R>;
+  scorers: Op<(...args: [M, R]) => any>[];
   maxConcurrency?: number;
 }
 
-interface Runnable {
-  run: (...args: any[]) => Promise<any>;
+interface Runnable<T extends (...args: any[]) => any> {
+  run: (...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>;
 }
 
-type WeaveCallable = Op<any> | Runnable;
+type WeaveCallable<T extends (...args: any[]) => any> = Op<T> | Runnable<T>;
 
-function callWeaveCallable(callable: WeaveCallable, ...args: any[]) {
+function callWeaveCallable<T extends (...args: any[]) => any>(
+  callable: WeaveCallable<T>,
+  ...args: Parameters<T>
+) {
   if (typeof callable === "function") {
     return callable(...args);
   }
@@ -66,11 +71,11 @@ async function* asyncParallelMap<T, U>(
   }
 }
 
-export class Evaluation extends WeaveObject {
-  private dataset: Dataset;
-  private scorers: Op<any>[];
+export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
+  private dataset: Dataset<R>;
+  private scorers: Op<(...args: [M, R]) => any>[];
 
-  constructor(parameters: EvaluationParameters) {
+  constructor(parameters: EvaluationParameters<R, M>) {
     super(parameters);
     this.dataset = parameters.dataset;
     this.scorers = parameters.scorers;
@@ -86,7 +91,7 @@ export class Evaluation extends WeaveObject {
     model,
     maxConcurrency = 5,
   }: {
-    model: WeaveCallable;
+    model: WeaveCallable<(...args: [R]) => Promise<M>>;
     maxConcurrency?: number;
   }) {
     const results: Array<{
@@ -131,8 +136,8 @@ export class Evaluation extends WeaveObject {
     model,
     example,
   }: {
-    model: WeaveCallable;
-    example: Record<string, any>;
+    model: WeaveCallable<(...args: [R]) => Promise<M>>;
+    example: R;
   }) {
     const startTime = new Date();
     let modelOutput;
