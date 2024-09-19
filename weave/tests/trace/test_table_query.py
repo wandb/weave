@@ -48,11 +48,11 @@ def test_table_query(client: WeaveClient):
         )
     )
 
-    row_data = [r.val for r in res.rows]
-    result_row_digests = [r.digest for r in res.rows]
+    result_vals = [r.val for r in res.rows]
+    result_digests = [r.digest for r in res.rows]
 
-    assert row_data == data
-    assert result_row_digests == row_digests
+    assert result_vals == data
+    assert result_digests == row_digests
 
 
 def test_table_query_filter_by_row_digests(client: WeaveClient):
@@ -67,9 +67,10 @@ def test_table_query_filter_by_row_digests(client: WeaveClient):
         )
     )
 
-    assert len(res.rows) == 3
-    assert [r.digest for r in res.rows] == filtered_digests
-    assert [r.val["id"] for r in res.rows] == [data[i]["id"] for i in range(2, 5)]
+    result_digests = [r.digest for r in res.rows]
+
+    assert len(result_digests) == 3
+    assert result_digests == filtered_digests
 
 
 def test_table_query_limit(client: WeaveClient):
@@ -80,8 +81,12 @@ def test_table_query_limit(client: WeaveClient):
         tsi.TableQueryReq(project_id=client._project_id(), digest=digest, limit=limit)
     )
 
-    assert len(res.rows) == limit
-    assert all(r.val["id"] in [d["id"] for d in data] for r in res.rows)
+    result_vals = [r.val for r in res.rows]
+    result_digests = [r.digest for r in res.rows]
+
+    assert len(result_vals) == limit
+    assert result_digests == row_digests[:limit]
+    assert result_vals == [d for d in data[:limit]]
 
 
 def test_table_query_offset(client: WeaveClient):
@@ -92,21 +97,12 @@ def test_table_query_offset(client: WeaveClient):
         tsi.TableQueryReq(project_id=client._project_id(), digest=digest, offset=offset)
     )
 
-    assert len(res.rows) == len(data) - offset
-    assert all(r.val["id"] in [d["id"] for d in data] for r in res.rows)
+    result_vals = [r.val for r in res.rows]
+    result_digests = [r.digest for r in res.rows]
 
-
-def test_table_query_sort_no_sort(client: WeaveClient):
-    digest, row_digests, data = generate_table_data(client, 10, 5)
-
-    res = client.server.table_query(
-        tsi.TableQueryReq(
-            project_id=client._project_id(),
-            digest=digest,
-        )
-    )
-
-    assert [r.val["id"] for r in res.rows] != sorted([d["id"] for d in data])
+    assert len(result_vals) == len(data) - offset
+    assert result_digests == row_digests[offset:]
+    assert result_vals == [d for d in data[offset:]]
 
 
 def test_table_query_sort_by_column(client: WeaveClient):
@@ -120,8 +116,14 @@ def test_table_query_sort_by_column(client: WeaveClient):
         )
     )
 
+    result_vals = [r.val for r in res.rows]
+    result_digests = [r.digest for r in res.rows]
+
     sorted_data = sorted(data, key=lambda x: x["id"], reverse=True)
-    assert [r.val["id"] for r in res.rows] == [d["id"] for d in sorted_data]
+    assert result_vals == sorted_data
+    assert [r.val["id"] for r in res.rows] != [
+        d["id"] for d in data
+    ]  # Ensure order is different from original (assertion on the test itself)
 
 
 def test_table_query_sort_by_nested_column(client: WeaveClient):
@@ -135,10 +137,11 @@ def test_table_query_sort_by_nested_column(client: WeaveClient):
         )
     )
 
+    result_vals = [r.val for r in res.rows]
+
     sorted_data = sorted(data, key=lambda x: x["nested_col"]["prop_a"])
-    assert [r.val["nested_col"]["prop_a"] for r in res.rows] == [
-        d["nested_col"]["prop_a"] for d in sorted_data
-    ]
+    assert result_vals == sorted_data
+
     assert [r.val["id"] for r in res.rows] != [
         d["id"] for d in data
     ]  # Ensure order is different from original (assertion on the test itself)
@@ -158,11 +161,14 @@ def test_table_query_combined(client: WeaveClient):
             sort_by=[tsi.SortBy(field="id", direction="desc")],
         )
     )
+    result_vals = [r.val for r in res.rows]
+    result_digests = [r.digest for r in res.rows]
+
     sorted_data = sorted(data, key=lambda x: x["id"], reverse=True)
     expected_data = sorted_data[offset : offset + limit]
 
     assert len(res.rows) == limit
-    assert [r.val["id"] for r in res.rows] == [d["id"] for d in expected_data]
+    assert result_vals == expected_data
 
 
 def test_table_query_multiple_sort_criteria(client: WeaveClient):
@@ -178,11 +184,10 @@ def test_table_query_multiple_sort_criteria(client: WeaveClient):
             ],
         )
     )
+    result_vals = [r.val for r in res.rows]
 
     sorted_data = sorted(data, key=lambda x: (x["col_0"], -x["id"]))
-    assert [(r.val["col_0"], r.val["id"]) for r in res.rows] == [
-        (d["col_0"], d["id"]) for d in sorted_data
-    ]
+    assert result_vals == sorted_data
     assert [r.val["id"] for r in res.rows] != [
         d["id"] for d in data
     ]  # Ensure order is different from original  (assertion on the test itself)
