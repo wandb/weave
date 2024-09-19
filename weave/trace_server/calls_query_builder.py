@@ -50,7 +50,7 @@ from weave.trace_server.trace_server_interface_util import (
 logger = logging.getLogger(__name__)
 
 
-class CallsMergedField(BaseModel):
+class QueryBuilderField(BaseModel):
     field: str
 
     def as_sql(
@@ -64,6 +64,8 @@ class CallsMergedField(BaseModel):
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
 
+
+class CallsMergedField(QueryBuilderField):
     def is_heavy(self) -> bool:
         return False
 
@@ -91,22 +93,7 @@ class CallsMergedDynamicField(CallsMergedAggField):
         cast: typing.Optional[tsi_query.CastTo] = None,
     ) -> str:
         res = super().as_sql(pb, table_alias)
-        if cast != "exists":
-            path_str = "'$'"
-            if self.extra_path:
-                param_name = pb.add_param(quote_json_path_parts(self.extra_path))
-                path_str = _param_slot(param_name, "String")
-            val = f"JSON_VALUE({res}, {path_str})"
-            return clickhouse_cast(val, cast)
-        else:
-            # UGG - this is an ugly part of clickhouse! It is really difficult to differentiate
-            # between null, non-existent, "", and "null"!
-            path_parts = []
-            if self.extra_path:
-                for part in self.extra_path:
-                    path_parts.append(", " + _param_slot(pb.add_param(part), "String"))
-            safe_path = "".join(path_parts)
-            return f"(NOT (JSONType({res}{safe_path}) = 'Null' OR JSONType({res}{safe_path}) IS NULL))"
+        return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         if self.extra_path:
@@ -126,27 +113,89 @@ class CallsMergedDynamicField(CallsMergedAggField):
         return True
 
 
+class QueryBuilderDynamicField(QueryBuilderField):
+    extra_path: typing.Optional[list[str]] = None
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: typing.Optional[tsi_query.CastTo] = None,
+    ) -> str:
+        res = super().as_sql(pb, table_alias)
+        return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
+
+    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+        if self.extra_path:
+            raise NotImplementedError(
+                "Dynamic fields cannot be selected directly, yet - implement me!"
+            )
+        return f"{super().as_sql(pb, table_alias)} AS {self.field}"
+
+
+def json_dump_field_as_sql(
+    pb: ParamBuilder,
+    table_alias: str,
+    root_field_sanitized: str,
+    extra_path: typing.Optional[list[str]] = None,
+    cast: typing.Optional[tsi_query.CastTo] = None,
+) -> str:
+    if cast != "exists":
+        path_str = "'$'"
+        if extra_path:
+            param_name = pb.add_param(quote_json_path_parts(extra_path))
+            path_str = _param_slot(param_name, "String")
+        val = f"JSON_VALUE({root_field_sanitized}, {path_str})"
+        return clickhouse_cast(val, cast)
+    else:
+        # UGG - this is an ugly part of clickhouse! It is really difficult to differentiate
+        # between null, non-existent, "", and "null"!
+        path_parts = []
+        if extra_path:
+            for part in extra_path:
+                path_parts.append(", " + _param_slot(pb.add_param(part), "String"))
+        safe_path = "".join(path_parts)
+        return f"(NOT (JSONType({root_field_sanitized}{safe_path}) = 'Null' OR JSONType({root_field_sanitized}{safe_path}) IS NULL))"
+
+
 class OrderField(BaseModel):
-    field: CallsMergedField
+    field: QueryBuilderField
     direction: typing.Literal["ASC", "DESC"]
 
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
-        options: list[typing.Tuple[typing.Optional[tsi_query.CastTo], str]]
-        if isinstance(self.field, CallsMergedDynamicField):
-            # Prioritize existence, then cast to double, then str
-            options = [
-                ("exists", "desc"),
-                ("double", self.direction),
-                ("string", self.direction),
-            ]
-        else:
-            options = [(None, self.direction)]
-        res = ""
-        for index, (cast, direction) in enumerate(options):
-            if index > 0:
-                res += ", "
-            res += f"{self.field.as_sql(pb, table_alias, cast)} {direction}"
-        return res
+        requires_type_casting = isinstance(
+            self.field, (CallsMergedDynamicField, QueryBuilderDynamicField)
+        )
+        return order_by_sql(
+            self.field, requires_type_casting, self.direction, table_alias, pb
+        )
+
+
+def order_by_sql(
+    field: QueryBuilderField,
+    requires_type_casting: bool,
+    direction: typing.Literal["ASC", "DESC"],
+    table_alias: str,
+    pb: ParamBuilder,
+) -> str:
+    options: list[
+        typing.Tuple[typing.Optional[tsi_query.CastTo], typing.Literal["ASC", "DESC"]]
+    ]
+    if requires_type_casting:
+        # Prioritize existence, then cast to double, then str
+        options = [
+            ("exists", "DESC"),
+            ("double", direction),
+            ("string", direction),
+        ]
+    else:
+        options = [(None, direction)]
+    res = ""
+    for index, (cast, inner_direction) in enumerate(options):
+        if index > 0:
+            res += ", "
+        res += f"{field.as_sql(pb, table_alias, cast)} {inner_direction}"
+    return res
 
 
 class Condition(BaseModel):

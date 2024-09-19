@@ -52,6 +52,8 @@ from clickhouse_connect.driver.summary import QuerySummary
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
+    OrderField,
+    QueryBuilderDynamicField,
     combine_conditions,
 )
 from weave.trace_server.ids import generate_id
@@ -77,7 +79,7 @@ from .feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from .orm import ParamBuilder, Row, quote_json_path
+from .orm import ParamBuilder, Row
 from .token_costs import LLM_TOKEN_PRICES_TABLE, validate_cost_purge_req
 from .trace_server_common import (
     LRUCache,
@@ -769,17 +771,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conds.append("1 = 1")
 
         sort_clause = ""
+        pb = ParamBuilder()
         if req.sort_by:
             sort_fields = []
             for i, sort in enumerate(req.sort_by):
-                direction = "ASC" if sort.direction.lower() == "asc" else "DESC"
-                param_name = f"json_path_{i}"
-                parameters[param_name] = quote_json_path(sort.field)
-                sort_fields.append(
-                    f"JSON_VALUE(tr.val_dump, {{{param_name}: String}}) {direction}"
+                # TODO: better splitting of escaped dots (.) in field names
+                extra_path = sort.field.split(".")
+                field = OrderField(
+                    field=QueryBuilderDynamicField(
+                        field="val_dump", extra_path=extra_path
+                    ),
+                    direction="ASC" if sort.direction.lower() == "asc" else "DESC",
                 )
+                sort_fields.append(field.as_sql(pb, "tr"))
             sort_clause = f"ORDER BY {', '.join(sort_fields)}"
-
+        sort_params = pb.get_params()
+        parameters.update(sort_params)
         rows = self._table_query(
             req.project_id,
             req.digest,

@@ -161,7 +161,6 @@ def test_table_query_combined(client: WeaveClient):
     sorted_data = sorted(data, key=lambda x: x["id"], reverse=True)
     expected_data = sorted_data[offset : offset + limit]
 
-
     assert len(res.rows) == limit
     assert [r.val["id"] for r in res.rows] == [d["id"] for d in expected_data]
 
