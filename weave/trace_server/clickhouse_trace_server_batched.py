@@ -763,7 +763,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parameters = {}
         if req.filter:
             if req.filter.row_digests:
-                conds.append("tr.digest IN {row_digets: Array(String)}")
+                conds.append("tr.digest IN {row_digests: Array(String)}")
                 parameters["row_digests"] = req.filter.row_digests
         else:
             conds.append("1 = 1")
@@ -773,6 +773,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conditions=conds,
             limit=req.limit,
             offset=req.offset,
+            parameters=parameters,
         )
         return tsi.TableQueryRes(rows=rows)
 
