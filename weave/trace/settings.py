@@ -55,7 +55,11 @@ class UserSettings(BaseModel):
     """Toggles code capture for ops.
     
     If True, saves code for ops so they can be reloaded for later use.
-    Can be overrided with the environment variable `WEAVE_CAPTURE_CODE`"""
+    Can be overrided with the environment variable `WEAVE_CAPTURE_CODE`
+    
+    WARNING: Switching between `save_code=True` and `save_code=False` mid-script
+    may lead to unexpected behaviour.  Make sure this is only set once at the start!
+    """
 
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
