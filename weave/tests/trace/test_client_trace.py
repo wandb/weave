@@ -1,5 +1,6 @@
 import dataclasses
 import datetime
+import json
 import platform
 import sys
 import time
@@ -25,6 +26,7 @@ from weave.trace.object_record import ObjectRecord
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_trace_server_batched import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
@@ -2870,3 +2872,53 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
         )
     )
     assert len(res.objs) == 1  # Just the weave object, and not the pydantic model
+
+
+def test_large_keys_are_stripped_call(client, caplog):
+    is_sqlite = client_is_sqlite(client)
+    if is_sqlite:
+        # no need to strip in sqlite
+        return
+
+    data = {"dictionary": {f"{i}": i for i in range(300_000)}}
+
+    @weave.op
+    def test_op_dict(input_data: dict):
+        return {"output": input_data}
+
+    test_op_dict(data)
+
+    calls = list(test_op_dict.calls())
+    assert len(calls) == 1
+    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+
+    # now test for inputs/output as raw string
+    @weave.op
+    def test_op_str(input_data: str):
+        return input_data
+
+    test_op_str(json.dumps(data))
+
+    calls = list(test_op_str.calls())
+    assert len(calls) == 1
+    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+
+    # and now list
+    @weave.op
+    def test_op_list(input_data: list[str]):
+        return input_data
+
+    test_op_list([json.dumps(data)])
+
+    calls = list(test_op_list.calls())
+    assert len(calls) == 1
+    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+
+    error_messages = [
+        record.message for record in caplog.records if record.levelname == "ERROR"
+    ]
+    for error_message in error_messages:
+        assert "Retrying with large objects stripped" in error_message
