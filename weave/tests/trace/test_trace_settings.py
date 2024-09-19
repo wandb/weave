@@ -2,6 +2,7 @@ import inspect
 import io
 import os
 import sys
+import textwrap
 import timeit
 
 import weave
@@ -101,9 +102,15 @@ def test_should_capture_code_setting(client):
     assert "Code-capture disabled" in inspect.getsource(func2)
 
     parse_and_apply_settings(UserSettings(capture_code=True))
-    ref = weave.publish(func)
-    func2 = ref.get()
-    assert "Code-capture disabled" not in inspect.getsource(func2)
+    ref2 = weave.publish(func)
+    func3 = ref2.get()
+    assert inspect.getsource(func3) == textwrap.dedent(
+        """
+        @weave.op
+        def func():
+            return 1
+        """
+    )
 
 
 def test_should_capture_code_env(client):
@@ -113,6 +120,12 @@ def test_should_capture_code_env(client):
     assert "Code-capture disabled" in inspect.getsource(func2)
 
     os.environ["WEAVE_CAPTURE_CODE"] = "true"
-    ref = weave.publish(func)
-    func2 = ref.get()
-    assert "Code-capture disabled" not in inspect.getsource(func2)
+    ref2 = weave.publish(func)
+    func3 = ref2.get()
+    assert inspect.getsource(func3) == textwrap.dedent(
+        """
+        @weave.op
+        def func():
+            return 1
+        """
+    )
