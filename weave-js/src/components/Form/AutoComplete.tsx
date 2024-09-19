@@ -1,7 +1,4 @@
-import Autocomplete, {
-  AutocompleteProps,
-  createFilterOptions,
-} from '@mui/material/Autocomplete';
+import Autocomplete, {AutocompleteProps} from '@mui/material/Autocomplete';
 import {createTheme, ThemeProvider} from '@mui/material/styles';
 import React from 'react';
 
@@ -31,13 +28,6 @@ const FONT_SIZES = {
   variable: '14px',
 };
 
-const PADDING = {
-  small: '2px 8px',
-  medium: '4px 6px 4px 12px',
-  large: '8px 12px',
-  variable: '2px 8px',
-};
-
 const getStyles = (props: AdditionalProps) => {
   const size = props.size ?? 'medium';
   const customTheme = createTheme({
@@ -45,7 +35,9 @@ const getStyles = (props: AdditionalProps) => {
       MuiOutlinedInput: {
         styleOverrides: {
           root: {
-            height: HEIGHTS[size],
+            paddingTop: '0px !important',
+            paddingBottom: '0px !important',
+
             fontSize: FONT_SIZES[size],
             fontFamily: 'Source Sans Pro',
             minWidth: '100px',
@@ -54,12 +46,12 @@ const getStyles = (props: AdditionalProps) => {
             '& fieldset': {
               borderColor: MOON_250,
             },
-            '&&:focus-within fieldset': {
-              borderColor: TEAL_400,
-              borderWidth: '2px',
+            '&&.Mui-focused fieldset': {
+              borderColor: TEAL_400, // Correct focus border color
+              borderWidth: '2px', // Ensure this border width applies on focus
             },
-            '&&:hover:not(:focus-within) fieldset': {
-              borderColor: TEAL_350,
+            '&&:hover:not(.Mui-focused) fieldset': {
+              borderColor: TEAL_350, // Hover but not focused
               borderWidth: '2px',
             },
             '& input::placeholder': {
@@ -71,13 +63,20 @@ const getStyles = (props: AdditionalProps) => {
       },
       MuiInputBase: {
         styleOverrides: {
+          root: {
+            minHeight: HEIGHTS[size],
+            paddingTop: '0px !important',
+            paddingBottom: '0px !important',
+          },
           inputMultiline: {
-            whiteSpace: 'normal', // Allow text to wrap
-            overflow: 'hidden', // Hide scrollbars
-            textOverflow: 'ellipsis', // Show ellipsis when overflowing
-            display: '-webkit-box',
-            WebkitLineClamp: 3, // Limit number of lines
-            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            whiteSpace: 'pre-wrap',
+            overflowY: 'auto',
+            scrollbarWidth: 'none', // For Firefox (hides the scrollbar)
+            msOverflowStyle: 'none', // For IE and Edge (hides the scrollbar)
+            '&::-webkit-scrollbar': {
+              display: 'none', // For Chrome, Safari, and WebKit-based browsers (hides the scrollbar)
+            },
           },
         },
       },
