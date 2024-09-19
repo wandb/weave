@@ -4,7 +4,7 @@ import { OpOptions, Op } from "./opType";
 export function op<T extends (...args: any[]) => any>(
   fn: T,
   options?: OpOptions<T>
-): Op<(...args: Parameters<T>) => Promise<ReturnType<T>>> {
+): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>> {
   const fnName = options?.originalFunction?.name || fn.name || "anonymous";
   let actualOpName = fnName;
   const thisArg = options?.bindThis;

@@ -1,60 +1,73 @@
 import { WeaveObject, WeaveObjectParameters, ObjectRef } from "./weaveObject";
 import { Table } from "./table";
 
-interface DatasetParameters extends WeaveObjectParameters {
-    rows: Record<string, any>[];
+interface DatasetParameters<R extends DatasetRow>
+  extends WeaveObjectParameters {
+  rows: R[];
 }
 
 export class DatasetRowRef {
-    constructor(public projectId: string, public objId: string, public digest: string, public rowDigest: string) { }
+  constructor(
+    public projectId: string,
+    public objId: string,
+    public digest: string,
+    public rowDigest: string
+  ) {}
 
-    public uri() {
-        return `weave:///${this.projectId}/object/${this.objId}:${this.digest}/attr/rows/id/${this.rowDigest}`;
-    }
-
+  public uri() {
+    return `weave:///${this.projectId}/object/${this.objId}:${this.digest}/attr/rows/id/${this.rowDigest}`;
+  }
 }
 
-type DatasetRow = Record<string, any> & {
-    __savedRef?: DatasetRowRef | Promise<DatasetRowRef>;
-}
+export type DatasetRow = Record<string, any> & {
+  __savedRef?: DatasetRowRef | Promise<DatasetRowRef>;
+};
 
-export class Dataset extends WeaveObject {
-    saveAttrNames = ['rows'];
-    public rows: Table;
+export class Dataset<R extends DatasetRow> extends WeaveObject {
+  saveAttrNames = ["rows"];
+  public rows: Table<R>;
 
-    constructor(parameters: DatasetParameters) {
-        const baseParameters = {
-            id: parameters.id,
-            description: parameters.description
-        }
-        super(baseParameters);
-        this.rows = new Table(parameters.rows);
+  constructor(parameters: DatasetParameters<R>) {
+    const baseParameters = {
+      id: parameters.id,
+      description: parameters.description,
+    };
+    super(baseParameters);
+    this.rows = new Table(parameters.rows);
+  }
+
+  async save(): Promise<ObjectRef> {
+    // Need require because of circular dependency
+    const client = require("./clientApi").globalClient;
+    return client.saveObject(this);
+  }
+
+  get length(): number {
+    return this.rows.length;
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterator<any> {
+    for (let i = 0; i < this.length; i++) {
+      yield this.row(i);
     }
+  }
 
-    async save(): Promise<ObjectRef> {
-        // Need require because of circular dependency
-        const client = require('./clientApi').globalClient;
-        return client.saveObject(this);
+  row(index: number): R {
+    const tableRow = this.rows.row(index);
+    const datasetRow: R = { ...tableRow, __savedRef: undefined };
+    if (this.__savedRef && tableRow.__savedRef) {
+      datasetRow.__savedRef = Promise.all([
+        this.__savedRef,
+        tableRow.__savedRef,
+      ]).then(([ref, tableRowRef]) => {
+        return new DatasetRowRef(
+          ref.projectId,
+          ref.objectId,
+          ref.digest,
+          tableRowRef.rowDigest
+        );
+      });
     }
-
-    get length(): number {
-        return this.rows.length;
-    }
-
-    async *[Symbol.asyncIterator](): AsyncIterator<any> {
-        for (let i = 0; i < this.length; i++) {
-            yield this.row(i);
-        }
-    }
-
-    row(index: number): DatasetRow {
-        const tableRow = this.rows.row(index);
-        const datasetRow: DatasetRow = { ...tableRow, __savedRef: undefined };
-        if (this.__savedRef && tableRow.__savedRef) {
-            datasetRow.__savedRef = Promise.all([this.__savedRef, tableRow.__savedRef]).then(([ref, tableRowRef]) => {
-                return new DatasetRowRef(ref.projectId, ref.objectId, ref.digest, tableRowRef.rowDigest);
-            });
-        }
-        return datasetRow;
-    }
+    return datasetRow;
+  }
 }
