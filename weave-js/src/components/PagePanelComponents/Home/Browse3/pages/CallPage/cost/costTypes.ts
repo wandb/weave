@@ -42,20 +42,20 @@ export const isUsageDataKey = (key: any): key is UsageDataKeys => {
   return usageDataKeys.includes(key as UsageDataKeys);
 };
 
-export type TokenMetrics = {
+export type CostTotals = {
   inputs: {
-    tokens: Record<string, number>;
+    cost: Record<string, number>;
   };
   outputs: {
-    tokens: Record<string, number>;
+    cost: Record<string, number>;
   };
 };
 
-export type CostMetrics = {
+export type TokenTotals = {
   inputs: {
-    cost: Record<string, number>;
+    tokens: Record<string, number>;
   };
   outputs: {
-    cost: Record<string, number>;
+    tokens: Record<string, number>;
   };
 };

@@ -23,7 +23,7 @@ import {isWeaveRef} from '../../filters/common';
 import {
   getCostsFromCellParams,
   getTokensFromCellParams,
-} from '../CallPage/cost/costUtils';
+} from '../CallPage/cost';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
