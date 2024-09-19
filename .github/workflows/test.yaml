@@ -12,7 +12,30 @@ on:
   push:
 
 jobs:
-  build-container:
+  # ==== Query Service Jobs ====
+  weavejs-lint-compile:
+    name: WeaveJS Lint and Compile
+    runs-on: ubuntu-latest
+    # runs-on: [self-hosted, gke-runner]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '18.x'
+      - run: |
+          set -e
+          cd weave-js
+          yarn install --frozen-lockfile
+          yarn generate
+          yarn eslint --max-warnings=0
+          yarn tslint
+          yarn prettier
+          yarn run tsc
+
+  build-container-query-service:
     name: Build test container
     timeout-minutes: 30
     runs-on: [self-hosted, builder]
@@ -37,6 +60,61 @@ jobs:
       - name: Build legacy (query sevice) unit test image
         run: python3 weave/docker/docker_build.py build_deps weave-test-python-client builder . weave/legacy/Dockerfile.client.test
 
+  test:
+    name: Legacy (Query Service) Python unit tests
+    timeout-minutes: 15 # do not raise! running longer than this indicates an issue with the tests. fix there.
+    needs:
+      - build-container-query-service
+    # runs-on: [self-hosted, gke-runner]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        job_num: [0, 1]
+    # runs-on: ubuntu-latest
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-client:${{ github.sha }}
+    services:
+      wandbservice:
+        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
+        credentials:
+          username: _json_key
+          password: ${{ secrets.gcp_wb_sa_key }}
+        env:
+          CI: 1
+          WANDB_ENABLE_TEST_CONTAINER: true
+        ports:
+          - '8080:8080'
+          - '8083:8083'
+          - '9015:9015'
+        options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
+    steps:
+      # - uses: datadog/agent-github-action@v1.3
+      #   with:
+      #     api_key: ${{ secrets.DD_API_KEY }}
+      - uses: actions/checkout@v2
+      - name: Verify wandb server is running
+        run: curl -s http://wandbservice:8080/healthz
+      - name: Run Legacy (Query Service) Python Unit Tests
+        env:
+          DD_SERVICE: weave-python
+          DD_ENV: ci
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+        run: |
+          source /root/venv/bin/activate && \
+          pip install 'dspy-ai==2.4.13' && \
+          pip install pydantic -U && \
+          cd weave && \
+          pytest \
+          --job-num=${{ matrix.job_num }} \
+          --timeout=90 \
+          --ddtrace \
+          --durations=5 \
+          ./legacy
+
+  # ==== Trace Jobs ====
   lint:
     name: Python lint
     runs-on: ubuntu-latest
@@ -53,28 +131,6 @@ jobs:
           pip install tox
       - name: Run tox
         run: tox -e lint
-
-  weavejs-lint-compile:
-    name: WeaveJS Lint and Compile
-    runs-on: ubuntu-latest
-    # runs-on: [self-hosted, gke-runner]
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v1
-        with:
-          node-version: '18.x'
-      - run: |
-          set -e
-          cd weave-js
-          yarn install --frozen-lockfile
-          yarn generate
-          yarn eslint --max-warnings=0
-          yarn tslint
-          yarn prettier
-          yarn run tsc
 
   trace-tests:
     name: Trace tox tests
@@ -156,57 +212,3 @@ jobs:
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
           tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }}
-
-  test:
-    name: Legacy (Query Service) Python unit tests
-    timeout-minutes: 15 # do not raise! running longer than this indicates an issue with the tests. fix there.
-    needs:
-      - build-container
-    # runs-on: [self-hosted, gke-runner]
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        job_num: [0, 1]
-    # runs-on: ubuntu-latest
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-client:${{ github.sha }}
-    services:
-      wandbservice:
-        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
-        credentials:
-          username: _json_key
-          password: ${{ secrets.gcp_wb_sa_key }}
-        env:
-          CI: 1
-          WANDB_ENABLE_TEST_CONTAINER: true
-        ports:
-          - '8080:8080'
-          - '8083:8083'
-          - '9015:9015'
-        options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
-    steps:
-      # - uses: datadog/agent-github-action@v1.3
-      #   with:
-      #     api_key: ${{ secrets.DD_API_KEY }}
-      - uses: actions/checkout@v2
-      - name: Verify wandb server is running
-        run: curl -s http://wandbservice:8080/healthz
-      - name: Run Legacy (Query Service) Python Unit Tests
-        env:
-          DD_SERVICE: weave-python
-          DD_ENV: ci
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WB_SERVER_HOST: http://wandbservice
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-        run: |
-          source /root/venv/bin/activate && \
-          pip install 'dspy-ai==2.4.13' && \
-          pip install pydantic -U && \
-          cd weave && \
-          pytest \
-          --job-num=${{ matrix.job_num }} \
-          --timeout=90 \
-          --ddtrace \
-          --durations=5 \
-          ./legacy
