@@ -1,10 +1,11 @@
 import configparser
+import json
 import netrc
 import os
 from typing import Optional
 from urllib.parse import urlparse
 
-from weave.legacy.weave.errors import WeaveConfigurationError
+from weave.trace.errors import WeaveConfigurationError
 
 WEAVE_PARALLELISM = "WEAVE_PARALLELISM"
 
@@ -111,3 +112,31 @@ def weave_wandb_api_key() -> Optional[str]:
                 "There are different credentials in the netrc file and the environment. Using the environment value."
             )
     return env_api_key or netrc_api_key
+
+
+def weave_wandb_cookie() -> Optional[str]:
+    cookie = os.environ.get("WEAVE_WANDB_COOKIE")
+    if cookie:
+        if is_public():
+            raise WeaveConfigurationError(
+                "WEAVE_WANDB_COOKIE should not be set in public mode."
+            )
+        for netrc_file in ("~/.netrc", "~/_netrc"):
+            if os.path.exists(os.path.expanduser(netrc_file)):
+                raise WeaveConfigurationError(
+                    f"Please delete {netrc_file} while using WEAVE_WANDB_COOKIE to avoid using your credentials"
+                )
+    return cookie
+
+
+def weave_wandb_gql_headers() -> dict[str, str]:
+    # expects a json string
+    raw = os.environ.get("WEAVE_WANDB_GQL_HEADERS")
+    if raw:
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            raise WeaveConfigurationError(
+                "WEAVE_WANDB_GQL_HEADERS should be a json string"
+            )
+    return {}
