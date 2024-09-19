@@ -67,7 +67,6 @@ async function* asyncParallelMap<T, U>(
 }
 
 export class Evaluation extends WeaveObject {
-  saveAttrNames = ["dataset", "scorers"];
   private dataset: Dataset;
   private scorers: Op<any>[];
 

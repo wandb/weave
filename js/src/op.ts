@@ -116,6 +116,10 @@ export function op<T extends (...args: any[]) => any>(
   return opWrapper as Op<T>;
 }
 
+export function isOp(fn: any): fn is Op<any> {
+  return fn.__isOp === true;
+}
+
 export function boundOp(
   bindThis: any,
   fn: (...args: any[]) => any,
