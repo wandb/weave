@@ -830,20 +830,20 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     field = f"json_extract(tr.val, '$.{field}')"
                 sort_parts.append(f"{field} {direction}")
             order_by = f"ORDER BY {', '.join(sort_parts)}"
-
+        else:
+            order_by = "ORDER BY OrderedDigests.original_order"
         # First get the row IDs by querying tables
         query = f"""
         WITH OrderedDigests AS (
             SELECT
-                json_each.value AS digest
+                json_each.value AS digest,
+                json_each.id AS original_order
             FROM
                 tables,
                 json_each(tables.row_digests)
             WHERE
                 tables.project_id = ? AND
                 tables.digest = ?
-            ORDER BY
-                json_each.id
         )
         SELECT
             tr.digest,
