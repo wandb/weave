@@ -368,15 +368,52 @@ class ObjReadRes(BaseModel):
 
 
 class ObjectVersionFilter(BaseModel):
-    base_object_classes: Optional[List[str]] = None
-    object_ids: Optional[List[str]] = None
-    is_op: Optional[bool] = None
-    latest_only: Optional[bool] = None
+    base_object_classes: Optional[List[str]] = Field(
+        default=None,
+        description="Filter objects by their base classes",
+        examples=[["Model"], ["Dataset"]],
+    )
+    object_ids: Optional[List[str]] = Field(
+        default=None,
+        description="Filter objects by their IDs",
+        examples=["my_favorite_model", "my_favorite_dataset"],
+    )
+    is_op: Optional[bool] = Field(
+        default=None,
+        description="Filter objects based on whether they are weave.ops or not. `True` will only return ops, `False` will return non-ops, and `None` will return all objects",
+        examples=[True, False, None],
+    )
+    latest_only: Optional[bool] = Field(
+        default=None,
+        description="If True, return only the latest version of each object. `False` and `None` will return all versions",
+        examples=[True, False],
+    )
 
 
 class ObjQueryReq(BaseModel):
-    project_id: str
-    filter: Optional[ObjectVersionFilter] = None
+    project_id: str = Field(
+        description="The ID of the project to query", examples=["user/project"]
+    )
+    filter: Optional[ObjectVersionFilter] = Field(
+        default=None,
+        description="Filter criteria for the query. See `ObjectVersionFilter`",
+        examples=[
+            ObjectVersionFilter(object_ids=["my_favorite_model"], latest_only=True)
+        ],
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of results to return", examples=[100]
+    )
+    offset: Optional[int] = Field(
+        default=None,
+        description="Number of results to skip before returning",
+        examples=[0],
+    )
+    sort_by: Optional[List[SortBy]] = Field(
+        default=None,
+        description="Sorting criteria for the query results. Currently only supports 'object_id' and 'created_at'.",
+        examples=[[SortBy(field="created_at", direction="desc")]],
+    )
 
 
 class ObjQueryRes(BaseModel):
