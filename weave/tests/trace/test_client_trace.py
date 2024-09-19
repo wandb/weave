@@ -2210,6 +2210,79 @@ def test_call_query_stream_columns(client):
     assert calls[0].inputs == {"a": 0, "b": 0}
 
 
+def test_call_query_stream_columns_with_costs(client):
+    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
+    if is_sqlite:
+        # dont run this test for sqlite
+        return
+
+    @weave.op
+    def calculate(a: int, b: int) -> int:
+        return {
+            "result": {"a + b": a + b},
+            "not result": 123,
+            "usage": {"prompt_tokens": 10, "completion_tokens": 10},
+            "model": "test_model",
+        }
+
+    for i in range(2):
+        calculate(i, i * i)
+
+    # Test that costs are returned if we include the summary field
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary"],
+            include_costs=True,
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 2
+    assert calls[0].summary is not None
+    assert calls[0].summary.get("weave").get("costs") is not None
+
+    # This should not happen, users should not request summary_dump
+    # Test that costs are returned if we include the summary_dump field
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary_dump"],
+            include_costs=True,
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 2
+    assert calls[0].summary is not None
+    assert calls[0].summary.get("weave").get("costs") is not None
+
+    # Test that costs are returned if we don't include the summary field
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id"],
+            include_costs=True,
+        )
+    )
+
+    calls = list(calls)
+    assert len(calls) == 2
+    # Summary should come back even though it wasn't requested, because we include costs
+    assert calls[0].summary.get("weave").get("costs") is not None
+
+    # Test that costs are not returned if we include the summary field, but don't include costs
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary"],
+        )
+    )
+
+    calls = list(calls)
+    assert len(calls) == 2
+    assert calls[0].summary is not None
+    assert calls[0].summary.get("weave", {}).get("costs") is None
+
+
 @pytest.mark.skip("Not implemented: filter / sort through refs")
 def test_sort_and_filter_through_refs(client):
     @weave.op()
