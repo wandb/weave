@@ -124,14 +124,15 @@ def _dict_is_op_like(data: dict):  # type: ignore
 def convert_specific_ops_to_generic_ops_data(data):  # type: ignore
     """Fix op call names for serialized objects containing graphs"""
     if isinstance(data, list):
-        return [convert_specific_ops_to_generic_ops_data(d) for d in data]
+        for i in range(len(data)):
+            data[i] = convert_specific_ops_to_generic_ops_data(data[i])
     elif isinstance(data, dict):
-        d = data
         if _dict_is_op_like(data):
-            d["name"], d["inputs"] = convert_specific_opname_to_generic_opname(
-                d["name"], d["inputs"]
+            data["name"], data["inputs"] = convert_specific_opname_to_generic_opname(
+                data["name"], data["inputs"]
             )
-        return {k: convert_specific_ops_to_generic_ops_data(v) for k, v in d.items()}
+        for k, v in data.items():
+            data[k] = convert_specific_ops_to_generic_ops_data(v)
     return data
 
 
@@ -153,13 +154,13 @@ def remove_opcall_versions_node(node: graph.Node) -> graph.Node:
 def remove_opcall_versions_data(data):  # type: ignore
     """Fix op call names for serialized objects containing graphs"""
     if isinstance(data, list):
-        return [remove_opcall_versions_data(d) for d in data]
+        for i in range(len(data)):
+            data[i] = remove_opcall_versions_data(data[i])
     elif isinstance(data, dict):
-        d = data
         if _dict_is_op_like(data):
-            d = copy.copy(data)
-            d["name"] = graph.opuri_full_name(data["name"])
-        return {k: remove_opcall_versions_data(v) for k, v in d.items()}
+            data["name"] = graph.opuri_full_name(data["name"])
+        for k, v in data.items():
+            data[k] = remove_opcall_versions_data(v)
     return data
 
 
@@ -170,25 +171,26 @@ def fixup_node(node: graph.Node) -> graph.Node:
 
 def recursively_unwrap_unions(obj):  # type: ignore
     if isinstance(obj, list):
-        return [recursively_unwrap_unions(o) for o in obj]
-    if isinstance(obj, dict):
+        for i in range(len(obj)):
+            obj[i] = recursively_unwrap_unions(obj[i])
+    elif isinstance(obj, dict):
         if "_union_id" in obj and "_val" in obj:
             return recursively_unwrap_unions(obj["_val"])
         else:
-            return {
-                k: recursively_unwrap_unions(v)
-                for k, v in obj.items()
-                if k != "_union_id"
-            }
+            for k, v in obj.items():
+                if k != "_union_id":
+                    obj[k] = recursively_unwrap_unions(v)
     return obj
 
 
 def remove_nan_and_inf(obj):  # type: ignore
     if isinstance(obj, list):
-        return [remove_nan_and_inf(o) for o in obj]
-    if isinstance(obj, dict):
-        return {k: remove_nan_and_inf(v) for k, v in obj.items()}
-    if isinstance(obj, float):
+        for i in range(len(obj)):
+            obj[i] = remove_nan_and_inf(obj[i])
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            obj[k] = remove_nan_and_inf(v)
+    elif isinstance(obj, float):
         if math.isnan(obj) or math.isinf(obj):
             return 0
     return obj
@@ -204,17 +206,14 @@ def remove_partialobject_from_types(data):  # type: ignore
     "project"
 
     """
-    # TODO: check this
-
     if isinstance(data, list):
-        return [remove_partialobject_from_types(d) for d in data]
+        for i in range(len(data)):
+            data[i] = remove_partialobject_from_types(data[i])
     elif isinstance(data, dict):
-        result = {}
-        for key in data:
-            if key == "type" and data[key] == "PartialObject":
-                return data["keyless_weave_type_class"]
-            result[key] = remove_partialobject_from_types(data[key])
-        return result
+        if data.get("type") == "PartialObject":
+            return data["keyless_weave_type_class"]
+        for k, v in data.items():
+            data[k] = remove_partialobject_from_types(v)
     return data
 
 
