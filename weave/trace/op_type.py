@@ -290,7 +290,7 @@ def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
     missing_code_template = textwrap.dedent(
         f"""
         def {func_name}{sig_str}:
-            ...  # Code-capture unavailable for this op
+            ... # Code-capture unavailable for this op
         """
     )[1:]  # skip first newline char
 
