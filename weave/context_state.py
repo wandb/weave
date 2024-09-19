@@ -39,3 +39,8 @@ class WandbApiContext:
 _wandb_api_context: contextvars.ContextVar[typing.Optional[WandbApiContext]] = (
     contextvars.ContextVar("wandb_api_context", default=None)
 )
+
+## urls.py Context
+_use_local_urls: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "use_local_urls", default=False
+)
