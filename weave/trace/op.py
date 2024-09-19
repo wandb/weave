@@ -307,38 +307,6 @@ def calls(op: Op) -> "CallsIter":
     return client._op_calls(op)
 
 
-# Legacy decos
-@overload
-def op(name: Any) -> Any: ...
-@overload
-def op(input_type: Any, output_type: Any) -> Any: ...
-@overload
-def op(name: Any, input_type: Any, output_type: Any) -> Any: ...
-@overload
-def op(name: Any, output_type: Any) -> Any: ...
-@overload
-def op(name: Any, input_type: Any, output_type: Any, render_info: Any) -> Any: ...
-@overload
-def op(name: Any, input_type: Any, output_type: Any, pure: Any) -> Any: ...
-@overload
-def op(name: Any, input_type: Any, output_type: Any, hidden: Any) -> Any: ...
-@overload
-def op(
-    input_type: Any = None,
-    output_type: Any = None,
-    refine_output_type: Any = None,
-    name: Any = None,
-    setter: Any = None,
-    render_info: Any = None,
-    hidden: Any = None,
-    pure: Any = None,
-    _op_def_class: Any = None,
-    plugins: Any = None,
-    mutation: Any = None,
-    weavify: Any = None,
-) -> Any: ...
-
-
 # Modern decos
 @overload
 def op(func: Any) -> Op: ...
@@ -357,10 +325,8 @@ def op(
     ...
 
 
-# type ignore here is because we have the legacy decorators above.  Once they are
-# removed, we can remove the overloads this type ignore.
 @overload
-def op(*, name: str) -> Callable[[Any], Op]:  # type: ignore
+def op(*, name: str) -> Callable[[Any], Op]:
     """Use name to set the name of the op itself."""
     ...
 
