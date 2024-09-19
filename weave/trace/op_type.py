@@ -288,6 +288,7 @@ def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
         sig_str = reconstruct_signature(fn)
     except Exception as e:
         warnings.append(f"Failed to reconstruct signature: {e}")
+        sig_str = "(*args, **kwargs)"
 
     func_name = fn.__name__
     missing_code_template = textwrap.dedent(
