@@ -55,26 +55,23 @@ export const CallTraceView: FC<{
       headerName: 'Call Tree',
       headerAlign: 'center',
       flex: 1,
-      renderCell: params => {
-        // console.log(params, costLoading);
-        return (
-          <CustomGridTreeDataGroupingCell
-            {...params}
-            costLoading={costLoading}
-            onClick={event => {
-              setExpandKeys(curr => {
-                if (curr.has(params.row.id)) {
-                  const newSet = new Set(curr);
-                  newSet.delete(params.row.id);
-                  return newSet;
-                } else {
-                  return new Set([...curr, params.row.id]);
-                }
-              });
-            }}
-          />
-        );
-      },
+      renderCell: params => (
+        <CustomGridTreeDataGroupingCell
+          {...params}
+          costLoading={costLoading}
+          onClick={event => {
+            setExpandKeys(curr => {
+              if (curr.has(params.row.id)) {
+                const newSet = new Set(curr);
+                newSet.delete(params.row.id);
+                return newSet;
+              } else {
+                return new Set([...curr, params.row.id]);
+              }
+            });
+          }}
+        />
+      ),
     }),
     [costLoading]
   );
