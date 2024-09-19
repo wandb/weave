@@ -245,7 +245,9 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
     {
       opIds: [obj.opId],
     },
-    100
+    100,
+    // Dont need the op value, pass empty columns
+    []
   );
   if (ops.loading) {
     return <LoadingDots />;
