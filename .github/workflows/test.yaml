@@ -13,30 +13,8 @@ on:
 
 jobs:
   # ==== Query Service Jobs ====
-  weavejs-lint-compile:
-    name: WeaveJS Lint and Compile
-    runs-on: ubuntu-latest
-    # runs-on: [self-hosted, gke-runner]
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v1
-        with:
-          node-version: '18.x'
-      - run: |
-          set -e
-          cd weave-js
-          yarn install --frozen-lockfile
-          yarn generate
-          yarn eslint --max-warnings=0
-          yarn tslint
-          yarn prettier
-          yarn run tsc
-
   build-container-query-service:
-    name: Build test container
+    name: Build Legacy (Query Service) test container
     timeout-minutes: 30
     runs-on: [self-hosted, builder]
     # runs-on: ubuntu-latest
@@ -58,7 +36,7 @@ jobs:
       - name: Prune docker cache
         run: docker system prune -f
       - name: Build legacy (query sevice) unit test image
-        run: python3 weave/docker/docker_build.py build_deps weave-test-python-client builder . weave/legacy/Dockerfile.client.test
+        run: python3 weave/docker/docker_build.py build_deps weave-test-python-query-service builder . weave/legacy/Dockerfile.ci.test
 
   test:
     name: Legacy (Query Service) Python unit tests
@@ -72,7 +50,7 @@ jobs:
       matrix:
         job_num: [0, 1]
     # runs-on: ubuntu-latest
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-client:${{ github.sha }}
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-query-service:${{ github.sha }}
     services:
       wandbservice:
         image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
@@ -113,6 +91,29 @@ jobs:
           --ddtrace \
           --durations=5 \
           ./legacy
+
+  # ==== Weave UI Jobs ====
+  weavejs-lint-compile:
+    name: WeaveJS Lint and Compile
+    runs-on: ubuntu-latest
+    # runs-on: [self-hosted, gke-runner]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '18.x'
+      - run: |
+          set -e
+          cd weave-js
+          yarn install --frozen-lockfile
+          yarn generate
+          yarn eslint --max-warnings=0
+          yarn tslint
+          yarn prettier
+          yarn run tsc
 
   # ==== Trace Jobs ====
   lint:
