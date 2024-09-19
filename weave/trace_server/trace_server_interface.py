@@ -510,15 +510,38 @@ class TableCreateRes(BaseModel):
 
 
 class TableRowFilter(BaseModel):
-    row_digests: Optional[List[str]] = None
+    row_digests: Optional[List[str]] = Field(
+        default=None,
+        description="List of row digests to filter by",
+        examples=[["row_digest_1", "row_digest_2"]],
+    )
 
 
 class TableQueryReq(BaseModel):
-    project_id: str
-    digest: str
-    filter: Optional[TableRowFilter] = None
-    limit: Optional[int] = None
-    offset: Optional[int] = None
+    project_id: str = Field(
+        description="The ID of the project", examples=["my_entity/my_project"]
+    )
+    digest: str = Field(
+        description="The digest of the table to query", examples=["table_digest_123"]
+    )
+    filter: Optional[TableRowFilter] = Field(
+        default=None,
+        description="Optional filter to apply to the query. See `TableRowFilter` for more details.",
+        examples=[{"row_digests": ["row_digest_1", "row_digest_2"]}],
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of rows to return", examples=[100]
+    )
+    offset: Optional[int] = Field(
+        default=None,
+        description="Number of rows to skip before starting to return rows",
+        examples=[10],
+    )
+    sort_by: Optional[List[SortBy]] = Field(
+        default=None,
+        description="List of fields to sort by. Fields can be dot-separated to access dictionary values.",
+        examples=[[{"field": "col_a.prop_b", "order": "desc"}]],
+    )
 
 
 class TableQueryRes(BaseModel):
