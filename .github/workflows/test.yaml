@@ -144,7 +144,7 @@ jobs:
             '10',
             '11',
             # '12',  # TODO: We have actual failing tests in 3.12, but commenting for simplicity for now.
-            '13.0b1',
+            '13.0-rc.2',
             #
           ]
         tox-shard:
