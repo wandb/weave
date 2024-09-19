@@ -1,4 +1,10 @@
+import configparser
+import netrc
 import os
+from typing import Optional
+from urllib.parse import urlparse
+
+from weave.legacy.weave.errors import WeaveConfigurationError
 
 WEAVE_PARALLELISM = "WEAVE_PARALLELISM"
 
@@ -41,6 +47,10 @@ def wandb_production() -> bool:
     return os.getenv("WEAVE_ENV") == "wandb_production"
 
 
+def is_public() -> bool:
+    return wandb_production()
+
+
 def wandb_base_url() -> str:
     settings = Settings()
     return os.environ.get("WANDB_BASE_URL", settings.base_url).rstrip("/")
@@ -57,3 +67,47 @@ def weave_trace_server_url() -> str:
     if base_url != "https://api.wandb.ai":
         default = base_url + "/traces"
     return os.getenv("WF_TRACE_SERVER_URL", default)
+
+
+def _wandb_api_key_via_env() -> Optional[str]:
+    api_key = os.environ.get("WANDB_API_KEY")
+    if api_key and is_public():
+        raise WeaveConfigurationError("WANDB_API_KEY should not be set in public mode.")
+    return api_key
+
+
+def _wandb_api_key_via_netrc() -> Optional[str]:
+    for filepath in ("~/.netrc", "~/_netrc"):
+        api_key = _wandb_api_key_via_netrc_file(filepath)
+        if api_key:
+            return api_key
+    return None
+
+
+def _wandb_api_key_via_netrc_file(filepath: str) -> Optional[str]:
+    netrc_path = os.path.expanduser(filepath)
+    if not os.path.exists(netrc_path):
+        return None
+    nrc = netrc.netrc(netrc_path)
+    res = nrc.authenticators(urlparse(wandb_base_url()).netloc)
+    api_key = None
+    if res:
+        _, _, api_key = res
+    if api_key and is_public():
+        raise WeaveConfigurationError(f"{filepath} should not be set in public mode.")
+    return api_key
+
+
+def weave_wandb_api_key() -> Optional[str]:
+    env_api_key = _wandb_api_key_via_env()
+    netrc_api_key = _wandb_api_key_via_netrc()
+    if env_api_key and netrc_api_key:
+        if wandb_production():
+            raise WeaveConfigurationError(
+                "WANDB_API_KEY should not be set in both ~/.netrc and the environment."
+            )
+        elif env_api_key != netrc_api_key:
+            print(
+                "There are different credentials in the netrc file and the environment. Using the environment value."
+            )
+    return env_api_key or netrc_api_key
