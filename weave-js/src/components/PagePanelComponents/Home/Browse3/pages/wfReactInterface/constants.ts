@@ -19,4 +19,8 @@ export const OP_CATEGORIES = [
   'evaluate',
   'tune',
 ] as const;
-export const KNOWN_BASE_OBJECT_CLASSES = ['Model', 'Dataset'] as const;
+export const KNOWN_BASE_OBJECT_CLASSES = [
+  'Prompt',
+  'Model',
+  'Dataset',
+] as const;

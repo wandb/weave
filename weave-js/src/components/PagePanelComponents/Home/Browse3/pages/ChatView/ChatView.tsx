@@ -24,7 +24,7 @@ export const ChatView = ({chat}: ChatViewProps) => {
   return (
     <div>
       <HorizontalRuleWithLabel label="Input" />
-      <MessageList messages={chat.request.messages} />
+      <MessageList messages={chat.request.messages} values={chat.values} />
       {chatResult && chatResult.choices && (
         <div className="mt-12" ref={outputRef}>
           <HorizontalRuleWithLabel label="Output" />

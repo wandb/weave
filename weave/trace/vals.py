@@ -479,6 +479,12 @@ class WeaveList(Traceable, list):
 
         super().__setitem__(index, value)
 
+    # def __deepcopy__(self, memo: dict) -> 'WeaveList':
+    #     copied_list = WeaveList(ref=self.ref, server=self.server, root=self.root, parent=self.parent)
+    #     for item in self:
+    #         copied_list.append(copy.deepcopy(item, memo))
+    #     return copied_list
+
     def append(self, item: Any) -> None:
         self._mark_dirty()
         if isinstance(item, Traceable):

@@ -9,11 +9,13 @@ import {Message} from './types';
 type MessagePanelProps = {
   message: Message;
   isStructuredOutput?: boolean;
+  values: Record<string, any>;
 };
 
 export const MessagePanel = ({
   message,
   isStructuredOutput,
+  values,
 }: MessagePanelProps) => {
   const isUser = message.role === 'user';
   const bg = isUser ? 'bg-cactus-300/[0.48]' : 'bg-moon-100';
@@ -26,6 +28,7 @@ export const MessagePanel = ({
             <MessagePanelPart
               value={message.content}
               isStructuredOutput={isStructuredOutput}
+              values={values}
             />
           ) : (
             message.content.map((p, i) => (

@@ -107,6 +107,7 @@ export type Chat = {
   isStructuredOutput: boolean;
   request: ChatRequest;
   result: ChatCompletion | null;
+  values: Record<string, any>;
 };
 
 export type ChoicesMode = 'linear' | 'carousel';

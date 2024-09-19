@@ -11,6 +11,7 @@ import {ChatView} from '../ChatView/ChatView';
 import {useCallAsChat} from '../ChatView/hooks';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {isWeaveRef} from '../../filters/common';
 
 type CallChatProps = {call: TraceCallSchema};
 
@@ -145,6 +146,10 @@ export const isTraceCallChat = (call: TraceCallSchema): boolean => {
     return false;
   }
   const {messages} = call.inputs;
+  if (isWeaveRef(messages)) {
+    // Assuming it is our prompt object
+    return true;
+  }
   if (!_.isArray(messages)) {
     return false;
   }

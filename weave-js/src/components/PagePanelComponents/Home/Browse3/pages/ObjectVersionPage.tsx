@@ -28,6 +28,9 @@ import {
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
+import {TabPrompt} from './TabPrompt';
+import {TabUsePrompt} from './TabUsePrompt';
+import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
 import {useWFHooks} from './wfReactInterface/context';
 import {
   objectVersionKeyToRefUri,
@@ -89,6 +92,7 @@ export const ObjectVersionPage: React.FC<{
   } else if (objectVersion.result == null) {
     return <NotFoundPanel title="Object not found" />;
   }
+  console.log({objectVersion});
   return (
     <ObjectVersionPageInner {...props} objectVersion={objectVersion.result} />
   );
@@ -115,15 +119,14 @@ const ObjectVersionPageInner: React.FC<{
   );
   const objectVersionCount = (objectVersions.result ?? []).length;
   const baseObjectClass = useMemo(() => {
-    if (objectVersion.baseObjectClass === 'Dataset') {
-      return 'Dataset';
-    }
-    if (objectVersion.baseObjectClass === 'Model') {
-      return 'Model';
-    }
-    return null;
+    const s = objectVersion.baseObjectClass;
+    return KNOWN_BASE_OBJECT_CLASSES.includes(s as KnownBaseObjectClassType)
+      ? (s as KnownBaseObjectClassType)
+      : null;
   }, [objectVersion.baseObjectClass]);
   const refUri = objectVersionKeyToRefUri(objectVersion);
+
+  const showPromptTab = baseObjectClass === 'Prompt';
 
   const minimalColumns = useMemo(() => {
     return ['id', 'op_name', 'project_id'];
@@ -264,39 +267,71 @@ const ObjectVersionPageInner: React.FC<{
       //   },
       // ]}
       tabs={[
-        {
-          label: isDataset ? 'Rows' : 'Values',
-          content: (
-            <ScrollableTabContent sx={isDataset ? {p: 0} : {}}>
-              <Box
-                sx={{
-                  flex: '0 0 auto',
-                  height: '100%',
-                }}>
-                {data.loading ? (
-                  <CenteredAnimatedLoader />
-                ) : (
-                  <WeaveCHTableSourceRefContext.Provider value={refUri}>
-                    <CustomWeaveTypeProjectContext.Provider
-                      value={{entity: entityName, project: projectName}}>
-                      <ObjectViewerSection
-                        title=""
+        ...(showPromptTab
+          ? [
+              {
+                label: 'Prompt',
+                content: (
+                  <ScrollableTabContent>
+                    {data.loading ? (
+                      <CenteredAnimatedLoader />
+                    ) : (
+                      <TabPrompt
+                        entity={entityName}
+                        project={projectName}
                         data={viewerDataAsObject}
-                        noHide
-                        isExpanded
                       />
-                    </CustomWeaveTypeProjectContext.Provider>
-                  </WeaveCHTableSourceRefContext.Provider>
-                )}
-              </Box>
-            </ScrollableTabContent>
-          ),
-        },
+                    )}
+                  </ScrollableTabContent>
+                ),
+              },
+            ]
+          : []),
+        ...(!showPromptTab
+          ? [
+              {
+                label: isDataset ? 'Rows' : 'Values',
+                content: (
+                  <ScrollableTabContent sx={isDataset ? {p: 0} : {}}>
+                    <Box
+                      sx={{
+                        flex: '0 0 auto',
+                        height: '100%',
+                      }}>
+                      {data.loading ? (
+                        <CenteredAnimatedLoader />
+                      ) : (
+                        <WeaveCHTableSourceRefContext.Provider value={refUri}>
+                          <CustomWeaveTypeProjectContext.Provider
+                            value={{entity: entityName, project: projectName}}>
+                            <ObjectViewerSection
+                              title=""
+                              data={viewerDataAsObject}
+                              noHide
+                              isExpanded
+                            />
+                          </CustomWeaveTypeProjectContext.Provider>
+                        </WeaveCHTableSourceRefContext.Provider>
+                      )}
+                    </Box>
+                  </ScrollableTabContent>
+                ),
+              },
+            ]
+          : []),
         {
           label: 'Use',
           content: (
             <Tailwind>
-              {baseObjectClass === 'Dataset' ? (
+              {baseObjectClass === 'Prompt' ? (
+                <TabUsePrompt
+                  name={objectName}
+                  uri={refUri}
+                  entityName={entityName}
+                  projectName={projectName}
+                  data={viewerDataAsObject}
+                />
+              ) : baseObjectClass === 'Dataset' ? (
                 <TabUseDataset
                   name={objectName}
                   uri={refUri}

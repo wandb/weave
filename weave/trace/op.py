@@ -306,6 +306,7 @@ def _execute_call(
     try:
         res = func(*args, **kwargs)
     except Exception as e:
+        print(e)
         handle_exception(e)
     else:
         return process(res)

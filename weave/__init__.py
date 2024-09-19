@@ -12,8 +12,12 @@ from weave.flow.dataset import Dataset
 from weave.flow.eval import Evaluation, Scorer
 from weave.flow.model import Model
 from weave.flow.obj import Object
+from weave.flow.prompt.prompt import Prompt
+from weave.flow.prompt.prompt_factory import p
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
+
+P = Prompt
 
 # Special object informing doc generation tooling which symbols
 # to document & to associate with this module.
@@ -31,6 +35,7 @@ __docspec__ = [
     Object,
     Dataset,
     Model,
+    Prompt,
     Evaluation,
     Scorer,
 ]

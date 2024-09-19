@@ -1,3 +1,4 @@
+import copy
 import dataclasses
 import datetime
 import platform
@@ -401,6 +402,13 @@ class WeaveKeyDict(dict):
     def __setitem__(self, key: Any, value: Any) -> None:
         raise KeyError("Cannot modify `weave` dict directly -- for internal use only!")
 
+    def __deepcopy__(self, memo: dict) -> "WeaveKeyDict":
+        """This allows deepcopy to work instead of throwing the internal use only error above."""
+        copied_dict = WeaveKeyDict()
+        for key, value in self.items():
+            super().__setitem__(key, copy.deepcopy(value, memo))
+        return copied_dict
+
 
 class AttributesDict(dict):
     """A dict representing the attributes of a call.
@@ -425,6 +433,13 @@ class AttributesDict(dict):
         if key == "weave":
             raise KeyError("Cannot set 'weave' directly -- for internal use only!")
         super().__setitem__(key, value)
+
+    def __deepcopy__(self, memo: dict) -> "AttributesDict":
+        """This allows deepcopy to work instead of throwing the internal use only error above."""
+        copied_dict = AttributesDict()
+        for key, value in self.items():
+            super().__setitem__(key, copy.deepcopy(value, memo))
+        return copied_dict
 
     def _set_weave_item(self, subkey: Any, value: Any) -> None:
         """Internal method to set items in the 'weave' subdictionary."""
