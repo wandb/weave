@@ -142,7 +142,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         if len(batch) == 0:
             return
 
-        encoded_data = Batch(batch=batch).model_dump_json().encode("utf-8")
+        data = Batch(batch=batch).model_dump_json()
+        encoded_data = data.encode("utf-8")
         encoded_bytes = len(encoded_data)
 
         # Update target batch size (this allows us to have a dynamic batch size based on the size of the data being sent)
@@ -158,9 +159,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             split_idx = int(len(batch) // 2)
             self._flush_calls(batch[:split_idx], _should_update_batch_size=False)
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
-            return
-
-        if len(batch) == 0:
             return
 
         r = requests.post(
