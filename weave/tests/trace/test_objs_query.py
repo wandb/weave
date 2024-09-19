@@ -11,7 +11,7 @@ def generate_objects(weave_client: WeaveClient, obj_count: int, version_count: i
 
 def test_objs_query_all(client: WeaveClient):
     generate_objects(client, 10, 10)
-    client._flush()
+
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
@@ -22,20 +22,7 @@ def test_objs_query_all(client: WeaveClient):
 
 def test_objs_query_filter_object_ids(client: WeaveClient):
     generate_objects(client, 10, 10)
-    client._flush()
-    res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client._project_id(),
-            filter=tsi.ObjectVersionFilter(object_ids=["obj_0", "obj_1"]),
-        )
-    )
-    assert len(res.objs) == 20
-    assert all([obj.object_id in ["obj_0", "obj_1"] for obj in res.objs])
 
-
-def test_objs_query_filter_object_ids(client: WeaveClient):
-    generate_objects(client, 10, 10)
-    client._flush()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
@@ -48,7 +35,7 @@ def test_objs_query_filter_object_ids(client: WeaveClient):
 
 def test_objs_query_filter_is_op(client: WeaveClient):
     generate_objects(client, 10, 10)
-    client._flush()
+
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(), filter=tsi.ObjectVersionFilter(is_op=True)
@@ -65,7 +52,7 @@ def test_objs_query_filter_is_op(client: WeaveClient):
 
 def test_objs_query_filter_latest_only(client: WeaveClient):
     generate_objects(client, 10, 10)
-    client._flush()
+
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
@@ -79,7 +66,7 @@ def test_objs_query_filter_latest_only(client: WeaveClient):
 
 def test_objs_query_filter_limit_offset_sort_by_created_at(client: WeaveClient):
     generate_objects(client, 10, 10)
-    client._flush()
+
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
@@ -119,7 +106,7 @@ def test_objs_query_filter_limit_offset_sort_by_created_at(client: WeaveClient):
 
 def test_objs_query_filter_limit_offset_sort_by_object_id(client: WeaveClient):
     generate_objects(client, 10, 10)
-    client._flush()
+
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
