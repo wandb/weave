@@ -539,7 +539,7 @@ class TableQueryReq(BaseModel):
     )
     sort_by: Optional[List[SortBy]] = Field(
         default=None,
-        description="List of fields to sort by. Fields can be dot-separated to access dictionary values.",
+        description="List of fields to sort by. Fields can be dot-separated to access dictionary values. No sorting uses the default table order.",
         examples=[[{"field": "col_a.prop_b", "order": "desc"}]],
     )
 

@@ -24,12 +24,13 @@ def generate_table_data(client: WeaveClient, n_rows: int, n_cols: int):
         )
     )
     digest = res.digest
+    row_digests = res.row_digests
 
-    return digest, data
+    return digest, row_digests, data
 
 
 def test_table_query(client: WeaveClient):
-    digest, data = generate_table_data(client, 10, 10)
+    digest, row_digests, data = generate_table_data(client, 10, 10)
 
     res = client.server.table_query(
         tsi.TableQueryReq(
@@ -39,5 +40,7 @@ def test_table_query(client: WeaveClient):
     )
 
     row_data = [r.val for r in res.rows]
+    row_digests = [r.digest for r in res.rows]
 
     assert row_data == data
+    assert row_digests == row_digests
