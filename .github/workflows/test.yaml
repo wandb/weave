@@ -78,8 +78,8 @@ jobs:
           yarn prettier
           yarn run tsc
 
-  test2:
-    name: Tox tests
+  trace-tests:
+    name: Trace tox tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -139,7 +139,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install tox
-      - name: Run tox
+      - name: Run tox (Clickhouse Only)
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -150,7 +150,7 @@ jobs:
           tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }} -- \
             -m "weave_client and not skip_clickhouse_client" \
             --weave-server=clickhouse
-      - name: Run tox (Clickhouse Only)
+      - name: Run tox
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -200,28 +200,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Verify wandb server is running
         run: curl -s http://wandbservice:8080/healthz
-      - name: Run Python Unit Tests (Clickhouse Client Only)
-        env:
-          DD_SERVICE: weave-python
-          DD_ENV: ci
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WB_SERVER_HOST: http://wandbservice
-          WF_CLICKHOUSE_HOST: weave_clickhouse
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-        # This runner specifically runs the tests that use the `client` fixture (those that support clickhouse client tests)
-        # However, we skip tests marked with `skip_clickhouse_client`. These should be considered TODOs and an exception
-        run: |
-          source /root/venv/bin/activate && \
-          cd weave && \
-          pytest -m "weave_client and not skip_clickhouse_client" \
-          --weave-server=clickhouse \
-          --job-num=${{ matrix.job_num }} \
-          --timeout=90 \
-          --ddtrace \
-          --durations=5 \
-          ./legacy
-      - name: Run Python Unit Tests
+      - name: Run Legacy (Query Service) Python Unit Tests
         env:
           DD_SERVICE: weave-python
           DD_ENV: ci
