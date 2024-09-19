@@ -2922,32 +2922,3 @@ def test_large_keys_are_stripped_call(client, caplog):
     ]
     for error_message in error_messages:
         assert "Retrying with large objects stripped" in error_message
-
-
-def test_large_keys_are_stripped_object(client, caplog):
-    is_sqlite = client_is_sqlite(client)
-    if is_sqlite:
-        # no need to strip in sqlite
-        return
-
-    data = {"dictionary": {f"{i}": i for i in range(300_000)}}
-
-    class WeaveObject(weave.Object):
-        data: dict
-
-    weave_obj = WeaveObject(data=data)
-    weave.publish(weave_obj)
-
-    res = get_client_trace_server(client).objs_query(
-        tsi.ObjQueryReq(
-            project_id=get_client_project_id(client),
-        )
-    )
-    assert len(res.objs) == 1
-    assert res.objs[0].val == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-
-    error_messages = [
-        record.message for record in caplog.records if record.levelname == "ERROR"
-    ]
-    for error_message in error_messages:
-        assert "Attempting retry with large fields stripped" in error_message

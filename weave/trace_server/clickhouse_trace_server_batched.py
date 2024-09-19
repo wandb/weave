@@ -146,7 +146,7 @@ ObjRefListType = list[ri.InternalObjectRef]
 
 
 CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
-ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": "<EXCEEDS_LIMITS>"}'
+ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
@@ -573,14 +573,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             digest=digest,
         )
 
-        column_names = list(ch_obj.model_fields.keys())
-        data = list(ch_obj.model_dump().values())
-        try:
-            self._insert("object_versions", data=[data], column_names=column_names)
-        except InsertTooLarge:
-            logger.info("Attempting retry with large fields stripped")
-            batch = self._strip_large_values([data])
-            self._insert("object_versions", data=batch, column_names=column_names)
+        self._insert(
+            "object_versions",
+            data=[list(ch_obj.model_dump().values())],
+            column_names=list(ch_obj.model_fields.keys()),
+        )
 
         return tsi.ObjCreateRes(digest=digest)
 
