@@ -23,6 +23,7 @@ from weave.trace.ipython import (
 )
 from weave.trace.op import Op
 from weave.trace.refs import ObjectRef
+from weave.trace_server.trace_server_interface_util import str_digest
 
 from ..legacy.weave import environment
 from . import serializer
@@ -269,10 +270,12 @@ def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
         fn = fn.resolve_fn
 
     if not settings.should_capture_code():
+        # This digest is kept for op versioning purposes
+        digest = str_digest(inspect.getsource(fn))
         return textwrap.dedent(
-            """
+            f"""
             def func(*args, **kwargs):
-                ...  # Code-capture disabled for this op
+                ...  # Code-capture disabled for this op (digest: {digest})
             """
         )
 
