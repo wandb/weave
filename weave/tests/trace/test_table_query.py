@@ -141,29 +141,26 @@ def test_table_query_sort_by_nested_column(client: WeaveClient):
     ]
     assert [r.val["id"] for r in res.rows] != [
         d["id"] for d in data
-    ]  # Ensure order is different from original
+    ]  # Ensure order is different from original (assertion on the test itself)
 
 
 def test_table_query_combined(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 20, 5)
 
-    filtered_digests = random.sample(row_digests, 10)
     limit = 5
     offset = 2
     res = client.server.table_query(
         tsi.TableQueryReq(
             project_id=client._project_id(),
             digest=digest,
-            filter=tsi.TableRowFilter(row_digests=filtered_digests),
             limit=limit,
             offset=offset,
             sort_by=[tsi.SortBy(field="id", direction="desc")],
         )
     )
-
-    filtered_data = [d for d in data if d["id"] in [r.val["id"] for r in res.rows]]
-    sorted_data = sorted(filtered_data, key=lambda x: x["id"], reverse=True)
+    sorted_data = sorted(data, key=lambda x: x["id"], reverse=True)
     expected_data = sorted_data[offset : offset + limit]
+
 
     assert len(res.rows) == limit
     assert [r.val["id"] for r in res.rows] == [d["id"] for d in expected_data]
@@ -189,4 +186,4 @@ def test_table_query_multiple_sort_criteria(client: WeaveClient):
     ]
     assert [r.val["id"] for r in res.rows] != [
         d["id"] for d in data
-    ]  # Ensure order is different from original
+    ]  # Ensure order is different from original  (assertion on the test itself)

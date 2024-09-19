@@ -77,7 +77,7 @@ from .feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from .orm import ParamBuilder, Row
+from .orm import ParamBuilder, Row, quote_json_path
 from .token_costs import LLM_TOKEN_PRICES_TABLE, validate_cost_purge_req
 from .trace_server_common import (
     LRUCache,
@@ -760,13 +760,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
-        parameters = {}
+        parameters: Dict[str, Any] = {}
         if req.filter:
             if req.filter.row_digests:
                 conds.append("tr.digest IN {row_digests: Array(String)}")
                 parameters["row_digests"] = req.filter.row_digests
         else:
             conds.append("1 = 1")
+
+        sort_clause = ""
+        if req.sort_by:
+            sort_fields = []
+            for i, sort in enumerate(req.sort_by):
+                direction = "ASC" if sort.direction.lower() == "asc" else "DESC"
+                param_name = f"json_path_{i}"
+                parameters[param_name] = quote_json_path(sort.field)
+                sort_fields.append(
+                    f"JSON_VALUE(tr.val_dump, {{{param_name}: String}}) {direction}"
+                )
+            sort_clause = f"ORDER BY {', '.join(sort_fields)}"
+
         rows = self._table_query(
             req.project_id,
             req.digest,
@@ -774,6 +787,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             limit=req.limit,
             offset=req.offset,
             parameters=parameters,
+            sort_clause=sort_clause,
         )
         return tsi.TableQueryRes(rows=rows)
 
@@ -785,6 +799,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
         parameters: Optional[Dict[str, Any]] = None,
+        sort_clause: str = "",
     ) -> list[tsi.TableRowSchema]:
         conds = ["project_id = {project_id: String}"]
         if conditions:
@@ -825,6 +840,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     ORDER BY project_id, digest
                 ) tr ON t.project_id = tr.project_id AND t.row_digest = tr.digest
                 WHERE {predicate}
+                {sort_clause}
             """
         if parameters is None:
             parameters = {}
