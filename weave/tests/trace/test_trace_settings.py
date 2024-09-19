@@ -106,4 +106,13 @@ def test_should_capture_code_setting(client):
     assert "Code-capture disabled" not in inspect.getsource(func2)
 
 
-def test_should_capture_code_env(client): ...
+def test_should_capture_code_env(client):
+    os.environ["WEAVE_CAPTURE_CODE"] = "false"
+    ref = weave.publish(func)
+    func2 = ref.get()
+    assert "Code-capture disabled" in inspect.getsource(func2)
+
+    os.environ["WEAVE_CAPTURE_CODE"] = "true"
+    ref = weave.publish(func)
+    func2 = ref.get()
+    assert "Code-capture disabled" not in inspect.getsource(func2)
