@@ -27,7 +27,7 @@ from weave.trace.op import op as op_deco
 from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_op_uri
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.table import Table
-from weave.trace.util import deprecated
+from weave.trace.util import deprecated, num_bytes
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_interface import (
@@ -1478,26 +1478,26 @@ def replace_large_objects(obj: Any, max_size: int = 1 * 1024**2) -> Any:
     if isinstance(obj, list):
         list_res = []
         for v in obj:
-            if size := len(str(v).encode("utf-8")) > max_size:
+            if size := num_bytes(v) > max_size:
                 v = JSONBlob(obj=v, size=size)
             list_res.append(v)
         obj = list_res
     elif isinstance(obj, dict):
         dict_res = {}
         for k, v in obj.items():
-            if size := len(str(v).encode("utf-8")) > max_size:
+            if size := num_bytes(v) > max_size:
                 v = JSONBlob(obj=v, size=size)
             dict_res[k] = v
         obj = dict_res
     elif isinstance(obj, tuple):
         tuple_res = []
         for v in obj:
-            if size := len(str(v).encode("utf-8")) > max_size:
+            if size := num_bytes(v) > max_size:
                 v = JSONBlob(obj=v, size=size)
             tuple_res.append(v)
         obj = tuple(tuple_res)
     else:  # str
-        if size := len(obj.encode("utf-8")) > max_size:
+        if size := num_bytes(obj) > max_size:
             obj = JSONBlob(obj=obj, size=size)
     return obj
 

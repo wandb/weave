@@ -138,6 +138,20 @@ def deprecated(new_name: str) -> Callable[[Callable[..., Any]], Callable[..., An
     return deco
 
 
+def num_bytes(data: Any) -> int:
+    """
+    Calculate the number of bytes in Any by casting to str and
+    then utf-8 encoding.
+
+    This can be computationally expensive, only call when necessary.
+    Never raise on a failed str cast, just return 0.
+    """
+    try:
+        return len(str(data).encode("utf-8"))
+    except Exception:
+        return 0
+
+
 # rename for cleaner export
 ThreadPoolExecutor = ContextAwareThreadPoolExecutor
 Thread = ContextAwareThread
