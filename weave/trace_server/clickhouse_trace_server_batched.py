@@ -146,7 +146,7 @@ ObjRefListType = list[ri.InternalObjectRef]
 
 
 CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
-ENTITY_TOO_LARGE_ERROR = "<EXCEEDS_LIMITS>"
+ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": "<EXCEEDS_LIMITS>"}'
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
@@ -574,22 +574,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         column_names = list(ch_obj.model_fields.keys())
+        data = list(ch_obj.model_dump().values())
         try:
-            self._insert(
-                "object_versions",
-                data=[list(ch_obj.model_dump().values())],
-                column_names=column_names,
-            )
-        except RequestTooLarge:
-            logger.error(
-                "Object insert too large. Attempting retry with large fields stripped"
-            )
-            batch = self._strip_large_values([ch_obj])
-            self._insert(
-                "object_versions",
-                data=[list(batch[0].model_dump().values())],
-                column_names=column_names,
-            )
+            self._insert("object_versions", data=[data], column_names=column_names)
+        except InsertTooLarge:
+            logger.info("Attempting retry with large fields stripped")
+            batch = self._strip_large_values([data])
+            self._insert("object_versions", data=batch, column_names=column_names)
 
         return tsi.ObjCreateRes(digest=digest)
 
@@ -1613,54 +1604,42 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _flush_calls(self) -> None:
         try:
             self._insert_call_batch(self._call_batch)
-        except RequestTooLarge:
-            logger.error("Request too large. Retrying with large objects stripped.")
+        except InsertTooLarge:
+            logger.info("Retrying with large objects stripped.")
             batch = self._strip_large_values(self._call_batch)
             self._insert_call_batch(batch)
 
         self._call_batch = []
 
-    def _strip_large_values(self, batch: list) -> list:
+    def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
         """
         Iterate through the batch and replace large values with placeholders.
 
         If values are larger than 1MiB replace them with placeholder values.
-        Batch should be a list of pydantic objects
         """
-
         final_batch = []
         # Set the value byte limit to be anything over 1MiB to catch
         # payloads with multiple large values that are still under the
         # single row insert limit.
         val_byte_limit = 1 * 1024 * 1024
-
-        # Call batch is bigger than the single row insert limit, could be
-        # totally fine, but make sure that no single row is over the limit
-        seen_bytes = 0
         for item in batch:
-            item_dump = item.model_dump_json()
-            bytes_size = _num_bytes(item_dump)
-            seen_bytes += bytes_size
-
-            # If bytes_size > row_bytes_limit, this item is too large,
-            # iterate through the json value keys to find and replace
-            # the large values with a placeholder.
+            bytes_size = _num_bytes(str(item))
+            # If bytes_size > the limit, this item is too large,
+            # iterate through the json-dumped item values to find and
+            # replace the large values with a placeholder.
             if bytes_size > CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
-                for value in item_dump.values():
-                    if not isinstance(value, (dict, list, tuple)):
-                        # only check user controlled large fields
-                        continue
-
-                    if isinstance(value, dict):
-                        for k, v in value.items():
-                            if _num_bytes(v) > val_byte_limit:
-                                value[k] = ENTITY_TOO_LARGE_ERROR
-                    elif isinstance(value, list) or isinstance(value, tuple):
-                        for v in value:
-                            if _num_bytes(v) > val_byte_limit:
-                                v = ENTITY_TOO_LARGE_ERROR
-                item = item.__class__(**item_dump)
-            final_batch.append(item)
+                stripped_item = []
+                for value in item:
+                    # all the values should be json dumps, there are no
+                    # non json fields controlled by the user that can
+                    # be large enough to strip... (?)
+                    if _num_bytes(value) > val_byte_limit:
+                        stripped_item += [ENTITY_TOO_LARGE_PAYLOAD]
+                    else:
+                        stripped_item += [value]
+                final_batch.append(stripped_item)
+            else:
+                final_batch.append(item)
         return final_batch
 
 
