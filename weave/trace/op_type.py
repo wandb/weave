@@ -13,6 +13,7 @@ import typing
 from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any, Callable, Optional, Union, get_args, get_origin
 
+from weave.trace import settings
 from weave.trace.client_context import context_state
 from weave.trace.client_context.weave_client import get_weave_client
 from weave.trace.errors import WeaveOpSerializeError
