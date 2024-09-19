@@ -1349,8 +1349,6 @@ def replace_large_objects(obj: Any, max_size: int = 1 * 1024**2) -> Any:
     if isinstance(obj, list):
         list_res = []
         for v in obj:
-            # TODO: casting as str is not actually the real size of the object
-            # its close, but not actually the json dump.
             if size := len(str(v).encode("utf-8")) > max_size:
                 v = JSONBlob(obj=v, size=size)
             list_res.append(v)
@@ -1371,7 +1369,7 @@ def replace_large_objects(obj: Any, max_size: int = 1 * 1024**2) -> Any:
         obj = tuple(tuple_res)
     else:  # str
         if size := len(obj.encode("utf-8")) > max_size:
-            obj = JSONBlob(obj=v, size=size)
+            obj = JSONBlob(obj=obj, size=size)
     return obj
 
 
