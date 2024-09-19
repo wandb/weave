@@ -34,6 +34,7 @@ import sqlparse
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
     ParamBuilder,
@@ -617,7 +618,7 @@ def get_field_by_name(name: str) -> CallsMergedField:
                 if len(field_parts) > 1:
                     return field.with_path(field_parts[1:])
             return field
-        raise ValueError(f"Field {name} is not allowed")
+        raise InvalidFieldError(f"Field {name} is not allowed")
     return ALLOWED_CALL_FIELDS[name]
 
 
