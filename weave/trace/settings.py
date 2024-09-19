@@ -36,7 +36,11 @@ class UserSettings(BaseModel):
     """Toggles op code saving.
     
     If True, the minimal amount of code to run the op will be saved.
-    Can be overrided with the environment variable `WEAVE_SAVE_CODE`"""
+    Can be overrided with the environment variable `WEAVE_SAVE_CODE`
+    
+    WARNING: Switching between `save_code=True` and `save_code=False` mid-script
+    may lead to unexpected behaviour.  Make sure this is only set once at the start!
+    """
 
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
