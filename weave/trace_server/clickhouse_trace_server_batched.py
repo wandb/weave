@@ -629,6 +629,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             object_id_conditions=object_id_conditions,
             parameters=parameters,
             is_latest=is_latest,
+            limit=req.limit,
+            offset=req.offset,
+            sort_by=req.sort_by,
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
@@ -1390,6 +1393,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parameters: Optional[Dict[str, Any]] = None,
         is_latest: bool = False,
         limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        sort_by: Optional[list[tsi.SortBy]] = None,
     ) -> list[SelectableCHObjSchema]:
         """
         Main query for fetching objects.
@@ -1417,8 +1422,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         is_latest_part = "is_latest = 1" if is_latest else "1 = 1"
 
         limit_part = ""
-        if limit != None:
-            limit_part = f"LIMIT {limit}"
+        offset_part = ""
+        if limit is not None:
+            limit_part = f"LIMIT {int(limit)}"
+        if offset is not None:
+            offset_part = f" OFFSET {int(offset)}"
+
+        sort_part = ""
+        if sort_by:
+            valid_sort_fields = {"object_id", "created_at"}
+            sort_clauses = []
+            for sort in sort_by:
+                if sort.field in valid_sort_fields and sort.direction in {
+                    "asc",
+                    "desc",
+                }:
+                    sort_clauses.append(f"{sort.field} {sort.direction.upper()}")
+            if sort_clauses:
+                sort_part = f"ORDER BY {', '.join(sort_clauses)}"
 
         if parameters is None:
             parameters = {}
@@ -1473,7 +1494,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     {conditions_part}
             )
             WHERE {is_latest_part}
+            {sort_part}
             {limit_part}
+            {offset_part}
         """
         query_result = self._query_stream(
             select_query,
