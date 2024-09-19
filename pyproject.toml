@@ -53,10 +53,10 @@ version = { attr = "weave.version.VERSION" }
 dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.dynamic.optional-dependencies]
-examples = { file = ["requirements.ecosystem.txt"] }
-engine = { file = ["requirements.engine.txt"] }
-ecosystem = { file = ["requirements.ecosystem.txt"] }
-datadog = { file = ["requirements.datadog.txt"] }
+examples = { file = ["requirements.legacy.ecosystem.txt"] }
+engine = { file = ["requirements.legacy.engine.txt"] }
+ecosystem = { file = ["requirements.legacy.ecosystem.txt"] }
+datadog = { file = ["requirements.legacy.datadog.txt"] }
 modal = { file = ["requirements.modal.txt"] }
 
 [tool.pytest.ini_options]
@@ -127,8 +127,8 @@ parse = """(?x)
     )?                                # pre-release section is optional
 """
 serialize = [
-    "{major}.{minor}.{patch}-{pre_l}{pre_n}",
-    "{major}.{minor}.{patch}",
+  "{major}.{minor}.{patch}-{pre_l}{pre_n}",
+  "{major}.{minor}.{patch}",
 ]
 search = "{current_version}"
 replace = "{new_version}"
