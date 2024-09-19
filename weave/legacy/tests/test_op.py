@@ -249,28 +249,3 @@ def test_op_method_inferred_self():
         "a": types.Int(),
     }
     assert SomeWeaveObj.my_op.concrete_output_type == types.String()
-
-
-# def test_op_internal_tracing_enabled(client):
-#     # This test verifies the behavior of `_tracing_enabled` which
-#     # is not a user-facing API and is used internally to toggle
-#     # tracing on and off.
-#     @weave.op
-#     def my_op():
-#         return "hello"
-
-#     my_op()  # <-- this call will be traced
-
-#     assert len(list(my_op.calls())) == 1
-
-#     my_op._tracing_enabled = False
-
-#     my_op()  # <-- this call will not be traced
-
-#     assert len(list(my_op.calls())) == 1
-
-#     my_op._tracing_enabled = True
-
-#     my_op()  # <-- this call will be traced
-
-#     assert len(list(my_op.calls())) == 2
