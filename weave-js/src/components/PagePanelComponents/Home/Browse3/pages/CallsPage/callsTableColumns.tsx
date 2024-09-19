@@ -20,7 +20,7 @@ import {Timestamp} from '../../../../../Timestamp';
 import {Reactions} from '../../feedback/Reactions';
 import {CellFilterWrapper} from '../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../filters/common';
-import {getCostsFromCellParams} from '../CallPage/TraceCostStats';
+import {getCostsFromCellParams} from '../CallPage/cost';
 import {getTokensFromCellParams} from '../CallPage/TraceUsageStats';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
