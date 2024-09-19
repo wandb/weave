@@ -113,7 +113,15 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
     } catch (err) {
       // ignore
     }
-    content = <CodeEditor value={reformatted} language={language} readOnly />;
+    content = (
+      <CodeEditor
+        value={reformatted}
+        language={language}
+        readOnly
+        handleMouseWheel
+        alwaysConsumeMouseWheel={false}
+      />
+    );
   } else if (format === 'Markdown') {
     content = <Markdown content={trimmed} />;
   }
