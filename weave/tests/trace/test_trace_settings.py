@@ -105,7 +105,7 @@ def test_should_capture_code_setting(client):
     ref = weave.publish(test_func)
     test_func2 = ref.get()
     code2 = test_func2.art.path_contents["obj.py"].decode()
-    assert "Code-capture disabled" in code2
+    assert "Code-capture was disabled" in code2
 
     parse_and_apply_settings(UserSettings(capture_code=True))
 
@@ -118,7 +118,7 @@ def test_should_capture_code_setting(client):
     ref2 = weave.publish(test_func)
     test_func3 = ref2.get()
     code3 = test_func3.art.path_contents["obj.py"].decode()
-    assert "Code-capture disabled" not in code3
+    assert "Code-capture was disabled" not in code3
 
 
 def test_should_capture_code_env(client):
@@ -131,7 +131,7 @@ def test_should_capture_code_env(client):
     ref = weave.publish(test_func)
     test_func2 = ref.get()
     code2 = test_func2.art.path_contents["obj.py"].decode()
-    assert "Code-capture disabled" in code2
+    assert "Code-capture was disabled" in code2
 
     os.environ["WEAVE_CAPTURE_CODE"] = "true"
 
@@ -142,4 +142,4 @@ def test_should_capture_code_env(client):
     ref2 = weave.publish(test_func)
     test_func3 = ref2.get()
     code3 = test_func3.art.path_contents["obj.py"].decode()
-    assert "Code-capture disabled" not in code3
+    assert "Code-capture was disabled" not in code3

@@ -275,7 +275,7 @@ def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
         return textwrap.dedent(
             f"""
             def func(*args, **kwargs):
-                ...  # Code-capture disabled for this op (digest: {digest})
+                ...  # Code-capture was disabled while saving this op (digest: {digest})
             """
         )
 
