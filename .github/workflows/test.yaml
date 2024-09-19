@@ -36,8 +36,6 @@ jobs:
         run: docker system prune -f
       - name: Build unit test image
         run: python3 weave/docker/docker_build.py build_deps weave-test-python-client builder . weave/docker/Dockerfile.python-client.test
-      - name: Build integration test image
-        run: python3 weave/docker/docker_build.py build weave-integration-test . weave/legacy/Dockerfile.test
 
   lint:
     name: Python lint
@@ -188,11 +186,6 @@ jobs:
           - '8083:8083'
           - '9015:9015'
         options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
-      weave_clickhouse:
-        image: clickhouse/clickhouse-server
-        ports:
-          - '8123:8123'
-        options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
     steps:
       # - uses: datadog/agent-github-action@v1.3
       #   with:
@@ -207,7 +200,6 @@ jobs:
           WEAVE_SENTRY_ENV: ci
           CI: 1
           WB_SERVER_HOST: http://wandbservice
-          WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
           source /root/venv/bin/activate && \
