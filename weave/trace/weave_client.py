@@ -133,7 +133,7 @@ def map_to_refs(obj: Any) -> Any:
     return obj
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class Call:
     op_name: str
     trace_id: str
