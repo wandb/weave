@@ -169,7 +169,7 @@ def map_to_refs(obj: Any) -> Any:
 class Call:
     """A Call represents a single operation that was executed as part of a trace."""
 
-    op_name: str
+    _op_name: Union[str, Future[str]]
     trace_id: str
     project_id: str
     parent_id: Optional[str]
@@ -188,16 +188,15 @@ class Call:
 
     _feedback: Optional[RefFeedbackQuery] = None
 
-    # TODO: document this and the similar ones in refs
-    _op_ref: Optional[Ref] = None
+    @property
+    def op_name(self) -> str:
+        if isinstance(self._op_name, Future):
+            self.__dict__["_op_name"] = self._op_name.result()
 
-    def __getattribute__(self, item: str) -> Any:
-        if item == "op_name" and object.__getattribute__(self, "_op_ref") is not None:
-            op_ref = object.__getattribute__(self, "_op_ref")
-            name = op_ref.uri()
-            object.__setattr__(self, "op_name", name)
-            object.__setattr__(self, "_op_ref", None)
-        return object.__getattribute__(self, item)
+        if not isinstance(self._op_name, str):
+            raise Exception(f"Call op_name is not a string: {self._op_name}")
+
+        return self._op_name
 
     @property
     def func_name(self) -> str:
@@ -360,7 +359,7 @@ def make_client_call(
 ) -> WeaveObject:
     output = server_call.output
     call = Call(
-        op_name=server_call.op_name,
+        _op_name=server_call.op_name,
         project_id=server_call.project_id,
         trace_id=server_call.trace_id,
         parent_id=server_call.parent_id,
@@ -655,9 +654,10 @@ class WeaveClient:
         attributes._set_weave_item("os_release", platform.release())
         attributes._set_weave_item("sys_version", sys.version)
 
+        op_name_future = self.async_job_queue.submit_job(lambda: op_def_ref.uri())
+
         call = Call(
-            op_name="",
-            _op_ref=op_def_ref,
+            _op_name=op_name_future,
             project_id=self._project_id(),
             trace_id=trace_id,
             parent_id=parent_id,
@@ -1263,21 +1263,14 @@ class WeaveClient:
             lambda: res_future.result().digest
         )
 
-        table_ref = TableRef(self.entity, self.project, digest_future)
+        row_digests_future: Future[list[str]] = self.async_job_queue.submit_job(
+            lambda: res_future.result().row_digests
+        )
 
-        # row_digests: Optional[list[str]] = None
-        # # This check is needed because in older versions of
-        # # the trace server, this will come back as an empty list.
-        # # In these cases, we want to set row_digests to None so that
-        # # the WeaveTable knows that it needs to fetch the rows from the server.
-        # if len(response.row_digests) == len(table.rows):
-        #     row_digests = response.row_digests
-        # table_ref = TableRef(
-        #     entity=self.entity,
-        #     project=self.project,
-        #     digest=response.digest,
-        #     row_digests=row_digests,
-        # )
+        table_ref = TableRef(
+            self.entity, self.project, digest_future, row_digests_future
+        )
+
         table.ref = table_ref
 
         if isinstance(table, WeaveTable):

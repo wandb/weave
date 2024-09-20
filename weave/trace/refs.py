@@ -25,7 +25,7 @@ class TableRef(Ref):
     entity: str
     project: str
     _digest: Union[str, Future[str]]
-    row_digests: Optional[list[str]] = None
+    _row_digests: Optional[Union[list[str], Future[list[str]]]] = None
 
     @property
     def digest(self) -> str:
@@ -40,6 +40,17 @@ class TableRef(Ref):
         refs_internal.validate_no_colons(self._digest, "digest")
 
         return self._digest
+
+    @property
+    def row_digests(self) -> list[str]:
+        if isinstance(self._row_digests, Future):
+            # Block until the Future resolves and store the result
+            self.__dict__["_row_digests"] = self._row_digests.result()
+
+        if not isinstance(self._row_digests, list):
+            raise Exception(f"TableRef row_digests is not a list: {self._row_digests}")
+
+        return self._row_digests
 
     def __post_init__(self) -> None:
         if isinstance(self._digest, str):

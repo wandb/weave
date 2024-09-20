@@ -77,7 +77,7 @@ def test_simple_op(client):
         f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
     )
     assert fetched_call == weave_client.Call(
-        op_name=expected_name,
+        _op_name=expected_name,
         project_id=f"{client.entity}/{client.project}",
         trace_id=fetched_call.trace_id,
         parent_id=None,
