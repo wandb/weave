@@ -182,8 +182,8 @@ export const ConfirmDeleteModal: FC<{
         onDeleteCallback?.();
         closePeek();
       })
-      .catch(e => {
-        setError(`Error deleting ${deleteTargetStr}: ${e.message}`);
+      .catch(() => {
+        setError(`Error deleting ${deleteTargetStr}`);
         setDeleteLoading(false);
       });
   };
