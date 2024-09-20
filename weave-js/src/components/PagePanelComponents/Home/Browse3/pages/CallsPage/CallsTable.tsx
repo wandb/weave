@@ -181,17 +181,18 @@ export const CallsTable: FC<{
     initialFilter ?? {},
     onFilterUpdate
   );
-  // Calculate the effective filter
-  const effectiveFilter = useMemo(
-    () => getEffectiveFilter(filter, frozenFilter),
-    [filter, frozenFilter]
-  );
 
   // 2. Filter (Unstructured Filter)
   const filterModelResolved = filterModel ?? DEFAULT_FILTER_CALLS;
 
   // 3. Sort
   const sortModelResolved = sortModel ?? DEFAULT_SORT_CALLS;
+
+  // 3.5 Calculate the effective filter
+  const effectiveFilter = useMemo(
+    () => getEffectiveFilter(filter, frozenFilter, filterModelResolved),
+    [filter, frozenFilter, filterModelResolved]
+  );
 
   // 4. Pagination
   const paginationModelResolved = paginationModel ?? DEFAULT_PAGINATION_CALLS;

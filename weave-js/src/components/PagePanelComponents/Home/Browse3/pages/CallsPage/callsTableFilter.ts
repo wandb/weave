@@ -1,3 +1,4 @@
+import {GridFilterModel} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import {useMemo} from 'react';
 
@@ -38,7 +39,8 @@ export type WFHighLevelCallFilter = {
  */
 export const getEffectiveFilter = (
   activeFilter: WFHighLevelCallFilter,
-  frozenFilter?: WFHighLevelCallFilter
+  frozenFilter?: WFHighLevelCallFilter,
+  gridFilterModel?: GridFilterModel
 ) => {
   const effectiveFilter = {
     ...activeFilter,
@@ -46,8 +48,10 @@ export const getEffectiveFilter = (
   };
 
   // TraceRootsOnly is now only a calculated field
-  effectiveFilter.traceRootsOnly =
-    filterShouldUseTraceRootsOnly(effectiveFilter);
+  effectiveFilter.traceRootsOnly = filterShouldUseTraceRootsOnly(
+    effectiveFilter,
+    gridFilterModel
+  );
 
   validateFilterUICompatibility(effectiveFilter);
   return effectiveFilter;
@@ -78,7 +82,8 @@ const validateFilterUICompatibility = (filter: WFHighLevelCallFilter) => {
  * other fields.
  */
 export const filterShouldUseTraceRootsOnly = (
-  filter: WFHighLevelCallFilter
+  filter: WFHighLevelCallFilter,
+  gridFilterModel?: GridFilterModel
 ) => {
   const opVersionRefsSet = (filter.opVersionRefs?.length ?? 0) > 0;
   const inputObjectVersionRefsSet =
@@ -86,11 +91,13 @@ export const filterShouldUseTraceRootsOnly = (
   const outputObjectVersionRefsSet =
     (filter.outputObjectVersionRefs?.length ?? 0) > 0;
   const parentIdSet = filter.parentId != null;
+  const gridFilterModelSet = (gridFilterModel?.items.length ?? 0) > 0;
   return (
     !opVersionRefsSet &&
     !inputObjectVersionRefsSet &&
     !outputObjectVersionRefsSet &&
-    !parentIdSet
+    !parentIdSet &&
+    !gridFilterModelSet
   );
 };
 export const useInputObjectVersionOptions = (
