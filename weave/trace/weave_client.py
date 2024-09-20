@@ -1221,14 +1221,14 @@ class WeaveClient:
                 entity=self.entity,
                 project=self.project,
                 name=name,
-                _digest_future=digest_future,
+                _digest=digest_future,
             )
         else:
             ref = ObjectRef(
                 entity=self.entity,
                 project=self.project,
                 name=name,
-                _digest_future=digest_future,
+                _digest=digest_future,
             )
 
         # Attach the ref to the object
@@ -1276,7 +1276,7 @@ class WeaveClient:
         table_ref = TableRef(
             entity=self.entity,
             project=self.project,
-            _digest_future=digest_future,
+            _digest=digest_future,
         )
 
         # row_digests: Optional[list[str]] = None

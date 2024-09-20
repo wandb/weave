@@ -24,37 +24,27 @@ class Ref:
 class TableRef(Ref):
     entity: str
     project: str
+    _digest: Union[str, Future[str]]
     row_digests: Optional[list[str]] = None
-
-    _digest: Optional[str] = dataclasses.field(default=None, repr=False)
-    _digest_future: Optional[Future[str]] = dataclasses.field(default=None, repr=False)
 
     @property
     def digest(self) -> str:
-        if self._digest is None:
-            if self._digest_future is None:
-                # This should never happen due to the post-init check,
-                # but adding this to make mypy happy.
-                raise ValueError("Digest is None")
+        if isinstance(self._digest, Future):
             # Block until the Future resolves and store the result
-            self.__dict__["digest"] = self._digest_future.result()
+            self.__dict__["_digest"] = self._digest.result()
 
-        if self._digest is None:
-            raise ValueError("Digest is None")
+        if not isinstance(self._digest, str):
+            raise Exception(f"TableRef digest is not a string: {self._digest}")
 
-        refs_internal.validate_no_slashes(self.digest, "digest")
-        refs_internal.validate_no_colons(self.digest, "digest")
+        refs_internal.validate_no_slashes(self._digest, "digest")
+        refs_internal.validate_no_colons(self._digest, "digest")
 
         return self._digest
 
     def __post_init__(self) -> None:
-        if self._digest is None and self._digest_future is None:
-            raise ValueError("Digest is None")
-        if self._digest is not None and self._digest_future is not None:
-            raise ValueError("Cannot set both digest and digest_future")
-        if self._digest is not None:
-            refs_internal.validate_no_slashes(self.digest, "digest")
-            refs_internal.validate_no_colons(self.digest, "digest")
+        if isinstance(self._digest, str):
+            refs_internal.validate_no_slashes(self._digest, "digest")
+            refs_internal.validate_no_colons(self._digest, "digest")
 
     def uri(self) -> str:
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
@@ -85,35 +75,25 @@ class ObjectRef(RefWithExtra):
     entity: str
     project: str
     name: str
+    _digest: Union[str, Future[str]]
     extra: tuple[str, ...] = ()
-
-    _digest: Optional[str] = dataclasses.field(default=None, repr=False)
-    _digest_future: Optional[Future[str]] = dataclasses.field(default=None, repr=False)
 
     @property
     def digest(self) -> str:
-        if self._digest is None:
-            if self._digest_future is None:
-                # This should never happen due to the post-init check,
-                # but adding this to make mypy happy.
-                raise ValueError("Digest is None")
+        if isinstance(self._digest, Future):
             # Block until the Future resolves and store the result
-            self.__dict__["digest"] = self._digest_future.result()
+            self.__dict__["_digest"] = self._digest.result()
 
-        if self._digest is None:
-            raise ValueError("Digest is None")
+        if not isinstance(self._digest, str):
+            raise Exception(f"ObjectRef digest is not a string: {self._digest}")
 
-        refs_internal.validate_no_slashes(self.digest, "digest")
-        refs_internal.validate_no_colons(self.digest, "digest")
+        refs_internal.validate_no_slashes(self._digest, "digest")
+        refs_internal.validate_no_colons(self._digest, "digest")
 
         return self._digest
 
     def __post_init__(self) -> None:
-        if self._digest is None and self._digest_future is None:
-            raise ValueError("Digest is None")
-        if self._digest is not None and self._digest_future is not None:
-            raise ValueError("Cannot set both digest and digest_future")
-        if self._digest is not None:
+        if isinstance(self._digest, str):
             refs_internal.validate_no_slashes(self._digest, "digest")
             refs_internal.validate_no_colons(self._digest, "digest")
         refs_internal.validate_extra(list(self.extra))
