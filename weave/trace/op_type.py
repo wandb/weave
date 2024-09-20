@@ -3,6 +3,7 @@ import builtins
 import collections
 import collections.abc
 import inspect
+import io
 import json
 import os
 import re
@@ -490,6 +491,7 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
     code.append(op_function_code)
 
     with artifact.new_file(f"{name}.py") as f:
+        assert isinstance(f, io.StringIO)
         import_block = "\n".join(import_code)
         import_lines = ["import weave"] + import_block.split("\n")
         import_lines = dedupe_list(import_lines)
