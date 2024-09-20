@@ -53,7 +53,7 @@ const getStyles = (props: AdditionalProps) => {
               borderColor: TEAL_350,
               borderWidth: '2px',
             },
-            '& input::placeholder': {
+            '& .MuiInputBase-input::placeholder': {
               color: MOON_500,
               opacity: 1,
             },
