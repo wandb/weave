@@ -2,7 +2,6 @@ import dataclasses
 import typing
 from urllib import parse
 
-from weave.trace import box
 from weave.trace_server import refs_internal
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
@@ -17,42 +16,6 @@ def parse_local_ref_str(s: str) -> typing.Tuple[str, typing.Optional[list[str]]]
         return s, None
     path, extra = s.split("#", 1)
     return path, extra.split("/")
-
-
-def val_with_relative_ref(
-    parent_object: typing.Any, child_object: typing.Any, ref_extra_parts: list[str]
-) -> typing.Any:
-    from weave.legacy.weave import ref_base
-    from weave.trace.client_context import context_state
-
-    # If we already have a ref, resolve it
-    if isinstance(child_object, ref_base.Ref):
-        child_object = child_object.get()
-
-    # Only do this if ref_tracking_enabled right now. I just want to
-    # avoid introducing new behavior into W&B prod for the moment.
-    if context_state.ref_tracking_enabled():
-        from weave.legacy.weave import storage
-
-        child_ref = storage.get_ref(child_object)
-        parent_ref = ref_base.get_ref(parent_object)
-
-        # This first check is super important - if the child ref is pointing
-        # to a completely different artifact (ref), then we want to point to
-        # the child's inherent ref, not the relative ref from the parent.
-        if child_ref is not None:
-            if parent_ref is not None:
-                if hasattr(child_ref, "digest") and hasattr(parent_ref, "digest"):
-                    if child_ref.digest != parent_ref.digest:
-                        return child_object
-
-        if parent_ref is not None:
-            child_object = box.box(child_object)
-            sub_ref = parent_ref.with_extra(None, child_object, ref_extra_parts)
-            ref_base._put_ref(child_object, sub_ref)
-        return child_object
-
-    return child_object
 
 
 @dataclasses.dataclass
