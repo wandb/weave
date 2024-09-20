@@ -30,7 +30,13 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   const opDefRef = useMemo(() => parseRefMaybe(data.value ?? ''), [data.value]);
   if (!data.isLeaf) {
     if (data.valueType === 'object' && '_ref' in data.value) {
-      return <SmallRef objRef={parseRef(data.value._ref)} />;
+      const innerRef = data.value._ref;
+      const ref = parseRefMaybe(innerRef);
+      if (ref != null) {
+        return <SmallRef objRef={ref} />;
+      } else {
+        console.error('Expected ref, found', innerRef, typeof innerRef);
+      }
     }
     if (USE_TABLE_FOR_ARRAYS && data.valueType === 'array') {
       return <DataTableView data={data.value} />;
