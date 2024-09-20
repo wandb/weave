@@ -23,6 +23,9 @@ from .tests.trace.trace_server_clickhouse_conftest import *
 from .tests.wandb_system_tests_conftest import *
 from .trace import autopatch
 
+# Force testing to never report wandb sentry events
+os.environ["WANDB_ERROR_REPORTING"] = "false"
+
 
 class FakeTracer:
     def trace(*args, **kwargs):
@@ -53,7 +56,14 @@ def test_artifact_dir():
     return "/tmp/weave/pytest/%s" % os.environ.get("PYTEST_CURRENT_TEST")
 
 
+def pytest_sessionfinish(session, exitstatus):
+    if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED:
+        print("No tests were selected. Exiting gracefully.")
+        session.exitstatus = 0
+
+
 def pytest_collection_modifyitems(config, items):
+    # Add the weave_client marker to all tests that have a client fixture
     # Get the job number from environment variable (0 for even tests, 1 for odd tests)
     job_num = config.getoption("--job-num", default=None)
     if job_num is None:
@@ -68,7 +78,6 @@ def pytest_collection_modifyitems(config, items):
 
     items[:] = selected_items
 
-    # Add the weave_client marker to all tests that have a client fixture
     for item in items:
         if "client" in item.fixturenames:
             item.add_marker(pytest.mark.weave_client)
@@ -185,6 +194,47 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
         return attr
 
 
+def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
+    """A wrapper around a trace server that records all attribute access.
+
+    This is extremely helpful for tests to assert that a certain series of
+    attribute accesses happen (or don't happen), and in order. We will
+    probably want to make this a bit more sophisticated in the future, but
+    this is a pretty good start.
+
+    For example, you can do something like the followng to assert that various
+    read operations do not happen!
+
+    ```pyth
+    access_log = client.server.attribute_access_log
+    assert "table_query" not in access_log
+    assert "obj_read" not in access_log
+    assert "file_content_read" not in access_log
+    ```
+    """
+
+    class ServerRecorder(type(server)):  # type: ignore
+        attribute_access_log: list[str]
+
+        def __init__(self, server: tsi.TraceServerInterface):  # type: ignore
+            self.server = server
+            self.attribute_access_log = []
+
+        def __getattribute__(self, name):
+            self_server = super().__getattribute__("server")
+            access_log = super().__getattribute__("attribute_access_log")
+            if name == "server":
+                return self_server
+            if name == "attribute_access_log":
+                return access_log
+            attr = self_server.__getattribute__(name)
+            if name != "attribute_access_log":
+                access_log.append(name)
+            return attr
+
+    return ServerRecorder(server)
+
+
 @pytest.fixture()
 def client(request) -> Generator[weave_client.WeaveClient, None, None]:
     inited_client = None
@@ -218,7 +268,9 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
-        client = TestOnlyFlushingWeaveClient(entity, project, server)
+        client = TestOnlyFlushingWeaveClient(
+            entity, project, make_server_recorder(server)
+        )
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
     try:

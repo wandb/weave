@@ -41,7 +41,7 @@ class UserSettings(BaseModel):
 
     disabled: bool = False
     """Toggles Weave tracing.
-    
+
     If True, all weave ops will behave like regular functions.
     Can be overrided with the environment variable `WEAVE_DISABLED`"""
 
@@ -50,6 +50,16 @@ class UserSettings(BaseModel):
 
     If True, prints a link to the Weave UI when calling a weave op.
     Can be overrided with the environment variable `WEAVE_PRINT_CALL_LINK`"""
+
+    capture_code: bool = True
+    """Toggles code capture for ops.
+
+    If True, saves code for ops so they can be reloaded for later use.
+    Can be overrided with the environment variable `WEAVE_CAPTURE_CODE`
+
+    WARNING: Switching between `save_code=True` and `save_code=False` mid-script
+    may lead to unexpected behaviour.  Make sure this is only set once at the start!
+    """
 
     convert_paths_to_images: bool = True
     """Toggles conversion of image file paths to PathImage objects.
@@ -64,8 +74,7 @@ class UserSettings(BaseModel):
             return {"text": text, "image": url}
 
         If WEAVE_CONVERT_PATHS_TO_IMAGES=true, `image` will be converted to PathImage
-        and stored as an object.
-    """
+        and stored as an object."""
 
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
@@ -91,6 +100,10 @@ def should_disable_weave() -> bool:
 
 def should_print_call_link() -> bool:
     return _should("print_call_link")
+
+
+def should_capture_code() -> bool:
+    return _should("capture_code")
 
 
 def should_convert_paths_to_images() -> bool:

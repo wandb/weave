@@ -368,15 +368,52 @@ class ObjReadRes(BaseModel):
 
 
 class ObjectVersionFilter(BaseModel):
-    base_object_classes: Optional[List[str]] = None
-    object_ids: Optional[List[str]] = None
-    is_op: Optional[bool] = None
-    latest_only: Optional[bool] = None
+    base_object_classes: Optional[List[str]] = Field(
+        default=None,
+        description="Filter objects by their base classes",
+        examples=[["Model"], ["Dataset"]],
+    )
+    object_ids: Optional[List[str]] = Field(
+        default=None,
+        description="Filter objects by their IDs",
+        examples=["my_favorite_model", "my_favorite_dataset"],
+    )
+    is_op: Optional[bool] = Field(
+        default=None,
+        description="Filter objects based on whether they are weave.ops or not. `True` will only return ops, `False` will return non-ops, and `None` will return all objects",
+        examples=[True, False, None],
+    )
+    latest_only: Optional[bool] = Field(
+        default=None,
+        description="If True, return only the latest version of each object. `False` and `None` will return all versions",
+        examples=[True, False],
+    )
 
 
 class ObjQueryReq(BaseModel):
-    project_id: str
-    filter: Optional[ObjectVersionFilter] = None
+    project_id: str = Field(
+        description="The ID of the project to query", examples=["user/project"]
+    )
+    filter: Optional[ObjectVersionFilter] = Field(
+        default=None,
+        description="Filter criteria for the query. See `ObjectVersionFilter`",
+        examples=[
+            ObjectVersionFilter(object_ids=["my_favorite_model"], latest_only=True)
+        ],
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of results to return", examples=[100]
+    )
+    offset: Optional[int] = Field(
+        default=None,
+        description="Number of results to skip before returning",
+        examples=[0],
+    )
+    sort_by: Optional[List[SortBy]] = Field(
+        default=None,
+        description="Sorting criteria for the query results. Currently only supports 'object_id' and 'created_at'.",
+        examples=[[SortBy(field="created_at", direction="desc")]],
+    )
 
 
 class ObjQueryRes(BaseModel):
@@ -474,6 +511,18 @@ class TableUpdateReq(BaseModel):
 
 class TableUpdateRes(BaseModel):
     digest: str
+    # A note to developers:
+    # This default factory is needed because we share the
+    # same interface for the python client and the server.
+    # As a result, we might have servers in the wild that
+    # do not support this field. Therefore, we want to ensure
+    # that clients expecting this field will not break when
+    # they are targetting an older server. We should remove
+    # this default factory once we are sure that all servers
+    # have been updated to support this field.
+    updated_row_digests: list[str] = Field(
+        default_factory=list, description="The digests of the rows that were updated"
+    )
 
 
 class TableRowSchema(BaseModel):
@@ -483,18 +532,66 @@ class TableRowSchema(BaseModel):
 
 class TableCreateRes(BaseModel):
     digest: str
+    # A note to developers:
+    # This default factory is needed because we share the
+    # same interface for the python client and the server.
+    # As a result, we might have servers in the wild that
+    # do not support this field. Therefore, we want to ensure
+    # that clients expecting this field will not break when
+    # they are targetting an older server. We should remove
+    # this default factory once we are sure that all servers
+    # have been updated to support this field.
+    row_digests: list[str] = Field(
+        default_factory=list, description="The digests of the rows that were created"
+    )
 
 
 class TableRowFilter(BaseModel):
-    row_digests: Optional[List[str]] = None
+    row_digests: Optional[List[str]] = Field(
+        default=None,
+        description="List of row digests to filter by",
+        examples=[
+            [
+                "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+                "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+            ]
+        ],
+    )
 
 
 class TableQueryReq(BaseModel):
-    project_id: str
-    digest: str
-    filter: Optional[TableRowFilter] = None
-    limit: Optional[int] = None
-    offset: Optional[int] = None
+    project_id: str = Field(
+        description="The ID of the project", examples=["my_entity/my_project"]
+    )
+    digest: str = Field(
+        description="The digest of the table to query",
+        examples=["aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"],
+    )
+    filter: Optional[TableRowFilter] = Field(
+        default=None,
+        description="Optional filter to apply to the query. See `TableRowFilter` for more details.",
+        examples=[
+            {
+                "row_digests": [
+                    "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+                    "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+                ]
+            }
+        ],
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of rows to return", examples=[100]
+    )
+    offset: Optional[int] = Field(
+        default=None,
+        description="Number of rows to skip before starting to return rows",
+        examples=[10],
+    )
+    sort_by: Optional[List[SortBy]] = Field(
+        default=None,
+        description="List of fields to sort by. Fields can be dot-separated to access dictionary values. No sorting uses the default table order (insertion order).",
+        examples=[[{"field": "col_a.prop_b", "order": "desc"}]],
+    )
 
 
 class TableQueryRes(BaseModel):
