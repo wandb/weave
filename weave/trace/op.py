@@ -1,6 +1,7 @@
 """Defines the Op protocol and related functions."""
 
 import inspect
+import sys
 import typing
 from functools import partial, wraps
 from types import MethodType
@@ -477,7 +478,7 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
             wrapper._tracing_enabled = True  # type: ignore
 
-            if callable(call_name_func := kwargs.get("call_display_name")):
+            if callable(call_name_func := kwargs.get("call_display_name", "")):
                 params = inspect.signature(call_name_func).parameters
                 if len(params) != 1:
                     raise DisplayNameFuncError(
@@ -522,6 +523,13 @@ def maybe_unbind_method(oplike: Union[Op, MethodType, partial]) -> Op:
         op = oplike
 
     return cast(Op, op)
+
+
+def is_op(obj: Any) -> bool:
+    if sys.version_info < (3, 12):
+        return isinstance(obj, Op)
+
+    return all(hasattr(obj, attr) for attr in Op.__annotations__)
 
 
 __docspec__ = [call, calls]

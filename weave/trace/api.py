@@ -16,7 +16,7 @@ from weave.trace.client_context import weave_client as weave_client_context
 
 from . import context, weave_client, weave_init
 from .constants import TRACE_OBJECT_EMOJI
-from .op import Op, op
+from .op import Op, is_op, op
 from .refs import ObjectRef, parse_uri
 from .settings import UserSettings, parse_and_apply_settings, should_disable_weave
 from .table import Table
@@ -85,7 +85,7 @@ def as_op(fn: Callable) -> Op:
     Returns:
         The Op of the function.
     """
-    if not isinstance(fn, Op):
+    if not is_op(fn):
         raise ValueError("fn must be a weave.op() decorated function")
     return fn
 

@@ -93,7 +93,7 @@ def get_scorer_attributes(
                 f"Scorer {scorer_name} must implement score and summarize methods. Did you forget to wrap with @weave.op()?"
             )
     elif callable(scorer):
-        if isinstance(scorer, Op):
+        if is_op(scorer):
             scorer_name = scorer.name
         else:
             scorer_name = scorer.__name__
