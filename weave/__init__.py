@@ -35,9 +35,13 @@ __version__ = version.VERSION
 from weave.flow.obj import Object
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model
+from weave.flow.prompt.prompt import Prompt
 from weave.flow.eval import Evaluation, Scorer
 from weave.flow.agent import Agent, AgentState
 from weave.trace.util import ThreadPoolExecutor, Thread
+
+# Shorthand
+P = Prompt
 
 # See the comment above pre_init_modules above. This is check to ensure we don't accidentally
 # introduce loading weave.legacy.weave.ops or weave.legacy.weave.panels when importing weave.
@@ -73,6 +77,7 @@ __docspec__ = [
     Object,
     Dataset,
     Model,
+    Prompt,
     Evaluation,
     Scorer,
 ]

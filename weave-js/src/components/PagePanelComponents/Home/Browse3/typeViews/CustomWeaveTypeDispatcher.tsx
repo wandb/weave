@@ -2,6 +2,7 @@ import React from 'react';
 
 import {CustomWeaveTypePayload} from './customWeaveType.types';
 import {PILImageImage} from './PIL.Image.Image/PILImageImage';
+import {Messages} from './weave.flow.prompt.Messages/Messages';
 
 type CustomWeaveTypeDispatcherProps = {
   data: CustomWeaveTypePayload;
@@ -27,6 +28,9 @@ const customWeaveTypeRegistry: {
 } = {
   'PIL.Image.Image': {
     component: PILImageImage,
+  },
+  'weave.flow.prompt.Messages': {
+    component: Messages,
   },
 };
 

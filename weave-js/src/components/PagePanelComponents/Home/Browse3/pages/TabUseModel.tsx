@@ -21,7 +21,7 @@ export const TabUseModel = ({name, uri, projectName}: TabUseModelProps) => {
   const label = isParentObject ? 'model version' : 'object';
 
   return (
-    <Box m={2}>
+    <Box>
       <Alert icon="lightbulb-info">
         See{' '}
         <DocLink
