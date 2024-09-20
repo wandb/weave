@@ -37,7 +37,6 @@ const getStyles = (props: AdditionalProps) => {
           root: {
             paddingTop: '0px !important',
             paddingBottom: '0px !important',
-            // alignItems: 'flex-start',
             fontSize: FONT_SIZES[size],
             fontFamily: 'Source Sans Pro',
             minWidth: '100px',
@@ -67,7 +66,6 @@ const getStyles = (props: AdditionalProps) => {
             minHeight: HEIGHTS[size],
             paddingTop: '0px !important',
             paddingBottom: '0px !important',
-            // overflow: 'hidden',
           },
           inputMultiline: {
             overflow: 'hidden',
