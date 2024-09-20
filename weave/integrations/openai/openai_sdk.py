@@ -58,6 +58,20 @@ def openai_on_finish_post_processor(
                     )
                 )
         return _tool_calls
+    
+    try:
+        from openai._response import APIResponse
+        if isinstance(value, APIResponse):
+            value = value.parse()
+    except:
+         pass
+    
+    try:
+        from openai._legacy_response import LegacyAPIResponse
+        if isinstance(value, LegacyAPIResponse):
+            value = value.parse()
+    except:
+        pass
 
     if isinstance(value, ChatCompletionChunk):
         final_value = ChatCompletion(
