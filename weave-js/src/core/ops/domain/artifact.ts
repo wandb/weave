@@ -87,7 +87,7 @@ export const opArtifactCreatedAt = makeArtifactOp({
   argDescriptions: {artifact: artifactArgDescription},
   returnValueDescription: `The creation date of the ${docType('artifact')}`,
   returnType: inputTypes => 'date',
-  resolver: ({artifact}) => moment(artifact.createdAt + 'Z').toDate(),
+  resolver: ({artifact}) => artifact.createdAt,
 });
 
 export const opArtifactProject = makeArtifactOp({
