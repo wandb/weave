@@ -29,7 +29,7 @@ We'll use Streamlit to build the interface and we'll capture the LLM interaction
 !pip install weave openai streamlit
 ```
 
-First, create a file called `secrets.toml` and add an OpenAI key so it works with `[st.secrets](https://docs.streamlit.io/develop/api-reference/connections/st.secrets)`. You can [sign up](https://platform.openai.com/signup) on the OpenAI platform to get your own API key. 
+First, create a file called `secrets.toml` and add an OpenAI key so it works with [st.secrets](https://docs.streamlit.io/develop/api-reference/connections/st.secrets). You can [sign up](https://platform.openai.com/signup) on the OpenAI platform to get your own API key. 
 
 
 ```python
@@ -43,11 +43,13 @@ Next, create a file called `chatbot.py` with the following contents:
 ```python
 # chatbot.py
 
-import weave
-from openai import OpenAI
 import streamlit as st
+from openai import OpenAI
+
+import weave
 
 st.title("Add feedback")
+
 
 # highlight-next-line
 @weave.op
@@ -56,16 +58,20 @@ def chat_response(prompt):
         model="gpt-4o",
         messages=[
             {"role": "user", "content": prompt},
-            *[{"role": m["role"], "content": m["content"]} for m in st.session_state.messages]
+            *[
+                {"role": m["role"], "content": m["content"]}
+                for m in st.session_state.messages
+            ],
         ],
         stream=True,
     )
     response = st.write_stream(stream)
-    return {'response': response}
+    return {"response": response}
+
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 # highlight-next-line
-weave_client = weave.init('feedback-example')
+weave_client = weave.init("feedback-example")
 
 
 def display_chat_messages():
@@ -73,23 +79,39 @@ def display_chat_messages():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
+
 def get_and_process_prompt():
     if prompt := st.chat_input("What is up?"):
         st.session_state.messages.append({"role": "user", "content": prompt})
-    
+
         with st.chat_message("user"):
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-# highlight-next-line            
-            with weave.attributes({'session': st.session_state['session_id'], 'env': 'prod'}):
+            # highlight-next-line
+            with weave.attributes(
+                {"session": st.session_state["session_id"], "env": "prod"}
+            ):
                 # This could also be weave model.predict.call if you're using a weave.Model subclass
-                result, call = chat_response.call(prompt) # call the function with `.call`, this returns a tuple with a new Call object
-# highlight-next-line
-                st.button(":thumbsup:",   on_click=lambda: call.feedback.add_reaction("👍"), key='up')
-# highlight-next-line
-                st.button(":thumbsdown:", on_click=lambda: call.feedback.add_reaction("👎"), key='down')
-                st.session_state.messages.append({"role": "assistant", "content": result['response']})
+                result, call = chat_response.call(
+                    prompt
+                )  # call the function with `.call`, this returns a tuple with a new Call object
+                # highlight-next-line
+                st.button(
+                    ":thumbsup:",
+                    on_click=lambda: call.feedback.add_reaction("👍"),
+                    key="up",
+                )
+                # highlight-next-line
+                st.button(
+                    ":thumbsdown:",
+                    on_click=lambda: call.feedback.add_reaction("👎"),
+                    key="down",
+                )
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": result["response"]}
+                )
+
 
 def init_chat_history():
     if "messages" not in st.session_state:
@@ -97,10 +119,11 @@ def init_chat_history():
 
 
 def main():
-    st.session_state['session_id'] = '123abc'
+    st.session_state["session_id"] = "123abc"
     init_chat_history()
     display_chat_messages()
     get_and_process_prompt()
+
 
 if __name__ == "__main__":
     main()
@@ -117,23 +140,27 @@ If we consider our decorated prediction function as:
 
 
 ```python
-
 import weave
-weave.init('feedback-example')
+
+weave.init("feedback-example")
+
+
 # highlight-next-line
 @weave.op
 def predict(input_data):
     # Your prediction logic here
-    some_result = 'hello world'
+    some_result = "hello world"
     return some_result
 ```
 
-We can use it as usal to deliver some model response to the user:
+We can use it as usual to deliver some model response to the user:
 
 
 ```python
-with weave.attributes({'session': '123abc', 'env': 'prod'}): # attach arbitrary attributes to the call alongside inputs & outputs
-    result = predict(input_data="your data here") # user question through the App UI
+with weave.attributes(
+    {"session": "123abc", "env": "prod"}
+):  # attach arbitrary attributes to the call alongside inputs & outputs
+    result = predict(input_data="your data here")  # user question through the App UI
 ```
 
 To attach feedback, you need the `call` object, which is obtained by using the `.call()` method *instead of calling the function as normal*:
@@ -148,30 +175,9 @@ After making the call, the output of the operation is available using `result` a
 
 
 ```python
-call.feedback.add_reaction("👍") # user reaction through the App UI
+call.feedback.add_reaction("👍")  # user reaction through the App UI
 ```
-
-## Retrieving Feedback 
-
-We can pull feedback and their associated calls using weaves export APIs. 
-
-
-```python
-thumbs_down = client.feedback(reaction="👎")
-calls = thumbs_down.refs().calls()
-for call in calls:
-    print(call.inputs)
-    print(call.feedback)
-```
-
-First, we gather all feedback of a certain type using `client.feedback(reaction="👎")`, then we can get the associalted calls with `.refs().calls()`. Finally, we can get the inputs and feedback of each call. 
-
-:::tip 
-After some post-processing, this can be used to build a `weave.Dataset` for use in `weave.Evaluation`.
-:::
 
 ## Conclusion
 
-In this tutorial, we built a chat UI with Streamlit which had inputs & outputs captured in Weave, alongside 👍👎 buttons to capture user feedback. We then showed how to retrieve and filter feedback using export APIs.
-
-
+In this tutorial, we built a chat UI with Streamlit which had inputs & outputs captured in Weave, alongside 👍👎 buttons to capture user feedback. 
