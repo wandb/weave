@@ -52,6 +52,8 @@ from clickhouse_connect.driver.summary import QuerySummary
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
+    OrderField,
+    QueryBuilderDynamicField,
     combine_conditions,
 )
 from weave.trace_server.ids import generate_id
@@ -285,10 +287,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
-            necessary_cost_columns = ["started_at", "summary_dump"]
+            summary_columns = ["summary", "summary_dump"]
             columns = [
-                *[col for col in columns if col not in necessary_cost_columns],
-                *necessary_cost_columns,
+                *[col for col in columns if col not in summary_columns],
+                "summary_dump",
             ]
         for col in columns:
             cq.add_field(col)
@@ -767,19 +769,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
-        parameters = {}
+        parameters: Dict[str, Any] = {}
         if req.filter:
             if req.filter.row_digests:
-                conds.append("tr.digest IN {row_digets: Array(String)}")
+                conds.append("tr.digest IN {row_digests: Array(String)}")
                 parameters["row_digests"] = req.filter.row_digests
         else:
             conds.append("1 = 1")
+
+        sort_clause = ""
+        pb = ParamBuilder()
+        if req.sort_by:
+            sort_fields = []
+            for i, sort in enumerate(req.sort_by):
+                # TODO: better splitting of escaped dots (.) in field names
+                extra_path = sort.field.split(".")
+                field = OrderField(
+                    field=QueryBuilderDynamicField(
+                        field="val_dump", extra_path=extra_path
+                    ),
+                    direction="ASC" if sort.direction.lower() == "asc" else "DESC",
+                )
+                sort_fields.append(field.as_sql(pb, "tr"))
+            sort_clause = f"ORDER BY {', '.join(sort_fields)}"
+        sort_params = pb.get_params()
+        parameters.update(sort_params)
         rows = self._table_query(
             req.project_id,
             req.digest,
             conditions=conds,
             limit=req.limit,
             offset=req.offset,
+            parameters=parameters,
+            sort_clause=sort_clause,
         )
         return tsi.TableQueryRes(rows=rows)
 
@@ -791,7 +813,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
         parameters: Optional[Dict[str, Any]] = None,
+        sort_clause: Optional[str] = None,
     ) -> list[tsi.TableRowSchema]:
+        if sort_clause is None:
+            sort_clause = ""
         conds = ["project_id = {project_id: String}"]
         if conditions:
             conds.extend(conditions)
@@ -831,6 +856,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     ORDER BY project_id, digest
                 ) tr ON t.project_id = tr.project_id AND t.row_digest = tr.digest
                 WHERE {predicate}
+                {sort_clause}
             """
         if parameters is None:
             parameters = {}

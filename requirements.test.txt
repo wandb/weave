@@ -1,10 +1,11 @@
 -r requirements.txt
 
 # This file is a temporary hold over until the Core repo is updated to just point to legacy
--r requirements.legacy.test.txt
+# -r requirements.legacy.test.txt
 
 pytest>=8.2.0
 pytest-asyncio>=0.23.6
+pytest-xdist>=3.1.0
 clickhouse_connect==0.7.0
 fastapi>=0.110.0
 sqlparse==0.5.0
@@ -19,17 +20,8 @@ pytest-recording==0.13.1
 vcrpy==6.0.1
 semver==2.13.0             # Used for switching logic based on package versions
 
-# Integration Vendors
-mistralai>=1.0.0            # MistralAI
-litellm>=1.36.1             # LiteLLM
-llama-index>=0.10.35        # LlamaIndex
-anthropic>=0.18.0           # Anthropic
-langchain-core>=0.2.1       # LangChain
-langchain-openai>=0.1.7     # LangChain
-langchain-community>=0.2.1  # LangChain
-chromadb>=0.5.0             # LangChain
-pysqlite3-binary==0.5.3     # LangChain
-cohere>=5.9.1               # Cohere
-groq>=0.9.0                 # Groq
-cerebras-cloud-sdk          # cerebras-cloud-sdk
-google-generativeai>=0.7.2  # Google Generative AI
+# serving tests
+flask
+uvicorn>=0.27.0
+
+pillow
