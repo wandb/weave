@@ -58,12 +58,14 @@ const PropKey = styled.div`
   text-align: right;
   scrollbar-width: none;
 `;
+PropKey.displayName = 'S.PropKey';
 
 const GridCell = styled.div<{
   colSpan?: number;
   rowSpan?: number;
   button?: boolean;
 }>`
+  font-size: 14px;
   border: 1px solid ${MOON_200};
   grid-column-end: span ${props => props.colSpan || 1};
   grid-row-end: span ${props => props.rowSpan || 1};
@@ -81,6 +83,7 @@ const GridCell = styled.div<{
     }
   `}
 `;
+GridCell.displayName = 'S.GridCell';
 
 const GridCellSubgrid = styled.div<{
   colSpan?: number;
@@ -97,6 +100,7 @@ const GridCellSubgrid = styled.div<{
   grid-template-columns: ${props => props.colsTemp || 'subgrid'};
   overflow: auto;
 `;
+GridCellSubgrid.displayName = 'S.GridCellSubgrid';
 
 const GridContainer = styled.div<{colsTemp: string; rowsTemp: string}>`
   display: grid;
@@ -104,6 +108,7 @@ const GridContainer = styled.div<{colsTemp: string; rowsTemp: string}>`
   grid-template-columns: ${props => props.colsTemp};
   grid-template-rows: ${props => props.rowsTemp};
 `;
+GridContainer.displayName = 'S.GridContainer';
 
 const centeredTextStyleMixin: React.CSSProperties = {
   display: 'flex',
@@ -976,6 +981,7 @@ const ICValueView: React.FC<{value: any}> = ({value}) => {
         wordBreak: 'break-all',
         padding: 0,
         margin: 0,
+        fontFamily: 'Inconsolata',
       }}>
       {text}
     </pre>
