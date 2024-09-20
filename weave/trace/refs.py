@@ -63,9 +63,9 @@ class TableRef(Ref):
 
 @dataclasses.dataclass(frozen=True)
 class RefWithExtra(Ref):
-    def with_extra(self, extra: tuple[str, ...]) -> "RefWithExtra":
+    def with_extra(self, extra: tuple[Union[str, Future[str]], ...]) -> "RefWithExtra":
         params = dataclasses.asdict(self)
-        params["extra"] = self.extra + tuple(extra)  # type: ignore
+        params["_extra"] = self._extra + tuple(extra)  # type: ignore
         return self.__class__(**params)
 
     def with_key(self, key: str) -> "RefWithExtra":
@@ -77,8 +77,8 @@ class RefWithExtra(Ref):
     def with_index(self, index: int) -> "RefWithExtra":
         return self.with_extra((LIST_INDEX_EDGE_NAME, str(index)))
 
-    def with_item(self, item_digest: str) -> "RefWithExtra":
-        return self.with_extra((TABLE_ROW_ID_EDGE_NAME, f"{item_digest}"))
+    def with_item(self, item_digest: Union[str, Future[str]]) -> "RefWithExtra":
+        return self.with_extra((TABLE_ROW_ID_EDGE_NAME, item_digest))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -87,7 +87,11 @@ class ObjectRef(RefWithExtra):
     project: str
     name: str
     _digest: Union[str, Future[str]]
-    extra: tuple[str, ...] = ()
+    _extra: tuple[Union[str, Future[str]], ...] = ()
+
+    @property
+    def extra(self) -> tuple[str, ...]:
+        return tuple(e if isinstance(e, str) else e.result() for e in self._extra)
 
     @property
     def digest(self) -> str:
@@ -173,11 +177,15 @@ class CallRef(RefWithExtra):
     entity: str
     project: str
     id: str
-    extra: tuple[str, ...] = ()
+    _extra: tuple[Union[str, Future[str]], ...] = ()
+
+    @property
+    def extra(self) -> tuple[str, ...]:
+        return tuple(e if isinstance(e, str) else e.result() for e in self._extra)
 
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/call/{self.id}"
-        if self.extra:
+        if self._extra:
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
@@ -198,16 +206,16 @@ def parse_uri(uri: str) -> AnyRef:
         return TableRef(entity=entity, project=project, _digest=remaining[0])
     extra = tuple(urllib.parse.unquote(r) for r in remaining[1:])
     if kind == "call":
-        return CallRef(entity=entity, project=project, id=remaining[0], extra=extra)
+        return CallRef(entity=entity, project=project, id=remaining[0], _extra=extra)
     elif kind == "object":
         name, version = remaining[0].split(":")
         return ObjectRef(
-            entity=entity, project=project, name=name, _digest=version, extra=extra
+            entity=entity, project=project, name=name, _digest=version, _extra=extra
         )
     elif kind == "op":
         name, version = remaining[0].split(":")
         return OpRef(
-            entity=entity, project=project, name=name, _digest=version, extra=extra
+            entity=entity, project=project, name=name, _digest=version, _extra=extra
         )
     else:
         raise ValueError(f"Unknown ref kind: {kind}")

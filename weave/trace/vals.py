@@ -261,7 +261,7 @@ class WeaveTable(Traceable):
             should_local_iter = (
                 self.ref is not None
                 and self.table_ref is not None
-                and self.table_ref.row_digests is not None
+                and self.table_ref._row_digests is not None
                 and self._prefetched_rows is not None
             )
             if should_local_iter:
@@ -314,7 +314,7 @@ class WeaveTable(Traceable):
         if (
             self.ref is None
             or self.table_ref is None
-            or self.table_ref.row_digests is None
+            or self.table_ref._row_digests is None
             or self._prefetched_rows is None
         ):
             logger.error(
@@ -323,13 +323,15 @@ class WeaveTable(Traceable):
             yield from self._remote_iter()
             return
 
-        row_digest_len = len(self.table_ref.row_digests)
-        prefetched_rows_len = len(self._prefetched_rows)
-        if row_digest_len != prefetched_rows_len:
-            logger.error(
-                f"Expected length of row digests ({row_digest_len}) to match prefetched rows ({prefetched_rows_len}). Falling back to remote iteration."
-            )
-            yield from self._remote_iter()
+        if isinstance(self.table_ref._row_digests, list):
+            # Only do this check if it is resolved
+            row_digest_len = len(self.table_ref._row_digests)
+            prefetched_rows_len = len(self._prefetched_rows)
+            if row_digest_len != prefetched_rows_len:
+                logger.error(
+                    f"Expected length of row digests ({row_digest_len}) to match prefetched rows ({prefetched_rows_len}). Falling back to remote iteration."
+                )
+                yield from self._remote_iter()
             return
 
         for ndx, item in enumerate(self.table_ref.row_digests):
