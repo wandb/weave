@@ -5,7 +5,6 @@ import pytest
 import weave
 
 
-@pytest.mark.skip("Skip v0 tests because CI can't handle it")
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
@@ -61,7 +60,6 @@ def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> Non
     assert output.usage.total_tokens == model_usage["total_tokens"] == 309
 
 
-@pytest.mark.skip("Skip v0 tests because CI can't handle it")
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
@@ -116,7 +114,6 @@ Ultimately, the best French cheese is a matter of personal taste. I would recomm
     assert output.usage.total_tokens == model_usage["total_tokens"] == 307
 
 
-@pytest.mark.skip("Skip v0 tests because CI can't handle it")
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
@@ -177,7 +174,6 @@ def test_mistral_quickstart_with_stream(
     assert output.usage.total_tokens == model_usage["total_tokens"] == 284
 
 
-@pytest.mark.skip("Skip v0 tests because CI can't handle it")
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]

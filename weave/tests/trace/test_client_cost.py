@@ -11,7 +11,7 @@ from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 def test_cost_apis(client):
     is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
     if is_sqlite:
-        # only run this test for sqlite
+        # dont run this test for sqlite
         return
 
     project_id = client._project_id()
@@ -145,7 +145,7 @@ def test_cost_apis(client):
 def test_purge_only_ids(client):
     is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
     if is_sqlite:
-        # only run this test for sqlite
+        # dont run this test for sqlite
         return
 
     project_id = client._project_id()

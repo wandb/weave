@@ -445,7 +445,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if limit:
             query += f" LIMIT {limit}"
         if req.offset:
+            if limit is None:
+                query += " LIMIT -1"
             query += f" OFFSET {req.offset}"
+
         print("QUERY", query)
 
         cursor.execute(query)
@@ -810,13 +813,77 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
+        parameters: list[str] = []
         if req.filter:
-            raise NotImplementedError("Table filter not implemented")
+            if req.filter.row_digests:
+                conds.append(
+                    "tr.digest IN ({})".format(
+                        ",".join("?" * len(req.filter.row_digests))
+                    )
+                )
+                parameters.extend(req.filter.row_digests)
         else:
             conds.append("1 = 1")
-        rows = self._table_query(req.project_id, req.digest, conditions=conds)
 
-        return tsi.TableQueryRes(rows=rows)
+        predicate = " AND ".join(conds)
+
+        # Construct the ORDER BY clause
+        order_by = ""
+        if req.sort_by:
+            sort_parts = []
+            for sort in req.sort_by:
+                field = sort.field
+                direction = sort.direction.upper()
+                if "." in field:
+                    # Handle nested fields
+                    parts = field.split(".")
+                    field = f"json_extract(tr.val, '$.{'.'.join(parts)}')"
+                else:
+                    field = f"json_extract(tr.val, '$.{field}')"
+                sort_parts.append(f"{field} {direction}")
+            order_by = f"ORDER BY {', '.join(sort_parts)}"
+        else:
+            order_by = "ORDER BY OrderedDigests.original_order"
+        # First get the row IDs by querying tables
+        query = f"""
+        WITH OrderedDigests AS (
+            SELECT
+                json_each.value AS digest,
+                json_each.id AS original_order
+            FROM
+                tables,
+                json_each(tables.row_digests)
+            WHERE
+                tables.project_id = ? AND
+                tables.digest = ?
+        )
+        SELECT
+            tr.digest,
+            tr.val
+        FROM
+            OrderedDigests
+            JOIN table_rows tr ON OrderedDigests.digest = tr.digest
+        WHERE {predicate}
+        {order_by}
+        """
+
+        if req.limit is not None:
+            query += f" LIMIT {req.limit}"
+        if req.offset is not None:
+            if req.limit is None:
+                query += " LIMIT -1"
+            query += f" OFFSET {req.offset}"
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(query, [req.project_id, req.digest] + list(parameters))
+        query_result = cursor.fetchall()
+
+        return tsi.TableQueryRes(
+            rows=[
+                tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
+                for r in query_result
+            ]
+        )
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches
@@ -989,49 +1056,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
         print("COST PURGE is not implemented for local sqlite", req)
         return tsi.CostPurgeRes()
-
-    def _table_query(
-        self,
-        project_id: str,
-        digest: str,
-        conditions: Optional[list[str]] = None,
-        limit: Optional[int] = None,
-        parameters: Optional[dict[str, Any]] = None,
-    ) -> list[tsi.TableRowSchema]:
-        conn, cursor = get_conn_cursor(self.db_path)
-        conds = ["project_id = {project_id: String}"]
-        if conditions:
-            conds.extend(conditions)
-
-        predicate = " AND ".join(conds)
-        # First get the row IDs by querying tables
-        cursor.execute(
-            """
-            WITH OrderedDigests AS (
-                SELECT
-                    json_each.value AS digest
-                FROM
-                    tables,
-                    json_each(tables.row_digests)
-                WHERE
-                    tables.project_id = ? AND
-                    tables.digest = ?
-                ORDER BY
-                    json_each.id
-            )
-            SELECT
-                table_rows.digest,
-                table_rows.val
-            FROM
-                OrderedDigests
-                JOIN table_rows ON OrderedDigests.digest = table_rows.digest
-            """,
-            (project_id, digest),
-        )
-        query_result = cursor.fetchall()
-        return [
-            tsi.TableRowSchema(digest=r[0], val=json.loads(r[1])) for r in query_result
-        ]
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
