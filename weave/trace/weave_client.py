@@ -60,6 +60,7 @@ from weave.trace_server.trace_server_interface import (
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
     TableCreateReq,
+    TableCreateRes,
     TableSchemaForInsert,
     TraceServerInterface,
 )
@@ -524,7 +525,7 @@ class WeaveClient:
         #
         # However, we always want to resolve the ref to the digest. So
         # here, we just directly assign the digest.
-        ref = dataclasses.replace(ref, digest=read_res.obj.digest)
+        ref = dataclasses.replace(ref, _digest=read_res.obj.digest)
 
         data = read_res.obj.val
 
@@ -1207,27 +1208,27 @@ class WeaveClient:
                 )
             )
 
-        response = self.async_job_queue.submit_job(send_obj_create)
-
-        def blocking_digest_resolver() -> str:
-            return response.result().digest
+        res_future: Future[ObjCreateRes] = self.async_job_queue.submit_job(
+            send_obj_create
+        )
+        digest_future: Future[str] = self.async_job_queue.submit_job(
+            lambda: res_future.result().digest
+        )
 
         ref: Ref
         if is_opdef:
             ref = OpRef(
-                self.entity,
-                self.project,
-                name,
-                digest="",
-                _blocking_digest_resolver=blocking_digest_resolver,
+                entity=self.entity,
+                project=self.project,
+                name=name,
+                _digest_future=digest_future,
             )
         else:
             ref = ObjectRef(
-                self.entity,
-                self.project,
-                name,
-                digest="",
-                _blocking_digest_resolver=blocking_digest_resolver,
+                entity=self.entity,
+                project=self.project,
+                name=name,
+                _digest_future=digest_future,
             )
 
         # Attach the ref to the object
@@ -1261,21 +1262,21 @@ class WeaveClient:
         """
         rows = to_json(table.rows, self._project_id(), self)
 
-        response = self.async_job_queue.submit_job(
+        res_future: Future[TableCreateRes] = self.async_job_queue.submit_job(
             self.server.table_create,
             TableCreateReq(
                 table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
             ),
         )
 
-        def blocking_digest_resolver() -> str:
-            return response.result().digest
+        digest_future: Future[str] = self.async_job_queue.submit_job(
+            lambda: res_future.result().digest
+        )
 
         table_ref = TableRef(
             entity=self.entity,
             project=self.project,
-            digest="",
-            _blocking_digest_resolver=blocking_digest_resolver,
+            _digest_future=digest_future,
         )
 
         # row_digests: Optional[list[str]] = None
@@ -1361,7 +1362,9 @@ class WeaveClient:
         raise NotImplementedError()
 
     def _ref_uri(self, name: str, version: str, path: str) -> str:
-        return ObjectRef(self.entity, self.project, name, version).uri()
+        return ObjectRef(
+            entity=self.entity, project=self.project, name=name, _digest=version
+        ).uri()
 
     def _flush(self) -> None:
         # Used to wait until all currently enqueued jobs are processed

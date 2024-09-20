@@ -1,6 +1,7 @@
 import dataclasses
 import urllib
-from typing import Any, Callable, Optional, Union
+from concurrent.futures import Future
+from typing import Any, Optional, Union
 
 from ..trace_server import refs_internal
 
@@ -23,40 +24,37 @@ class Ref:
 class TableRef(Ref):
     entity: str
     project: str
-    digest: str
     row_digests: Optional[list[str]] = None
-    _blocking_digest_resolver: Optional[Callable[[], str]] = dataclasses.field(
-        default=None, repr=False
-    )
+
+    _digest_future: Optional[Future[str]] = dataclasses.field(default=None, repr=False)
+    _digest: Optional[str] = dataclasses.field(default=None, repr=False)
+
+    @property
+    def digest(self) -> str:
+        if self._digest is None:
+            if self._digest_future is None:
+                # This should never happen due to the post-init check,
+                # but adding this to make mypy happy.
+                raise ValueError("Digest is None")
+            # Block until the Future resolves and store the result
+            self.__dict__["digest"] = self._digest_future.result()
+
+        if self._digest is None:
+            raise ValueError("Digest is None")
+
+        refs_internal.validate_no_slashes(self.digest, "digest")
+        refs_internal.validate_no_colons(self.digest, "digest")
+
+        return self._digest
 
     def __post_init__(self) -> None:
-        if self._blocking_digest_resolver is not None:
-            object.__setattr__(self, "digest", "")
-
-    def as_dict(self) -> dict:
-        # Needed to not accidentally block on resolving the digest
-        if self._blocking_digest_resolver is not None:
-            digest = ""
-        else:
-            digest = self.digest
-        return {
-            "entity": self.entity,
-            "project": self.project,
-            "digest": digest,
-            "row_digests": self.row_digests,
-            "_blocking_digest_resolver": self._blocking_digest_resolver,
-        }
-
-    def __getattribute__(self, item: str) -> Any:
-        if (
-            item == "digest"
-            and object.__getattribute__(self, "_blocking_digest_resolver") is not None
-        ):
-            resolver = object.__getattribute__(self, "_blocking_digest_resolver")
-            digest = resolver()
-            object.__setattr__(self, "digest", digest)
-            object.__setattr__(self, "_blocking_digest_resolver", None)
-        return object.__getattribute__(self, item)
+        if self._digest is None and self._digest_future is None:
+            raise ValueError("Digest is None")
+        if self._digest is not None and self._digest_future is not None:
+            raise ValueError("Cannot set both digest and digest_future")
+        if self._digest is not None:
+            refs_internal.validate_no_slashes(self.digest, "digest")
+            refs_internal.validate_no_colons(self.digest, "digest")
 
     def uri(self) -> str:
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
@@ -87,48 +85,40 @@ class ObjectRef(RefWithExtra):
     entity: str
     project: str
     name: str
-    digest: str
     extra: tuple[str, ...] = ()
-    _blocking_digest_resolver: Optional[Callable[[], str]] = dataclasses.field(
-        default=None, repr=False
-    )
+
+    _digest_future: Optional[Future[str]] = dataclasses.field(default=None, repr=False)
+    _digest: Optional[str] = dataclasses.field(default=None, repr=False)
+
+    @property
+    def digest(self) -> str:
+        if self._digest is None:
+            if self._digest_future is None:
+                # This should never happen due to the post-init check,
+                # but adding this to make mypy happy.
+                raise ValueError("Digest is None")
+            # Block until the Future resolves and store the result
+            self.__dict__["digest"] = self._digest_future.result()
+
+        if self._digest is None:
+            raise ValueError("Digest is None")
+
+        refs_internal.validate_no_slashes(self.digest, "digest")
+        refs_internal.validate_no_colons(self.digest, "digest")
+
+        return self._digest
 
     def __post_init__(self) -> None:
-        if self._blocking_digest_resolver is not None:
-            object.__setattr__(self, "digest", "")
-        else:
+        if self._digest is None and self._digest_future is None:
+            raise ValueError("Digest is None")
+        if self._digest is not None and self._digest_future is not None:
+            raise ValueError("Cannot set both digest and digest_future")
+        if self._digest is not None:
             refs_internal.validate_no_slashes(self.digest, "digest")
             refs_internal.validate_no_colons(self.digest, "digest")
         refs_internal.validate_extra(list(self.extra))
         refs_internal.validate_no_slashes(self.name, "name")
         refs_internal.validate_no_colons(self.name, "name")
-
-    def __getattribute__(self, item: str) -> Any:
-        if (
-            item == "digest"
-            and object.__getattribute__(self, "_blocking_digest_resolver") is not None
-        ):
-            resolver = object.__getattribute__(self, "_blocking_digest_resolver")
-            digest = resolver()
-            # VALIDATE DIGEST?
-            object.__setattr__(self, "digest", digest)
-            object.__setattr__(self, "_blocking_digest_resolver", None)
-        return object.__getattribute__(self, item)
-
-    def as_dict(self) -> dict:
-        # Needed to not accidentally block on resolving the digest
-        if self._blocking_digest_resolver is not None:
-            digest = ""
-        else:
-            digest = self.digest
-        return {
-            "entity": self.entity,
-            "project": self.project,
-            "name": self.name,
-            "digest": digest,
-            "extra": self.extra,
-            "_blocking_digest_resolver": self._blocking_digest_resolver,
-        }
 
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.digest}"
@@ -214,19 +204,19 @@ def parse_uri(uri: str) -> AnyRef:
     entity, project, kind = parts[:3]
     remaining = tuple(parts[3:])
     if kind == "table":
-        return TableRef(entity=entity, project=project, digest=remaining[0])
+        return TableRef(entity=entity, project=project, _digest=remaining[0])
     extra = tuple(urllib.parse.unquote(r) for r in remaining[1:])
     if kind == "call":
         return CallRef(entity=entity, project=project, id=remaining[0], extra=extra)
     elif kind == "object":
         name, version = remaining[0].split(":")
         return ObjectRef(
-            entity=entity, project=project, name=name, digest=version, extra=extra
+            entity=entity, project=project, name=name, _digest=version, extra=extra
         )
     elif kind == "op":
         name, version = remaining[0].split(":")
         return OpRef(
-            entity=entity, project=project, name=name, digest=version, extra=extra
+            entity=entity, project=project, name=name, _digest=version, extra=extra
         )
     else:
         raise ValueError(f"Unknown ref kind: {kind}")

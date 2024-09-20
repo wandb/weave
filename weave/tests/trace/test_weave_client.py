@@ -178,8 +178,8 @@ def test_dataset_refs(client):
         "shawn",
         "test-project",
         "my-dataset",
-        ref.ref.digest,
-        (
+        _digest=ref.ref.digest,
+        extra=(
             OBJECT_ATTR_EDGE_NAME,
             "rows",
             TABLE_ROW_ID_EDGE_NAME,
@@ -196,8 +196,8 @@ def test_dataset_refs(client):
         "shawn",
         "test-project",
         "my-dataset",
-        ref.ref.digest,
-        (
+        _digest=ref.ref.digest,
+        extra=(
             OBJECT_ATTR_EDGE_NAME,
             "rows",
             TABLE_ROW_ID_EDGE_NAME,
