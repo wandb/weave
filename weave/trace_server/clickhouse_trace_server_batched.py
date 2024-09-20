@@ -104,7 +104,7 @@ MAX_FLUSH_AGE = 15
 
 FILE_CHUNK_SIZE = 100000
 
-MAX_DELETE_CALLS_COUNT = 1000
+MAX_DELETE_CALLS_COUNT = 100
 
 
 class NotFoundError(Exception):
@@ -444,10 +444,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
             )
 
-        # Note: i think this project condition is redundant
-        proj_cond = "calls_merged.project_id = {project_id: String}"
-        proj_params = {"project_id": req.project_id}
-
         # get all parents
         parents = list(
             self.calls_query_stream(
@@ -456,6 +452,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     filter=tsi.CallsFilter(
                         call_ids=req.call_ids,
                     ),
+                    # request minimal columns
+                    columns=["id", "parent_id"],
                 )
             )
         )
@@ -468,6 +466,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     filter=tsi.CallsFilter(
                         trace_ids=[p.trace_id for p in parents],
                     ),
+                    # request minimal columns
+                    columns=["id", "parent_id"],
                 )
             )
         )
@@ -1954,7 +1954,7 @@ def _digest_is_version_like(digest: str) -> Tuple[bool, int]:
 
 def find_call_descendants(
     root_ids: list[str],
-    all_calls: list[SelectableCHCallSchema],
+    all_calls: list[tsi.CallSchema],
 ) -> list[str]:
     # make a map of call_id to children list
     children_map = defaultdict(list)
