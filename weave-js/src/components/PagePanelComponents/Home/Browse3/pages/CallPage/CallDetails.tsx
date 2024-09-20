@@ -129,7 +129,7 @@ export const CallDetails: FC<{
           }}>
           <CustomWeaveTypeProjectContext.Provider
             value={{entity: call.entity, project: call.project}}>
-            <ObjectViewerSection title="Inputs" data={inputs} />
+            <ObjectViewerSection title="Inputs" data={inputs} isExpanded />
           </CustomWeaveTypeProjectContext.Provider>
         </Box>
         <Box
@@ -147,7 +147,7 @@ export const CallDetails: FC<{
           ) : (
             <CustomWeaveTypeProjectContext.Provider
               value={{entity: call.entity, project: call.project}}>
-              <ObjectViewerSection title="Output" data={output} />
+              <ObjectViewerSection title="Output" data={output} isExpanded />
             </CustomWeaveTypeProjectContext.Provider>
           )}
         </Box>
