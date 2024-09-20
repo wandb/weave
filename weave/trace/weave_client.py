@@ -1217,19 +1217,9 @@ class WeaveClient:
 
         ref: Ref
         if is_opdef:
-            ref = OpRef(
-                entity=self.entity,
-                project=self.project,
-                name=name,
-                _digest=digest_future,
-            )
+            ref = OpRef(self.entity, self.project, name, digest_future)
         else:
-            ref = ObjectRef(
-                entity=self.entity,
-                project=self.project,
-                name=name,
-                _digest=digest_future,
-            )
+            ref = ObjectRef(self.entity, self.project, name, digest_future)
 
         # Attach the ref to the object
         try:
@@ -1273,11 +1263,7 @@ class WeaveClient:
             lambda: res_future.result().digest
         )
 
-        table_ref = TableRef(
-            entity=self.entity,
-            project=self.project,
-            _digest=digest_future,
-        )
+        table_ref = TableRef(self.entity, self.project, digest_future)
 
         # row_digests: Optional[list[str]] = None
         # # This check is needed because in older versions of
@@ -1362,9 +1348,7 @@ class WeaveClient:
         raise NotImplementedError()
 
     def _ref_uri(self, name: str, version: str, path: str) -> str:
-        return ObjectRef(
-            entity=self.entity, project=self.project, name=name, _digest=version
-        ).uri()
+        return ObjectRef(self.entity, self.project, name, version).uri()
 
     def _flush(self) -> None:
         # Used to wait until all currently enqueued jobs are processed
