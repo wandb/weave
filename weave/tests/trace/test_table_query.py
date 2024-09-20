@@ -54,6 +54,7 @@ def test_table_query(client: WeaveClient):
     assert result_vals == data
     assert result_digests == row_digests
 
+
 def test_table_query_invalid_digest(client: WeaveClient):
     res = client.server.table_query(
         tsi.TableQueryReq(
@@ -63,7 +64,6 @@ def test_table_query_invalid_digest(client: WeaveClient):
     )
 
     assert res.rows == []
-
 
 
 def test_table_query_filter_by_row_digests(client: WeaveClient):
@@ -95,7 +95,6 @@ def test_table_query_invalid_row_digest(client: WeaveClient):
     )
 
     assert res.rows == []
-
 
 
 def test_table_query_limit(client: WeaveClient):
