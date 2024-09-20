@@ -8,7 +8,7 @@ from pydantic import BaseModel
 import weave
 from weave.flow.obj import Object
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.op import Op, is_op
+from weave.trace.op import Op, as_op, is_op
 
 
 class Scorer(Object):
@@ -94,6 +94,7 @@ def get_scorer_attributes(
             )
     elif callable(scorer):
         if is_op(scorer):
+            scorer = as_op(scorer)
             scorer_name = scorer.name
         else:
             scorer_name = scorer.__name__

@@ -22,7 +22,7 @@ from weave.flow.scorer import (
 )
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
-from weave.trace.op import Op, is_op
+from weave.trace.op import Op, as_op, is_op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import get_ref
 
@@ -40,6 +40,7 @@ def async_call(
 ) -> typing.Coroutine:
     is_async = False
     if is_op(func):
+        func = as_op(func)
         is_async = inspect.iscoroutinefunction(func.resolve_fn)
     else:
         is_async = inspect.iscoroutinefunction(func)
@@ -141,10 +142,13 @@ class Evaluation(Object):
             model_predict = get_infer_method(model)
 
         model_predict_fn_name = (
-            model_predict.name if is_op(model_predict) else model_predict.__name__
+            as_op(model_predict).name
+            if is_op(model_predict)
+            else model_predict.__name__
         )
 
         if is_op(model_predict):
+            model_predict = as_op(model_predict)
             predict_signature = model_predict.signature
         else:
             predict_signature = inspect.signature(model_predict)
@@ -197,6 +201,7 @@ class Evaluation(Object):
         for scorer in scorers:
             scorer_name, score_fn, _ = get_scorer_attributes(scorer)
             if is_op(score_fn):
+                score_fn = as_op(score_fn)
                 score_signature = score_fn.signature
             else:
                 score_signature = inspect.signature(score_fn)

@@ -532,4 +532,23 @@ def is_op(obj: Any) -> bool:
     return all(hasattr(obj, attr) for attr in Op.__annotations__)
 
 
+def as_op(fn: Callable) -> Op:
+    """Given a @weave.op() decorated function, return its Op.
+
+    @weave.op() decorated functions are instances of Op already, so this
+    function should be a no-op at runtime. But you can use it to satisfy type checkers
+    if you need to access OpDef attributes in a typesafe way.
+
+    Args:
+        fn: A weave.op() decorated function.
+
+    Returns:
+        The Op of the function.
+    """
+    if not is_op(fn):
+        raise ValueError("fn must be a weave.op() decorated function")
+
+    return cast(Op, fn)
+
+
 __docspec__ = [call, calls]

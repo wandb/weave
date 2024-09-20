@@ -21,7 +21,7 @@ from weave.trace.ipython import (
     get_class_source,
     is_running_interactively,
 )
-from weave.trace.op import Op, is_op
+from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef
 from weave.trace_server.trace_server_interface_util import str_digest
 
@@ -267,6 +267,7 @@ def reconstruct_signature(fn: typing.Callable) -> str:
 
 def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
     if is_op(fn):
+        fn = as_op(fn)
         fn = fn.resolve_fn
 
     if not settings.should_capture_code():
