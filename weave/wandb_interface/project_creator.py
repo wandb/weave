@@ -1,6 +1,4 @@
-"""
-The purpose of this utility is to simply ensure that a W&B project exists
-"""
+"""The purpose of this utility is to simply ensure that a W&B project exists"""
 
 import logging
 import typing
