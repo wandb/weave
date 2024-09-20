@@ -19,7 +19,7 @@ Generating high-quality code with proper structure, documentation, and tests is 
 
 We'll use Weave for evaluation comparison and tracking, and OpenAI's GPT models for code generation using structured outputs.
 
-![Evaluation](./media/codegen/eval_dash.png)
+![Evaluation](../../media/codegen/eval_dash.png)
 
 ## Video Demonstration
 
@@ -217,7 +217,7 @@ This `CodeFormatter` class provides several Weave operations to clean and format
 
 ## Define the CodeGenerationPipeline
 
-![Code Generation Pipeline](./media/codegen/codegen_trace.png)
+![Code Generation Pipeline](../../media/codegen/codegen_trace.png)
 
 Now, let's implement the core code generation logic:
 
@@ -337,7 +337,7 @@ async def score_humaneval_test(test: str, entry_point: str, model_output: str):
 
 These evaluation functions run the generated code and return a boolean value indicating whether the code passed the test provided from the dataset.
 
-![Evaluation](./media/codegen/eval_trace.png)
+![Evaluation](../../media/codegen/eval_trace.png)
 
 ## Create a Weave Dataset and run evaluation
 
@@ -405,7 +405,7 @@ for model_name in ["gpt-4o-2024-08-06"]:
 
 This code creates a dataset with our sample prompts, defines our humaneval test scorer, and runs an evaluation of our code generation pipeline.
 
-![Final Evaluation](./media/codegen/eval_dash.png)
+![Final Evaluation](../../media/codegen/eval_dash.png)
 
 ## Conclusion
 
