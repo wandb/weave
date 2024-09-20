@@ -1,5 +1,3 @@
-import moment from 'moment';
-
 import * as Urls from '../../_external/util/urls';
 import {list, maybe, typedDict} from '../../model/helpers';
 import {docType} from '../../util/docs';
