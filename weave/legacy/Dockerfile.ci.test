@@ -10,6 +10,6 @@ RUN python3 -m venv venv
 RUN --mount=type=cache,target=/root/.cache /bin/bash -c \
     "source venv/bin/activate && \
     pip install --upgrade pip && \
-    pip install -r requirements.test.txt"
+    pip install -r requirements.legacy.test.txt"
 
 ENTRYPOINT "/bin/bash"

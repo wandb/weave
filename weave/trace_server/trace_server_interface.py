@@ -547,15 +547,51 @@ class TableCreateRes(BaseModel):
 
 
 class TableRowFilter(BaseModel):
-    row_digests: Optional[List[str]] = None
+    row_digests: Optional[List[str]] = Field(
+        default=None,
+        description="List of row digests to filter by",
+        examples=[
+            [
+                "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+                "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+            ]
+        ],
+    )
 
 
 class TableQueryReq(BaseModel):
-    project_id: str
-    digest: str
-    filter: Optional[TableRowFilter] = None
-    limit: Optional[int] = None
-    offset: Optional[int] = None
+    project_id: str = Field(
+        description="The ID of the project", examples=["my_entity/my_project"]
+    )
+    digest: str = Field(
+        description="The digest of the table to query",
+        examples=["aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"],
+    )
+    filter: Optional[TableRowFilter] = Field(
+        default=None,
+        description="Optional filter to apply to the query. See `TableRowFilter` for more details.",
+        examples=[
+            {
+                "row_digests": [
+                    "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+                    "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+                ]
+            }
+        ],
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of rows to return", examples=[100]
+    )
+    offset: Optional[int] = Field(
+        default=None,
+        description="Number of rows to skip before starting to return rows",
+        examples=[10],
+    )
+    sort_by: Optional[List[SortBy]] = Field(
+        default=None,
+        description="List of fields to sort by. Fields can be dot-separated to access dictionary values. No sorting uses the default table order (insertion order).",
+        examples=[[{"field": "col_a.prop_b", "order": "desc"}]],
+    )
 
 
 class TableQueryRes(BaseModel):

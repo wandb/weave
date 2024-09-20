@@ -64,6 +64,8 @@ const getRefs = (data: Data): string[] => {
 
 type RefValues = Record<string, any>; // ref URI to value
 
+const RESOVLED_REF_KEY = '_ref';
+
 // This is a general purpose object viewer that can be used to view any object.
 export const ObjectViewer = ({
   apiRef,
@@ -144,13 +146,13 @@ export const ObjectViewer = ({
         if (typeof val === 'object' && val !== null) {
           val = {
             ...v,
-            _ref: r,
+            [RESOVLED_REF_KEY]: r,
           };
         } else {
           // This makes it so that runs pointing to primitives can still be expanded in the table.
           val = {
             '': v,
-            _ref: r,
+            [RESOVLED_REF_KEY]: r,
           };
         }
       }
@@ -165,11 +167,11 @@ export const ObjectViewer = ({
         refValues[context.value] != null &&
         // If this is a ref and the parent has been visited, we already resolved
         // this ref. Example: `a._ref` where `a` is already in resolvedRefPaths
-        !resolvedRefPaths.has(context.value + context.parent?.toString() ?? '')
+        !resolvedRefPaths.has(context.parent?.toString() ?? '')
       ) {
         dirty = true;
         const res = refValues[context.value];
-        resolvedRefPaths.add(context.value + context.path.toString());
+        resolvedRefPaths.add(context.path.toString());
         return res;
       }
       return _.clone(context.value);

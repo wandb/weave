@@ -4,7 +4,7 @@ import contextlib
 import os
 import threading
 import time
-from typing import Any, Callable, Iterator, Optional, Union
+from typing import Any, Iterator, Optional, Union
 
 # TODO: type_serializers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
@@ -16,7 +16,7 @@ from weave.trace.client_context import weave_client as weave_client_context
 
 from . import context, weave_client, weave_init
 from .constants import TRACE_OBJECT_EMOJI
-from .op import Op, op
+from .op import as_op, op
 from .refs import ObjectRef, parse_uri
 from .settings import UserSettings, parse_and_apply_settings, should_disable_weave
 from .table import Table
@@ -70,24 +70,6 @@ def local_client() -> Iterator[weave_client.WeaveClient]:
         yield inited_client.client
     finally:
         inited_client.reset()
-
-
-def as_op(fn: Callable) -> Op:
-    """Given a @weave.op() decorated function, return its Op.
-
-    @weave.op() decorated functions are instances of Op already, so this
-    function should be a no-op at runtime. But you can use it to satisfy type checkers
-    if you need to access OpDef attributes in a typesafe way.
-
-    Args:
-        fn: A weave.op() decorated function.
-
-    Returns:
-        The Op of the function.
-    """
-    if not isinstance(fn, Op):
-        raise ValueError("fn must be a weave.op() decorated function")
-    return fn
 
 
 def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
