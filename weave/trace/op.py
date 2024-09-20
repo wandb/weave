@@ -376,6 +376,7 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
     await extract()  # calls the function and tracks the call in the Weave UI
     ```
     """
+    # TODO: (AT): Remove
     if context_state.get_loading_built_ins():
         from weave.legacy.weave.decorator_op import op as legacy_op
 
