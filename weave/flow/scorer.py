@@ -8,7 +8,7 @@ from pydantic import BaseModel
 import weave
 from weave.flow.obj import Object
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.op import Op
+from weave.trace.op import Op, is_op
 
 
 class Scorer(Object):
