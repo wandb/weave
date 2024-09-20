@@ -1,3 +1,8 @@
+/**
+ * Our Chat View is based on OpenAI's Chat API, with an extension to support
+ * Placeholders in Prompts.
+ */
+
 export type Placeholder = {
   name: string;
   type: string;

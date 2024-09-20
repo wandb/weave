@@ -1,5 +1,6 @@
 import React from 'react';
 
+import {Alert} from '../../../../../Alert';
 import {ToolCall} from './types';
 
 type OneToolCallProps = {
@@ -9,7 +10,7 @@ type OneToolCallProps = {
 const OneToolCall = ({toolCall}: OneToolCallProps) => {
   const {function: toolCallFunction} = toolCall;
   const {name, arguments: args} = toolCallFunction;
-  let parsedArgs = null;
+  let parsedArgs: any = null;
   try {
     const parsed = JSON.parse(args);
     parsedArgs = JSON.stringify(parsed);
@@ -18,6 +19,7 @@ const OneToolCall = ({toolCall}: OneToolCallProps) => {
     }
   } catch (e) {
     // The model does not always generate valid JSON
+    return <Alert severity="error">Invalid JSON: {args}</Alert>;
   }
   return (
     <code className="whitespace-pre text-xs">

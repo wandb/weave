@@ -54,7 +54,14 @@ const deref = (object: any, refsMap: Record<string, any>): any => {
 };
 
 // Memoize the call as chat
-export const useCallAsChat = (call: TraceCallSchema) => {
+export const useCallAsChat = (
+  call: TraceCallSchema
+): {
+  loading: boolean;
+  isStructuredOutput: boolean;
+  request: ChatRequest;
+  result: ChatCompletion | null;
+} => {
   // Traverse the data and find all ref URIs.
   const refs = getRefs(call);
   const {useRefsData} = useWFHooks();
