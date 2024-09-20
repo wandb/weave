@@ -12,7 +12,7 @@ import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation
 from weave.legacy.weave import op_def
-from weave.tests.trace.util import DatetimeMatcher, RegexStringMatcher
+from weave.tests.trace.util import AnyIntMatcher, DatetimeMatcher, RegexStringMatcher
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
@@ -257,7 +257,13 @@ def test_call_create(client):
         id=call.id,
         output="hello",
         exception=None,
-        summary={},
+        summary={
+            "weave": {
+                "status": "success",
+                "trace_name": "x",
+                "latency_ms": AnyIntMatcher(),
+            }
+        },
         _children=[],
         attributes={
             "weave": {
@@ -299,9 +305,14 @@ def test_calls_query(client):
                 "sys_version": sys.version,
             },
         },
+        summary={
+            "weave": {
+                "status": "running",
+                "trace_name": "x",
+            }
+        },
         started_at=DatetimeMatcher(),
         ended_at=None,
-        deleted_at=None,
     )
     assert result[1] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -320,9 +331,14 @@ def test_calls_query(client):
                 "sys_version": sys.version,
             },
         },
+        summary={
+            "weave": {
+                "status": "running",
+                "trace_name": "x",
+            }
+        },
         started_at=DatetimeMatcher(),
         ended_at=None,
-        deleted_at=None,
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
@@ -686,6 +702,7 @@ def test_save_model(client):
     assert model2.predict("x") == "input is: x"
 
 
+@pytest.mark.skip(reason="TODO: Skip flake")
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 def test_saved_nested_modellike(client):
     class A(weave.Object):
@@ -1131,7 +1148,24 @@ def test_table_partitioning(network_proxy_client):
     NUM_ROWS = 16
     rows = list(row_gen(NUM_ROWS, 1024))
     exp_digest = "15696550bde28f9231173a085ce107c823e7eab6744a97adaa7da55bc9c93347"
-
+    row_digests = [
+        "2df5YAp2sqlYyxEpTKsIrUlf9Kc5ZxEkbqtqUnYOLhk",
+        "DMjRIeuM76SCqXqsqehYyfL3KYV5fL0DBr6g4RJ4izA",
+        "f949WksZQdTgf5Ac3cXS5cMuGf0otLvpULOfOsAGiYs",
+        "YaFBweA0HU7w51Sdt8X4uhSmjk7N4WqSfuknmBRpWcc",
+        "BBzLkGZ6fFraXdoFOSjj7p2d1qSiyMXjRnk7Zas2FEA",
+        "i6i1XJ7QecqWkB8MdljoWu35tpjwk8npzFAd67aisB4",
+        "IsjSZ4usQrHUcu0cNtKedBlUWrIW1f4cSDck1lGCSMw",
+        "MkL0DTiDMCW3agkcIeZ5g5VP0MyFuQcVpa1yqGGVZwk",
+        "Vu6S8c4XdXgWNYaAXKqsxuicY6XbYDKLIUkd2M0YPF8",
+        "IkIjQFARp0Qny3AUav18zZuzY4INFXsREPkS3iFCrWo",
+        "E3T6ngUGSpXY9u2l58sb9smleJ7GO2YlYJY0tq2oV5U",
+        "uNmcjBhJyiC6qvJZ0JRlGLpRm68ARrXVYlBgjGRqRdA",
+        "0bzwVP0JFd7Y2W9YmpPUv62aAkyY2RCaFVxMnEfjIqY",
+        "3bZG40U188x6bVfm9aQX2xvYVqlCftD82O4UsDZtRVU",
+        "KW40nfHplo7BDJux0kP8PeYQ95lnOEGaeYfgNtsQ1oE",
+        "u10rDrPoYXl58eQStkQP4dPH6KfmE7I88f0FYI7L9fg",
+    ]
     remote_client.remote_request_bytes_limit = (
         100 * 1024
     )  # very large buffer to ensure a single request
@@ -1144,6 +1178,7 @@ def test_table_partitioning(network_proxy_client):
         )
     )
     assert res.digest == exp_digest
+    assert res.row_digests == row_digests
     assert len(records) == 1
 
     remote_client.remote_request_bytes_limit = (
@@ -1158,6 +1193,7 @@ def test_table_partitioning(network_proxy_client):
         )
     )
     assert res.digest == exp_digest
+    assert res.row_digests == row_digests
     assert len(records) == (
         1  # The first create call,
         + 1  # the second  create
@@ -1260,10 +1296,10 @@ def test_summary_tokens_cost(client):
             "completion_tokens": 4000000,
             "requests": 2,
             "total_tokens": 0,
-            "prompt_tokens_cost": pytest.approx(60),
-            "completion_tokens_cost": pytest.approx(240),
-            "cost_per_prompt_token": 3e-05,
-            "cost_per_completion_token": 6e-05,
+            "prompt_tokens_total_cost": pytest.approx(60),
+            "completion_tokens_total_cost": pytest.approx(240),
+            "prompt_token_cost": 3e-05,
+            "completion_token_cost": 6e-05,
             "prompt_token_cost_unit": "USD",
             "completion_token_cost_unit": "USD",
             "provider_id": "openai",
@@ -1279,10 +1315,10 @@ def test_summary_tokens_cost(client):
             "completion_tokens": 5000000,
             "requests": 1,
             "total_tokens": 0,
-            "prompt_tokens_cost": pytest.approx(15),
-            "completion_tokens_cost": pytest.approx(75),
-            "cost_per_prompt_token": 5e-06,
-            "cost_per_completion_token": 1.5e-05,
+            "prompt_tokens_total_cost": pytest.approx(15),
+            "completion_tokens_total_cost": pytest.approx(75),
+            "prompt_token_cost": 5e-06,
+            "completion_token_cost": 1.5e-05,
             "prompt_token_cost_unit": "USD",
             "completion_token_cost_unit": "USD",
             "provider_id": "openai",
@@ -1294,7 +1330,11 @@ def test_summary_tokens_cost(client):
 
     # for no cost call, there should be no cost information
     # currently that means no weave object in the summary
-    assert noCostCallSummary.get("weave", "bah") == "bah"
+    assert noCostCallSummary["weave"] == {
+        "status": "success",
+        "trace_name": "models",
+        "latency_ms": AnyIntMatcher(),
+    }
 
 
 @pytest.mark.skip_clickhouse_client
@@ -1319,8 +1359,15 @@ def test_summary_tokens_cost_sqlite(client):
     noCostCallSummary = callsNoCost[0].summary
     withCostCallSummary = callsWithCost[0].summary
 
-    assert noCostCallSummary is None
-    assert withCostCallSummary is None
+    weave_summary = {
+        "weave": {
+            "status": "running",
+            "trace_name": "x",
+        }
+    }
+
+    assert noCostCallSummary == weave_summary
+    assert withCostCallSummary == weave_summary
 
 
 def test_ref_in_dict(client):

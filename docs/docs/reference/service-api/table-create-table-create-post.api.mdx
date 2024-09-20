@@ -5,7 +5,7 @@ description: "Table Create"
 sidebar_label: "Table Create"
 hide_title: true
 hide_table_of_contents: true
-api: eJylVdtu2kAQ/RW0zxRo1CfeclUjtQoipC8IRYM9gU1t72Z3HYKQ/70zswuYUBKpfQF798zlnLl4owIsvBpO1QTmBXo16ypj0UHQprrN1ZDu6fwxcwgBHw9erPFBdZXDlxp9uDD5Wg03KjNVwCrwI1hb6Exc9Z+9qfjMZ0ssgZ+s40BBU1B6E8/Hx/T2jFl41LmA1pYwygenqwWFDjqwkRpFVIcSbighsxJbHbD0LTMzZxAj0gE4B+uWmzEbNvv7ZBApaoc569TKKIWa7T2IiPdC8ca428oTk089RurvvVyKyGN8IfumbRBcjXLgraEAwvBsMOC/HH3mtGXByc19nWXo/VNddMYJTJH/sT65XlCRPyrCVUR8xjY5OkWXC8Auvp2dHTP6BYXOJd/OtXPG/QcdDKCLgy45BBQmO7iFan33RPm/5990dyeaMlmgU83sdIv9MDFB7sLSLz7S8yfVDha479fTUBGjM+Hbz+RnXjF0wrUKsZc3qnuaxlWU72/BtpDvk8noyGGsrcesdjqsRU7GXYDXJPd01lA2hyWX5ujE7uDEMSwNr6W0fCyEJb31ZYb62RZGc/eKzkuA2lGd1TIE64f9fnCQYW8FVT7vgVYccJuOzG2sfiupnersgV0Lit7ncs98uNnG+y14/QaljcusvdV2e2xfv7ipphvqGHKjqycjRknBG/DhfHRLOOYS5Rj0vvYGXBjmX4L0eAUlHit1IOOORMC30LcFaOlAkWaTRNwuIpqp6IOkWbLKdLPZEFt8cEXT8DFRdVw9enwFpyPJKbf9EiGnEWDdfyNB1GWczy/SnAwvammo97PKcxQtzmlr2fAhdtZqhNHd/YTA8/T5KU3ONg5WrC/9DpXiTxpbS2nljOYbqkXN4zVU0SdXAGoWYidWrHA3/bdmn5ZBKz8RR2fnZPxAjcflIJm6iU6djtqb4qT9CLxfGZe37G064rXSNH8Ajr6jSQ==
+api: eJylVU1v4jAQ/SuRzyzQak/c+qmttKsiSveCEBqSgbibxK7tlCKU/74ztoFQCpV2L208fvP13njYCAdLKwYTMYZ5gVZMO0JpNOCkqh4yMaB7ss9Sg+BwdnDQyjrREQZfa7TuWmVrMdiIVFUOK8efoHUhUx+q92JVxTab5lgCf2nDiZykpHTykY/NdHrB1M1k5kFrTRhhnZHVklI76dhJDAMqoYIbKkitvK90WNqWm5oziBHRAMbAuhVmxI7N/j46hBalwYx5alUUU033ETyJT77Fe2UeKkudfBkxtP4xyo0neYSv5N+0HZyp0RusVpTAd3jZ7/O/DG1qpGbCKcxTnaZo7aIuklEEU+Z/1CeTSxL5nAi3AREEmAX8pzpEz7M6JLfRv/OhqXGOSYydqEXi6Mgi0Ae4ZIUGkzCd2Ze0x45O8c6TwCG+X14eU/sbCpl54pI7Y5T5D17RgSwOaDoEFCo9uIVq/big+o/p3FkkVbJEI5rpaY5/qlAgy1Da5Tlhf9EQwRL3gp2GejKSMd9+RT/3FVJHXEuIPb2B3dNt3Ab6Pku2hfwYj4dHAYO2FtPaSLf2dDLuGqwkuifTZno0eDwcSZgOLhxdrng/xi2oweV06vnH3Eu3MFoAb2isT1Ab0lnkzmk76PWcgRS7K6iyeRek4ITbcvwCCeq3itqxzhE4tEfRee7vuR8ettF+Hd+9Q6nDVm2v191C3esXVuZkQxNDYWS1UN4pMngP1l0NHwjHvQQ6+t2Lbp+F4f5L8DNeQYnHTB3QuGvC4bvr6QKkn0BPzSaSuN2I9KZCDKImZ5bpZrOhbvHZFE3DZmrVsHr0+QZGhiYnPPY5QkZPgHn/gwQRN+F9fvPDyfCi9gP18a3yOwoeV7Q+tTuLnbYGYfj4NCbwPP4OlipjHwMr5pf+DoTg31b29tJ6G71vqJY1P6+BCDFZAaiZiB1ZQeFO/N96+7QMWvV5cmR6Rc7PNHgsB9HUie3U0dTeFCf9h2DtSpms5a+jiddK0/wFhYHS9Q==
 sidebar_class_name: "post api-method"
 info_path: reference/service-api/fastapi
 custom_edit_url: null
@@ -205,6 +205,15 @@ Table Create
                         schema={{"type":"string","title":"Digest"}}
                       >
                         
+                      </SchemaItem><SchemaItem
+                        collapsible={false}
+                        name={"row_digests"}
+                        required={false}
+                        schemaName={"string[]"}
+                        qualifierMessage={undefined}
+                        schema={{"items":{"type":"string"},"type":"array","title":"Row Digests","description":"The digests of the rows that were created"}}
+                      >
+                        
                       </SchemaItem>
                     </ul>
                   </details>
@@ -213,7 +222,7 @@ Table Create
                   value={"Example (from schema)"}
                 >
                   <ResponseSamples
-                    responseExample={"{\n  \"digest\": \"string\"\n}"}
+                    responseExample={"{\n  \"digest\": \"string\",\n  \"row_digests\": [\n    \"string\"\n  ]\n}"}
                     language={"json"}
                   >
                     

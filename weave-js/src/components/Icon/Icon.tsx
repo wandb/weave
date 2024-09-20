@@ -140,6 +140,7 @@ import {ReactComponent as ImportPanTool1} from '../../assets/icons/icon-pan-tool
 import {ReactComponent as ImportPanel} from '../../assets/icons/icon-panel.svg';
 import {ReactComponent as ImportPanelAutoGen} from '../../assets/icons/icon-panel-auto-gen.svg';
 import {ReactComponent as ImportPanelManual} from '../../assets/icons/icon-panel-manual.svg';
+import {ReactComponent as ImportParallelCoordinates} from '../../assets/icons/icon-parallel-coordinates.svg';
 import {ReactComponent as ImportParentBackUp} from '../../assets/icons/icon-parent-back-up.svg';
 import {ReactComponent as ImportPause} from '../../assets/icons/icon-pause.svg';
 import {ReactComponent as ImportPaused} from '../../assets/icons/icon-paused.svg';
@@ -678,6 +679,9 @@ export const IconPanelAutoGen = (props: SVGIconProps) => (
 export const IconPanelManual = (props: SVGIconProps) => (
   <ImportPanelManual {...updateIconProps(props)} />
 );
+export const IconParallelCoordinates = (props: SVGIconProps) => (
+  <ImportParallelCoordinates {...updateIconProps(props)} />
+);
 export const IconParentBackUp = (props: SVGIconProps) => (
   <ImportParentBackUp {...updateIconProps(props)} />
 );
@@ -1132,6 +1136,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   panel: IconPanel,
   'panel-auto-gen': IconPanelAutoGen,
   'panel-manual': IconPanelManual,
+  'parallel-coordinates': IconParallelCoordinates,
   'parent-back-up': IconParentBackUp,
   pause: IconPause,
   paused: IconPaused,

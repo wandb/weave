@@ -32,7 +32,7 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   children?: ReactElement | string;
   active?: boolean;
-  tooltip?: string;
+  tooltip?: ReactElement | string;
   tooltipProps?: TooltipContentProps;
   twWrapperStyles?: React.CSSProperties;
 };
@@ -150,10 +150,17 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             <Tooltip.Root open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
               <Tooltip.Trigger asChild>
                 {/* span is needed so tooltip works on disabled buttons */}
-                <span>{button}</span>
+                <span className="[display:inherit]">{button}</span>
               </Tooltip.Trigger>
               <Tooltip.Portal>
-                <Tooltip.Content {...tooltipProps}>{tooltip}</Tooltip.Content>
+                <Tooltip.Content
+                  {...tooltipProps}
+                  style={{
+                    // it's hard to state how silly this is, but the zIndex on semantic's modal is 2147483605 - so, that + 1
+                    zIndex: 2147483606,
+                  }}>
+                  {tooltip}
+                </Tooltip.Content>
               </Tooltip.Portal>
             </Tooltip.Root>
           </Tooltip.Provider>

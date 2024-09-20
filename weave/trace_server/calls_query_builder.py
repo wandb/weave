@@ -34,6 +34,7 @@ import sqlparse
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
     ParamBuilder,
@@ -50,7 +51,7 @@ from weave.trace_server.trace_server_interface_util import (
 logger = logging.getLogger(__name__)
 
 
-class CallsMergedField(BaseModel):
+class QueryBuilderField(BaseModel):
     field: str
 
     def as_sql(
@@ -64,6 +65,8 @@ class CallsMergedField(BaseModel):
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
 
+
+class CallsMergedField(QueryBuilderField):
     def is_heavy(self) -> bool:
         return False
 
@@ -91,22 +94,7 @@ class CallsMergedDynamicField(CallsMergedAggField):
         cast: typing.Optional[tsi_query.CastTo] = None,
     ) -> str:
         res = super().as_sql(pb, table_alias)
-        if cast != "exists":
-            path_str = "'$'"
-            if self.extra_path:
-                param_name = pb.add_param(quote_json_path_parts(self.extra_path))
-                path_str = _param_slot(param_name, "String")
-            val = f"JSON_VALUE({res}, {path_str})"
-            return clickhouse_cast(val, cast)
-        else:
-            # UGG - this is an ugly part of clickhouse! It is really difficult to differentiate
-            # between null, non-existent, "", and "null"!
-            path_parts = []
-            if self.extra_path:
-                for part in self.extra_path:
-                    path_parts.append(", " + _param_slot(pb.add_param(part), "String"))
-            safe_path = "".join(path_parts)
-            return f"(NOT (JSONType({res}{safe_path}) = 'Null' OR JSONType({res}{safe_path}) IS NULL))"
+        return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         if self.extra_path:
@@ -126,8 +114,67 @@ class CallsMergedDynamicField(CallsMergedAggField):
         return True
 
 
+class QueryBuilderDynamicField(QueryBuilderField):
+    # This is a temporary solution to address a specific use case.
+    # We need to reuse the `CallsMergedDynamicField` mechanics in the table_query,
+    # but the table_query is not an aggregating table. Therefore, we
+    # can't use `CallsMergedDynamicField` directly because it
+    # inherits from `CallsMergedAggField`.
+    #
+    # To solve this, we've created `QueryBuilderDynamicField`, which is similar to
+    # `CallsMergedDynamicField` but doesn't inherit from `CallsMergedAggField`.
+    # Both classes use `json_dump_field_as_sql` for the main functionality.
+    #
+    # While this approach isn't as DRY as we'd like, it allows us to implement
+    # the needed functionality with minimal refactoring. In the future, we should
+    # consider a more elegant solution that reduces code duplication.
+
+    extra_path: typing.Optional[list[str]] = None
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: typing.Optional[tsi_query.CastTo] = None,
+    ) -> str:
+        res = super().as_sql(pb, table_alias)
+        return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
+
+    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+        if self.extra_path:
+            raise NotImplementedError(
+                "Dynamic fields cannot be selected directly, yet - implement me!"
+            )
+        return f"{super().as_sql(pb, table_alias)} AS {self.field}"
+
+
+def json_dump_field_as_sql(
+    pb: ParamBuilder,
+    table_alias: str,
+    root_field_sanitized: str,
+    extra_path: typing.Optional[list[str]] = None,
+    cast: typing.Optional[tsi_query.CastTo] = None,
+) -> str:
+    if cast != "exists":
+        path_str = "'$'"
+        if extra_path:
+            param_name = pb.add_param(quote_json_path_parts(extra_path))
+            path_str = _param_slot(param_name, "String")
+        val = f"JSON_VALUE({root_field_sanitized}, {path_str})"
+        return clickhouse_cast(val, cast)
+    else:
+        # Note: ClickHouse has limitations in distinguishing between null, non-existent, empty string, and "null".
+        # This workaround helps to handle these cases.
+        path_parts = []
+        if extra_path:
+            for part in extra_path:
+                path_parts.append(", " + _param_slot(pb.add_param(part), "String"))
+        safe_path = "".join(path_parts)
+        return f"(NOT (JSONType({root_field_sanitized}{safe_path}) = 'Null' OR JSONType({root_field_sanitized}{safe_path}) IS NULL))"
+
+
 class OrderField(BaseModel):
-    field: CallsMergedField
+    field: QueryBuilderField
     direction: typing.Literal["ASC", "DESC"]
 
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
@@ -398,6 +445,15 @@ class CallsQuery(BaseModel):
             )
         )
 
+        # Important: We must always filter out calls that have not been started
+        # This can occur when there is an out of order call part insertion or worse,
+        # when such occurance happens and the client terminates early.
+        self.add_condition(
+            tsi_query.NotOperation.model_validate(
+                {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
+            )
+        )
+
         # If we should not optimize, then just build the base query
         if not should_optimize and not self.include_costs:
             return self._as_sql_base_format(pb, table_alias)
@@ -438,9 +494,16 @@ class CallsQuery(BaseModel):
         """
 
         if self.include_costs:
+            # TODO: We should unify the calls query order by fields to be orm sort by fields
+            order_by_fields = [
+                tsi.SortBy(
+                    field=sort_by.field.field, direction=sort_by.direction.lower()
+                )
+                for sort_by in self.order_fields
+            ]
             raw_sql += f""",
             all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
-            {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields])}
+            {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
             """
 
         else:
@@ -552,7 +615,7 @@ def get_field_by_name(name: str) -> CallsMergedField:
                 if len(field_parts) > 1:
                     return field.with_path(field_parts[1:])
             return field
-        raise ValueError(f"Field {name} is not allowed")
+        raise InvalidFieldError(f"Field {name} is not allowed")
     return ALLOWED_CALL_FIELDS[name]
 
 

@@ -1,25 +1,12 @@
 import os
-from typing import Any
 
 import pytest
 from anthropic import Anthropic, AsyncAnthropic
 
 import weave
-from weave.trace_server import trace_server_interface as tsi
 
 model = "claude-3-haiku-20240307"
 # model = "claude-3-opus-20240229"
-
-
-def _get_call_output(call: tsi.CallSchema) -> Any:
-    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
-
-    Keeping this here for now, but it should be removed in the future once we have a better solution.
-    """
-    call_output = call.output
-    if isinstance(call_output, str) and call_output.startswith("weave://"):
-        return weave.ref(call_output).get()
-    return call_output
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -43,11 +30,11 @@ def test_anthropic(
     all_content = message.content[0]
     exp = "Hello! It's nice to meet you. How can I assist you today?"
     assert all_content.text == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "end_turn"
@@ -90,11 +77,12 @@ def test_anthropic_stream(
             output_tokens = event.usage.output_tokens
     exp = "Hello there! How can I assist you today?"
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "end_turn"
@@ -130,11 +118,12 @@ async def test_async_anthropic(
     all_content = message.content[0]
     exp = "Hello! It's nice to meet you. How can I assist you today?"
     assert all_content.text == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "end_turn"
@@ -179,11 +168,12 @@ async def test_async_anthropic_stream(
             output_tokens = event.usage.output_tokens
     exp = "Hello! It's nice to meet you. How can I assist you today?"
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "end_turn"
@@ -239,11 +229,12 @@ def test_tools_calling(
     all_content = message.content[0]
     assert all_content.input["location"] == exp
     assert all_content.type == "tool_use"
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "tool_use"
@@ -287,11 +278,12 @@ def test_anthropic_messages_stream_ctx_manager(
 
     exp = "Hello there!"
     assert all_content.strip() == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == model
     assert output.stop_reason == "end_turn"
     assert output.stop_sequence is None
@@ -335,11 +327,12 @@ async def test_async_anthropic_messages_stream_ctx_manager(
     exp = "Hello there!"
     assert all_content.strip() == exp
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == model
     assert output.stop_reason == "end_turn"
     assert output.stop_sequence is None
@@ -381,11 +374,12 @@ def test_anthropic_messages_stream_ctx_manager_text(
 
     exp = "Hello there!"
     assert all_content.strip() == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == model
     assert output.stop_reason == "end_turn"
     assert output.stop_sequence is None
@@ -428,11 +422,12 @@ async def test_async_anthropic_messages_stream_ctx_manager_text(
     exp = "Hello there!"
     assert all_content.strip() == exp
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == model
     assert output.stop_reason == "end_turn"
     assert output.stop_sequence is None

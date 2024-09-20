@@ -1,10 +1,9 @@
-from typing import Any
-
 from pydantic import BaseModel, ValidationError
 
 from . import trace_server_interface as tsi
 from .errors import InvalidRequest
 from .orm import Column, Table
+from .validation import validate_purge_req_multiple, validate_purge_req_one
 
 TABLE_FEEDBACK = Table(
     "feedback",
@@ -38,40 +37,9 @@ def validate_feedback_create_req(req: tsi.FeedbackCreateReq) -> None:
             )
 
 
-MESSAGE_INVALID_PURGE = "Can only purge feedback by specifying one or more ids"
-
-
-def validate_dict_one_key(d: dict, key: str, typ: type) -> Any:
-    if not isinstance(d, dict):
-        raise InvalidRequest(f"Expected a dictionary, got {d}")
-    keys = list(d.keys())
-    if len(keys) != 1:
-        raise InvalidRequest(f"Expected a dictionary with one key, got {d}")
-    if keys[0] != key:
-        raise InvalidRequest(f"Expected key {key}, got {keys[0]}")
-    val = d[key]
-    if not isinstance(val, typ):
-        raise InvalidRequest(f"Expected value of type {typ}, got {type(val)}")
-    return val
-
-
-def validate_feedback_purge_req_one(value: Any) -> None:
-    tup = validate_dict_one_key(value, "eq_", tuple)
-    if len(tup) != 2:
-        raise InvalidRequest(MESSAGE_INVALID_PURGE)
-    get_field = validate_dict_one_key(tup[0], "get_field_", str)
-    if get_field != "id":
-        raise InvalidRequest(MESSAGE_INVALID_PURGE)
-    literal = validate_dict_one_key(tup[1], "literal_", str)
-    if not isinstance(literal, str):
-        raise InvalidRequest(MESSAGE_INVALID_PURGE)
-
-
-def validate_feedback_purge_req_multiple(value: Any) -> None:
-    if not isinstance(value, list):
-        raise InvalidRequest(MESSAGE_INVALID_PURGE)
-    for item in value:
-        validate_feedback_purge_req_one(item)
+MESSAGE_INVALID_FEEDBACK_PURGE = (
+    "Can only purge feedback by specifying one or more feedback ids"
+)
 
 
 def validate_feedback_purge_req(req: tsi.FeedbackPurgeReq) -> None:
@@ -79,10 +47,10 @@ def validate_feedback_purge_req(req: tsi.FeedbackPurgeReq) -> None:
     expr = req.query.expr_.model_dump()
     keys = list(expr.keys())
     if len(keys) != 1:
-        raise InvalidRequest(MESSAGE_INVALID_PURGE)
+        raise InvalidRequest(MESSAGE_INVALID_FEEDBACK_PURGE)
     if keys[0] == "eq_":
-        validate_feedback_purge_req_one(expr)
+        validate_purge_req_one(expr, MESSAGE_INVALID_FEEDBACK_PURGE)
     elif keys[0] == "or_":
-        validate_feedback_purge_req_multiple(expr["or_"])
+        validate_purge_req_multiple(expr["or_"], MESSAGE_INVALID_FEEDBACK_PURGE)
     else:
-        raise InvalidRequest(MESSAGE_INVALID_PURGE)
+        raise InvalidRequest(MESSAGE_INVALID_FEEDBACK_PURGE)

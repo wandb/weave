@@ -64,9 +64,11 @@ __docspec__ = [
     init,
     publish,
     ref,
+    require_current_call,
     get_current_call,
     finish,
     op,
+    attributes,
     # Re-exported from flow module
     Object,
     Dataset,

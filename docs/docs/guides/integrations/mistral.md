@@ -1,6 +1,8 @@
 # MistralAI
 
-Weave automatically tracks and logs LLM calls made via the [MistralAI Python library](https://github.com/mistralai/client-python).
+Weave automatically tracks and logs LLM calls made via the [MistralAI Python library](https://github.com/mistralai/client-python). 
+
+> We support the new Mistral v1.0 SDK, check the migration guide [here](https://github.com/mistralai/client-python/blob/main/MIGRATION.md)
 
 ## Traces
 
@@ -14,19 +16,21 @@ weave.init("cheese_recommender")
 
 # then use mistralai library as usual
 import os
-from mistralai.client import MistralClient
-from mistralai.models.chat_completion import ChatMessage
+from mistralai import Mistral
 
 api_key = os.environ["MISTRAL_API_KEY"]
 model = "mistral-large-latest"
 
-client = MistralClient(api_key=api_key)
+client = Mistral(api_key=api_key)
 
 messages = [
-    ChatMessage(role="user", content="What is the best French cheese?")
+    {
+        "role": "user",
+        "content": "What is the best French cheese?",
+    },
 ]
 
-chat_response = client.chat(
+chat_response = client.chat.complete(
     model=model,
     messages=messages,
 )
@@ -46,9 +50,14 @@ Weave ops make results *reproducible* by automatically versioning code as you ex
 def cheese_recommender(region:str, model:str) -> str:
     "Recommend the best cheese in a given region"
     
-    messages = [ChatMessage(role="user", content=f"What is the best cheese in {region}?")]
+    messages = [
+        {
+            "role": "user",
+            "content": f"What is the best cheese in {region}?",
+        },
+    ]
 
-    chat_response = client.chat(
+    chat_response = client.chat.complete(
         model=model,
         messages=messages,
     )
@@ -71,7 +80,7 @@ In the example below, you can experiment with `model` and `country`. Every time 
 
 ```python
 import weave
-import mistralai
+from mistralai import Mistral
 
 weave.init("mistralai_project")
 
@@ -83,13 +92,16 @@ class CheeseRecommender(weave.Model): # Change to `weave.Model`
     def predict(self, region:str) -> str: # Change to `predict`
         "Recommend the best cheese in a given region"
         
-        client = MistralClient()
+        client = Mistral(api_key=api_key)
 
-        messages = [ChatMessage(
-            role="user", 
-            content=f"What is the best cheese in {region}?")]
+        messages = [
+            {
+                "role": "user",
+                "content": f"What is the best cheese in {region}?",
+            },
+        ]
 
-        chat_response = client.chat(
+        chat_response = client.chat.complete(
             model=model,
             messages=messages,
             temperature=self.temperature

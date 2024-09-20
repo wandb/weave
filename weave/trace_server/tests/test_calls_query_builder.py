@@ -17,7 +17,15 @@ def test_query_baseline() -> None:
         WHERE project_id = {pb_0:String}
         GROUP BY (project_id,id)
         HAVING (
-            any(calls_merged.deleted_at) IS NULL
+            ((
+                any(calls_merged.deleted_at) IS NULL
+            ))
+            AND
+            ((
+               NOT ((
+                  any(calls_merged.started_at) IS NULL
+               ))
+            ))
         )
         """,
         {"pb_0": "project"},
@@ -38,7 +46,15 @@ def test_query_light_column() -> None:
         WHERE project_id = {pb_0:String}
         GROUP BY (project_id,id)
         HAVING (
-            any(calls_merged.deleted_at) IS NULL
+            ((
+                any(calls_merged.deleted_at) IS NULL
+            ))
+            AND
+            ((
+               NOT ((
+                  any(calls_merged.started_at) IS NULL
+               ))
+            ))
         )
         """,
         {"pb_0": "project"},
@@ -59,7 +75,15 @@ def test_query_heavy_column() -> None:
         WHERE project_id = {pb_0:String}
         GROUP BY (project_id,id)
         HAVING (
-            any(calls_merged.deleted_at) IS NULL
+            ((
+                any(calls_merged.deleted_at) IS NULL
+            ))
+            AND
+            ((
+               NOT ((
+                  any(calls_merged.started_at) IS NULL
+               ))
+            ))
         )
         """,
         {"pb_0": "project"},
@@ -88,9 +112,9 @@ def test_query_heavy_column_simple_filter() -> None:
             GROUP BY (project_id,id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
             AND
-                (any(calls_merged.op_name) IN {pb_0:Array(String)})
-            )
+                (any(calls_merged.op_name) IN {pb_0:Array(String)}))
         )
         SELECT
             calls_merged.id AS id,
@@ -129,9 +153,9 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
             GROUP BY (project_id,id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
             AND
-                (any(calls_merged.op_name) IN {pb_0:Array(String)})
-            )
+                (any(calls_merged.op_name) IN {pb_0:Array(String)}))
         )
         SELECT
             calls_merged.id AS id,
@@ -172,6 +196,8 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
             GROUP BY (project_id,id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
+            AND
+                ((NOT ((any(calls_merged.started_at) IS NULL))))
             AND
                 (any(calls_merged.op_name) IN {pb_0:Array(String)})
             )
@@ -239,6 +265,8 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             AND
                 ((any(calls_merged.deleted_at) IS NULL))
             AND
+                ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND
                 (any(calls_merged.op_name) IN {pb_1:Array(String)})
             )
         )
@@ -304,7 +332,8 @@ def test_query_light_column_with_costs() -> None:
                 WHERE project_id = {pb_1:String}
                 GROUP BY (project_id, id)
                 HAVING (((any(calls_merged.deleted_at) IS NULL))
-                        AND (any(calls_merged.op_name) IN {pb_0:Array(String)}))),
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                AND (any(calls_merged.op_name) IN {pb_0:Array(String)}))),
             all_calls AS (
                 SELECT
                     calls_merged.id AS id,
@@ -333,6 +362,7 @@ def test_query_light_column_with_costs() -> None:
             ranked_prices AS (
                 SELECT
                     *,
+                    llm_token_prices.id,
                     llm_token_prices.pricing_level,
                     llm_token_prices.pricing_level_id,
                     llm_token_prices.provider_id,
@@ -383,10 +413,10 @@ def test_query_light_column_with_costs() -> None:
                                         '"completion_tokens":', toString(completion_tokens), ',',
                                         '"requests":', toString(requests), ',',
                                         '"total_tokens":', toString(total_tokens), ',',
-                                        '"cost_per_prompt_token":', toString(prompt_token_cost), ',',
-                                        '"cost_per_completion_token":', toString(completion_token_cost), ',',
-                                        '"prompt_tokens_cost":', toString(prompt_tokens * prompt_token_cost), ',',
-                                        '"completion_tokens_cost":', toString(completion_tokens * completion_token_cost), ',',
+                                        '"prompt_token_cost":', toString(prompt_token_cost), ',',
+                                        '"completion_token_cost":', toString(completion_token_cost), ',',
+                                        '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',',
+                                        '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
                                         '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit),  '",',
                                         '"completion_token_cost_unit":"', toString(completion_token_cost_unit),  '",',
                                         '"effective_date":"', toString(effective_date),  '",',
