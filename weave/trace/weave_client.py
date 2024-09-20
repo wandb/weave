@@ -720,7 +720,9 @@ class WeaveClient:
                     "requests": 1,
                     **original_output["usage"],
                 }
-            elif hasattr(original_output, "usage") and hasattr(original_output, "model"):
+            elif hasattr(original_output, "usage") and hasattr(
+                original_output, "model"
+            ):
                 # Handle the cases where we are emitting an object instead of a pre-serialized dict
                 # In fact, this is going to become the more common case
                 model = original_output.model
