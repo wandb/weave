@@ -9,6 +9,22 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 if typing.TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
 
+def safe_unwrap_api_response(value: typing.Any) -> typing.Any:
+    try:
+        from openai._response import APIResponse
+        if isinstance(value, APIResponse):
+            return value.parse()
+    except:
+         pass
+    
+    try:
+        from openai._legacy_response import LegacyAPIResponse
+        if isinstance(value, LegacyAPIResponse):
+            return value.parse()
+    except:
+        pass
+
+    return value
 
 def openai_on_finish_post_processor(
     value: typing.Optional["ChatCompletionChunk"],
@@ -58,20 +74,6 @@ def openai_on_finish_post_processor(
                     )
                 )
         return _tool_calls
-    
-    try:
-        from openai._response import APIResponse
-        if isinstance(value, APIResponse):
-            value = value.parse()
-    except:
-         pass
-    
-    try:
-        from openai._legacy_response import LegacyAPIResponse
-        if isinstance(value, LegacyAPIResponse):
-            value = value.parse()
-    except:
-        pass
 
     if isinstance(value, ChatCompletionChunk):
         final_value = ChatCompletion(
@@ -275,6 +277,7 @@ def create_wrapper_sync(
         op.name = name  # type: ignore
         return add_accumulator(
             op,  # type: ignore
+            output_pre_processor=safe_unwrap_api_response,
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
                 acc, value, skip_last=not _openai_stream_options_is_set(inputs)
             ),
@@ -312,6 +315,7 @@ def create_wrapper_async(
         op.name = name  # type: ignore
         return add_accumulator(
             op,  # type: ignore
+            output_pre_processor=safe_unwrap_api_response,
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
                 acc, value, skip_last=not _openai_stream_options_is_set(inputs)
             ),

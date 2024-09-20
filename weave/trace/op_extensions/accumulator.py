@@ -155,6 +155,7 @@ def add_accumulator(
     op: Op,
     make_accumulator: Callable[[Dict], Callable[[S, V], S]],
     *,
+    output_pre_processor: Optional[Callable[[Any], Any]] = None,
     should_accumulate: Optional[Callable[[Dict], bool]] = None,
     on_finish_post_processor: Optional[Callable[[Any], Any]] = None,
     iterator_wrapper: Type[_IteratorWrapper] = _IteratorWrapper,
@@ -188,10 +189,14 @@ def add_accumulator(
     def on_output(
         value: Iterator[V], on_finish: FinishCallbackType, inputs: Dict
     ) -> Iterator:
-        def wrapped_on_finish(value: Any, e: Optional[BaseException] = None) -> None:
+        original_value = value
+        if output_pre_processor is not None:
+            value = output_pre_processor(value)
+
+        def wrapped_on_finish(value_inner: Any, e: Optional[BaseException] = None) -> None:
             if on_finish_post_processor is not None:
-                value = on_finish_post_processor(value)
-            on_finish(value, e)
+                value_inner = on_finish_post_processor(value_inner)
+            on_finish(value_inner, e)
 
         if should_accumulate is None or should_accumulate(inputs):
             # we build the accumulator here dependent on the inputs (optional)
@@ -204,7 +209,7 @@ def add_accumulator(
             )
         else:
             wrapped_on_finish(value)
-            return value
+            return original_value
 
     op._set_on_output_handler(on_output)
     return op
