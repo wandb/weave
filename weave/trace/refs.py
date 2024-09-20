@@ -16,8 +16,8 @@ class Ref:
     def uri(self) -> str:
         raise NotImplementedError
 
-    def as_dict(self) -> dict:
-        return dataclasses.asdict(self)
+    # def as_dict(self) -> dict:
+    #     return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -26,8 +26,8 @@ class TableRef(Ref):
     project: str
     row_digests: Optional[list[str]] = None
 
-    _digest_future: Optional[Future[str]] = dataclasses.field(default=None, repr=False)
     _digest: Optional[str] = dataclasses.field(default=None, repr=False)
+    _digest_future: Optional[Future[str]] = dataclasses.field(default=None, repr=False)
 
     @property
     def digest(self) -> str:
@@ -63,7 +63,7 @@ class TableRef(Ref):
 @dataclasses.dataclass(frozen=True)
 class RefWithExtra(Ref):
     def with_extra(self, extra: tuple[str, ...]) -> "RefWithExtra":
-        params = self.as_dict()
+        params = dataclasses.asdict(self)
         params["extra"] = self.extra + tuple(extra)  # type: ignore
         return self.__class__(**params)
 
@@ -87,8 +87,8 @@ class ObjectRef(RefWithExtra):
     name: str
     extra: tuple[str, ...] = ()
 
-    _digest_future: Optional[Future[str]] = dataclasses.field(default=None, repr=False)
     _digest: Optional[str] = dataclasses.field(default=None, repr=False)
+    _digest_future: Optional[Future[str]] = dataclasses.field(default=None, repr=False)
 
     @property
     def digest(self) -> str:
@@ -114,8 +114,8 @@ class ObjectRef(RefWithExtra):
         if self._digest is not None and self._digest_future is not None:
             raise ValueError("Cannot set both digest and digest_future")
         if self._digest is not None:
-            refs_internal.validate_no_slashes(self.digest, "digest")
-            refs_internal.validate_no_colons(self.digest, "digest")
+            refs_internal.validate_no_slashes(self._digest, "digest")
+            refs_internal.validate_no_colons(self._digest, "digest")
         refs_internal.validate_extra(list(self.extra))
         refs_internal.validate_no_slashes(self.name, "name")
         refs_internal.validate_no_colons(self.name, "name")
