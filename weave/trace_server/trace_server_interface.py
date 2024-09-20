@@ -803,16 +803,3 @@ class TraceServerInterface(Protocol):
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
-
-
-# These symbols are used in the WB Trace Server and it is not safe
-# to remove them, else it will break the server. Once the server
-# is updated to use the new symbols, these can be removed.
-
-# Legacy Names (i think these might be used in a few growth examples, so keeping
-# around until we clean those up of them)
-_CallsFilter = CallsFilter
-_SortBy = SortBy
-_OpVersionFilter = OpVersionFilter
-_ObjectVersionFilter = ObjectVersionFilter
-_TableRowFilter = TableRowFilter

@@ -19,7 +19,6 @@ from typing import (
     runtime_checkable,
 )
 
-from weave.legacy.weave import context_state
 from weave.trace import box, call_context, settings
 from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.context import call_attributes
@@ -409,6 +408,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
     ```
     """
     # TODO: (AT): Remove
+    from weave.legacy.weave import context_state
+
     if context_state.get_loading_built_ins():
         from weave.legacy.weave.decorator_op import op as legacy_op
 
