@@ -1,5 +1,7 @@
 from typing import Any, Callable, Optional, Sequence
+import logging
 
+logger = logging.getLogger(__name__)
 
 class Patcher:
     def attempt_patch(self) -> bool:
@@ -16,13 +18,21 @@ class MultiPatcher(Patcher):
     def attempt_patch(self) -> bool:
         all_successful = True
         for patcher in self.patchers:
-            all_successful = all_successful and patcher.attempt_patch()
+            try:
+                all_successful = all_successful and patcher.attempt_patch()
+            except Exception as e:
+                logger.error(f"Error in attempt_patch: {e}")
+                all_successful = False
         return all_successful
 
     def undo_patch(self) -> bool:
         all_successful = True
         for patcher in self.patchers:
-            all_successful = all_successful and patcher.undo_patch()
+            try:
+                all_successful = all_successful and patcher.undo_patch()
+            except Exception as e:
+                logger.error(f"Error in undo_patch: {e}")
+                all_successful = False
         return all_successful
 
 
