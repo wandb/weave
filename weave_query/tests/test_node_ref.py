@@ -1,5 +1,4 @@
-from weave.legacy.weave import api as weave
-from weave.legacy.weave import graph
+from weave_query.weave_query import api as weave
 
 from ...legacy.weave import node_ref
 

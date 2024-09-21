@@ -2,10 +2,11 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave.ecosystem.wandb import weave_plotly
-from weave.legacy.weave.language_features.tagging import tagged_value_type
-from weave.legacy.weave.panel_util import make_node
+
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query.ecosystem.wandb import weave_plotly
+from weave_query.weave_query.language_features.tagging import tagged_value_type
+from weave_query.weave_query.panel_util import make_node
 
 TIME_SERIES_BIN_SIZES_SEC = [
     # TODO: will need more steps along here for smooth zooming.
@@ -64,9 +65,9 @@ class TimeSeriesConfig:
     max_x: weave.Node[typing.Any] = dataclasses.field(
         default_factory=lambda: weave.legacy.weave.graph.VoidNode()
     )
-    label: weave.Node[
-        typing.Optional[typing.Union[str, weave.types.InvalidPy]]
-    ] = dataclasses.field(default_factory=lambda: weave.legacy.weave.graph.VoidNode())
+    label: weave.Node[typing.Optional[typing.Union[str, weave.types.InvalidPy]]] = (
+        dataclasses.field(default_factory=lambda: weave.legacy.weave.graph.VoidNode())
+    )
     mark: weave.Node[str] = dataclasses.field(
         default_factory=lambda: weave.legacy.weave.graph.ConstNode(
             weave.types.String(), "bar"
@@ -83,7 +84,9 @@ class TimeSeriesConfig:
 def first_column_of_type(
     node_type: weave.types.Type,
     desired_type: weave.types.Type,
-) -> typing.Tuple[weave.legacy.weave.graph.ConstNode, weave.legacy.weave.graph.ConstNode]:
+) -> typing.Tuple[
+    weave.legacy.weave.graph.ConstNode, weave.legacy.weave.graph.ConstNode
+]:
     if isinstance(node_type, tagged_value_type.TaggedValueType):
         node_type = node_type.value
     if weave.types.List().assign_type(node_type):
@@ -260,7 +263,8 @@ class TimeSeries(weave.Panel):
                     item=weave.legacy.weave.panels.FunctionEditor(config.max_x),
                 ),
                 "agg": weave.legacy.weave.panels.LabeledItem(
-                    label="agg", item=weave.legacy.weave.panels.FunctionEditor(config.agg)
+                    label="agg",
+                    item=weave.legacy.weave.panels.FunctionEditor(config.agg),
                 ),
                 "mark": weave.legacy.weave.panels.LabeledItem(
                     label="mark",
@@ -296,7 +300,9 @@ class TimeSeries(weave.Panel):
         if not weave.types.optional(weave.types.Timestamp()).assign_type(
             min_x.type
         ) or not weave.types.optional(weave.types.Timestamp()).assign_type(max_x.type):
-            return weave.legacy.weave.panels.PanelHtml(weave.legacy.weave.ops.Html("No data"))  # type: ignore
+            return weave.legacy.weave.panels.PanelHtml(
+                weave.legacy.weave.ops.Html("No data")
+            )  # type: ignore
 
         exact_bin_size = ((max_x - min_x) / N_BINS).totalSeconds()  # type: ignore
         bin_size_index = TIME_SERIES_BIN_SIZES_SEC_NODE.map(  # type: ignore
@@ -323,7 +329,9 @@ class TimeSeries(weave.Panel):
             bin_start = bin_start_ms
             bin_end = bin_end_ms
 
-            group_items["bin"] = weave.legacy.weave.ops.dict_(start=bin_start, stop=bin_end)
+            group_items["bin"] = weave.legacy.weave.ops.dict_(
+                start=bin_start, stop=bin_end
+            )
 
             if label_fn_output_type == weave.types.Invalid():
                 group_items["label"] = "no_label"

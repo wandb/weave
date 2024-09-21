@@ -1,11 +1,13 @@
 import pytest
-
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import box
-from weave.legacy.weave.arrow.arrow import ArrowWeaveListType
-from weave.legacy.weave.language_features.tagging import tag_store, tagged_value_type
 from weave.legacy.tests.util.list_arrow_test_helpers import ArrowNode
+
+from weave_query.weave_query import box, weave_internal
+from weave_query.weave_query.arrow.arrow import ArrowWeaveListType
+from weave_query.weave_query.language_features.tagging import (
+    tag_store,
+    tagged_value_type,
+)
 
 pick_options = [
     # Basic Pick

@@ -1,8 +1,6 @@
-import typing
-
-from weave.legacy.weave import codify
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import op, weave_class
+from weave_query.weave_query import codify
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import op
 
 
 # This matches the output type logic of the frontend

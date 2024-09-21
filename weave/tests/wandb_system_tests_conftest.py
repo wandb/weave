@@ -15,7 +15,7 @@ import pytest
 import requests
 import wandb
 
-from weave.legacy.weave.wandb_api import (
+from weave_query.weave_query.wandb_api import (
     WandbApiContext,
     from_environment,
     wandb_api_context,

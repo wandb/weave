@@ -1,14 +1,12 @@
 import os
-import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import weave_internal as internal
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import util, dispatch
-from weave.legacy.weave.panels import panel_board, panel_group
-from weave.legacy.weave.panels_py import panel_autoboard
-from weave.legacy.weave.panels_py.generator_templates import template_registry
+
+from weave_query.weave_query import util, weave_internal
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.panels import panel_board
+from weave_query.weave_query.panels_py import panel_autoboard
+from weave_query.weave_query.panels_py.generator_templates import template_registry
 
 panels = weave.legacy.weave.panels
 ops = weave.legacy.weave.ops
@@ -320,7 +318,9 @@ def board(
             x_domain=user_zoom_range,
             n_bins=50,
         ),
-        layout=weave.legacy.weave.panels.GroupPanelLayout(x=0, y=height, w=12, h=height),
+        layout=weave.legacy.weave.panels.GroupPanelLayout(
+            x=0, y=height, w=12, h=height
+        ),
     )
 
     overview_tab.add(
@@ -336,7 +336,9 @@ def board(
             x_domain=user_zoom_range,
             n_bins=50,
         ),
-        layout=weave.legacy.weave.panels.GroupPanelLayout(x=12, y=height, w=12, h=height),
+        layout=weave.legacy.weave.panels.GroupPanelLayout(
+            x=12, y=height, w=12, h=height
+        ),
     )
 
     overview_tab.add(
@@ -358,7 +360,9 @@ def board(
         overview_tab.add(
             "avg_total_tokens_per_req",
             filtered_window_data["summary.total_tokens"].avg(),  # type: ignore
-            layout=weave.legacy.weave.panels.GroupPanelLayout(x=18, y=height * 2, w=6, h=3),
+            layout=weave.legacy.weave.panels.GroupPanelLayout(
+                x=18, y=height * 2, w=6, h=3
+            ),
         ),
     )
 

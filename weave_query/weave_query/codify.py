@@ -6,8 +6,7 @@ import typing
 
 import black
 
-from weave.legacy.weave import weave_types
-from weave.legacy.weave import storage, graph, registry_mem
+from weave_query.weave_query import graph, registry_mem, storage, weave_types
 
 from . import codifiable_value_mixin
 
@@ -44,9 +43,9 @@ def object_to_code_no_format(obj: typing.Any) -> str:
     return _otc_using_storage_fallback(obj)
 
 
-_var_node_frame: contextvars.ContextVar[
-    typing.Optional[list[str]]
-] = contextvars.ContextVar("var_node_frame", default=None)
+_var_node_frame: contextvars.ContextVar[typing.Optional[list[str]]] = (
+    contextvars.ContextVar("var_node_frame", default=None)
+)
 
 
 @contextlib.contextmanager

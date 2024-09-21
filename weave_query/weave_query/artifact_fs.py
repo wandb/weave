@@ -6,14 +6,20 @@ import json
 import os
 import typing
 
-from weave.legacy.weave import errors
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import artifact_base, file_base, object_context, ref_base, uris
-from weave.legacy.weave.language_features.tagging import tag_store
-from weave.legacy.weave import ref_util
+from weave_query.weave_query import (
+    artifact_base,
+    errors,
+    file_base,
+    object_context,
+    ref_base,
+    ref_util,
+    uris,
+)
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.language_features.tagging import tag_store
 
 if typing.TYPE_CHECKING:
-    from weave.legacy.weave import graph
+    from weave_query.weave_query import graph
 
 
 class FilesystemArtifactType(types.Type):
@@ -85,7 +91,7 @@ class FilesystemArtifact(artifact_base.Artifact):
         return self.ref_from_local_str(key, type_).get()
 
     def as_node(self) -> "graph.Node":
-        from weave.legacy.weave.ops_primitives.weave_api import get as op_get
+        from weave_query.weave_query.ops_primitives.weave_api import get as op_get
 
         return op_get(str(self))
 
@@ -199,9 +205,9 @@ class FilesystemArtifact(artifact_base.Artifact):
 
 FilesystemArtifactType.instance_classes = FilesystemArtifact
 
-_loading_artifact: contextvars.ContextVar[
-    typing.Optional[FilesystemArtifact]
-] = contextvars.ContextVar("_loading_artifact", default=None)
+_loading_artifact: contextvars.ContextVar[typing.Optional[FilesystemArtifact]] = (
+    contextvars.ContextVar("_loading_artifact", default=None)
+)
 
 
 @contextlib.contextmanager
@@ -267,7 +273,7 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
 
         ot = self._outer_type
         if self.extra is not None:
-            from weave.legacy.weave import types_numpy
+            from weave_query.weave_query import types_numpy
 
             if not types.is_list_like(ot) and isinstance(
                 ot, types_numpy.NumpyArrayType
@@ -451,7 +457,7 @@ class FilesystemArtifactFile(file_base.File):
         return self.artifact.size(self.path)
 
     def digest(self) -> typing.Optional[str]:
-        from weave.legacy.weave.artifact_wandb import WandbArtifact
+        from weave_query.weave_query.artifact_wandb import WandbArtifact
 
         if isinstance(self.artifact, WandbArtifact):
             # we can get the digest from the manifest (much faster)

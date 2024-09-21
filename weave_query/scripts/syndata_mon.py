@@ -10,7 +10,7 @@ import pandas as pd
 import tqdm
 from faker import Faker
 
-from weave.legacy.weave.arrow.list_ import ArrowWeaveList, dataframe_to_arrow
+from weave_query.weave_query.arrow.list_ import ArrowWeaveList, dataframe_to_arrow
 
 
 # Generate the version schedule
@@ -95,7 +95,9 @@ def random_predictions(n_users: int = 10) -> ArrowWeaveList:
     # Read the file and generate prompts
     with open(
         os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "../..", "testdata/t8.shakespeare.txt")
+            os.path.join(
+                os.path.dirname(__file__), "../..", "testdata/t8.shakespeare.txt"
+            )
         ),
         "r",
     ) as f:

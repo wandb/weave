@@ -4,11 +4,14 @@ import dataclasses
 import json
 import typing
 
-from weave.legacy.weave import api as weave
 from weave import types
-from weave.legacy.weave import errors, engine_trace, artifact_fs, file_base
-from weave.legacy.weave.language_features.tagging.tag_store import isolated_tagging_context
-from weave.legacy.weave.ops_primitives import html, markdown
+
+from weave_query.weave_query import api as weave
+from weave_query.weave_query import artifact_fs, engine_trace, errors, file_base
+from weave_query.weave_query.language_features.tagging.tag_store import (
+    isolated_tagging_context,
+)
+from weave_query.weave_query.ops_primitives import html, markdown
 
 
 class LegacyImageArtifactFileRef:
@@ -283,7 +286,7 @@ class LegacyTableNDArrayType(types.Type):
 # code can work with it.
 @weave.op()
 def html_file(html: html.Html) -> HtmlArtifactFileRef:
-    from weave.legacy.weave import storage
+    from weave_query.weave_query import storage
 
     # This is a ref to the html object
     with isolated_tagging_context():
@@ -305,7 +308,7 @@ def html_file(html: html.Html) -> HtmlArtifactFileRef:
     )
 )
 def markdown_file(md: markdown.Markdown):
-    from weave.legacy.weave import storage
+    from weave_query.weave_query import storage
 
     with isolated_tagging_context():
         ref = storage.save(md)

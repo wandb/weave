@@ -1,12 +1,11 @@
 import typing
 
-import pytest
-
 import weave
-from weave.legacy.weave import compile_domain, compile_table, weave_internal
-from weave.legacy.weave import context_state as _context
-from weave.legacy.weave.language_features.tagging import make_tag_getter_op
-from weave.legacy.weave.ops_domain import run_ops
+
+from weave_query.weave_query import compile_domain, compile_table, weave_internal
+from weave_query.weave_query import context_state as _context
+from weave_query.weave_query.language_features.tagging import make_tag_getter_op
+from weave_query.weave_query.ops_domain import run_ops
 
 from ...legacy.weave import stitch
 from ...tests import fixture_fakewandb as fwb

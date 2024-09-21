@@ -11,20 +11,22 @@ import pyarrow as pa
 import typing_extensions
 from pyarrow import compute as pc
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import box
-from weave.legacy.weave.arrow.arrow_tags import awl_add_arrow_tags
-from weave.legacy.weave.arrow.list_ import ArrowWeaveList
-from weave.legacy.weave.language_features.tagging import tag_store
-from weave.legacy.weave.language_features.tagging.opdef_util import (
+from weave_query.weave_query import box
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.arrow.arrow_tags import awl_add_arrow_tags
+from weave_query.weave_query.arrow.list_ import ArrowWeaveList
+from weave_query.weave_query.language_features.tagging import tag_store
+from weave_query.weave_query.language_features.tagging.opdef_util import (
     get_first_arg,
     should_flow_tags,
     should_tag_op_def_outputs,
 )
-from weave.legacy.weave.language_features.tagging.tagged_value_type import TaggedValueType
+from weave_query.weave_query.language_features.tagging.tagged_value_type import (
+    TaggedValueType,
+)
 
 if typing.TYPE_CHECKING:
-    from weave.legacy.weave import op_def as OpDef
+    from weave_query.weave_query import op_def as OpDef
 
 
 def _is_tagged_value(val: types.Type) -> typing_extensions.TypeGuard[TaggedValueType]:
@@ -38,7 +40,7 @@ def _is_optional_tagged_value(
 
 
 def _strip_tags(val: typing.Any) -> typing.Any:
-    from weave.legacy.weave.ops_arrow import ArrowWeaveList
+    from weave_query.weave_query.ops_arrow import ArrowWeaveList
 
     if isinstance(val, ArrowWeaveList):
         if _is_tagged_value(val.object_type):

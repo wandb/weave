@@ -2,11 +2,11 @@ import copy
 from contextlib import contextmanager
 
 import pytest
-
 import weave
-from weave.legacy.weave import graph, storage
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.panels.panel_plot import Plot, PlotConstants, Series
+
+from weave_query.weave_query import graph, storage
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.panels.panel_plot import Plot, PlotConstants, Series
 
 from .test_run_segment import create_experiment
 

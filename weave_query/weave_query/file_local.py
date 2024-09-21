@@ -2,7 +2,7 @@ import contextlib
 import os
 import typing
 
-from weave.legacy.weave import weave_types as types
+from weave_query.weave_query import weave_types as types
 
 from . import file_base, file_util
 
@@ -57,7 +57,7 @@ class LocalFile(file_base.File):
         return self
 
     def _contents(self) -> str:
-        with (open(self.path, encoding="ISO-8859-1")) as f:
+        with open(self.path, encoding="ISO-8859-1") as f:
             return f.read()
 
 

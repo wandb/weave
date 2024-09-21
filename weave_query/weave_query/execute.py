@@ -9,7 +9,7 @@ import traceback
 import typing
 from collections.abc import Mapping
 
-from weave.legacy.weave import weave_types as types
+from weave_query.weave_query import weave_types as types
 
 # Configuration
 # Libraries
@@ -17,7 +17,7 @@ from weave.legacy.weave import weave_types as types
 # Ops
 # Trace / cache
 # Language Features
-from weave.legacy.weave import (
+from weave_query.weave_query import (
     errors,
     engine_trace,
     environment,
@@ -42,7 +42,7 @@ from weave.legacy.weave import (
     value_or_error,
     wandb_api,
 )
-from weave.legacy.weave.language_features.tagging import (
+from weave_query.weave_query.language_features.tagging import (
     opdef_util,
     process_opdef_resolve_fn,
     tag_store,
@@ -153,9 +153,9 @@ def is_panelplot_data_fetch_query(node: graph.Node) -> bool:
     return False
 
 
-_top_level_stats_ctx: contextvars.ContextVar[
-    typing.Optional[ExecuteStats]
-] = contextvars.ContextVar("_top_level_stats_ctx", default=None)
+_top_level_stats_ctx: contextvars.ContextVar[typing.Optional[ExecuteStats]] = (
+    contextvars.ContextVar("_top_level_stats_ctx", default=None)
+)
 
 
 @contextlib.contextmanager
@@ -184,7 +184,7 @@ def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.
             "Executing %s leaf nodes. (showing first 10)\n%s"
             % (
                 len(nodes),
-                "\n".join([graph_debug.node_expr_str_full(n) for n in nodes[:10]])
+                "\n".join([graph_debug.node_expr_str_full(n) for n in nodes[:10]]),
                 # graph_debug.assignments_string(
                 #     graph_debug.to_assignment_form(
                 #         graph_debug.combine_common_nodes(nodes)

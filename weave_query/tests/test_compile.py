@@ -1,15 +1,15 @@
 import pytest
 import wandb
-
 import weave
-from weave.legacy.weave import async_demo, compile, graph
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import use
-from weave.legacy.weave.dispatch import RuntimeOutputNode
-from weave.legacy.weave.ops_arrow import to_arrow
-from weave.legacy.weave.ops_arrow.vectorize import raise_on_python_bailout
-from weave.legacy.weave.wandb_interface.wandb_stream_table import StreamTable
-from weave.legacy.weave.weave_internal import const, define_fn, make_const_node
+
+from weave_query.weave_query import async_demo, compile, graph
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import use
+from weave_query.weave_query.dispatch import RuntimeOutputNode
+from weave_query.weave_query.ops_arrow import to_arrow
+from weave_query.weave_query.ops_arrow.vectorize import raise_on_python_bailout
+from weave_query.weave_query.wandb_interface.wandb_stream_table import StreamTable
+from weave_query.weave_query.weave_internal import define_fn, make_const_node
 
 
 def test_automatic_await_compile():
@@ -147,13 +147,21 @@ def test_optimize_merge_empty_dict():
     non_empty_dict = weave.legacy.weave.ops.dict_(a=5, b=2)
     assert (
         compile.compile_simple_optimizations(
-            [weave.legacy.weave.ops.TypedDict.merge(non_empty_dict, weave.legacy.weave.ops.dict_())]
+            [
+                weave.legacy.weave.ops.TypedDict.merge(
+                    non_empty_dict, weave.legacy.weave.ops.dict_()
+                )
+            ]
         )[0].to_json()
         == non_empty_dict.to_json()
     )
     assert (
         compile.compile_simple_optimizations(
-            [weave.legacy.weave.ops.TypedDict.merge(weave.legacy.weave.ops.dict_(), non_empty_dict)]
+            [
+                weave.legacy.weave.ops.TypedDict.merge(
+                    weave.legacy.weave.ops.dict_(), non_empty_dict
+                )
+            ]
         )[0].to_json()
         == non_empty_dict.to_json()
     )
@@ -167,8 +175,12 @@ def test_optimize_merge_empty_dict():
 
 
 def test_compile_lambda_uniqueness():
-    list_node_1 = weave.legacy.weave.ops.make_list(a=make_const_node(weave.types.Number(), 1))
-    list_node_2 = weave.legacy.weave.ops.make_list(a=make_const_node(weave.types.Number(), 2))
+    list_node_1 = weave.legacy.weave.ops.make_list(
+        a=make_const_node(weave.types.Number(), 1)
+    )
+    list_node_2 = weave.legacy.weave.ops.make_list(
+        a=make_const_node(weave.types.Number(), 2)
+    )
     fn_node = define_fn({"row": weave.types.Number()}, lambda row: row + 1)
     mapped_1 = list_node_1.map(fn_node)
     mapped_2 = list_node_2.map(fn_node)
@@ -223,7 +235,9 @@ def test_compile_through_function_call(user_by_api_key_in_env):
     fn_node = define_fn(
         {"entity_name": types.String()},
         lambda entity_name: (
-            weave.legacy.weave.ops.project(entity_name, run.project).run(run.id).history2()
+            weave.legacy.weave.ops.project(entity_name, run.project)
+            .run(run.id)
+            .history2()
         ),
     )
     called_node = fn_node(run.entity)

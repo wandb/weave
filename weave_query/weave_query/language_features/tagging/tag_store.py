@@ -22,9 +22,8 @@ import weakref
 from collections import defaultdict
 from contextlib import contextmanager
 
-from weave.legacy.weave import errors
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import engine_trace, box
+from weave_query.weave_query import box, engine_trace, errors
+from weave_query.weave_query import weave_types as types
 
 statsd = engine_trace.statsd()  # type: ignore
 

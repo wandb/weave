@@ -1,20 +1,20 @@
 import logging
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import (
-    weave_internal,
-    errors,
-    engine_trace,
-    ref_base,
-    registry_mem,
+from weave_query.weave_query import (
     box,
     compile,
+    engine_trace,
+    errors,
     forward_graph,
     graph,
     language_nullability,
     op_policy,
+    ref_base,
+    registry_mem,
+    weave_internal,
 )
-from weave.legacy.weave.language_features.tagging import tag_store
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.language_features.tagging import tag_store
 
 # from . import object_context
 

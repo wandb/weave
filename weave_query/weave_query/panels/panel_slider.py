@@ -2,8 +2,8 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import panel
+
+from weave_query.weave_query import panel, weave_internal
 
 
 @weave.type()

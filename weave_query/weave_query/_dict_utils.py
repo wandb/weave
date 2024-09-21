@@ -1,10 +1,13 @@
 import typing
 
-from weave.legacy.weave import box
-from weave.legacy.weave.language_features.tagging import tag_store, tagged_value_type
+from weave_query.weave_query import box
+from weave_query.weave_query.language_features.tagging import (
+    tag_store,
+    tagged_value_type,
+)
 
-from weave.legacy.weave import errors
-from weave.legacy.weave import weave_types as types
+from weave_query.weave_query import errors
+from weave_query.weave_query import weave_types as types
 
 
 def typeddict_pick_output_type(input_types):

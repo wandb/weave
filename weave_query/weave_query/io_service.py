@@ -22,7 +22,7 @@ from typing import Any, Callable, Dict, Iterator, TypeVar
 
 import aioprocessing
 
-from weave.legacy.weave import (
+from weave_query.weave_query import (
     weave_http,
     filesystem,
     errors,
@@ -388,9 +388,9 @@ class Server:
             if isinstance(client, SyncClient):
                 self.client_response_queues[client.client_id] = queue.Queue()
             else:
-                self.client_response_queues[
-                    client.client_id
-                ] = async_queue.ThreadQueue()
+                self.client_response_queues[client.client_id] = (
+                    async_queue.ThreadQueue()
+                )
 
     def unregister_client(
         self, client: typing.Union["SyncClient", "AsyncClient"]

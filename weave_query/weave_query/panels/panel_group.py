@@ -3,21 +3,21 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import (
-    errors, 
+
+from weave_query.weave_query import (
     codifiable_value_mixin,
     codify,
     dispatch,
+    errors,
     graph,
     panel,
     panel_util,
+    weave_internal,
 )
-from weave.legacy.weave.panels.bank import (
+from weave_query.weave_query.panels.bank import (
     default_panel_bank_flow_section_config,
     flow_layout,
 )
-from weave.legacy.weave.panels.panel_group_panel_info import PanelInfo
 
 ItemsType = typing.TypeVar("ItemsType")
 
@@ -313,9 +313,9 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             code_items_map = {}
             if gc.items != {}:
                 for item_name, item in gc.items.items():
-                    code_items_map[
-                        item_name
-                    ] = codify.lambda_wrapped_object_to_code_no_format(item, prior_vars)
+                    code_items_map[item_name] = (
+                        codify.lambda_wrapped_object_to_code_no_format(item, prior_vars)
+                    )
                     prior_vars.append(item_name)
                 if len(code_items_map) > 0:
                     items_val = (
@@ -336,9 +336,7 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             param_str = (
                 ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
             )
-        return (
-            f"""weave.legacy.weave.panels.panel_group.Group({input_node_str} {param_str})"""
-        )
+        return f"""weave.legacy.weave.panels.panel_group.Group({input_node_str} {param_str})"""
 
     # @property
     # def config(self):

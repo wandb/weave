@@ -1,1 +1,1 @@
-from weave.legacy.weave.ecosystem.py import pydoc
+from weave_query.weave_query.ecosystem.py import pydoc as pydoc

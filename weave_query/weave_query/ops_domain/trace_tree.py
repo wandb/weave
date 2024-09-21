@@ -5,17 +5,15 @@ import json
 import logging
 import typing
 import uuid
-from enum import Enum
 
 import typeguard
 from wandb.sdk.data_types.trace_tree import Result as WBSpanResult
 from wandb.sdk.data_types.trace_tree import Span as WBSpan
 
-from weave.legacy.weave import api as weave
-from weave.legacy.weave import stream_data_interfaces
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import op_def
-from weave.legacy.weave.decorator_op import op
+from weave_query.weave_query import api as weave
+from weave_query.weave_query import op_def, stream_data_interfaces
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.decorator_op import op
 
 
 class StatusCode:
@@ -46,7 +44,6 @@ def _setattr_with_typeguard(obj: typing.Any, key: str, value: typing.Any) -> Non
     Set an attribute on an instance of a class with annotated class attributes, but first check that
     the value is of the correct type. If not, log a warning and set the attribute to None.
     """
-
     hints = typing.get_type_hints(obj.__class__)
     if key not in hints:
         raise ValueError(f"Object {obj} has no attribute {key}")
@@ -199,9 +196,9 @@ def get_chain_repr(span: Span) -> str:
 @weave.type(__override_name="wb_trace_tree")  # type: ignore
 class WBTraceTree:
     root_span_dumps: str  # Span
-    model_dict_dumps: typing.Optional[
-        str
-    ] = None  # typing.Optional[typing.Dict[str, typing.Any]]
+    model_dict_dumps: typing.Optional[str] = (
+        None  # typing.Optional[typing.Dict[str, typing.Any]]
+    )
     model_hash: typing.Optional[str] = None
 
     @weave.op()
@@ -315,10 +312,8 @@ def convert_to_spans(
     if wb_span.span_id is None:
         wb_span.span_id = create_id_from_seed(tree.root_span_dumps)
 
-    spans: typing.List[
-        TraceSpanDictWithTimestamp
-    ] = stream_data_interfaces.wb_span_to_weave_spans(
-        wb_span, None, None
+    spans: typing.List[TraceSpanDictWithTimestamp] = (
+        stream_data_interfaces.wb_span_to_weave_spans(wb_span, None, None)
     )  # type: ignore
     if len(spans) > 0:
         spans[0]["attributes"] = spans[0]["attributes"] or {}

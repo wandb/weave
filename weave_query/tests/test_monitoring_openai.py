@@ -11,14 +11,9 @@ from openai.types.chat.chat_completion_chunk import ChatCompletionChunk, ChoiceD
 from openai.types.chat.chat_completion_chunk import Choice as ChunkChoice
 from openai.types.completion_usage import CompletionUsage
 
-import weave
-from weave.legacy.weave.monitoring import init_monitor
-from weave.legacy.weave.monitoring.openai import util
-from weave.legacy.weave.monitoring.openai.models import *
-from weave.legacy.weave.monitoring.openai.models import Context
-from weave.legacy.weave.monitoring.openai.openai import patch, unpatch
-from weave.legacy.weave.monitoring.openai.util import Context
-from weave.legacy.weave.wandb_interface.wandb_stream_table import StreamTable
+from weave_query.weave_query.monitoring.openai.models import *
+from weave_query.weave_query.monitoring.openai.openai import unpatch
+from weave_query.weave_query.wandb_interface.wandb_stream_table import StreamTable
 
 
 @pytest.fixture

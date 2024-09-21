@@ -2,16 +2,16 @@ import os
 import typing
 
 import pytest
-
 import weave
-from weave.legacy.weave import api, environment, execute, ops, weave_internal
-from weave.legacy.weave import weave_types as types
+
+from weave_query.weave_query import api, environment, execute, ops, weave_internal
+from weave_query.weave_query import weave_types as types
 
 from . import test_wb
 
 execute_test_count_op_run_count = 0
 
-from weave.legacy.weave import context_state as _context_state
+from weave_query.weave_query import context_state as _context_state
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 

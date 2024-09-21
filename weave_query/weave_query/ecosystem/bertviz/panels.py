@@ -1,11 +1,13 @@
 import bertviz
-
 import weave
-from weave.legacy.weave.ecosystem import huggingface
+
+from weave_query.weave_query.ecosystem import huggingface
 
 
 @weave.op()
-def head_view(attention: huggingface.ModelOutputAttention) -> weave.legacy.weave.ops.Html:
+def head_view(
+    attention: huggingface.ModelOutputAttention,
+) -> weave.legacy.weave.ops.Html:
     # All the information we need is attached to the ModelOutputAttention object.
     # This is important. In Weave, types should "stand alone", meaning they should
     # contain references to any information that is necessary for their use.
@@ -48,7 +50,9 @@ class BertvizHeadView(weave.Panel):
 
 
 @weave.op()
-def model_view(attention: huggingface.ModelOutputAttention) -> weave.legacy.weave.ops.Html:
+def model_view(
+    attention: huggingface.ModelOutputAttention,
+) -> weave.legacy.weave.ops.Html:
     # Parallels head_view() to visualize the full matrix of attention heads as rows
     # and layers as columns for each attention map
 

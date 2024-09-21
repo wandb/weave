@@ -2,11 +2,11 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import graph, panel, panel_util
-from weave.legacy.weave.arrow import list_
-from weave.legacy.weave.panels import table_state
+
+from weave_query.weave_query import graph, panel, panel_util, weave_internal
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.arrow import list_
+from weave_query.weave_query.panels import table_state
 
 
 @weave.type()

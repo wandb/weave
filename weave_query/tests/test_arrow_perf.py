@@ -3,9 +3,9 @@
 import time
 
 import pytest
-
 import weave
-from weave.legacy.weave import ops_arrow, ops_primitives
+
+from weave_query.weave_query import ops_arrow, ops_primitives
 
 
 @pytest.mark.skip(reason="Performance test")

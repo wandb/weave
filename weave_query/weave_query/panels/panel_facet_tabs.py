@@ -2,8 +2,8 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import graph, panel
-from weave.legacy.weave.panels.panel_group import PanelBankSectionConfig
+
+from weave_query.weave_query import graph, panel
 
 RenderType = typing.TypeVar("RenderType")
 

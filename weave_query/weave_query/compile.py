@@ -5,8 +5,8 @@ import random
 import re
 import typing
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import (
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query import (
     weave_internal,
     errors,
     engine_trace,
@@ -28,8 +28,8 @@ from weave.legacy.weave import (
     stitch,
     value_or_error,
 )
-from weave.legacy.weave.language_features.tagging import tagged_value_type_helpers
-from weave.legacy.weave.op_def import OpDef
+from weave_query.weave_query.language_features.tagging import tagged_value_type_helpers
+from weave_query.weave_query.op_def import OpDef
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
@@ -41,7 +41,7 @@ DEBUG_COMPILE = False
 def _dispatch_error_is_client_error(
     op_name: str, input_types: dict[str, types.Type]
 ) -> bool:
-    from weave.legacy.weave.ops_domain import wbmedia
+    from weave_query.weave_query.ops_domain import wbmedia
 
     if op_name in set(
         (
@@ -71,7 +71,9 @@ def _dispatch_error_is_client_error(
 
 def _call_run_await(run_node: graph.Node) -> graph.OutputNode:
     return graph.OutputNode(
-        run_node.type.output_type.output, "run-await", {"self": run_node}  # type: ignore
+        run_node.type.output_type.output,
+        "run-await",
+        {"self": run_node},  # type: ignore
     )
 
 
@@ -268,7 +270,7 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
                     node.type, "ArrowWeaveListTypedDict-columnNames", {"self": awl_node}
                 )
     elif isinstance(node, graph.OutputNode) and node.from_op.name == "flatten":
-        from weave.legacy.weave.arrow.arrow import ArrowWeaveListType
+        from weave_query.weave_query.arrow.arrow import ArrowWeaveListType
 
         from .ops_arrow.list_ops import _concat_output_type
 
@@ -284,7 +286,7 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
                 {"arr": arr_node},
             )
     elif isinstance(node, graph.OutputNode) and node.from_op.name == "concat":
-        from weave.legacy.weave.arrow.arrow import ArrowWeaveListType
+        from weave_query.weave_query.arrow.arrow import ArrowWeaveListType
 
         from .ops_arrow.list_ops import flatten_return_type
 
@@ -487,7 +489,7 @@ def compile_dedupe(
     nodes: dict[str, graph.Node] = {}
 
     def _dedupe(node: graph.Node) -> graph.Node:
-        from weave.legacy.weave import serialize
+        from weave_query.weave_query import serialize
 
         node_id = serialize.node_id(node)
         if node_id in nodes:

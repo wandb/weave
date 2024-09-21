@@ -1,0 +1,29 @@
+-r requirements.legacy.txt
+-r requirements.legacy.engine.txt
+-r requirements.legacy.datadog.txt
+pytest>=8.2.0
+pytest-watch>=4.2.0
+pytest-timeout>=2.1.0
+pytest-xdist>=3.1.0
+pytest-rerunfailures>=11.1.2
+pytest-timestamper>=0.0.9
+plotly>=5.13.0
+nbmake>=0.5
+bokeh==3.0.3 # pinning to help speed up CI
+soundfile>=0.11.0
+pytest-asyncio>=0.23.6
+hypothesis>=6.68.3
+numpy<1.24  # shap uses np.bool which is removed in 1.24
+# Pinning for package resolution speed in CI
+Faker==19.6.2  # used for synthetic data generation
+pytest-dotenv
+supervisor>=4.2.5
+clickhouse_connect==0.7.0
+uvicorn>=0.27.0
+fastapi>=0.110.0
+tqdm>=4.66.3  # CVE 2024-34062
+cryptography>=42.0.7  # CVE 2023-23931
+
+# SQL Generation Tests
+sqlparse
+filelock

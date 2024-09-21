@@ -4,12 +4,19 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import errors, codifiable_value_mixin, codify, graph, panel
-from weave.legacy.weave.ops_primitives import boolean, list_
-from weave.legacy.weave.ops_primitives import dict as dict_
-from weave.legacy.weave.panels import panel_table, table_state
+
+from weave_query.weave_query import (
+    codifiable_value_mixin,
+    codify,
+    errors,
+    graph,
+    panel,
+    weave_internal,
+)
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.ops_primitives import boolean, list_
+from weave_query.weave_query.ops_primitives import dict as dict_
+from weave_query.weave_query.panels import panel_table, table_state
 
 
 @weave.type()

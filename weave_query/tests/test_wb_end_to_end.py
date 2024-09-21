@@ -1,7 +1,7 @@
 import wandb
-
 import weave
-from weave.legacy.weave import compile
+
+from weave_query.weave_query import compile
 
 
 # Example of end to end integration test
@@ -11,7 +11,9 @@ def test_run_logging(user_by_api_key_in_env):
     run.finish()
 
     summary_node = (
-        weave.legacy.weave.ops.project(run.entity, run.project).run(run.id).summary()["a"]
+        weave.legacy.weave.ops.project(run.entity, run.project)
+        .run(run.id)
+        .summary()["a"]
     )
     summary = weave.use(summary_node)
 
@@ -74,7 +76,10 @@ def test_run_histories(user_by_api_key_in_env):
     run.finish()
 
     history_node = (
-        weave.legacy.weave.ops.project(run.entity, run.project).runs().history().concat()["a"]
+        weave.legacy.weave.ops.project(run.entity, run.project)
+        .runs()
+        .history()
+        .concat()["a"]
     )
     history = weave.use(history_node)
 

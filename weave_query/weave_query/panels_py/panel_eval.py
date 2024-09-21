@@ -1,5 +1,6 @@
 import weave
-from weave.legacy.weave.panels import panel_board
+
+from weave_query.weave_query.panels import panel_board
 
 # This is not yet general, it describes a board for a specific
 # formulation of a text extraction problem

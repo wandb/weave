@@ -1,7 +1,7 @@
 import pytest
-
 import weave
-from weave.legacy.weave import (
+
+from weave_query.weave_query import (
     artifact_fs,
     artifact_local,
     environment,

@@ -30,13 +30,12 @@ import functools
 import json
 import typing
 
-from weave.legacy.weave import errors
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import box, mappers, mappers_python
-from weave.legacy.weave.language_features.tagging import tag_store
+from weave_query.weave_query import box, errors, mappers, mappers_python
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.language_features.tagging import tag_store
 
 if typing.TYPE_CHECKING:
-    from weave.legacy.weave import artifact_base, artifact_fs
+    from weave_query.weave_query import artifact_base, artifact_fs
 
 
 def flatten_tag_type_to_typed_dict(tag_type: types.Type) -> types.TypedDict:
@@ -130,7 +129,6 @@ def flatten_tag_type_to_typed_dict(tag_type: types.Type) -> types.TypedDict:
     This function is used to perform the above described flattening of the tag-side of the
     TaggedValue chain.
     """
-
     # First, if the tag is already a TypedDict, then we are good
     if isinstance(tag_type, types.TypedDict):
         return tag_type

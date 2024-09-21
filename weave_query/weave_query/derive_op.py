@@ -6,22 +6,22 @@ import copy
 import inspect
 import typing
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import (
-    storage,
-    weave_internal,
-    errors,
-    parallelism,
-    registry_mem,
+from weave_query.weave_query import (
     box,
     context_state,
+    errors,
     execute_fast,
     graph,
     op_args,
     op_def,
     op_policy,
+    parallelism,
+    registry_mem,
+    storage,
+    weave_internal,
 )
-from weave.legacy.weave.language_features.tagging import tag_store
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.language_features.tagging import tag_store
 
 USE_PARALLEL_DOWNLOAD = True
 USE_PARALLEL_REFINE = True
@@ -195,7 +195,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                         raise errors.WeaveMakeFunctionError(
                             "output_type function must return a node."
                         )
-                    from weave.legacy.weave.ops_primitives.list_ import make_list
+                    from weave_query.weave_query.ops_primitives.list_ import make_list
 
                     return types.List.make(
                         {

@@ -2,8 +2,8 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import graph, panel
+
+from weave_query.weave_query import graph, panel
 
 ChoiceType = typing.TypeVar("ChoiceType")
 

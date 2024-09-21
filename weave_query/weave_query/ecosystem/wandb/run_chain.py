@@ -2,8 +2,9 @@ import json
 import typing
 
 import weave
-from weave.legacy.weave import compile, op_def, ops_arrow
-from weave.legacy.weave.ecosystem.wandb import gql_artifact_dag
+
+from weave_query.weave_query import compile, op_def, ops_arrow
+from weave_query.weave_query.ecosystem.wandb import gql_artifact_dag
 
 
 @weave.type()

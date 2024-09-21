@@ -1,1 +1,1 @@
-from weave.legacy.weave.ecosystem.bertviz.panels import *
+from weave_query.weave_query.ecosystem.bertviz.panels import *

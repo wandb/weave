@@ -2,11 +2,17 @@ import time
 
 import numpy as np
 import pytest
+import weave
 from PIL import Image
 
-import weave
-from weave.legacy.weave import context, execute, gql_json_cache, wandb_api, weave_types
-from weave.legacy.weave.wandb_interface.wandb_stream_table import StreamTable
+from weave_query.weave_query import (
+    context,
+    execute,
+    gql_json_cache,
+    wandb_api,
+    weave_types,
+)
+from weave_query.weave_query.wandb_interface.wandb_stream_table import StreamTable
 
 
 def make_stream_table(*args, **kwargs):
@@ -121,7 +127,9 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
 
     def do_asserts():
         hist_node = (
-            weave.legacy.weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
+            weave.legacy.weave.ops.project(
+                user_by_api_key_in_env.username, "stream-tables"
+            )
             .run("test_table")
             .history2()
         )

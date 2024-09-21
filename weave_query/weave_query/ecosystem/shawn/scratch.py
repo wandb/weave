@@ -2,7 +2,8 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import panel, panel_util
+
+from weave_query.weave_query import panel, panel_util
 
 
 @weave.op()
@@ -10,7 +11,9 @@ def single_distribution(
     input_node: weave.Node[list[float]],
 ) -> weave.legacy.weave.panels.Plot:
     binned = input_node.groupby(lambda v: round(v * 10) / 10).map(  # type: ignore
-        lambda group: weave.legacy.weave.ops.dict_(value=group.key(), count=group.count())
+        lambda group: weave.legacy.weave.ops.dict_(
+            value=group.key(), count=group.count()
+        )
     )
     return weave.legacy.weave.panels.Plot(
         binned,
@@ -23,7 +26,9 @@ def single_distribution(
 @weave.type()
 class AdderConfig:
     operand: weave.Node[int] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.ConstNode(weave.types.Int(), 10)
+        default_factory=lambda: weave.legacy.weave.graph.ConstNode(
+            weave.types.Int(), 10
+        )
     )
 
 
@@ -61,7 +66,9 @@ def adder(
 ) -> weave.legacy.weave.panels.LabeledItem:
     input_val = typing.cast(int, input_node)
     config = adder_default_config(config)
-    return weave.legacy.weave.panels.LabeledItem(label="output", item=input_val + config.operand)  # type: ignore
+    return weave.legacy.weave.panels.LabeledItem(
+        label="output", item=input_val + config.operand
+    )  # type: ignore
 
 
 @weave.type()

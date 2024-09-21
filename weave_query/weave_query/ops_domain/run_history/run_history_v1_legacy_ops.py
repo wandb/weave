@@ -2,14 +2,13 @@ import json
 
 import pyarrow as pa
 
-from weave.legacy.weave import engine_trace
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import op
-from weave.legacy.weave import gql_json_cache
-from weave.legacy.weave.gql_op_plugin import wb_gql_op_plugin
-from weave.legacy.weave.ops_domain import wb_domain_types as wdt
-from weave.legacy.weave.ops_domain import wb_util
-from weave.legacy.weave.ops_domain.run_history import history_op_common
+from weave_query.weave_query import engine_trace, gql_json_cache
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import op
+from weave_query.weave_query.gql_op_plugin import wb_gql_op_plugin
+from weave_query.weave_query.ops_domain import wb_domain_types as wdt
+from weave_query.weave_query.ops_domain import wb_util
+from weave_query.weave_query.ops_domain.run_history import history_op_common
 
 tracer = engine_trace.tracer()
 

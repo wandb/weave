@@ -10,9 +10,15 @@ import itertools
 import typing
 
 import pytest
-
 import weave
-from weave.legacy.weave import (
+from weave.legacy.tests.util.concrete_tagged_value import (
+    TaggedValue,
+    concrete_from_tagstore,
+    concrete_to_tagstore,
+)
+from weave.legacy.tests.util.op_specs import OP_TEST_SPECS, OpSpec, OpSpecTestCase
+
+from weave_query.weave_query import (
     graph,
     graph_debug,
     language_nullability,
@@ -22,18 +28,11 @@ from weave.legacy.weave import (
     storage,
     weave_internal,
 )
-from weave.legacy.weave.language_features.tagging import make_tag_getter_op
-from weave.legacy.weave.language_features.tagging.tagged_value_type import (
+from weave_query.weave_query.language_features.tagging.tagged_value_type import (
     TaggedValueType,
 )
 
 from ...legacy.weave import registry_mem
-from weave.legacy.tests.util.concrete_tagged_value import (
-    TaggedValue,
-    concrete_from_tagstore,
-    concrete_to_tagstore,
-)
-from weave.legacy.tests.util.op_specs import OP_TEST_SPECS, OpSpec, OpSpecTestCase
 
 
 def assert_equal_with_tags(node: graph.Node, v: typing.Any, expected: typing.Any):

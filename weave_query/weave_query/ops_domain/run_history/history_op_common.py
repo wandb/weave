@@ -4,34 +4,33 @@ import typing
 import pyarrow as pa
 from pyarrow import parquet as pq
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import use
-from weave.legacy.weave import (
-    util,
-    errors,
-    engine_trace,
-    registry_mem,
+from weave_query.weave_query import (
     _dict_utils,
     artifact_base,
     artifact_fs,
     compile,
     compile_table,
+    engine_trace,
+    errors,
     gql_json_cache,
     graph,
     io_service,
     op_args,
+    registry_mem,
+    util,
 )
-from weave.legacy.weave.arrow.concat import concatenate_all
-from weave.legacy.weave.compile_domain import InputAndStitchProvider
-from weave.legacy.weave.compile_table import KeyTree
-from weave.legacy.weave.language_features.tagging.tagged_value_type import TaggedValueType
-from weave.legacy.weave.mappers_arrow import map_to_arrow
-from weave.legacy.weave.ops_arrow import ArrowWeaveList
-from weave.legacy.weave.ops_arrow.list_ops import concat
-from weave.legacy.weave.ops_domain import table, wb_util
-from weave.legacy.weave.ops_domain import wb_domain_types as wdt
-from weave.legacy.weave.ops_primitives import make_list
-from weave.legacy.weave.wandb_interface import wandb_stream_table
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.arrow.concat import concatenate_all
+from weave_query.weave_query.compile_domain import InputAndStitchProvider
+from weave_query.weave_query.compile_table import KeyTree
+from weave_query.weave_query.language_features.tagging.tagged_value_type import (
+    TaggedValueType,
+)
+from weave_query.weave_query.mappers_arrow import map_to_arrow
+from weave_query.weave_query.ops_arrow import ArrowWeaveList
+from weave_query.weave_query.ops_domain import table, wb_util
+from weave_query.weave_query.ops_domain import wb_domain_types as wdt
+from weave_query.weave_query.wandb_interface import wandb_stream_table
 
 tracer = engine_trace.tracer()
 
@@ -45,8 +44,8 @@ class TypeCount(typing.TypedDict):
 
 
 def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
-    from weave.legacy.weave.ops_domain.trace_tree import WBTraceTree
-    from weave.legacy.weave.ops_domain.wbmedia import ImageArtifactFileRefType
+    from weave_query.weave_query.ops_domain.trace_tree import WBTraceTree
+    from weave_query.weave_query.ops_domain.wbmedia import ImageArtifactFileRefType
 
     tc_type = tc["type"]
     if tc_type == "string":

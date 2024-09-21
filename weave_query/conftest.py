@@ -7,13 +7,18 @@ import typing
 import pytest
 from flask.testing import FlaskClient
 
-from weave.legacy.weave import client as client_legacy
-from weave.legacy.weave import context_state, environment, io_service, serialize
-from weave.legacy.weave.language_features.tagging.tag_store import (
+from weave_query.weave_query import client as client_legacy
+from weave_query.weave_query import (
+    context_state,
+    environment,
+    io_service,
+    logs,
+    serialize,
+)
+from weave_query.weave_query.language_features.tagging.tag_store import (
     isolated_tagging_context,
 )
 
-from weave.legacy.weave import logs
 # from .tests.wandb_system_tests_conftest import *
 
 logs.configure_logger()
@@ -27,6 +32,7 @@ context_state._eager_mode.set(False)
 # makes that work...
 
 ### Disable datadog engine tracing
+
 
 def pytest_sessionstart(session):
     context_state.disable_analytics()
@@ -52,8 +58,6 @@ def pre_post_each_test(test_artifact_dir, caplog):
     del os.environ["WEAVE_LOCAL_ARTIFACT_DIR"]
 
 
-
-
 @pytest.fixture()
 def fresh_server_logfile():
     def _clearlog():
@@ -65,6 +69,7 @@ def fresh_server_logfile():
     _clearlog()
     yield
     _clearlog()
+
 
 @pytest.fixture()
 def eager_mode():
@@ -144,11 +149,7 @@ def weave_test_client(http_server_test_client):
     return client_legacy.Client(http_server_test_client)
 
 
-
-
 @pytest.fixture()
 def ref_tracking():
     with context_state.ref_tracking(True):
         yield
-
-

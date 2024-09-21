@@ -1,9 +1,7 @@
-from weave.legacy.weave.server import handle_request
+from weave_query.weave_query.server import handle_request
 
 
 def test_playback():
-    from weave.legacy.weave import ecosystem
-
     for payload in [execute_payloads[-1]]:
         res = handle_request(payload, True)
         res.results.unwrap()

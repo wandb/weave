@@ -1,8 +1,8 @@
 import black
 import pytest
-
 import weave
-from weave.legacy.weave import panels
+
+from weave_query.weave_query import panels
 
 # IMPORTANT: Do not import other symbols inside of weave
 # so that we ensure the produced code only relies on the weave symbol.

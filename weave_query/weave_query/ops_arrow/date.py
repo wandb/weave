@@ -3,12 +3,10 @@ import typing
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import op
-from weave.legacy.weave import timestamp as weave_timestamp
-from weave.legacy.weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
-from weave.legacy.weave.decorator_arrow_op import arrow_op
-from weave.legacy.weave.ops_arrow import util
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import op
+from weave_query.weave_query.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+from weave_query.weave_query.decorator_arrow_op import arrow_op
 
 ARROW_WEAVE_LIST_TIMESTAMP_TYPE = ArrowWeaveListType(types.Timestamp())
 ARROW_WEAVE_LIST_BOOLEAN_TYPE = ArrowWeaveListType(types.Boolean())

@@ -1,12 +1,16 @@
 import weave
-from weave.legacy.weave import ops_arrow
+
+from weave_query.weave_query import ops_arrow
 
 
 def test_cond_basic():
     assert weave.use(weave.legacy.weave.ops.cond({"a": True}, {"a": 5})) == 5
     assert weave.use(weave.legacy.weave.ops.cond({"a": False}, {"a": 5})) == None
     assert (
-        weave.use(weave.legacy.weave.ops.cond({"a": False, "b": True}, {"a": 5, "b": 6})) == 6
+        weave.use(
+            weave.legacy.weave.ops.cond({"a": False, "b": True}, {"a": 5, "b": 6})
+        )
+        == 6
     )
 
 

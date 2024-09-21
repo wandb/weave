@@ -1,12 +1,9 @@
-import math
-
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import op, use
-from weave.legacy.weave import graph
-from weave.legacy.weave.ops_primitives import date
-from weave.legacy.weave.ops_primitives.dict import dict_
-from weave.legacy.weave.weave_internal import call_fn, define_fn, make_const_node
-from weave.legacy.weave.weave_types import Function, NumberBinType
+from weave_query.weave_query import graph
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import op, use
+from weave_query.weave_query.ops_primitives.dict import dict_
+from weave_query.weave_query.weave_internal import call_fn, define_fn, make_const_node
+from weave_query.weave_query.weave_types import Function, NumberBinType
 
 
 @op(
@@ -35,7 +32,8 @@ def number_bins_fixed(step):
         "bins": types.Number(),
     },
     output_type=Function(
-        input_types={"row": types.Number()}, output_type=NumberBinType  # type: ignore
+        input_types={"row": types.Number()},
+        output_type=NumberBinType,  # type: ignore
     ),
     render_info={"type": "function"},
 )
@@ -54,7 +52,8 @@ def numbers_bins_equal(arr, bins):
         "in_": types.Number(),
         "bin_fn": types.optional(
             Function(
-                input_types={"row": types.Number()}, output_type=NumberBinType  # type: ignore
+                input_types={"row": types.Number()},
+                output_type=NumberBinType,  # type: ignore
             )
         ),
     },

@@ -11,9 +11,9 @@ import typing
 from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any
 
-from weave.legacy.weave import storage
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import (
+from weave_query.weave_query import storage
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query import (
     artifact_fs,
     artifact_local,
     context_state,
@@ -29,7 +29,8 @@ if typing.TYPE_CHECKING:
 
 def type_code(type_):
     if isinstance(type_, py_types.GenericAlias) or isinstance(
-        type_, typing._GenericAlias  # type: ignore
+        type_,
+        typing._GenericAlias,  # type: ignore
     ):
         args = ", ".join(type_code(t) for t in type_.__args__)
         if type_.__origin__ == list or type_.__origin__ == collections.abc.Sequence:
@@ -58,7 +59,8 @@ def generate_referenced_type_code(type_):
             result += f"    {k}: {type_code(type_.__annotations__[k])}\n"
         return result
     elif isinstance(type_, py_types.GenericAlias) or isinstance(
-        type_, typing._GenericAlias  # type: ignore
+        type_,
+        typing._GenericAlias,  # type: ignore
     ):
         return generate_referenced_type_code(type_.__args__[0])
 
@@ -447,7 +449,7 @@ class OpDefType(types.Type):
         except FileNotFoundError:
             pass
 
-        from weave.legacy.weave import artifact_wandb
+        from weave_query.weave_query import artifact_wandb
 
         is_wandb_artifact = False
         if isinstance(artifact, artifact_wandb.WandbArtifact):

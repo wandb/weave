@@ -1,11 +1,7 @@
-import pyarrow as pa
-import pyarrow.compute as pc
-
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
-from weave.legacy.weave.decorator_arrow_op import arrow_op
-from weave.legacy.weave.decorator_op import op
-from weave.legacy.weave.ops_arrow import util
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+from weave_query.weave_query.decorator_arrow_op import arrow_op
+from weave_query.weave_query.ops_arrow import util
 
 nullable_binary_input_type = {
     "self": ArrowWeaveListType(types.optional(types.RefType())),
@@ -22,7 +18,7 @@ nullable_binary_input_type = {
     output_type=ArrowWeaveListType(types.Boolean()),
 )
 def ref_equal(self, other):
-    from weave.legacy.weave import storage
+    from weave_query.weave_query import storage
 
     # Weave engine automatically derefs, so we need to undo that via
     # _get_ref here.

@@ -2,10 +2,9 @@
 # The outputs of weave.show (the generated panel urls and their arguments)
 # need to match what javascript expects.
 
-from weave.legacy.weave import ops
+from weave_query.weave_query import ops
 
 from ...legacy.weave.show import _show_params
-from . import test_helpers
 
 
 def test_show_simple_call(cereal_csv):

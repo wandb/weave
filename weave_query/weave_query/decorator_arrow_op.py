@@ -1,9 +1,9 @@
 import typing
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import op_def
-from weave.legacy.weave.arrow.arrow import ArrowWeaveListType
-from weave.legacy.weave.language_features.tagging import tagged_value_type
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query import op_def
+from weave_query.weave_query.arrow.arrow import ArrowWeaveListType
+from weave_query.weave_query.language_features.tagging import tagged_value_type
 
 from .decorator_op import op
 
@@ -29,7 +29,7 @@ def _make_nullable_vector_input_type_callable(
     old_type_func: TypeCallable,
 ) -> TypeCallable:
     def new_callable_nullable_awl_type(
-        non_callable_input_types: dict[str, types.Type]
+        non_callable_input_types: dict[str, types.Type],
     ) -> types.Type:
         old_type = old_type_func(non_callable_input_types)
         return _nullify_vector_type(old_type)
@@ -72,7 +72,7 @@ def _make_new_vector_output_type_callable(
     old_type_func: TypeCallable, is_null_consuming=False
 ) -> TypeCallable:
     def new_callable_nullable_awl_type(
-        non_callable_input_types: dict[str, types.Type]
+        non_callable_input_types: dict[str, types.Type],
     ) -> types.Type:
         first_input_type_name = next(k for k in non_callable_input_types)
         first_input_type = non_callable_input_types[first_input_type_name]

@@ -1,18 +1,14 @@
-import asyncio
 import contextlib
-import time
 
-import numpy as np
 import pytest
 import requests
 
-from weave.legacy.weave import api as weave
-from weave.legacy.weave import client as _client
-from weave.legacy.weave import context_state, ops
-from weave.legacy.weave import server as _server
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.decorator_op import op
-from weave.legacy.weave.weave_internal import make_const_node
+from weave_query.weave_query import api as weave
+from weave_query.weave_query import client as _client
+from weave_query.weave_query import ops
+from weave_query.weave_query import server as _server
+from weave_query.weave_query.decorator_op import op
+from weave_query.weave_query.weave_internal import make_const_node
 
 SERVER_TYPES = ["inprocess", "subprocess", "http"]
 

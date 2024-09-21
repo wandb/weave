@@ -1,8 +1,9 @@
 import typing
 
 import weave
-from weave.legacy.weave import registry_mem
-from weave.legacy.weave.ops_domain import run_ops, wb_domain_types
+
+from weave_query.weave_query import registry_mem
+from weave_query.weave_query.ops_domain import run_ops, wb_domain_types
 
 # We can't chain ops called .name() because of a weird bug :( [its a field on VarNode].
 # So we have to get the ops here and call them directly for now.

@@ -4,13 +4,13 @@ import typing
 
 import hdbscan
 import pyarrow as pa
+import weave
 from typing_extensions import (
     NotRequired,
     TypedDict,
 )
 
-import weave
-from weave.legacy.weave import ops_arrow
+from weave_query.weave_query import ops_arrow
 
 
 class HDBSCANOptions(TypedDict):

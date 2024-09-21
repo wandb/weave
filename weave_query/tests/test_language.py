@@ -3,8 +3,9 @@
 import typing
 
 import weave
-from weave.legacy.weave import box, context_state
-from weave.legacy.weave.language_features.tagging import (
+
+from weave_query.weave_query import box, context_state
+from weave_query.weave_query.language_features.tagging import (
     make_tag_getter_op,
     tag_store,
     tagged_value_type,

@@ -1,5 +1,5 @@
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.language_features.tagging import make_tag_getter_op
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.language_features.tagging import make_tag_getter_op
 
 group_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
     "groupKey", types.Any(), op_name="group-groupkey"

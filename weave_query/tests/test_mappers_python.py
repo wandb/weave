@@ -1,7 +1,10 @@
 import math
 
-from weave.legacy.weave import api, context, mappers_python, val_const, weave_internal
-from weave.legacy.weave import weave_types as types
+from weave_query.weave_query import (
+    mappers_python,
+    val_const,
+)
+from weave_query.weave_query import weave_types as types
 
 
 def test_map_typed_dict():

@@ -1,4 +1,3 @@
-import random
 import typing
 from builtins import map as builtin_map
 from collections import defaultdict
@@ -7,34 +6,34 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import op, type_of
-from weave.legacy.weave import op_args, op_def
-from weave.legacy.weave.arrow import arrow_tags, convert
-from weave.legacy.weave.arrow.arrow import (
+from weave_query.weave_query import op_args, op_def
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import op
+from weave_query.weave_query.arrow import arrow_tags, convert
+from weave_query.weave_query.arrow.arrow import (
     ArrowWeaveListType,
     arrow_as_array,
     offsets_starting_at_zero,
 )
-from weave.legacy.weave.arrow.concat import concatenate_all
-from weave.legacy.weave.arrow.constructors import (
+from weave_query.weave_query.arrow.concat import concatenate_all
+from weave_query.weave_query.arrow.constructors import (
     vectorized_container_constructor_preprocessor,
     vectorized_input_types,
 )
-from weave.legacy.weave.arrow.convert import to_compare_safe
-from weave.legacy.weave.arrow.list_ import (
+from weave_query.weave_query.arrow.convert import to_compare_safe
+from weave_query.weave_query.arrow.list_ import (
     ArrowWeaveList,
     PathType,
     is_list_arrowweavelist,
     is_taggedvalue_arrowweavelist,
 )
-from weave.legacy.weave.decorator_arrow_op import arrow_op
-from weave.legacy.weave.language_features.tagging import (
+from weave_query.weave_query.decorator_arrow_op import arrow_op
+from weave_query.weave_query.language_features.tagging import (
     tagged_value_type,
     tagged_value_type_helpers,
 )
-from weave.legacy.weave.ops_arrow.vectorize import _apply_fn_node_with_tag_pushdown
-from weave.legacy.weave.ops_primitives import list_ as primitive_list
+from weave_query.weave_query.ops_arrow.vectorize import _apply_fn_node_with_tag_pushdown
+from weave_query.weave_query.ops_primitives import list_ as primitive_list
 
 FLATTEN_DELIMITER = "➡️"
 
@@ -268,9 +267,7 @@ def _sort_values_list_array_to_table(
 ) -> pa.Table:
     flattened = sort_values._arrow_data_asarray_no_tags().flatten()
 
-    columns = (
-        []
-    )  # this is intended to be a pylist and will be small since it is number of sort fields
+    columns = []  # this is intended to be a pylist and will be small since it is number of sort fields
     col_len = len(sort_values._arrow_data)
     dir_len = len(col_dirs)
     col_names = [str(i) for i in range(dir_len)]
@@ -961,7 +958,7 @@ def flatten(arr):
 
 
 def _drop_tags_output_type(input_type):
-    from weave.legacy.weave.op_def import map_type
+    from weave_query.weave_query.op_def import map_type
 
     return map_type(
         input_type["arr"],

@@ -14,12 +14,11 @@ from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.requests import RequestsHTTPTransport
 from requests.auth import HTTPBasicAuth
 
-from weave.legacy.weave import errors
-from weave.legacy.weave import environment as weave_env
-from weave.legacy.weave import wandb_client_api, engine_trace
+from weave_query.weave_query import engine_trace, errors, wandb_client_api
+from weave_query.weave_query import environment as weave_env
 
 # Importing at the top-level namespace so other files can import from here.
-from weave.legacy.weave.context_state import WandbApiContext, _wandb_api_context
+from weave_query.weave_query.context_state import WandbApiContext, _wandb_api_context
 
 tracer = engine_trace.tracer()  # type: ignore
 

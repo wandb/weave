@@ -1,5 +1,6 @@
 import weave
-from weave.legacy.weave.ops_primitives import file_local
+
+from weave_query.weave_query.ops_primitives import file_local
 
 
 def test_file_browsing():

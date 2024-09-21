@@ -1,12 +1,13 @@
 import random
 
 import weave
-from weave.legacy.weave import panels
-from weave.legacy.weave.show import show_url
+
+from weave_query.weave_query import panels
+from weave_query.weave_query.show import show_url
 
 # Weave package now defaults to eager mode, but lazy mode required for this example notebook for now.
 weave.use_lazy_execution()
-from weave.legacy.weave.ecosystem import wandb
+from weave_query.weave_query.ecosystem import wandb
 
 weave.use_fixed_server_port()
 

@@ -4,6 +4,7 @@ import time
 import typing
 
 import faiss
+import weave
 from langchain.base_language import BaseLanguageModel
 from langchain.callbacks.tracers.base import BaseTracer
 from langchain.callbacks.tracers.schemas import Run
@@ -40,13 +41,11 @@ from langchain.schema import BaseRetriever
 from langchain.vectorstores import FAISS, VectorStore
 from langchain.vectorstores.base import VectorStoreRetriever
 
-import weave
-from weave.legacy.weave import storage
-from weave.legacy.weave import artifact_base
-from weave.legacy.weave.artifact_fs import FilesystemArtifact
-from weave.legacy.weave.ecosystem.langchain import util
-from weave.legacy.weave.ops_domain import trace_tree
-from weave.legacy.weave.weave_types import Type
+from weave_query.weave_query import artifact_base, storage
+from weave_query.weave_query.artifact_fs import FilesystemArtifact
+from weave_query.weave_query.ecosystem.langchain import util
+from weave_query.weave_query.ops_domain import trace_tree
+from weave_query.weave_query.weave_types import Type
 
 
 class WeaveTracer(BaseTracer):

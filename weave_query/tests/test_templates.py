@@ -1,10 +1,10 @@
 import typing
 
 import wandb
-
 import weave
-from weave.legacy.weave import context_state as _context
-from weave.legacy.weave.wandb_interface.wandb_stream_table import StreamTable
+
+from weave_query.weave_query import context_state as _context
+from weave_query.weave_query.wandb_interface.wandb_stream_table import StreamTable
 
 from ...legacy.weave.panels_py import generator_templates
 

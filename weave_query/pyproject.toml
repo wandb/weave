@@ -1,5 +1,5 @@
 [project]
-name = "weave"
+name = "weave_query"
 description = "A toolkit for building composable interactive data driven applications."
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -31,7 +31,7 @@ requires-python = ">=3.9"
 dynamic = ["version", "dependencies", "optional-dependencies"]
 
 [project.scripts]
-weave = "weave.cli:cli"
+weave_query = "weave_query.cli:cli"
 
 [project.urls]
 Company = "https://wandb.com"
@@ -46,11 +46,11 @@ requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["weave"]
+packages = ["weave_query"]
 
 [tool.setuptools.dynamic]
-version = { attr = "weave.version.VERSION" }
-dependencies = { file = ["requirements.txt"] }
+# version = { attr = "weave.version.VERSION" }
+dependencies = { file = ["requirements.legacy.txt"] }
 
 [tool.setuptools.dynamic.optional-dependencies]
 examples = { file = ["requirements.legacy.ecosystem.txt"] }
@@ -60,7 +60,7 @@ datadog = { file = ["requirements.legacy.datadog.txt"] }
 modal = { file = ["requirements.modal.txt"] }
 
 [tool.pytest.ini_options]
-testpaths = ["weave"]
+testpaths = ["weave_query"]
 filterwarnings = ["error"]
 
 [tool.ruff.lint]
@@ -89,15 +89,10 @@ ignore = [
   "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/ - we use Google style
   "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/ - we use Google style
 ]
-exclude = [
-  "weave/api.py",
-  "weave/__init__.py",
-  "weave/legacy/**/*.py",
-  "examples",
-]
+exclude = ["weave_query", "examples", "__init__.py"]
 
 [tool.ruff.lint.isort]
-known-third-party = ["wandb"]
+known-third-party = ["wandb", "weave"]
 
 [tool.ruff.lint.per-file-ignores]
 "weave/tests/*" = ["F401"]
@@ -107,12 +102,7 @@ known-third-party = ["wandb"]
 [tool.ruff]
 line-length = 88
 show-fixes = true
-exclude = [
-  "weave/query_api.py",
-  "weave/__init__.py",
-  "weave/legacy/**/*.py",
-  "examples",
-]
+exclude = ["weave_query", "examples", "__init__.py"]
 
 [tool.bumpversion]
 current_version = "0.51.8-dev0"

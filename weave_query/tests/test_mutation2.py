@@ -1,5 +1,6 @@
 import weave
-from weave.legacy.weave import ref_base, uris, weave_internal
+
+from weave_query.weave_query import weave_internal
 
 
 def test_mutation_set_direct_call():
@@ -53,7 +54,9 @@ def test_merge():
     weave.save({"a": 5, "b": 6}, "my-dict:latest")
     dict_obj = weave.legacy.weave.ops.get("local-artifact:///my-dict:latest/obj")
     weave.legacy.weave.ops.set(dict_obj["a"], 17, root_args={"branch": "my-branch"})
-    modified_dict_obj = weave.legacy.weave.ops.get("local-artifact:///my-dict:my-branch/obj")
+    modified_dict_obj = weave.legacy.weave.ops.get(
+        "local-artifact:///my-dict:my-branch/obj"
+    )
     new_uri = weave.legacy.weave.ops.merge_artifact(modified_dict_obj)
     dict_obj_node = weave.legacy.weave.ops.get(new_uri)
     assert (
@@ -70,14 +73,16 @@ def test_merge_no_version():
     # uri now has a direct commit hash for the version
     dict_obj = weave.legacy.weave.ops.get(uri)
     weave.legacy.weave.ops.set(dict_obj["a"], 17, root_args={"branch": "my-branch"})
-    modified_dict_obj = weave.legacy.weave.ops.get("local-artifact:///my-dict:my-branch/obj")
+    modified_dict_obj = weave.legacy.weave.ops.get(
+        "local-artifact:///my-dict:my-branch/obj"
+    )
     new_uri = weave.legacy.weave.ops.merge_artifact(modified_dict_obj)
     dict_obj_node = weave.legacy.weave.ops.get(new_uri)
     assert weave.use(dict_obj_node) == {"a": 17, "b": 6}
 
 
 def test_merge_list_type():
-    from weave.legacy.weave import object_context
+    from weave_query.weave_query import object_context
 
     weave.save([], "my-list:latest")
     obj = weave.legacy.weave.ops.get("local-artifact:///my-list:latest/obj")
@@ -85,7 +90,9 @@ def test_merge_list_type():
         obj.append({"a": "x"}, {})
         obj.append([1], {})
 
-    assert weave.use(weave.legacy.weave.ops.get("local-artifact:///my-list:latest/obj")) == [
+    assert weave.use(
+        weave.legacy.weave.ops.get("local-artifact:///my-list:latest/obj")
+    ) == [
         {"a": "x"},
         [1],
     ]
@@ -130,7 +137,9 @@ def test_artifact_history_local_from_hash():
 
     new_uri = hash_uri
     for i in range(num_versions):
-        new_uri = weave.legacy.weave.ops.undo_artifact(weave.legacy.weave.ops.get(new_uri))
+        new_uri = weave.legacy.weave.ops.undo_artifact(
+            weave.legacy.weave.ops.get(new_uri)
+        )
         assert "main" not in new_uri
         res = weave.storage.get(new_uri + "/obj")
         assert res == total_list[: num_versions - i]
@@ -157,7 +166,9 @@ def test_artifact_history_remote_with_branch(user_by_api_key_in_env):
     assert new_art == total_list
 
     for i in range(num_versions):
-        new_uri = weave.legacy.weave.ops.undo_artifact(weave.legacy.weave.ops.get(new_uri))
+        new_uri = weave.legacy.weave.ops.undo_artifact(
+            weave.legacy.weave.ops.get(new_uri)
+        )
         res = weave.storage.get(new_uri)
         if i == num_versions - 1:
             assert new_uri.startswith("wandb")
@@ -187,7 +198,9 @@ def test_artifact_history_remote_with_hash(user_by_api_key_in_env):
     assert new_art == total_list
 
     for i in range(num_versions):
-        new_uri = weave.legacy.weave.ops.undo_artifact(weave.legacy.weave.ops.get(new_uri))
+        new_uri = weave.legacy.weave.ops.undo_artifact(
+            weave.legacy.weave.ops.get(new_uri)
+        )
         res = weave.storage.get(new_uri)
         if i == num_versions - 1:
             assert new_uri.startswith("wandb")

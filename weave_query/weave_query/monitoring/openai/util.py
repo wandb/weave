@@ -1,14 +1,13 @@
 import inspect
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Generator, Iterator, Optional, TypeVar
+from typing import Any, Callable, Dict, Generator, TypeVar
 
 import tiktoken
 import wandb
-from openai.types.chat.chat_completion import ChatCompletion
-from openai.types.chat.chat_completion_chunk import ChatCompletionChunk, Choice
+from openai.types.chat.chat_completion_chunk import Choice
 from openai.types.completion_usage import CompletionUsage
 
-from weave.legacy.weave.monitoring.openai.models import *
+from weave_query.weave_query.monitoring.openai.models import *
 
 T = TypeVar("T")
 

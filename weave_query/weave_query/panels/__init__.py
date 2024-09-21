@@ -1,70 +1,117 @@
-from weave.legacy.weave import context_state as _context_state
+from weave_query.weave_query import context_state as _context_state
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 
-from weave.legacy.weave.panels.panel_auto import *
+from weave_query.weave_query.panel import Panel as Panel
+from weave_query.weave_query.panels.panel_auto import *
 
 # basic
-from weave.legacy.weave.panels.panel_basic import *
+from weave_query.weave_query.panels.panel_basic import *
 
 # top level board
-from weave.legacy.weave.panels.panel_board import Board, BoardPanel, BoardPanelLayout
-from weave.legacy.weave.panels.panel_card import Card, CardTab
-from weave.legacy.weave.panels.panel_color import Color
-from weave.legacy.weave.panels.panel_daterange import DateRange
+from weave_query.weave_query.panels.panel_board import (
+    Board as Board,
+)
+from weave_query.weave_query.panels.panel_board import (
+    BoardPanel as BoardPanel,
+)
+from weave_query.weave_query.panels.panel_board import (
+    BoardPanelLayout as BoardPanelLayout,
+)
+from weave_query.weave_query.panels.panel_card import Card as Card
+from weave_query.weave_query.panels.panel_card import CardTab as CardTab
+from weave_query.weave_query.panels.panel_color import Color as Color
+from weave_query.weave_query.panels.panel_daterange import DateRange as DateRange
 
 # domain
-from weave.legacy.weave.panels.panel_domain import *
-from weave.legacy.weave.panels.panel_dropdown import Dropdown, DropdownConfig
-from weave.legacy.weave.panels.panel_each import Each
-from weave.legacy.weave.panels.panel_each_column import EachColumn
+from weave_query.weave_query.panels.panel_domain import *
+from weave_query.weave_query.panels.panel_dropdown import Dropdown as Dropdown
+from weave_query.weave_query.panels.panel_dropdown import (
+    DropdownConfig as DropdownConfig,
+)
+from weave_query.weave_query.panels.panel_each import Each as Each
+from weave_query.weave_query.panels.panel_each_column import EachColumn as EachColumn
 
 # special
-from weave.legacy.weave.panels.panel_expression import *
-from weave.legacy.weave.panels.panel_facet import Facet
-from weave.legacy.weave.panels.panel_facet_tabs import FacetTabs
-from weave.legacy.weave.panels.panel_filter_editor import FilterEditor
-from weave.legacy.weave.panels.panel_function_editor import (
-    FunctionEditor,
-    FunctionEditorConfig,
+from weave_query.weave_query.panels.panel_expression import *
+from weave_query.weave_query.panels.panel_facet import Facet as Facet
+from weave_query.weave_query.panels.panel_facet_tabs import FacetTabs as FacetTabs
+from weave_query.weave_query.panels.panel_filter_editor import (
+    FilterEditor as FilterEditor,
 )
-from weave.legacy.weave.panels.panel_group import (
-    Group,
-    GroupLayoutFlow,
-    GroupPanel,
-    GroupPanelLayout,
+from weave_query.weave_query.panels.panel_function_editor import (
+    FunctionEditor as FunctionEditor,
 )
-from weave.legacy.weave.panels.panel_grouping_editor import GroupingEditor
+from weave_query.weave_query.panels.panel_function_editor import (
+    FunctionEditorConfig as FunctionEditorConfig,
+)
+from weave_query.weave_query.panels.panel_group import (
+    Group as Group,
+)
+from weave_query.weave_query.panels.panel_group import (
+    GroupLayoutFlow as GroupLayoutFlow,
+)
+from weave_query.weave_query.panels.panel_group import (
+    GroupPanel as GroupPanel,
+)
+from weave_query.weave_query.panels.panel_group import (
+    GroupPanelLayout as GroupPanelLayout,
+)
+from weave_query.weave_query.panels.panel_grouping_editor import (
+    GroupingEditor as GroupingEditor,
+)
 
 # Incomplete
-from weave.legacy.weave.panels.panel_histogram import *
-from weave.legacy.weave.panels.panel_html import PanelHtml
+from weave_query.weave_query.panels.panel_histogram import *
+from weave_query.weave_query.panels.panel_html import PanelHtml as PanelHtml
 
 # layout
-from weave.legacy.weave.panels.panel_labeled_item import LabeledItem
+from weave_query.weave_query.panels.panel_labeled_item import LabeledItem as LabeledItem
 
 # legacy
-from weave.legacy.weave.panels.panel_legacy import *
-from weave.legacy.weave.panels.panel_markdown import PanelMarkdown
+from weave_query.weave_query.panels.panel_legacy import *
+from weave_query.weave_query.panels.panel_markdown import PanelMarkdown as PanelMarkdown
 
 # Non-standard editor (todo: update)
-from weave.legacy.weave.panels.panel_object_picker import ObjectPicker, ObjectPickerConfig
-from weave.legacy.weave.panels.panel_plot import Plot, PlotConstants, Series
+from weave_query.weave_query.panels.panel_object_picker import (
+    ObjectPicker as ObjectPicker,
+)
+from weave_query.weave_query.panels.panel_object_picker import (
+    ObjectPickerConfig as ObjectPickerConfig,
+)
+from weave_query.weave_query.panels.panel_plot import Plot as Plot
+from weave_query.weave_query.panels.panel_plot import PlotConstants as PlotConstants
+from weave_query.weave_query.panels.panel_plot import Series as Series
 
 # sidebar specific
-from weave.legacy.weave.panels.panel_query import Query, QueryCondition, QueryConfig
-from weave.legacy.weave.panels.panel_sections import Sections
-from weave.legacy.weave.panels.panel_select import SelectEditor, SelectEditorConfig
+from weave_query.weave_query.panels.panel_query import (
+    Query as Query,
+)
+from weave_query.weave_query.panels.panel_query import (
+    QueryCondition as QueryCondition,
+)
+from weave_query.weave_query.panels.panel_query import (
+    QueryConfig as QueryConfig,
+)
+from weave_query.weave_query.panels.panel_sections import Sections as Sections
+from weave_query.weave_query.panels.panel_select import SelectEditor as SelectEditor
+from weave_query.weave_query.panels.panel_select import (
+    SelectEditorConfig as SelectEditorConfig,
+)
 
 # editors
-from weave.legacy.weave.panels.panel_slider import Slider, SliderConfig
-from weave.legacy.weave.panels.panel_string import PanelString
-from weave.legacy.weave.panels.panel_string_editor import StringEditor
-from weave.legacy.weave.panels.panel_table import ColumnDef, Table, TableColumn
-from weave.legacy.weave.panels.panel_trace import Trace
+from weave_query.weave_query.panels.panel_slider import Slider as Slider
+from weave_query.weave_query.panels.panel_slider import SliderConfig as SliderConfig
+from weave_query.weave_query.panels.panel_string import PanelString as PanelString
+from weave_query.weave_query.panels.panel_string_editor import (
+    StringEditor as StringEditor,
+)
+from weave_query.weave_query.panels.panel_table import ColumnDef as ColumnDef
+from weave_query.weave_query.panels.panel_table import Table as Table
+from weave_query.weave_query.panels.panel_table import TableColumn as TableColumn
+from weave_query.weave_query.panels.panel_trace import Trace as Trace
 
 # navigation
-from weave.legacy.weave.panels.panel_weavelink import WeaveLink
-from weave.legacy.weave.panel import Panel
+from weave_query.weave_query.panels.panel_weavelink import WeaveLink as WeaveLink
 
 _context_state.clear_loading_built_ins(_loading_builtins_token)

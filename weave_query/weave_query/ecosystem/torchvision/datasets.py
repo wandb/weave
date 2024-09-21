@@ -8,11 +8,10 @@ import typing
 from typing import TypeVar
 
 import PIL.Image
+import weave
 from torchvision import datasets
 
-import weave
-from weave.legacy.weave import infer_types
-from weave.legacy.weave import panels
+from weave_query.weave_query import infer_types, panels
 
 ExampleType = TypeVar("ExampleType")
 

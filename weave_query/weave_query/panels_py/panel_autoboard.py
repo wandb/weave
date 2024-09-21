@@ -26,10 +26,9 @@ import os
 import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave.panels import panel_plot
-from weave.legacy.weave.panels_py.generator_templates import template_registry
-from weave.legacy.weave import util
+
+from weave_query.weave_query import util, weave_internal
+from weave_query.weave_query.panels import panel_plot
 
 
 @weave.type()
@@ -404,7 +403,9 @@ def auto_panels(
             layout=weave.legacy.weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
         ),
     )
-    return weave.legacy.weave.panels.Board(vars=control_items, panels=panels, editable=False)
+    return weave.legacy.weave.panels.Board(
+        vars=control_items, panels=panels, editable=False
+    )
 
 
 # The interface for constructing this Panel from Python

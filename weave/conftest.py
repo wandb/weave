@@ -5,10 +5,9 @@ import tempfile
 
 import numpy as np
 import pytest
+import weave
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-import weave
 from weave import context_state
 from weave.trace import weave_init
 from weave.trace_server import (
@@ -144,7 +143,7 @@ def enable_touch_on_read():
 
 @pytest.fixture()
 def consistent_table_col_ids():
-    from weave.legacy.weave.panels import table_state
+    from weave_query.weave_query.panels import table_state
 
     with table_state.use_consistent_col_ids():
         yield

@@ -1,10 +1,10 @@
 import dataclasses
-import inspect
 import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave.ecosystem.wandb import weave_plotly
+
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query.ecosystem.wandb import weave_plotly
 
 
 @weave.type()
@@ -53,10 +53,12 @@ class Scatter(weave.Panel):
         return weave.legacy.weave.panels.Group(
             items={
                 "x_fn": weave.legacy.weave.panels.LabeledItem(
-                    label="x", item=weave.legacy.weave.panels.FunctionEditor(config.x_fn)
+                    label="x",
+                    item=weave.legacy.weave.panels.FunctionEditor(config.x_fn),
                 ),
                 "y_fn": weave.legacy.weave.panels.LabeledItem(
-                    label="y", item=weave.legacy.weave.panels.FunctionEditor(config.y_fn)
+                    label="y",
+                    item=weave.legacy.weave.panels.FunctionEditor(config.y_fn),
                 ),
                 "label_fn": weave.legacy.weave.panels.LabeledItem(
                     label="label",
@@ -80,10 +82,14 @@ class Scatter(weave.Panel):
                 config.label_fn.type
             )
         ):
-            return weave.legacy.weave.panels.PanelHtml(weave.legacy.weave.ops.Html("No data"))  # type: ignore
+            return weave.legacy.weave.panels.PanelHtml(
+                weave.legacy.weave.ops.Html("No data")
+            )  # type: ignore
         if config.label_fn.type == weave.types.Invalid():
             plot_data = unnested.map(
-                lambda item: weave.legacy.weave.ops.dict_(x=config.x_fn(item), y=config.y_fn(item))  # type: ignore
+                lambda item: weave.legacy.weave.ops.dict_(
+                    x=config.x_fn(item), y=config.y_fn(item)
+                )  # type: ignore
             )
         else:
             plot_data = unnested.map(

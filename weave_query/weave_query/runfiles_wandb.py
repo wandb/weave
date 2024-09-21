@@ -6,17 +6,17 @@ import random
 import shutil
 import typing
 
-from weave.legacy.weave import environment as weave_env
-from weave.legacy.weave import filesystem
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import (
+from weave_query.weave_query import (
     artifact_fs,
     errors,
     file_util,
+    filesystem,
     memo,
     uris,
     wandb_client_api,
 )
+from weave_query.weave_query import environment as weave_env
+from weave_query.weave_query import weave_types as types
 
 if typing.TYPE_CHECKING:
     from wandb.apis.public import Run as WBRun
