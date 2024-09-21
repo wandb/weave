@@ -1,6 +1,7 @@
 """Defines the Op protocol and related functions."""
 
 import inspect
+import logging
 import sys
 import typing
 from functools import partial, wraps
@@ -26,6 +27,8 @@ from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
+
+logger = logging.getLogger(__name__)
 
 from .constants import TRACE_CALL_EMOJI
 
@@ -235,8 +238,12 @@ def _execute_call(
         return output
 
     def process(res: Any) -> Any:
-        res = box.box(res)
-        res = on_output(res)
+        try:
+            res = box.box(res)
+            res = on_output(res)
+        except Exception as e:
+            logger.error(f"Error processing output: {e}")
+            pass
         return res, call
 
     def handle_exception(e: Exception) -> Any:

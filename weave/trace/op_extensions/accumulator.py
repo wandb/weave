@@ -1,4 +1,5 @@
 import atexit
+import logging
 import weakref
 from typing import (
     Any,
@@ -15,6 +16,8 @@ from typing import (
 )
 
 from weave.trace.op import FinishCallbackType, Op
+
+logger = logging.getLogger(__name__)
 
 S = TypeVar("S")
 V = TypeVar("V")
@@ -64,7 +67,10 @@ class _IteratorWrapper(Generic[V]):
             )
         try:
             value = next(self._iterator_or_ctx_manager)  # type: ignore
-            self._on_yield(value)
+            try:
+                self._on_yield(value)
+            except Exception as e:
+                logger.error(f"Error in on_yield: {e}")
             return value
         except (StopIteration, StopAsyncIteration) as e:
             self._call_on_close_once()
@@ -83,7 +89,10 @@ class _IteratorWrapper(Generic[V]):
             )
         try:
             value = await self._iterator_or_ctx_manager.__anext__()  # type: ignore
-            self._on_yield(value)
+            try:
+                self._on_yield(value)
+            except Exception as e:
+                logger.error(f"Error in on_yield: {e}")
             return value
         except (StopAsyncIteration, StopIteration) as e:
             self._call_on_close_once()
