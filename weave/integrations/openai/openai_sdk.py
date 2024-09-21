@@ -235,6 +235,14 @@ def should_use_accumulator(inputs: typing.Dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
+def disable_tracing_for_inputs(*args, **kwargs):
+    # When this header is set, OpenAI returns an APIResponse object that we cannot
+    parent_call = weave.get_current_call()
+    if parent_call and parent_call.func_name.startswith("litellm"):
+        return kwargs.get("extra_headers", {}).get("X-Stainless-Raw-Response") == "true"
+    return False
+
+
 def create_wrapper_sync(
     name: str,
 ) -> typing.Callable[[typing.Callable], typing.Callable]:
@@ -259,6 +267,7 @@ def create_wrapper_sync(
 
         op = weave.op()(_add_stream_options(fn))
         op.name = name  # type: ignore
+        op._set_disable_tracing_for_inputs(disable_tracing_for_inputs)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
@@ -296,6 +305,7 @@ def create_wrapper_async(
 
         op = weave.op()(_add_stream_options(fn))
         op.name = name  # type: ignore
+        op._set_disable_tracing_for_inputs(disable_tracing_for_inputs)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(

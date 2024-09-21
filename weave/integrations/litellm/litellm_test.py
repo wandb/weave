@@ -62,7 +62,7 @@ def test_litellm_quickstart(
 
     assert all_content == exp
     calls = list(client.calls())
-    assert len(calls) == 2
+    assert len(calls) == 2 - (1 if USES_RAW_OPENAI_RESPONSE_IN_ASYNC else 0)
     call = calls[0]
     assert call.exception is None and call.ended_at is not None
     output = call.output
@@ -103,7 +103,7 @@ async def test_litellm_quickstart_async(
 
     assert all_content == exp
     calls = list(client.calls())
-    assert len(calls) == 2
+    assert len(calls) == 2 - (1 if USES_RAW_OPENAI_RESPONSE_IN_ASYNC else 0)
     call = calls[0]
     assert call.exception is None and call.ended_at is not None
     output = call.output
@@ -144,12 +144,13 @@ def test_litellm_quickstart_stream(
     for chunk in chat_response:
         if chunk.choices[0].delta.content:
             all_content += chunk.choices[0].delta.content
+    del chat_response
 
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you. How can I assist you today?"""
 
     assert all_content == exp
     calls = list(client.calls())
-    assert len(calls) == 2
+    assert len(calls) == 2 - (1 if USES_RAW_OPENAI_RESPONSE_IN_ASYNC else 0)
     call = calls[0]
     assert call.exception is None and call.ended_at is not None
     output = call.output
@@ -160,12 +161,12 @@ def test_litellm_quickstart_stream(
     assert output["created"] == Nearly(chunk.created)
     summary = call.summary
     assert summary is not None
-    if not USES_RAW_OPENAI_RESPONSE_IN_ASYNC:
-        model_usage = summary["usage"][output["model"]]
-        assert model_usage["requests"] == 1
-        assert model_usage["completion_tokens"] == 31
-        assert model_usage["prompt_tokens"] == 13
-        assert model_usage["total_tokens"] == 44
+
+    model_usage = summary["usage"][output["model"]]
+    assert model_usage["requests"] == 1
+    assert model_usage["completion_tokens"] == 31
+    assert model_usage["prompt_tokens"] == 13
+    assert model_usage["total_tokens"] == 44
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -192,7 +193,7 @@ async def test_litellm_quickstart_stream_async(
 
     assert all_content == exp
     calls = list(client.calls())
-    assert len(calls) == 2
+    assert len(calls) == 2 - (1 if USES_RAW_OPENAI_RESPONSE_IN_ASYNC else 0)
     call = calls[0]
     assert call.exception is None and call.ended_at is not None
     output = call.output
@@ -203,12 +204,12 @@ async def test_litellm_quickstart_stream_async(
     assert output["created"] == Nearly(chunk.created)
     summary = call.summary
     assert summary is not None
-    if not USES_RAW_OPENAI_RESPONSE_IN_ASYNC:
-        model_usage = summary["usage"][output["model"]]
-        assert model_usage["requests"] == 1
-        assert model_usage["completion_tokens"] == 41
-        assert model_usage["prompt_tokens"] == 13
-        assert model_usage["total_tokens"] == 54
+
+    model_usage = summary["usage"][output["model"]]
+    assert model_usage["requests"] == 1
+    assert model_usage["completion_tokens"] == 41
+    assert model_usage["prompt_tokens"] == 13
+    assert model_usage["total_tokens"] == 54
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode

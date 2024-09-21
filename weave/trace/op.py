@@ -74,6 +74,7 @@ def print_call_link(call: "Call") -> None:
 
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
 OnOutputHandlerType = Callable[[Any, FinishCallbackType, Dict], Any]
+DisableTracingForInputsType = Optional[Callable[[dict[str, Any]], bool]]
 
 
 def value_is_sentinel(param: Any) -> bool:
@@ -140,6 +141,7 @@ class Op(Protocol):
     # not sure if this is the best place for this, but kept for compat
     _set_on_output_handler: Callable[[OnOutputHandlerType], None]
     _on_output_handler: Optional[OnOutputHandlerType]
+    _disable_tracing_for_inputs: Optional[DisableTracingForInputsType]
 
     __call__: Callable[..., Any]
     __self__: Any
@@ -158,6 +160,14 @@ def _set_on_output_handler(func: Op, on_output: OnOutputHandlerType) -> None:
     if func._on_output_handler is not None:
         raise ValueError("Cannot set on_output_handler multiple times")
     func._on_output_handler = on_output
+
+
+def _set_disable_tracing_for_inputs(
+    func: Op, disable_tracing_for_inputs: DisableTracingForInputsType
+) -> None:
+    if func._disable_tracing_for_inputs is not None:
+        raise ValueError("Cannot set disable_tracing_for_inputs multiple times")
+    func._disable_tracing_for_inputs = disable_tracing_for_inputs
 
 
 def _is_unbound_method(func: Callable) -> bool:
@@ -433,6 +443,11 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                         return await func(*args, **kwargs)
                     if not wrapper._tracing_enabled:  # type: ignore
                         return await func(*args, **kwargs)
+                    if (
+                        wrapper._disable_tracing_for_inputs is not None  # type: ignore
+                        and wrapper._disable_tracing_for_inputs(*args, **kwargs)  # type: ignore
+                    ):
+                        return await func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     res, _ = await _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
                     return res
@@ -445,6 +460,11 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                     if weave_client_context.get_weave_client() is None:
                         return func(*args, **kwargs)
                     if not wrapper._tracing_enabled:  # type: ignore
+                        return func(*args, **kwargs)
+                    if (
+                        wrapper._disable_tracing_for_inputs is not None
+                        and wrapper._disable_tracing_for_inputs(*args, **kwargs)
+                    ):
                         return func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     res, _ = _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
@@ -475,6 +495,11 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
             wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
             wrapper._on_output_handler = None  # type: ignore
+
+            wrapper._set_disable_tracing_for_inputs = partial(
+                _set_disable_tracing_for_inputs, wrapper
+            )  # type: ignore
+            wrapper._disable_tracing_for_inputs = None  # type: ignore
 
             wrapper._tracing_enabled = True  # type: ignore
 

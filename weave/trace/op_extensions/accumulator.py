@@ -155,7 +155,6 @@ def add_accumulator(
     op: Op,
     make_accumulator: Callable[[Dict], Callable[[S, V], S]],
     *,
-    output_pre_processor: Optional[Callable[[Any], Any]] = None,
     should_accumulate: Optional[Callable[[Dict], bool]] = None,
     on_finish_post_processor: Optional[Callable[[Any], Any]] = None,
     iterator_wrapper: Type[_IteratorWrapper] = _IteratorWrapper,
