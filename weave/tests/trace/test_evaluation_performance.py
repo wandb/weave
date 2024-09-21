@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from datetime import time
 from threading import Lock
 from typing import Any, Generator
 
@@ -61,23 +62,23 @@ async def test_evaluation_performance(client: WeaveClient):
         {
             "question": "What is the capital of France?",
             "expected": "Paris",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            # "img": PIL.Image.new("RGB", (100, 100)),
         },
-        {
-            "question": "Who wrote 'To Kill a Mockingbird'?",
-            "expected": "Harper Lee",
-            "img": PIL.Image.new("RGB", (100, 100)),
-        },
-        {
-            "question": "What is the square root of 64?",
-            "expected": "8",
-            "img": PIL.Image.new("RGB", (100, 100)),
-        },
-        {
-            "question": "What is the thing you say when you don't know something?",
-            "expected": "I don't know",
-            "img": PIL.Image.new("RGB", (100, 100)),
-        },
+        # {
+        #     "question": "Who wrote 'To Kill a Mockingbird'?",
+        #     "expected": "Harper Lee",
+        #     "img": PIL.Image.new("RGB", (100, 100)),
+        # },
+        # {
+        #     "question": "What is the square root of 64?",
+        #     "expected": "8",
+        #     "img": PIL.Image.new("RGB", (100, 100)),
+        # },
+        # {
+        #     "question": "What is the thing you say when you don't know something?",
+        #     "expected": "I don't know",
+        #     "img": PIL.Image.new("RGB", (100, 100)),
+        # },
     ]
 
     @weave.op()
@@ -104,11 +105,12 @@ async def test_evaluation_performance(client: WeaveClient):
         assert res["score"]["true_count"] == 1
         log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
         assert log == ["ensure_project_exists"]
-
+    
+    time.sleep(0.1)  # Add a small delay
     client._flush()
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
     assert log == ["ensure_project_exists"]
 
-    # assert "something interesting about the results" == False
+    assert "something interesting about the results" == False
