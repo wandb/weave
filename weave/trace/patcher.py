@@ -1,7 +1,8 @@
-from typing import Any, Callable, Optional, Sequence
 import logging
+from typing import Any, Callable, Optional, Sequence
 
 logger = logging.getLogger(__name__)
+
 
 class Patcher:
     def attempt_patch(self) -> bool:
