@@ -82,7 +82,7 @@ jobs:
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
           source /root/venv/bin/activate && \
-          cd weave && \
+          cd weave_query && \
           pytest \
           --job-num=${{ matrix.job_num }} \
           --timeout=90 \
