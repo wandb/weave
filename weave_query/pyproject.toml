@@ -1,5 +1,5 @@
 [project]
-name = "weave_query"
+name = "weave"
 description = "A toolkit for building composable interactive data driven applications."
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -89,10 +89,15 @@ ignore = [
   "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/ - we use Google style
   "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/ - we use Google style
 ]
-exclude = ["weave_query/*", "__init__.py", "examples"]
+exclude = [
+  "weave/api.py",
+  "weave/__init__.py",
+  "weave/legacy/**/*.py",
+  "examples",
+]
 
 [tool.ruff.lint.isort]
-known-third-party = ["wandb", "weave"]
+known-third-party = ["wandb"]
 
 [tool.ruff.lint.per-file-ignores]
 "weave/tests/*" = ["F401"]
@@ -110,7 +115,7 @@ exclude = [
 ]
 
 [tool.bumpversion]
-current_version = "0.51.9-dev0"
+current_version = "0.51.8-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
