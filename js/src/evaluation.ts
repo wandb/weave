@@ -15,7 +15,7 @@ interface EvaluationParameters<R extends DatasetRow, M>
 
 interface Runnable<T extends (...args: any[]) => any> {
   id: string;
-  run: (...args: Parameters<T>) => ReturnType<T>;
+  invoke: (...args: Parameters<T>) => ReturnType<T>;
 }
 
 type WeaveCallable<T extends (...args: any[]) => any> = Op<T> | Runnable<T>;
@@ -27,7 +27,7 @@ function callWeaveCallable<T extends (...args: any[]) => any>(
   if (typeof callable === "function") {
     return callable(...args);
   }
-  return callable.run(...args);
+  return callable.invoke(...args);
 }
 
 function weaveCallableName<T extends (...args: any[]) => any>(
