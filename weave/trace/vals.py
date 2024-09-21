@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
 from weave.trace import box
-from weave.trace.client_context.weave_client import get_weave_client
+from weave.trace.client_context.weave_client import get_weave_client, require_weave_client
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
 from weave.trace.op import Op, maybe_bind_method
@@ -333,15 +333,22 @@ class WeaveTable(Traceable):
                 )
                 yield from self._remote_iter()
             return
-
-        for ndx, item in enumerate(self.table_ref.row_digests):
-            new_ref = self.ref.with_item(item)
+        
+        for ndx, row in enumerate(self._prefetched_rows):
+            # this is nasty:
+            wc = require_weave_client()
+            def get_next_id():
+                return self.table_ref.row_digests[ndx]
+            
+            next_id_future = wc.async_job_queue.submit_job(get_next_id)
+            new_ref = self.ref.with_item(next_id_future)
             val = self._prefetched_rows[ndx]
             res = from_json(
                 val, self.table_ref.entity + "/" + self.table_ref.project, self.server
             )
             res = make_trace_obj(res, new_ref, self.server, self.root)
             yield res
+
 
     def _remote_iter(self) -> Generator[dict, None, None]:
         page_index = 0

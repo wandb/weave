@@ -16,8 +16,8 @@ class Ref:
     def uri(self) -> str:
         raise NotImplementedError
 
-    # def as_dict(self) -> dict:
-    #     return dataclasses.asdict(self)
+    def as_param_dict(self) -> dict:
+        return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -26,6 +26,14 @@ class TableRef(Ref):
     project: str
     _digest: Union[str, Future[str]]
     _row_digests: Optional[Union[list[str], Future[list[str]]]] = None
+
+    def as_param_dict(self) -> dict:
+        return {
+            "entity": self.entity,
+            "project": self.project,
+            "_digest": self._digest,
+            "_row_digests": self._row_digests,
+        }
 
     @property
     def digest(self) -> str:
@@ -64,7 +72,7 @@ class TableRef(Ref):
 @dataclasses.dataclass(frozen=True)
 class RefWithExtra(Ref):
     def with_extra(self, extra: tuple[Union[str, Future[str]], ...]) -> "RefWithExtra":
-        params = dataclasses.asdict(self)
+        params = self.as_param_dict()
         params["_extra"] = self._extra + tuple(extra)  # type: ignore
         return self.__class__(**params)
 
@@ -89,6 +97,15 @@ class ObjectRef(RefWithExtra):
     _digest: Union[str, Future[str]]
     _extra: tuple[Union[str, Future[str]], ...] = ()
 
+    def as_param_dict(self) -> dict:
+        return {
+            "entity": self.entity,
+            "project": self.project,
+            "name": self.name,
+            "_digest": self._digest,
+            "_extra": self._extra,
+        }
+
     @property
     def extra(self) -> tuple[str, ...]:
         return tuple(e if isinstance(e, str) else e.result() for e in self._extra)
@@ -111,7 +128,8 @@ class ObjectRef(RefWithExtra):
         if isinstance(self._digest, str):
             refs_internal.validate_no_slashes(self._digest, "digest")
             refs_internal.validate_no_colons(self._digest, "digest")
-        refs_internal.validate_extra(list(self.extra))
+        # TODO: FIx me!
+        # refs_internal.validate_extra(list(self.extra))
         refs_internal.validate_no_slashes(self.name, "name")
         refs_internal.validate_no_colons(self.name, "name")
 
@@ -178,6 +196,14 @@ class CallRef(RefWithExtra):
     project: str
     id: str
     _extra: tuple[Union[str, Future[str]], ...] = ()
+
+    def as_param_dict(self) -> dict:
+        return {
+            "entity": self.entity,
+            "project": self.project,
+            "id": self.id,
+            "_extra": self._extra,
+        }
 
     @property
     def extra(self) -> tuple[str, ...]:

@@ -1198,21 +1198,27 @@ class WeaveClient:
 
         def send_obj_create() -> ObjCreateRes:
             json_val = to_json(val, self._project_id(), self)
-            return self.server.obj_create(
-                ObjCreateReq(
+            req = ObjCreateReq(
                     obj=ObjSchemaForInsert(
                         project_id=self.entity + "/" + self.project,
                         object_id=name,
                         val=json_val,
                     )
                 )
-            )
+            res = self.server.obj_create(req)
+                
+            return res
 
         res_future: Future[ObjCreateRes] = self.async_job_queue.submit_job(
             send_obj_create
         )
+
+        def get_digest():
+            res = res_future.result()
+            return res.digest
+
         digest_future: Future[str] = self.async_job_queue.submit_job(
-            lambda: res_future.result().digest
+            get_digest
         )
 
         ref: Ref
@@ -1250,21 +1256,35 @@ class WeaveClient:
         """Saves a Table to the weave server and returns the TableRef.
         This is the sister function to _save_object_basic but for Tables.
         """
-        rows = to_json(table.rows, self._project_id(), self)
+
+        def send_table_create() -> TableCreateRes:
+            rows = to_json(table.rows, self._project_id(), self)
+            req = TableCreateReq(
+                    table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
+                )
+            res = self.server.table_create(req
+                
+            )
+            return res
 
         res_future: Future[TableCreateRes] = self.async_job_queue.submit_job(
-            self.server.table_create,
-            TableCreateReq(
-                table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
-            ),
+            send_table_create
         )
+
+        def get_table_digest():
+            res = res_future.result()
+            return res.digest
 
         digest_future: Future[str] = self.async_job_queue.submit_job(
-            lambda: res_future.result().digest
+            get_table_digest
         )
 
+        def get_row_digests(): 
+            res = res_future.result()
+            return res.row_digests
+
         row_digests_future: Future[list[str]] = self.async_job_queue.submit_job(
-            lambda: res_future.result().row_digests
+            get_row_digests
         )
 
         table_ref = TableRef(

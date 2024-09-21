@@ -1,5 +1,7 @@
 import atexit
 import concurrent.futures
+import contextlib
+import contextvars
 import logging
 import threading
 from concurrent.futures import Future
@@ -7,9 +9,19 @@ from typing import Any, Callable, TypeVar
 
 T = TypeVar("T")
 
-MAX_WORKER_DEFAULT = 2**3  # 8 workers to not overwhelm the DB
+MAX_WORKER_DEFAULT = 2**10  # 8 workers to not overwhelm the DB
 
 logger = logging.getLogger(__name__)
+
+should_raise_on_async_job_queue = contextvars.ContextVar('should_raise_on_async_job_queue', default=False)
+
+@contextlib.contextmanager
+def raise_on_async_job_queue(raise_value: bool = True):
+    token = should_raise_on_async_job_queue.set(raise_value)
+    try:
+        yield
+    finally:
+        should_raise_on_async_job_queue.reset(token)
 
 
 class AsyncJobQueue:
@@ -83,7 +95,10 @@ class AsyncJobQueue:
                 self._active_jobs.remove(f)
             exception = f.exception()
             if exception:
+                raise exception
                 logger.error(f"Job failed with exception: {exception}")
+                if should_raise_on_async_job_queue.get():
+                    raise exception
 
         future.add_done_callback(callback)
         return future
@@ -109,4 +124,7 @@ class AsyncJobQueue:
             try:
                 future.result()
             except Exception as e:
+                raise e
                 logger.error(f"Job failed during flush: {e}")
+                if should_raise_on_async_job_queue.get():
+                    raise e
