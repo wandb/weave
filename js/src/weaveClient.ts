@@ -367,7 +367,8 @@ export class WeaveClient {
     thisArg: any,
     currentCall: CallStackEntry,
     parentCall: CallStackEntry | undefined,
-    startTime: Date
+    startTime: Date,
+    displayName?: string
   ) {
     const inputs = await this.paramsToCallInputs(
       params,
@@ -384,6 +385,7 @@ export class WeaveClient {
       trace_id: currentCall.traceId,
       parent_id: parentCall?.callId,
       started_at: startTime.toISOString(),
+      display_name: displayName,
       attributes: {
         weave: {
           client_version: packageVersion,

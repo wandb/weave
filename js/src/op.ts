@@ -30,6 +30,9 @@ export function op<T extends (...args: any[]) => any>(
         `🍩 https://wandb.ai/${globalClient.projectId}/r/call/${currentCall.callId}`
       );
     }
+    const displayName = options?.callDisplayName
+      ? options.callDisplayName(...params)
+      : undefined;
     const startCallPromise = globalClient.startCall(
       opWrapper,
       params,
@@ -37,7 +40,8 @@ export function op<T extends (...args: any[]) => any>(
       thisArg,
       currentCall,
       parentCall,
-      startTime
+      startTime,
+      displayName
     );
 
     try {
@@ -120,10 +124,11 @@ export function isOp(fn: any): fn is Op<any> {
   return fn.__isOp === true;
 }
 
-export function boundOp(
+export function boundOp<T extends (...args: any[]) => any>(
   bindThis: any,
-  fn: (...args: any[]) => any,
-  options?: OpOptions<any>
+  fn: T,
+  options?: OpOptions<T>
 ) {
-  return op(fn.bind(bindThis), { originalFunction: fn, bindThis, ...options });
+  const boundFn = fn.bind(bindThis) as T;
+  return op(boundFn, { originalFunction: fn, bindThis, ...options });
 }
