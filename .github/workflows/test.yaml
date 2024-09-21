@@ -72,6 +72,8 @@ jobs:
       - uses: actions/checkout@v2
       - name: Verify wandb server is running
         run: curl -s http://wandbservice:8080/healthz
+      - run: |
+          ls -la
       - name: Run Legacy (Query Service) Python Unit Tests
         env:
           DD_SERVICE: weave-python
