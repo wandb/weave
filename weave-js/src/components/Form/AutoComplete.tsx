@@ -58,15 +58,14 @@ const getStyles = (props: AdditionalProps) => {
               opacity: 1,
             },
           },
+          input: {
+            padding: '0px !important',
+            minHeight: `${HEIGHTS[size]} !important`,
+          },
         },
       },
       MuiInputBase: {
         styleOverrides: {
-          root: {
-            minHeight: HEIGHTS[size],
-            paddingTop: '0px !important',
-            paddingBottom: '0px !important',
-          },
           inputMultiline: {
             overflow: 'hidden',
             whiteSpace: 'pre-wrap',
