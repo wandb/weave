@@ -14,6 +14,9 @@ import * as S from './PanelString.styles';
 import {TooltipTrigger} from './Tooltip';
 import {WeaveFormatContext} from './WeaveFormatContext';
 
+const rtlChars =
+  /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
 const inputType = {
   type: 'union' as const,
   members: [
@@ -52,6 +55,25 @@ function isURL(text: string): boolean {
     return false;
   }
 }
+
+/**
+ * Determines if a given text contains any right-to-left (RTL) script characters.
+ *
+ * RTL script characters are defined as any character within the Unicode ranges:
+ * - U+0590 to U+05FF
+ * - U+0600 to U+06FF
+ * - U+0750 to U+077F
+ * - U+08A0 to U+08FF
+ * - U+FB50 to U+FDFF
+ * - U+FE70 to U+FEFF
+ * Matching arabic, hebrew, and other related scripts.
+ *
+ * @param text - The text to be checked for RTL characters.
+ * @returns `true` if the text contains RTL characters, otherwise `false`.
+ */
+const isRTL = (text: string): boolean => {
+  return rtlChars.test(text);
+};
 
 const defaultConfig = (): PanelStringConfigState => {
   return {
@@ -224,16 +246,21 @@ export const PanelString: React.FC<PanelStringProps> = props => {
         console.error(e);
       }
     }
+    // Check if the first 100 characters contain any characters from an RTL script
+    // and set the text direction accordingly.
+    const textStyle: React.CSSProperties = isRTL(fullStr.slice(0, 100))
+      ? {direction: 'rtl', textAlign: 'right'}
+      : {};
     let contentPlaintext;
     if (parsed) {
       contentPlaintext = (
-        <S.PreformattedJSONString>
+        <S.PreformattedJSONString style={textStyle}>
           {JSON.stringify(parsed, null, 2)}
         </S.PreformattedJSONString>
       );
     } else {
       contentPlaintext = (
-        <S.PreformattedProportionalString>
+        <S.PreformattedProportionalString style={textStyle}>
           {fullStr}
         </S.PreformattedProportionalString>
       );

@@ -1,25 +1,12 @@
 import os
-from typing import Any
 
 import pytest
 from anthropic import Anthropic, AsyncAnthropic
 
 import weave
-from weave.trace_server import trace_server_interface as tsi
 
 model = "claude-3-haiku-20240307"
 # model = "claude-3-opus-20240229"
-
-
-def _get_call_output(call: tsi.CallSchema) -> Any:
-    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
-
-    Keeping this here for now, but it should be removed in the future once we have a better solution.
-    """
-    call_output = call.output
-    if isinstance(call_output, str) and call_output.startswith("weave://"):
-        return weave.ref(call_output).get()
-    return call_output
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -28,7 +15,7 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_anthropic(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(
@@ -43,11 +30,11 @@ def test_anthropic(
     all_content = message.content[0]
     exp = "Hello! It's nice to meet you. How can I assist you today?"
     assert all_content.text == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "end_turn"
@@ -67,7 +54,7 @@ def test_anthropic(
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_anthropic_stream(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(
@@ -90,11 +77,12 @@ def test_anthropic_stream(
             output_tokens = event.usage.output_tokens
     exp = "Hello there! How can I assist you today?"
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "end_turn"
@@ -115,7 +103,7 @@ def test_anthropic_stream(
 )
 @pytest.mark.asyncio
 async def test_async_anthropic(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted
@@ -127,15 +115,15 @@ async def test_async_anthropic(
         max_tokens=1024,
         messages=[{"role": "user", "content": "Hello, Claude"}],
     )
-
     all_content = message.content[0]
     exp = "Hello! It's nice to meet you. How can I assist you today?"
     assert all_content.text == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "end_turn"
@@ -156,7 +144,7 @@ async def test_async_anthropic(
 )
 @pytest.mark.asyncio
 async def test_async_anthropic_stream(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted
@@ -180,11 +168,12 @@ async def test_async_anthropic_stream(
             output_tokens = event.usage.output_tokens
     exp = "Hello! It's nice to meet you. How can I assist you today?"
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "end_turn"
@@ -204,7 +193,7 @@ async def test_async_anthropic_stream(
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_tools_calling(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(
@@ -240,11 +229,12 @@ def test_tools_calling(
     all_content = message.content[0]
     assert all_content.input["location"] == exp
     assert all_content.type == "tool_use"
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "tool_use"
@@ -256,3 +246,195 @@ def test_tools_calling(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"] == 56
     assert output.usage.input_tokens == model_usage["input_tokens"] == 354
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+def test_anthropic_messages_stream_ctx_manager(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(
+        api_key=api_key,
+    )
+
+    all_content = ""
+    with anthropic_client.messages.stream(
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": "Say hello there!",
+            }
+        ],
+        model=model,
+    ) as stream:
+        for event in stream:
+            if event.type == "text":
+                all_content += event.text
+
+    exp = "Hello there!"
+    assert all_content.strip() == exp
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
+    assert call.exception is None and call.ended_at is not None
+    output = call.output
+    assert output.model == model
+    assert output.stop_reason == "end_turn"
+    assert output.stop_sequence is None
+    assert output.content[0].text.strip() == exp
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.output_tokens == model_usage["output_tokens"]
+    assert output.usage.input_tokens == model_usage["input_tokens"]
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+@pytest.mark.asyncio
+async def test_async_anthropic_messages_stream_ctx_manager(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    anthropic_client = AsyncAnthropic(
+        api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
+    )
+
+    all_content = ""
+    async with anthropic_client.messages.stream(
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": "Say hello there!",
+            }
+        ],
+        model=model,
+    ) as stream:
+        async for event in stream:
+            if event.type == "text":
+                all_content += event.text
+
+    exp = "Hello there!"
+    assert all_content.strip() == exp
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
+    assert call.exception is None and call.ended_at is not None
+    output = call.output
+    assert output.model == model
+    assert output.stop_reason == "end_turn"
+    assert output.stop_sequence is None
+    assert output.content[0].text.strip() == exp
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.output_tokens == model_usage["output_tokens"]
+    assert output.usage.input_tokens == model_usage["input_tokens"]
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+def test_anthropic_messages_stream_ctx_manager_text(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(
+        api_key=api_key,
+    )
+
+    all_content = ""
+    with anthropic_client.messages.stream(
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": "Say hello there!",
+            }
+        ],
+        model=model,
+    ) as stream:
+        for text in stream.text_stream:
+            all_content += text
+
+    exp = "Hello there!"
+    assert all_content.strip() == exp
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
+    assert call.exception is None and call.ended_at is not None
+    output = call.output
+    assert output.model == model
+    assert output.stop_reason == "end_turn"
+    assert output.stop_sequence is None
+    assert output.content[0].text.strip() == exp
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.output_tokens == model_usage["output_tokens"]
+    assert output.usage.input_tokens == model_usage["input_tokens"]
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+@pytest.mark.asyncio
+async def test_async_anthropic_messages_stream_ctx_manager_text(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    anthropic_client = AsyncAnthropic(
+        api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
+    )
+
+    all_content = ""
+    async with anthropic_client.messages.stream(
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": "Say hello there!",
+            }
+        ],
+        model=model,
+    ) as stream:
+        async for text in stream.text_stream:
+            all_content += text
+
+    exp = "Hello there!"
+    assert all_content.strip() == exp
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
+    assert call.exception is None and call.ended_at is not None
+    output = call.output
+    assert output.model == model
+    assert output.stop_reason == "end_turn"
+    assert output.stop_sequence is None
+    assert output.content[0].text.strip() == exp
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.output_tokens == model_usage["output_tokens"]
+    assert output.usage.input_tokens == model_usage["input_tokens"]

@@ -25,21 +25,26 @@ from flask import (
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
-from weave import (
+from weave.legacy.weave import (
+    context_state,
     engine_trace,
     environment,
     errors,
     filesystem,
+    graph,
     logs,
     registry_mem,
     server,
     storage,
     util,
+    value_or_error,
+    wandb_api,
     weavejs_fixes,
 )
-from weave.legacy import context_state, graph, value_or_error, wandb_api
-from weave.legacy.language_features.tagging import tag_store
-from weave.server_error_handling import client_safe_http_exceptions_as_werkzeug
+from weave.legacy.weave.language_features.tagging import tag_store
+from weave.legacy.weave.server_error_handling import (
+    client_safe_http_exceptions_as_werkzeug,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +93,7 @@ if engine_trace.datadog_is_enabled():
 
 
 # Ensure these are imported and registered
-from weave.legacy import ops
+from weave.legacy.weave import ops
 
 # NOTE: Fixes flask dev server's auto-reload capability, by forcing it to use
 # stat mode instead of watchdog mode. It turns out that "import wandb" breaks
@@ -107,11 +112,11 @@ blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
 def import_ecosystem():
-    from weave.legacy import ops, panels, panels_py
+    from weave.legacy.weave import ops, panels, panels_py
 
     # Attempt to import MVP ecosystem modules
     try:
-        from weave.legacy.ecosystem import langchain, replicate
+        from weave.legacy.weave.ecosystem import langchain, replicate
     except ImportError:
         pass
 
@@ -124,7 +129,7 @@ def import_ecosystem():
         # except (ImportError, OSError, wandb.Error):
         #     print("Error: Couldn't import faiss module for Weaveflow.")
         try:
-            from weave.legacy.ecosystem import all
+            from weave.legacy.weave.ecosystem import all
         except (ImportError, OSError, wandb.Error):
             pass
 
@@ -436,9 +441,17 @@ def frontend_env():
     }
 
 
+def legacy_weave_redirect():
+    return redirect("https://wandb.github.io/weave/", code=302)
+
+
 @blueprint.route("/__frontend", defaults={"path": None})
 @blueprint.route("/__frontend/<path:path>")
 def frontend(path):
+    # Redirect to the new docs site
+    if not environment.env_is_ci():
+        return legacy_weave_redirect()
+
     """Serve the frontend with a simple fileserver over HTTP."""
     # We serve up a dynamic env.js file before all other js.
     if path is not None and path.endswith("env.js"):
@@ -457,6 +470,10 @@ def frontend(path):
 @blueprint.route("/", defaults={"path": None})
 @blueprint.route("/<path:path>")
 def root_frontend(path):
+    # Redirect to the new docs site
+    if not environment.env_is_ci():
+        return legacy_weave_redirect()
+
     if request.args.get("unsetBetaVersion") is not None:
         resp = redirect_without_query_param("unsetBetaVersion")
         resp.set_cookie("betaVersion", "", max_age=0)

@@ -17,6 +17,7 @@ import {Box, Typography} from '@mui/material';
 import {
   GridColumnVisibilityModel,
   GridFilterModel,
+  GridLogicOperator,
   GridPaginationModel,
   GridPinnedColumns,
   GridRowSelectionModel,
@@ -27,7 +28,6 @@ import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import React, {
   FC,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -37,10 +37,10 @@ import {useHistory} from 'react-router-dom';
 
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
-import {
-  useWeaveflowCurrentRouteContext,
-  WeaveHeaderExtrasContext,
-} from '../../context';
+import {Tailwind} from '../../../../../Tailwind';
+import {useWeaveflowCurrentRouteContext} from '../../context';
+import {getDefaultOperatorForValue} from '../../filters/common';
+import {FilterPanel} from '../../filters/FilterPanel';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
@@ -68,6 +68,7 @@ import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
   ExportSelector,
+  RefreshButton,
 } from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
 import {WFHighLevelCallFilter} from './callsTableFilter';
@@ -102,6 +103,10 @@ export const DEFAULT_PIN_CALLS: GridPinnedColumns = {
 export const DEFAULT_SORT_CALLS: GridSortModel = [
   {field: 'started_at', sort: 'desc'},
 ];
+export const DEFAULT_FILTER_CALLS: GridFilterModel = {
+  items: [],
+  logicOperator: GridLogicOperator.And,
+};
 
 const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   pageSize: DEFAULT_PAGE_SIZE,
@@ -116,13 +121,18 @@ export const CallsTable: FC<{
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
-  hideControls?: boolean;
+
+  hideControls?: boolean; // Hide the entire filter and column bar
+  hideOpSelector?: boolean; // Hide the op selector control
 
   columnVisibilityModel?: GridColumnVisibilityModel;
   setColumnVisibilityModel?: (newModel: GridColumnVisibilityModel) => void;
 
   pinModel?: GridPinnedColumns;
   setPinModel?: (newModel: GridPinnedColumns) => void;
+
+  filterModel?: GridFilterModel;
+  setFilterModel?: (newModel: GridFilterModel) => void;
 
   sortModel?: GridSortModel;
   setSortModel?: (newModel: GridSortModel) => void;
@@ -136,17 +146,19 @@ export const CallsTable: FC<{
   onFilterUpdate,
   frozenFilter,
   hideControls,
+  hideOpSelector,
   columnVisibilityModel,
   setColumnVisibilityModel,
   pinModel,
   setPinModel,
+  filterModel,
+  setFilterModel,
   sortModel,
   setSortModel,
   paginationModel,
   setPaginationModel,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
 
   const isReadonly =
     loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
@@ -176,7 +188,7 @@ export const CallsTable: FC<{
   );
 
   // 2. Filter (Unstructured Filter)
-  const [filterModel, setFilterModel] = useState<GridFilterModel>({items: []});
+  const filterModelResolved = filterModel ?? DEFAULT_FILTER_CALLS;
 
   // 3. Sort
   const sortModelResolved = sortModel ?? DEFAULT_SORT_CALLS;
@@ -223,7 +235,7 @@ export const CallsTable: FC<{
     entity,
     project,
     effectiveFilter,
-    filterModel,
+    filterModelResolved,
     sortModelResolved,
     paginationModelResolved,
     expandedRefCols
@@ -260,6 +272,26 @@ export const CallsTable: FC<{
     [callsResult]
   );
 
+  const onAddFilter =
+    filterModel && setFilterModel
+      ? (field: string, operator: string | null, value: any) => {
+          const op = operator ? operator : getDefaultOperatorForValue(value);
+          const newModel = {
+            ...filterModel,
+            items: [
+              ...filterModel.items,
+              {
+                id: filterModel.items.length,
+                field,
+                operator: op,
+                value,
+              },
+            ],
+          };
+          setFilterModel(newModel);
+        }
+      : undefined;
+
   // Column Management: Build the columns needed for the table
   const {columns, setUserDefinedColumnWidths} = useCallsTableColumns(
     entity,
@@ -269,7 +301,8 @@ export const CallsTable: FC<{
     expandedRefCols,
     onCollapse,
     onExpand,
-    columnIsRefExpanded
+    columnIsRefExpanded,
+    onAddFilter
   );
 
   // Now, there are 4 primary controls:
@@ -366,8 +399,10 @@ export const CallsTable: FC<{
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {
     setFilter({});
-    setFilterModel({items: []});
-  }, [setFilter]);
+    if (setFilterModel) {
+      setFilterModel({items: []});
+    }
+  }, [setFilter, setFilterModel]);
 
   // CPR (Tim) - (GeneralRefactoring): Remove this, and add a slot for empty content that can be calculated
   // in the parent component
@@ -379,6 +414,9 @@ export const CallsTable: FC<{
 
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
+  const clearSelectedCalls = useCallback(() => {
+    setSelectedCalls([]);
+  }, [setSelectedCalls]);
   const muiColumns = useMemo(() => {
     const cols = [
       {
@@ -466,38 +504,6 @@ export const CallsTable: FC<{
   // Register Compare Evaluations Button
   const history = useHistory();
   const router = useWeaveflowCurrentRouteContext();
-  useEffect(() => {
-    if (!isEvaluateTable) {
-      return;
-    }
-    addExtra('compareEvaluations', {
-      node: (
-        <CompareEvaluationsTableButton
-          onClick={() => {
-            history.push(
-              router.compareEvaluationsUri(entity, project, selectedCalls)
-            );
-          }}
-          disabled={selectedCalls.length === 0}
-        />
-      ),
-      order: 1,
-    });
-
-    return () => removeExtra('compareEvaluations');
-  }, [
-    apiRef,
-    addExtra,
-    removeExtra,
-    isEvaluateTable,
-    selectedCalls.length,
-    selectedCalls,
-    tableData,
-    router,
-    entity,
-    project,
-    history,
-  ]);
 
   // We really want to use columns here, but because visibleColumns
   // is a prop to ExportSelector, it causes infinite reloads.
@@ -510,98 +516,13 @@ export const CallsTable: FC<{
     return Array.from(keysSet);
   }, [tableData]);
 
-  // Register Export Button
-  useEffect(() => {
-    const visibleColumns =
-      tableData.length > 0
-        ? allRowKeys.filter(col => columnVisibilityModel?.[col] !== false)
-        : [];
-    addExtra('exportButton', {
-      node: (
-        <ExportSelector
-          selectedCalls={selectedCalls}
-          numTotalCalls={callsTotal}
-          disabled={callsTotal === 0}
-          visibleColumns={visibleColumns}
-          callQueryParams={{
-            entity,
-            project,
-            filter: effectiveFilter,
-            gridFilter: filterModel,
-            gridSort: sortModel,
-          }}
-          rightmostButton={isReadonly}
-        />
-      ),
-      order: 2,
-    });
+  const visibleColumns = useMemo(() => {
+    return tableData.length > 0
+      ? allRowKeys.filter(col => columnVisibilityModel?.[col] !== false)
+      : [];
+  }, [allRowKeys, columnVisibilityModel, tableData]);
 
-    return () => removeExtra('exportButton');
-  }, [
-    selectedCalls,
-    callsTotal,
-    tableData,
-    allRowKeys,
-    columnVisibilityModel,
-    entity,
-    project,
-    isReadonly,
-    effectiveFilter,
-    filterModel,
-    sortModel,
-    addExtra,
-    removeExtra,
-  ]);
-
-  // Register Delete Button
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
-  useEffect(() => {
-    if (isReadonly) {
-      return;
-    }
-    addExtra('deleteSelectedCalls', {
-      node: (
-        <BulkDeleteButton
-          onClick={() => setDeleteConfirmModalOpen(true)}
-          disabled={selectedCalls.length === 0}
-        />
-      ),
-      order: 3,
-    });
-
-    return () => removeExtra('deleteSelectedCalls');
-  }, [addExtra, removeExtra, selectedCalls, isEvaluateTable, isReadonly]);
-
-  useEffect(() => {
-    if (isReadonly) {
-      return;
-    }
-    addExtra('deleteSelectedCallsModal', {
-      node: (
-        <ConfirmDeleteModal
-          calls={tableData
-            .filter(row => selectedCalls.includes(row.id))
-            .map(traceCallToUICallSchema)}
-          confirmDelete={deleteConfirmModalOpen}
-          setConfirmDelete={setDeleteConfirmModalOpen}
-          onDeleteCallback={() => {
-            setSelectedCalls([]);
-          }}
-        />
-      ),
-      order: -1,
-    });
-    return () => removeExtra('deleteSelectedCallsModal');
-  }, [
-    addExtra,
-    removeExtra,
-    selectedCalls,
-    deleteConfirmModalOpen,
-    isReadonly,
-    entity,
-    project,
-    tableData,
-  ]);
 
   // Called in reaction to Hide column menu
   const onColumnVisibilityModelChange = setColumnVisibilityModel
@@ -653,52 +574,68 @@ export const CallsTable: FC<{
       filterListSx={{
         pb: 1,
         display: hideControls ? 'none' : 'flex',
+        alignItems: 'center',
       }}
       filterListItems={
-        <>
-          <ListItem sx={{minWidth: '190px'}}>
-            <FormControl fullWidth>
-              <Autocomplete
-                PaperComponent={paperProps => <StyledPaper {...paperProps} />}
-                size="small"
-                // Temp disable multiple for simplicity - may want to re-enable
-                // multiple
-                limitTags={1}
-                disabled={Object.keys(frozenFilter ?? {}).includes(
-                  'opVersions'
-                )}
-                value={selectedOpVersionOption}
-                onChange={(event, newValue) => {
-                  if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
-                    setFilter({
-                      ...filter,
-                      opVersionRefs: [],
-                    });
-                  } else {
-                    setFilter({
-                      ...filter,
-                      opVersionRefs: newValue ? [newValue] : [],
-                    });
-                  }
-                }}
-                renderInput={renderParams => (
-                  <StyledTextField
-                    {...renderParams}
-                    label={OP_FILTER_GROUP_HEADER}
-                    sx={{maxWidth: '350px'}}
+        <Tailwind style={{display: 'contents'}}>
+          {!hideOpSelector && (
+            <div className="flex-none">
+              <ListItem sx={{minWidth: 190, width: 320}}>
+                <FormControl fullWidth>
+                  <Autocomplete
+                    PaperComponent={paperProps => (
+                      <StyledPaper {...paperProps} />
+                    )}
+                    size="small"
+                    // Temp disable multiple for simplicity - may want to re-enable
+                    // multiple
+                    limitTags={1}
+                    disabled={Object.keys(frozenFilter ?? {}).includes(
+                      'opVersions'
+                    )}
+                    value={selectedOpVersionOption}
+                    onChange={(event, newValue) => {
+                      if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
+                        setFilter({
+                          ...filter,
+                          opVersionRefs: [],
+                        });
+                      } else {
+                        setFilter({
+                          ...filter,
+                          opVersionRefs: newValue ? [newValue] : [],
+                        });
+                      }
+                    }}
+                    renderInput={renderParams => (
+                      <StyledTextField
+                        {...renderParams}
+                        label={OP_FILTER_GROUP_HEADER}
+                        sx={{maxWidth: '350px'}}
+                      />
+                    )}
+                    getOptionLabel={option => {
+                      return opVersionOptions[option]?.title ?? 'loading...';
+                    }}
+                    disableClearable={
+                      selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
+                    }
+                    groupBy={option => opVersionOptions[option]?.group}
+                    options={Object.keys(opVersionOptions)}
                   />
-                )}
-                getOptionLabel={option => {
-                  return opVersionOptions[option]?.title ?? 'loading...';
-                }}
-                disableClearable={
-                  selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
-                }
-                groupBy={option => opVersionOptions[option]?.group}
-                options={Object.keys(opVersionOptions)}
-              />
-            </FormControl>
-          </ListItem>
+                </FormControl>
+              </ListItem>
+            </div>
+          )}
+          {filterModel && setFilterModel && (
+            <FilterPanel
+              filterModel={filterModel}
+              columnInfo={columns}
+              setFilterModel={setFilterModel}
+              selectedCalls={selectedCalls}
+              clearSelectedCalls={clearSelectedCalls}
+            />
+          )}
           {selectedInputObjectVersion && (
             <Chip
               label={`Input: ${objectVersionNiceString(
@@ -736,24 +673,77 @@ export const CallsTable: FC<{
               }}
             />
           )}
-          <div style={{flex: '1 1 auto'}} />
-          {columnVisibilityModel && setColumnVisibilityModel && (
-            <div>
-              <ManageColumnsButton
-                columnInfo={columns}
-                columnVisibilityModel={columnVisibilityModel}
-                setColumnVisibilityModel={setColumnVisibilityModel}
+          {isEvaluateTable && (
+            <CompareEvaluationsTableButton
+              onClick={() => {
+                history.push(
+                  router.compareEvaluationsUri(entity, project, selectedCalls)
+                );
+              }}
+              disabled={selectedCalls.length === 0}
+            />
+          )}
+          {!isReadonly && (
+            <div className="flex-none">
+              <BulkDeleteButton
+                onClick={() => setDeleteConfirmModalOpen(true)}
+                disabled={selectedCalls.length === 0}
+              />
+              <ConfirmDeleteModal
+                calls={tableData
+                  .filter(row => selectedCalls.includes(row.id))
+                  .map(traceCallToUICallSchema)}
+                confirmDelete={deleteConfirmModalOpen}
+                setConfirmDelete={setDeleteConfirmModalOpen}
+                onDeleteCallback={() => {
+                  setSelectedCalls([]);
+                }}
               />
             </div>
           )}
-        </>
+          <ButtonDivider />
+
+          <div className="flex-none">
+            <ExportSelector
+              selectedCalls={selectedCalls}
+              numTotalCalls={callsTotal}
+              disabled={callsTotal === 0}
+              visibleColumns={visibleColumns}
+              // Remove cols from expandedRefs if it's not in visibleColumns (probably just inputs.example)
+              refColumnsToExpand={Array.from(expandedRefCols).filter(col =>
+                visibleColumns.includes(col)
+              )}
+              callQueryParams={{
+                entity,
+                project,
+                filter: effectiveFilter,
+                gridFilter: filterModel ?? DEFAULT_FILTER_CALLS,
+                gridSort: sortModel,
+              }}
+            />
+          </div>
+          {columnVisibilityModel && setColumnVisibilityModel && (
+            <>
+              <ButtonDivider />
+              <div className="flex-none">
+                <ManageColumnsButton
+                  columnInfo={columns}
+                  columnVisibilityModel={columnVisibilityModel}
+                  setColumnVisibilityModel={setColumnVisibilityModel}
+                />
+              </div>
+            </>
+          )}
+          <ButtonDivider />
+          <RefreshButton onClick={() => calls.refetch()} />
+        </Tailwind>
       }>
       <StyledDataGrid
         // Start Column Menu
         // ColumnMenu is needed to support pinning and column visibility
         disableColumnMenu={false}
         // ColumnFilter is definitely useful
-        disableColumnFilter={false}
+        disableColumnFilter={true}
         disableMultipleColumnsFiltering={false}
         // ColumnPinning seems to be required in DataGridPro, else it crashes.
         // However, in this case it is also useful.
@@ -781,11 +771,6 @@ export const CallsTable: FC<{
         sortModel={sortModel}
         onSortModelChange={onSortModelChange}
         // SORT SECTION END
-        // FILTER SECTION START
-        filterMode="server"
-        filterModel={filterModel}
-        onFilterModelChange={newModel => setFilterModel(newModel)}
-        // FILTER SECTION END
         // PAGINATION SECTION START
         pagination
         rowCount={callsTotal}
@@ -827,7 +812,7 @@ export const CallsTable: FC<{
                 return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
               } else if (
                 effectiveFilter.traceRootsOnly &&
-                filterModel.items.length === 0
+                filterModelResolved.items.length === 0
               ) {
                 return <Empty {...EMPTY_PROPS_TRACES} />;
               }
@@ -872,6 +857,10 @@ export const CallsTable: FC<{
     </FilterLayoutTemplate>
   );
 };
+
+const ButtonDivider = () => (
+  <div className="h-24 flex-none border-l-[1px] border-moon-250"></div>
+);
 
 const useParentIdOptions = (
   entity: string,

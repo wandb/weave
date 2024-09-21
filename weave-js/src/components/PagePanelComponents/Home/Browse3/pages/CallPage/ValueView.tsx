@@ -1,8 +1,10 @@
 import React, {useMemo} from 'react';
 
-import {parseRef} from '../../../../../../react';
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
-import {isRef} from '../common/util';
+import {isWeaveRef} from '../../filters/common';
+import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
+import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {
   DataTableView,
   USE_TABLE_FOR_ARRAYS,
@@ -27,11 +29,23 @@ type ValueViewProps = {
 export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   const opDefRef = useMemo(() => parseRefMaybe(data.value ?? ''), [data.value]);
   if (!data.isLeaf) {
+    if (data.valueType === 'object' && Object.keys(data.value).length === 0) {
+      return <ValueViewPrimitive>Empty object</ValueViewPrimitive>;
+    }
     if (data.valueType === 'object' && '_ref' in data.value) {
-      return <SmallRef objRef={parseRef(data.value._ref)} />;
+      const innerRef = data.value._ref;
+      const ref = parseRefMaybe(innerRef);
+      if (ref != null) {
+        return <SmallRef objRef={ref} />;
+      } else {
+        console.error('Expected ref, found', innerRef, typeof innerRef);
+      }
     }
     if (USE_TABLE_FOR_ARRAYS && data.valueType === 'array') {
       return <DataTableView data={data.value} />;
+    }
+    if (data.valueType === 'array' && data.value.length === 0) {
+      return <ValueViewPrimitive>Empty List</ValueViewPrimitive>;
     }
     return null;
   }
@@ -42,7 +56,7 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   if (data.value === null) {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
   }
-  if (isRef(data.value)) {
+  if (isWeaveRef(data.value)) {
     if (
       opDefRef &&
       opDefRef.scheme === 'weave' &&
@@ -72,10 +86,43 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   }
 
   if (data.valueType === 'array') {
+    if (data.value.length === 0) {
+      return <ValueViewPrimitive>Empty List</ValueViewPrimitive>;
+    }
     // Compared to toString this keeps the square brackets.
-    // This is particularly helpful for empty lists, for which toString would return an empty string.
     return <div>{JSON.stringify(data.value)}</div>;
   }
 
+  if (data.valueType === 'object') {
+    if (isCustomWeaveTypePayload(data.value)) {
+      // This is a little ugly, but essentially if the data is coming from an
+      // expanded ref, then we want to use that ref to get the entity and project.
+      // Else we just use the current entity and project.
+      let entityForWeaveType: string | undefined;
+      let projectForWeaveType: string | undefined;
+
+      if (valueIsExpandedRef(data)) {
+        const parsedRef = parseRef((data.value as any)._ref);
+        if (isWeaveObjectRef(parsedRef)) {
+          entityForWeaveType = parsedRef.entityName;
+          projectForWeaveType = parsedRef.projectName;
+        }
+      }
+
+      // If we have have a custom view for this weave type, use it.
+      return (
+        <CustomWeaveTypeDispatcher
+          data={data.value}
+          entity={entityForWeaveType}
+          project={projectForWeaveType}
+        />
+      );
+    }
+  }
+
   return <div>{data.value.toString()}</div>;
+};
+
+const valueIsExpandedRef = (data: ValueData) => {
+  return data.value != null && (data.value as any)._ref != null;
 };

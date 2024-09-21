@@ -22,9 +22,9 @@ from weave.flow.scorer import (
 )
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
-from weave.trace.op import Op
+from weave.trace.op import Op, as_op, is_op
 from weave.trace.vals import WeaveObject
-from weave.weave_client import get_ref
+from weave.trace.weave_client import get_ref
 
 console = Console()
 
@@ -39,7 +39,8 @@ def async_call(
     func: typing.Union[Callable, Op], *args: Any, **kwargs: Any
 ) -> typing.Coroutine:
     is_async = False
-    if isinstance(func, Op):
+    if is_op(func):
+        func = as_op(func)
         is_async = inspect.iscoroutinefunction(func.resolve_fn)
     else:
         is_async = inspect.iscoroutinefunction(func)
@@ -111,9 +112,9 @@ class Evaluation(Object):
                 raise ValueError(
                     f"Scorer {scorer.__name__} must be an instance, not a class. Did you forget to instantiate?"
                 )
-            elif callable(scorer) and not isinstance(scorer, Op):
+            elif callable(scorer) and not is_op(scorer):
                 scorer = weave.op()(scorer)
-            elif isinstance(scorer, Op):
+            elif is_op(scorer):
                 pass
             else:
                 raise ValueError(f"Invalid scorer: {scorer}")
@@ -141,12 +142,13 @@ class Evaluation(Object):
             model_predict = get_infer_method(model)
 
         model_predict_fn_name = (
-            model_predict.name
-            if isinstance(model_predict, Op)
+            as_op(model_predict).name
+            if is_op(model_predict)
             else model_predict.__name__
         )
 
-        if isinstance(model_predict, Op):
+        if is_op(model_predict):
+            model_predict = as_op(model_predict)
             predict_signature = model_predict.signature
         else:
             predict_signature = inspect.signature(model_predict)
@@ -198,7 +200,8 @@ class Evaluation(Object):
         scorers = typing.cast(list[Union[Op, Scorer]], self.scorers or [])
         for scorer in scorers:
             scorer_name, score_fn, _ = get_scorer_attributes(scorer)
-            if isinstance(score_fn, Op):
+            if is_op(score_fn):
+                score_fn = as_op(score_fn)
                 score_signature = score_fn.signature
             else:
                 score_signature = inspect.signature(score_fn)
@@ -352,12 +355,12 @@ def is_valid_model(model: Any) -> bool:
         # Model instances are supported
         isinstance(model, Model)
         # Ops are supported
-        or isinstance(model, Op)
+        or is_op(model)
         # Saved Models (Objects with predict) are supported
         or (
             get_ref(model) is not None
             and isinstance(model, WeaveObject)
             and hasattr(model, "predict")
-            and isinstance(model.predict, Op)
+            and is_op(model.predict)
         )
     )

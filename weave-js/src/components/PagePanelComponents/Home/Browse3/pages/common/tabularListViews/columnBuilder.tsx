@@ -9,12 +9,16 @@ import React from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../../react';
 import {ErrorBoundary} from '../../../../../../ErrorBoundary';
-import {flattenObject} from '../../../../Browse2/browse2Util';
+import {flattenObjectPreservingWeaveTypes} from '../../../../Browse2/browse2Util';
 import {CellValue} from '../../../../Browse2/CellValue';
 import {CollapseHeader} from '../../../../Browse2/CollapseGroupHeader';
 import {ExpandHeader} from '../../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../../Browse2/SmallRef';
+import {CellFilterWrapper} from '../../../filters/CellFilterWrapper';
+import {isWeaveRef} from '../../../filters/common';
+import {isCustomWeaveTypePayload} from '../../../typeViews/customWeaveType.types';
+import {CustomWeaveTypeProjectContext} from '../../../typeViews/CustomWeaveTypeDispatcher';
 import {
   OBJECT_ATTR_EDGE_NAME,
   WEAVE_PRIVATE_PREFIX,
@@ -28,9 +32,7 @@ import {
   isTableRef,
   makeRefExpandedPayload,
 } from '../../wfReactInterface/tsDataModelHooksCallRefExpansion';
-import {isRef} from '../util';
 import {buildTree} from './buildTree';
-import {allOperators} from './operators';
 
 /**
  * This function is responsible for taking the raw data and flattening it
@@ -60,7 +62,15 @@ export function prepareFlattenedDataForTable<T>(
 ): Array<T & {[key: string]: string}> {
   return data.map(r => {
     // First, flatten the inner object
-    let flattened = flattenObject(r ?? {});
+    let flattened = flattenObjectPreservingWeaveTypes(r ?? {});
+
+    // In the rare case that we have custom objects in the root (this only occurs if you directly)
+    // publish a custom object. Then we want to instead nest it under an empty key!
+    if (isCustomWeaveTypePayload(flattened)) {
+      flattened = {
+        ' ': flattened,
+      };
+    }
 
     flattened = replaceTableRefsInFlattenedData(flattened);
 
@@ -127,7 +137,7 @@ export function prepareFlattenedDataForTable<T>(
 function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
   return Object.fromEntries(
     Object.entries(flattened).map(([key, val]) => {
-      if (isRef(val)) {
+      if (isWeaveRef(val)) {
         const parsedRef = parseRef(val);
         if (isWeaveObjectRef(parsedRef)) {
           if (parsedRef.weaveKind === 'table') {
@@ -140,7 +150,7 @@ function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
                   lookupPath.join('.') + '.' + EXPANDED_REF_REF_KEY;
                 if (parentKey in flattened) {
                   const parentVal = flattened[parentKey];
-                  if (isRef(parentVal)) {
+                  if (isWeaveRef(parentVal)) {
                     parentRef = parentVal;
                   }
                   break;
@@ -150,7 +160,11 @@ function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
               if (parentRef) {
                 const newVal: ExpandedRefWithValueAsTableRef =
                   makeRefExpandedPayload(
-                    parentRef + '/' + OBJECT_ATTR_EDGE_NAME + '/' + attr,
+                    parentRef +
+                      '/' +
+                      OBJECT_ATTR_EDGE_NAME +
+                      '/' +
+                      encodeURIComponent(attr),
                     val
                   );
                 return [key, newVal];
@@ -182,13 +196,14 @@ const isExpandedRefWithValueAsTableRef = (
 
 export const buildDynamicColumns = <T extends GridValidRowModel>(
   filteredDynamicColumnNames: string[],
+  entityProjectFromRow: (row: T) => {entity: string; project: string},
   valueForKey: (row: T, key: string) => any,
   columnIsExpanded?: (col: string) => boolean,
   columnCanBeExpanded?: (col: string) => boolean,
   onCollapse?: (col: string) => void,
   onExpand?: (col: string) => void,
-  columnIsFilterable?: (col: string) => boolean,
-  columnIsSortable?: (col: string) => boolean
+  columnIsSortable?: (col: string) => boolean,
+  onAddFilter?: (field: string, operator: string | null, value: any) => void
 ) => {
   const cols: Array<GridColDef<T>> = [];
 
@@ -245,9 +260,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       flex: 1,
       minWidth: 150,
       field: key,
-      filterable: columnIsFilterable && columnIsFilterable(key),
       sortable: columnIsSortable && columnIsSortable(key),
-      filterOperators: allOperators,
       headerName: key,
       renderHeader: () => {
         return (
@@ -271,21 +284,44 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
         return val;
       },
       renderCell: cellParams => {
+        const {entity, project} = entityProjectFromRow(cellParams.row);
         const val = valueForKey(cellParams.row, key);
         if (val === undefined) {
-          return <NotApplicable />;
+          return (
+            <CellFilterWrapper
+              onAddFilter={onAddFilter}
+              field={key}
+              operation={'(any): isEmpty'}
+              value={undefined}>
+              <NotApplicable />
+            </CellFilterWrapper>
+          );
         }
         return (
           <ErrorBoundary>
-            {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition
+            <CellFilterWrapper
+              onAddFilter={onAddFilter}
+              field={key}
+              operation={null}
+              value={val}
+              style={{
+                width: '100%',
+                height: '100%',
+                alignContent: 'center',
+              }}>
+              {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition
             into `CellValue`. However, at the moment, `ExpandedRefWithValueAsTableRef` is a
             Table-specific data structure and we might not want to leak that into the
             rest of the system*/}
-            {isExpandedRefWithValueAsTableRef(val) ? (
-              <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
-            ) : (
-              <CellValue value={val} />
-            )}
+              {isExpandedRefWithValueAsTableRef(val) ? (
+                <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
+              ) : (
+                <CustomWeaveTypeProjectContext.Provider
+                  value={{entity, project}}>
+                  <CellValue value={val} />
+                </CustomWeaveTypeProjectContext.Provider>
+              )}
+            </CellFilterWrapper>
           </ErrorBoundary>
         );
       },

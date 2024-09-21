@@ -1,32 +1,32 @@
 import Box from '@mui/material/Box';
-import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {Loading} from '@wandb/weave/components/Loading';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {FC, useCallback} from 'react';
+import React, {FC, useCallback, useEffect, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {
-  TRACETREE_PARAM,
-  useClosePeek,
-  useWeaveflowCurrentRouteContext,
-} from '../../context';
+import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
+import {NotFoundPanel} from '../../NotFoundPanel';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
-import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {
+  ScrollableTabContent,
+  SimplePageLayoutWithHeader,
+} from '../common/SimplePageLayout';
+import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
 import {TabUseCall} from '../TabUseCall';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallChat, isCallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
-
 export const CallPage: FC<{
   entity: string;
   project: string;
@@ -34,7 +34,6 @@ export const CallPage: FC<{
   path?: string;
 }> = props => {
   const {useCall} = useWFHooks();
-  const close = useClosePeek();
 
   const call = useCall({
     entity: props.entity,
@@ -45,16 +44,7 @@ export const CallPage: FC<{
   if (call.loading) {
     return <CenteredAnimatedLoader />;
   } else if (call.result === null) {
-    return (
-      <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
-        <div style={{alignSelf: 'flex-end', margin: 10}}>
-          <Button icon="close" variant="ghost" onClick={close} />
-        </div>
-        <div style={{flex: 1}}>
-          <ErrorPanel title="Call not found" subtitle="" subtitle2="" />
-        </div>
-      </div>
-    );
+    return <NotFoundPanel title="Call not found" />;
   }
   return <CallPageInnerVertical {...props} call={call.result} />;
 };
@@ -64,6 +54,34 @@ const useCallTabs = (call: CallSchema) => {
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
   return [
+    ...(isEvaluateOp(call.spanName)
+      ? [
+          {
+            label: 'Evaluation',
+            content: (
+              <CompareEvaluationsPageContent
+                entity={call.entity}
+                project={call.project}
+                evaluationCallIds={[call.callId]}
+              />
+            ),
+          },
+        ]
+      : []),
+    ...(isCallChat(call)
+      ? [
+          {
+            label: 'Chat',
+            content: (
+              <ScrollableTabContent>
+                <Tailwind>
+                  <CallChat call={call.traceCall!} />
+                </Tailwind>
+              </ScrollableTabContent>
+            ),
+          },
+        ]
+      : []),
     {
       label: 'Call',
       content: <CallDetails call={call} />,
@@ -106,6 +124,7 @@ const CallPageInnerVertical: FC<{
 }> = ({call, path}) => {
   useViewTraceEvent(call);
 
+  const {useCall} = useWFHooks();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
 
@@ -139,16 +158,30 @@ const CallPageInnerVertical: FC<{
 
   const tree = useCallFlattenedTraceTree(call, path ?? null);
   const {rows, expandKeys, loading} = tree;
-  let {selectedCall} = tree;
+
+  const {selectedCall} = tree;
+  const callComplete = useCall({
+    entity: selectedCall.entity,
+    project: selectedCall.project,
+    callId: selectedCall.callId,
+  });
 
   const assumeCallIsSelectedCall = path == null || path === '';
+  const [currentCall, setCurrentCall] = useState(call);
 
-  if (assumeCallIsSelectedCall) {
-    // Allows us to bypass the loading state when the call is already selected.
-    selectedCall = call;
-  }
+  useEffect(() => {
+    if (assumeCallIsSelectedCall) {
+      setCurrentCall(selectedCall);
+    }
+  }, [assumeCallIsSelectedCall, selectedCall]);
 
-  const callTabs = useCallTabs(selectedCall);
+  useEffect(() => {
+    if (!callComplete.loading && callComplete.result) {
+      setCurrentCall(callComplete.result);
+    }
+  }, [callComplete]);
+
+  const callTabs = useCallTabs(currentCall);
 
   if (loading && !assumeCallIsSelectedCall) {
     return <Loading centered />;
@@ -171,14 +204,14 @@ const CallPageInnerVertical: FC<{
         </Box>
       }
       isSidebarOpen={showTraceTree}
-      headerContent={<CallOverview call={selectedCall} />}
+      headerContent={<CallOverview call={currentCall} />}
       leftSidebar={
         loading ? (
           <Loading centered />
         ) : (
           <CallTraceView
             call={call}
-            selectedCall={selectedCall}
+            selectedCall={currentCall}
             rows={rows}
             forcedExpandKeys={expandKeys}
             path={path}

@@ -1,5 +1,10 @@
 # These are the base Weave requirements, enough for weave tracking and evaluation
 # to work.
+# -r requirements.legacy.txt
+# COPIED FROM LEGACY:
+# =======================================
+# These are the base Weave requirements, enough for weave tracking and evaluation
+# to work.
 
 # Type annotations, we need ParamSpec in python3.9
 typing_extensions>=4.0.0
@@ -41,6 +46,34 @@ numpy<2.0.0
 
 # Segment logging
 analytics-python>=1.2.9
+
+# Used for ISO date parsing.
+python-dateutil>=2.8.2
+
+# Used for version parsing in integrations.
+packaging>=21.0
+
+# Need to exclude the 8.4.0 version of tenacity because it has a bug
+# on import of AsyncRetrying
+tenacity>=8.3.0,!=8.4.0
+
+
+# Used for emoji shortcode support in feedback
+emoji>=2.12.1
+
+# Used for ID Generation - remove once python's
+# built-in uuid module is updated to support UUIDv7
+uuid-utils>=0.9.0
+# =======================================
+
+pydantic>=2.0.0
+wandb>=0.17.1
+
+# Segment logging
+analytics-python>=1.2.9
+
+# Used for ISO date parsing.
+python-dateutil>=2.8.2
 
 # Used for version parsing in integrations.
 packaging>=21.0

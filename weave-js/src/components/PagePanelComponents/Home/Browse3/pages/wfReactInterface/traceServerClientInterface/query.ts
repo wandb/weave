@@ -40,6 +40,10 @@ type GtOperation = {
   $gt: [Operand, Operand];
 };
 
+type InOperation = {
+  $in: [Operand, Operand[]];
+};
+
 type GteOperation = {
   $gte: [Operand, Operand];
 };
@@ -61,6 +65,7 @@ type Operation =
   | EqOperation
   | GtOperation
   | GteOperation
+  | InOperation
   | ContainsOperation;
 
 type Operand =

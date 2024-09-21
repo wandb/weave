@@ -1,5 +1,6 @@
 import dataclasses
-from typing import Any, Union
+import urllib
+from typing import Any, Optional, Union
 
 from ..trace_server import refs_internal
 
@@ -20,6 +21,7 @@ class TableRef(Ref):
     entity: str
     project: str
     digest: str
+    row_digests: Optional[list[str]] = None
 
     def uri(self) -> str:
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
@@ -53,18 +55,25 @@ class ObjectRef(RefWithExtra):
     digest: str
     extra: tuple[str, ...] = ()
 
+    def __post_init__(self) -> None:
+        refs_internal.validate_no_slashes(self.digest, "digest")
+        refs_internal.validate_no_colons(self.digest, "digest")
+        refs_internal.validate_extra(list(self.extra))
+        refs_internal.validate_no_slashes(self.name, "name")
+        refs_internal.validate_no_colons(self.name, "name")
+
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.digest}"
         if self.extra:
-            u += "/" + "/".join(self.extra)
+            u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
     def get(self) -> Any:
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
         # that should be removed.
-        from weave.client_context.weave_client import get_weave_client
-        from weave.weave_init import init_weave
+        from weave.trace.client_context.weave_client import get_weave_client
+        from weave.trace.weave_init import init_weave
 
         gc = get_weave_client()
         if gc is not None:
@@ -106,7 +115,7 @@ class OpRef(ObjectRef):
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/op/{self.name}:{self.digest}"
         if self.extra:
-            u += "/" + "/".join(self.extra)
+            u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
 
@@ -120,11 +129,11 @@ class CallRef(RefWithExtra):
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/call/{self.id}"
         if self.extra:
-            u += "/" + "/".join(self.extra)
+            u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
 
-AnyRef = Union[ObjectRef, TableRef, CallRef]
+AnyRef = Union[ObjectRef, TableRef, CallRef, OpRef]
 
 
 def parse_uri(uri: str) -> AnyRef:
@@ -138,27 +147,24 @@ def parse_uri(uri: str) -> AnyRef:
     remaining = tuple(parts[3:])
     if kind == "table":
         return TableRef(entity=entity, project=project, digest=remaining[0])
-    elif kind == "call":
-        return CallRef(
-            entity=entity, project=project, id=remaining[0], extra=remaining[1:]
-        )
+    extra = tuple(urllib.parse.unquote(r) for r in remaining[1:])
+    if kind == "call":
+        return CallRef(entity=entity, project=project, id=remaining[0], extra=extra)
     elif kind == "object":
         name, version = remaining[0].split(":")
         return ObjectRef(
-            entity=entity,
-            project=project,
-            name=name,
-            digest=version,
-            extra=remaining[1:],
+            entity=entity, project=project, name=name, digest=version, extra=extra
         )
     elif kind == "op":
         name, version = remaining[0].split(":")
         return OpRef(
-            entity=entity,
-            project=project,
-            name=name,
-            digest=version,
-            extra=remaining[1:],
+            entity=entity, project=project, name=name, digest=version, extra=extra
         )
     else:
         raise ValueError(f"Unknown ref kind: {kind}")
+
+
+def parse_op_uri(uri: str) -> OpRef:
+    if not isinstance(parsed := parse_uri(uri), OpRef):
+        raise ValueError(f"URI is not for an Op: {uri}")
+    return parsed

@@ -14,7 +14,9 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
-import {isRef} from '../common/util';
+import {isWeaveRef} from '../../filters/common';
+import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
+import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
 import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
 import {ObjectViewer} from './ObjectViewer';
@@ -57,7 +59,7 @@ const isSimpleData = (data: Data): boolean => {
       isSimple = false;
       return false;
     }
-    if (isRef(context.value)) {
+    if (isWeaveRef(context.value)) {
       isSimple = false;
       return false;
     }
@@ -119,7 +121,7 @@ const ObjectViewerSectionNonEmpty = ({
       );
     }
     return null;
-  }, [apiRef, mode, data, expandedIds]);
+  }, [mode, apiRef, data, expandedIds]);
 
   const setTreeExpanded = useCallback(
     (setIsExpanded: boolean) => {
@@ -215,9 +217,20 @@ export const ObjectViewerSection = ({
   noHide,
   isExpanded,
 }: ObjectViewerSectionProps) => {
-  const numKeys = Object.keys(data).length;
   const currentRef = useContext(WeaveCHTableSourceRefContext);
 
+  if (isCustomWeaveTypePayload(data)) {
+    return (
+      <>
+        <TitleRow>
+          <Title>{title}</Title>
+        </TitleRow>
+        <CustomWeaveTypeDispatcher data={data} />
+      </>
+    );
+  }
+
+  const numKeys = Object.keys(data).length;
   if (numKeys === 0) {
     return (
       <>
@@ -229,17 +242,18 @@ export const ObjectViewerSection = ({
     );
   }
   if (numKeys === 1 && '_result' in data) {
-    const value = data._result;
+    let value = data._result;
+    if (isWeaveRef(value)) {
+      // Little hack to make sure that we render refs
+      // inside the expansion table view
+      value = {' ': value};
+    }
     const valueType = getValueType(value);
-    if (
-      valueType === 'object' ||
-      (valueType === 'array' && value.length > 0) ||
-      isRef(value)
-    ) {
+    if (valueType === 'object' || (valueType === 'array' && value.length > 0)) {
       return (
         <ObjectViewerSectionNonEmptyMemoed
           title={title}
-          data={{Value: value}}
+          data={value}
           noHide={noHide}
           isExpanded={isExpanded}
         />

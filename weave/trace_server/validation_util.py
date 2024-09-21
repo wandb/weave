@@ -58,6 +58,6 @@ def require_internal_ref_uri(
 
 
 def require_max_str_len(s: str, length: int) -> str:
-    if len(s) >= length:
+    if len(s) > length:
         raise CHValidationError(f"String too long: {s}. Max length is {length}")
     return s

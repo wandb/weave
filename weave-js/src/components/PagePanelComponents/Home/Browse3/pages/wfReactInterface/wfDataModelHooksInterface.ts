@@ -171,16 +171,17 @@ export type WFDataModelHooksInterface = {
     offset?: number,
     sortBy?: traceServerClientTypes.SortBy[],
     query?: Query,
+    columns?: string[],
     expandedRefColumns?: Set<string>,
     opts?: {skip?: boolean; refetchOnDelete?: boolean}
-  ) => Loadable<CallSchema[]>;
+  ) => Loadable<CallSchema[]> & Refetchable;
   useCallsStats: (
     entity: string,
     project: string,
     filter: CallFilter,
     query?: Query,
     opts?: {skip?: boolean; refetchOnDelete?: boolean}
-  ) => Loadable<traceServerClientTypes.TraceCallsQueryStatsRes>;
+  ) => Loadable<traceServerClientTypes.TraceCallsQueryStatsRes> & Refetchable;
   useCallsDeleteFunc: () => (
     entity: string,
     project: string,
@@ -201,7 +202,8 @@ export type WFDataModelHooksInterface = {
     offset?: number,
     sortBy?: traceServerClientTypes.SortBy[],
     query?: Query,
-    columns?: string[]
+    columns?: string[],
+    expandedRefCols?: string[]
   ) => Promise<Blob>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
@@ -236,7 +238,7 @@ export type WFDataModelHooksInterface = {
     project: string,
     digest: string,
     opts?: {skip?: boolean}
-  ) => Loadable<string>;
+  ) => Loadable<ArrayBuffer>;
   useFeedback: (
     key: FeedbackKey | null,
     sortBy?: traceServerClientTypes.SortBy[]

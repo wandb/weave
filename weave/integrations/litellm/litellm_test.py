@@ -6,7 +6,6 @@ import pytest
 import semver
 
 import weave
-from weave.trace_server import trace_server_interface as tsi
 
 from .litellm import litellm_patcher
 
@@ -26,17 +25,6 @@ class Nearly:
 
     def __eq__(self, other: Any) -> bool:
         return abs(self.v - other) < 2
-
-
-def _get_call_output(call: tsi.CallSchema) -> Any:
-    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
-
-    Keeping this here for now, but it should be removed in the future once we have a better solution.
-    """
-    call_output = call.output
-    if isinstance(call_output, str) and call_output.startswith("weave://"):
-        return weave.ref(call_output).get()
-    return call_output
 
 
 @pytest.fixture(scope="package")
@@ -60,7 +48,7 @@ def patch_litellm(request: Any) -> Generator[None, None, None]:
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 def test_litellm_quickstart(
-    client: weave.weave_client.WeaveClient, patch_litellm: None
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = litellm.completion(
@@ -73,11 +61,11 @@ def test_litellm_quickstart(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you. How can I assist you today?"""
 
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 2
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 2
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chat_response.id
@@ -86,13 +74,16 @@ def test_litellm_quickstart(
     assert output["created"] == Nearly(chat_response.created)
     summary = call.summary
     assert summary is not None
-    model_usage = summary["usage"][output["model"]]
-    assert model_usage["requests"] == 1
-    assert (
-        output["usage"]["completion_tokens"] == model_usage["completion_tokens"] == 31
-    )
-    assert output["usage"]["prompt_tokens"] == model_usage["prompt_tokens"] == 13
-    assert output["usage"]["total_tokens"] == model_usage["total_tokens"] == 44
+    if not USES_RAW_OPENAI_RESPONSE_IN_ASYNC:
+        model_usage = summary["usage"][output["model"]]
+        assert model_usage["requests"] == 1
+        assert (
+            output["usage"]["completion_tokens"]
+            == model_usage["completion_tokens"]
+            == 31
+        )
+        assert output["usage"]["prompt_tokens"] == model_usage["prompt_tokens"] == 13
+        assert output["usage"]["total_tokens"] == model_usage["total_tokens"] == 44
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -101,7 +92,7 @@ def test_litellm_quickstart(
 )
 @pytest.mark.asyncio
 async def test_litellm_quickstart_async(
-    client: weave.weave_client.WeaveClient, patch_litellm: None
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = await litellm.acompletion(
@@ -114,11 +105,11 @@ async def test_litellm_quickstart_async(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you with whatever you need. How can I assist you today?"""
 
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 2
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 2
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chat_response.id
@@ -144,7 +135,7 @@ async def test_litellm_quickstart_async(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 def test_litellm_quickstart_stream(
-    client: weave.weave_client.WeaveClient, patch_litellm: None
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = litellm.completion(
@@ -162,11 +153,11 @@ def test_litellm_quickstart_stream(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you. How can I assist you today?"""
 
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 2
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 2
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chunk.id
@@ -174,11 +165,12 @@ def test_litellm_quickstart_stream(
     assert output["created"] == Nearly(chunk.created)
     summary = call.summary
     assert summary is not None
-    model_usage = summary["usage"][output["model"]]
-    assert model_usage["requests"] == 1
-    assert model_usage["completion_tokens"] == 31
-    assert model_usage["prompt_tokens"] == 13
-    assert model_usage["total_tokens"] == 44
+    if not USES_RAW_OPENAI_RESPONSE_IN_ASYNC:
+        model_usage = summary["usage"][output["model"]]
+        assert model_usage["requests"] == 1
+        assert model_usage["completion_tokens"] == 31
+        assert model_usage["prompt_tokens"] == 13
+        assert model_usage["total_tokens"] == 44
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -187,7 +179,7 @@ def test_litellm_quickstart_stream(
 )
 @pytest.mark.asyncio
 async def test_litellm_quickstart_stream_async(
-    client: weave.weave_client.WeaveClient, patch_litellm: None
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = await litellm.acompletion(
@@ -204,11 +196,11 @@ async def test_litellm_quickstart_stream_async(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here and ready to assist you with any questions or tasks you may have. How can I help you today?"""
 
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 2
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 2
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chunk.id
@@ -231,7 +223,7 @@ async def test_litellm_quickstart_stream_async(
 )
 @pytest.mark.asyncio
 def test_model_predict(
-    client: weave.weave_client.WeaveClient, patch_litellm: None
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
     class TranslatorModel(weave.Model):
         model: str

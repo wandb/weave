@@ -47,6 +47,7 @@ simplifications:
 - [`query.GetFieldOperator`](#class-getfieldoperator)
 - [`query.GtOperation`](#class-gtoperation)
 - [`query.GteOperation`](#class-gteoperation)
+- [`query.InOperation`](#class-inoperation)
 - [`query.LiteralOperation`](#class-literaloperation)
 - [`query.NotOperation`](#class-notoperation)
 - [`query.OrOperation`](#class-oroperation)
@@ -58,7 +59,7 @@ simplifications:
 ---
 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L95"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L85"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `AndOperation`
 
@@ -68,11 +69,11 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$and`: `typing.List[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]]`
+- `$and`: `typing.List[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]]`
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L128"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L123"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ContainsOperation`
 
@@ -86,7 +87,7 @@ simplifications:
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L132"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L127"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ContainsSpec`
 
@@ -96,13 +97,13 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `input`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]`
-- `substr`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]`
+- `input`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]`
+- `substr`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]`
 - `case_insensitive`: `typing.Optional[bool]`
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L81"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L71"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ConvertOperation`
 
@@ -116,7 +117,7 @@ simplifications:
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L88"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L78"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ConvertSpec`
 
@@ -126,12 +127,12 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `input`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]`
+- `input`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]`
 - `to`: `typing.Literal['double', 'string', 'int', 'bool', 'exists']`
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L110"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L100"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `EqOperation`
 
@@ -141,11 +142,11 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$eq`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation], typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]]`
+- `$eq`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation], typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]]`
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L66"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L56"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `GetFieldOperator`
 
@@ -159,7 +160,7 @@ simplifications:
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L115"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L105"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `GtOperation`
 
@@ -169,11 +170,11 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$gt`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation], typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]]`
+- `$gt`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation], typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]]`
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L120"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L110"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `GteOperation`
 
@@ -183,11 +184,25 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$gte`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation], typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]]`
+- `$gte`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation], typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]]`
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L48"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L115"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
+## <kbd>class</kbd> `InOperation`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `$in`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation], list['Operand']]`
+
+---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L38"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `LiteralOperation`
 
@@ -201,7 +216,7 @@ simplifications:
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L105"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L95"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `NotOperation`
 
@@ -211,11 +226,11 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$not`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]]`
+- `$not`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]]`
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L100"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L90"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `OrOperation`
 
@@ -225,11 +240,11 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$or`: `typing.List[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]]`
+- `$or`: `typing.List[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]]`
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L30"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L162"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `Query`
 
@@ -239,4 +254,4 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$expr`: `typing.Union[AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]`
+- `$expr`: `typing.Union[AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]`

@@ -20,8 +20,9 @@ import React, {
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
+import {isWeaveRef} from '../../filters/common';
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {isRef} from '../common/util';
+import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
 import {
   LIST_INDEX_EDGE_NAME,
   OBJECT_ATTR_EDGE_NAME,
@@ -40,7 +41,7 @@ import {
 import {mapObject, ObjectPath, traverse, TraverseContext} from './traverse';
 import {ValueView} from './ValueView';
 
-type Data = Record<string, any>;
+type Data = Record<string, any> | any[];
 
 type ObjectViewerProps = {
   apiRef: React.MutableRefObject<GridApiPro>;
@@ -54,7 +55,7 @@ type ObjectViewerProps = {
 const getRefs = (data: Data): string[] => {
   const refs = new Set<string>();
   traverse(data, (context: TraverseContext) => {
-    if (isRef(context.value)) {
+    if (isWeaveRef(context.value)) {
       refs.add(context.value);
     }
   });
@@ -62,6 +63,8 @@ const getRefs = (data: Data): string[] => {
 };
 
 type RefValues = Record<string, any>; // ref URI to value
+
+const RESOVLED_REF_KEY = '_ref';
 
 // This is a general purpose object viewer that can be used to view any object.
 export const ObjectViewer = ({
@@ -88,6 +91,27 @@ export const ObjectViewer = ({
   const addExpandedRef = useCallback((path: string, ref: string) => {
     setExpandedRefs(eRefs => ({...eRefs, [path]: ref}));
   }, []);
+
+  // This effect will ensure that all "expandedIds" whose value is a ref
+  // have the ref added to the `expandedRefs` state.
+  useEffect(() => {
+    const expandRefsToAdd: {[path: string]: string} = {};
+    const mapper = (context: TraverseContext) => {
+      const contextPath = context.path.toString();
+      if (
+        expandedIds.includes(contextPath) &&
+        isWeaveRef(context.value) &&
+        expandedRefs[contextPath] == null
+      ) {
+        expandRefsToAdd[contextPath] = context.value;
+      }
+      return context.value;
+    };
+    mapObject(resolvedData, mapper);
+    if (Object.keys(expandRefsToAdd).length > 0) {
+      setExpandedRefs(eRefs => ({...eRefs, ...expandRefsToAdd}));
+    }
+  }, [resolvedData, expandedIds, expandedRefs, setExpandedRefs]);
 
   // `refs` is the union of `dataRefs` and the refs in `expandedRefs`.
   const refs = useMemo(() => {
@@ -122,13 +146,13 @@ export const ObjectViewer = ({
         if (typeof val === 'object' && val !== null) {
           val = {
             ...v,
-            _ref: r,
+            [RESOVLED_REF_KEY]: r,
           };
         } else {
           // This makes it so that runs pointing to primitives can still be expanded in the table.
           val = {
             '': v,
-            _ref: r,
+            [RESOVLED_REF_KEY]: r,
           };
         }
       }
@@ -137,11 +161,14 @@ export const ObjectViewer = ({
     let resolved = data;
     let dirty = true;
     const mapper = (context: TraverseContext) => {
-      if (isRef(context.value) && refValues[context.value] != null) {
+      if (
+        isWeaveRef(context.value) &&
+        refValues[context.value] != null &&
+        // Don't expand _ref keys
+        context.path.tail() !== RESOVLED_REF_KEY
+      ) {
         dirty = true;
-        const res = refValues[context.value];
-        delete refValues[context.value];
-        return res;
+        return refValues[context.value];
       }
       return _.clone(context.value);
     };
@@ -163,15 +190,46 @@ export const ObjectViewer = ({
       }
     > = [];
     traverse(resolvedData, context => {
+      // Ops should be migrated to the generic CustomWeaveType pattern, but for
+      // now they are custom handled.
+      const isOpPayload = context.value?.weave_type?.type === 'Op';
+
+      if (isCustomWeaveTypePayload(context.value) && !isOpPayload) {
+        /**
+         * This block adds an "empty" key that is used to render the custom
+         * weave type. In the event that a custom type has both properties AND
+         * custom views, then we might need to extend / modify this part.
+         */
+        const refBackingData = context.value?._ref;
+        let depth = context.depth;
+        let path = context.path;
+        if (refBackingData) {
+          contexts.push({
+            ...context,
+            isExpandableRef: true,
+          });
+          depth += 1;
+          path = context.path.plus('');
+        }
+        contexts.push({
+          depth,
+          isLeaf: true,
+          path,
+          value: context.value,
+          valueType: context.valueType,
+        });
+        return 'skip';
+      }
+
       if (context.depth !== 0) {
         const contextTail = context.path.tail();
-        const isNullDescription =
+        const isNullDescriptionOrName =
           typeof contextTail === 'string' &&
-          contextTail === 'description' &&
+          (contextTail === 'description' || contextTail === 'name') &&
           context.valueType === 'null';
         // For now we'll hide all keys that start with an underscore, is a name field, or is a null description.
         // Eventually we might offer a user toggle to display them.
-        if (context.path.hasHiddenKey() || isNullDescription) {
+        if (context.path.hasHiddenKey() || isNullDescriptionOrName) {
           return 'skip';
         }
         if (isExpandableRef(context.value)) {
@@ -207,7 +265,8 @@ export const ObjectViewer = ({
       if (USE_TABLE_FOR_ARRAYS && context.valueType === 'array') {
         return 'skip';
       }
-      if (context.value?._ref && context.value?.weave_type?.type === 'Op') {
+      if (context.value?._ref && isOpPayload) {
+        // This should be moved to the CustomWeaveType pattern.
         contexts.push({
           depth: context.depth + 1,
           isLeaf: true,
@@ -301,7 +360,7 @@ export const ObjectViewer = ({
                 }
                 return [...eIds, params.row.id];
               });
-              if (isRef(refToExpand)) {
+              if (isWeaveRef(refToExpand)) {
                 addExpandedRef(params.row.id, refToExpand);
               }
             }}
@@ -371,17 +430,22 @@ export const ObjectViewer = ({
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
           const isNonRefString =
-            params.model.valueType === 'string' && !isRef(params.model.value);
+            params.model.valueType === 'string' &&
+            !isWeaveRef(params.model.value);
           const isArray = params.model.valueType === 'array';
           const isTableRef =
-            isRef(params.model.value) &&
+            isWeaveRef(params.model.value) &&
             (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
           const {isCode} = params.model;
+          const isCustomWeaveType = isCustomWeaveTypePayload(
+            params.model.value
+          );
           if (
             isNonRefString ||
             (isArray && USE_TABLE_FOR_ARRAYS) ||
             isTableRef ||
-            isCode
+            isCode ||
+            isCustomWeaveType
           ) {
             return 'auto';
           }
@@ -423,7 +487,7 @@ const buildBaseRef = (
     const parts = path.toPath().slice(-startIndex);
     parts.forEach(part => {
       if (typeof part === 'string') {
-        baseRef += '/' + OBJECT_ATTR_EDGE_NAME + '/' + part;
+        baseRef += '/' + OBJECT_ATTR_EDGE_NAME + '/' + encodeURIComponent(part);
       } else if (typeof part === 'number') {
         baseRef += '/' + LIST_INDEX_EDGE_NAME + '/' + part.toString();
       } else {

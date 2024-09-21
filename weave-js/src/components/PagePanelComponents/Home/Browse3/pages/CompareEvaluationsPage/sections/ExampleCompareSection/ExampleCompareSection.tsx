@@ -15,9 +15,11 @@ import {Button} from '../../../../../../../Button';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
+import {isWeaveRef} from '../../../../filters/common';
+import {isCustomWeaveTypePayload} from '../../../../typeViews/customWeaveType.types';
+import {CustomWeaveTypeDispatcher} from '../../../../typeViews/CustomWeaveTypeDispatcher';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {CallLink} from '../../../common/Links';
-import {isRef} from '../../../common/util';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {
   buildCompositeMetricsMap,
@@ -56,12 +58,14 @@ const PropKey = styled.div`
   text-align: right;
   scrollbar-width: none;
 `;
+PropKey.displayName = 'S.PropKey';
 
 const GridCell = styled.div<{
   colSpan?: number;
   rowSpan?: number;
   button?: boolean;
 }>`
+  font-size: 14px;
   border: 1px solid ${MOON_200};
   grid-column-end: span ${props => props.colSpan || 1};
   grid-row-end: span ${props => props.rowSpan || 1};
@@ -79,6 +83,7 @@ const GridCell = styled.div<{
     }
   `}
 `;
+GridCell.displayName = 'S.GridCell';
 
 const GridCellSubgrid = styled.div<{
   colSpan?: number;
@@ -95,6 +100,7 @@ const GridCellSubgrid = styled.div<{
   grid-template-columns: ${props => props.colsTemp || 'subgrid'};
   overflow: auto;
 `;
+GridCellSubgrid.displayName = 'S.GridCellSubgrid';
 
 const GridContainer = styled.div<{colsTemp: string; rowsTemp: string}>`
   display: grid;
@@ -102,6 +108,7 @@ const GridContainer = styled.div<{colsTemp: string; rowsTemp: string}>`
   grid-template-columns: ${props => props.colsTemp};
   grid-template-rows: ${props => props.rowsTemp};
 `;
+GridContainer.displayName = 'S.GridContainer';
 
 const centeredTextStyleMixin: React.CSSProperties = {
   display: 'flex',
@@ -939,12 +946,26 @@ const removePrefix = (key: string, prefix: string) => {
 };
 
 const ICValueView: React.FC<{value: any}> = ({value}) => {
+  // We should merge this with ValueView.tsx. Unfortunately,
+  // the styling preferences and sizing differ enough to make
+  // this more challenging than it should be.
+
   let text = '';
   if (value == null) {
     return <NotApplicable />;
   } else if (typeof value === 'object') {
+    if (isCustomWeaveTypePayload(value)) {
+      // This is a bit arbitrary sizing. Just forcing 300px for now. It would be
+      // more ideal if `CustomWeaveTypeDispatcher` had some sort of dynamic sizing
+      // that could be applied here.
+      return (
+        <div style={{width: '100%', height: '300px', overflow: 'hidden'}}>
+          <CustomWeaveTypeDispatcher data={value} />
+        </div>
+      );
+    }
     text = JSON.stringify(value || {}, null, 2);
-  } else if (typeof value === 'string' && isRef(value)) {
+  } else if (typeof value === 'string' && isWeaveRef(value)) {
     return <SmallRef objRef={parseRef(value)} />;
   } else {
     text = value.toString();
@@ -960,11 +981,13 @@ const ICValueView: React.FC<{value: any}> = ({value}) => {
         wordBreak: 'break-all',
         padding: 0,
         margin: 0,
+        fontFamily: 'Inconsolata',
       }}>
       {text}
     </pre>
   );
 };
+
 const trimWhitespace = (str: string) => {
   // Trim leading and trailing whitespace
   return str.replace(/^\s+|\s+$/g, '');

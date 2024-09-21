@@ -131,7 +131,9 @@ export const useOpVersionOptions = (
 
   // Get all the versions of the currently selected op
   const currentRef = effectiveFilter.opVersionRefs?.[0] ?? null;
-  const currentOpId = currentRef ? refUriToOpVersionKey(currentRef).opId : null;
+  const currentOpId = currentRef
+    ? refUriToOpVersionKey(currentRef)?.opId
+    : null;
   const currentVersions = useOpVersions(
     entity,
     project,

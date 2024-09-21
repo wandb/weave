@@ -1,0 +1,13 @@
+{
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true,
+  "python.testing.cwd": "./weave",
+  "python.formatting.provider": "black",
+  "search.exclude": {
+    "weave/frontend": true
+  },
+  "files.insertFinalNewline": true,
+  "black-formatter.importStrategy": "fromEnvironment",
+  "cSpell.words": ["Weaveflow"],
+  "python.testing.pytestArgs": ["weave", "-v", "--pyargs"]
+}

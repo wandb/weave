@@ -1,9 +1,13 @@
+# DO NOT MOVE OR DELETE OR RENAME THIS FILE
+# This file is used by the clear_cache job in the weave-python helm chart
+# https://github.com/wandb/helm-charts/blob/fe97ad11ddbbfb4cf3e9b05888ea8a3ab43518a6/charts/operator-wandb/charts/weave/templates/deployment.yaml#L93
+# The plan is to keep this file around for a while to make sure we dont introduce and back compat issues, while moving weave-python
+# TODO: Josiah, remove this file when we have confirmed that the new clear_cache job in weave-python dedicated is working as expected
 import os
 import time
 
-from weave.legacy import cache
+from weave.legacy.weave import cache
 
-# TODO: This should be split out into a scripts dir
 # Script to run to delete expired caches
 if __name__ == "__main__":
     print("Starting clear cache job", flush=True)

@@ -1,28 +1,12 @@
 import os
-import typing
 
 import pytest
 from openai import AsyncOpenAI, OpenAI
 
 import weave
-from weave.trace_server import trace_server_interface as tsi
+from weave.integrations.integration_utilities import op_name_from_ref
 
 model = "gpt-4o"
-
-
-def _get_call_output(call: tsi.CallSchema) -> typing.Any:
-    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
-
-    Keeping this here for now, but it should be removed in the future once we have a better solution.
-    """
-    call_output = call.output
-    if isinstance(call_output, str) and call_output.startswith("weave://"):
-        return weave.ref(call_output).get()
-    return call_output
-
-
-def op_name_from_ref(ref: str) -> str:
-    return ref.split("/")[-1].split(":")[0]
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -30,7 +14,7 @@ def op_name_from_ref(ref: str) -> str:
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
-def test_openai_quickstart(client: weave.weave_client.WeaveClient) -> None:
+def test_openai_quickstart(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
@@ -42,19 +26,18 @@ def test_openai_quickstart(client: weave.weave_client.WeaveClient) -> None:
         max_tokens=64,
         top_p=1,
     )
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    print(res)
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but I'm here and ready to help you! How can I assist you today?"
     assert response.choices[0].message.content == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "gpt-4o-2024-05-13"
     assert output.object == "chat.completion"
 
@@ -77,7 +60,9 @@ def test_openai_quickstart(client: weave.weave_client.WeaveClient) -> None:
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
-async def test_openai_async_quickstart(client: weave.weave_client.WeaveClient) -> None:
+async def test_openai_async_quickstart(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = AsyncOpenAI(api_key=api_key)
@@ -89,18 +74,18 @@ async def test_openai_async_quickstart(client: weave.weave_client.WeaveClient) -
         max_tokens=64,
         top_p=1,
     )
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but I'm here and ready to help you! How can I assist you today?"
     assert response.choices[0].message.content == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "gpt-4o-2024-05-13"
     assert output.object == "chat.completion"
 
@@ -122,7 +107,7 @@ async def test_openai_async_quickstart(client: weave.weave_client.WeaveClient) -
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_openai_stream_quickstart(client: weave.weave_client.WeaveClient) -> None:
+def test_openai_stream_quickstart(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
@@ -141,18 +126,18 @@ def test_openai_stream_quickstart(client: weave.weave_client.WeaveClient) -> Non
         if chunk.choices[0].delta.content:
             all_content += chunk.choices[0].delta.content
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but thanks for asking! How can I assist you today?"
     assert all_content == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output["model"] == "gpt-4o-2024-05-13"
     assert output["object"] == "chat.completion"
 
@@ -179,7 +164,7 @@ def test_openai_stream_quickstart(client: weave.weave_client.WeaveClient) -> Non
 )
 @pytest.mark.asyncio
 async def test_openai_async_stream_quickstart(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
@@ -198,18 +183,18 @@ async def test_openai_async_stream_quickstart(
         if chunk.choices[0].delta.content:
             all_content += chunk.choices[0].delta.content
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but thanks for asking! How can I assist you today?"
     assert all_content == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output["model"] == "gpt-4o-2024-05-13"
     assert output["object"] == "chat.completion"
 
@@ -231,7 +216,9 @@ async def test_openai_async_stream_quickstart(
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_openai_stream_usage_quickstart(client: weave.weave_client.WeaveClient) -> None:
+def test_openai_stream_usage_quickstart(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
@@ -250,14 +237,15 @@ def test_openai_stream_usage_quickstart(client: weave.weave_client.WeaveClient) 
 
     for chunk in response:
         pass
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["total_tokens"] == 35
     assert usage["completion_tokens"] == 24
@@ -268,7 +256,7 @@ def test_openai_stream_usage_quickstart(client: weave.weave_client.WeaveClient) 
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_openai_function_call(client: weave.weave_client.WeaveClient) -> None:
+def test_openai_function_call(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
@@ -315,18 +303,18 @@ def test_openai_function_call(client: weave.weave_client.WeaveClient) -> None:
         top_p=1,
     )
     print(response)
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
     assert response.choices[0].message.function_call.arguments == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "gpt-4o-2024-05-13"
     assert output.object == "chat.completion"
 
@@ -354,7 +342,7 @@ def test_openai_function_call(client: weave.weave_client.WeaveClient) -> None:
 )
 @pytest.mark.asyncio
 async def test_openai_function_call_async(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
@@ -401,18 +389,18 @@ async def test_openai_function_call_async(
         max_tokens=64,
         top_p=1,
     )
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":200}'
     assert response.choices[0].message.function_call.arguments == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "gpt-4o-2024-05-13"
     assert output.object == "chat.completion"
 
@@ -440,7 +428,7 @@ async def test_openai_function_call_async(
 )
 @pytest.mark.asyncio
 async def test_openai_function_call_async_stream(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
@@ -492,9 +480,10 @@ async def test_openai_function_call_async_stream(
     async for chunk in response:
         pass
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
@@ -527,7 +516,7 @@ async def test_openai_function_call_async_stream(
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_openai_tool_call(client: weave.weave_client.WeaveClient) -> None:
+def test_openai_tool_call(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
@@ -576,18 +565,18 @@ def test_openai_tool_call(client: weave.weave_client.WeaveClient) -> None:
     )
     print(response)
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
     assert response.choices[0].message.tool_calls[0].function.arguments == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "gpt-4o-2024-05-13"
     assert output.object == "chat.completion"
 
@@ -614,7 +603,9 @@ def test_openai_tool_call(client: weave.weave_client.WeaveClient) -> None:
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
-async def test_openai_tool_call_async(client: weave.weave_client.WeaveClient) -> None:
+async def test_openai_tool_call_async(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = AsyncOpenAI(api_key=api_key)
@@ -661,18 +652,18 @@ async def test_openai_tool_call_async(client: weave.weave_client.WeaveClient) ->
         max_tokens=64,
         top_p=1,
     )
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
     assert response.choices[0].message.tool_calls[0].function.arguments == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "gpt-4o-2024-05-13"
     assert output.object == "chat.completion"
 
@@ -700,7 +691,7 @@ async def test_openai_tool_call_async(client: weave.weave_client.WeaveClient) ->
 )
 @pytest.mark.asyncio
 async def test_openai_tool_call_async_stream(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
@@ -756,9 +747,10 @@ async def test_openai_tool_call_async_stream(
     async for chunk in response:
         pass
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
@@ -801,7 +793,7 @@ async def test_openai_tool_call_async_stream(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 def test_openai_as_context_manager(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
@@ -817,18 +809,18 @@ def test_openai_as_context_manager(
             if chunk.choices[0].delta.content:
                 all_content += chunk.choices[0].delta.content
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = "Hello! As a context manager, you play a crucial role in managing resources efficiently and ensuring proper setup and teardown in Python. You likely implement methods like `__enter__` and `__exit__` to manage contexts properly. How can I assist you today?"
     assert all_content == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output["model"] == "gpt-4o-2024-05-13"
     assert output["object"] == "chat.completion"
 
@@ -854,7 +846,7 @@ def test_openai_as_context_manager(
 )
 @pytest.mark.asyncio
 async def test_openai_as_context_manager_async(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
@@ -872,18 +864,18 @@ async def test_openai_as_context_manager_async(
             if chunk.choices[0].delta.content:
                 all_content += chunk.choices[0].delta.content
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = "Hello! It sounds like you're referring to the concept of an asynchronous context manager in programming, typically found in languages like Python. Asynchronous context managers are useful for managing resources that need to be setup and cleaned up, often in an asynchronous manner. Do you have any specific questions or scenarios you need help with regarding async context managers?"
     assert all_content == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output["model"] == "gpt-4o-2024-05-13"
     assert output["object"] == "chat.completion"
 
