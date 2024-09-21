@@ -14,7 +14,8 @@ interface EvaluationParameters<R extends DatasetRow, M>
 }
 
 interface Runnable<T extends (...args: any[]) => any> {
-  run: (...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>;
+  id: string;
+  run: (...args: Parameters<T>) => ReturnType<T>;
 }
 
 type WeaveCallable<T extends (...args: any[]) => any> = Op<T> | Runnable<T>;
@@ -27,6 +28,15 @@ function callWeaveCallable<T extends (...args: any[]) => any>(
     return callable(...args);
   }
   return callable.run(...args);
+}
+
+function weaveCallableName<T extends (...args: any[]) => any>(
+  callable: WeaveCallable<T>
+) {
+  if (typeof callable === "function") {
+    return getOpName(callable);
+  }
+  return callable.id;
 }
 
 async function* asyncParallelMap<T, U>(
@@ -81,6 +91,8 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
     this.scorers = parameters.scorers;
     this.evaluate = boundOp(this, this.evaluate, {
       parameterNames: "useParam0Object",
+      callDisplayName: (inputs) =>
+        `${this.id}_${weaveCallableName(inputs.model)}`,
     });
     this.predict_and_score = boundOp(this, this.predict_and_score, {
       parameterNames: "useParam0Object",
@@ -95,9 +107,9 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
     maxConcurrency?: number;
   }) {
     const results: Array<{
-      modelOutput: any;
-      modelError: number;
-      modelLatency: number;
+      model_output: any;
+      model_success: boolean;
+      model_latency: number;
       [key: string]: any;
     }> = [];
 
@@ -121,9 +133,14 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
       (item) => [{ model, example: item }],
       maxConcurrency
     )) {
-      const { scores, ...rest } = result;
-      results.push({ ...rest, ...scores });
-      modelErrors += result.modelError;
+      const { scores } = result;
+      results.push({
+        model_success: result.model_success,
+        model_output: result.model_output,
+        ...scores,
+        model_latency: result.model_latency,
+      });
+      modelErrors += result.model_success ? 0 : 1;
       progressBar.update(nDone, { running: nRunning, modelErrors });
     }
 
@@ -141,12 +158,12 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
   }) {
     const startTime = new Date();
     let modelOutput;
-    let modelError = 0;
+    let modelError = false;
     try {
       modelOutput = await callWeaveCallable(model, example);
     } catch (e) {
       console.error(e);
-      modelError = 1;
+      modelError = true;
     }
     const endTime = new Date();
     const modelLatency = (endTime.getTime() - startTime.getTime()) / 1000; // Convert to seconds
@@ -164,41 +181,48 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
       }
     }
 
-    return { modelOutput, scores, modelLatency, modelError };
+    return {
+      model_success: !modelError,
+      model_output: modelOutput,
+      scores,
+      model_latency: modelLatency,
+    };
   }
 
   private summarizeResults(
     results: Array<{
-      modelOutput: any;
-      modelError: number;
-      modelLatency: number;
+      model_output: any;
+      model_success: boolean;
+      model_latency: number;
       [key: string]: any;
     }>
   ) {
     const summarizeNestedObject = (
-      obj: any,
-      currentPath: string = ""
+      results: Array<any>
     ): Record<string, any> => {
       const nestedSummary: Record<string, any> = {};
 
-      for (const [key, value] of Object.entries(obj)) {
-        const newPath = currentPath ? `${currentPath}.${key}` : key;
+      // Get all unique keys from all results
+      const allKeys = new Set(results.flatMap((obj) => Object.keys(obj ?? {})));
 
+      for (const key of allKeys) {
+        const values = results.map((result) =>
+          result == null ? null : result[key]
+        );
         if (
-          typeof value === "object" &&
-          value !== null &&
-          !Array.isArray(value) &&
-          !isMedia(value)
+          values.some(
+            (v) =>
+              typeof v === "object" &&
+              v !== null &&
+              !Array.isArray(v) &&
+              !isMedia(v)
+          )
         ) {
-          nestedSummary[key] = summarizeNestedObject(value, newPath);
+          const result = summarizeNestedObject(values);
+          if (Object.keys(result).length > 0) {
+            nestedSummary[key] = result;
+          }
         } else {
-          const values = results.map((result) => {
-            const keys = newPath.split(".");
-            return keys.reduce((acc: any, k) => acc && acc[k], result);
-          });
-          // Don't filter out undefined values?
-          // .filter((v) => v !== undefined);
-
           const columnSummary = this.summarizeColumn(values);
           if (Object.keys(columnSummary).length > 0) {
             nestedSummary[key] = columnSummary;
@@ -209,26 +233,23 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
       return nestedSummary;
     };
 
-    // Find the first result with valid scores to use as a template
-    const templateResult =
-      results.find((r) => r.modelError === 0) || results[0];
-    return summarizeNestedObject(templateResult);
+    return summarizeNestedObject(results);
   }
 
   private summarizeColumn(values: any[]): Record<string, number> {
-    const nonUndefinedValues = values.filter((v) => v !== undefined);
-    if (nonUndefinedValues.length === 0) {
+    const nonNilValues = values.filter((v) => v != null);
+    if (nonNilValues.length === 0) {
       return {}; // Return an empty object if there are no valid values
     }
 
-    if (nonUndefinedValues.every((v) => typeof v === "boolean")) {
-      const trueCount = nonUndefinedValues.filter((v) => v).length;
+    if (nonNilValues.every((v) => typeof v === "boolean")) {
+      const trueCount = nonNilValues.filter((v) => v).length;
       return {
         true_count: trueCount,
         true_fraction: values.length > 0 ? trueCount / values.length : 0,
       };
-    } else if (nonUndefinedValues.every((v) => typeof v === "number")) {
-      const sum = nonUndefinedValues.reduce((acc, v) => acc + v, 0);
+    } else if (nonNilValues.every((v) => typeof v === "number")) {
+      const sum = nonNilValues.reduce((acc, v) => acc + v, 0);
       return {
         mean: values.length > 0 ? sum / values.length : 0,
       };
