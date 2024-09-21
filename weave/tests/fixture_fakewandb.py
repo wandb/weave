@@ -10,7 +10,7 @@ from urllib import parse
 
 import wandb
 import weave
-from weave.legacy.tests.util.tag_test_util import op_add_tag
+# from weave.legacy.tests.util.tag_test_util import op_add_tag
 
 # Note: We're mocking out the whole io_service right now. This is too
 # high level and doesn't test the actual io implementation. We should
@@ -353,8 +353,8 @@ class SetupResponse:
                 artifact_uri,
             )
         )
-        if tag_payload:
-            res = op_add_tag(res, tag_payload)
+        # if tag_payload:
+        #     res = op_add_tag(res, tag_payload)
         return res
 
     def mock_artifact_by_id_as_node(
@@ -378,8 +378,8 @@ class SetupResponse:
                 artifact_uri,
             )
         )
-        if tag_payload:
-            res = op_add_tag(res, tag_payload)
+        # if tag_payload:
+        #     res = op_add_tag(res, tag_payload)
         return res
 
 
