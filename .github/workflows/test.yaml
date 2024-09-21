@@ -82,15 +82,13 @@ jobs:
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
           source /root/venv/bin/activate && \
-          pip install 'dspy-ai==2.4.13' && \
-          pip install pydantic -U && \
           cd weave && \
           pytest \
           --job-num=${{ matrix.job_num }} \
           --timeout=90 \
           --ddtrace \
           --durations=5 \
-          ./legacy
+          ./weave_query
 
   test-query-service-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
