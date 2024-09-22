@@ -73,22 +73,22 @@ async def test_evaluation_performance(client: WeaveClient):
         {
             "question": "What is the capital of France?",
             "expected": "Paris",
-            # "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100)),
         },
         {
             "question": "Who wrote 'To Kill a Mockingbird'?",
             "expected": "Harper Lee",
-            # "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100)),
         },
         {
             "question": "What is the square root of 64?",
             "expected": "8",
-            # "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100)),
         },
         {
             "question": "What is the thing you say when you don't know something?",
             "expected": "I don't know",
-            # "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100)),
         },
     ]
 
@@ -127,8 +127,8 @@ async def test_evaluation_performance(client: WeaveClient):
     assert counts == {
         "ensure_project_exists": 1,
         "table_create": 2,
-        "obj_create": 8,
-        "file_create": 5,
+        "obj_create": 9,
+        "file_create": 10,
         "call_start": 14,
         "call_end": 14,
     }
