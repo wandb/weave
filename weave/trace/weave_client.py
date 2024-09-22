@@ -16,6 +16,7 @@ from weave.legacy.weave import ref_base, urls
 from weave.trace import call_context, trace_sentry
 from weave.trace.async_job_queue import AsyncJobQueue
 from weave.trace.client_context import weave_client as weave_client_context
+from weave.trace.concurrent.futures import defer
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.object_record import (
@@ -654,7 +655,7 @@ class WeaveClient:
         attributes._set_weave_item("os_release", platform.release())
         attributes._set_weave_item("sys_version", sys.version)
 
-        op_name_future = self.async_job_queue.submit_job(lambda: op_def_ref.uri())
+        op_name_future = defer(lambda: op_def_ref.uri())
 
         call = Call(
             _op_name=op_name_future,
@@ -1197,36 +1198,21 @@ class WeaveClient:
         name = sanitize_object_name(name)
 
         def send_obj_create() -> ObjCreateRes:
-            try:
-                json_val = to_json(val, self._project_id(), self)
-                req = ObjCreateReq(
-                    obj=ObjSchemaForInsert(
-                        project_id=self.entity + "/" + self.project,
-                        object_id=name,
-                        val=json_val,
-                    )
+            json_val = to_json(val, self._project_id(), self)
+            req = ObjCreateReq(
+                obj=ObjSchemaForInsert(
+                    project_id=self.entity + "/" + self.project,
+                    object_id=name,
+                    val=json_val,
                 )
-                res = self.server.obj_create(req)
-                if res is None:
-                    raise Exception("Object creation failed")
-                return res
-            except Exception as e:
-                print(f"Error in send_obj_create: {e}")
-                raise
+            )
+            return self.server.obj_create(req)
 
         res_future: Future[ObjCreateRes] = self.async_job_queue.submit_job(
             send_obj_create
         )
 
-        def get_digest() -> str:
-            try:
-                res = res_future.result()
-                return res.digest
-            except Exception as e:
-                print(f"Error in get_digest: {e}")
-                raise
-
-        digest_future: Future[str] = self.async_job_queue.submit_job(get_digest)
+        digest_future: Future[str] = defer(lambda: res_future.result().digest)
 
         ref: Ref
         if is_opdef:
@@ -1265,41 +1251,19 @@ class WeaveClient:
         """
 
         def send_table_create() -> TableCreateRes:
-            self_server = self.server
-            try:
-                rows = to_json(table.rows, self._project_id(), self)
-                req = TableCreateReq(
-                    table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
-                )
-                res = self_server.table_create(req)
-                if res is None:
-                    self_server.table_create(req)
-                    raise Exception("Table creation failed")
-                return res
-            except Exception as e:
-                print(f"Error in send_table_create: {e}")
-                raise
+            rows = to_json(table.rows, self._project_id(), self)
+            req = TableCreateReq(
+                table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
+            )
+            return self.server.table_create(req)
 
         res_future: Future[TableCreateRes] = self.async_job_queue.submit_job(
             send_table_create
         )
 
-        def get_table_digest() -> str:
-            print("Accessing future result")
-            res = res_future.result()
-            print(f"Future result: {res}")
-            if res is None:
-                raise Exception("Table creation result is None")
-            return res.digest
-
-        digest_future: Future[str] = self.async_job_queue.submit_job(get_table_digest)
-
-        def get_row_digests() -> list[str]:
-            res = res_future.result()
-            return res.row_digests
-
-        row_digests_future: Future[list[str]] = self.async_job_queue.submit_job(
-            get_row_digests
+        digest_future: Future[str] = defer(lambda: res_future.result().digest)
+        row_digests_future: Future[list[str]] = defer(
+            lambda: res_future.result().row_digests
         )
 
         table_ref = TableRef(
