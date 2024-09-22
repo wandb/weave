@@ -29,23 +29,31 @@ Get your wandb API key from [here](https://wandb.ai/authorize).
 Put this in a file called `predict.mjs`:
 
 ```javascript
-import { init, op, wrapOpenAI } from 'weave';
+import { OpenAI } from "openai";
+import { init, op, wrapOpenAI } from "weave";
 
-const openai = wrapOpenAI();
+const openai = wrapOpenAI(new OpenAI());
 
 async function extractDinos(input) {
-    const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: `In JSON format extract a list of 'dinosaurs', with their 'name', their 'common_name', and whether its 'diet' is a herbivore or carnivore: ${input}` }],
-    });
-    return response.choices[0].message.content;
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "user",
+        content: `In JSON format extract a list of 'dinosaurs', with their 'name', their 'common_name', and whether its 'diet' is a herbivore or carnivore: ${input}`,
+      },
+    ],
+  });
+  return response.choices[0].message.content;
 }
 const extractDinosOp = op(extractDinos);
 
 async function main() {
-    await init('weave-quickstart');
-    const result = await extractDinosOp("I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below.");
-    console.log(result);
+  await init("weave-quickstart");
+  const result = await extractDinosOp(
+    "I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below."
+  );
+  console.log(result);
 }
 
 main();
@@ -64,10 +72,10 @@ node predict.mjs
 Before you can start tracing operations, you need to initialize a project. This sets up the necessary environment for trace collection.
 
 ```javascript
-import { init } from 'weave';
+import { init } from "weave";
 
 // Initialize your project with a unique project name
-init('my-awesome-ai-project');
+init("my-awesome-ai-project");
 ```
 
 ### Tracing Operations
@@ -75,16 +83,16 @@ init('my-awesome-ai-project');
 You can trace specific operations using the `op` function. This function wraps your existing functions and tracks their execution.
 
 ```javascript
-import { op } from 'weave';
+import { op } from "weave";
 
 // Define a function you want to trace
 async function myFunction(arg1, arg2) {
-    // Your function logic
-    return arg1 + arg2;
+  // Your function logic
+  return arg1 + arg2;
 }
 
 // Wrap the function with op to enable tracing
-const tracedFunction = op(myFunction, 'myFunction');
+const tracedFunction = op(myFunction, "myFunction");
 
 // Call the traced function
 tracedFunction(5, 10);
@@ -95,62 +103,63 @@ tracedFunction(5, 10);
 Weave provides an integration with OpenAI, allowing you to trace API calls made to OpenAI's services seamlessly.
 
 ```javascript
-import { wrapOpenAI } from 'weave/integrations/openai';
+import { wrapOpenAI } from "weave/integrations/openai";
 
 // Create a patched instance of OpenAI
 const openai = wrapOpenAI();
 
 // Use the OpenAI instance as usual
 openai.chat.completions.create({
-    model: 'text-davinci-003',
-    prompt: 'Translate the following English text to French: "Hello, world!"',
-    max_tokens: 60
+  model: "text-davinci-003",
+  prompt: 'Translate the following English text to French: "Hello, world!"',
+  max_tokens: 60,
 });
 
 // Weave tracks images too!
 openai.images.generate({
-    prompt: "A cute baby sea otter",
-    n: 3,
-    size: "256x256",
-    response_format: "b64_json"
+  prompt: "A cute baby sea otter",
+  n: 3,
+  size: "256x256",
+  response_format: "b64_json",
 });
 ```
 
 ### Evaluations
 
 ```typescript
-import { init, op, Dataset, Evaluation } from 'weave';
+import { init, op, Dataset, Evaluation } from "weave";
 
 async function main() {
-    await init('weavejsdev-eval6');
-    const ds = new Dataset({
-        id: "My Dataset",
-        description: "This is a dataset",
-        rows: [
-            { name: "Alice", age: 25 },
-            { name: "Bob", age: 30 },
-            { name: "Charlie", age: 34 }
-        ]
-    });
-    const evaluation = new Evaluation({
-        dataset: ds,
-        scorers: [
-            op((modelOutput: any, datasetItem: any) =>
-                modelOutput == datasetItem.age, { name: 'isEqual' }),
-        ]
-    })
+  await init("weavejsdev-eval6");
+  const ds = new Dataset({
+    id: "My Dataset",
+    description: "This is a dataset",
+    rows: [
+      { name: "Alice", age: 25 },
+      { name: "Bob", age: 30 },
+      { name: "Charlie", age: 34 },
+    ],
+  });
+  const evaluation = new Evaluation({
+    dataset: ds,
+    scorers: [
+      op(
+        (modelOutput: any, datasetItem: any) => modelOutput == datasetItem.age,
+        { name: "isEqual" }
+      ),
+    ],
+  });
 
-    const model = op(async function myModel(input) {
-        return input.age
-    })
+  const model = op(async function myModel(input) {
+    return input.age;
+  });
 
-    const results = await evaluation.evaluate({ model })
-    console.log(JSON.stringify(results, null, 2))
+  const results = await evaluation.evaluate({ model });
+  console.log(JSON.stringify(results, null, 2));
 }
 
 main();
 ```
-
 
 ## Configuration
 
@@ -167,7 +176,6 @@ Get your wandb API key from [here](https://wandb.ai/authorize).
 ## License
 
 This project is licensed under the Apaache2 License - see the [LICENSE](../LICENSE) file for details.
-
 
 ### Roadmap / TODO
 

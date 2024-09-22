@@ -39,6 +39,17 @@ function weaveCallableName<T extends (...args: any[]) => any>(
   return callable.id;
 }
 
+async function* repeatAsyncIterator<T>(
+  asyncIterator: AsyncIterable<T>,
+  repeatCount: number
+): AsyncGenerator<T, void, unknown> {
+  for (let i = 0; i < repeatCount; i++) {
+    for await (const item of asyncIterator) {
+      yield item;
+    }
+  }
+}
+
 async function* asyncParallelMap<T, U>(
   asyncIterator: AsyncIterable<T>,
   fn: (item: T, ...args: any[]) => Promise<U>,
@@ -101,9 +112,11 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
 
   async evaluate({
     model,
+    nTrials = 1,
     maxConcurrency = 5,
   }: {
     model: WeaveCallable<(...args: [R]) => Promise<M>>;
+    nTrials?: number;
     maxConcurrency?: number;
   }) {
     const results: Array<{
@@ -121,14 +134,21 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
       hideCursor: true,
     });
 
-    progressBar.start(this.dataset.length, 0, {
+    progressBar.start(this.dataset.length * nTrials, 0, {
       running: 0,
       modelErrors: 0,
     });
 
     let modelErrors = 0;
+    let datasetExamples = this.dataset;
+    if (nTrials > 1) {
+      // @ts-ignore
+      datasetExamples = repeatAsyncIterator(this.dataset, nTrials);
+    }
+
+    // for await (const { result, nRunning, nDone } of asyncParallelMap(
     for await (const { result, nRunning, nDone } of asyncParallelMap(
-      this.dataset,
+      datasetExamples,
       this.predict_and_score,
       (item) => [{ model, example: item }],
       maxConcurrency
