@@ -732,7 +732,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
             conn.commit()
 
-        print("Table created", digest, row_digests)
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:

@@ -179,6 +179,9 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
     read operation(s) are performed.
     """
 
+    def set_autoflush(self, value: bool):
+        self._autoflush = value
+
     def __getattribute__(self, name):
         self_super = super()
         attr = self_super.__getattribute__(name)
@@ -187,7 +190,8 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
 
             def wrapper(*args, **kwargs):
                 res = attr(*args, **kwargs)
-                # self_super._flush()
+                if self.__dict__.get("_autoflush", True):
+                    self_super._flush()
                 return res
 
             return wrapper

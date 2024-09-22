@@ -54,6 +54,7 @@ class BlockingTraceServer(tsi.TraceServerInterface):
 @contextmanager
 def paused_client(client: WeaveClient) -> Generator[WeaveClient, None, None]:
     original_server = client.server
+    client.set_autoflush(False)
     blocking_server = BlockingTraceServer(original_server)
     client.server = blocking_server
     blocking_server.pause()
@@ -62,6 +63,7 @@ def paused_client(client: WeaveClient) -> Generator[WeaveClient, None, None]:
     finally:
         blocking_server.resume()
         client.server = original_server
+        client.set_autoflush(True)
         client._flush()
 
 
