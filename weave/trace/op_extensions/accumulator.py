@@ -16,6 +16,7 @@ from typing import (
 )
 
 from weave.trace.op import FinishCallbackType, Op
+from weave.trace.op_extensions.error_once import log_once
 
 logger = logging.getLogger(__name__)
 
@@ -68,9 +69,12 @@ class _IteratorWrapper(Generic[V]):
         try:
             value = next(self._iterator_or_ctx_manager)  # type: ignore
             try:
+                # Here we do a try/catch because we don't want to
+                # break the user process if we trip up on processing
+                # the yielded value
                 self._on_yield(value)
             except Exception as e:
-                logger.error(f"Error in on_yield: {e}")
+                log_once(logger.error, f"Error in on_yield: {e}")
             return value
         except (StopIteration, StopAsyncIteration) as e:
             self._call_on_close_once()
@@ -91,8 +95,11 @@ class _IteratorWrapper(Generic[V]):
             value = await self._iterator_or_ctx_manager.__anext__()  # type: ignore
             try:
                 self._on_yield(value)
+                # Here we do a try/catch because we don't want to
+                # break the user process if we trip up on processing
+                # the yielded value
             except Exception as e:
-                logger.error(f"Error in on_yield: {e}")
+                log_once(logger.error, f"Error in async on_yield: {e}")
             return value
         except (StopAsyncIteration, StopIteration) as e:
             self._call_on_close_once()

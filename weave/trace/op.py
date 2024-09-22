@@ -26,6 +26,7 @@ from weave.trace import box, call_context, settings
 from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
+from weave.trace.op_extensions.error_once import log_once
 from weave.trace.refs import ObjectRef
 
 logger = logging.getLogger(__name__)
@@ -238,11 +239,14 @@ def _execute_call(
         return output
 
     def process(res: Any) -> Any:
+        res = box.box(res)
         try:
-            res = box.box(res)
+            # Here we do a try/catch because we don't want to
+            # break the user process if we trip up on processing
+            # the output
             res = on_output(res)
         except Exception as e:
-            logger.error(f"Error processing output: {e}")
+            log_once(logger.error, f"Error processing output: {e}")
             pass
         return res, call
 
