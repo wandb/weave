@@ -9,7 +9,7 @@ from typing import Any, Callable, Generator, TypeVar
 
 T = TypeVar("T")
 
-MAX_WORKER_DEFAULT = 2**10  # 8 workers to not overwhelm the DB
+MAX_WORKER_DEFAULT = 2**3  # 8 workers to not overwhelm the DB
 
 logger = logging.getLogger(__name__)
 
