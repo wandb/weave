@@ -27,20 +27,28 @@ class BlockingTraceServer(tsi.TraceServerInterface):
     def resume(self) -> None:
         self.lock.release()
 
-    def __getattr__(self, item: str) -> Any:
-        inner_attr = getattr(self.internal_trace_server, item)
-        if callable(inner_attr):
+    def __getattribute__(self, item: str) -> Any:
+        if (
+            item == "internal_trace_server"
+            or item == "lock"
+            or item == "resume"
+            or item == "pause"
+        ):
+            return super().__getattribute__(item)
+        internal_trace_server = super().__getattribute__("internal_trace_server")
 
-            def wrapper(*args, **kwargs):
-                print(f"Calling {item} with args: {args}, kwargs: {kwargs}")
-                with self.lock:
-                    result = inner_attr(*args, **kwargs)
-                    print(f"Result: {result}")
-                return result
+        if item == "attribute_access_log":
+            return getattr(internal_trace_server, item)
 
-            return wrapper
-        else:
-            return inner_attr
+        def wrapper(*args, **kwargs):
+            print(f"Calling {item} with args: {args}, kwargs: {kwargs}")
+            with self.lock:
+                inner_attr = getattr(internal_trace_server, item)
+                result = inner_attr(*args, **kwargs)
+                print(f"Result: {result}")
+            return result
+
+        return wrapper
 
 
 @contextmanager
@@ -54,6 +62,7 @@ def paused_client(client: WeaveClient) -> Generator[WeaveClient, None, None]:
     finally:
         blocking_server.resume()
         client.server = original_server
+        client._flush()
 
 
 @pytest.mark.asyncio
@@ -64,21 +73,21 @@ async def test_evaluation_performance(client: WeaveClient):
             "expected": "Paris",
             # "img": PIL.Image.new("RGB", (100, 100)),
         },
-        # {
-        #     "question": "Who wrote 'To Kill a Mockingbird'?",
-        #     "expected": "Harper Lee",
-        #     "img": PIL.Image.new("RGB", (100, 100)),
-        # },
-        # {
-        #     "question": "What is the square root of 64?",
-        #     "expected": "8",
-        #     "img": PIL.Image.new("RGB", (100, 100)),
-        # },
-        # {
-        #     "question": "What is the thing you say when you don't know something?",
-        #     "expected": "I don't know",
-        #     "img": PIL.Image.new("RGB", (100, 100)),
-        # },
+        {
+            "question": "Who wrote 'To Kill a Mockingbird'?",
+            "expected": "Harper Lee",
+            # "img": PIL.Image.new("RGB", (100, 100)),
+        },
+        {
+            "question": "What is the square root of 64?",
+            "expected": "8",
+            # "img": PIL.Image.new("RGB", (100, 100)),
+        },
+        {
+            "question": "What is the thing you say when you don't know something?",
+            "expected": "I don't know",
+            # "img": PIL.Image.new("RGB", (100, 100)),
+        },
     ]
 
     @weave.op()
@@ -99,18 +108,33 @@ async def test_evaluation_performance(client: WeaveClient):
 
     assert log == ["ensure_project_exists"]
 
-    # TODO: Client.pause "network" traffic
     with paused_client(client) as client:
         res = await evaluation.evaluate(predict)
         assert res["score"]["true_count"] == 1
         log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
         assert log == ["ensure_project_exists"]
-    
-    time.sleep(0.1)  # Add a small delay
-    client._flush()
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
-    assert log == ["ensure_project_exists"]
+    counts = {}
+    for l in log:
+        if l not in counts:
+            counts[l] = 0
+        counts[l] += 1
 
-    assert "something interesting about the results" == False
+    assert counts == {
+        "ensure_project_exists": 1,
+        "table_create": 2,
+        "obj_create": 8,
+        "file_create": 5,
+        "call_start": 14,
+        "call_end": 14,
+    }
+
+    calls = client.calls()
+    objects = client._objects()
+
+    assert (
+        len(list(calls)) == 14
+    )  # eval, summary, 4 predict_and_score, 4 predicts, 4 scores
+    assert len(list(objects)) == 3  # model, dataset, evaluation

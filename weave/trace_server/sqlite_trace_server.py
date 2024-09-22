@@ -731,7 +731,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 (req.table.project_id, digest, json.dumps(row_digests)),
             )
             conn.commit()
-        
+
         print("Table created", digest, row_digests)
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 

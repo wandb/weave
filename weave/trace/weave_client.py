@@ -1197,7 +1197,7 @@ class WeaveClient:
         name = sanitize_object_name(name)
 
         def send_obj_create() -> ObjCreateRes:
-            try:    
+            try:
                 json_val = to_json(val, self._project_id(), self)
                 req = ObjCreateReq(
                     obj=ObjSchemaForInsert(
@@ -1218,7 +1218,7 @@ class WeaveClient:
             send_obj_create
         )
 
-        def get_digest():
+        def get_digest() -> str:
             try:
                 res = res_future.result()
                 return res.digest
@@ -1226,9 +1226,7 @@ class WeaveClient:
                 print(f"Error in get_digest: {e}")
                 raise
 
-        digest_future: Future[str] = self.async_job_queue.submit_job(
-            get_digest
-        )
+        digest_future: Future[str] = self.async_job_queue.submit_job(get_digest)
 
         ref: Ref
         if is_opdef:
@@ -1267,13 +1265,15 @@ class WeaveClient:
         """
 
         def send_table_create() -> TableCreateRes:
+            self_server = self.server
             try:
                 rows = to_json(table.rows, self._project_id(), self)
                 req = TableCreateReq(
-                        table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
-                    )
-                res = self.server.table_create(req)
+                    table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
+                )
+                res = self_server.table_create(req)
                 if res is None:
+                    self_server.table_create(req)
                     raise Exception("Table creation failed")
                 return res
             except Exception as e:
@@ -1284,19 +1284,17 @@ class WeaveClient:
             send_table_create
         )
 
-        def get_table_digest():
+        def get_table_digest() -> str:
             print("Accessing future result")
             res = res_future.result()
             print(f"Future result: {res}")
             if res is None:
                 raise Exception("Table creation result is None")
-            return res.row_digests
+            return res.digest
 
-        digest_future: Future[str] = self.async_job_queue.submit_job(
-            get_table_digest
-        )
+        digest_future: Future[str] = self.async_job_queue.submit_job(get_table_digest)
 
-        def get_row_digests(): 
+        def get_row_digests() -> list[str]:
             res = res_future.result()
             return res.row_digests
 

@@ -5,7 +5,7 @@ import contextvars
 import logging
 import threading
 from concurrent.futures import Future
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Generator, TypeVar
 
 T = TypeVar("T")
 
@@ -13,10 +13,13 @@ MAX_WORKER_DEFAULT = 2**10  # 8 workers to not overwhelm the DB
 
 logger = logging.getLogger(__name__)
 
-should_raise_on_async_job_queue = contextvars.ContextVar('should_raise_on_async_job_queue', default=False)
+should_raise_on_async_job_queue = contextvars.ContextVar(
+    "should_raise_on_async_job_queue", default=False
+)
+
 
 @contextlib.contextmanager
-def raise_on_async_job_queue(raise_value: bool = True):
+def raise_on_async_job_queue(raise_value: bool = True) -> Generator[None, None, None]:
     token = should_raise_on_async_job_queue.set(raise_value)
     try:
         yield
