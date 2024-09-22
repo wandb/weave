@@ -67,6 +67,8 @@ class SymbolPatcher(Patcher):
         target = self._get_symbol_target()
         if target is None:
             return False
+        if not hasattr(target.base_symbol, target.attr):
+            return False
         original_value = getattr(target.base_symbol, target.attr)
         try:
             new_val = self._make_new_value(original_value)
