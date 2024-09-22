@@ -246,7 +246,7 @@ def _execute_call(
             # the output
             res = on_output(res)
         except Exception as e:
-            log_once(logger.error, f"Error processing output: {e}")
+            log_once(logger.error, f"Error capturing call output: {e}")
             pass
         return res, call
 

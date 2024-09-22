@@ -50,12 +50,24 @@ class _IteratorWrapper(Generic[V]):
 
     def _call_on_close_once(self) -> None:
         if not self._on_finished_called:
-            self._on_close()  # type: ignore
+            try:
+                self._on_close()  # type: ignore
+            except Exception as e:
+                log_once(
+                    logger.error,
+                    f"Error finishing call - some logs may not be captured: {e}",
+                )
             self._on_finished_called = True
 
     def _call_on_error_once(self, e: Exception) -> None:
         if not self._on_finished_called:
-            self._on_error(e)
+            try:
+                self._on_error(e)
+            except Exception as e:
+                log_once(
+                    logger.error,
+                    f"Error finishing call with exception - some logs may not be captured: {e}",
+                )
             self._on_finished_called = True
 
     def __iter__(self) -> "_IteratorWrapper":
@@ -74,7 +86,9 @@ class _IteratorWrapper(Generic[V]):
                 # the yielded value
                 self._on_yield(value)
             except Exception as e:
-                log_once(logger.error, f"Error in on_yield: {e}")
+                log_once(
+                    logger.error, f"Error capturing yielded value for call output: {e}"
+                )
             return value
         except (StopIteration, StopAsyncIteration) as e:
             self._call_on_close_once()
@@ -99,7 +113,10 @@ class _IteratorWrapper(Generic[V]):
                 # break the user process if we trip up on processing
                 # the yielded value
             except Exception as e:
-                log_once(logger.error, f"Error in async on_yield: {e}")
+                log_once(
+                    logger.error,
+                    f"Error capturing async yielded value for call output: {e}",
+                )
             return value
         except (StopAsyncIteration, StopIteration) as e:
             self._call_on_close_once()
