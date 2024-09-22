@@ -176,7 +176,6 @@ class Call:
     attributes: Optional[dict] = None
     started_at: Optional[datetime.datetime] = None
     ended_at: Optional[datetime.datetime] = None
-    deleted_at: Optional[datetime.datetime] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
 
@@ -355,7 +354,6 @@ def make_client_call(
         attributes=server_call.attributes,
         started_at=server_call.started_at,
         ended_at=server_call.ended_at,
-        deleted_at=server_call.deleted_at,
     )
     if call.id is None:
         raise ValueError("Call ID is None")

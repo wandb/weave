@@ -277,7 +277,6 @@ def test_call_create(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=DatetimeMatcher(),
-        deleted_at=None,
     )
     assert dataclasses.asdict(result._val) == dataclasses.asdict(expected)
 
