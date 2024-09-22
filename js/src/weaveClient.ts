@@ -405,15 +405,17 @@ export class WeaveClient {
     endTime: Date,
     startCallPromise: Promise<void>
   ) {
-    // ensure end is logged after start is logged
-    await startCallPromise;
-    result = await this.saveWeaveValues(result);
+    // Important to do this first before any awaiting, so we're guaranteed that children
+    // summaries are processed before parents!
     const mergedSummary = processSummary(
       result,
       summarize,
       currentCall,
       parentCall
     );
+    // ensure end is logged after start is logged
+    await startCallPromise;
+    result = await this.saveWeaveValues(result);
     await this.saveCallEnd({
       project_id: this.projectId,
       id: currentCall.callId,
