@@ -1,7 +1,7 @@
 import dataclasses
 import urllib
 from concurrent.futures import Future
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, cast
 
 from ..trace_server import refs_internal
 
@@ -108,7 +108,13 @@ class ObjectRef(RefWithExtra):
 
     @property
     def extra(self) -> tuple[str, ...]:
-        return tuple(e if isinstance(e, str) else e.result() for e in self._extra)
+        if any(isinstance(e, Future) for e in self._extra):
+            self.__dict__["_extra"] = tuple(
+                e if isinstance(e, str) else e.result() for e in self._extra
+            )
+            refs_internal.validate_extra(list(self.extra))
+
+        return cast(tuple[str, ...], self._extra)
 
     @property
     def digest(self) -> str:
@@ -129,7 +135,6 @@ class ObjectRef(RefWithExtra):
             refs_internal.validate_no_slashes(self._digest, "digest")
             refs_internal.validate_no_colons(self._digest, "digest")
         # TODO: FIx me!
-        # refs_internal.validate_extra(list(self.extra))
         refs_internal.validate_no_slashes(self.name, "name")
         refs_internal.validate_no_colons(self.name, "name")
 
