@@ -56,6 +56,12 @@ def test_artifact_dir():
     return "/tmp/weave/pytest/%s" % os.environ.get("PYTEST_CURRENT_TEST")
 
 
+def pytest_sessionfinish(session, exitstatus):
+    if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED:
+        print("No tests were selected. Exiting gracefully.")
+        session.exitstatus = 0
+
+
 def pytest_collection_modifyitems(config, items):
     # Add the weave_client marker to all tests that have a client fixture
     for item in items:
