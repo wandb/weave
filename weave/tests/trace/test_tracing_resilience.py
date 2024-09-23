@@ -8,8 +8,8 @@ import importlib
 from typing import Callable, Iterator
 import weave
 
-# TODO: Test code capture resiliance
-# TODO: Test postprocess input/output resiliance
+# TODO: Test code capture resilience
+# TODO: Test postprocess input/output resilience
 
 import pytest
 from weave.trace.context import raise_on_captured_errors
@@ -21,7 +21,7 @@ class TestException(Exception):
     pass
 
 
-def test_resiliance_to_user_code_errors(client):
+def test_resilience_to_user_code_errors(client):
     def do_test():
         @weave.op
         def throws():
@@ -76,7 +76,7 @@ class ThrowingServer(tsi.TraceServerInterface):
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes: raise TestException("FAILURE!")
 
 @pytest.mark.skip("TODO: Unskip after Tim's backgrounding PR goes in (add one for the entire eval workflow)")
-def test_resiliance_to_server_errors(client):
+def test_resilience_to_server_errors(client):
     client.server = ThrowingServer()
     def do_test():
         @weave.op
@@ -96,7 +96,7 @@ def test_resiliance_to_server_errors(client):
 
 
 
-def test_resiliance_to_patcher_errors(client):
+def test_resilience_to_patcher_errors(client):
     class Module:
         def method(self):
             return 0
@@ -118,7 +118,7 @@ def test_resiliance_to_patcher_errors(client):
     res = do_test()
     assert res == 0
 
-def test_resiliance_to_output_handler_errors(client):
+def test_resilience_to_output_handler_errors(client):
     def do_test():
         @weave.op
         def simple_op():
@@ -141,7 +141,7 @@ def test_resiliance_to_output_handler_errors(client):
         assert res == "hello"
 
 @pytest.mark.asyncio
-async def test_resiliance_to_output_handler_errors_async(client):
+async def test_resilience_to_output_handler_errors_async(client):
     async def do_test():
         @weave.op
         async def simple_op():
@@ -163,7 +163,7 @@ async def test_resiliance_to_output_handler_errors_async(client):
         res = await do_test()
         assert res == "hello"
 
-def test_resiliance_to_accumulator_make_accumulator_errors(client):
+def test_resilience_to_accumulator_make_accumulator_errors(client):
     def do_test():
         @weave.op
         def simple_op():
@@ -185,7 +185,7 @@ def test_resiliance_to_accumulator_make_accumulator_errors(client):
         res = do_test()
         assert list(res) == [1, 2, 3]
 
-def test_resiliance_to_accumulator_accumulation_errors(client):
+def test_resilience_to_accumulator_accumulation_errors(client):
     def do_test():
         @weave.op
         def simple_op():
@@ -210,7 +210,7 @@ def test_resiliance_to_accumulator_accumulation_errors(client):
         assert list(res) == [1, 2, 3]
 
 
-def test_resiliance_to_accumulator_should_accumulate_errors(client):
+def test_resilience_to_accumulator_should_accumulate_errors(client):
     def do_test():
         @weave.op
         def simple_op():
@@ -239,7 +239,7 @@ def test_resiliance_to_accumulator_should_accumulate_errors(client):
         assert list(res) == [1, 2, 3]
 
 
-def test_resiliance_to_accumulator_on_finish_post_processor_errors(client):
+def test_resilience_to_accumulator_on_finish_post_processor_errors(client):
     def do_test():
         @weave.op
         def simple_op():
@@ -269,7 +269,7 @@ def test_resiliance_to_accumulator_on_finish_post_processor_errors(client):
         assert list(res) == [1, 2, 3]
 
 
-def test_resiliance_to_accumulator_internal_errors(client):
+def test_resilience_to_accumulator_internal_errors(client):
     def do_test():
         @weave.op
         def simple_op():
