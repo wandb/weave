@@ -994,7 +994,7 @@ class Dict(Type):
         # TODO: consider if we can / should accept key_type. Would make JS side
         # harder since js objects can only have string keys.
         if not String().assign_type(self.key_type):
-            raise Exception("Dict only supports string keys!")
+            raise errors.WeaveTypeError("Dict only supports string keys!")
 
     def _assign_type_inner(self, other_type):  # type: ignore
         if isinstance(other_type, TypedDict):
@@ -1009,7 +1009,7 @@ class Dict(Type):
         value_type = UnknownType()
         for k, v in obj.items():
             if not isinstance(k, str):
-                raise Exception("Dict only supports string keys!")
+                raise errors.WeaveTypeError("Dict only supports string keys!")
             value_type = value_type.assign_type(TypeRegistry.type_of(v))
         return cls(String(), value_type)
 

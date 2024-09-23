@@ -1,24 +1,12 @@
 import os
-from typing import Any
 
 import cohere
 import pytest
 
 import weave
-from weave.trace_server import trace_server_interface as tsi
+from weave.integrations.integration_utilities import _get_call_output, op_name_from_ref
 
 cohere_model = "command"  # You can change this to a specific model if needed
-
-
-def _get_call_output(call: tsi.CallSchema) -> Any:
-    call_output = call.output
-    if isinstance(call_output, str) and call_output.startswith("weave://"):
-        return weave.ref(call_output).get()
-    return call_output
-
-
-def op_name_from_ref(ref: str) -> str:
-    return ref.split("/")[-1].split(":")[0]
 
 
 @pytest.mark.skip_clickhouse_client
@@ -41,13 +29,14 @@ def test_cohere(
 
     exp = response.text
     assert exp.strip() != ""
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.Client.chat"
-    output = _get_call_output(call)
+    output = call.output
     assert output.text == exp
     assert output.generation_id == response.generation_id
     assert output.citations == response.citations
@@ -95,13 +84,14 @@ def test_cohere_stream(
         pass
 
     response = event.response  # the NonStreamedChatResponse
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.Client.chat_stream"
-    output = _get_call_output(call)
+    output = call.output
     assert output.text == response.text
     assert output.generation_id == response.generation_id
     summary = call.summary
@@ -151,13 +141,14 @@ async def test_cohere_async(
 
     exp = response.text
     assert exp.strip() != ""
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.AsyncClient.chat"
-    output = _get_call_output(call)
+    output = call.output
     assert output.text == exp
     assert output.generation_id == response.generation_id
     assert output.citations == response.citations
@@ -205,13 +196,14 @@ async def test_cohere_async_stream(
         pass
 
     response = event.response  # the NonStreamedChatResponse
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.AsyncClient.chat_stream"
-    output = _get_call_output(call)
+    output = call.output
     assert output.text == response.text
     assert output.generation_id == response.generation_id
     summary = call.summary
@@ -257,9 +249,9 @@ def test_cohere_v2(
         messages=[{"role": "user", "content": "count to three"}],
         max_tokens=1024,
     )
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
@@ -304,9 +296,9 @@ async def test_cohere_async_v2(
         messages=[{"role": "user", "content": "count to three"}],
         max_tokens=1024,
     )
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
@@ -362,9 +354,9 @@ def test_cohere_stream_v2(
             if event.type == "message-end":
                 finish_reason = event.delta.finish_reason
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
@@ -412,9 +404,9 @@ async def test_cohere_async_stream_v2(
             if event.type == "message-end":
                 finish_reason = event.delta.finish_reason
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at

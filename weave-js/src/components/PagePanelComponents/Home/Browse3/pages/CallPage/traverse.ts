@@ -304,7 +304,7 @@ export const mapObject = (
   data: any,
   transform: (context: TraverseContext) => any
 ) => {
-  const result = {};
+  const result = getValueType(data) === 'array' ? [] : {};
   traverse(data, context => {
     if (context.depth === 0) {
       return;

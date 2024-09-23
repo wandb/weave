@@ -13,11 +13,16 @@ import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
-import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {
+  ScrollableTabContent,
+  SimplePageLayoutWithHeader,
+} from '../common/SimplePageLayout';
+import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
 import {TabUseCall} from '../TabUseCall';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallChat, isCallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
@@ -49,6 +54,34 @@ const useCallTabs = (call: CallSchema) => {
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
   return [
+    ...(isEvaluateOp(call.spanName)
+      ? [
+          {
+            label: 'Evaluation',
+            content: (
+              <CompareEvaluationsPageContent
+                entity={call.entity}
+                project={call.project}
+                evaluationCallIds={[call.callId]}
+              />
+            ),
+          },
+        ]
+      : []),
+    ...(isCallChat(call)
+      ? [
+          {
+            label: 'Chat',
+            content: (
+              <ScrollableTabContent>
+                <Tailwind>
+                  <CallChat call={call.traceCall!} />
+                </Tailwind>
+              </ScrollableTabContent>
+            ),
+          },
+        ]
+      : []),
     {
       label: 'Call',
       content: <CallDetails call={call} />,

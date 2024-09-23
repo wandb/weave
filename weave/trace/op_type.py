@@ -13,14 +13,17 @@ import typing
 from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any, Callable, Optional, Union, get_args, get_origin
 
-from weave.legacy.weave import artifact_fs, context_state, errors, storage
+from weave import context_state
+from weave.legacy.weave import artifact_fs, errors, storage
+from weave.trace import settings
 from weave.trace.ipython import (
     ClassNotFoundError,
     get_class_source,
     is_running_interactively,
 )
-from weave.trace.op import Op
+from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef
+from weave.trace_server.trace_server_interface_util import str_digest
 
 from ..legacy.weave import environment
 from . import serializer
@@ -262,16 +265,33 @@ def reconstruct_signature(fn: typing.Callable) -> str:
     return sig_str
 
 
-def get_source_or_fallback(fn: typing.Callable) -> str:
-    if isinstance(fn, Op):
+def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
+    if is_op(fn):
+        fn = as_op(fn)
         fn = fn.resolve_fn
 
-    func_name = fn.__name__
+    if not settings.should_capture_code():
+        # This digest is kept for op versioning purposes
+        digest = str_digest(inspect.getsource(fn))
+        return textwrap.dedent(
+            f"""
+            def func(*args, **kwargs):
+                ...  # Code-capture was disabled while saving this op (digest: {digest})
+            """
+        )
+
+    try:
+        return get_source_notebook_safe(fn)
+    except OSError:
+        pass
+
     try:
         sig_str = reconstruct_signature(fn)
     except Exception as e:
-        print(f"Failed to reconstruct signature {e=}")
+        warnings.append(f"Failed to reconstruct signature: {e}")
         sig_str = "(*args, **kwargs)"
+
+    func_name = fn.__name__
     missing_code_template = textwrap.dedent(
         f"""
         def {func_name}{sig_str}:
@@ -279,10 +299,7 @@ def get_source_or_fallback(fn: typing.Callable) -> str:
         """
     )[1:]  # skip first newline char
 
-    try:
-        return get_source_notebook_safe(fn)
-    except OSError:
-        return missing_code_template
+    return missing_code_template
 
 
 def get_code_deps(
@@ -328,7 +345,7 @@ def _get_code_deps(
         ]
         return {"import_code": [], "code": [], "warnings": warnings}
 
-    source = get_source_or_fallback(fn)
+    source = get_source_or_fallback(fn, warnings=warnings)
     try:
         parsed = ast.parse(source)
     except SyntaxError:
@@ -365,7 +382,7 @@ def _get_code_deps(
             if var_value.__name__ != var_name:
                 import_line += f" as {var_name}"
             import_code.append(import_line)
-        elif isinstance(var_value, (py_types.FunctionType, Op, type)):
+        elif isinstance(var_value, (py_types.FunctionType, type)) or is_op(var_value):
             if var_value.__module__ == fn.__module__:
                 if not var_value in seen:
                     seen[var_value] = True
@@ -388,7 +405,7 @@ def _get_code_deps(
                 if var_value.__module__.split(".")[0] == fn.__module__.split(".")[0]:
                     pass
 
-                if isinstance(var_value, Op):
+                if is_op(var_value):
                     warnings.append(
                         f"Cross-module op dependencies are not yet serializable {var_value}"
                     )
@@ -494,7 +511,7 @@ def save_instance(
             # print(message)
             pass
 
-    op_function_code = get_source_or_fallback(obj)
+    op_function_code = get_source_or_fallback(obj, warnings=warnings)
 
     if not WEAVE_OP_PATTERN.search(op_function_code):
         op_function_code = "@weave.op()\n" + op_function_code
@@ -539,15 +556,14 @@ def load_instance(
     )
 
     sys.path.insert(0, os.path.abspath(module_dir))
-    with context_state.no_op_register():
-        try:
-            mod = __import__(import_name, fromlist=[module_dir])
-        except Exception as e:
-            print("Op loading exception. This might be fine!", e)
-            import traceback
+    try:
+        mod = __import__(import_name, fromlist=[module_dir])
+    except Exception as e:
+        print("Op loading exception. This might be fine!", e)
+        import traceback
 
-            traceback.print_exc()
-            return None
+        traceback.print_exc()
+        return None
     sys.path.pop(0)
 
     # In the case where the saved op calls another op, we will have multiple
@@ -580,4 +596,4 @@ def fully_qualified_opname(wrap_fn: Callable) -> str:
     return "file://" + op_module_file + "." + wrap_fn.__name__
 
 
-serializer.register_serializer(Op, save_instance, load_instance)
+serializer.register_serializer(Op, save_instance, load_instance, is_op)

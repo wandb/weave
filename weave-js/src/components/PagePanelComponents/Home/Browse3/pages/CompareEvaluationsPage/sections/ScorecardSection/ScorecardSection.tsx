@@ -64,6 +64,7 @@ const GridCell = styled.div<{
     }
   `}
 `;
+GridCell.displayName = 'S.GridCell';
 
 export const ScorecardSection: React.FC<{
   state: EvaluationComparisonState;

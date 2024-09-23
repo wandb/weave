@@ -219,3 +219,7 @@ class TestOnlyUserInjectingExternalTraceServer(
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         req.wb_user_id = self._user_id
         return super().feedback_create(req)
+
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        req.wb_user_id = self._user_id
+        return super().cost_create(req)

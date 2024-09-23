@@ -1,24 +1,17 @@
-import logging
 import os
-import pathlib
 import random
 import shutil
 import tempfile
-import typing
 
 import numpy as np
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from flask.testing import FlaskClient
 
 import weave
-from weave.legacy.weave import client as client_legacy
-from weave.legacy.weave import context_state, environment, io_service, serialize
-from weave.legacy.weave.language_features.tagging.tag_store import (
-    isolated_tagging_context,
-)
+from weave import context_state
 from weave.trace import weave_init
+from weave.trace.context import raise_on_captured_errors
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     sqlite_trace_server,
@@ -26,23 +19,13 @@ from weave.trace_server import (
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
 
-from .legacy.weave import logs
 from .tests import fixture_fakewandb
 from .tests.trace.trace_server_clickhouse_conftest import *
 from .tests.wandb_system_tests_conftest import *
 from .trace import autopatch
 
-logs.configure_logger()
-
-# Lazy mode was the default for a long time. Eager is now the default for the user API.
-# A lot of tests are written to expect lazy mode, so just make lazy mode the default for
-# tests.
-context_state._eager_mode.set(False)
-
-# A lot of tests rely on weave.legacy.weave.ops.* being in scope. Importing this here
-# makes that work...
-
-### Disable datadog engine tracing
+# Force testing to never report wandb sentry events
+os.environ["WANDB_ERROR_REPORTING"] = "false"
 
 
 class FakeTracer:
@@ -69,16 +52,23 @@ def guard(*args, **kwargs):
 # socket.socket = guard
 
 
-def pytest_sessionstart(session):
-    context_state.disable_analytics()
-
-
 @pytest.fixture()
 def test_artifact_dir():
     return "/tmp/weave/pytest/%s" % os.environ.get("PYTEST_CURRENT_TEST")
 
 
+def pytest_sessionfinish(session, exitstatus):
+    if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED:
+        print("No tests were selected. Exiting gracefully.")
+        session.exitstatus = 0
+
+
 def pytest_collection_modifyitems(config, items):
+    # Add the weave_client marker to all tests that have a client fixture
+    for item in items:
+        if "client" in item.fixturenames:
+            item.add_marker(pytest.mark.weave_client)
+
     # Get the job number from environment variable (0 for even tests, 1 for odd tests)
     job_num = config.getoption("--job-num", default=None)
     if job_num is None:
@@ -93,30 +83,11 @@ def pytest_collection_modifyitems(config, items):
 
     items[:] = selected_items
 
-    # Add the weave_client marker to all tests that have a client fixture
-    for item in items:
-        if "client" in item.fixturenames:
-            item.add_marker(pytest.mark.weave_client)
-
 
 @pytest.fixture(autouse=True)
-def pre_post_each_test(test_artifact_dir, caplog):
-    # TODO: can't get this to work. I was trying to setup pytest log capture
-    # to use our custom log stuff, so that it indents nested logs properly.
-    caplog.handler.setFormatter(logging.Formatter(logs.default_log_format))
-    # Tests rely on full cache mode right now.
-    os.environ["WEAVE_CACHE_MODE"] = "full"
-    os.environ["WEAVE_GQL_SCHEMA_PATH"] = str(
-        pathlib.Path(__file__).parent.parent / "wb_schema.gql"
-    )
-    try:
-        shutil.rmtree(test_artifact_dir)
-    except (FileNotFoundError, OSError):
-        pass
-    os.environ["WEAVE_LOCAL_ARTIFACT_DIR"] = test_artifact_dir
-    with isolated_tagging_context():
+def always_raise_on_captured_errors():
+    with raise_on_captured_errors():
         yield
-    del os.environ["WEAVE_LOCAL_ARTIFACT_DIR"]
 
 
 @pytest.fixture(autouse=True)
@@ -134,19 +105,6 @@ def cache_mode_minimal():
 
 
 @pytest.fixture()
-def fresh_server_logfile():
-    def _clearlog():
-        try:
-            os.remove(logs.default_log_filename())
-        except (OSError, FileNotFoundError) as e:
-            pass
-
-    _clearlog()
-    yield
-    _clearlog()
-
-
-@pytest.fixture()
 def cereal_csv():
     with tempfile.TemporaryDirectory() as d:
         cereal_path = os.path.join(d, "cereal.csv")
@@ -155,26 +113,10 @@ def cereal_csv():
 
 
 @pytest.fixture()
-def eager_mode():
-    with context_state.eager_execution():
-        yield
-
-
-@pytest.fixture()
 def fake_wandb():
     setup_response = fixture_fakewandb.setup()
     yield setup_response
     fixture_fakewandb.teardown(setup_response)
-
-
-@pytest.fixture()
-def use_server_gql_schema():
-    old_schema_path = environment.gql_schema_path()
-    if old_schema_path is not None:
-        del os.environ["WEAVE_GQL_SCHEMA_PATH"]
-    yield
-    if old_schema_path is not None:
-        os.environ["WEAVE_GQL_SCHEMA_PATH"] = old_schema_path
 
 
 @pytest.fixture()
@@ -200,73 +142,11 @@ def app():
     yield app
 
 
-class HttpServerTestClient:
-    def __init__(self, flask_test_client: FlaskClient):
-        """Constructor.
-
-        Args:
-            flask_test_client: A flask test client to use for sending requests to the test application
-        """
-        self.flask_test_client = flask_test_client
-        self.execute_endpoint = "/__weave/execute"
-
-    def execute(
-        self,
-        nodes,
-        headers: typing.Optional[dict[str, typing.Any]] = None,
-        no_cache=False,
-    ):
-        _headers: dict[str, typing.Any] = {}
-        if headers is not None:
-            _headers = headers
-
-        serialized = serialize.serialize(nodes)
-        r = self.flask_test_client.post(
-            self.execute_endpoint,
-            json={"graphs": serialized},
-            headers=_headers,
-        )
-
-        return r.json["data"]
-
-
-@pytest.fixture()
-def http_server_test_client(app):
-    from . import weave_server
-
-    app = weave_server.make_app()
-    flask_client = app.test_client()
-    return HttpServerTestClient(flask_client)
-
-
-@pytest.fixture()
-def weave_test_client(http_server_test_client):
-    return client_legacy.Client(http_server_test_client)
-
-
 @pytest.fixture()
 def enable_touch_on_read():
     os.environ["WEAVE_ENABLE_TOUCH_ON_READ"] = "1"
     yield
     del os.environ["WEAVE_ENABLE_TOUCH_ON_READ"]
-
-
-@pytest.fixture()
-def io_server_factory():
-    original_server = io_service.SERVER
-
-    def factory(process=False):
-        server = io_service.Server(process=process)
-        server.start()
-        io_service.SERVER = server
-        return server
-
-    yield factory
-
-    if io_service.SERVER and io_service.SERVER is not original_server:
-        io_service.SERVER.shutdown()
-
-    io_service.SERVER = original_server
 
 
 @pytest.fixture()
@@ -278,26 +158,88 @@ def consistent_table_col_ids():
 
 
 @pytest.fixture()
-def ref_tracking():
-    with context_state.ref_tracking(True):
-        yield
-
-
-@pytest.fixture()
 def strict_op_saving():
     with context_state.strict_op_saving(True):
         yield
 
 
-# we already were doing pytest_addoption in wandb_system_tests_conftest so
-# the weave flag is there as well
-# def pytest_addoption(parser):
-#     parser.addoption(
-#         "--weave-server",
-#         action="store",
-#         default="sqlite",
-#         help="Specify the client object to use: sqlite or clickhouse",
-#     )
+class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
+    """
+    A WeaveClient that automatically flushes after every method call.
+
+    This subclass overrides the behavior of the standard WeaveClient to ensure
+    that all write operations are immediately flushed to the underlying storage
+    before any subsequent read operation is performed. This is particularly
+    useful in testing scenarios where data is written and then immediately read
+    back, as it eliminates potential race conditions or inconsistencies that
+    might arise from delayed writes.
+
+    The flush operation is applied to all public methods (those not starting with
+    an underscore) except for the 'flush' method itself, to avoid infinite recursion.
+    This aggressive flushing strategy may impact performance and should primarily
+    be used in testing environments rather than production scenarios.
+
+    Note: Due to this, the test suite essentially "blocks" on every operation. So
+    if we are to test timing, this might not be the best choice. As an alternative,
+    we could explicitly call flush() in every single test that reads data, before the
+    read operation(s) are performed.
+    """
+
+    def __getattribute__(self, name):
+        self_super = super()
+        attr = self_super.__getattribute__(name)
+
+        if callable(attr) and not name.startswith("_") and name != "flush":
+
+            def wrapper(*args, **kwargs):
+                res = attr(*args, **kwargs)
+                self_super._flush()
+                return res
+
+            return wrapper
+
+        return attr
+
+
+def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
+    """A wrapper around a trace server that records all attribute access.
+
+    This is extremely helpful for tests to assert that a certain series of
+    attribute accesses happen (or don't happen), and in order. We will
+    probably want to make this a bit more sophisticated in the future, but
+    this is a pretty good start.
+
+    For example, you can do something like the followng to assert that various
+    read operations do not happen!
+
+    ```pyth
+    access_log = client.server.attribute_access_log
+    assert "table_query" not in access_log
+    assert "obj_read" not in access_log
+    assert "file_content_read" not in access_log
+    ```
+    """
+
+    class ServerRecorder(type(server)):  # type: ignore
+        attribute_access_log: list[str]
+
+        def __init__(self, server: tsi.TraceServerInterface):  # type: ignore
+            self.server = server
+            self.attribute_access_log = []
+
+        def __getattribute__(self, name):
+            self_server = super().__getattribute__("server")
+            access_log = super().__getattribute__("attribute_access_log")
+            if name == "server":
+                return self_server
+            if name == "attribute_access_log":
+                return access_log
+            attr = self_server.__getattribute__(name)
+            if name != "attribute_access_log":
+                access_log.append(name)
+            return attr
+
+    return ServerRecorder(server)
 
 
 @pytest.fixture()
@@ -317,9 +259,7 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
             sqlite_server, DummyIdConverter(), entity
         )
     elif weave_server_flag == "clickhouse":
-        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
-            use_async_insert=False
-        )
+        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
         ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
         ch_server._run_migrations()
@@ -335,7 +275,9 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
-        client = weave_client.WeaveClient(entity, project, server)
+        client = TestOnlyFlushingWeaveClient(
+            entity, project, make_server_recorder(server)
+        )
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
     try:

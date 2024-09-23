@@ -1,6 +1,8 @@
 """Defines the Op protocol and related functions."""
 
 import inspect
+import logging
+import sys
 import typing
 from functools import partial, wraps
 from types import MethodType
@@ -22,9 +24,12 @@ from typing import (
 from weave.legacy.weave import context_state
 from weave.trace import box, call_context, settings
 from weave.trace.client_context import weave_client as weave_client_context
-from weave.trace.context import call_attributes
+from weave.trace.context import call_attributes, get_raise_on_captured_errors
 from weave.trace.errors import OpCallError
+from weave.trace.op_extensions.log_once import log_once
 from weave.trace.refs import ObjectRef
+
+logger = logging.getLogger(__name__)
 
 from .constants import TRACE_CALL_EMOJI
 
@@ -47,9 +52,23 @@ except ImportError:
     ANTHROPIC_NOT_GIVEN = None
 
 try:
+    # https://github.com/search?q=repo:mistralai/client-python%20Final&type=code
+    from mistralai.types.basemodel import UNSET  # type: ignore
+
+    MISTRAL_NOT_GIVEN = UNSET  # type: ignore
+except ImportError:
+    MISTRAL_NOT_GIVEN = None
+
+MISTRAL_NOT_GIVEN = None
+
+
+try:
     from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
 except ImportError:
     CEREBRAS_NOT_GIVEN = None
+
+
+class DisplayNameFuncError(ValueError): ...
 
 
 def print_call_link(call: "Call") -> None:
@@ -67,6 +86,7 @@ def value_is_sentinel(param: Any) -> bool:
         or param.default is OPENAI_NOT_GIVEN
         or param.default is COHERE_NOT_GIVEN
         or param.default is ANTHROPIC_NOT_GIVEN
+        or param.default is MISTRAL_NOT_GIVEN
         or param.default is CEREBRAS_NOT_GIVEN
         or param.default is Ellipsis
     )
@@ -110,9 +130,13 @@ class Op(Protocol):
     """
 
     name: str
+    call_display_name: Union[str, Callable[["Call"], str]]
     signature: inspect.Signature
     ref: Optional[ObjectRef]
     resolve_fn: Callable
+
+    postprocess_inputs: Optional[Callable[[dict[str, Any]], dict[str, Any]]]
+    postprocess_output: Optional[Callable[..., Any]]
 
     call: Callable[..., Any]
     calls: Callable[..., "CallsIter"]
@@ -178,6 +202,7 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
         func,
         inputs_with_defaults,
         parent_call,
+        display_name=func.call_display_name,
         attributes=attributes,
     )
 
@@ -198,7 +223,12 @@ def _execute_call(
         if has_finished:
             raise ValueError("Should not call finish more than once")
 
-        client.finish_call(call, output, exception)
+        client.finish_call(
+            call,
+            output,
+            exception,
+            postprocess_output=__op.postprocess_output,
+        )
         if not call_context.get_current_call():
             print_call_link(call)
 
@@ -210,7 +240,21 @@ def _execute_call(
 
     def process(res: Any) -> Any:
         res = box.box(res)
-        res = on_output(res)
+        try:
+            # Here we do a try/catch because we don't want to
+            # break the user process if we trip up on processing
+            # the output
+            res = on_output(res)
+        except Exception as e:
+            log_once(logger.error, f"Error capturing call output: {e}")
+            if get_raise_on_captured_errors():
+                raise
+        finally:
+            # Is there a better place for this? We want to ensure that even
+            # if the final output fails to be captured, we still pop the call
+            # so we don't put future calls under the old call.
+            call_context.pop_call(call.id)
+
         return res, call
 
     def handle_exception(e: Exception) -> Any:
@@ -222,15 +266,12 @@ def _execute_call(
     if inspect.iscoroutinefunction(func):
 
         async def _call_async() -> Coroutine[Any, Any, Any]:
-            call_context.push_call(call)
             try:
                 res = await func(*args, **kwargs)
             except Exception as e:
                 return handle_exception(e)
             else:
                 return process(res)
-            finally:
-                call_context.pop_call(call.id)
 
         return _call_async()
 
@@ -323,6 +364,42 @@ def op(
 def op(func: Any) -> Op: ...
 
 
+@overload
+def op(
+    *,
+    call_display_name: Union[str, Callable[["Call"], str]],
+) -> Callable[[Any], Op]:
+    """Use call_display_name to set the display name of the traced call.
+
+    When set as a callable, the callable must take in a Call object
+    (which can have attributes like op_name, trace_id, etc.) and return
+    the string to be used as the display name of the traced call."""
+    ...
+
+
+# type ignore here is because we have the legacy decorators above.  Once they are
+# removed, we can remove the overloads this type ignore.
+@overload
+def op(*, name: str) -> Callable[[Any], Op]:  # type: ignore
+    """Use name to set the name of the op itself."""
+    ...
+
+
+@overload
+def op(
+    *,
+    postprocess_inputs: Callable[[dict[str, Any]], dict[str, Any]],
+    postprocess_output: Callable[..., Any],
+) -> Any:
+    """
+    Modify the inputs and outputs of an op before sending data to weave.
+
+    This does not modify inputs or outputs at function call time, only when
+    the data is sent to weave.
+    """
+    ...
+
+
 def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
     """
     A decorator to weave op-ify a function or method.  Works for both sync and async.
@@ -394,16 +471,19 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
             # Tack these helpers on to our wrapper
             wrapper.resolve_fn = func  # type: ignore
 
-            name = func.__qualname__ if is_method else func.__name__
+            inferred_name = func.__qualname__ if is_method else func.__name__
 
             # funcs and methods defined inside another func will have the
             # name prefixed with {outer}.<locals>.{func_name}
             # this is noisy for us, so we strip it out
-            name = name.split(".<locals>.")[-1]
+            inferred_name = inferred_name.split(".<locals>.")[-1]
 
-            wrapper.name = name  # type: ignore
+            wrapper.name = kwargs.get("name", inferred_name)  # type: ignore
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
+
+            wrapper.postprocess_inputs = kwargs.get("postprocess_inputs")  # type: ignore
+            wrapper.postprocess_output = kwargs.get("postprocess_output")  # type: ignore
 
             wrapper.call = partial(call, wrapper)  # type: ignore
             wrapper.calls = partial(calls, wrapper)  # type: ignore
@@ -416,12 +496,19 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
             wrapper._tracing_enabled = True  # type: ignore
 
+            if callable(call_name_func := kwargs.get("call_display_name", "")):
+                params = inspect.signature(call_name_func).parameters
+                if len(params) != 1:
+                    raise DisplayNameFuncError(
+                        "`call_display_name` function must take exactly 1 argument (the Call object)"
+                    )
+            wrapper.call_display_name = call_name_func  # type: ignore
+
             return cast(Op, wrapper)
 
         return create_wrapper(func)
 
     if len(args) == 1 and len(kwargs) == 0 and callable(func := args[0]):
-        # return wrap(args[0])
         return op_deco(func)
 
     return op_deco
@@ -454,6 +541,32 @@ def maybe_unbind_method(oplike: Union[Op, MethodType, partial]) -> Op:
         op = oplike
 
     return cast(Op, op)
+
+
+def is_op(obj: Any) -> bool:
+    if sys.version_info < (3, 12):
+        return isinstance(obj, Op)
+
+    return all(hasattr(obj, attr) for attr in Op.__annotations__)
+
+
+def as_op(fn: Callable) -> Op:
+    """Given a @weave.op() decorated function, return its Op.
+
+    @weave.op() decorated functions are instances of Op already, so this
+    function should be a no-op at runtime. But you can use it to satisfy type checkers
+    if you need to access OpDef attributes in a typesafe way.
+
+    Args:
+        fn: A weave.op() decorated function.
+
+    Returns:
+        The Op of the function.
+    """
+    if not is_op(fn):
+        raise ValueError("fn must be a weave.op() decorated function")
+
+    return cast(Op, fn)
 
 
 __docspec__ = [call, calls]
