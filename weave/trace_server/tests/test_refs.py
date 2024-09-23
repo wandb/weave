@@ -37,7 +37,7 @@ def test_ref_parsing_external_invalid():
             project="project",
             name=string_with_every_char(),
             _digest="1234567890",
-            extra=("key", string_with_every_char()),
+            _extra=("key", string_with_every_char()),
         )
 
 
@@ -47,7 +47,7 @@ def test_ref_parsing_external_sanitized():
         project="project",
         name=sanitize_object_name(string_with_every_char()),
         _digest="1234567890",
-        extra=("key", string_with_every_char()),
+        _extra=("key", string_with_every_char()),
     )
 
     ref_str = ref_start.uri()

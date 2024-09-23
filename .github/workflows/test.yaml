@@ -135,6 +135,7 @@ jobs:
 
   trace-tests:
     name: Trace tox tests
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     strategy:
       matrix:
