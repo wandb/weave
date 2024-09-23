@@ -5,9 +5,9 @@ title: Integrating with Weave - Production Dashboard
 
 :::tip[This is a notebook]
 
-<a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./notebooks/dashboard_integraion.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
+<a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./notebooks/online_monitoring.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
 
-<a href="https://github.com/wandb/weave/blob/master/docs/./notebooks/dashboard_integraion.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
+<a href="https://github.com/wandb/weave/blob/master/docs/./notebooks/online_monitoring.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
 
 :::
 
@@ -42,9 +42,8 @@ To follow along this tutorial you'll only need to install the following packages
 ## 2.1 Initializing Weave Client and Defining Costs
 First, we'll set up a function to initialize the Weave client and add costs for each model. 
 
-* We have included the standard costs for many standard models but we also make it easy to add your own custom costs and custom models. In the following we'll show how to add custom costs for a couple of models and use the standard costs for the rest.
-* The costs are calculate based on the tracked tockens for each call in Weave. For our standard integrations we will automatically track the token usage, but it is also possible to return custom token counts for any call. See this cookbook on how to define the token count and cost calculation for a custom model - [custom cost cookbook](https://weave-docs.wandb.ai/reference/gen_notebooks/custom_model_cost#setting-up-a-model-with-weave).
-* We can also add an `effective_date` parameter to the function to set the date when the costs should be effective - more information about the `add_cost` function [here](https://weave-docs.wandb.ai/guides/tracking/costs).
+* We have included the standard costs for many standard models but we also make it easy to add your own custom costs and custom models. In the following we'll show how to add custom costs for a few models and use the standard costs for the rest.
+* The costs are calculate based on the tracked tokens for each call in Weave. For many LLM vendor libraries, we will automatically track the token usage, but it is also possible to return custom token counts for any call. See this cookbook on how to define the token count and cost calculation for a custom model - [custom cost cookbook](https://weave-docs.wandb.ai/reference/gen_notebooks/custom_model_cost#setting-up-a-model-with-weave).
 
 
 ```python
@@ -127,7 +126,7 @@ calls = fetch_calls(client, PROJECT_NAME, datetime.now() - timedelta(days=1), Tr
 pd.DataFrame([call.dict() for call in calls]).head(3)
 ```
 
-Processing the calls is very easy with the return from Weave - we'll extract the relevant information and store it in a list of dictionaries. We'll then convert the list of dictionaries to a pandas DataFrame and return it. For the high-level APIs we don't need to do this processing.
+Processing the calls is very easy with the return from Weave - we'll extract the relevant information and store it in a list of dictionaries. We'll then convert the list of dictionaries to a pandas DataFrame and return it. 
 
 
 ```python
@@ -165,7 +164,7 @@ df_calls.head(3)
 
 ### 2.2.2 Using high-level APIs
 Instead of goin through every call Weave also provides high-level APIs to directly access model costs, feedback, and other metrics. 
-For example for the cost, we'll use the `query_costs` API to fetch the costs of all used LLMs using in project:
+For example, for the cost, we'll use the `query_costs` API to fetch the costs of all used LLMs using in project:
 
 
 ```python
@@ -179,7 +178,7 @@ df_costs
 ```
 
 ## 2.4 Gathering inputs and generating visualizations
-Next, we'll gather the inputs using streamlit and generate the visualizations using plotly. This is the most basic dashboard, but you can customize it as you like! Check out the complete source code with Streamlit [here](https://github.com/NiWaRe/knowledge-worker-weave/blob/master/prod_dashboard.py).
+Next, we can generate the visualizations using plotly. This is the most basic dashboard, but you can customize it as you like! For a more complex example, check out a Streamlit example [here](https://github.com/NiWaRe/knowledge-worker-weave/blob/master/prod_dashboard.py).
 
 
 ```python
@@ -220,4 +219,9 @@ In this cookbook, we demonstrated how to create a custom production monitoring d
     * Easy download of the data in CSV, TSV, JSONL, JSON formats - see [here](https://weave-docs.wandb.ai/guides/tracking/tracing#querying--exporting-calls) for more details.
     * Easy export using programmatic access to the data - see "Use Python" section in the export panel as described in this cookbook. See [here](https://weave-docs.wandb.ai/guides/tracking/tracing#querying--exporting-calls) for more details.
 
-This custom dashboard extends Weave's native Traces view, allowing for tailored monitoring of LLM applications in production. While this dashboard will soon be directly integrated into Weave, the easy programmatic data access will be preserved. This ensures that enterprises can continue to integrate Weave data into their existing monitoring tools and FinOps processes.
+This custom dashboard extends Weave's native Traces view, allowing for tailored monitoring of LLM applications in production. If you're interested in viewing a more complex dashboard, check out a Streamlit example [here](https://github.com/NiWaRe/knowledge-worker-weave/blob/master/prod_dashboard.py).
+
+
+```python
+
+```
