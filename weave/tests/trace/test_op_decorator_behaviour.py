@@ -164,7 +164,7 @@ async def test_async_method_call(client, weave_obj, py_obj):
             entity="shawn",
             project="test-project",
             name="A",
-            digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
+            _digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
             _extra=(),
         ),
         "a": 1,

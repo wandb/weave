@@ -18,7 +18,7 @@ def test_isdescended_from():
         project="p",
         name="n",
         _digest="v",
-        extra=["attr", "x2", "attr", "x4"],
+        _extra=["attr", "x2", "attr", "x4"],
     )
     assert a.is_descended_from(b) == False
     assert b.is_descended_from(a) == True
