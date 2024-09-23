@@ -211,7 +211,7 @@ export type WFDataModelHooksInterface = {
     project: string,
     filter: OpVersionFilter,
     limit?: number,
-    columns?: string[],
+    metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (

@@ -53,10 +53,9 @@ const OpVersionPageInner: React.FC<{
     project,
     {
       opIds: [opId],
-      // Pass empty columns to avoid loading the object val
     },
-    undefined,
-    []
+    undefined, // limit
+    true // metadataOnly
   );
   const opVersionCount = (opVersions.result ?? []).length;
   const callsStats = useCallsStats(entity, project, {

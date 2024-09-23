@@ -751,7 +751,7 @@ const convertTraceServerObjectVersionToOpSchema = (
 
 const useOpVersions = makeTraceServerEndpointHook<
   'objsQuery',
-  [string, string, OpVersionFilter, number?, string[]?, {skip?: boolean}?],
+  [string, string, OpVersionFilter, number?, boolean?, {skip?: boolean}?],
   OpVersionSchema[]
 >(
   'objsQuery',
@@ -760,7 +760,7 @@ const useOpVersions = makeTraceServerEndpointHook<
     project: string,
     filter: OpVersionFilter,
     limit?: number,
-    columns?: string[],
+    metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => ({
     params: {
@@ -771,7 +771,7 @@ const useOpVersions = makeTraceServerEndpointHook<
         is_op: true,
       },
       limit,
-      columns,
+      metadata_only: metadataOnly,
     },
     skip: opts?.skip,
   }),
