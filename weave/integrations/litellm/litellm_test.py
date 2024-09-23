@@ -1,4 +1,5 @@
 import os
+from importlib.metadata import version
 from typing import Any, Generator
 
 import litellm
@@ -15,8 +16,7 @@ from .litellm import litellm_patcher
 # We can handle this in non-streaming mode, but in streaming mode, we
 # have no way of correctly capturing the output and not messing up the
 # users' code (that i can see). In these cases, model cost is not captured.
-
-USES_RAW_OPENAI_RESPONSE = semver.compare(litellm._version.version, "1.42.11") > 0
+USES_RAW_OPENAI_RESPONSE = semver.compare(version(litellm), "1.42.11") > 0
 
 
 class Nearly:
@@ -144,7 +144,6 @@ def test_litellm_quickstart_stream(
     for chunk in chat_response:
         if chunk.choices[0].delta.content:
             all_content += chunk.choices[0].delta.content
-    del chat_response
 
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you. How can I assist you today?"""
 
