@@ -7,7 +7,7 @@ logged_messages = []
 def log_once(log_method: Callable[[str], None], message: str) -> None:
     """Logs a message once, suppressing subsequent messages of the same type. This
     is useful for notifying the user about errors without spamming the logs.
-    
+
     This is mostly useful for cases where the same error message might occur many times.
     For example, if an op fails to save, it is likely going to happen every time that op is
     called. Or, if we have an error in our patched iterator, then it likely happens every time
