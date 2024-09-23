@@ -179,7 +179,7 @@ class OrderField(BaseModel):
 
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         options: list[typing.Tuple[typing.Optional[tsi_query.CastTo], str]]
-        if isinstance(self.field, CallsMergedDynamicField):
+        if isinstance(self.field, (QueryBuilderDynamicField, CallsMergedDynamicField)):
             # Prioritize existence, then cast to double, then str
             options = [
                 ("exists", "desc"),
