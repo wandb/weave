@@ -12,8 +12,10 @@ test_only_raise_on_captured_errors: contextvars.ContextVar[bool] = (
 
 
 @contextlib.contextmanager
-def raise_on_captured_errors() -> typing.Generator[None, None, None]:
-    token = test_only_raise_on_captured_errors.set(True)
+def raise_on_captured_errors(
+    should_raise: bool = True,
+) -> typing.Generator[None, None, None]:
+    token = test_only_raise_on_captured_errors.set(should_raise)
     try:
         yield
     finally:
