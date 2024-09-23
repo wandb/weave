@@ -74,7 +74,6 @@ def print_call_link(call: "Call") -> None:
 
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
 OnOutputHandlerType = Callable[[Any, FinishCallbackType, Dict], Any]
-DisableTracingForInputsType = Optional[Callable[[dict[str, Any]], bool]]
 
 
 def value_is_sentinel(param: Any) -> bool:
