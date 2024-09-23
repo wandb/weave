@@ -79,24 +79,40 @@ class FutureExecutor:
         self._recursion_limit = recursion_limit
         self._recursion_depths: Dict[int, int] = {}
         self._recursion_depths_lock = Lock()
+        self._local_lock = Lock()
         atexit.register(self._shutdown)
 
     @property
     def _executor(self) -> ContextAwareThreadPoolExecutor:
-        if not hasattr(self._local, "executor"):
-            target_name = (
-                f"{self._thread_name_prefix}-{threading.current_thread().name}"
-            )
-            if "-MainThread" in target_name:
-                target_name = target_name.replace("-MainThread", "")
-            while "-" + self._thread_name_prefix in target_name:
-                target_name = target_name.replace("-" + self._thread_name_prefix, "")
-            self._local.executor = ContextAwareThreadPoolExecutor(
-                max_workers=self._max_workers, thread_name_prefix=target_name
-            )
-            self._local.active_futures = []
-            self._local.active_futures_lock = Lock()
+        with self._local_lock:
+            if not hasattr(self._local, "executor"):
+                target_name = (
+                    f"{self._thread_name_prefix}-{threading.current_thread().name}"
+                )
+                if "-MainThread" in target_name:
+                    target_name = target_name.replace("-MainThread", "")
+                while "-" + self._thread_name_prefix in target_name:
+                    target_name = target_name.replace(
+                        "-" + self._thread_name_prefix, ""
+                    )
+                self._local.executor = ContextAwareThreadPoolExecutor(
+                    max_workers=self._max_workers, thread_name_prefix=target_name
+                )
         return self._local.executor
+
+    @property
+    def _active_futures_lock(self) -> Lock:
+        with self._local_lock:
+            if not hasattr(self._local, "active_futures_lock"):
+                self._local.active_futures_lock = Lock()
+        return self._local.active_futures_lock
+
+    @property
+    def _active_futures(self) -> List[Future]:
+        with self._local_lock:
+            if not hasattr(self._local, "active_futures"):
+                self._local.active_futures = []
+        return self._local.active_futures
 
     def _shutdown(self) -> None:
         if hasattr(self._local, "executor"):
@@ -141,15 +157,15 @@ class FutureExecutor:
                     del self._recursion_depths[executing_thread_id]
 
         future = self._executor.submit(wrapped_f)
-        with self._local.active_futures_lock:
-            self._local.active_futures.append(future)
+        with self._active_futures_lock:
+            self._active_futures.append(future)
         future.add_done_callback(self._future_done_callback)
         return future
 
     def _future_done_callback(self, future: Future) -> None:
-        with self._local.active_futures_lock:
-            if future in self._local.active_futures:
-                self._local.active_futures.remove(future)
+        with self._active_futures_lock:
+            if future in self._active_futures:
+                self._active_futures.remove(future)
 
     def then(self, futures: List[Future[T]], g: Callable[[List[T]], U]) -> Future[U]:
         """
