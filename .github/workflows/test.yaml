@@ -74,6 +74,8 @@ jobs:
         run: curl -s http://wandbservice:8080/healthz
       - run: |
           ls -la
+      - run: |
+          pwd
       - name: Run Legacy (Query Service) Python Unit Tests
         env:
           DD_SERVICE: weave-python
