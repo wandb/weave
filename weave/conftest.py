@@ -84,6 +84,12 @@ def pytest_collection_modifyitems(config, items):
 
 
 @pytest.fixture(autouse=True)
+def raise_on_captured_errors():
+    with context_state.raise_on_captured_errors():
+        yield
+
+
+@pytest.fixture(autouse=True)
 def throw_on_error():
     os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"] = "true"
     yield

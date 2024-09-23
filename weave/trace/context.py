@@ -1,6 +1,24 @@
+import contextlib
 import contextvars
 import typing
 
 call_attributes: contextvars.ContextVar[typing.Dict[str, typing.Any]] = (
     contextvars.ContextVar("call_attributes", default={})
 )
+
+test_only_raise_on_captured_errors: contextvars.ContextVar[bool] = (
+    contextvars.ContextVar("test_only_raise_on_captured_errors", default=False)
+)
+
+
+@contextlib.contextmanager
+def raise_on_captured_errors() -> typing.Generator[None, None, None]:
+    token = test_only_raise_on_captured_errors.set(True)
+    try:
+        yield
+    finally:
+        test_only_raise_on_captured_errors.reset(token)
+
+
+def get_raise_on_captured_errors() -> bool:
+    return test_only_raise_on_captured_errors.get(False)

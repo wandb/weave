@@ -15,6 +15,7 @@ from typing import (
     Union,
 )
 
+from weave.trace.context import get_raise_on_captured_errors
 from weave.trace.op import FinishCallbackType, Op
 from weave.trace.op_extensions.error_once import log_once
 
@@ -57,6 +58,8 @@ class _IteratorWrapper(Generic[V]):
                     logger.error,
                     f"Error finishing call - some logs may not be captured: {e}",
                 )
+                if get_raise_on_captured_errors():
+                    raise
             self._on_finished_called = True
 
     def _call_on_error_once(self, e: Exception) -> None:
@@ -68,6 +71,8 @@ class _IteratorWrapper(Generic[V]):
                     logger.error,
                     f"Error finishing call with exception - some logs may not be captured: {e}",
                 )
+                if get_raise_on_captured_errors():
+                    raise
             self._on_finished_called = True
 
     def __iter__(self) -> "_IteratorWrapper":
@@ -89,6 +94,8 @@ class _IteratorWrapper(Generic[V]):
                 log_once(
                     logger.error, f"Error capturing yielded value for call output: {e}"
                 )
+                if get_raise_on_captured_errors():
+                    raise
             return value
         except (StopIteration, StopAsyncIteration) as e:
             self._call_on_close_once()
@@ -117,6 +124,8 @@ class _IteratorWrapper(Generic[V]):
                     logger.error,
                     f"Error capturing async yielded value for call output: {e}",
                 )
+                if get_raise_on_captured_errors():
+                    raise
             return value
         except (StopAsyncIteration, StopIteration) as e:
             self._call_on_close_once()
