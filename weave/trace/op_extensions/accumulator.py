@@ -17,7 +17,7 @@ from typing import (
 
 from weave.trace.context import get_raise_on_captured_errors
 from weave.trace.op import FinishCallbackType, Op
-from weave.trace.op_extensions.error_once import log_once
+from weave.trace.op_extensions.log_once import log_once
 
 logger = logging.getLogger(__name__)
 
