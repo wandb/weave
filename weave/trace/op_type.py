@@ -24,7 +24,7 @@ from weave.trace.ipython import (
     is_running_interactively,
 )
 from weave.trace.mem_artifact import MemTraceFilesArtifact
-from weave.trace.op import Op
+from weave.trace.op import Op, as_op, is_op
 from weave.trace_server.trace_server_interface_util import str_digest
 
 from . import env, serializer
@@ -245,7 +245,8 @@ def reconstruct_signature(fn: typing.Callable) -> str:
 
 
 def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
-    if isinstance(fn, Op):
+    if is_op(fn):
+        fn = as_op(fn)
         fn = fn.resolve_fn
 
     if not settings.should_capture_code():
@@ -360,7 +361,7 @@ def _get_code_deps(
             if var_value.__name__ != var_name:
                 import_line += f" as {var_name}"
             import_code.append(import_line)
-        elif isinstance(var_value, (py_types.FunctionType, Op, type)):
+        elif isinstance(var_value, (py_types.FunctionType, type)) or is_op(var_value):
             if var_value.__module__ == fn.__module__:
                 if not var_value in seen:
                     seen[var_value] = True
@@ -383,7 +384,7 @@ def _get_code_deps(
                 if var_value.__module__.split(".")[0] == fn.__module__.split(".")[0]:
                     pass
 
-                if isinstance(var_value, Op):
+                if is_op(var_value):
                     warnings.append(
                         f"Cross-module op dependencies are not yet serializable {var_value}"
                     )
@@ -566,4 +567,4 @@ def fully_qualified_opname(wrap_fn: Callable) -> str:
     return "file://" + op_module_file + "." + wrap_fn.__name__
 
 
-serializer.register_serializer(Op, save_instance, load_instance)
+serializer.register_serializer(Op, save_instance, load_instance, is_op)

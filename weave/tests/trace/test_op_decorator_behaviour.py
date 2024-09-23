@@ -6,7 +6,7 @@ import pytest
 
 import weave
 from weave.trace import errors
-from weave.trace.op import Op, op
+from weave.trace.op import Op, is_op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import Call
@@ -124,18 +124,12 @@ def test_sync_method(client, weave_obj, py_obj):
 def test_sync_method_call(client, weave_obj, py_obj):
     res, call = weave_obj.method.call(weave_obj, 1)
     assert isinstance(call, Call)
-
-    if sys.version_info >= (3, 12):
-        digest = "A8XuHAXc9nJGOWBH3uKJNKVhZHJcGncYtgYXJmEfcG0"
-    else:
-        digest = "tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo"
-
     assert call.inputs == {
         "self": ObjectRef(
             entity="shawn",
             project="test-project",
             name="A",
-            digest=digest,
+            digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
             extra=(),
         ),
         "a": 1,
@@ -165,18 +159,12 @@ async def test_async_method(client, weave_obj, py_obj):
 async def test_async_method_call(client, weave_obj, py_obj):
     res, call = await weave_obj.amethod.call(weave_obj, 1)
     assert isinstance(call, Call)
-
-    if sys.version_info >= (3, 12):
-        digest = "A8XuHAXc9nJGOWBH3uKJNKVhZHJcGncYtgYXJmEfcG0"
-    else:
-        digest = "tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo"
-
     assert call.inputs == {
         "self": ObjectRef(
             entity="shawn",
             project="test-project",
             name="A",
-            digest=digest,
+            digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
             extra=(),
         ),
         "a": 1,
@@ -193,29 +181,29 @@ async def test_async_method_call(client, weave_obj, py_obj):
 
 
 def test_sync_func_patching_passes_inspection(func):
-    assert isinstance(func, Op)
+    assert is_op(func)
     assert inspect.isfunction(func)
 
 
 def test_async_func_patching_passes_inspection(afunc):
-    assert isinstance(afunc, Op)
+    assert is_op(afunc)
     assert inspect.iscoroutinefunction(afunc)
 
 
 def test_sync_method_patching_passes_inspection(weave_obj, py_obj):
-    assert isinstance(weave_obj.method, Op)
+    assert is_op(weave_obj.method)
     assert inspect.ismethod(weave_obj.method)
 
-    assert isinstance(py_obj.method, Op)
+    assert is_op(py_obj.method)
     assert inspect.ismethod(py_obj.method)
 
 
 def test_async_method_patching_passes_inspection(weave_obj, py_obj):
-    assert isinstance(weave_obj.amethod, Op)
+    assert is_op(weave_obj.amethod)
     assert inspect.iscoroutinefunction(weave_obj.amethod)
     assert inspect.ismethod(weave_obj.amethod)
 
-    assert isinstance(py_obj.amethod, Op)
+    assert is_op(py_obj.amethod)
     assert inspect.iscoroutinefunction(py_obj.amethod)
     assert inspect.ismethod(py_obj.amethod)
 

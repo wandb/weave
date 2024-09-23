@@ -92,19 +92,19 @@ jobs:
           --durations=5 \
           ./legacy
 
-  test-query-service-matrix-check:  # This job does nothing and is only used for the branch protection
+  test-query-service-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 
     needs:
-    - test-query-service
+      - test-query-service
 
     runs-on: ubuntu-latest
 
     steps:
-    - name: Passes if all test-query-service jobs succeeded
-      uses: re-actors/alls-green@release/v1
-      with:
-        jobs: ${{ toJSON(needs) }}
+      - name: Passes if all test-query-service jobs succeeded
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
 
   # ==== Weave UI Jobs ====
   weavejs-lint-compile:
@@ -149,6 +149,7 @@ jobs:
 
   trace-tests:
     name: Trace tox tests
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -157,7 +158,7 @@ jobs:
             '9',
             '10',
             '11',
-            # '12',  # TODO: We have actual failing tests in 3.12, but commenting for simplicity for now.
+            '12',
             #
           ]
         tox-shard:
@@ -212,7 +213,7 @@ jobs:
           WEAVE_SENTRY_ENV: ci
           CI: 1
           WB_SERVER_HOST: http://wandbservice
-          WF_CLICKHOUSE_HOST: weave_clickhouse
+          WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
           tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }} -- \
@@ -227,16 +228,16 @@ jobs:
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
           tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }}
-  trace-tests-matrix-check:  # This job does nothing and is only used for the branch protection
+  trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 
     needs:
-    - trace-tests
+      - trace-tests
 
     runs-on: ubuntu-latest
 
     steps:
-    - name: Passes if all trace-tests jobs succeeded
-      uses: re-actors/alls-green@release/v1
-      with:
-        jobs: ${{ toJSON(needs) }}
+      - name: Passes if all trace-tests jobs succeeded
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
