@@ -27,9 +27,11 @@ import contextlib
 import contextvars
 import logging
 import threading
-from concurrent.futures import Future, ThreadPoolExecutor, wait
+from concurrent.futures import Future, wait
 from threading import Lock
 from typing import Any, Callable, Dict, Generator, List, Optional, TypeVar
+
+from weave.trace.util import ContextAwareThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +84,7 @@ class FutureExecutor:
         atexit.register(self._shutdown)
 
     @property
-    def _executor(self) -> ThreadPoolExecutor:
+    def _executor(self) -> ContextAwareThreadPoolExecutor:
         if not hasattr(self._local, "executor"):
             target_name = (
                 f"{self._thread_name_prefix}-{threading.current_thread().name}"
@@ -91,7 +93,7 @@ class FutureExecutor:
                 target_name = target_name.replace("-MainThread", "")
             while "-" + self._thread_name_prefix in target_name:
                 target_name = target_name.replace("-" + self._thread_name_prefix, "")
-            self._local.executor = ThreadPoolExecutor(
+            self._local.executor = ContextAwareThreadPoolExecutor(
                 max_workers=self._max_workers, thread_name_prefix=target_name
             )
         return self._local.executor
