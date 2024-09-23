@@ -700,6 +700,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             req.project_id,
             conditions=conds,
             parameters=parameters,
+            metadata_only=req.metadata_only,
             limit=req.limit,
             offset=req.offset,
             sort_by=req.sort_by,
@@ -1079,14 +1080,29 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         project_id: str,
         conditions: Optional[list[str]] = None,
         parameters: Optional[Dict[str, Any]] = None,
+        metadata_only: bool = False,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
         sort_by: Optional[list[tsi.SortBy]] = None,
     ) -> list[tsi.ObjSchema]:
         conn, cursor = get_conn_cursor(self.db_path)
         pred = " AND ".join(conditions or ["1 = 1"])
-        query = f"""SELECT * FROM objects
-                    WHERE deleted_at IS NULL AND project_id = ? AND {pred}"""
+        val_dump_part = "'{}' as val_dump" if metadata_only else "val_dump"
+        query = f"""
+            SELECT
+                project_id,
+                object_id,
+                created_at,
+                kind,
+                base_object_class,
+                {val_dump_part},
+                digest,
+                version_index,
+                is_latest
+            FROM objects
+            WHERE deleted_at IS NULL AND
+                project_id = ? AND {pred}
+        """
 
         if sort_by:
             valid_sort_fields = {"object_id", "created_at"}
@@ -1123,10 +1139,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     created_at=row[2],
                     kind=row[3],
                     base_object_class=row[4],
-                    val=json.loads(row[6]),
-                    digest=row[7],
-                    version_index=row[8],
-                    is_latest=row[9],
+                    val=json.loads(row[5]),
+                    digest=row[6],
+                    version_index=row[7],
+                    is_latest=row[8],
                 )
             )
         return result
