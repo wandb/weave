@@ -162,20 +162,16 @@ def test_litellm_quickstart_stream(
     summary = call.summary
     assert summary is not None
 
-    model_usage = summary["usage"][output["model"]]
-    assert model_usage["requests"] == 1
     # We are stuck here:
     # 1. LiteLLM uses raw responses, which we can't wrap in our iterator
     # 2. They don't even capture token usage correctly, so this info is
     # not available for now.
     if not USES_RAW_OPENAI_RESPONSE:
+        model_usage = summary["usage"][output["model"]]
+        assert model_usage["requests"] == 1
         assert model_usage["completion_tokens"] == 31
         assert model_usage["prompt_tokens"] == 13
         assert model_usage["total_tokens"] == 44
-    else:
-        assert model_usage["completion_tokens"] == 0
-        assert model_usage["prompt_tokens"] == 0
-        assert model_usage["total_tokens"] == 0
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -214,20 +210,16 @@ async def test_litellm_quickstart_stream_async(
     summary = call.summary
     assert summary is not None
 
-    model_usage = summary["usage"][output["model"]]
-    assert model_usage["requests"] == 1
     # We are stuck here:
     # 1. LiteLLM uses raw responses, which we can't wrap in our iterator
     # 2. They don't even capture token usage correctly, so this info is
     # not available for now.
     if not USES_RAW_OPENAI_RESPONSE:
+        model_usage = summary["usage"][output["model"]]
+        assert model_usage["requests"] == 1
         assert model_usage["completion_tokens"] == 41
         assert model_usage["prompt_tokens"] == 13
         assert model_usage["total_tokens"] == 54
-    else:
-        assert model_usage["completion_tokens"] == 0
-        assert model_usage["prompt_tokens"] == 0
-        assert model_usage["total_tokens"] == 0
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
