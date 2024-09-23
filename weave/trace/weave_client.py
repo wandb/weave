@@ -23,7 +23,7 @@ from weave.trace.object_record import (
     dataclass_object_record,
     pydantic_object_record,
 )
-from weave.trace.op import Op, maybe_unbind_method
+from weave.trace.op import Op, is_op, maybe_unbind_method
 from weave.trace.op import op as op_deco
 from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_op_uri
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
@@ -1060,7 +1060,7 @@ class WeaveClient:
             pass
 
         # If it's an Op, use the Op saving logic
-        if isinstance(val, Op):
+        if is_op(val):
             # TODO: Probably should call _save_op directly here (or error)
             pass
 
@@ -1125,7 +1125,7 @@ class WeaveClient:
 
         # Case 2: Op:
         # Here we save the op itself.
-        elif isinstance(obj, Op):
+        elif is_op(obj):
             # Ref is attached in here
             self._save_op(obj)
 
@@ -1177,7 +1177,7 @@ class WeaveClient:
         if getattr(val, "_is_dirty", False) and not isinstance(val, WeaveTable):
             val.ref = None
 
-        is_opdef = isinstance(val, Op)
+        is_opdef = is_op(val)
         orig_val = val
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):

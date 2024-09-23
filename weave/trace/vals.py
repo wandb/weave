@@ -15,7 +15,7 @@ from weave.trace.client_context.weave_client import (
 from weave.trace.concurrent.futures import defer
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
-from weave.trace.op import Op, maybe_bind_method
+from weave.trace.op import is_op, maybe_bind_method
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
@@ -659,7 +659,7 @@ def make_trace_obj(
             return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, dict):
             return WeaveDict(val, ref=new_ref, server=server, root=root)
-    if isinstance(val, Op) and inspect.signature(val.resolve_fn).parameters.get("self"):
+    if is_op(val) and inspect.signature(val.resolve_fn).parameters.get("self"):
         # This condition attempts to bind the current `self` to the attribute if
         # it happens to be both an `Op` and have a `self` argument. This is a
         # bit of a hack since we are not always sure that the current object is
@@ -683,7 +683,7 @@ def make_trace_obj(
         # val.call = partial(call, val, parent)
         val = maybe_bind_method(val, parent)
     box_val = box.box(val)
-    if isinstance(box_val, pydantic_v1.BaseModel) or isinstance(val, Op):
+    if isinstance(box_val, pydantic_v1.BaseModel) or is_op(val):
         box_val.__dict__["ref"] = new_ref
     elif box_val is None or isinstance(box_val, bool):
         # We intentionally don't box None and bools because it's imposible to
