@@ -216,7 +216,7 @@ jobs:
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
           tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }} -- \
-            -m "weave_client and not skip_clickhouse_client" \
+            -m "not skip_clickhouse_client" \
             --weave-server=clickhouse
       - name: Run tox
         env:
