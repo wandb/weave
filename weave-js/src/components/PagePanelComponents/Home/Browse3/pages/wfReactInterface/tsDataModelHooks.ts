@@ -911,7 +911,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     project: string,
     filter: ObjectVersionFilter,
     limit?: number,
-    columns?: string[],
+    metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => ({
     params: {
@@ -923,7 +923,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
         is_op: false,
       },
       limit,
-      columns,
+      metadata_only: metadataOnly,
     },
     skip: opts?.skip,
   }),
@@ -933,7 +933,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     inputProject,
     filter,
     limit,
-    columns,
+    metadataOnly,
     opts
   ): ObjectVersionSchema[] =>
     res.objs.map(convertTraceServerObjectVersionToSchema)

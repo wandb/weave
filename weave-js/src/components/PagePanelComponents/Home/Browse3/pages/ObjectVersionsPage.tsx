@@ -131,8 +131,8 @@ export const FilterableObjectVersionsTable: React.FC<{
         : undefined,
       latestOnly: effectivelyLatestOnly,
     },
-    undefined,
-    []
+    undefined, // limit
+    true // metadataOnly
   );
 
   if (filteredObjectVersions.loading) {
@@ -397,7 +397,7 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
       objectIds: [obj.objectId],
     },
     100,
-    []
+    true // metadataOnly
   );
   if (objectVersionsNode.loading) {
     return <LoadingDots />;
@@ -411,7 +411,7 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
         objectName: obj.objectId,
       }}
       versionCount={Math.min(countValue, 99)}
-      countIsLimited={countValue >= 100}
+      countIsLimited={countValue === 100}
       neverPeek
       variant="secondary"
     />

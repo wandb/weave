@@ -222,7 +222,7 @@ export type WFDataModelHooksInterface = {
     project: string,
     filter: ObjectVersionFilter,
     limit?: number,
-    columns?: string[],
+    metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => LoadableWithError<ObjectVersionSchema[]>;
   // `useRefsData` is in beta while we integrate Shawn's new Object DB
