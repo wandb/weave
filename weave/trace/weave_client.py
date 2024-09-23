@@ -16,7 +16,7 @@ from weave.legacy.weave import ref_base, urls
 from weave.trace import call_context, trace_sentry
 from weave.trace.async_job_queue import AsyncJobQueue
 from weave.trace.client_context import weave_client as weave_client_context
-from weave.trace.concurrent.futures import defer
+from weave.trace.concurrent.futures import defer, then
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.object_record import (
@@ -1212,7 +1212,7 @@ class WeaveClient:
             send_obj_create
         )
 
-        digest_future: Future[str] = defer(lambda: res_future.result().digest)
+        digest_future: Future[str] = then([res_future], lambda res: res[0].digest)
 
         ref: Ref
         if is_opdef:
@@ -1261,9 +1261,9 @@ class WeaveClient:
             send_table_create
         )
 
-        digest_future: Future[str] = defer(lambda: res_future.result().digest)
-        row_digests_future: Future[list[str]] = defer(
-            lambda: res_future.result().row_digests
+        digest_future: Future[str] = then([res_future], lambda res: res[0].digest)
+        row_digests_future: Future[list[str]] = then(
+            [res_future], lambda res: res[0].row_digests
         )
 
         table_ref = TableRef(

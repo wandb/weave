@@ -25,7 +25,7 @@ from concurrent.futures import Future, ThreadPoolExecutor, wait
 from typing import Callable, List, TypeVar
 
 # Constants
-MAX_WORKERS = 8
+MAX_WORKERS = 2**3
 THREAD_NAME_PREFIX = "WeaveThreadPool"
 
 T = TypeVar("T")
