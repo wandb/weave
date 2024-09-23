@@ -52,6 +52,8 @@ from clickhouse_connect.driver.summary import QuerySummary
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
+    OrderField,
+    QueryBuilderDynamicField,
     combine_conditions,
 )
 from weave.trace_server.ids import generate_id
@@ -143,6 +145,10 @@ all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
 ObjRefListType = list[ri.InternalObjectRef]
+
+
+CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
+ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
@@ -281,10 +287,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
-            necessary_cost_columns = ["started_at", "summary_dump"]
+            summary_columns = ["summary", "summary_dump"]
             columns = [
-                *[col for col in columns if col not in necessary_cost_columns],
-                *necessary_cost_columns,
+                *[col for col in columns if col not in summary_columns],
+                "summary_dump",
             ]
         for col in columns:
             cq.add_field(col)
@@ -438,10 +444,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
             )
 
-        # Note: i think this project condition is redundant
-        proj_cond = "calls_merged.project_id = {project_id: String}"
-        proj_params = {"project_id": req.project_id}
-
         # get all parents
         parents = list(
             self.calls_query_stream(
@@ -450,6 +452,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     filter=tsi.CallsFilter(
                         call_ids=req.call_ids,
                     ),
+                    # request minimal columns
+                    columns=["id", "parent_id"],
                 )
             )
         )
@@ -462,6 +466,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     filter=tsi.CallsFilter(
                         trace_ids=[p.trace_id for p in parents],
                     ),
+                    # request minimal columns
+                    columns=["id", "parent_id"],
                 )
             )
         )
@@ -629,6 +635,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             object_id_conditions=object_id_conditions,
             parameters=parameters,
             is_latest=is_latest,
+            limit=req.limit,
+            offset=req.offset,
+            sort_by=req.sort_by,
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
@@ -760,19 +769,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
-        parameters = {}
+        parameters: Dict[str, Any] = {}
         if req.filter:
             if req.filter.row_digests:
-                conds.append("tr.digest IN {row_digets: Array(String)}")
+                conds.append("tr.digest IN {row_digests: Array(String)}")
                 parameters["row_digests"] = req.filter.row_digests
         else:
             conds.append("1 = 1")
+
+        sort_clause = ""
+        pb = ParamBuilder()
+        if req.sort_by:
+            sort_fields = []
+            for i, sort in enumerate(req.sort_by):
+                # TODO: better splitting of escaped dots (.) in field names
+                extra_path = sort.field.split(".")
+                field = OrderField(
+                    field=QueryBuilderDynamicField(
+                        field="val_dump", extra_path=extra_path
+                    ),
+                    direction="ASC" if sort.direction.lower() == "asc" else "DESC",
+                )
+                sort_fields.append(field.as_sql(pb, "tr"))
+            sort_clause = f"ORDER BY {', '.join(sort_fields)}"
+        sort_params = pb.get_params()
+        parameters.update(sort_params)
         rows = self._table_query(
             req.project_id,
             req.digest,
             conditions=conds,
             limit=req.limit,
             offset=req.offset,
+            parameters=parameters,
+            sort_clause=sort_clause,
         )
         return tsi.TableQueryRes(rows=rows)
 
@@ -784,7 +813,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
         parameters: Optional[Dict[str, Any]] = None,
+        sort_clause: Optional[str] = None,
     ) -> list[tsi.TableRowSchema]:
+        if sort_clause is None:
+            sort_clause = ""
         conds = ["project_id = {project_id: String}"]
         if conditions:
             conds.extend(conditions)
@@ -824,6 +856,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     ORDER BY project_id, digest
                 ) tr ON t.project_id = tr.project_id AND t.row_digest = tr.digest
                 WHERE {predicate}
+                {sort_clause}
             """
         if parameters is None:
             parameters = {}
@@ -1390,6 +1423,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parameters: Optional[Dict[str, Any]] = None,
         is_latest: bool = False,
         limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        sort_by: Optional[list[tsi.SortBy]] = None,
     ) -> list[SelectableCHObjSchema]:
         """
         Main query for fetching objects.
@@ -1417,8 +1452,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         is_latest_part = "is_latest = 1" if is_latest else "1 = 1"
 
         limit_part = ""
-        if limit != None:
-            limit_part = f"LIMIT {limit}"
+        offset_part = ""
+        if limit is not None:
+            limit_part = f"LIMIT {int(limit)}"
+        if offset is not None:
+            offset_part = f" OFFSET {int(offset)}"
+
+        sort_part = ""
+        if sort_by:
+            valid_sort_fields = {"object_id", "created_at"}
+            sort_clauses = []
+            for sort in sort_by:
+                if sort.field in valid_sort_fields and sort.direction in {
+                    "asc",
+                    "desc",
+                }:
+                    sort_clauses.append(f"{sort.field} {sort.direction.upper()}")
+            if sort_clauses:
+                sort_part = f"ORDER BY {', '.join(sort_clauses)}"
 
         if parameters is None:
             parameters = {}
@@ -1473,7 +1524,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     {conditions_part}
             )
             WHERE {is_latest_part}
+            {sort_part}
             {limit_part}
+            {offset_part}
         """
         query_result = self._query_stream(
             select_query,
@@ -1594,8 +1647,58 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._flush_calls()
 
     def _flush_calls(self) -> None:
-        self._insert_call_batch(self._call_batch)
+        try:
+            self._insert_call_batch(self._call_batch)
+        except InsertTooLarge:
+            logger.info("Retrying with large objects stripped.")
+            batch = self._strip_large_values(self._call_batch)
+            self._insert_call_batch(batch)
+
         self._call_batch = []
+
+    def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
+        """
+        Iterate through the batch and replace large values with placeholders.
+
+        If values are larger than 1MiB replace them with placeholder values.
+        """
+        final_batch = []
+        # Set the value byte limit to be anything over 1MiB to catch
+        # payloads with multiple large values that are still under the
+        # single row insert limit.
+        val_byte_limit = 1 * 1024 * 1024
+        for item in batch:
+            bytes_size = _num_bytes(str(item))
+            # If bytes_size > the limit, this item is too large,
+            # iterate through the json-dumped item values to find and
+            # replace the large values with a placeholder.
+            if bytes_size > CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
+                stripped_item = []
+                for value in item:
+                    # all the values should be json dumps, there are no
+                    # non json fields controlled by the user that can
+                    # be large enough to strip... (?)
+                    if _num_bytes(value) > val_byte_limit:
+                        stripped_item += [ENTITY_TOO_LARGE_PAYLOAD]
+                    else:
+                        stripped_item += [value]
+                final_batch.append(stripped_item)
+            else:
+                final_batch.append(item)
+        return final_batch
+
+
+def _num_bytes(data: Any) -> int:
+    """
+    Calculate the number of bytes in a string.
+
+    This can be computationally expensive, only call when necessary.
+    Never raise on a failed str cast, just return 0.
+    """
+    try:
+        return len(str(data).encode("utf-8"))
+    except Exception:
+        return 0
 
 
 def _dict_value_to_dump(
@@ -1851,7 +1954,7 @@ def _digest_is_version_like(digest: str) -> Tuple[bool, int]:
 
 def find_call_descendants(
     root_ids: list[str],
-    all_calls: list[SelectableCHCallSchema],
+    all_calls: list[tsi.CallSchema],
 ) -> list[str]:
     # make a map of call_id to children list
     children_map = defaultdict(list)

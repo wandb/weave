@@ -23,6 +23,9 @@ from .tests.trace.trace_server_clickhouse_conftest import *
 from .tests.wandb_system_tests_conftest import *
 from .trace import autopatch
 
+# Force testing to never report wandb sentry events
+os.environ["WANDB_ERROR_REPORTING"] = "false"
+
 
 class FakeTracer:
     def trace(*args, **kwargs):
@@ -53,7 +56,14 @@ def test_artifact_dir():
     return "/tmp/weave/pytest/%s" % os.environ.get("PYTEST_CURRENT_TEST")
 
 
+def pytest_sessionfinish(session, exitstatus):
+    if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED:
+        print("No tests were selected. Exiting gracefully.")
+        session.exitstatus = 0
+
+
 def pytest_collection_modifyitems(config, items):
+    # Add the weave_client marker to all tests that have a client fixture
     # Get the job number from environment variable (0 for even tests, 1 for odd tests)
     job_num = config.getoption("--job-num", default=None)
     if job_num is None:
@@ -68,7 +78,6 @@ def pytest_collection_modifyitems(config, items):
 
     items[:] = selected_items
 
-    # Add the weave_client marker to all tests that have a client fixture
     for item in items:
         if "client" in item.fixturenames:
             item.add_marker(pytest.mark.weave_client)
