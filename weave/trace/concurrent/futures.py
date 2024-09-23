@@ -22,8 +22,16 @@ file I/O, or other operations with significant waiting times.
 """
 
 import atexit
+import concurrent.futures
+import contextlib
+import contextvars
+import logging
 from concurrent.futures import Future, ThreadPoolExecutor, wait
-from typing import Callable, List, Optional, TypeVar
+from threading import Lock
+from typing import Any, Callable, Generator, List, Optional, TypeVar
+
+logger = logging.getLogger(__name__)
+
 
 # Constants
 THREAD_NAME_PREFIX = "WeaveThreadPool"
@@ -31,20 +39,84 @@ THREAD_NAME_PREFIX = "WeaveThreadPool"
 T = TypeVar("T")
 U = TypeVar("U")
 
+should_raise_on_future_exceptions = contextvars.ContextVar(
+    "should_raise_on_future_exceptions", default=False
+)
+
+
+@contextlib.contextmanager
+def raise_on_future_exceptions(raise_value: bool = True) -> Generator[None, None, None]:
+    token = should_raise_on_future_exceptions.set(raise_value)
+    try:
+        yield
+    finally:
+        should_raise_on_future_exceptions.reset(token)
+
 
 class FutureExecutor:
+    """A utility for threadpool execution and promise-like chaining.
+
+    This class provides a thread-safe way to submit and execute jobs asynchronously
+    using a ThreadPoolExecutor. It ensures proper shutdown of the executor when the
+    object is deleted or when the program exits. If jobs are submitted after shutdown,
+    the queue will restart automatically.
+
+    Args:
+        max_workers (int): The maximum number of worker threads to use. Defaults to 1024. We
+        want this to be quite large so that we don't have deadlocks in cases where jobs are submitting & waiting on
+        new jobs as part of their callback chain, which when executed serially would deadlock.
+    """
+
     def __init__(
         self,
-        max_workers: Optional[int] = None,
+        max_workers: Optional[int] = 1024,
         thread_name_prefix: str = THREAD_NAME_PREFIX,
     ):
         self._executor = ThreadPoolExecutor(
             max_workers=max_workers, thread_name_prefix=thread_name_prefix
         )
+        self._active_futures: List[Future] = []
+        self._active_futures_lock = Lock()
         atexit.register(self._shutdown)
 
     def _shutdown(self) -> None:
         self._executor.shutdown(wait=True)
+
+    def submit(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
+        """Submits a job to be executed asynchronously.
+
+        If the queue has been shut down, it will be restarted automatically.
+
+        Args:
+            func: The function to be executed.
+            *args: Positional arguments to pass to the function.
+            **kwargs: Keyword arguments to pass to the function.
+
+        Returns:
+            A Future representing the execution of the job.
+
+        Example usage:
+
+        ```python
+        def example_job(x):
+            time.sleep(1)  # Simulate some work
+            return x * 2
+
+        queue = AsyncJobQueue(max_workers=4)
+
+        # Submit multiple jobs
+        futures = [queue.submit_job(example_job, i) for i in range(5)]
+
+        # Wait for all jobs to complete and get results
+        results = [future.result() for future in futures]
+        print(results)  # Output: [0, 2, 4, 6, 8]
+        ```
+        """
+
+        def wrapper() -> T:
+            return f(*args, **kwargs)
+
+        return self.defer(wrapper)
 
     def defer(self, f: Callable[[], T]) -> Future[T]:
         """
@@ -69,7 +141,16 @@ class FutureExecutor:
         print(result)  # Output: "Task completed"
         ```
         """
-        return self._executor.submit(f)
+        future = self._executor.submit(f)
+        with self._active_futures_lock:
+            self._active_futures.append(future)
+        future.add_done_callback(self._future_done_callback)
+        return future
+
+    def _future_done_callback(self, future: Future) -> None:
+        with self._active_futures_lock:
+            if future in self._active_futures:
+                self._active_futures.remove(future)
 
     def then(self, futures: List[Future[T]], g: Callable[[List[T]], U]) -> Future[U]:
         """
@@ -144,6 +225,32 @@ class FutureExecutor:
                 f.add_done_callback(on_done_callback)
 
         return result_future
+
+    def flush(self, timeout: Optional[float] = None) -> bool:
+        """
+        Block until all currently submitted items are complete or timeout is reached.
+        This method allows new submissions while waiting, ensuring that
+        submitted jobs can enqueue more items if needed to complete.
+
+        Args:
+            timeout (Optional[float]): Maximum time to wait in seconds. If None, wait indefinitely.
+
+        Returns:
+            bool: True if all tasks completed, False if timeout was reached.
+        """
+        with self._active_futures_lock:
+            if not self._active_futures:
+                return True
+            futures_to_wait = list(self._active_futures)
+
+        for future in concurrent.futures.as_completed(futures_to_wait, timeout=timeout):
+            try:
+                future.result()
+            except Exception as e:
+                logger.error(f"Job failed during flush: {e}")
+                if should_raise_on_future_exceptions.get():
+                    raise e
+        return True
 
 
 # Create a global FutureExecutor instance

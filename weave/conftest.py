@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 import weave
 from weave import context_state
 from weave.trace import weave_init
-from weave.trace.async_job_queue import raise_on_async_job_queue
+from weave.trace.concurrent.futures import raise_on_future_exceptions
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     sqlite_trace_server,
@@ -279,7 +279,7 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
     try:
-        with raise_on_async_job_queue():
+        with raise_on_future_exceptions():
             yield inited_client.client
     finally:
         inited_client.reset()

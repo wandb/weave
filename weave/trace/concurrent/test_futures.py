@@ -171,3 +171,13 @@ def test_empty_futures_list() -> None:
 
     future_result: Future[int] = executor.then([], process_data)
     assert future_result.result() == 0
+
+
+def test_nested_futures() -> None:
+    executor: FutureExecutor = FutureExecutor(max_workers=1)
+
+    def fetch_data() -> List[int]:
+        return executor.defer(lambda: [1, 2, 3, 4, 5]).result()
+
+    res = executor.defer(fetch_data).result()
+    assert res == [1, 2, 3, 4, 5]

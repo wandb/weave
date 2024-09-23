@@ -14,9 +14,8 @@ from requests import HTTPError
 from weave import version
 from weave.legacy.weave import ref_base, urls
 from weave.trace import call_context, trace_sentry
-from weave.trace.async_job_queue import AsyncJobQueue
 from weave.trace.client_context import weave_client as weave_client_context
-from weave.trace.concurrent.futures import defer, then
+from weave.trace.concurrent.futures import FutureExecutor, defer, then
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.object_record import (
@@ -436,7 +435,7 @@ class AttributesDict(dict):
 
 class WeaveClient:
     server: TraceServerInterface
-    async_job_queue: AsyncJobQueue
+    future_executor: FutureExecutor
 
     """
     A client for interacting with the Weave trace server.
@@ -459,7 +458,7 @@ class WeaveClient:
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
-        self.async_job_queue = AsyncJobQueue()
+        self.future_executor = FutureExecutor()
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
@@ -699,7 +698,7 @@ class WeaveClient:
                 )
             )
 
-        self.async_job_queue.submit_job(send_start_call)
+        self.future_executor.defer(send_start_call)
 
         if use_stack:
             call_context.push_call(call)
@@ -775,7 +774,7 @@ class WeaveClient:
                 )
             )
 
-        self.async_job_queue.submit_job(send_end_call)
+        self.future_executor.defer(send_end_call)
 
         # Descendent error tracking disabled til we fix UI
         # Add this call's summary after logging the call, so that only
@@ -1208,9 +1207,7 @@ class WeaveClient:
             )
             return self.server.obj_create(req)
 
-        res_future: Future[ObjCreateRes] = self.async_job_queue.submit_job(
-            send_obj_create
-        )
+        res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
 
         digest_future: Future[str] = then([res_future], lambda res: res[0].digest)
 
@@ -1257,7 +1254,7 @@ class WeaveClient:
             )
             return self.server.table_create(req)
 
-        res_future: Future[TableCreateRes] = self.async_job_queue.submit_job(
+        res_future: Future[TableCreateRes] = self.future_executor.defer(
             send_table_create
         )
 
@@ -1344,7 +1341,7 @@ class WeaveClient:
 
     def _flush(self) -> None:
         # Used to wait until all currently enqueued jobs are processed
-        self.async_job_queue.flush()
+        self.future_executor.flush()
         if self._server_is_flushable:
             # We don't want to do an instance check here because it could
             # be susceptible to shutdown race conditions. So we save a boolean
@@ -1354,7 +1351,7 @@ class WeaveClient:
             self.server.call_processor.wait_until_all_processed()  # type: ignore
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
-        return self.async_job_queue.submit_job(self.server.file_create, req)
+        return self.future_executor.submit(self.server.file_create, req)
 
 
 def safe_current_wb_run_id() -> Optional[str]:
