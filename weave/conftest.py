@@ -65,6 +65,10 @@ def pytest_sessionfinish(session, exitstatus):
 
 def pytest_collection_modifyitems(config, items):
     # Add the weave_client marker to all tests that have a client fixture
+    for item in items:
+        if "client" in item.fixturenames:
+            item.add_marker(pytest.mark.weave_client)
+
     # Get the job number from environment variable (0 for even tests, 1 for odd tests)
     job_num = config.getoption("--job-num", default=None)
     if job_num is None:
@@ -78,10 +82,6 @@ def pytest_collection_modifyitems(config, items):
             selected_items.append(item)
 
     items[:] = selected_items
-
-    for item in items:
-        if "client" in item.fixturenames:
-            item.add_marker(pytest.mark.weave_client)
 
 
 @pytest.fixture(autouse=True)
