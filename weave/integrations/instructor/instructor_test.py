@@ -1,43 +1,13 @@
 import asyncio
 import json
 import os
-from typing import Any, Iterable, List, Optional
+from typing import Any, Iterable, List
 
 import pytest
 from pydantic import BaseModel
 
 import weave
-from weave.trace_server import trace_server_interface as tsi
-
-
-def _get_call_output(call: tsi.CallSchema) -> Any:
-    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
-
-    Keeping this here for now, but it should be removed in the future once we have a better solution.
-    """
-    call_output = call.output
-    if isinstance(call_output, str) and call_output.startswith("weave://"):
-        return weave.ref(call_output).get()
-    return call_output
-
-
-def flatten_calls(
-    calls: list[tsi.CallSchema], parent_id: Optional[str] = None, depth: int = 0
-) -> list:
-    def children_of_parent_id(id: Optional[str]) -> list[tsi.CallSchema]:
-        return [call for call in calls if call.parent_id == id]
-
-    children = children_of_parent_id(parent_id)
-    res = []
-    for child in children:
-        res.append((child, depth))
-        res.extend(flatten_calls(calls, child.id, depth + 1))
-
-    return res
-
-
-def op_name_from_ref(ref: str) -> str:
-    return ref.split("/")[-1].split(":")[0]
+from weave.integrations.integration_utilities import op_name_from_ref
 
 
 class Person(BaseModel):
@@ -78,31 +48,22 @@ def test_instructor_openai(
         messages=[{"role": "user", "content": "My name is John and I am 20 years old"}],
     )
 
-    weave_server_response = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_response.calls) == 2
+    calls = list(client.calls())
+    assert len(calls) == 2
 
-    flattened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_response.calls)
-    ]
-    assert flattened_calls_list == [
-        ("Instructor.create", 0),
-        ("openai.chat.completions.create", 1),
-    ]
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "Instructor.create"
+    output = call.output
+    assert output.person_name == "John"
+    assert output.age == 20
 
-    call = weave_server_response.calls[0]
-    assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
-    assert output["person_name"] == "John"
-    assert output["age"] == 20
-
-    call = weave_server_response.calls[1]
-    assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    output = call.output
     output_arguments = json.loads(
-        output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+        output.choices[0].message.tool_calls[0].function.arguments
     )
     assert "person_name" in output_arguments
     assert "age" in output_arguments
@@ -135,31 +96,22 @@ def test_instructor_openai_async(
 
     asyncio.run(extract_person("My name is John and I am 20 years old"))
 
-    weave_server_response = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_response.calls) == 2
+    calls = list(client.calls())
+    assert len(calls) == 2
 
-    flattened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_response.calls)
-    ]
-    assert flattened_calls_list == [
-        ("AsyncInstructor.create", 0),
-        ("openai.chat.completions.create", 1),
-    ]
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "AsyncInstructor.create"
+    output = call.output
+    assert output.person_name == "John"
+    assert output.age == 20
 
-    call = weave_server_response.calls[0]
-    assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
-    assert output["person_name"] == "John"
-    assert output["age"] == 20
-
-    call = weave_server_response.calls[1]
-    assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    output = call.output
     output_arguments = json.loads(
-        output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+        output.choices[0].message.tool_calls[0].function.arguments
     )
     assert "person_name" in output_arguments
     assert "age" in output_arguments
@@ -197,32 +149,23 @@ def test_instructor_iterable(
         ],
     )
 
-    weave_server_response = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_response.calls) == 2
+    calls = list(client.calls())
+    assert len(calls) == 2
 
-    flattened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_response.calls)
-    ]
-    assert flattened_calls_list == [
-        ("Instructor.create", 0),
-        ("openai.chat.completions.create", 1),
-    ]
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "Instructor.create"
+    output = call.output
+    assert output[0].person_name == "Jason"
+    assert output[0].age == 10
+    assert output[1].person_name == "John"
+    assert output[1].age == 30
 
-    call = weave_server_response.calls[0]
-    assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
-    assert output[0]["person_name"] == "Jason"
-    assert output[0]["age"] == 10
-    assert output[1]["person_name"] == "John"
-    assert output[1]["age"] == 30
-
-    call = weave_server_response.calls[1]
-    assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
-    output_arguments = json.loads(output["choices"][0]["message"]["content"])
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    output = call.output
+    output_arguments = json.loads(output.choices[0].message.content)
     assert "tasks" in output_arguments
     assert "person_name" in output_arguments["tasks"][0]
     assert "age" in output_arguments["tasks"][0]
@@ -266,43 +209,21 @@ def test_instructor_iterable_sync_stream(
     )
     _ = [user for user in users]
 
-    weave_server_response = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_response.calls) == 2
+    calls = list(client.calls())
+    assert len(calls) == 2
 
-    flattened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_response.calls)
-    ]
-    assert flattened_calls_list == [
-        ("Instructor.create", 0),
-        ("openai.chat.completions.create", 1),
-    ]
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "Instructor.create"
+    output = call.output
+    assert output[0].person_name == "Jason"
+    assert output[0].age == 10
+    assert output[1].person_name == "John"
+    assert output[1].age == 30
 
-    call = weave_server_response.calls[0]
-    assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
-    assert output[0]["person_name"] == "Jason"
-    assert output[0]["age"] == 10
-    assert output[1]["person_name"] == "John"
-    assert output[1]["age"] == 30
-
-    call = weave_server_response.calls[1]
-    assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
-    output_arguments = json.loads(
-        output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
-    )
-    assert "tasks" in output_arguments
-    assert "person_name" in output_arguments["tasks"][0]
-    assert "age" in output_arguments["tasks"][0]
-    assert "Jason" in output_arguments["tasks"][0]["person_name"]
-    assert output_arguments["tasks"][0]["age"] == 10
-    assert "person_name" in output_arguments["tasks"][1]
-    assert "age" in output_arguments["tasks"][1]
-    assert "John" in output_arguments["tasks"][1]["person_name"]
-    assert output_arguments["tasks"][1]["age"] == 30
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
 
 @pytest.mark.skip_clickhouse_client
@@ -342,43 +263,23 @@ def test_instructor_iterable_async_stream(
 
     asyncio.run(print_iterable_results())
 
-    weave_server_response = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_response.calls) == 2
+    calls = list(client.calls())
+    assert len(calls) == 2
 
-    flattened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_response.calls)
-    ]
-    assert flattened_calls_list == [
-        ("AsyncInstructor.create", 0),
-        ("openai.chat.completions.create", 1),
-    ]
-
-    call = weave_server_response.calls[0]
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
-    assert output[0]["person_name"] == "Jason"
-    assert output[0]["age"] == 10
-    assert output[1]["person_name"] == "John"
-    assert output[1]["age"] == 30
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "AsyncInstructor.create"
+    output = call.output
+    assert output[0].person_name == "Jason"
+    assert output[0].age == 10
+    assert output[1].person_name == "John"
+    assert output[1].age == 30
 
-    call = weave_server_response.calls[1]
+    call = calls[1]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
-    output_arguments = json.loads(
-        output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
-    )
-    assert "tasks" in output_arguments
-    assert "person_name" in output_arguments["tasks"][0]
-    assert "age" in output_arguments["tasks"][0]
-    assert "Jason" in output_arguments["tasks"][0]["person_name"]
-    assert output_arguments["tasks"][0]["age"] == 10
-    assert "person_name" in output_arguments["tasks"][1]
-    assert "age" in output_arguments["tasks"][1]
-    assert "John" in output_arguments["tasks"][1]["person_name"]
-    assert output_arguments["tasks"][1]["age"] == 30
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
 
 @pytest.mark.skip_clickhouse_client
@@ -425,44 +326,28 @@ list of speakers.
     )
     _ = [extraction for extraction in extraction_stream]
 
-    weave_server_response = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_response.calls) == 2
+    calls = list(client.calls())
+    assert len(calls) == 2
 
-    flattened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_response.calls)
-    ]
-    assert flattened_calls_list == [
-        ("Instructor.create_partial", 0),
-        ("openai.chat.completions.create", 1),
-    ]
-
-    call = weave_server_response.calls[0]
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
-    assert output["users"][0]["user_name"] == "John Doe"
-    assert output["users"][0]["email"] == "johndoe@email.com"
-    assert output["users"][0]["twitter"] == "@TechGuru44"
-    assert output["users"][1]["user_name"] == "Jane Smith"
-    assert output["users"][1]["email"] == "janesmith@email.com"
-    assert output["users"][1]["twitter"] == "@DigitalDiva88"
-    assert output["users"][2]["user_name"] == "Alex Johnson"
-    assert output["users"][2]["email"] == "alexj@email.com"
-    assert output["users"][2]["twitter"] == "@CodeMaster2023"
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "Instructor.create_partial"
+    output = call.output
+    assert output.users[0].user_name == "John Doe"
+    assert output.users[0].email == "johndoe@email.com"
+    assert output.users[0].twitter == "@TechGuru44"
+    assert output.users[1].user_name == "Jane Smith"
+    assert output.users[1].email == "janesmith@email.com"
+    assert output.users[1].twitter == "@DigitalDiva88"
+    assert output.users[2].user_name == "Alex Johnson"
+    assert output.users[2].email == "alexj@email.com"
+    assert output.users[2].twitter == "@CodeMaster2023"
 
-    call = weave_server_response.calls[1]
+    call = calls[1]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
-    output_arguments = json.loads(
-        output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
-    )
-    assert "users" in output_arguments
-    for user in output_arguments["users"]:
-        assert "user_name" in user
-        assert "email" in user
-        assert "twitter" in user
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
 
 @pytest.mark.skip_clickhouse_client
@@ -513,41 +398,25 @@ list of speakers.
 
     _ = asyncio.run(fetch_results(text_block))
 
-    weave_server_response = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_response.calls) == 2
+    calls = list(client.calls())
+    assert len(calls) == 2
 
-    flattened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_response.calls)
-    ]
-    assert flattened_calls_list == [
-        ("AsyncInstructor.create_partial", 0),
-        ("openai.chat.completions.create", 1),
-    ]
-
-    call = weave_server_response.calls[0]
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
-    assert output["users"][0]["user_name"] == "John Doe"
-    assert output["users"][0]["email"] == "johndoe@email.com"
-    assert output["users"][0]["twitter"] == "@TechGuru44"
-    assert output["users"][1]["user_name"] == "Jane Smith"
-    assert output["users"][1]["email"] == "janesmith@email.com"
-    assert output["users"][1]["twitter"] == "@DigitalDiva88"
-    assert output["users"][2]["user_name"] == "Alex Johnson"
-    assert output["users"][2]["email"] == "alexj@email.com"
-    assert output["users"][2]["twitter"] == "@CodeMaster2023"
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "AsyncInstructor.create_partial"
+    output = call.output
+    assert output.users[0].user_name == "John Doe"
+    assert output.users[0].email == "johndoe@email.com"
+    assert output.users[0].twitter == "@TechGuru44"
+    assert output.users[1].user_name == "Jane Smith"
+    assert output.users[1].email == "janesmith@email.com"
+    assert output.users[1].twitter == "@DigitalDiva88"
+    assert output.users[2].user_name == "Alex Johnson"
+    assert output.users[2].email == "alexj@email.com"
+    assert output.users[2].twitter == "@CodeMaster2023"
 
-    call = weave_server_response.calls[1]
+    call = calls[1]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
-    output_arguments = json.loads(
-        output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
-    )
-    assert "users" in output_arguments
-    for user in output_arguments["users"]:
-        assert "user_name" in user
-        assert "email" in user
-        assert "twitter" in user
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"

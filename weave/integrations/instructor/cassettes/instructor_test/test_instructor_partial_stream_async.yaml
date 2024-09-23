@@ -30,7 +30,7 @@ interactions:
       accept:
       - application/json
       accept-encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       connection:
       - keep-alive
       content-length:
@@ -40,560 +40,530 @@ interactions:
       host:
       - api.openai.com
       user-agent:
-      - AsyncOpenAI/Python 1.44.1
+      - AsyncOpenAI/Python 1.47.1
       x-stainless-arch:
-      - arm64
+      - x64
       x-stainless-async:
       - async:asyncio
       x-stainless-lang:
       - python
       x-stainless-os:
-      - MacOS
+      - Linux
       x-stainless-package-version:
-      - 1.44.1
+      - 1.47.1
       x-stainless-runtime:
       - CPython
       x-stainless-runtime-version:
-      - 3.10.14
+      - 3.12.1
     method: POST
     uri: https://api.openai.com/v1/chat/completions
   response:
     body:
-      string: 'data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"role":"assistant","content":null,"tool_calls":[{"index":0,"id":"call_i5VUvRcmXZD3WUStcvaPRNKM","type":"function","function":{"name":"PartialMeetingInfo","arguments":""}}],"refusal":null},"logprobs":null,"finish_reason":null}],"usage":null}
+      string: 'data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"role":"assistant","content":null,"tool_calls":[{"index":0,"id":"call_BXnhVie49WpZQOr0U9iU2238","type":"function","function":{"name":"PartialMeetingInfo","arguments":""}}],"refusal":null},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
-        "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
-        \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"users"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"users"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         [\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"   "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"   "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         {\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"     "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"       "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"user"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"user"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"_name"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"_name"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"John"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"John"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         Doe"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"     "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"       "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"email"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"email"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"j"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"j"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"oh"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"oh"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"nd"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"nd"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"oe"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"oe"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"@email"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"@email"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":".com"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":".com"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"     "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"       "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"twitter"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"twitter"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \"@"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Tech"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Tech"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"G"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"G"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"uru"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"uru"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"44"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"44"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"   "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"   "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         },\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"   "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"   "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         {\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"     "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"       "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"user"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"user"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"_name"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"_name"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Jane"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Jane"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         Smith"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"     "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"       "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"email"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"email"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"j"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"j"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"anes"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"anes"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"mith"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"mith"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"@email"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"@email"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":".com"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":".com"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"     "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"       "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"twitter"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"twitter"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \"@"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Digital"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Digital"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"D"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"D"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"iva"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"iva"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"88"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"88"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"   "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"   "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         },\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"   "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"   "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         {\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"     "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"       "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"user"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"user"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"_name"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"_name"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Alex"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Alex"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         Johnson"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"     "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"       "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"email"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"email"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"alex"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"alex"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"j"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"j"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"@email"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"@email"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":".com"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":".com"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"     "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"       "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"twitter"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"twitter"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \"@"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Code"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Code"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Master"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Master"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"202"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"202"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"3"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"3"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"   "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"   "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         }\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
-        "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"],\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
-        ],\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
-        "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"date"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"date"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"202"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"4"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"-"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"03"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"-"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"15"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"location"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"202"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Grand"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"4"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"-"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"03"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"-"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"15"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
-        "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
-        \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"location"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
-        \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Grand"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         Tech"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         Arena"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         located"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         at"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"452"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"452"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"1"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"1"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         Innovation"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         Drive"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"budget"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"500"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"00"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"deadline"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+
+
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
         \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"budget"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"202"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"4"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
-        "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"-"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"500"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"02"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"00"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"-"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":",\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"20"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
-        "}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
-        \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"}"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"deadline"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":"stop"}],"usage":null}
 
 
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"
-        \""}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"202"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"4"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"-"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"02"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"-"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"20"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"\n"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"}"}}]},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":"stop"}],"usage":null}
-
-
-        data: {"id":"chatcmpl-A8TXbdxhvwTgLueOVegggKypawG4N","object":"chat.completion.chunk","created":1726583543,"model":"gpt-4-0613","system_fingerprint":null,"choices":[],"usage":{"prompt_tokens":331,"completion_tokens":159,"total_tokens":490,"completion_tokens_details":{"reasoning_tokens":0}}}
+        data: {"id":"chatcmpl-AAhIsIC97gConemtSx1E7xOZTAkgY","object":"chat.completion.chunk","created":1727113102,"model":"gpt-4-0613","system_fingerprint":null,"choices":[],"usage":{"prompt_tokens":331,"completion_tokens":153,"total_tokens":484,"completion_tokens_details":{"reasoning_tokens":0}}}
 
 
         data: [DONE]
@@ -604,20 +574,20 @@ interactions:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 8c49ce27dcc53c2e-BOM
+      - 8c7c4ed73cad3ce2-BOM
       Connection:
       - keep-alive
       Content-Type:
       - text/event-stream; charset=utf-8
       Date:
-      - Tue, 17 Sep 2024 14:32:23 GMT
+      - Mon, 23 Sep 2024 17:38:22 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=wbaiYEMyWEUy2_oTc4XkJRjLEbbYc3U0aniJKFo8IHo-1726583543-1.0.1.1-DsoRO0bf7oCSRg084Et9lbs.ZB.bvYQ5kwaefsyKh_FpHsQp2o_rJiczDUguFSq_RJUv14FiJ78K49BmdVm8LA;
-        path=/; expires=Tue, 17-Sep-24 15:02:23 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=NSBKxV79SVaZe54.2euAsS7Nd1xE6C.91sh6Y2XQK6s-1727113102-1.0.1.1-ROeYvYGGs.e64d_MP3tonh5J8fSIY3cpMrGBtobP3_JVjb5ZPzRk2HcCl0HHQEVY7D9H_HroNz4Q__hEMjxcSA;
+        path=/; expires=Mon, 23-Sep-24 18:08:22 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=ZrgXy83j.h3JZkt8lSgyiKTIuEG4tC9SeY087wLsF3g-1726583543679-0.0.1.1-604800000;
+      - _cfuvid=G3bs8v7t.3S_BOIW.Kl50u6dR7FTFI2k2lEcI3qnAZo-1727113102537-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -625,12 +595,10 @@ interactions:
       - nosniff
       access-control-expose-headers:
       - X-Request-ID
-      alt-svc:
-      - h3=":443"; ma=86400
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '315'
+      - '293'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -648,7 +616,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 26ms
       x-request-id:
-      - req_43eac8b6c4639a88584b21bfe73616a7
+      - req_21b05f1b5d85f47992d5fd17f3da003d
     status:
       code: 200
       message: OK
