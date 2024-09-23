@@ -32,52 +32,6 @@ const getStyles = (props: AdditionalProps) => {
   const size = props.size ?? 'medium';
   const customTheme = createTheme({
     components: {
-      MuiOutlinedInput: {
-        styleOverrides: {
-          // root: {
-          //   paddingTop: '0px !important',
-          //   paddingBottom: '0px !important',
-          //   fontSize: FONT_SIZES[size],
-          //   fontFamily: 'Source Sans Pro',
-          //   minWidth: '100px',
-          //   color: MOON_800,
-          //   maxWidth: props.maxWidth ? `${props.maxWidth}px` : '100%',
-          //   '& fieldset': {
-          //     borderColor: MOON_250,
-          //   },
-          //   '&&.Mui-focused fieldset': {
-          //     borderColor: TEAL_400,
-          //     borderWidth: '2px',
-          //   },
-          //   '&&:hover:not(.Mui-focused) fieldset': {
-          //     borderColor: TEAL_350,
-          //     borderWidth: '2px',
-          //   },
-          //   '& .MuiInputBase-input::placeholder': {
-          //     color: MOON_500,
-          //     opacity: 1,
-          //   },
-          // },
-          // input: {
-          //   padding: '0px !important',
-          //   minHeight: `${HEIGHTS[size]} !important`,
-          // },
-        },
-      },
-      // MuiInputBase: {
-      //   styleOverrides: {
-      //     inputMultiline: {
-      //       overflow: 'hidden',
-      //       whiteSpace: 'pre-wrap',
-      //       overflowY: 'auto',
-      //       scrollbarWidth: 'none', // For Firefox (hides the scrollbar)
-      //       msOverflowStyle: 'none', // For IE and Edge (hides the scrollbar)
-      //       '&::-webkit-scrollbar': {
-      //         display: 'none', // For Chrome, Safari, and WebKit-based browsers (hides the scrollbar)
-      //       },
-      //     },
-      //   },
-      // },
       MuiAutocomplete: {
         styleOverrides: {
           root: {
