@@ -17,7 +17,6 @@ def test_dirty_model_op_retrieval(client):
 
     # Case 1: Model is clean on first call
     m2 = weave.ref(m.ref.uri()).get()
-    invoke = m2.invoke
 
     assert m2.invoke() == "openai"
     m2.client = "anthropic"
