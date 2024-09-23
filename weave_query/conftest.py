@@ -38,6 +38,14 @@ def pytest_sessionstart(session):
     context_state.disable_analytics()
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--job-num",
+        default=None,
+        help='cli to set "job-num"',
+    )
+
+
 def pytest_collection_modifyitems(config, items):
     # Get the job number from environment variable (0 for even tests, 1 for odd tests)
     job_num = config.getoption("--job-num", default=None)
