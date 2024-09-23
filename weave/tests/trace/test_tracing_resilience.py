@@ -12,6 +12,7 @@ from typing import Callable, Iterator
 import pytest
 
 import weave
+from weave.trace import call_context
 from weave.trace.context import raise_on_captured_errors
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
@@ -20,6 +21,10 @@ from weave.trace_server import trace_server_interface as tsi
 
 class TestException(Exception):
     pass
+
+
+def assert_no_current_call():
+    assert call_context.get_current_call() is None
 
 
 def test_resilience_to_user_code_errors(client):
@@ -38,6 +43,8 @@ def test_resilience_to_user_code_errors(client):
     with raise_on_captured_errors(False):
         with pytest.raises(TestException):
             do_test()
+
+    assert_no_current_call()
 
 
 class ThrowingServer(tsi.TraceServerInterface):
@@ -146,6 +153,8 @@ def test_resilience_to_server_errors(client):
         res = do_test()
         assert res == "hello"
 
+    assert_no_current_call()
+
 
 def test_resilience_to_patcher_errors(client):
     class Module:
@@ -173,6 +182,8 @@ def test_resilience_to_patcher_errors(client):
     res = do_test()
     assert res == 0
 
+    assert_no_current_call()
+
 
 def test_resilience_to_output_handler_errors(client):
     def do_test():
@@ -195,6 +206,8 @@ def test_resilience_to_output_handler_errors(client):
     with raise_on_captured_errors(False):
         res = do_test()
         assert res == "hello"
+
+    assert_no_current_call()
 
 
 @pytest.mark.asyncio
@@ -220,6 +233,8 @@ async def test_resilience_to_output_handler_errors_async(client):
         res = await do_test()
         assert res == "hello"
 
+    assert_no_current_call()
+
 
 def test_resilience_to_accumulator_make_accumulator_errors(client):
     def do_test():
@@ -242,6 +257,8 @@ def test_resilience_to_accumulator_make_accumulator_errors(client):
     with raise_on_captured_errors(False):
         res = do_test()
         assert list(res) == [1, 2, 3]
+
+    assert_no_current_call()
 
 
 @pytest.mark.asyncio
@@ -269,6 +286,8 @@ async def test_resilience_to_accumulator_make_accumulator_errors_async(client):
         res = await do_test()
         assert [item async for item in res] == [1, 2, 3]
 
+    assert_no_current_call()
+
 
 def test_resilience_to_accumulator_accumulation_errors(client):
     def do_test():
@@ -294,6 +313,8 @@ def test_resilience_to_accumulator_accumulation_errors(client):
     with raise_on_captured_errors(False):
         res = do_test()
         assert list(res) == [1, 2, 3]
+
+    assert_no_current_call()
 
 
 @pytest.mark.asyncio
@@ -324,6 +345,8 @@ async def test_resilience_to_accumulator_accumulation_errors_async(client):
     with raise_on_captured_errors(False):
         res = await do_test()
         assert [item async for item in res] == [1, 2, 3]
+
+    assert_no_current_call()
 
 
 def test_resilience_to_accumulator_should_accumulate_errors(client):
@@ -357,6 +380,8 @@ def test_resilience_to_accumulator_should_accumulate_errors(client):
     with raise_on_captured_errors(False):
         res = do_test()
         assert list(res) == [1, 2, 3]
+
+    assert_no_current_call()
 
 
 @pytest.mark.asyncio
@@ -394,6 +419,8 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(client):
         res = await do_test()
         assert [item async for item in res] == [1, 2, 3]
 
+    assert_no_current_call()
+
 
 def test_resilience_to_accumulator_on_finish_post_processor_errors(client):
     def do_test():
@@ -426,6 +453,8 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(client):
     with raise_on_captured_errors(False):
         res = do_test()
         assert list(res) == [1, 2, 3]
+
+    assert_no_current_call()
 
 
 @pytest.mark.asyncio
@@ -464,6 +493,8 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(c
         res = await do_test()
         assert [item async for item in res] == [1, 2, 3]
 
+    assert_no_current_call()
+
 
 def test_resilience_to_accumulator_internal_errors(client):
     def do_test():
@@ -490,6 +521,8 @@ def test_resilience_to_accumulator_internal_errors(client):
     with raise_on_captured_errors(False):
         with pytest.raises(TestException):
             list(do_test())
+
+    assert_no_current_call()
 
 
 @pytest.mark.asyncio
@@ -520,3 +553,5 @@ async def test_resilience_to_accumulator_internal_errors_async(client):
         with pytest.raises(TestException):
             res = await do_test()
             l = [item async for item in res]
+
+    assert_no_current_call()

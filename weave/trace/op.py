@@ -249,6 +249,12 @@ def _execute_call(
             log_once(logger.error, f"Error capturing call output: {e}")
             if get_raise_on_captured_errors():
                 raise
+        finally:
+            # Is there a better place for this? We want to ensure that even
+            # if the final output fails to be captured, we still pop the call
+            # so we don't put future calls under the old call.
+            call_context.pop_call(call.id)
+
         return res, call
 
     def handle_exception(e: Exception) -> Any:
