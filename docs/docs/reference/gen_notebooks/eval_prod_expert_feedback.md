@@ -150,7 +150,7 @@ We can see that we added three new rows compared to our previous version - see t
 
 Based on this new version of our evaluation dataset we can easily run a new evaluation. This will make the evaluation results more representative for your use-case and user-group in production. 
 
-To make sure that you are aware of what version of the dataset you used to calculate the metrics Weave will also let you know whether you are comparing two models with different metrics or evaluation datasets - see the "Dataset inconsistency detected". For more information on the evaluation workflow see the [Evaluation](./tutorial-eval.md) tutorial for more details.
+To make sure that you are aware of what version of the dataset you used to calculate the metrics Weave will also let you know whether you are comparing two models with different metrics or evaluation datasets - see the "Dataset inconsistency detected". For more information on the evaluation workflow see the [Evaluation](https://weave-docs.wandb.ai/tutorial-eval/) tutorial for more details.
 
 <img src="https://github.com/NiWaRe/knowledge-worker-weave/blob/master/screenshots/weave_dataset_inconsistency.png?raw=true" width="1000" alt="New annotated prod dataset in Weave" />
 
