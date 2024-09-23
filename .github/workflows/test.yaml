@@ -169,7 +169,7 @@ jobs:
             'cohere',
             'dspy',
             'groq',
-            'google-genai',
+            'google_ai_studio',
             'langchain',
             'litellm',
             'llamaindex',
