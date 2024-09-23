@@ -10,6 +10,38 @@ if typing.TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
 
 
+def maybe_unwrap_api_response(value: typing.Any) -> typing.Any:
+    """If the caller requests a raw response, we unwrap the APIResponse object.
+    We take a very conservative approach to only unwrap the types we know about.
+    """
+    maybe_value: typing.Any = None
+    try:
+        from openai._legacy_response import LegacyAPIResponse
+
+        if isinstance(value, LegacyAPIResponse):
+            maybe_value = value.parse()
+    except:
+        pass
+
+    try:
+        from openai._response import APIResponse
+
+        if isinstance(value, APIResponse):
+            maybe_value = value.parse()
+    except:
+        pass
+
+    try:
+        from openai.types.chat import ChatCompletion, ChatCompletionChunk
+
+        if isinstance(maybe_value, (ChatCompletion, ChatCompletionChunk)):
+            return maybe_value
+    except:
+        pass
+
+    return value
+
+
 def openai_on_finish_post_processor(
     value: typing.Optional["ChatCompletionChunk"],
 ) -> typing.Optional[typing.Dict]:
@@ -23,6 +55,8 @@ def openai_on_finish_post_processor(
         ChatCompletionMessageToolCall,
         Function,
     )
+
+    value = maybe_unwrap_api_response(value)
 
     def _get_function_call(
         function_call: typing.Optional[ChoiceDeltaFunctionCall],
@@ -232,15 +266,12 @@ def openai_accumulator(
 
 # Unlike other integrations, streaming is based on input flag
 def should_use_accumulator(inputs: typing.Dict) -> bool:
-    return isinstance(inputs, dict) and bool(inputs.get("stream"))
-
-
-def disable_tracing_for_inputs(*args, **kwargs):
-    # When this header is set, OpenAI returns an APIResponse object that we cannot
-    parent_call = weave.get_current_call()
-    if parent_call and parent_call.func_name.startswith("litellm"):
-        return kwargs.get("extra_headers", {}).get("X-Stainless-Raw-Response") == "true"
-    return False
+    return (
+        isinstance(inputs, dict)
+        and bool(inputs.get("stream"))
+        and not inputs.get("extra_headers", {}).get("X-Stainless-Raw-Response")
+        == "true"
+    )
 
 
 def create_wrapper_sync(
@@ -267,7 +298,6 @@ def create_wrapper_sync(
 
         op = weave.op()(_add_stream_options(fn))
         op.name = name  # type: ignore
-        op._set_disable_tracing_for_inputs(disable_tracing_for_inputs)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
@@ -305,7 +335,6 @@ def create_wrapper_async(
 
         op = weave.op()(_add_stream_options(fn))
         op.name = name  # type: ignore
-        op._set_disable_tracing_for_inputs(disable_tracing_for_inputs)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
