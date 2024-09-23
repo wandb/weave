@@ -7,7 +7,7 @@ import PIL
 import pytest
 
 import weave
-from weave.trace.weave_client import WeaveClient
+from weave.trace.weave_client import WeaveClient, get_ref, set_ref
 from weave.trace_server import trace_server_interface as tsi
 
 
@@ -41,11 +41,11 @@ class BlockingTraceServer(tsi.TraceServerInterface):
             return getattr(internal_trace_server, item)
 
         def wrapper(*args, **kwargs):
-            print(f"Calling {item} with args: {args}, kwargs: {kwargs}")
+            if item == "obj_create":
+                print("BLOCKING TRACE SERVER", item, args, kwargs)
             with self.lock:
                 inner_attr = getattr(internal_trace_server, item)
                 result = inner_attr(*args, **kwargs)
-                print(f"Result: {result}")
             return result
 
         return wrapper
@@ -67,8 +67,22 @@ def paused_client(client: WeaveClient) -> Generator[WeaveClient, None, None]:
         client._flush()
 
 
+def clear_ref(obj: Any) -> None:
+    if get_ref(obj) is not None:
+        set_ref(obj, None)
+
+
 @pytest.mark.asyncio
 async def test_evaluation_performance(client: WeaveClient):
+    from weave.type_serializers.Image.image import load
+
+    # Clear all refs to ensure that other tests do not interfere with this one
+    clear_ref(weave.Evaluation)
+    clear_ref(weave.Evaluation.predict_and_score)
+    clear_ref(weave.Evaluation.summarize)
+    clear_ref(weave.Evaluation.evaluate)
+    clear_ref(load)
+
     dataset = [
         {
             "question": "What is the capital of France?",
@@ -124,14 +138,17 @@ async def test_evaluation_performance(client: WeaveClient):
             counts[l] = 0
         counts[l] += 1
 
-    assert counts == {
-        "ensure_project_exists": 1,
-        "table_create": 2,
-        "obj_create": 9,
-        "file_create": 10,
-        "call_start": 14,
-        "call_end": 14,
-    }
+    assert (
+        counts
+        == {
+            "ensure_project_exists": 1,
+            "table_create": 2,  # dataset and score results
+            "obj_create": 9,  # Evaluate Op, Score Op, Predict and Score Op, Summarize Op, predict Op, PIL Image Serializer, Eval Results DS, MainDS, Evaluation Object
+            "file_create": 10,  # 4 images, 6 ops
+            "call_start": 14,
+            "call_end": 14,
+        }
+    )
 
     calls = client.calls()
     objects = client._objects()
