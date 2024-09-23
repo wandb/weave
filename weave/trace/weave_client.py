@@ -1181,7 +1181,12 @@ class WeaveClient:
         orig_val = val
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
-            return val
+            if ALLOW_MIXED_PROJECT_REFS:
+                return val
+            # Check if existing ref is to current project, if not,
+            # remove the ref and recreate it in the current project
+            if val.project == self.project:
+                return val
 
         # `to_json` is mostly fast, except for CustomWeaveTypes
         # which incur network costs to serialize the payload
@@ -1233,9 +1238,6 @@ class WeaveClient:
         Saves an Op to the weave server and returns the Ref. This is the sister
         function to _save_object_basic, but for Ops
         """
-        if op.ref is not None:
-            return op.ref
-
         if name is None:
             name = op.name
 

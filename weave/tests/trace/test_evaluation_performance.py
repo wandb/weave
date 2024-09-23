@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-from datetime import time
 from threading import Lock
 from typing import Any, Generator
 
@@ -7,7 +6,7 @@ import PIL
 import pytest
 
 import weave
-from weave.trace.weave_client import WeaveClient, get_ref, set_ref
+from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
 
@@ -67,22 +66,8 @@ def paused_client(client: WeaveClient) -> Generator[WeaveClient, None, None]:
         client._flush()
 
 
-def clear_ref(obj: Any) -> None:
-    if get_ref(obj) is not None:
-        set_ref(obj, None)
-
-
 @pytest.mark.asyncio
 async def test_evaluation_performance(client: WeaveClient):
-    from weave.type_serializers.Image.image import load
-
-    # Clear all refs to ensure that other tests do not interfere with this one
-    clear_ref(weave.Evaluation)
-    clear_ref(weave.Evaluation.predict_and_score)
-    clear_ref(weave.Evaluation.summarize)
-    clear_ref(weave.Evaluation.evaluate)
-    clear_ref(load)
-
     dataset = [
         {
             "question": "What is the capital of France?",
