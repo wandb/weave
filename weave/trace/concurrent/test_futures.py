@@ -173,11 +173,29 @@ def test_empty_futures_list() -> None:
     assert future_result.result() == 0
 
 
-def test_nested_futures() -> None:
+def test_nested_futures_with_max_workers() -> None:
     executor: FutureExecutor = FutureExecutor(max_workers=1)
 
-    def fetch_data() -> List[int]:
-        return executor.defer(lambda: [1, 2, 3, 4, 5]).result()
+    def inner_0() -> List[int]:
+        return [0]
 
-    res = executor.defer(fetch_data).result()
-    assert res == [1, 2, 3, 4, 5]
+    def inner_1() -> List[int]:
+        return executor.defer(inner_0).result() + [1]
+
+    def inner_2() -> List[int]:
+        return executor.defer(inner_1).result() + [2]
+
+    res = executor.defer(inner_2).result()
+    assert res == [0, 1, 2]
+
+
+def test_recursion_limit() -> None:
+    executor: FutureExecutor = FutureExecutor(max_workers=1, recursion_limit=10)
+
+    def recursive_task(depth: int) -> int:
+        if depth > 10:
+            return depth
+        return executor.defer(lambda: recursive_task(depth + 1)).result()
+
+    with pytest.raises(RecursionError):
+        recursive_task(0)

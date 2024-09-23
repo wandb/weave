@@ -1,6 +1,6 @@
 """Global ThreadPoolExecutor for executing tasks in parallel.
 
-This module provides a global ThreadPoolExecutor and utility functions for
+This module provides a thread-local ThreadPoolExecutor and utility functions for
 asynchronous task execution in Weave. It offers a simple interface for
 deferring tasks and chaining operations on futures, which is particularly
 useful for I/O-bound operations or long-running tasks that shouldn't block
@@ -26,9 +26,10 @@ import concurrent.futures
 import contextlib
 import contextvars
 import logging
+import threading
 from concurrent.futures import Future, ThreadPoolExecutor, wait
 from threading import Lock
-from typing import Any, Callable, Generator, List, Optional, TypeVar
+from typing import Any, Callable, Dict, Generator, List, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -54,94 +55,90 @@ def raise_on_future_exceptions(raise_value: bool = True) -> Generator[None, None
 
 
 class FutureExecutor:
-    """A utility for threadpool execution and promise-like chaining.
+    """A utility for thread-local threadpool execution and promise-like chaining.
 
     This class provides a thread-safe way to submit and execute jobs asynchronously
-    using a ThreadPoolExecutor. It ensures proper shutdown of the executor when the
-    object is deleted or when the program exits. If jobs are submitted after shutdown,
-    the queue will restart automatically.
+    using thread-local ThreadPoolExecutors. It ensures proper shutdown of the executors when the
+    object is deleted or when the program exits.
 
     Args:
-        max_workers (int): The maximum number of worker threads to use. Defaults to 1024. We
-        want this to be quite large so that we don't have deadlocks in cases where jobs are submitting & waiting on
-        new jobs as part of their callback chain, which when executed serially would deadlock.
+        max_workers (int): The maximum number of worker threads to use per executor. Defaults to 1024.
     """
 
     def __init__(
         self,
-        max_workers: Optional[int] = 1024,
+        max_workers: Optional[int] = None,
+        recursion_limit: int = 100,
         thread_name_prefix: str = THREAD_NAME_PREFIX,
     ):
-        self._executor = ThreadPoolExecutor(
-            max_workers=max_workers, thread_name_prefix=thread_name_prefix
-        )
+        self._max_workers = max_workers
+        self._thread_name_prefix = thread_name_prefix
+        self._local = threading.local()
         self._active_futures: List[Future] = []
         self._active_futures_lock = Lock()
+        self._recursion_limit = recursion_limit
+        self._recursion_depths: Dict[int, int] = {}
+        self._recursion_depths_lock = Lock()
         atexit.register(self._shutdown)
 
+    @property
+    def _executor(self) -> ThreadPoolExecutor:
+        if not hasattr(self._local, "executor"):
+            target_name = (
+                f"{self._thread_name_prefix}-{threading.current_thread().name}"
+            )
+            if "-MainThread" in target_name:
+                target_name = target_name.replace("-MainThread", "")
+            while "-" + self._thread_name_prefix in target_name:
+                target_name = target_name.replace("-" + self._thread_name_prefix, "")
+            self._local.executor = ThreadPoolExecutor(
+                max_workers=self._max_workers, thread_name_prefix=target_name
+            )
+        return self._local.executor
+
     def _shutdown(self) -> None:
-        self._executor.shutdown(wait=True)
+        if hasattr(self._local, "executor"):
+            self._local.executor.shutdown(wait=True)
 
-    def submit(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
-        """Submits a job to be executed asynchronously.
-
-        If the queue has been shut down, it will be restarted automatically.
+    def defer(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
+        """
+        Defer a function to be executed in a thread-local thread pool.
+        This is useful for long-running or I/O-bound functions where the result is not needed immediately.
 
         Args:
-            func: The function to be executed.
+            f (Callable[..., T]): The function to be executed.
             *args: Positional arguments to pass to the function.
             **kwargs: Keyword arguments to pass to the function.
 
         Returns:
-            A Future representing the execution of the job.
-
-        Example usage:
-
-        ```python
-        def example_job(x):
-            time.sleep(1)  # Simulate some work
-            return x * 2
-
-        queue = AsyncJobQueue(max_workers=4)
-
-        # Submit multiple jobs
-        futures = [queue.submit_job(example_job, i) for i in range(5)]
-
-        # Wait for all jobs to complete and get results
-        results = [future.result() for future in futures]
-        print(results)  # Output: [0, 2, 4, 6, 8]
-        ```
-        """
-
-        def wrapper() -> T:
-            return f(*args, **kwargs)
-
-        return self.defer(wrapper)
-
-    def defer(self, f: Callable[[], T]) -> Future[T]:
-        """
-        Defer a function to be executed in a thread pool.
-        This is useful for long-running or I/O-bound functions where the result is not needed immediately.
-
-        Args:
-            f (Callable[[], T]): A function that takes no arguments and returns a value of type T.
-
-        Returns:
             Future[T]: A Future object representing the eventual result of the function.
 
-        Example:
-        ```python
-        def long_running_task():
-            time.sleep(5)
-            return "Task completed"
-
-        future = defer(long_running_task)
-        # Do other work while the task is running
-        result = future.result()  # This will block until the task is complete
-        print(result)  # Output: "Task completed"
-        ```
+        Raises:
+            RecursionError: If the recursion depth exceeds the recursion limit.
         """
-        future = self._executor.submit(f)
+        submitting_thread_id = threading.get_ident()
+
+        with self._recursion_depths_lock:
+            current_depth = self._recursion_depths.get(submitting_thread_id, 0)
+            new_depth = current_depth + 1
+
+            if new_depth > self._recursion_limit:
+                raise RecursionError(
+                    f"Maximum recursion depth of {self._recursion_limit} exceeded"
+                )
+
+        def wrapped_f() -> T:
+            executing_thread_id = threading.get_ident()
+            with self._recursion_depths_lock:
+                self._recursion_depths[executing_thread_id] = new_depth
+
+            try:
+                return f(*args, **kwargs)
+            finally:
+                with self._recursion_depths_lock:
+                    del self._recursion_depths[executing_thread_id]
+
+        future = self._executor.submit(wrapped_f)
         with self._active_futures_lock:
             self._active_futures.append(future)
         future.add_done_callback(self._future_done_callback)
@@ -163,36 +160,6 @@ class FutureExecutor:
 
         Returns:
             Future[U]: A new Future object representing the result of applying g to the results of the futures.
-
-        Example:
-        ```python
-        def fetch_data():
-            return [1, 2, 3, 4, 5]
-
-        def process_data(data_list):
-            return sum(data_list[0])  # Assuming a single future in the list
-
-        future_data = defer(fetch_data)
-        future_result = then([future_data], process_data)
-        result = future_result.result()
-        print(result)  # Output: 15
-
-        # Using multiple futures
-        def fetch_data1():
-            return [1, 2, 3]
-
-        def fetch_data2():
-            return [4, 5]
-
-        def process_multiple_data(data_list):
-            return sum(sum(data) for data in data_list)
-
-        future_data1 = defer(fetch_data1)
-        future_data2 = defer(fetch_data2)
-        future_result = then([future_data1, future_data2], process_multiple_data)
-        result = future_result.result()
-        print(result)  # Output: 15
-        ```
         """
         result_future: Future[U] = Future()
 

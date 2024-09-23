@@ -1351,7 +1351,7 @@ class WeaveClient:
             self.server.call_processor.wait_until_all_processed()  # type: ignore
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
-        return self.future_executor.submit(self.server.file_create, req)
+        return self.future_executor.defer(self.server.file_create, req)
 
 
 def safe_current_wb_run_id() -> Optional[str]:
