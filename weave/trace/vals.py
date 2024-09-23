@@ -156,12 +156,20 @@ def attribute_access_result(
         return maybe_bind_method(val_attr_val, self)
 
     if (ref := getattr(self, "ref", None)) is None:
-        return val_attr_val
+        # Even if we have not parent ref, if our current value is an object
+        # ref, we should still process it with make_trace_obj. Practically,
+        # this allows a user to "get" a Model, update a field, then invoke it.
+        # Primary test: `test_dirty_model_op_retrieval`
+        if not isinstance(val_attr_val, ObjectRef):
+            return val_attr_val
+        new_ref = None
+    else:
+        new_ref = ref.with_attr(attr_name)
+
     if server is None:
         return val_attr_val
 
     root = getattr(self, "root", None)
-    new_ref = ref.with_attr(attr_name)
 
     return make_trace_obj(
         val_attr_val,
