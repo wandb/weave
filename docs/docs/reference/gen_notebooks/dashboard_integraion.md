@@ -18,10 +18,10 @@ title: Integrating with Weave - Production Dashboard
 
 # Integrating with Weave: Production Dashboard
 
-The GenAI tooling landscape is rapidly evolving - new frameworks, tools, and applications are emerging all the time. Weave aims to be a one-stop-shop for all your GenAI monitoring and evaluation needs. This also means that sometimes it is necessary to integrate with existing platforms or extend Weave to fit the personal needs of the specific company.
+The GenAI tooling landscape is rapidly evolving - new frameworks, tools, and applications are emerging all the time. Weave aims to be a one-stop-shop for all your GenAI monitoring and evaluation needs. This also means that sometimes it is necessary to integrate with existing platforms or extend Weave to fit the specific needs of your project or organization.
 
 In this cookbook, we'll demonstrate how to leverage Weave's powerful APIs and functions to create a custom dashboard for production monitoring as an extension to the Traces view in Weave. We'll focus on:
-* Fetching data from Weave
+* Fetching traces, costs, feedback, and other metrics from Weave
 * Creating aggregate views for user feedback and cost distribution
 * Creating visualizations for token usage and latency over time
 
@@ -44,8 +44,12 @@ First, we'll set up a function to initialize the Weave client and add costs for 
 
 
 ```python
+PROJECT_NAME = "wandb-smle/weave-cookboook-demo"
+```
+
+
+```python
 import weave
-import streamlit as st
 
 MODEL_NAMES = [
     # model name, prompt cost, completion cost
@@ -58,7 +62,6 @@ MODEL_NAMES = [
     ("gpt-4o", 0.03, 0.06)
 ]
 
-@st.cache_resource
 def init_weave_client(project_name):
     try:
         client = weave.init(project_name)
@@ -66,12 +69,19 @@ def init_weave_client(project_name):
             client.add_cost(llm_id=model, prompt_token_cost=prompt_cost, completion_token_cost=completion_cost)
         return client
     except Exception as e:
-        st.error(f"Failed to initialize Weave client for project '{project_name}': {e}")
+        print(f"Failed to initialize Weave client for project '{project_name}': {e}")
         return None
+    
+client = init_weave_client(PROJECT_NAME)
 ```
 
 ## 2.2 Fetching Calls Data from Weave
-Next, we'll use the `calls_query_stream` API to fetch the calls data from Weave:
+In order to fetch call data from Weave, we have two options:
+1. Fetching Data call-by-call
+2. Using high-level APIs
+
+### 2.2.1 Fetching Data call-by-call
+The first option to access data from Weave is to retrieve a list of filtered calls and extract the wanted data call-by-call. For that we can use the `calls_query_stream` API to fetch the calls data from Weave:
 
 * `calls_query_stream` API: This API allows us to fetch the calls data from Weave.
 * `filter` dictionary: This dictionary contains the filter parameters to fetch the calls data - see [here](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace_server/weave.trace_server.trace_server_interface/#class-callschema) for more details.
@@ -83,6 +93,8 @@ Next, we'll use the `calls_query_stream` API to fetch the calls data from Weave:
 
 ```python
 import itertools
+import pandas as pd
+from datetime import datetime, timedelta
 
 def fetch_calls(client, project_id, start_time, trace_roots_only, limit):
     filter_params = {
@@ -96,54 +108,42 @@ def fetch_calls(client, project_id, start_time, trace_roots_only, limit):
     try:
         calls_stream = client.server.calls_query_stream(filter_params)
         calls = list(itertools.islice(calls_stream, limit)) # limit the number of calls to fetch if too many
-        st.write(f"Fetched {len(calls)} calls.")
+        print(f"Fetched {len(calls)} calls.")
         return calls
     except Exception as e:
-        st.error(f"Error fetching calls: {e}")
+        print(f"Error fetching calls: {e}")
         return []
+    
+calls = fetch_calls(client, PROJECT_NAME, datetime.now() - timedelta(days=1), True, 100)
 ```
-
-For the cost, we'll use the `query_costs` API to fetch the costs of all used LLMs using a single call from Weave:
 
 
 ```python
-# Use cost API to get costs
-client = init_weave_client(selected_project)
-if client is None:
-    st.stop()
-
-costs = client.query_costs()
-df_costs = pd.DataFrame([cost.dict() for cost in costs])
-df_costs['total_cost'] = df_costs['prompt_token_cost'] + df_costs['completion_token_cost']
+# the raw data is a list of Call objects
+pd.DataFrame([call.dict() for call in calls]).head(3)
 ```
 
-## 2.3 Processing Calls Data
-Processing the calls is very easy with the return from Weave - we'll extract the relevant information and store it in a list of dictionaries. We'll then convert the list of dictionaries to a pandas DataFrame and return it.
+Processing the calls is very easy with the return from Weave - we'll extract the relevant information and store it in a list of dictionaries. We'll then convert the list of dictionaries to a pandas DataFrame and return it. For the high-level APIs we don't need to do this processing.
 
 
 ```python
 import json
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 
 def process_calls(calls):
     records = []
     for call in calls:
-        # For the latency and tokens we'll actually go through each call and extract model name from the inputs or outputs (this will change in the future)
-        model = next((model for model, _, _ in MODEL_NAMES if model in json.dumps(call.inputs) or model in json.dumps(call.output)), "N/A")
-        costs = call.summary.get("weave", {}).get("costs", {})
-        total_tokens = sum(cost.get("prompt_tokens", 0) + cost.get("completion_tokens", 0) for cost in costs.values())
         feedback = call.summary.get("weave", {}).get("feedback", [])
         thumbs_up = sum(1 for item in feedback if isinstance(item, dict) and item.get("payload", {}).get("emoji") == "👍")
         thumbs_down = sum(1 for item in feedback if isinstance(item, dict) and item.get("payload", {}).get("emoji") == "👎")
+        latency = call.summary.get("weave", {}).get("latency_ms", 0)
         
         records.append({
             "Call ID": call.id,
-            "Trace ID": call.trace_id,
-            "Display Name": call.display_name,
-            "Model": model,
-            "Tokens": total_tokens,
-            "Latency (ms)": call.summary.get("weave", {}).get("latency_ms", 0),
+            "Trace ID": call.trace_id,         # this is a unique ID for the trace that can be used to retrieve it
+            "Display Name": call.display_name, # this is an optional name you can set in the UI or programatically
+            "Latency (ms)": latency,
             "Thumbs Up": thumbs_up,
             "Thumbs Down": thumbs_down,
             "Started At": pd.to_datetime(getattr(call, 'started_at', datetime.min)),
@@ -153,8 +153,29 @@ def process_calls(calls):
     return pd.DataFrame(records)
 ```
 
+
+```python
+df_calls = process_calls(calls)
+df_calls.head(3)
+```
+
+### 2.2.2 Using high-level APIs
+Instead of goin through every call Weave also provides high-level APIs to directly access model costs, feedback, and other metrics. 
+For example for the cost, we'll use the `query_costs` API to fetch the costs of all used LLMs using in project:
+
+
+```python
+# Use cost API to get costs
+costs = client.query_costs()
+df_costs = pd.DataFrame([cost.dict() for cost in costs])
+df_costs['total_cost'] = df_costs['prompt_token_cost'] + df_costs['completion_token_cost']
+
+# only show the first row for every unqiue llm_id
+df_costs
+```
+
 ## 2.4 Gathering inputs and generating visualizations
-Next, we'll gather the inputs using streamlit and generate the visualizations using plotly. This is the most basic dashboard, but you can customize it as you like! Check out the complete source code [here](https://github.com/NiWaRe/knowledge-worker-weave/blob/master/prod_dashboard.py).
+Next, we'll gather the inputs using streamlit and generate the visualizations using plotly. This is the most basic dashboard, but you can customize it as you like! Check out the complete source code with Streamlit [here](https://github.com/NiWaRe/knowledge-worker-weave/blob/master/prod_dashboard.py).
 
 
 ```python
@@ -177,29 +198,12 @@ def plot_model_cost_distribution(df):
 
 
 ```python
-AVAILABLE_PROJECTS = [
-    # entity name, project name
-    "wandb-smle/weave-cookboook-demo",
-]
+plot_feedback_pie_chart(df_calls["Thumbs Up"].sum(), df_calls["Thumbs Down"].sum())
+```
 
-def render_dashboard():
-    # Configs panel
-    st.markdown("<div class='header'>Weave LLM Monitoring Dashboard</div>", unsafe_allow_html=True)
 
-    trace_roots_only = st.sidebar.toggle("Trace Roots Only", value=True)
-    selected_project = st.sidebar.selectbox("Select Weave Project", AVAILABLE_PROJECTS, index=0)
-    client = init_weave_client(selected_project)
-    if client is None:
-        st.stop()
-
-    # [...]: Check the source code for the rest of the dashboard
-
-    # First plots - feedback and cost distribution
-    col1, col2 = st.columns(2)
-    with col1:
-        st.plotly_chart(plot_feedback_pie_chart(thumbs_up, thumbs_down), use_container_width=True)
-    with col2:
-        st.plotly_chart(plot_model_cost_distribution(df_costs), use_container_width=True)
+```python
+plot_model_cost_distribution(df_costs)
 ```
 
 # Conclusion
