@@ -19,7 +19,7 @@ import {
   GridFilterModel,
   GridLogicOperator,
   GridPaginationModel,
-  GridPinnedColumns,
+  GridPinnedColumnFields,
   GridRowSelectionModel,
   GridSortModel,
   useGridApiRef,
@@ -96,7 +96,7 @@ export const DEFAULT_COLUMN_VISIBILITY_CALLS = {
 
 export const ALWAYS_PIN_LEFT_CALLS = ['CustomCheckbox'];
 
-export const DEFAULT_PIN_CALLS: GridPinnedColumns = {
+export const DEFAULT_PIN_CALLS: GridPinnedColumnFields = {
   left: ['CustomCheckbox', 'op_name'],
 };
 
@@ -128,8 +128,8 @@ export const CallsTable: FC<{
   columnVisibilityModel?: GridColumnVisibilityModel;
   setColumnVisibilityModel?: (newModel: GridColumnVisibilityModel) => void;
 
-  pinModel?: GridPinnedColumns;
-  setPinModel?: (newModel: GridPinnedColumns) => void;
+  pinModel?: GridPinnedColumnFields;
+  setPinModel?: (newModel: GridPinnedColumnFields) => void;
 
   filterModel?: GridFilterModel;
   setFilterModel?: (newModel: GridFilterModel) => void;
@@ -532,7 +532,7 @@ export const CallsTable: FC<{
     : undefined;
 
   const onPinnedColumnsChange = useCallback(
-    (newModel: GridPinnedColumns) => {
+    (newModel: GridPinnedColumnFields) => {
       if (!setPinModel || callsLoading) {
         return;
       }
@@ -781,7 +781,6 @@ export const CallsTable: FC<{
         // PAGINATION SECTION END
         rowHeight={38}
         columns={muiColumns}
-        experimentalFeatures={{columnGrouping: true}}
         disableRowSelectionOnClick
         rowSelectionModel={rowSelectionModel}
         // columnGroupingModel={groupingModel}

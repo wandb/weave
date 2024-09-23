@@ -274,8 +274,8 @@ const ObjectVersionsTable: React.FC<{
     cols.push(
       basicField('baseObjectClass', 'Category', {
         width: 100,
-        valueGetter: cellParams => {
-          return cellParams.row.obj.baseObjectClass;
+        valueGetter: (unused, row) => {
+          return row.obj.baseObjectClass;
         },
         renderCell: cellParams => {
           const category = cellParams.value;
@@ -290,8 +290,8 @@ const ObjectVersionsTable: React.FC<{
     cols.push(
       basicField('createdAtMs', 'Created', {
         width: 100,
-        valueGetter: cellParams => {
-          return cellParams.row.obj.createdAtMs;
+        valueGetter: (unused, row) => {
+          return row.obj.createdAtMs;
         },
         renderCell: cellParams => {
           const createdAtMs = cellParams.value;
@@ -371,7 +371,6 @@ const ObjectVersionsTable: React.FC<{
       columnHeaderHeight={40}
       rowHeight={38}
       columns={columns}
-      experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
       rowSelectionModel={rowSelectionModel}
       columnGroupingModel={columnGroupingModel}

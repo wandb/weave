@@ -272,8 +272,8 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
           </div>
         );
       },
-      valueGetter: cellParams => {
-        const val = valueForKey(cellParams.row, key);
+      valueGetter: (unused, row) => {
+        const val = valueForKey(row, key);
         if (Array.isArray(val) || typeof val === 'object') {
           try {
             return JSON.stringify(val);
