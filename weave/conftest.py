@@ -186,7 +186,7 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
         self_super = super()
         attr = self_super.__getattribute__(name)
 
-        if callable(attr) and not name.startswith("_") and name != "flush":
+        if callable(attr) and name != "flush":
 
             def wrapper(*args, **kwargs):
                 res = attr(*args, **kwargs)

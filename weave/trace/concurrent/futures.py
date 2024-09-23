@@ -76,8 +76,6 @@ class FutureExecutor:
         self._max_workers = max_workers
         self._thread_name_prefix = thread_name_prefix
         self._local = threading.local()
-        self._active_futures: List[Future] = []
-        self._active_futures_lock = Lock()
         self._recursion_limit = recursion_limit
         self._recursion_depths: Dict[int, int] = {}
         self._recursion_depths_lock = Lock()
@@ -96,6 +94,8 @@ class FutureExecutor:
             self._local.executor = ContextAwareThreadPoolExecutor(
                 max_workers=self._max_workers, thread_name_prefix=target_name
             )
+            self._local.active_futures = []
+            self._local.active_futures_lock = Lock()
         return self._local.executor
 
     def _shutdown(self) -> None:
@@ -141,15 +141,15 @@ class FutureExecutor:
                     del self._recursion_depths[executing_thread_id]
 
         future = self._executor.submit(wrapped_f)
-        with self._active_futures_lock:
-            self._active_futures.append(future)
+        with self._local.active_futures_lock:
+            self._local.active_futures.append(future)
         future.add_done_callback(self._future_done_callback)
         return future
 
     def _future_done_callback(self, future: Future) -> None:
-        with self._active_futures_lock:
-            if future in self._active_futures:
-                self._active_futures.remove(future)
+        with self._local.active_futures_lock:
+            if future in self._local.active_futures:
+                self._local.active_futures.remove(future)
 
     def then(self, futures: List[Future[T]], g: Callable[[List[T]], U]) -> Future[U]:
         """
@@ -207,10 +207,12 @@ class FutureExecutor:
         Returns:
             bool: True if all tasks completed, False if timeout was reached.
         """
-        with self._active_futures_lock:
-            if not self._active_futures:
+        if not hasattr(self._local, "active_futures"):
+            return True
+        with self._local.active_futures_lock:
+            if not self._local.active_futures:
                 return True
-            futures_to_wait = list(self._active_futures)
+            futures_to_wait = list(self._local.active_futures)
 
         for future in concurrent.futures.as_completed(futures_to_wait, timeout=timeout):
             try:
