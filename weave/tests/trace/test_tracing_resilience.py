@@ -306,7 +306,7 @@ async def test_resilience_to_accumulator_accumulation_errors_async(client):
             yield 3
 
         def make_accumulator(*args, **kwargs):
-            async def accumulate(*args, **kwargs):
+            def accumulate(*args, **kwargs):
                 raise TestException("FAILURE!")
 
             return accumulate
