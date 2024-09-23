@@ -21,11 +21,11 @@ of independent tasks, especially in scenarios involving network requests,
 file I/O, or other operations with significant waiting times.
 """
 
+import atexit
 from concurrent.futures import Future, ThreadPoolExecutor, wait
-from typing import Callable, List, TypeVar
+from typing import Callable, List, Optional, TypeVar
 
 # Constants
-MAX_WORKERS = 2**3
 THREAD_NAME_PREFIX = "WeaveThreadPool"
 
 T = TypeVar("T")
@@ -35,12 +35,16 @@ U = TypeVar("U")
 class FutureExecutor:
     def __init__(
         self,
-        max_workers: int = MAX_WORKERS,
+        max_workers: Optional[int] = None,
         thread_name_prefix: str = THREAD_NAME_PREFIX,
     ):
         self._executor = ThreadPoolExecutor(
             max_workers=max_workers, thread_name_prefix=thread_name_prefix
         )
+        atexit.register(self._shutdown)
+
+    def _shutdown(self) -> None:
+        self._executor.shutdown(wait=True)
 
     def defer(self, f: Callable[[], T]) -> Future[T]:
         """

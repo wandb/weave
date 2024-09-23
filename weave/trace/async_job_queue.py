@@ -5,11 +5,9 @@ import contextvars
 import logging
 import threading
 from concurrent.futures import Future
-from typing import Any, Callable, Generator, TypeVar
+from typing import Any, Callable, Generator, Optional, TypeVar
 
 T = TypeVar("T")
-
-MAX_WORKER_DEFAULT = 2**3  # 8 workers to not overwhelm the DB
 
 logger = logging.getLogger(__name__)
 
@@ -39,18 +37,16 @@ class AsyncJobQueue:
         executor (concurrent.futures.ThreadPoolExecutor): The executor used to run jobs.
         _lock (threading.Lock): A lock to ensure thread-safe operations.
         _active_jobs (set): A set to keep track of active jobs and callbacks.
-        _max_workers (int): The maximum number of worker threads to use.
 
     Args:
         max_workers (int): The maximum number of worker threads to use. Defaults to 8.
     """
 
-    def __init__(self, max_workers: int = MAX_WORKER_DEFAULT) -> None:
-        self._max_workers = max_workers
+    def __init__(self, max_workers: Optional[int] = None) -> None:
         self._lock = threading.Lock()
         self._active_jobs: set[Future] = set()
         self.executor = concurrent.futures.ThreadPoolExecutor(
-            max_workers=self._max_workers, thread_name_prefix="AsyncJobQueue"
+            max_workers=max_workers, thread_name_prefix="WeaveClientAsyncJobQueue"
         )
         atexit.register(self._at_exit_handler)
 
@@ -98,7 +94,6 @@ class AsyncJobQueue:
                 self._active_jobs.remove(f)
             exception = f.exception()
             if exception:
-                raise exception
                 logger.error(f"Job failed with exception: {exception}")
                 if should_raise_on_async_job_queue.get():
                     raise exception
@@ -127,7 +122,6 @@ class AsyncJobQueue:
             try:
                 future.result()
             except Exception as e:
-                raise e
                 logger.error(f"Job failed during flush: {e}")
                 if should_raise_on_async_job_queue.get():
                     raise e
