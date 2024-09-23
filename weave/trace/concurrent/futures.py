@@ -118,6 +118,31 @@ class FutureExecutor:
         if hasattr(self._local, "executor"):
             self._local.executor.shutdown(wait=True)
 
+    def _safe_submit(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
+        """
+        Submit a function to the thread-local thread pool. If there is an error submitting to the thread pool,
+        execute the function directly in the current thread (this allows us to finish flushing the threads when shutting down)
+        """
+        try:
+            return self._executor.submit(f, *args, **kwargs)
+        except Exception as e:
+            logger.error(f"Unable to submit job to thread pool: {e}")
+            if should_raise_on_future_exceptions.get():
+                raise e
+            return self._execute_directly(f, *args, **kwargs)
+
+    def _execute_directly(
+        self, f: Callable[..., T], *args: Any, **kwargs: Any
+    ) -> Future[T]:
+        """Execute a function directly in the current thread."""
+        fut: Future[T] = Future()
+        try:
+            res = f(*args, **kwargs)
+            fut.set_result(res)
+        except Exception as e:
+            fut.set_exception(e)
+        return fut
+
     def defer(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
         """
         Defer a function to be executed in a thread-local thread pool.
@@ -156,7 +181,7 @@ class FutureExecutor:
                 with self._recursion_depths_lock:
                     del self._recursion_depths[executing_thread_id]
 
-        future = self._executor.submit(wrapped_f)
+        future = self._safe_submit(wrapped_f)
         with self._active_futures_lock:
             self._active_futures.append(future)
         future.add_done_callback(self._future_done_callback)
@@ -189,7 +214,7 @@ class FutureExecutor:
                 result_future.set_exception(e)
                 return
 
-            g_future = self._executor.submit(g, results)
+            g_future = self._safe_submit(g, results)
 
             def on_g_done(f: Future[U]) -> None:
                 try:
@@ -201,10 +226,10 @@ class FutureExecutor:
 
         def on_done_callback(_: Future[T]) -> None:
             if all(fut.done() for fut in futures):
-                self._executor.submit(callback)
+                self._safe_submit(callback)
 
         if not futures:
-            self._executor.submit(callback)
+            self._safe_submit(callback)
         else:
             for f in futures:
                 f.add_done_callback(on_done_callback)
