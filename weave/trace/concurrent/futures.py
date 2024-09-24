@@ -80,37 +80,6 @@ class FutureExecutor:
         self._in_deferred_context = ContextVar("in_deferred_context", default=False)
         atexit.register(self._shutdown)
 
-    def _shutdown(self) -> None:
-        if self._executor:
-            self._executor.shutdown(wait=True)
-
-    def _safe_submit(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
-        """
-        Submit a function to the thread pool. If there is an error submitting to the thread pool,
-        or if max_workers is 0, execute the function directly in the current thread.
-        """
-        if self._executor is None or self._in_deferred_context.get():
-            return self._execute_directly(f, *args, **kwargs)
-
-        try:
-            return self._executor.submit(f, *args, **kwargs)
-        except Exception as e:
-            if get_raise_on_captured_errors():
-                raise e
-            return self._execute_directly(f, *args, **kwargs)
-
-    def _execute_directly(
-        self, f: Callable[..., T], *args: Any, **kwargs: Any
-    ) -> Future[T]:
-        """Execute a function directly in the current thread."""
-        fut: Future[T] = Future()
-        try:
-            res = f(*args, **kwargs)
-            fut.set_result(res)
-        except Exception as e:
-            fut.set_exception(e)
-        return fut
-
     def defer(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
         """
         Defer a function to be executed in a thread pool.
@@ -124,15 +93,7 @@ class FutureExecutor:
         Returns:
             Future[T]: A Future object representing the eventual result of the function.
         """
-
-        def wrapped_f() -> T:
-            token = self._in_deferred_context.set(True)
-            try:
-                return f(*args, **kwargs)
-            finally:
-                self._in_deferred_context.reset(token)
-
-        future = self._safe_submit(wrapped_f)
+        future = self._safe_submit(f, *args, **kwargs)
         with self._active_futures_lock:
             self._active_futures.append(future)
         future.add_done_callback(self._future_done_callback)
@@ -173,7 +134,7 @@ class FutureExecutor:
                 except Exception as e:
                     result_future.set_exception(e)
 
-            g_future.add_done_callback(on_g_done)
+            self._safe_add_done_callback(g_future, on_g_done)
 
         def on_done_callback(_: Future[T]) -> None:
             if all(fut.done() for fut in futures):
@@ -183,7 +144,7 @@ class FutureExecutor:
             self._safe_submit(callback)
         else:
             for f in futures:
-                f.add_done_callback(on_done_callback)
+                self._safe_add_done_callback(f, on_done_callback)
 
         return result_future
 
@@ -212,6 +173,54 @@ class FutureExecutor:
                 if get_raise_on_captured_errors():
                     raise e
         return True
+
+    def _shutdown(self) -> None:
+        if self._executor:
+            self._executor.shutdown(wait=True)
+
+    def _make_deadlock_safe(self, f: Callable[..., T]) -> Callable[..., T]:
+        def wrapped_f(*args: Any, **kwargs: Any) -> T:
+            token = self._in_deferred_context.set(True)
+            try:
+                return f(*args, **kwargs)
+            finally:
+                self._in_deferred_context.reset(token)
+
+        return wrapped_f
+
+    def _safe_add_done_callback(
+        self, future: Future[T], callback: Callable[[Future[T]], None]
+    ) -> None:
+        future.add_done_callback(self._make_deadlock_safe(callback))
+
+    def _safe_submit(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
+        """
+        Submit a function to the thread pool. If there is an error submitting to the thread pool,
+        or if max_workers is 0, execute the function directly in the current thread.
+        """
+        wrapped = self._make_deadlock_safe(f)
+
+        if self._executor is None or self._in_deferred_context.get():
+            return self._execute_directly(wrapped, *args, **kwargs)
+
+        try:
+            return self._executor.submit(wrapped, *args, **kwargs)
+        except Exception as e:
+            if get_raise_on_captured_errors():
+                raise e
+            return self._execute_directly(wrapped, *args, **kwargs)
+
+    def _execute_directly(
+        self, f: Callable[..., T], *args: Any, **kwargs: Any
+    ) -> Future[T]:
+        """Execute a function directly in the current thread."""
+        fut: Future[T] = Future()
+        try:
+            res = f(*args, **kwargs)
+            fut.set_result(res)
+        except Exception as e:
+            fut.set_exception(e)
+        return fut
 
 
 __all__ = ["FutureExecutor"]

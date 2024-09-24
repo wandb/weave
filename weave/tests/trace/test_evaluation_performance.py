@@ -62,8 +62,8 @@ def paused_client(client: WeaveClient) -> Generator[WeaveClient, None, None]:
     finally:
         blocking_server.resume()
         client.server = original_server
-        client.set_autoflush(True)
         client._flush()
+        client.set_autoflush(True)
 
 
 def build_evaluation():
