@@ -956,6 +956,8 @@ const useTableQuery = makeTraceServerEndpointHook<
     string,
     traceServerTypes.TraceTableQueryReq['filter'],
     traceServerTypes.TraceTableQueryReq['limit'],
+    traceServerTypes.TraceTableQueryReq['offset'],
+    traceServerTypes.TraceTableQueryReq['sort_by'],
     {skip?: boolean}?
   ],
   any[]
@@ -966,6 +968,8 @@ const useTableQuery = makeTraceServerEndpointHook<
     digest: traceServerTypes.TraceTableQueryReq['digest'],
     filter: traceServerTypes.TraceTableQueryReq['filter'],
     limit: traceServerTypes.TraceTableQueryReq['limit'],
+    offset: traceServerTypes.TraceTableQueryReq['offset'],
+    sortBy: traceServerTypes.TraceTableQueryReq['sort_by'],
     opts?: {skip?: boolean}
   ) => ({
     params: {
@@ -973,6 +977,8 @@ const useTableQuery = makeTraceServerEndpointHook<
       digest,
       filter,
       limit,
+      offset,
+      sort_by: sortBy,
     },
     skip: opts?.skip,
   }),
@@ -1129,6 +1135,8 @@ const useRefsData = (
     tableUriDigest,
     tableQueryFilter,
     tableQuery?.limit,
+    undefined,
+    undefined,
     {skip: tableRefUris.length === 0 || cachedTableResult != null}
   );
 
@@ -1183,6 +1191,14 @@ const useRefsData = (
     tableRefUris,
     tableRefKey,
   ]);
+};
+
+const useTableRowsQuery = () => {
+  throw new Error('Not implemented');
+};
+
+const useTableQueryStats = () => {
+  throw new Error('Not implemented');
 };
 
 const useApplyMutationsToRef = (): ((
@@ -1527,6 +1543,8 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useApplyMutationsToRef,
   useFeedback,
   useFileContent,
+  useTableRowsQuery,
+  useTableQueryStats,
   derived: {
     useChildCallsForCompare,
     useGetRefsType,
