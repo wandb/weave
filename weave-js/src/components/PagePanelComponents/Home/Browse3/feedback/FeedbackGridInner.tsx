@@ -23,6 +23,7 @@ export const FeedbackGridInner = ({
     {
       field: 'feedback_type',
       headerName: 'Type',
+      display: 'flex',
       renderCell: params => (
         <div className="overflow-hidden">
           <FeedbackTypeChip feedbackType={params.row.feedback_type} />
@@ -57,6 +58,7 @@ export const FeedbackGridInner = ({
       field: 'id',
       headerName: 'ID',
       width: 50,
+      display: 'flex',
       renderCell: params => <CopyableId id={params.row.id} type="Feedback" />,
     },
     {
@@ -88,6 +90,7 @@ export const FeedbackGridInner = ({
       sortable: false,
       resizable: false,
       disableColumnMenu: true,
+      display: 'flex',
       renderCell: params => {
         const projectId = params.row.project_id;
         const feedbackId = params.row.id;
