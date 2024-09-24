@@ -12,14 +12,14 @@ from wandb.sdk.artifacts.artifact_state import ArtifactState
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 
 import weave
-from weave.legacy.weave import artifact_fs
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.artifact_wandb import WandbArtifact, WeaveWBArtifactURI
-from weave.legacy.weave.language_features.tagging.tagged_value_type import TaggedValueType
-from weave.legacy.weave.ops_domain.wbmedia import ImageArtifactFileRefType
-from weave.legacy.weave.ops_primitives import file
-from weave.legacy.weave.wandb_client_api import wandb_gql_query
-from weave.legacy.weave.wandb_util import weave0_type_json_to_weave1_type
+from weave_query.weave_query import artifact_fs
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.artifact_wandb import WandbArtifact, WeaveWBArtifactURI
+from weave_query.weave_query.language_features.tagging.tagged_value_type import TaggedValueType
+from weave_query.weave_query.ops_domain.wbmedia import ImageArtifactFileRefType
+from weave_query.weave_query.ops_primitives import file
+from weave_query.weave_query.wandb_client_api import wandb_gql_query
+from weave_query.weave_query.wandb_util import weave0_type_json_to_weave1_type
 
 from ...tests.fixture_fakewandb import FakeApi
 

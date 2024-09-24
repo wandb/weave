@@ -1,5 +1,5 @@
-from weave.legacy.weave import graph
-from weave.legacy.weave.panels import panel
+from weave_query.weave_query import graph
+from weave_query.weave_query.panels import panel
 
 
 class VerticalContainerConfig:

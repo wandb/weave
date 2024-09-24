@@ -2,7 +2,7 @@ import typing
 
 import weave
 import weave.legacy.weave
-from weave.legacy.weave import val_const
+from weave_query.weave_query import val_const
 
 
 class ScenarioResult(typing.TypedDict):

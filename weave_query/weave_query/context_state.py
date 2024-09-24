@@ -3,11 +3,11 @@ import contextvars
 import dataclasses
 import typing
 
-from weave.legacy.weave import server_interface
+from weave_query.weave_query import server_interface
 
 if typing.TYPE_CHECKING:
-    from weave.legacy.weave import client_interface, uris
-    from weave.legacy.weave.graph_client import GraphClient
+    from weave_query.weave_query import client_interface, uris
+    from weave_query.weave_query.graph_client import GraphClient
 
 
 # colab currently runs ipykernel < 6.0.  This resets context on every

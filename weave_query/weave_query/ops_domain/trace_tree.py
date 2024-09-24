@@ -11,11 +11,11 @@ import typeguard
 from wandb.sdk.data_types.trace_tree import Result as WBSpanResult
 from wandb.sdk.data_types.trace_tree import Span as WBSpan
 
-from weave.legacy.weave import api as weave
-from weave.legacy.weave import stream_data_interfaces
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import op_def
-from weave.legacy.weave.decorator_op import op
+from weave_query.weave_query import api as weave
+from weave_query.weave_query import stream_data_interfaces
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query import op_def
+from weave_query.weave_query.decorator_op import op
 
 
 class StatusCode:

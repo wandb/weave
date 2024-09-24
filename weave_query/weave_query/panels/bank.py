@@ -1,6 +1,6 @@
 # TODO: move all panelbank stuff here
 
-from weave.legacy.weave.panels import panel_group
+from weave_query.weave_query.panels import panel_group
 
 
 def default_panel_bank_flow_section_config():

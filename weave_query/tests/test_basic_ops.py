@@ -1,8 +1,8 @@
-from weave.legacy.weave import api as weave
-from weave.legacy.weave import box, ops
-from weave.legacy.weave.ops_primitives import number
-from weave.legacy.weave.ops_primitives.string import *
-from weave.legacy.weave.weave_internal import make_const_node
+from weave_query.weave_query import api as weave
+from weave_query.weave_query import box, ops
+from weave_query.weave_query.ops_primitives import number
+from weave_query.weave_query.ops_primitives.string import *
+from weave_query.weave_query.weave_internal import make_const_node
 
 
 def test_number_ops():

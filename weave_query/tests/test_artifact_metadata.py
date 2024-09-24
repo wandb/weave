@@ -1,8 +1,8 @@
 import wandb
 
 import weave
-from weave.legacy.weave import artifact_local, artifact_wandb
-from weave.legacy.weave.wandb_interface.wandb_artifact_pusher import (
+from weave_query.weave_query import artifact_local, artifact_wandb
+from weave_query.weave_query.wandb_interface.wandb_artifact_pusher import (
     write_artifact_to_wandb,
 )
 

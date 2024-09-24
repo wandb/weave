@@ -2,9 +2,9 @@ import typing
 
 import pytest
 
-from weave.legacy.weave import api as weave
-from weave.legacy.weave import box
-from weave.legacy.weave.ops_primitives import any
+from weave_query.weave_query import api as weave
+from weave_query.weave_query import box
+from weave_query.weave_query.ops_primitives import any
 
 cases: list[typing.Tuple[typing.Any, bool]] = [
     (1, False),

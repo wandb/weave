@@ -1,7 +1,7 @@
 import typing
 
 import weave
-from weave.legacy.weave.ecosystem.slack import slack
+from weave_query.weave_query.ecosystem.slack import slack
 
 
 @weave.type()

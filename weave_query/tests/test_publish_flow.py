@@ -3,20 +3,20 @@ import typing
 import pytest
 
 import weave
-from weave.legacy.weave import panels, storage
-from weave.legacy.weave.artifact_fs import BranchPointType, FilesystemArtifactRef
-from weave.legacy.weave.artifact_local import (
+from weave_query.weave_query import panels, storage
+from weave_query.weave_query.artifact_fs import BranchPointType, FilesystemArtifactRef
+from weave_query.weave_query.artifact_local import (
     LocalArtifact,
     LocalArtifactRef,
     WeaveLocalArtifactURI,
 )
-from weave.legacy.weave.artifact_wandb import (
+from weave_query.weave_query.artifact_wandb import (
     WandbArtifact,
     WandbArtifactRef,
     WeaveWBArtifactURI,
     likely_commit_hash,
 )
-from weave.legacy.weave.uris import WeaveURI
+from weave_query.weave_query.uris import WeaveURI
 
 
 def test_publish_values(user_by_api_key_in_env):
@@ -26,7 +26,7 @@ def test_publish_values(user_by_api_key_in_env):
 
 
 def test_publish_panel(user_by_api_key_in_env):
-    from weave.legacy.weave import panel_util
+    from weave_query.weave_query import panel_util
 
     table_obj = panels.Table(
         panel_util.make_node(

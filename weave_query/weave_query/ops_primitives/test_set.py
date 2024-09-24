@@ -1,5 +1,5 @@
 import weave
-from weave.legacy.weave import ops_primitives, val_const
+from weave_query.weave_query import ops_primitives, val_const
 
 
 def test_difference_type():

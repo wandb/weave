@@ -8,7 +8,7 @@ import string
 # import ipynbname
 import typing
 
-from weave.legacy.weave.errors import WeaveFingerprintErrorMixin
+from weave_query.weave_query.errors import WeaveFingerprintErrorMixin
 
 sentry_inited = False
 

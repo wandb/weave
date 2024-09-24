@@ -1,8 +1,8 @@
 import weave
-from weave.legacy.weave import context_state as _context
-from weave.legacy.weave import graph
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.weave_internal import make_const_node
+from weave_query.weave_query import context_state as _context
+from weave_query.weave_query import graph
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.weave_internal import make_const_node
 
 from ...legacy.weave import registry_mem
 

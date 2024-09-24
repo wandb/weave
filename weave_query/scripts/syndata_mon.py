@@ -10,7 +10,7 @@ import pandas as pd
 import tqdm
 from faker import Faker
 
-from weave.legacy.weave.arrow.list_ import ArrowWeaveList, dataframe_to_arrow
+from weave_query.weave_query.arrow.list_ import ArrowWeaveList, dataframe_to_arrow
 
 
 # Generate the version schedule

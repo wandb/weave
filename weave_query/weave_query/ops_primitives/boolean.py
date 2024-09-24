@@ -1,9 +1,9 @@
 import typing
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import op, weave_class
-from weave.legacy.weave import dispatch
-from weave.legacy.weave.ops_primitives.dict import dict_
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import op, weave_class
+from weave_query.weave_query import dispatch
+from weave_query.weave_query.ops_primitives.dict import dict_
 
 
 @weave_class(weave_type=types.Boolean)

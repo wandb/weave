@@ -2,11 +2,11 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import codifiable_value_mixin, codify, panel
-from weave.legacy.weave.graph import ConstNode, Node, OutputNode, VoidNode
-from weave.legacy.weave.panels import table_state
-from weave.legacy.weave.panels.panel_query import Query
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query import codifiable_value_mixin, codify, panel
+from weave_query.weave_query.graph import ConstNode, Node, OutputNode, VoidNode
+from weave_query.weave_query.panels import table_state
+from weave_query.weave_query.panels.panel_query import Query
 
 
 @weave.type("tablePanelConfig")

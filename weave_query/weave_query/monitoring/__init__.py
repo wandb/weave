@@ -2,11 +2,11 @@
 
 # TODO: Notebook Walkthrough
 
-from weave.legacy.weave.monitoring.monitor import (
+from weave_query.weave_query.monitoring.monitor import (
     default_monitor,
     deinit_monitor,
     init_monitor,
 )
-from weave.legacy.weave.wandb_interface.wandb_stream_table import StreamTable
+from weave_query.weave_query.wandb_interface.wandb_stream_table import StreamTable
 
 __all__ = ["StreamTable", "monitor", "openai"]

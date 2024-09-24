@@ -4,7 +4,7 @@ import typing
 import transformers
 
 import weave
-from weave.legacy.weave.ecosystem.huggingface import hfmodel
+from weave_query.weave_query.ecosystem.huggingface import hfmodel
 
 # We have to forward-declare the Weave types to avoid circular reference
 # issues that weave.type() can't resolve yet.
@@ -71,7 +71,7 @@ class ClassificationResultPanel(weave.Panel):
 
     @weave.op()
     def render(self) -> weave.legacy.weave.panels.Table:
-        from weave.legacy.weave.ecosystem.huggingface.huggingface_models import huggingface
+        from weave_query.weave_query.ecosystem.huggingface.huggingface_models import huggingface
 
         return weave.legacy.weave.panels.Table(
             self.input_node,

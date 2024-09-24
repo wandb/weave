@@ -1,6 +1,6 @@
 import weave
-from weave.legacy.weave import dispatch, weave_internal
-from weave.legacy.weave import weave_types as types
+from weave_query.weave_query import dispatch, weave_internal
+from weave_query.weave_query import weave_types as types
 
 from weave.legacy.tests.util import weavejs_ops
 

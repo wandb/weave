@@ -3,7 +3,7 @@ import time
 import wandb
 
 import weave
-from weave.legacy.weave.ecosystem.wandb.panel_time_series import TimeSeries
+from weave_query.weave_query.ecosystem.wandb.panel_time_series import TimeSeries
 
 
 def test_panel_timeseries(user_by_api_key_in_env):

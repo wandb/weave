@@ -1,5 +1,5 @@
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import weave_types as types
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query import weave_types as types
 
 
 # TODO: Consider if this should accept a *args, **kwargs?

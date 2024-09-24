@@ -1,4 +1,4 @@
-from weave.legacy.weave import api as weave
+from weave_query.weave_query import api as weave
 
 from ...legacy.weave import registry_mem
 

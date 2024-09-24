@@ -2,7 +2,7 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import panel
+from weave_query.weave_query import panel
 
 span_typed_dict_type = weave.types.TypedDict(
     {

@@ -7,8 +7,8 @@ from openai.types.chat import (
 )
 from pydantic import BaseModel, Field
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.monitoring import monitor
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.monitoring import monitor
 
 
 class ModelTokensConfig(BaseModel):

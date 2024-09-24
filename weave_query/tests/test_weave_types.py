@@ -5,10 +5,10 @@ import pytest
 import weave
 import weave.legacy.weave
 import weave.legacy.weave.weave_types
-from weave.legacy.weave import _dict_utils, runs
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.language_features.tagging.tagged_value_type import TaggedValueType
-from weave.legacy.weave.ops_domain import wbmedia
+from weave_query.weave_query import _dict_utils, runs
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.language_features.tagging.tagged_value_type import TaggedValueType
+from weave_query.weave_query.ops_domain import wbmedia
 
 from ... import errors
 
@@ -713,7 +713,7 @@ def test_deserializes_single_member_union():
 
 
 def test_wbrun_not_assignable_to_weave_run():
-    from weave.legacy.weave.ops_domain import wb_domain_types
+    from weave_query.weave_query.ops_domain import wb_domain_types
 
     assert not weave.types.optional(wb_domain_types.Run().WeaveType()).assign_type(
         weave.types.RunType(

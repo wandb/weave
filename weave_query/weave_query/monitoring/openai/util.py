@@ -8,7 +8,7 @@ from openai.types.chat.chat_completion import ChatCompletion
 from openai.types.chat.chat_completion_chunk import ChatCompletionChunk, Choice
 from openai.types.completion_usage import CompletionUsage
 
-from weave.legacy.weave.monitoring.openai.models import *
+from weave_query.weave_query.monitoring.openai.models import *
 
 T = TypeVar("T")
 

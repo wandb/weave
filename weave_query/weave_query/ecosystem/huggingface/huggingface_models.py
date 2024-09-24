@@ -7,8 +7,8 @@ import torch
 import transformers
 
 import weave
-from weave.legacy.weave.ecosystem import pytorch
-from weave.legacy.weave.ecosystem.huggingface import (
+from weave_query.weave_query.ecosystem import pytorch
+from weave_query.weave_query.ecosystem.huggingface import (
     hfmodel,
     model_textclassification,
     model_textgeneration,

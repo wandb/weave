@@ -7,8 +7,8 @@ import torch
 import transformers
 
 import weave
-from weave.legacy.weave import op_def_type
-from weave.legacy.weave.ecosystem import pytorch
+from weave_query.weave_query import op_def_type
+from weave_query.weave_query.ecosystem import pytorch
 
 
 # This tells Weave how to serialize BaseModelOutput

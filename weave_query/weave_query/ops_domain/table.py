@@ -5,10 +5,10 @@ import json
 import logging
 import typing
 
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import op, weave_class
-from weave.legacy.weave import (
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import op, weave_class
+from weave_query.weave_query import (
     artifact_fs,
     artifact_wandb,
     io_service,
@@ -18,8 +18,8 @@ from weave.legacy.weave import (
     errors, 
     util, 
 )
-from weave.legacy.weave import timestamp as weave_timestamp
-from weave.legacy.weave.ops_domain import trace_tree, wbmedia
+from weave_query.weave_query import timestamp as weave_timestamp
+from weave_query.weave_query.ops_domain import trace_tree, wbmedia
 
 
 @dataclasses.dataclass(frozen=True)

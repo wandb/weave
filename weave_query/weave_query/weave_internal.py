@@ -1,7 +1,7 @@
 import typing
 
-from weave.legacy.weave import client_interface, context_state, errors, graph
-from weave.legacy.weave import weave_types as types
+from weave_query.weave_query import client_interface, context_state, errors, graph
+from weave_query.weave_query import weave_types as types
 
 
 def dereference_variables(
@@ -83,14 +83,14 @@ def use(
 
 def make_var_node(type_: types.Type, name: str) -> graph.VarNode:
     # Circular import. TODO: fix
-    from weave.legacy.weave import dispatch
+    from weave_query.weave_query import dispatch
 
     return dispatch.RuntimeVarNode(type_, name)
 
 
 def make_const_node(type_: types.Type, val: typing.Any) -> graph.ConstNode:
     # Circular import. TODO: fix
-    from weave.legacy.weave import dispatch
+    from weave_query.weave_query import dispatch
 
     return dispatch.RuntimeConstNode(type_, val)
 
@@ -114,7 +114,7 @@ def make_output_node(
     type_: types.Type, op_name: str, op_params: dict[str, graph.Node]
 ) -> graph.OutputNode:
     # Circular import. TODO: fix
-    from weave.legacy.weave import dispatch
+    from weave_query.weave_query import dispatch
 
     return dispatch.RuntimeOutputNode(type_, op_name, op_params)
 
@@ -125,7 +125,7 @@ def define_fn(
 ) -> graph.ConstNode:
     var_nodes = [make_var_node(t, k) for k, t in parameters.items()]
     try:
-        from weave.legacy.weave import op_def
+        from weave_query.weave_query import op_def
 
         with op_def.no_refine():
             fnNode = body(*var_nodes)
@@ -148,7 +148,7 @@ ENBoundParamsType = typing.Optional[dict[str, graph.Node]]
 # and the function doesn't explicitly operate on tagged values. this ensures that the input tags
 # are propagated appropriately to the output type of the function.
 def refine_graph(node: graph.Node) -> graph.Node:
-    from weave.legacy.weave.registry_mem import memory_registry
+    from weave_query.weave_query.registry_mem import memory_registry
 
     if isinstance(node, (graph.ConstNode, graph.VoidNode, graph.VarNode)):
         return node
@@ -176,6 +176,6 @@ def manual_call(
 
     You can produce incorrect nodes this way. Use with caution.
     """
-    from weave.legacy.weave import dispatch
+    from weave_query.weave_query import dispatch
 
     return dispatch.RuntimeOutputNode(output_type, op_name, inputs)

@@ -4,12 +4,12 @@ import numpy as np
 import wandb
 
 import weave
-from weave.legacy.weave.language_features.tagging import make_tag_getter_op
-from weave.legacy.weave.language_features.tagging.tagged_value_type import TaggedValueType
-from weave.legacy.weave.ops_arrow.list_ops import filter
-from weave.legacy.weave.ops_domain import wbmedia
-from weave.legacy.weave.ops_domain.wandb_domain_gql import _make_alias
-from weave.legacy.weave.weave_internal import make_const_node
+from weave_query.weave_query.language_features.tagging import make_tag_getter_op
+from weave_query.weave_query.language_features.tagging.tagged_value_type import TaggedValueType
+from weave_query.weave_query.ops_arrow.list_ops import filter
+from weave_query.weave_query.ops_domain import wbmedia
+from weave_query.weave_query.ops_domain.wandb_domain_gql import _make_alias
+from weave_query.weave_query.weave_internal import make_const_node
 
 
 def use_static_artifact_node(
@@ -326,7 +326,7 @@ def test_join_group_combo(fake_wandb):
     join_obj = sorted[0].joinObj()[0]
     assert weave.use(join_obj) == [1.0]
 
-    from weave.legacy.weave import context_state
+    from weave_query.weave_query import context_state
 
     _loading_builtins_token = context_state.set_loading_built_ins()
     tag_getter_op = make_tag_getter_op.make_tag_getter_op(

@@ -5,8 +5,8 @@ import pytest
 from PIL import Image
 
 import weave
-from weave.legacy.weave import context, execute, gql_json_cache, wandb_api, weave_types
-from weave.legacy.weave.wandb_interface.wandb_stream_table import StreamTable
+from weave_query.weave_query import context, execute, gql_json_cache, wandb_api, weave_types
+from weave_query.weave_query.wandb_interface.wandb_stream_table import StreamTable
 
 
 def make_stream_table(*args, **kwargs):

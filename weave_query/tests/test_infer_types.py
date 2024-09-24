@@ -1,6 +1,6 @@
 import typing
 
-from weave.legacy.weave import graph, infer_types, weave_types
+from weave_query.weave_query import graph, infer_types, weave_types
 
 
 def test_node_with_generic():

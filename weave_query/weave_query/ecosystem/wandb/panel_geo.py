@@ -3,8 +3,8 @@ import inspect
 import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave.ecosystem.wandb import weave_plotly
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query.ecosystem.wandb import weave_plotly
 
 
 # This is the panel's config (the state that is stored in the panel and configurable

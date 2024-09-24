@@ -1,5 +1,5 @@
 import weave
-from weave.legacy.weave import ref_base, uris, weave_internal
+from weave_query.weave_query import ref_base, uris, weave_internal
 
 
 def test_mutation_set_direct_call():
@@ -77,7 +77,7 @@ def test_merge_no_version():
 
 
 def test_merge_list_type():
-    from weave.legacy.weave import object_context
+    from weave_query.weave_query import object_context
 
     weave.save([], "my-list:latest")
     obj = weave.legacy.weave.ops.get("local-artifact:///my-list:latest/obj")

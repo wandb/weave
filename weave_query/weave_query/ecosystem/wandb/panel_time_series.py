@@ -2,10 +2,10 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave.ecosystem.wandb import weave_plotly
-from weave.legacy.weave.language_features.tagging import tagged_value_type
-from weave.legacy.weave.panel_util import make_node
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query.ecosystem.wandb import weave_plotly
+from weave_query.weave_query.language_features.tagging import tagged_value_type
+from weave_query.weave_query.panel_util import make_node
 
 TIME_SERIES_BIN_SIZES_SEC = [
     # TODO: will need more steps along here for smooth zooming.

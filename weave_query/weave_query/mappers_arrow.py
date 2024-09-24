@@ -5,9 +5,9 @@ from contextlib import contextmanager
 
 import pyarrow as pa
 
-from weave.legacy.weave import errors
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import (
+from weave_query.weave_query import errors
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query import (
     arrow_util,
     artifact_base,
     box,
@@ -17,9 +17,9 @@ from weave.legacy.weave import (
     partial_object,
     ref_base,
 )
-from weave.legacy.weave import mappers_python_def as mappers_python
-from weave.legacy.weave.arrow import arrow
-from weave.legacy.weave.language_features.tagging import tagged_value_type
+from weave_query.weave_query import mappers_python_def as mappers_python
+from weave_query.weave_query.arrow import arrow
+from weave_query.weave_query.language_features.tagging import tagged_value_type
 
 _in_tagging_context = contextvars.ContextVar("in_tagging_context", default=False)
 

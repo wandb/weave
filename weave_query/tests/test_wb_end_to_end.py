@@ -1,7 +1,7 @@
 import wandb
 
 import weave
-from weave.legacy.weave import compile
+from weave_query.weave_query import compile
 
 
 # Example of end to end integration test

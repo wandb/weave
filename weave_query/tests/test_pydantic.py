@@ -3,7 +3,7 @@ from typing import Any, Optional
 import pydantic
 
 import weave
-from weave.legacy.weave import weave_types as types
+from weave_query.weave_query import weave_types as types
 
 
 def test_pydantic_type_inference():

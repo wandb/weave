@@ -2,9 +2,9 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import panel_util
-from weave.legacy.weave.ecosystem.wandb import weave_plotly
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query import panel_util
+from weave_query.weave_query.ecosystem.wandb import weave_plotly
 
 
 @weave.type()

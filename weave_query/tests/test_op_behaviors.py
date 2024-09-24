@@ -12,7 +12,7 @@ import typing
 import pytest
 
 import weave
-from weave.legacy.weave import (
+from weave_query.weave_query import (
     graph,
     graph_debug,
     language_nullability,
@@ -22,8 +22,8 @@ from weave.legacy.weave import (
     storage,
     weave_internal,
 )
-from weave.legacy.weave.language_features.tagging import make_tag_getter_op
-from weave.legacy.weave.language_features.tagging.tagged_value_type import (
+from weave_query.weave_query.language_features.tagging import make_tag_getter_op
+from weave_query.weave_query.language_features.tagging.tagged_value_type import (
     TaggedValueType,
 )
 

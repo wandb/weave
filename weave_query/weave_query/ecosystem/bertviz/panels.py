@@ -1,7 +1,7 @@
 import bertviz
 
 import weave
-from weave.legacy.weave.ecosystem import huggingface
+from weave_query.weave_query.ecosystem import huggingface
 
 
 @weave.op()
