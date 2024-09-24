@@ -1080,7 +1080,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         project_id: str,
         conditions: Optional[list[str]] = None,
         parameters: Optional[Dict[str, Any]] = None,
-        metadata_only: bool = False,
+        metadata_only: Optional[bool] = False,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
         sort_by: Optional[list[tsi.SortBy]] = None,
