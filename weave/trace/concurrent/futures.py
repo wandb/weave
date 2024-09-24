@@ -126,7 +126,6 @@ class FutureExecutor:
         try:
             return self._executor.submit(f, *args, **kwargs)
         except Exception as e:
-            logger.error(f"Unable to submit job to thread pool: {e}")
             if should_raise_on_future_exceptions.get():
                 raise e
             return self._execute_directly(f, *args, **kwargs)
@@ -179,7 +178,10 @@ class FutureExecutor:
                 return f(*args, **kwargs)
             finally:
                 with self._recursion_depths_lock:
-                    del self._recursion_depths[executing_thread_id]
+                    try:    
+                        del self._recursion_depths[executing_thread_id]
+                    except KeyError:
+                        pass
 
         future = self._safe_submit(wrapped_f)
         with self._active_futures_lock:
