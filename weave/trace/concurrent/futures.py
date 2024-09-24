@@ -40,7 +40,6 @@ from weave.trace.util import ContextAwareThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
-
 # Constants
 THREAD_NAME_PREFIX = "WeaveThreadPool"
 
@@ -56,12 +55,11 @@ class FutureExecutor:
     object is deleted or when the program exits.
 
     Args:
-        max_workers (int): The maximum number of worker threads to use per executor. Defaults to None.
-                           If set to 0, all tasks will be executed directly in the current thread.
+        max_workers (Optional[int]): The maximum number of worker threads to use per executor.
+                                     Defaults to None. If set to 0, all tasks will be executed
+                                     directly in the current thread.
         thread_name_prefix (str): The prefix for thread names. Defaults to "WeaveThreadPool".
     """
-
-    _executor: Optional[ContextAwareThreadPoolExecutor]
 
     def __init__(
         self,
@@ -69,12 +67,11 @@ class FutureExecutor:
         thread_name_prefix: str = THREAD_NAME_PREFIX,
     ):
         self._max_workers = max_workers
+        self._executor: Optional[ContextAwareThreadPoolExecutor] = None
         if max_workers != 0:
             self._executor = ContextAwareThreadPoolExecutor(
                 max_workers=max_workers, thread_name_prefix=thread_name_prefix
             )
-        else:
-            self._executor = None
         self._active_futures: List[Future] = []
         self._active_futures_lock = Lock()
         self._in_thread_context = ContextVar("in_deferred_context", default=False)
@@ -83,6 +80,7 @@ class FutureExecutor:
     def defer(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
         """
         Defer a function to be executed in a thread pool.
+
         This is useful for long-running or I/O-bound functions where the result is not needed immediately.
 
         Args:
@@ -102,6 +100,7 @@ class FutureExecutor:
     def then(self, futures: List[Future[T]], g: Callable[[List[T]], U]) -> Future[U]:
         """
         Execute a function on the results of a list of futures.
+
         This is useful when the results of one or more futures are needed for further processing.
 
         Args:
@@ -146,6 +145,7 @@ class FutureExecutor:
     def flush(self, timeout: Optional[float] = None) -> bool:
         """
         Block until all currently submitted items are complete or timeout is reached.
+
         This method allows new submissions while waiting, ensuring that
         submitted jobs can enqueue more items if needed to complete.
 
@@ -154,6 +154,9 @@ class FutureExecutor:
 
         Returns:
             bool: True if all tasks completed, False if timeout was reached.
+
+        Raises:
+            RuntimeError: If called from within a thread context.
         """
         with self._active_futures_lock:
             if not self._active_futures:
@@ -161,7 +164,7 @@ class FutureExecutor:
             futures_to_wait = list(self._active_futures)
 
         if self._in_thread_context.get():
-            raise RuntimeError("Cannot flush from within a thead")
+            raise RuntimeError("Cannot flush from within a thread")
 
         for future in concurrent.futures.as_completed(futures_to_wait, timeout=timeout):
             try:
@@ -169,15 +172,11 @@ class FutureExecutor:
             except Exception as e:
                 logger.error(f"Job failed during flush: {e}")
                 if get_raise_on_captured_errors():
-                    raise e
+                    raise
         return True
 
-    # Start of private methods
-
     def _future_done_callback(self, future: Future) -> None:
-        """
-        Callback for when a future is done to remove it from the active futures list.
-        """
+        """Callback for when a future is done to remove it from the active futures list."""
         with self._active_futures_lock:
             if future in self._active_futures:
                 self._active_futures.remove(future)
@@ -188,9 +187,10 @@ class FutureExecutor:
             self._executor.shutdown(wait=True)
 
     def _make_deadlock_safe(self, f: Callable[..., T]) -> Callable[..., T]:
-        """Allows any function to be called from a thread without deadlocking.
+        """
+        Allows any function to be called from a thread without deadlocking.
 
-        Anytime a function is submitted to the threadpool (eg. submit or add_done_callback),
+        Anytime a function is submitted to the threadpool (e.g., submit or add_done_callback),
         it should be wrapped in this function so that it can be executed in the threadpool.
         """
 
@@ -206,14 +206,14 @@ class FutureExecutor:
     def _safe_add_done_callback(
         self, future: Future[T], callback: Callable[[Future[T]], None]
     ) -> None:
-        """
-        Add a done callback to a future.
-        """
+        """Add a done callback to a future."""
         future.add_done_callback(self._make_deadlock_safe(callback))
 
     def _safe_submit(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
         """
-        Submit a function to the thread pool. If there is an error submitting to the thread pool,
+        Submit a function to the thread pool.
+
+        If there is an error submitting to the thread pool,
         or if max_workers is 0, execute the function directly in the current thread.
         """
         wrapped = self._make_deadlock_safe(f)
@@ -225,7 +225,7 @@ class FutureExecutor:
             return self._executor.submit(wrapped, *args, **kwargs)
         except Exception as e:
             if get_raise_on_captured_errors():
-                raise e
+                raise
             return self._execute_directly(wrapped, *args, **kwargs)
 
     def _execute_directly(
