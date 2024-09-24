@@ -1187,6 +1187,7 @@ class WeaveClient:
             # remove the ref and recreate it in the current project
             if val.project == self.project:
                 return val
+            val = orig_val
 
         # `to_json` is mostly fast, except for CustomWeaveTypes
         # which incur network costs to serialize the payload

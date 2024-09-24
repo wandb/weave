@@ -66,7 +66,7 @@ def paused_client(client: WeaveClient) -> Generator[WeaveClient, None, None]:
         client._flush()
 
 
-def build_evaluation(client: WeaveClient):
+def build_evaluation():
     dataset = [
         {
             "question": "What is the capital of France?",
@@ -109,7 +109,8 @@ def build_evaluation(client: WeaveClient):
 
 @pytest.mark.asyncio
 async def test_evaluation_performance(client: WeaveClient):
-    evaluation, predict = build_evaluation(client)
+    client.project = "test_evaluation_performance"
+    evaluation, predict = build_evaluation()
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
@@ -153,7 +154,7 @@ async def test_evaluation_performance(client: WeaveClient):
 @pytest.mark.asyncio
 async def test_evaluation_resilience(client: WeaveClient):
     client.server = ThrowingServer()
-    evaluation, predict = build_evaluation(client)
+    evaluation, predict = build_evaluation()
 
     with pytest.raises(TestException):
         res = await evaluation.evaluate(predict)
