@@ -40,7 +40,7 @@ def lock(tmp_path_factory):
 
 @pytest.fixture()
 def serial(lock):
-    with lock.acquire(poll_intervall=0.1):
+    with lock.acquire(poll_interval=0.1):
         yield
 
 
