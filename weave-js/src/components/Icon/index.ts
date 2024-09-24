@@ -9,6 +9,7 @@ export {
   IconAudioVolume,
   IconAutomationRobotArm,
   IconBack,
+  IconBaselineAlt,
   IconBellNotifications,
   IconBenchmarkSquare,
   IconBlogReport,
