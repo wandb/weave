@@ -189,15 +189,3 @@ def test_nested_futures_with_max_workers() -> None:
 
     res = executor.defer(inner_2).result()
     assert res == [0, 1, 2]
-
-
-def test_recursion_limit() -> None:
-    executor: FutureExecutor = FutureExecutor(max_workers=1, recursion_limit=10)
-
-    def recursive_task(depth: int) -> int:
-        if depth > 10:
-            return depth
-        return executor.defer(lambda: recursive_task(depth + 1)).result()
-
-    with pytest.raises(RecursionError):
-        recursive_task(0)

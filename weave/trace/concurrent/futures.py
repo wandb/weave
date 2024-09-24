@@ -30,10 +30,10 @@ to manage asynchronous tasks:
 import atexit
 import concurrent.futures
 import logging
-import threading
 from concurrent.futures import Future, wait
+from contextvars import ContextVar
 from threading import Lock
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Callable, List, Optional, TypeVar
 
 from weave.trace.context import get_raise_on_captured_errors
 from weave.trace.util import ContextAwareThreadPoolExecutor
@@ -57,66 +57,33 @@ class FutureExecutor:
 
     Args:
         max_workers (int): The maximum number of worker threads to use per executor. Defaults to None.
-        recursion_limit (int): The maximum recursion depth allowed. Defaults to 100.
         thread_name_prefix (str): The prefix for thread names. Defaults to "WeaveThreadPool".
     """
 
     def __init__(
         self,
         max_workers: Optional[int] = None,
-        recursion_limit: int = 100,
         thread_name_prefix: str = THREAD_NAME_PREFIX,
     ):
-        self._max_workers = max_workers
-        self._thread_name_prefix = thread_name_prefix
-        self._local = threading.local()
-        self._recursion_limit = recursion_limit
-        self._recursion_depths: Dict[int, int] = {}
-        self._recursion_depths_lock = Lock()
-        self._local_lock = Lock()
+        self._executor = ContextAwareThreadPoolExecutor(
+            max_workers=max_workers, thread_name_prefix=thread_name_prefix
+        )
+        self._active_futures: List[Future] = []
+        self._active_futures_lock = Lock()
+        self._in_deferred_context = ContextVar("in_deferred_context", default=False)
         atexit.register(self._shutdown)
 
-    @property
-    def _executor(self) -> ContextAwareThreadPoolExecutor:
-        with self._local_lock:
-            if not hasattr(self._local, "executor"):
-                target_name = (
-                    f"{self._thread_name_prefix}-{threading.current_thread().name}"
-                )
-                if "-MainThread" in target_name:
-                    target_name = target_name.replace("-MainThread", "")
-                while "-" + self._thread_name_prefix in target_name:
-                    target_name = target_name.replace(
-                        "-" + self._thread_name_prefix, ""
-                    )
-                self._local.executor = ContextAwareThreadPoolExecutor(
-                    max_workers=self._max_workers, thread_name_prefix=target_name
-                )
-        return self._local.executor
-
-    @property
-    def _active_futures_lock(self) -> Lock:
-        with self._local_lock:
-            if not hasattr(self._local, "active_futures_lock"):
-                self._local.active_futures_lock = Lock()
-        return self._local.active_futures_lock
-
-    @property
-    def _active_futures(self) -> List[Future]:
-        with self._local_lock:
-            if not hasattr(self._local, "active_futures"):
-                self._local.active_futures = []
-        return self._local.active_futures
-
     def _shutdown(self) -> None:
-        if hasattr(self._local, "executor"):
-            self._local.executor.shutdown(wait=True)
+        self._executor.shutdown(wait=True)
 
     def _safe_submit(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
         """
-        Submit a function to the thread-local thread pool. If there is an error submitting to the thread pool,
+        Submit a function to the thread pool. If there is an error submitting to the thread pool,
         execute the function directly in the current thread (this allows us to finish flushing the threads when shutting down)
         """
+        if self._in_deferred_context.get():
+            return self._execute_directly(f, *args, **kwargs)
+
         try:
             return self._executor.submit(f, *args, **kwargs)
         except Exception as e:
@@ -138,7 +105,7 @@ class FutureExecutor:
 
     def defer(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
         """
-        Defer a function to be executed in a thread-local thread pool.
+        Defer a function to be executed in a thread pool.
         This is useful for long-running or I/O-bound functions where the result is not needed immediately.
 
         Args:
@@ -148,27 +115,14 @@ class FutureExecutor:
 
         Returns:
             Future[T]: A Future object representing the eventual result of the function.
-
-        Raises:
-            RecursionError: If the recursion depth exceeds the recursion limit.
         """
-        submitting_thread_id = threading.get_ident()
-
-        with self._recursion_depths_lock:
-            current_depth = self._recursion_depths.get(submitting_thread_id, 0)
-            new_depth = current_depth + 1
-
-            if new_depth > self._recursion_limit:
-                raise RecursionError(
-                    f"Maximum recursion depth of {self._recursion_limit} exceeded"
-                )
 
         def wrapped_f() -> T:
-            executing_thread_id = threading.get_ident()
-            with self._recursion_depths_lock:
-                self._recursion_depths[executing_thread_id] = new_depth
-
-            return f(*args, **kwargs)
+            token = self._in_deferred_context.set(True)
+            try:
+                return f(*args, **kwargs)
+            finally:
+                self._in_deferred_context.reset(token)
 
         future = self._safe_submit(wrapped_f)
         with self._active_futures_lock:
@@ -237,12 +191,10 @@ class FutureExecutor:
         Returns:
             bool: True if all tasks completed, False if timeout was reached.
         """
-        if not hasattr(self._local, "active_futures"):
-            return True
-        with self._local.active_futures_lock:
-            if not self._local.active_futures:
+        with self._active_futures_lock:
+            if not self._active_futures:
                 return True
-            futures_to_wait = list(self._local.active_futures)
+            futures_to_wait = list(self._active_futures)
 
         for future in concurrent.futures.as_completed(futures_to_wait, timeout=timeout):
             try:
