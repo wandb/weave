@@ -6,7 +6,7 @@ import PIL
 import pytest
 
 import weave
-from weave.tests.trace.test_tracing_resilience import TestException, ThrowingServer
+from weave.conftest import TestException
 from weave.trace.context import raise_on_captured_errors
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
@@ -152,8 +152,7 @@ async def test_evaluation_performance(client: WeaveClient):
 
 
 @pytest.mark.asyncio
-async def test_evaluation_resilience(client: WeaveClient):
-    client.server = ThrowingServer()
+async def test_evaluation_resilience(client_with_throwing_server: WeaveClient):
     evaluation, predict = build_evaluation()
 
     with pytest.raises(TestException):

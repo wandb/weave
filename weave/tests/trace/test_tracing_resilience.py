@@ -12,15 +12,12 @@ from typing import Callable, Iterator
 import pytest
 
 import weave
+from weave.conftest import TestException
 from weave.trace import call_context
 from weave.trace.context import raise_on_captured_errors
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 from weave.trace_server import trace_server_interface as tsi
-
-
-class TestException(Exception):
-    pass
 
 
 def assert_no_current_call():
@@ -47,93 +44,7 @@ def test_resilience_to_user_code_errors(client):
     assert_no_current_call()
 
 
-class ThrowingServer(tsi.TraceServerInterface):
-    # Call API
-    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        raise TestException("FAILURE!")
-
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        raise TestException("FAILURE!")
-
-    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        raise TestException("FAILURE!")
-
-    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        raise TestException("FAILURE!")
-
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        raise TestException("FAILURE!")
-
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        raise TestException("FAILURE!")
-
-    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
-        raise TestException("FAILURE!")
-
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
-        raise TestException("FAILURE!")
-
-    # Op API
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        raise TestException("FAILURE!")
-
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        raise TestException("FAILURE!")
-
-    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        raise TestException("FAILURE!")
-
-    # Cost API
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
-        raise TestException("FAILURE!")
-
-    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
-        raise TestException("FAILURE!")
-
-    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
-        raise TestException("FAILURE!")
-
-    # Obj API
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        raise TestException("FAILURE!")
-
-    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        raise TestException("FAILURE!")
-
-    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        raise TestException("FAILURE!")
-
-    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        raise TestException("FAILURE!")
-
-    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        raise TestException("FAILURE!")
-
-    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
-        raise TestException("FAILURE!")
-
-    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
-        raise TestException("FAILURE!")
-
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        raise TestException("FAILURE!")
-
-    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        raise TestException("FAILURE!")
-
-    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
-        raise TestException("FAILURE!")
-
-    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
-        raise TestException("FAILURE!")
-
-    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
-        raise TestException("FAILURE!")
-
-
-def test_resilience_to_server_errors(client):
-    client.server = ThrowingServer()
-
+def test_resilience_to_server_errors(client_with_throwing_server):
     def do_test():
         @weave.op
         def simple_op():
