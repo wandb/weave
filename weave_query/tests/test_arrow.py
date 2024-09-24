@@ -7,14 +7,13 @@ import pyarrow as pa
 import pytest
 from PIL import Image
 
-from weave_query.tests.util import tag_test_util as ttu
-from weave_query.tests.util import weavejs_ops
 from weave_query.weave_query import api as weave
 from weave_query.weave_query import (
     box,
     context_state,
     errors,
     graph,
+    mappers_arrow,
     ops,
     storage,
     weave_internal,
@@ -33,11 +32,14 @@ from weave_query.weave_query.language_features.tagging import (
     tag_store,
     tagged_value_type,
 )
+from weave_query.op_def import map_type
 from weave_query.weave_query.ops_domain import project_ops
 from weave_query.weave_query.ops_primitives import list_, make_list
-
-from . import test_wb
 from .util import list_arrow_test_helpers as lath
+
+from weave_query.tests.util import tag_test_util as ttu
+from weave_query.tests.util import weavejs_ops
+from . import test_wb
 
 _loading_builtins_token = context_state.set_loading_built_ins()
 # T in `conftest::pre_post_each_test` we set a custom artifact directory for each test for isolation
