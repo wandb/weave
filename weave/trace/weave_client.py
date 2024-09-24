@@ -1348,7 +1348,8 @@ class WeaveClient:
 
     def _flush(self) -> None:
         # Used to wait until all currently enqueued jobs are processed
-        self.future_executor.flush()
+        if not self.future_executor._in_thread_context.get():
+            self.future_executor.flush()
         if self._server_is_flushable:
             # We don't want to do an instance check here because it could
             # be susceptible to shutdown race conditions. So we save a boolean

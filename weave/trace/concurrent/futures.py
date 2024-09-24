@@ -77,7 +77,7 @@ class FutureExecutor:
             self._executor = None
         self._active_futures: List[Future] = []
         self._active_futures_lock = Lock()
-        self._in_deferred_context = ContextVar("in_deferred_context", default=False)
+        self._in_thread_context = ContextVar("in_deferred_context", default=False)
         atexit.register(self._shutdown)
 
     def defer(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
@@ -98,11 +98,6 @@ class FutureExecutor:
             self._active_futures.append(future)
         future.add_done_callback(self._future_done_callback)
         return future
-
-    def _future_done_callback(self, future: Future) -> None:
-        with self._active_futures_lock:
-            if future in self._active_futures:
-                self._active_futures.remove(future)
 
     def then(self, futures: List[Future[T]], g: Callable[[List[T]], U]) -> Future[U]:
         """
@@ -165,6 +160,9 @@ class FutureExecutor:
                 return True
             futures_to_wait = list(self._active_futures)
 
+        if self._in_thread_context.get():
+            raise RuntimeError("Cannot flush from within a thead")
+
         for future in concurrent.futures.as_completed(futures_to_wait, timeout=timeout):
             try:
                 future.result()
@@ -174,23 +172,43 @@ class FutureExecutor:
                     raise e
         return True
 
+    # Start of private methods
+
+    def _future_done_callback(self, future: Future) -> None:
+        """
+        Callback for when a future is done to remove it from the active futures list.
+        """
+        with self._active_futures_lock:
+            if future in self._active_futures:
+                self._active_futures.remove(future)
+
     def _shutdown(self) -> None:
+        """Shutdown the thread pool executor. Should only be called when the program is exiting."""
         if self._executor:
             self._executor.shutdown(wait=True)
 
     def _make_deadlock_safe(self, f: Callable[..., T]) -> Callable[..., T]:
+        """Allows any function to be called from a thread without deadlocking.
+
+        Anytime a function is submitted to the threadpool (eg. submit or add_done_callback),
+        it should be wrapped in this function so that it can be executed in the threadpool.
+        """
+
         def wrapped_f(*args: Any, **kwargs: Any) -> T:
-            token = self._in_deferred_context.set(True)
+            token = self._in_thread_context.set(True)
             try:
                 return f(*args, **kwargs)
             finally:
-                self._in_deferred_context.reset(token)
+                self._in_thread_context.reset(token)
 
         return wrapped_f
 
     def _safe_add_done_callback(
         self, future: Future[T], callback: Callable[[Future[T]], None]
     ) -> None:
+        """
+        Add a done callback to a future.
+        """
         future.add_done_callback(self._make_deadlock_safe(callback))
 
     def _safe_submit(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
@@ -200,7 +218,7 @@ class FutureExecutor:
         """
         wrapped = self._make_deadlock_safe(f)
 
-        if self._executor is None or self._in_deferred_context.get():
+        if self._executor is None or self._in_thread_context.get():
             return self._execute_directly(wrapped, *args, **kwargs)
 
         try:
