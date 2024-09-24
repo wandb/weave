@@ -65,7 +65,7 @@ const openAIStreamReducer = {
   },
 };
 
-export function makeOpenAIChatCompletionsOp(originalCreate: any) {
+export function makeOpenAIChatCompletionsOp(originalCreate: any, name: string) {
   return op(
     function (...args: Parameters<typeof originalCreate>) {
       const [originalParams]: any[] = args;
@@ -87,7 +87,7 @@ export function makeOpenAIChatCompletionsOp(originalCreate: any) {
       }
     },
     {
-      name: "openai.chat.completions.create",
+      name: name,
       parameterNames: "useParam0Object",
       summarize: (result) => ({
         usage: {
@@ -155,7 +155,10 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
     get(target, p, receiver) {
       const targetVal = Reflect.get(target, p, receiver);
       if (p === "create") {
-        return makeOpenAIChatCompletionsOp(targetVal.bind(target));
+        return makeOpenAIChatCompletionsOp(
+          targetVal.bind(target),
+          "openai.chat.completions.create"
+        );
       }
       return targetVal;
     },
@@ -184,7 +187,10 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
     get(target, p, receiver) {
       const targetVal = Reflect.get(target, p, receiver);
       if (p === "parse") {
-        return makeOpenAIChatCompletionsOp(targetVal.bind(target));
+        return makeOpenAIChatCompletionsOp(
+          targetVal.bind(target),
+          "openai.beta.chat.completions.parse"
+        );
       }
       return targetVal;
     },
