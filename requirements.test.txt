@@ -23,3 +23,5 @@ semver==2.13.0             # Used for switching logic based on package versions
 # serving tests
 flask
 uvicorn>=0.27.0
+
+pillow
