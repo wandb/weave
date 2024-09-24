@@ -16,7 +16,6 @@ type CollapseGroupHeaderProps = {
 export const Header = styled.div`
   display: flex;
   align-items: center;
-  font-weight: 600;
 `;
 Header.displayName = 'S.Header';
 
