@@ -7,6 +7,7 @@ import typing
 import pytest
 from flask.testing import FlaskClient
 
+from weave_query.tests import fixture_fakewandb
 from weave_query.weave_query import client as client_legacy
 from weave_query.weave_query import (
     context_state,
@@ -261,6 +262,15 @@ def cereal_csv():
         cereal_path = os.path.join(d, "cereal.csv")
         shutil.copy("testdata/cereal.csv", cereal_path)
         yield cereal_path
+        
+
+
+@pytest.fixture()
+def fake_wandb():
+    setup_response = fixture_fakewandb.setup()
+    yield setup_response
+    fixture_fakewandb.teardown(setup_response)
+
 
 
 @pytest.fixture()
