@@ -50,7 +50,8 @@ const useCallTabs = (call: CallSchema) => {
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
   return [
-    ...(isEvaluateOp(call.spanName)
+    // Disabling Evaluation tab until it's better for single evaluation
+    ...(false && isEvaluateOp(call.spanName)
       ? [
           {
             label: 'Evaluation',
