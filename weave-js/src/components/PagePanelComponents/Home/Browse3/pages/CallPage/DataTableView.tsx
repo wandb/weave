@@ -1,6 +1,10 @@
 import LinkIcon from '@mui/icons-material/Link';
-import {Alert, Box} from '@mui/material';
-import {GridColDef, useGridApiRef} from '@mui/x-data-grid-pro';
+import {Box} from '@mui/material';
+import {
+  GridColDef,
+  GridPaginationModel,
+  useGridApiRef,
+} from '@mui/x-data-grid-pro';
 import {
   isAssignableTo,
   list,
@@ -10,17 +14,20 @@ import {
   typedDictPropertyTypes,
 } from '@wandb/weave/core';
 import _ from 'lodash';
-import React, {FC, useCallback, useContext, useEffect, useMemo, useState} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {
-  isWeaveObjectRef,
-  parseRef,
-  WeaveObjectRef,
-} from '../../../../../../react';
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {CellValue} from '../../../Browse2/CellValue';
-import { parseRefMaybe } from '../../../Browse2/SmallRef';
+import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
@@ -29,11 +36,9 @@ import {StyledDataGrid} from '../../StyledDataGrid';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {TABLE_ID_EDGE_NAME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
-import {TableQuery} from '../wfReactInterface/wfDataModelHooksInterface';
-import { SortBy } from '../wfReactInterface/traceServerClientTypes';
+import {SortBy} from '../wfReactInterface/traceServerClientTypes';
 
-// Controls the maximum number of rows to display in the table
-const MAX_ROWS = 10_000;
+const DEFAULT_PAGE_SIZE = 100;
 
 // Controls whether to use a table for arrays or not.
 export const USE_TABLE_FOR_ARRAYS = false;
@@ -63,7 +68,11 @@ export const WeaveCHTable: FC<{
   );
 
   const lookupKey = useMemo(() => {
-    if (parsedRef == null || !isWeaveObjectRef(parsedRef) || parsedRef.weaveKind !== 'table') {
+    if (
+      parsedRef == null ||
+      !isWeaveObjectRef(parsedRef) ||
+      parsedRef.weaveKind !== 'table'
+    ) {
       return null;
     }
     return {
@@ -80,9 +89,19 @@ export const WeaveCHTable: FC<{
     {skip: lookupKey == null}
   );
 
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
   const [offset, setOffset] = useState(0);
   const [sortBy, setSortBy] = useState<SortBy[]>([]);
+
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
+    page: 0,
+    pageSize: DEFAULT_PAGE_SIZE,
+  });
+
+  useEffect(() => {
+    setOffset(paginationModel.page * paginationModel.pageSize);
+    setLimit(paginationModel.pageSize);
+  }, [paginationModel]);
 
   const fetchQuery = useTableRowsQuery(
     lookupKey?.entity ?? '',
@@ -154,11 +173,15 @@ export const WeaveCHTable: FC<{
       <DataTableView
         data={pagedRows}
         loading={fetchQuery.loading}
-        // Display key is "val" as the resulting rows have metadata/ref
-        // information outside of the actual data
         displayKey="val"
         onLinkClick={onClickEnabled ? onClick : undefined}
         fullHeight={props.fullHeight}
+        pageControl={{
+          paginationModel,
+          onPaginationModelChange: setPaginationModel,
+          rowCount: totalRows,
+          pageSizeOptions: [DEFAULT_PAGE_SIZE],
+        }}
       />
     </CustomWeaveTypeProjectContext.Provider>
   );
@@ -170,8 +193,14 @@ export const DataTableView: FC<{
   fullHeight?: boolean;
   loading?: boolean;
   displayKey?: string;
-  isTruncated?: boolean;
   onLinkClick?: (row: any) => void;
+  pageControl?: {
+    paginationModel: GridPaginationModel;
+    onPaginationModelChange: (model: GridPaginationModel) => void;
+    rowCount: number;
+    pageSizeOptions: number[];
+  };
+  autoPageSize?: boolean;
 }> = props => {
   const apiRef = useGridApiRef();
   const {isPeeking} = useContext(WeaveflowPeekContext);
@@ -334,16 +363,9 @@ export const DataTableView: FC<{
         width: '100%',
         height: props.fullHeight ? '100%' : 'inherit',
       }}>
-      {props.isTruncated && (
-        <Alert severity="warning">
-          Showing {dataAsListOfDict.length.toLocaleString()} rows only.
-        </Alert>
-      )}
       <Box
         sx={{
-          height: props.fullHeight
-            ? `calc(100% - ${props.isTruncated ? '48px' : '0px'})`
-            : height,
+          height: props.fullHeight ? `100%` : height,
           width: '100%',
         }}>
         <StyledDataGrid
@@ -373,7 +395,7 @@ export const DataTableView: FC<{
                 }
               : {}),
           }}
-          autoPageSize={true}
+          autoPageSize={props.autoPageSize}
           keepBorders={false}
           apiRef={apiRef}
           density="compact"
@@ -385,6 +407,12 @@ export const DataTableView: FC<{
           sx={{
             border: 'none',
           }}
+          pagination
+          paginationModel={props.pageControl?.paginationModel}
+          onPaginationModelChange={props.pageControl?.onPaginationModelChange}
+          pageSizeOptions={props.pageControl?.pageSizeOptions}
+          paginationMode={props.pageControl ? 'server' : 'client'}
+          rowCount={props.pageControl?.rowCount}
         />
       </Box>
     </div>
@@ -425,6 +453,7 @@ export const typeToDataGridColumnSpec = (
           return [
             {
               maxWidth,
+              flex: 1,
               type: 'string',
               editable: false,
               field: innerKey,
@@ -443,6 +472,7 @@ export const typeToDataGridColumnSpec = (
         return [
           {
             maxWidth,
+            flex: 1,
             type: colType,
             editable: editable && !disableEdits,
             field: innerKey,

@@ -124,7 +124,7 @@ const ObjectVersionPageInner: React.FC<{
     return viewerData;
   }, [viewerData]);
 
-  const isDataset = baseObjectClass === 'Dataset';
+  const isDataset = baseObjectClass === 'Dataset' && refExtra == null;
 
   return (
     <SimplePageLayoutWithHeader
