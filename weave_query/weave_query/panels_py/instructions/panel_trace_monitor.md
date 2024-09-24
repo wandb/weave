@@ -25,7 +25,7 @@ pip install weave
 If you are already using `Langchain`, simply create a tracer and add it as a callback to your next call:
 
 ```python
-from weave.legacy.weave.monitoring.langchain import WeaveTracer
+from weave_query.weave_query.monitoring.langchain import WeaveTracer
 
 tracer = WeaveTracer(f"{WB_ENTITY}/{WB_PROJECT}/{WB_STREAM}")
 llm.run(question, callbacks=[tracer])
@@ -38,7 +38,7 @@ llm.run(question, callbacks=[tracer])
 If you have existing code, the Trace decorator (and related utilities) allows you to instrument and log in a variety of formats. For example:
 
 ```python
-from weave.legacy.weave.monitoring import init_monitor
+from weave_query.weave_query.monitoring import init_monitor
 
 mon = init_monitor(f"{WB_ENTITY}/{WB_PROJECT}/{WB_STREAM}")
 
@@ -55,7 +55,7 @@ def adder(a, b):
 Finally, if you want to manually log span data, you can do so as well by logging directly to a StreamTable:
 
 ```python
-from weave.legacy.weave.monitoring import StreamTable
+from weave_query.weave_query.monitoring import StreamTable
 from weave.stream_data_interfaces import TraceSpanDict
 
 st = StreamTable(f"{WB_ENTITY}/{WB_PROJECT}/{WB_STREAM}")

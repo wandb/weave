@@ -32,23 +32,23 @@ def spacy(text: str) -> spacy_lib.tokens.doc.Doc:
 @weave.op()
 def spacy_doc_dep_to_html(
     spacy_doc: spacy_lib.tokens.doc.Doc,
-) -> weave.legacy.weave.ops.Html:
+) -> weave_query.weave_query.ops.Html:
     from spacy import displacy
 
     html = displacy.render(
         list(spacy_doc.sents), style="dep", jupyter=False, options={"compact": True}
     )
-    return weave.legacy.weave.ops.Html(html)
+    return weave_query.weave_query.ops.Html(html)
 
 
 @weave.op()
 def spacy_doc_ent_to_html(
     spacy_doc: spacy_lib.tokens.doc.Doc,
-) -> weave.legacy.weave.ops.Html:
+) -> weave_query.weave_query.ops.Html:
     from spacy import displacy
 
     html = displacy.render(spacy_doc, style="ent", jupyter=False)
-    return weave.legacy.weave.ops.Html(html)
+    return weave_query.weave_query.ops.Html(html)
 
 
 @weave.type()
@@ -57,18 +57,18 @@ class SpacyDocPanel(weave.Panel):
     input_node: weave.Node[spacy_lib.tokens.doc.Doc]
 
     @weave.op()
-    def render(self) -> weave.legacy.weave.panels.Card:
-        return weave.legacy.weave.panels.Card(
+    def render(self) -> weave_query.weave_query.panels.Card:
+        return weave_query.weave_query.panels.Card(
             title="Spacy Visualization",
             subtitle="",
             content=[
-                weave.legacy.weave.panels.CardTab(
+                weave_query.weave_query.panels.CardTab(
                     name="Dependencies",
-                    content=weave.legacy.weave.panels.PanelHtml(spacy_doc_dep_to_html(self.input_node)),  # type: ignore
+                    content=weave_query.weave_query.panels.PanelHtml(spacy_doc_dep_to_html(self.input_node)),  # type: ignore
                 ),
-                weave.legacy.weave.panels.CardTab(
+                weave_query.weave_query.panels.CardTab(
                     name="Named Entities",
-                    content=weave.legacy.weave.panels.PanelHtml(spacy_doc_ent_to_html(self.input_node)),  # type: ignore
+                    content=weave_query.weave_query.panels.PanelHtml(spacy_doc_ent_to_html(self.input_node)),  # type: ignore
                 ),
             ],
         )

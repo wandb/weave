@@ -52,7 +52,7 @@ def varbar(editable=True, items=None) -> panel_group.Group:
 
 
 def main() -> panel_group.Group:
-    return weave.legacy.weave.panels.Group(
+    return weave_query.weave_query.panels.Group(
         layoutMode="grid",
         showExpressions=True,
         enableAddPanel=True,
@@ -66,11 +66,11 @@ def Board(
 ):
     showExpressions = True if editable else "titleBar"
     vb = vars
-    if not isinstance(vb, weave.legacy.weave.panels.Group):
+    if not isinstance(vb, weave_query.weave_query.panels.Group):
         vb = varbar(editable=editable, items=vars)
 
     main = panels
-    if not isinstance(panels, weave.legacy.weave.panels.Group):
+    if not isinstance(panels, weave_query.weave_query.panels.Group):
         main_items = {}
         main_panel_layouts: list[panel_group.LayedOutPanel] = []
         for i, p in enumerate(panels):

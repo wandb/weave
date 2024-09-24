@@ -15,14 +15,14 @@ class DistributionConfig:
     # We should make a better type to represent this, so it can be
     # distinguished from an expression like bin_size.
     value_fn: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.VoidNode()
+        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
     )
     label_fn: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.VoidNode()
+        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
     )
     # This is an expression. It will be stored in the config as Node.
     bin_size: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.VoidNode()
+        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
     )
 
 
@@ -36,7 +36,7 @@ class Distribution(weave.Panel):
     @weave.op()
     def initialize(self) -> DistributionConfig:
         input_node = self.input_node
-        unnested = weave.legacy.weave.ops.unnest(input_node)
+        unnested = weave_query.weave_query.ops.unnest(input_node)
         return DistributionConfig(
             value_fn=weave_internal.define_fn(
                 {"item": unnested.type.object_type},
@@ -51,19 +51,19 @@ class Distribution(weave.Panel):
         )
 
     @weave.op()
-    def render_config(self) -> weave.legacy.weave.panels.Group:
+    def render_config(self) -> weave_query.weave_query.panels.Group:
         config = typing.cast(DistributionConfig, self.config)
-        return weave.legacy.weave.panels.Group(
+        return weave_query.weave_query.panels.Group(
             items={
-                "value_fn": weave.legacy.weave.panels.LabeledItem(
+                "value_fn": weave_query.weave_query.panels.LabeledItem(
                     label="value",
-                    item=weave.legacy.weave.panels.FunctionEditor(config.value_fn),
+                    item=weave_query.weave_query.panels.FunctionEditor(config.value_fn),
                 ),
-                "label_fn": weave.legacy.weave.panels.LabeledItem(
+                "label_fn": weave_query.weave_query.panels.LabeledItem(
                     label="label",
-                    item=weave.legacy.weave.panels.FunctionEditor(config.label_fn),
+                    item=weave_query.weave_query.panels.FunctionEditor(config.label_fn),
                 ),
-                "bin_size": weave.legacy.weave.panels.LabeledItem(
+                "bin_size": weave_query.weave_query.panels.LabeledItem(
                     label="bin_size",
                     # Must execute here because bin_size is an expression.
                     # Editor panels take the actual type they edit (in this
@@ -71,7 +71,7 @@ class Distribution(weave.Panel):
                     # const node directly in the config, or if the expression
                     # refers to variables, the edit will be routed to the appropriate
                     # owner.
-                    item=weave.legacy.weave.panels.Slider(config.bin_size.execute()),  # type: ignore
+                    item=weave_query.weave_query.panels.Slider(config.bin_size.execute()),  # type: ignore
                 ),
             }
         )
@@ -88,10 +88,10 @@ class Distribution(weave.Panel):
             config.value_fn.type.output_type  # type: ignore
         ):
             # TODO: need a nicer way to return error states
-            return weave.legacy.weave.panels.PanelString("Invalid value_fn")  # type: ignore
+            return weave_query.weave_query.panels.PanelString("Invalid value_fn")  # type: ignore
         # We always unnest, so that we can compare across groups of items
         # easily. (the Distribution notebook)
-        unnested = weave.legacy.weave.ops.unnest(input_node)
+        unnested = weave_query.weave_query.ops.unnest(input_node)
         bin_size = config.bin_size
 
         def bin_func(item):
@@ -112,10 +112,10 @@ class Distribution(weave.Panel):
             else:
                 group_items["label"] = config.label_fn(item)
 
-            return weave.legacy.weave.ops.dict_(**group_items)
+            return weave_query.weave_query.ops.dict_(**group_items)
 
         binned = unnested.groupby(lambda item: bin_func(item)).map(
-            lambda group: weave.legacy.weave.ops.dict_(
+            lambda group: weave_query.weave_query.ops.dict_(
                 value=group.groupkey()["value"],
                 label=group.groupkey()["label"],
                 count=group.count(),
@@ -129,9 +129,9 @@ class Distribution(weave.Panel):
 @weave.op()
 def distribution_panel_plot_render(
     input_node: weave.Node[list[typing.Any]], config: DistributionConfig
-) -> weave.legacy.weave.panels.Plot:
-    unnested = weave.legacy.weave.ops.unnest(input_node)
-    bin_size = weave.legacy.weave.ops.execute(config.bin_size)
+) -> weave_query.weave_query.panels.Plot:
+    unnested = weave_query.weave_query.ops.unnest(input_node)
+    bin_size = weave_query.weave_query.ops.execute(config.bin_size)
 
     def bin_func(item):
         value_fn_output_type = config.value_fn.type.output_type
@@ -147,18 +147,18 @@ def distribution_panel_plot_render(
         else:
             group_items["label"] = config.label_fn(item)
 
-        res = weave.legacy.weave.ops.dict_(**group_items)
+        res = weave_query.weave_query.ops.dict_(**group_items)
         return res
 
     binned = unnested.groupby(lambda item: bin_func(item)).map(
-        lambda group: weave.legacy.weave.ops.dict_(
+        lambda group: weave_query.weave_query.ops.dict_(
             value=group.groupkey()["value"],
             label=group.groupkey()["label"],
             count=group.count(),
         )
     )
 
-    return weave.legacy.weave.panels.Plot(
+    return weave_query.weave_query.panels.Plot(
         binned,
         x=lambda row: row["value"],
         y=lambda row: row["count"],

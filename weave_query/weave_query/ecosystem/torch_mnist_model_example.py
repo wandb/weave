@@ -55,7 +55,7 @@ class Model:
         output_type=weave.types.List(
             weave.types.TypedDict(
                 {
-                    "X": weave.legacy.weave.ops.image.PILImageType(),  # type: ignore
+                    "X": weave_query.weave_query.ops.image.PILImageType(),  # type: ignore
                     "y": weave.types.Int(),
                 }
             )
@@ -132,7 +132,7 @@ def train_epoch(network, loader, optimizer):
 @weave.op(
     render_info={"type": "function"},
     input_type={
-        "X": weave.types.List(weave.legacy.weave.ops.image.PILImageType()),  # type: ignore
+        "X": weave.types.List(weave_query.weave_query.ops.image.PILImageType()),  # type: ignore
         "y": weave.types.List(weave.types.Int()),  # TODO: class enum?
     },
     # TODO: WeaveJS doesn't support callable output type yet.

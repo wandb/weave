@@ -4,7 +4,7 @@ import pytest
 
 import weave_query as weave
 import weave_query
-import weave.legacy.weave.weave_types as types
+import weave_query.weave_query.weave_types as types
 from weave_query.weave_query import box, ops_arrow
 from weave_query.weave_query.arrow.convert import to_arrow
 from weave_query.weave_query.language_features.tagging import tag_store, tagged_value_type

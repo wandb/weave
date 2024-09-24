@@ -174,12 +174,12 @@ def test_cache_column():
     expected_result = [{"x": x, "y": x + 10000} for x in input_vals]
 
     l = weave.save(input_vals)
-    mapped = l.map(lambda x: weave.legacy.weave.ops.dict_(x=x, y=expensive_op(x)))
+    mapped = l.map(lambda x: weave_query.weave_query.ops.dict_(x=x, y=expensive_op(x)))
     res = weave.use(mapped)
     assert res == expected_result
 
     latest_obj = weave.use(
-        weave.legacy.weave.ops.get("local-artifact:///run-op-expensive_op:latest/obj")
+        weave_query.weave_query.ops.get("local-artifact:///run-op-expensive_op:latest/obj")
     )
     assert len(latest_obj) == len(input_vals)
     assert len(weave.versions(latest_obj)) == 1
@@ -198,7 +198,7 @@ def test_none_not_cached():
     assert res == expected_result
 
     latest_obj = weave.use(
-        weave.legacy.weave.ops.get("local-artifact:///run-op-expensive_op:latest/obj")
+        weave_query.weave_query.ops.get("local-artifact:///run-op-expensive_op:latest/obj")
     )
     assert len(latest_obj) == 1  # not 2! None not cached!
     assert len(weave.versions(latest_obj)) == 1

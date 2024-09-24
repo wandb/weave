@@ -15,7 +15,7 @@ def test_panel_timeseries(user_by_api_key_in_env):
     run.finish()
 
     history_node = (
-        weave.legacy.weave.ops.project(run.entity, run.project).run(run.id).history2()
+        weave_query.weave_query.ops.project(run.entity, run.project).run(run.id).history2()
     )
     panel = TimeSeries(history_node)
     init_config_node = panel.initialize()

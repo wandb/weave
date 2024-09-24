@@ -39,10 +39,10 @@ class FacetConfig:
         default_factory=lambda: None
     )
     xAxisLabel: weave.Node[str] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.VoidNode()
+        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
     )
     yAxisLabel: weave.Node[str] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.VoidNode()
+        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
     )
 
 
@@ -121,14 +121,14 @@ class Facet(panel.Panel):
             )
         x_fn = self.config.table.columnSelectFunctions[self.config.dims.x]
         y_fn = self.config.table.columnSelectFunctions[self.config.dims.y]
-        filtered = weave.legacy.weave.ops.List.filter(
+        filtered = weave_query.weave_query.ops.List.filter(
             self.input_node,
-            lambda item: weave.legacy.weave.ops.Boolean.bool_and(
-                weave.legacy.weave.ops.String.__eq__(
+            lambda item: weave_query.weave_query.ops.Boolean.bool_and(
+                weave_query.weave_query.ops.String.__eq__(
                     x_fn,
                     self.config.selectedCell["x"],
                 ),
-                weave.legacy.weave.ops.String.__eq__(
+                weave_query.weave_query.ops.String.__eq__(
                     y_fn,
                     self.config.selectedCell["y"],
                 ),
