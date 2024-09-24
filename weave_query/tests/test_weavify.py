@@ -3,7 +3,7 @@ import pytest
 from weave_query.weave_query import graph, ops, weave_internal
 from weave_query.weave_query import weave_types as types
 
-from ...legacy.weave import weavify
+from weave_query.weave_query import weavify
 from weave.legacy.tests.util import geom
 
 

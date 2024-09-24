@@ -19,7 +19,7 @@ from weave_query.weave_query import weave_types as types
 from weave_query.weave_query.arrow import list_ as arrow
 from weave_query.weave_query.weave_internal import make_const_node
 
-from ...legacy.weave.weavejs_fixes import recursively_unwrap_unions
+from weave_query.weave_query.weavejs_fixes import recursively_unwrap_unions
 from . import test_helpers
 
 
