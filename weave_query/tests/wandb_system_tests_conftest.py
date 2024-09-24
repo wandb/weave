@@ -14,7 +14,6 @@ import filelock
 import pytest
 import requests
 import wandb
-
 from weave.wandb_interface.wandb_api import from_environment
 
 
