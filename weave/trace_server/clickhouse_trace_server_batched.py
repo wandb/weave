@@ -888,8 +888,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         }
 
         query = """
-        SELECT count(row_digests),
-            row_number() OVER (PARTITION BY project_id, digest) AS rn
+        SELECT length(row_digests)
         FROM tables
         WHERE project_id = {project_id:String} AND digest = {digest:String}
         """

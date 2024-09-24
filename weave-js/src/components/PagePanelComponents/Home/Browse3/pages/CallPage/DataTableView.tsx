@@ -10,7 +10,7 @@ import {
   typedDictPropertyTypes,
 } from '@wandb/weave/core';
 import _ from 'lodash';
-import React, {FC, useCallback, useContext, useEffect, useMemo} from 'react';
+import React, {FC, useCallback, useContext, useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {
@@ -20,6 +20,7 @@ import {
 } from '../../../../../../react';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {CellValue} from '../../../Browse2/CellValue';
+import { parseRefMaybe } from '../../../Browse2/SmallRef';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
@@ -29,6 +30,7 @@ import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDisp
 import {TABLE_ID_EDGE_NAME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TableQuery} from '../wfReactInterface/wfDataModelHooksInterface';
+import { SortBy } from '../wfReactInterface/traceServerClientTypes';
 
 // Controls the maximum number of rows to display in the table
 const MAX_ROWS = 10_000;
@@ -53,26 +55,63 @@ export const WeaveCHTable: FC<{
   // Gets the source of this Table (set by a few levels up)
   const sourceRef = useContext(WeaveCHTableSourceRefContext);
 
-  // Retrieves the data for the table, with a limit of MAX_ROWS + 1
-  const fetchQuery = useValueOfRefUri(props.tableRefUri, {
-    limit: MAX_ROWS + 1,
-  });
+  const {useTableQueryStats, useTableRowsQuery} = useWFHooks();
 
   const parsedRef = useMemo(
-    () => parseRef(props.tableRefUri) as WeaveObjectRef,
+    () => parseRefMaybe(props.tableRefUri),
     [props.tableRefUri]
   );
 
-  // Determines if the table itself is truncated
-  const isTruncated = useMemo(() => {
-    return (fetchQuery.result ?? []).length > MAX_ROWS;
+  const lookupKey = useMemo(() => {
+    if (parsedRef == null || !isWeaveObjectRef(parsedRef) || parsedRef.weaveKind !== 'table') {
+      return null;
+    }
+    return {
+      entity: parsedRef.entityName,
+      project: parsedRef.projectName,
+      digest: parsedRef.artifactVersion,
+    };
+  }, [parsedRef]);
+
+  const numRowsQuery = useTableQueryStats(
+    lookupKey?.entity ?? '',
+    lookupKey?.project ?? '',
+    lookupKey?.digest ?? '',
+    {skip: lookupKey == null}
+  );
+
+  const [limit, setLimit] = useState(10);
+  const [offset, setOffset] = useState(0);
+  const [sortBy, setSortBy] = useState<SortBy[]>([]);
+
+  const fetchQuery = useTableRowsQuery(
+    lookupKey?.entity ?? '',
+    lookupKey?.project ?? '',
+    lookupKey?.digest ?? '',
+    undefined,
+    limit,
+    offset,
+    sortBy,
+    {skip: lookupKey == null}
+  );
+
+  const pagedRows = useMemo(() => {
+    return fetchQuery.result?.rows ?? [];
   }, [fetchQuery.result]);
 
-  // `sourceRows` are the effective rows to display. If the table is truncated,
-  // we only display the first MAX_ROWS rows.
-  const sourceRows = useMemo(() => {
-    return (fetchQuery.result ?? []).slice(0, MAX_ROWS);
-  }, [fetchQuery.result]);
+  const totalRows = useMemo(() => {
+    return numRowsQuery.result?.count ?? pagedRows.length;
+  }, [numRowsQuery.result, pagedRows]);
+
+  // TODO: Refactor `DataTableView` so that we can handle
+  // pagination, sorting, etc. in a more generic way.
+  console.log({
+    totalRows,
+    pagedRows,
+    limit,
+    offset,
+    sortBy,
+  });
 
   // In this block, we setup a click handler. The underlying datatable is more general
   // and not aware of the nuances of our links and ref model. Therefore, we handle
@@ -105,13 +144,16 @@ export const WeaveCHTable: FC<{
     [history, sourceRef, router]
   );
 
+  if (parsedRef == null || !isWeaveObjectRef(parsedRef)) {
+    return null;
+  }
+
   return (
     <CustomWeaveTypeProjectContext.Provider
       value={{entity: parsedRef.entityName, project: parsedRef.projectName}}>
       <DataTableView
-        data={sourceRows ?? []}
+        data={pagedRows}
         loading={fetchQuery.loading}
-        isTruncated={isTruncated}
         // Display key is "val" as the resulting rows have metadata/ref
         // information outside of the actual data
         displayKey="val"
@@ -419,27 +461,4 @@ export const typeToDataGridColumnSpec = (
     });
   }
   return [];
-};
-
-const useValueOfRefUri = (refUriStr: string, tableQuery?: TableQuery) => {
-  const {useRefsData} = useWFHooks();
-  const data = useRefsData([refUriStr], tableQuery);
-  return useMemo(() => {
-    if (data.loading) {
-      return {
-        loading: true,
-        result: undefined,
-      };
-    }
-    if (data.result == null || data.result.length === 0) {
-      return {
-        loading: true,
-        result: undefined,
-      };
-    }
-    return {
-      loading: false,
-      result: data.result[0],
-    };
-  }, [data]);
 };

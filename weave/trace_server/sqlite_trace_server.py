@@ -889,7 +889,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         parameters: list[Any] = [req.project_id, req.digest]
 
         query = """
-        SELECT COUNT(row_digests)
+        SELECT json_array_length(row_digests)
         FROM
             tables
         WHERE

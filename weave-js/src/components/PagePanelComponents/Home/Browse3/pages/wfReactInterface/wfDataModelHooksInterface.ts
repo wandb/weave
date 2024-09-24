@@ -219,7 +219,7 @@ export type WFDataModelHooksInterface = {
   useTableRowsQuery: (
     entity: string,
     project: string,
-    digest?: string,
+    digest: string,
     filter?: traceServerClientTypes.TraceTableQueryReq['filter'],
     limit?: traceServerClientTypes.TraceTableQueryReq['limit'],
     offset?: traceServerClientTypes.TraceTableQueryReq['offset'],
@@ -229,7 +229,7 @@ export type WFDataModelHooksInterface = {
   useTableQueryStats: (
     entity: string,
     project: string,
-    digest?: string,
+    digest: string,
     opts?: {skip?: boolean}
   ) => Loadable<traceServerClientTypes.TraceTableQueryStatsRes>;
   useRootObjectVersions: (
