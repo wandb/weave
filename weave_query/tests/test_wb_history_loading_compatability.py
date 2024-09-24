@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
+import weave_query
 import weave_query as weave
 from weave_query.weave_query import context_state as _context
 from weave_query.weave_query.ops_domain.run_history.context import (

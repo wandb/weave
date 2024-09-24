@@ -3,6 +3,7 @@ import typing
 
 import PIL
 
+import weave_query
 import weave_query as weave
 
 

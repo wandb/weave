@@ -1,5 +1,6 @@
 import typing
 
+import weave_query
 import weave_query as weave
 from weave_query.weave_query import panels, storage
 from weave_query.weave_query.artifact_fs import BranchPointType, FilesystemArtifactRef

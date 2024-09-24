@@ -2,6 +2,7 @@ import pickle
 
 import spacy as spacy_lib
 
+import weave_query
 import weave_query as weave
 
 

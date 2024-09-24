@@ -3,6 +3,7 @@ from contextlib import contextmanager
 
 import pytest
 
+import weave_query
 import weave_query as weave
 from weave_query.weave_query import graph, storage
 from weave_query.weave_query import weave_types as types

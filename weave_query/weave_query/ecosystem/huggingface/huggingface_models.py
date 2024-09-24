@@ -2,6 +2,7 @@ import typing
 
 import huggingface_hub
 
+import weave_query
 import weave_query as weave
 from weave_query.weave_query.ecosystem.huggingface import (
     hfmodel,

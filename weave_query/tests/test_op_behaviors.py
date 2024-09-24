@@ -11,6 +11,7 @@ import typing
 
 import pytest
 
+import weave_query
 import weave_query as weave
 from weave_query.tests.util.concrete_tagged_value import (
     TaggedValue,

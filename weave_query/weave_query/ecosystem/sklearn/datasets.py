@@ -1,5 +1,6 @@
 from sklearn.datasets import fetch_california_housing
 
+import weave_query
 import weave_query as weave
 
 

@@ -2,6 +2,7 @@ import typing
 
 import requests
 
+import weave_query
 import weave_query as weave
 
 

@@ -1,3 +1,4 @@
+import weave_query
 import weave_query as weave
 
 

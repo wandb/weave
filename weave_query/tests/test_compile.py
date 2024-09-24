@@ -1,6 +1,7 @@
 import pytest
 import wandb
 
+import weave_query
 import weave_query as weave
 from weave_query.weave_query import async_demo, compile, graph
 from weave_query.weave_query import weave_types as types

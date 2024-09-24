@@ -10,6 +10,7 @@ from wandb import data_types as wb_data_types
 from wandb.sdk.artifacts.artifact_state import ArtifactState
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 
+import weave_query
 import weave_query as weave
 from weave_query.weave_query import weave_types as types
 from weave_query.weave_query.language_features.tagging.tagged_value_type import (

@@ -1,5 +1,6 @@
 import wandb
 
+import weave_query
 import weave_query as weave
 from weave_query.weave_query import artifact_local, artifact_wandb
 

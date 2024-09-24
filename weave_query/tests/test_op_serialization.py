@@ -1,5 +1,6 @@
 import pytest
 
+import weave_query
 import weave_query as weave
 import weave_query.weave_query
 

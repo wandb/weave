@@ -3,6 +3,7 @@ import typing
 import datasets
 import huggingface_hub
 
+import weave_query
 import weave_query as weave
 
 

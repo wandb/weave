@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+import weave_query
 import weave_query as weave
 
 
