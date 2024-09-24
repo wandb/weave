@@ -11,7 +11,7 @@ from weave_query.weave_query.ops_domain import wb_domain_types
 from weave_query.weave_query.ops_primitives import _dict_utils
 
 from weave_query.weave_query import registry_mem
-from ...tests import fixture_fakewandb as fwb
+from weave_query.tests import fixture_fakewandb as fwb
 
 """
 Tests in this file whould be used to test the graphs that can be constructed
