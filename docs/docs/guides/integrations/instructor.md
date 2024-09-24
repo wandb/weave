@@ -38,7 +38,7 @@ user_info = client.chat.completions.create(
 |-----------------------------------------------------------------------------------------------------------------------|
 | Weave will now track and log all LLM calls made using Instructor. You can view the traces in the Weave web interface. |
 
-## Track Your Own Ops
+## Track your own ops
 
 Wrapping a function with `@weave.op` starts capturing inputs, outputs and app logic so you can debug how data flows through your app. You can deeply nest ops and build a tree of functions that you want to track. This also starts automatically versioning code as you experiment to capture ad-hoc details that haven't been committed to git.
 
@@ -145,17 +145,17 @@ model = PersonExtractor(openai_model="gpt-4", max_retries=2)
 asyncio.run(model.predict("John is 30 years old"))
 ```
 
-| ![](./imgs/instructor/instructor_model_trace.png)                                                   |
+| ![](./imgs/instructor/instructor_weave_model.png) |
 |---------------------------------------------------------------------------|
 | Tracing and versioning your calls using a [`Model`](../core-types/models) |
 
 ## Serving a Weave Model
 
-Given a weave reference any WeaveModel object, you can spin up a fastapi server and [serve](https://wandb.github.io/weave/guides/tools/serve) it.
+Given a weave reference any `weave.Model` object, you can spin up a fastapi server and [serve](https://wandb.github.io/weave/guides/tools/serve) it.
 
 | [![](./imgs/instructor/instructor_serve.png)](https://wandb.ai/geekyrakshit/instructor-test/weave/objects/PersonExtractor/versions/xXpMsJvaiTOjKafz1TnHC8wMgH5ZAAwYOaBMvHuLArI) |
 |----------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| You can find the weave reference of any WeaveModel by navigating to the model and copying it from the UI.                                                      |
+| You can find the weave reference of any `weave.Model` by navigating to the model and copying it from the UI.                                                      |
 
 You can serve your model by using the following command in the terminal:
 
