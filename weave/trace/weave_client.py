@@ -617,14 +617,17 @@ class WeaveClient:
         else:
             op_str = op
 
+        parse_obj_functions = [redact_sensitive_keys]
         if should_convert_paths_to_images():
-            inputs = convert_paths_to_images(inputs)
+            parse_obj_functions.append(convert_paths_to_images)
 
-        inputs_redacted = redact_sensitive_keys(inputs)
+        inputs = parse_obj(inputs, *parse_obj_functions)
+
+        # user controlled parsing of inputs
         if op.postprocess_inputs:
-            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
+            inputs_postprocessed = op.postprocess_inputs(inputs)
         else:
-            inputs_postprocessed = inputs_redacted
+            inputs_postprocessed = inputs
 
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
@@ -707,10 +710,11 @@ class WeaveClient:
         if should_convert_paths_to_images():
             parse_obj_functions.append(convert_paths_to_images)
 
-        output = parse_obj(output, parse_obj_functions)
+        output = parse_obj(output, *parse_obj_functions)
         self._save_nested_objects(output)
         original_output = output
 
+        # user controlled postprocessing of output
         if postprocess_output:
             postprocessed_output = postprocess_output(original_output)
         else:
@@ -1435,37 +1439,20 @@ REDACT_KEYS = (
 REDACTED_VALUE = "REDACTED"
 
 
-def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
-    # We should NEVER mutate reffed objects.
-    #
-    # 1. This code builds new objects that no longer have refs
-    # 2. Even if we did an in-place edit, that would invalidate the ref (since
-    # the ref is to the object's digest)
+def redact_sensitive_keys(obj: dict) -> dict:
     if get_ref(obj):
         return obj
 
-    if isinstance(obj, dict):
-        dict_res = {}
-        for k, v in obj.items():
-            if k in REDACT_KEYS:
-                dict_res[k] = REDACTED_VALUE
-            else:
-                dict_res[k] = redact_sensitive_keys(v)
-        return dict_res
+    assert isinstance(obj, dict)
 
-    elif isinstance(obj, list):
-        list_res = []
-        for v in obj:
-            list_res.append(redact_sensitive_keys(v))
-        return list_res
+    dict_res = {}
+    for k, v in obj.items():
+        if k in REDACT_KEYS:
+            dict_res[k] = REDACTED_VALUE
+        else:
+            dict_res[k] = redact_sensitive_keys(v)
 
-    elif isinstance(obj, tuple):
-        tuple_res = []
-        for v in obj:
-            tuple_res.append(redact_sensitive_keys(v))
-        return tuple(tuple_res)
-
-    return obj
+    return dict_res
 
 
 def sanitize_object_name(name: str) -> str:
@@ -1530,6 +1517,13 @@ def parse_obj(obj: Any, *parsers: Callable[[Any], Any]) -> Any:
 
     # recurse through container types
     if isinstance(obj, dict):
+        # Do any dict-type parsing
+        for parser in parsers:
+            param_types = typing.get_type_hints(parser)
+            if "obj" in param_types and param_types["obj"] == dict:
+                obj = parser(obj)
+
+        # Then recurse through the items
         obj = {k: parse_obj(v, *parsers) for k, v in obj.items()}
     elif isinstance(obj, list):
         obj = [parse_obj(v, *parsers) for v in obj]
@@ -1541,15 +1535,9 @@ def parse_obj(obj: Any, *parsers: Callable[[Any], Any]) -> Any:
     # apply parsers to primatives
     if isinstance(obj, str):
         for parser in parsers:
-            try:
-                # Check if the parser accepts a string type as a parameter
-                param_types = typing.get_type_hints(parser)
-                if "obj" in param_types and param_types["obj"] == str:
-                    obj = parser(obj)
-            except TypeError:
-                # If the parser does not have type hints, don't operate
-                # on the object, just continue
-                continue
+            param_types = typing.get_type_hints(parser)
+            if "obj" in param_types and param_types["obj"] == str:
+                obj = parser(obj)
     return obj
 
 
