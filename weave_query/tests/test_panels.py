@@ -81,7 +81,7 @@ def test_synced():
 
 def test_object_picker_choice_type():
     ints = weave.save([1, 2, 3], name="my-ints")
-    panel = weave_query.weave_query.panels.ObjectPicker(ints)
+    panel = weave.weave_query.panels.ObjectPicker(ints)
     panel_node = weave_internal.make_var_node(weave.type_of(panel), "panel")
     choice = panel_node.config.choice
     assert choice.type == weave.types.Function({}, weave.types.Int())
@@ -91,17 +91,17 @@ def test_facet_selected():
     data = weave.save(
         [{"guess": "dog", "truth": "cat"}, {"guess": "dog", "truth": "dog"}]
     )
-    facet = weave_query.weave_query.panels.Group(
+    facet = weave.weave_query.panels.Group(
         equalSize=True,
         items={
-            "confusion": weave_query.weave_query.panels.Facet(
+            "confusion": weave.weave_query.panels.Facet(
                 data,
                 x=lambda row: row["guess"],
                 y=lambda row: row["truth"],
-                select=lambda row: weave_query.weave_query.panels.Group(
+                select=lambda row: weave.weave_query.panels.Group(
                     layered=True,
                     items={
-                        "color": weave_query.weave_query.panels.Color(row.count() / 50),
+                        "color": weave.weave_query.panels.Color(row.count() / 50),
                         "count": row.count(),
                     },
                 ),
@@ -114,11 +114,11 @@ def test_facet_selected():
 
 def test_board():
     # Just make sure it runs for now.
-    weave_query.weave_query.panels.Board(
+    weave.weave_query.panels.Board(
         {
-            "nums": weave_query.weave_query.ops.range(0, 3, 1),
+            "nums": weave.weave_query.ops.range(0, 3, 1),
         },
-        [weave_query.weave_query.panels.BoardPanel(id="panel0", panel=lambda nums: nums)],
+        [weave.weave_query.panels.BoardPanel(id="panel0", panel=lambda nums: nums)],
     )
 
 
@@ -129,6 +129,6 @@ def test_plot_constants_assign():
 
 
 def test_plot_assign():
-    assert weave_query.weave_query.panels.Plot.WeaveType().assign_type(
-        weave.type_of(weave_query.weave_query.panels.Plot([{"a": 5}]))
+    assert weave.weave_query.panels.Plot.WeaveType().assign_type(
+        weave.type_of(weave.weave_query.panels.Plot([{"a": 5}]))
     )

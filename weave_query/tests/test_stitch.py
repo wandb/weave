@@ -121,7 +121,7 @@ def test_tag_access_in_filter_expr():
 
 def test_traverse_dict():
     obj_node = weave.save(_TestPlanObject("a", 1))
-    p = stitch.stitch([weave_query.weave_query.ops.dict_(x=obj_node)["x"].horse()])
+    p = stitch.stitch([weave.weave_query.ops.dict_(x=obj_node)["x"].horse()])
     obj_recorder = p.get_result(obj_node)
     assert len(obj_recorder.calls) == 1
     assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-horse"
@@ -129,7 +129,7 @@ def test_traverse_dict():
 
 def test_travese_groupby_dict():
     obj_node = weave.save([{"o": {"a": 5}, "x": 1}])
-    grouped = obj_node.groupby(lambda row: weave_query.weave_query.ops.dict_(x=row["o"]))
+    grouped = obj_node.groupby(lambda row: weave.weave_query.ops.dict_(x=row["o"]))
     output = grouped[0]["x"]
     groupkey_output = grouped[0].groupkey()["x"]["a"]
     p = stitch.stitch([output, groupkey_output])
@@ -162,16 +162,16 @@ def test_zero_arg_ops():
 
 
 def test_shared_fn_node():
-    const_list_node = weave_query.weave_query.ops.make_list(a=1, b=2)
+    const_list_node = weave.weave_query.ops.make_list(a=1, b=2)
     indexed_node = const_list_node[0]
-    arr_1_node = weave_query.weave_query.ops.make_list(a=1, b=2, c=3)
-    arr_2_node = weave_query.weave_query.ops.make_list(a=10, b=20, c=30)
+    arr_1_node = weave.weave_query.ops.make_list(a=1, b=2, c=3)
+    arr_2_node = weave.weave_query.ops.make_list(a=10, b=20, c=30)
 
     mapped_1_node = arr_1_node.map(
-        lambda row: weave_query.weave_query.ops.dict_(item=row, const=indexed_node)
+        lambda row: weave.weave_query.ops.dict_(item=row, const=indexed_node)
     )
     mapped_2_node = arr_2_node.map(
-        lambda row: weave_query.weave_query.ops.dict_(item=row, const=indexed_node)
+        lambda row: weave.weave_query.ops.dict_(item=row, const=indexed_node)
     )
 
     mapped_1_item_node = mapped_1_node["item"]
@@ -182,7 +182,7 @@ def test_shared_fn_node():
     mapped_2_item_add_node = mapped_2_item_node + 100
     mapped_2_const_add_node = mapped_2_const_node + 100
 
-    list_of_list_node = weave_query.weave_query.ops.make_list(
+    list_of_list_node = weave.weave_query.ops.make_list(
         a=mapped_1_item_node,
         b=mapped_1_const_node,
         c=mapped_2_item_add_node,
@@ -217,9 +217,9 @@ def test_shared_fn_node():
 
 def test_stitch_keytypes_override_fetch_all_columns(fake_wandb):
     fake_wandb.fake_api.add_mock(test_wb.table_mock_filtered)
-    keytypes_node = weave_query.weave_query.ops.object_keytypes(
+    keytypes_node = weave.weave_query.ops.object_keytypes(
         run_ops.run_tag_getter_op(
-            weave_query.weave_query.ops.project("stacey", "mendeleev")
+            weave.weave_query.ops.project("stacey", "mendeleev")
             .filteredRuns("{}", "-createdAt")
             .limit(50)
             .summary()
@@ -254,15 +254,15 @@ def test_stitch_overlapping_tags(fake_wandb):
             }
         }
     )
-    project_node = weave_query.weave_query.ops.project("stacey", "mendeleev")
+    project_node = weave.weave_query.ops.project("stacey", "mendeleev")
     filtered_runs_a_node = project_node.filteredRuns("{}", "-createdAt")[0]
     summary_a_node = filtered_runs_a_node.summary()
-    tagged_name_a = weave_query.weave_query.ops.run_ops.run_tag_getter_op(
+    tagged_name_a = weave.weave_query.ops.run_ops.run_tag_getter_op(
         summary_a_node["a"]
     ).name()
     filtered_runs_b_node = project_node.filteredRuns("{}", "+createdAt")[0]
     summary_b_node = filtered_runs_b_node.summary()
-    tagged_id_b = weave_query.weave_query.ops.run_ops.run_tag_getter_op(summary_b_node).id()
+    tagged_id_b = weave.weave_query.ops.run_ops.run_tag_getter_op(summary_b_node).id()
 
     p = stitch.stitch([tagged_name_a, tagged_id_b])
 
@@ -272,9 +272,9 @@ def test_stitch_overlapping_tags(fake_wandb):
 
 
 def test_refine_history_type_included_in_gql():
-    project_node = weave_query.weave_query.ops.project("stacey", "mendeleev")
+    project_node = weave.weave_query.ops.project("stacey", "mendeleev")
     runs_node = project_node.runs()
-    map_node = runs_node.map(lambda row: weave_query.weave_query.ops.dict_(variant=row))
+    map_node = runs_node.map(lambda row: weave.weave_query.ops.dict_(variant=row))
     checkpoint_node = map_node.createIndexCheckpointTag()
     index_node = checkpoint_node[0]
     pick_node = index_node["variant"]
@@ -285,7 +285,7 @@ def test_refine_history_type_included_in_gql():
 
 def test_stitch_missing_key():
     a_node = weave_internal.make_const_node(weave.types.String(), "a")
-    dict_node = weave_query.weave_query.ops.dict_(a=a_node)
+    dict_node = weave.weave_query.ops.dict_(a=a_node)
     picked_valid = dict_node["a"] + "-suffix"
     picked_missing = dict_node["b"] + "-suffix"
 

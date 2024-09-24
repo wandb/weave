@@ -106,31 +106,31 @@ def make_molecule(clean_up=True):
         #
         (
             make_image(),
-            weave_query.weave_query.ops.ImageArtifactFileRef.WeaveType(),  # type: ignore
+            weave.weave_query.ops.ImageArtifactFileRef.WeaveType(),  # type: ignore
         ),
         (
             make_audio(),
-            weave_query.weave_query.ops.AudioArtifactFileRef.WeaveType(),  # type: ignore
+            weave.weave_query.ops.AudioArtifactFileRef.WeaveType(),  # type: ignore
         ),
         (
             make_html(),
-            weave_query.weave_query.ops.HtmlArtifactFileRef.WeaveType(),  # type: ignore
+            weave.weave_query.ops.HtmlArtifactFileRef.WeaveType(),  # type: ignore
         ),
         (
             make_bokeh(),
-            weave_query.weave_query.ops.BokehArtifactFileRef.WeaveType(),  # type: ignore
+            weave.weave_query.ops.BokehArtifactFileRef.WeaveType(),  # type: ignore
         ),
         (
             make_video(),
-            weave_query.weave_query.ops.VideoArtifactFileRef.WeaveType(),  # type: ignore
+            weave.weave_query.ops.VideoArtifactFileRef.WeaveType(),  # type: ignore
         ),
         (
             make_object3d(),
-            weave_query.weave_query.ops.Object3DArtifactFileRef.WeaveType(),  # type: ignore
+            weave.weave_query.ops.Object3DArtifactFileRef.WeaveType(),  # type: ignore
         ),
         (
             make_molecule(),
-            weave_query.weave_query.ops.MoleculeArtifactFileRef.WeaveType(),  # type: ignore
+            weave.weave_query.ops.MoleculeArtifactFileRef.WeaveType(),  # type: ignore
         ),
         # See comment in wandb_util.py - this may change in the future
         # Temporarily disabled until we can figure out how to mock
@@ -627,7 +627,7 @@ def test_grouping_on_images(fake_wandb):
     table_node = file_node.table()
     table_rows = table_node.rows()
     grouped = table_rows.groupby(
-        lambda row: weave_query.weave_query.ops.dict_(g_image=row["image"])
+        lambda row: weave.weave_query.ops.dict_(g_image=row["image"])
     )
 
     raw_data = weave.use(grouped).to_pylist_notags()
@@ -758,7 +758,7 @@ def make_join_table_row_nodes(fake_wandb):
 def test_join_all_on_images(fake_wandb):
     table_1_rows, table_2_rows = make_join_table_row_nodes(fake_wandb)
 
-    rows = weave_query.weave_query.ops.make_list(a=table_1_rows, b=table_2_rows)
+    rows = weave.weave_query.ops.make_list(a=table_1_rows, b=table_2_rows)
 
     joined = rows.joinAll(lambda row: row["image"], True)
 
@@ -852,12 +852,12 @@ def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
 
     wait_for_x_times(wait_for)
 
-    run_node = weave_query.weave_query.ops.project(run.entity, run.project).run(run.id)
+    run_node = weave.weave_query.ops.project(run.entity, run.project).run(run.id)
 
     for history_op_name in ["history3", "history"]:
         history_node = run_node._get_op(history_op_name)()
         mapped_node = history_node.map(
-            lambda row: weave_query.weave_query.ops.dict_(
+            lambda row: weave.weave_query.ops.dict_(
                 **{key: row[key] for key in log_dict.keys()}
             )
         )

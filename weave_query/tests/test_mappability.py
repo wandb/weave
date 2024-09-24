@@ -58,10 +58,10 @@ def test_non_mapped_use():
 
 
 def test_non_mapped_serialized():
-    node = weave_query.weave_query.weave_internal.make_output_node(
+    node = weave.weave_query.weave_internal.make_output_node(
         weave.types.Int(),
         _test_add_one.name,
-        {"x": weave_query.weave_query.graph.ConstNode(weave.types.Int(), 1)},
+        {"x": weave.weave_query.graph.ConstNode(weave.types.Int(), 1)},
     )
     assert weave.use(node) == 2
 
@@ -79,11 +79,11 @@ def test_mapped_nullable_use():
 
 
 def test_mapped_serialized():
-    node = weave_query.weave_query.weave_internal.make_output_node(
+    node = weave.weave_query.weave_internal.make_output_node(
         weave.types.Int(),
         _test_add_one.name,
         {
-            "x": weave_query.weave_query.graph.ConstNode(
+            "x": weave.weave_query.graph.ConstNode(
                 weave.types.List(weave.types.Int()), [1, 2, 3]
             )
         },
@@ -98,11 +98,11 @@ def test_mapped_empty_use():
 
 
 def test_mapped_empty_serialized():
-    node = weave_query.weave_query.weave_internal.make_output_node(
+    node = weave.weave_query.weave_internal.make_output_node(
         weave.types.Int(),
         _test_add_one.name,
         {
-            "x": weave_query.weave_query.graph.ConstNode(
+            "x": weave.weave_query.graph.ConstNode(
                 weave.types.List(weave.types.Int()), []
             )
         },
@@ -124,7 +124,7 @@ def test_custom_class():
     node = TestType().test_fn(1)
     assert weave.use(node) == 2
 
-    node_list = weave_query.weave_query.ops.make_list(**{"0": TestType(), "1": TestType()})
+    node_list = weave.weave_query.ops.make_list(**{"0": TestType(), "1": TestType()})
     node = node_list.test_fn(1)
     assert weave.use(node) == [2, 2]
 

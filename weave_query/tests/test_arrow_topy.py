@@ -3,7 +3,7 @@ import typing
 
 import pytest
 import weave_query as weave
-from weave.legacy.tests.util.concrete_tagged_value import (
+from weave_query.tests.util.concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,
     concrete_to_tagstore,

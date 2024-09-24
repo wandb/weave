@@ -70,15 +70,15 @@ class ClassificationResultPanel(weave.Panel):
     input_node: weave.Node[list[ClassificationResult]]
 
     @weave.op()
-    def render(self) -> weave_query.weave_query.panels.Table:
+    def render(self) -> weave.weave_query.panels.Table:
         from weave_query.weave_query.ecosystem.huggingface.huggingface_models import (
             huggingface,
         )
 
-        return weave_query.weave_query.panels.Table(
+        return weave.weave_query.panels.Table(
             self.input_node,
             columns=[
-                lambda result_row: weave_query.weave_query.panels.WeaveLink(
+                lambda result_row: weave.weave_query.panels.WeaveLink(
                     result_row.model_name(),
                     to=lambda input: huggingface().model(input),  # type: ignore
                 ),
@@ -117,17 +117,17 @@ class FullTextClassificationResultPanel(weave.Panel):
     input_node: weave.Node[FullTextClassificationPipelineOutput]
 
     @weave.op()
-    def render(self) -> weave_query.weave_query.panels.Group:
+    def render(self) -> weave.weave_query.panels.Group:
         output = typing.cast(FullTextClassificationPipelineOutput, self.input_node)
-        return weave_query.weave_query.panels.Group(
+        return weave.weave_query.panels.Group(
             preferHorizontal=True,
             items={
-                "input": weave_query.weave_query.panels.LabeledItem(
+                "input": weave.weave_query.panels.LabeledItem(
                     label="input", item=output.model_input
                 ),
-                "output": weave_query.weave_query.panels.LabeledItem(
+                "output": weave.weave_query.panels.LabeledItem(
                     label="output",
-                    item=weave_query.weave_query.panels.Plot(
+                    item=weave.weave_query.panels.Plot(
                         input_node=typing.cast(weave.Node, output.model_output),
                         x=lambda class_score: class_score["score"],
                         y=lambda class_score: class_score["label"],

@@ -2,8 +2,8 @@ import itertools
 
 import numpy as np
 import pytest
-from weave.legacy.tests.util import list_arrow_test_helpers as lath
-from weave.legacy.tests.util import tag_test_util as ttu
+from weave_query.tests.util import list_arrow_test_helpers as lath
+from weave_query.tests.util import tag_test_util as ttu
 
 from weave_query.weave_query import api as weave
 from weave_query.weave_query import box, ops, weave_internal

@@ -6,8 +6,8 @@ import string
 import pyarrow as pa
 import pytest
 from PIL import Image
-from weave.legacy.tests.util import tag_test_util as ttu
-from weave.legacy.tests.util import weavejs_ops
+from weave_query.tests.util import tag_test_util as ttu
+from weave_query.tests.util import weavejs_ops
 
 from weave_query.weave_query import api as weave
 from weave_query.weave_query import (

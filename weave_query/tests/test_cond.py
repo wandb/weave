@@ -4,11 +4,11 @@ from weave_query.weave_query import ops_arrow
 
 
 def test_cond_basic():
-    assert weave.use(weave_query.weave_query.ops.cond({"a": True}, {"a": 5})) == 5
-    assert weave.use(weave_query.weave_query.ops.cond({"a": False}, {"a": 5})) == None
+    assert weave.use(weave.weave_query.ops.cond({"a": True}, {"a": 5})) == 5
+    assert weave.use(weave.weave_query.ops.cond({"a": False}, {"a": 5})) == None
     assert (
         weave.use(
-            weave_query.weave_query.ops.cond({"a": False, "b": True}, {"a": 5, "b": 6})
+            weave.weave_query.ops.cond({"a": False, "b": True}, {"a": 5, "b": 6})
         )
         == 6
     )
@@ -51,9 +51,9 @@ def test_cond_vector():
     )
     assert weave.use(
         conds.map(
-            lambda row: weave_query.weave_query.ops.cond(
-                weave_query.weave_query.ops.dict_(**{"a": row["a"], "b": row["b"]}),
-                weave_query.weave_query.ops.dict_(**{"a": row["val_a"], "b": row["val_b"]}),
+            lambda row: weave.weave_query.ops.cond(
+                weave.weave_query.ops.dict_(**{"a": row["a"], "b": row["b"]}),
+                weave.weave_query.ops.dict_(**{"a": row["val_a"], "b": row["val_b"]}),
             )
         )
     ).to_pylist_raw() == [5, None, 10]
@@ -72,9 +72,9 @@ def test_cond_vector_arr_value():
     )
     assert weave.use(
         conds.map(
-            lambda row: weave_query.weave_query.ops.cond(
-                weave_query.weave_query.ops.dict_(**{"a": row["a"], "b": row["b"]}),
-                weave_query.weave_query.ops.dict_(**{"a": row["val_a"], "b": row["val_b"]}),
+            lambda row: weave.weave_query.ops.cond(
+                weave.weave_query.ops.dict_(**{"a": row["a"], "b": row["b"]}),
+                weave.weave_query.ops.dict_(**{"a": row["val_a"], "b": row["val_b"]}),
             )
         )
     ).to_pylist_raw() == [[1, 2], None, [11, 12]]
@@ -93,9 +93,9 @@ def test_cond_vector_mixed():
     )
     assert weave.use(
         conds.map(
-            lambda row: weave_query.weave_query.ops.cond(
-                weave_query.weave_query.ops.dict_(**{"a": row["a"], "b": row["b"]}),
-                weave_query.weave_query.ops.dict_(**{"a": row["val_a"], "b": 99}),
+            lambda row: weave.weave_query.ops.cond(
+                weave.weave_query.ops.dict_(**{"a": row["a"], "b": row["b"]}),
+                weave.weave_query.ops.dict_(**{"a": row["val_a"], "b": 99}),
             )
         )
     ).to_pylist_raw() == [1, None, 99]
@@ -114,9 +114,9 @@ def test_cond_vector_mixed_arr_value():
     )
     assert weave.use(
         conds.map(
-            lambda row: weave_query.weave_query.ops.cond(
-                weave_query.weave_query.ops.dict_(**{"a": row["a"], "b": row["b"]}),
-                weave_query.weave_query.ops.dict_(**{"a": row["val_a"], "b": [99, 100]}),
+            lambda row: weave.weave_query.ops.cond(
+                weave.weave_query.ops.dict_(**{"a": row["a"], "b": row["b"]}),
+                weave.weave_query.ops.dict_(**{"a": row["val_a"], "b": [99, 100]}),
             )
         )
     ).to_pylist_raw() == [[1, 2], None, [99, 100]]

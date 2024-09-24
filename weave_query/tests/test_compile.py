@@ -144,12 +144,12 @@ def test_executing_js_multi_root():
 
 
 def test_optimize_merge_empty_dict():
-    non_empty_dict = weave_query.weave_query.ops.dict_(a=5, b=2)
+    non_empty_dict = weave.weave_query.ops.dict_(a=5, b=2)
     assert (
         compile.compile_simple_optimizations(
             [
-                weave_query.weave_query.ops.TypedDict.merge(
-                    non_empty_dict, weave_query.weave_query.ops.dict_()
+                weave.weave_query.ops.TypedDict.merge(
+                    non_empty_dict, weave.weave_query.ops.dict_()
                 )
             ]
         )[0].to_json()
@@ -158,15 +158,15 @@ def test_optimize_merge_empty_dict():
     assert (
         compile.compile_simple_optimizations(
             [
-                weave_query.weave_query.ops.TypedDict.merge(
-                    weave_query.weave_query.ops.dict_(), non_empty_dict
+                weave.weave_query.ops.TypedDict.merge(
+                    weave.weave_query.ops.dict_(), non_empty_dict
                 )
             ]
         )[0].to_json()
         == non_empty_dict.to_json()
     )
-    non_simplified_merge = weave_query.weave_query.ops.TypedDict.merge(
-        weave_query.weave_query.ops.dict_(j=3), non_empty_dict
+    non_simplified_merge = weave.weave_query.ops.TypedDict.merge(
+        weave.weave_query.ops.dict_(j=3), non_empty_dict
     )
     assert (
         compile.compile_simple_optimizations([non_simplified_merge])[0].to_json()
@@ -175,16 +175,16 @@ def test_optimize_merge_empty_dict():
 
 
 def test_compile_lambda_uniqueness():
-    list_node_1 = weave_query.weave_query.ops.make_list(
+    list_node_1 = weave.weave_query.ops.make_list(
         a=make_const_node(weave.types.Number(), 1)
     )
-    list_node_2 = weave_query.weave_query.ops.make_list(
+    list_node_2 = weave.weave_query.ops.make_list(
         a=make_const_node(weave.types.Number(), 2)
     )
     fn_node = define_fn({"row": weave.types.Number()}, lambda row: row + 1)
     mapped_1 = list_node_1.map(fn_node)
     mapped_2 = list_node_2.map(fn_node)
-    combined = weave_query.weave_query.ops.make_list(a=mapped_1, b=mapped_2)
+    combined = weave.weave_query.ops.make_list(a=mapped_1, b=mapped_2)
     concatted = combined.concat()
 
     # list node contains 2 nodes (const, list), x 2 = 4
@@ -216,7 +216,7 @@ def test_compile_lambda_uniqueness():
 #     This test demonstrates successful execution when there is an explicit
 #     const function instead of a direct node (resulting in an intermediate execution op)
 #     """
-#     history_node = weave_query.weave_query.ops.project(run.entity, run.project).run(run.id).history2()
+#     history_node = weave.weave_query.ops.project(run.entity, run.project).run(run.id).history2()
 #     pick = const(history_node).pick("val")
 #     res = weave.use(pick)
 #     assert res.to_pylist_notags() == list(range(10))
@@ -235,7 +235,7 @@ def test_compile_through_function_call(user_by_api_key_in_env):
     fn_node = define_fn(
         {"entity_name": types.String()},
         lambda entity_name: (
-            weave_query.weave_query.ops.project(entity_name, run.project)
+            weave.weave_query.ops.project(entity_name, run.project)
             .run(run.id)
             .history2()
         ),
@@ -251,7 +251,7 @@ def test_compile_list_flatten_to_awl_concat():
     # When the outer list-structure is a list, we want to dispatch to concat, preferably AWL-concat
     # when the outer list-structure is an AWL, we want to dispatch ensure that we use AWL ops
     # list of lists
-    list_list_node = weave_query.weave_query.ops.make_list(a=[1], b=[2])
+    list_list_node = weave.weave_query.ops.make_list(a=[1], b=[2])
     list_list_node_concat = list_list_node.concat()
     list_list_node_flatten = list_list_node.flatten()
     list_list_node_concat_compiled = compile.compile([list_list_node_concat])[0]
@@ -259,7 +259,7 @@ def test_compile_list_flatten_to_awl_concat():
     assert list_list_node_concat_compiled.from_op.name == "concat"
     assert list_list_node_flatten_compiled.from_op.name == "flatten"
     # list of awls
-    list_awl_node = weave_query.weave_query.ops.make_list(a=to_arrow([1]), b=to_arrow([2]))
+    list_awl_node = weave.weave_query.ops.make_list(a=to_arrow([1]), b=to_arrow([2]))
     list_awl_node_concat = list_awl_node.concat()
     list_awl_node_flatten = list_awl_node.flatten()
     list_awl_node_concat_compiled = compile.compile([list_awl_node_concat])[0]

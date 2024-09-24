@@ -71,8 +71,8 @@ class PetDatasetPanel(weave.Panel):
     input_node: weave.Node[list[OxfordIIITPetDatasetItem]]
 
     @weave.op()
-    def render(self) -> weave_query.weave_query.panels.Table:
-        return weave_query.weave_query.panels.Table(
+    def render(self) -> weave.weave_query.panels.Table:
+        return weave.weave_query.panels.Table(
             self.input_node,
             columns=[
                 lambda item: item["id"],

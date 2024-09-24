@@ -1,5 +1,5 @@
 import pytest
-from weave.legacy.tests.util import geom
+from weave_query.tests.util import geom
 
 from weave_query.weave_query import api as weave
 from weave_query.weave_query import ops_arrow

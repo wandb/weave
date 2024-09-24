@@ -51,8 +51,8 @@ def module_name(module: types.ModuleType) -> str:
 
 
 @weave.op()
-def module_doc(module: types.ModuleType) -> weave_query.weave_query.ops.Markdown:
-    return weave_query.weave_query.ops.Markdown(module.__doc__ or "")
+def module_doc(module: types.ModuleType) -> weave.weave_query.ops.Markdown:
+    return weave.weave_query.ops.Markdown(module.__doc__ or "")
 
 
 @weave.op()
@@ -93,8 +93,8 @@ def pyclass_module(pyclass: type) -> types.ModuleType:
 
 
 @weave.op()
-def pyclass_doc(pyclass: type) -> weave_query.weave_query.ops.Markdown:
-    return weave_query.weave_query.ops.Markdown(pyclass.__doc__ or "")
+def pyclass_doc(pyclass: type) -> weave.weave_query.ops.Markdown:
+    return weave.weave_query.ops.Markdown(pyclass.__doc__ or "")
 
 
 @weave.op()
@@ -126,8 +126,8 @@ def function_name(pyfunction: types.FunctionType) -> str:
 
 
 @weave.op()
-def function_doc(pyfunction: types.FunctionType) -> weave_query.weave_query.ops.Markdown:
-    return weave_query.weave_query.ops.Markdown(pyfunction.__doc__ or "")
+def function_doc(pyfunction: types.FunctionType) -> weave.weave_query.ops.Markdown:
+    return weave.weave_query.ops.Markdown(pyfunction.__doc__ or "")
 
 
 @weave.type()
@@ -136,34 +136,34 @@ class ModulePanel(weave.Panel):
     input_node: weave.Node[types.ModuleType]
 
     @weave.op()
-    def render(self) -> weave_query.weave_query.panels.Card:
+    def render(self) -> weave.weave_query.panels.Card:
         module = self.input_node
-        return weave_query.weave_query.panels.Card(
+        return weave.weave_query.panels.Card(
             title=module.module_name(),  # type: ignore
             subtitle="python module",
             content=[
-                weave_query.weave_query.panels.CardTab(
+                weave.weave_query.panels.CardTab(
                     name="Description",
-                    content=weave_query.weave_query.panels.PanelMarkdown(module.module_doc()),  # type: ignore
+                    content=weave.weave_query.panels.PanelMarkdown(module.module_doc()),  # type: ignore
                 ),
-                weave_query.weave_query.panels.CardTab(
+                weave.weave_query.panels.CardTab(
                     name="Classes",
-                    content=weave_query.weave_query.panels.Table(
+                    content=weave.weave_query.panels.Table(
                         module.module_classes(),  # type: ignore
                         columns=[
-                            lambda c: weave_query.weave_query.panels.WeaveLink(
+                            lambda c: weave.weave_query.panels.WeaveLink(
                                 c.class_name(),
                                 to=lambda inp: module.module_class(inp),  # type: ignore
                             )
                         ],
                     ),
                 ),
-                weave_query.weave_query.panels.CardTab(
+                weave.weave_query.panels.CardTab(
                     name="Functions",
-                    content=weave_query.weave_query.panels.Table(
+                    content=weave.weave_query.panels.Table(
                         module.module_functions(),  # type: ignore
                         columns=[
-                            lambda c: weave_query.weave_query.panels.WeaveLink(
+                            lambda c: weave.weave_query.panels.WeaveLink(
                                 c.function_name(),
                                 to=lambda inp: module.module_function(inp),  # type: ignore
                             )
@@ -180,22 +180,22 @@ class ClassPanel(weave.Panel):
     input_node: weave.Node[type]
 
     @weave.op()
-    def render(self) -> weave_query.weave_query.panels.Card:
+    def render(self) -> weave.weave_query.panels.Card:
         cls = self.input_node
-        return weave_query.weave_query.panels.Card(
+        return weave.weave_query.panels.Card(
             title=cls.class_name(),  # type: ignore
             subtitle="python class",
             content=[
-                weave_query.weave_query.panels.CardTab(
+                weave.weave_query.panels.CardTab(
                     name="Description",
-                    content=weave_query.weave_query.panels.PanelMarkdown(cls.pyclass_doc()),  # type: ignore
+                    content=weave.weave_query.panels.PanelMarkdown(cls.pyclass_doc()),  # type: ignore
                 ),
-                weave_query.weave_query.panels.CardTab(
+                weave.weave_query.panels.CardTab(
                     name="Methods",
-                    content=weave_query.weave_query.panels.Table(
+                    content=weave.weave_query.panels.Table(
                         cls.class_methods(),  # type: ignore
                         columns=[
-                            lambda m: weave_query.weave_query.panels.WeaveLink(
+                            lambda m: weave.weave_query.panels.WeaveLink(
                                 m.function_name(),
                                 to=lambda inp: cls.class_method(inp),  # type: ignore
                             )
@@ -212,15 +212,15 @@ class FunctionPanel(weave.Panel):
     input_node: weave.Node[types.FunctionType]
 
     @weave.op()
-    def render(self) -> weave_query.weave_query.panels.Card:
+    def render(self) -> weave.weave_query.panels.Card:
         func = self.input_node
-        return weave_query.weave_query.panels.Card(
+        return weave.weave_query.panels.Card(
             title=func.function_name(),  # type: ignore
             subtitle="python function",
             content=[
-                weave_query.weave_query.panels.CardTab(
+                weave.weave_query.panels.CardTab(
                     name="Description",
-                    content=weave_query.weave_query.panels.PanelMarkdown(func.function_doc()),  # type: ignore
+                    content=weave.weave_query.panels.PanelMarkdown(func.function_doc()),  # type: ignore
                 ),
             ],
         )

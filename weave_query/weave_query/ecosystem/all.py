@@ -37,11 +37,11 @@ ALL_MODULES = (
 LOAD_RESULTS: typing.DefaultDict[str, list[str]] = defaultdict(list[str])
 
 try:
-    logger.info("Loading weave_query.weave_query.ecosystem")
+    logger.info("Loading weave.weave_query.ecosystem")
     for module in ALL_MODULES:
         try:
             globals()[module] = importlib.import_module(
-                f"weave_query.weave_query.ecosystem.{module}"
+                f"weave.weave_query.ecosystem.{module}"
             )
             LOAD_RESULTS["loaded"].append(module)
         except ImportError as exc:

@@ -8,8 +8,8 @@ from weave_query.weave_query.panels import panel_board
 from weave_query.weave_query.panels_py import panel_autoboard
 from weave_query.weave_query.panels_py.generator_templates import template_registry
 
-panels = weave_query.weave_query.panels
-ops = weave_query.weave_query.ops
+panels = weave.weave_query.panels
+ops = weave.weave_query.ops
 
 
 # BOARD_ID must be unique across all ops. It must only contain letters and underscores.
@@ -99,7 +99,7 @@ board_name = "py_board-" + BOARD_ID
 #     input_node: weave.Node[list[typing.Any]]
 
 #     @weave.op()
-#     def render(self) -> weave_query.weave_query.panels.Table:
+#     def render(self) -> weave.weave_query.panels.Table:
 #         table = panels.Table(
 #             self.input_node,
 #             columns=[lambda row: row["inputs"]["messages"][-1]["content"]],
@@ -135,7 +135,7 @@ def openai_request_cost(record) -> float:  # type: ignore
     model = record["output.model"]
     pt = record["summary.prompt_tokens"]
     ct = record["summary.completion_tokens"]
-    cost_per_1000 = weave_query.weave_query.ops.case(
+    cost_per_1000 = weave.weave_query.ops.case(
         [
             # finetuned
             {"when": model.startsWith("ada:"), "then": pt * 0.0016 + ct * 0.0016},
@@ -194,7 +194,7 @@ def board(
     augmented_data = varbar.add(
         "augmented_data",
         source_data.with_columns(
-            weave_query.weave_query.ops.dict_(
+            weave.weave_query.ops.dict_(
                 **{
                     "summary.cost": source_data.map(
                         lambda row: openai_request_cost(row)
@@ -229,7 +229,7 @@ def board(
     ## 1. raw_data_range is derived from raw_data
     filtered_range = varbar.add(
         "filtered_range",
-        weave_query.weave_query.ops.make_list(
+        weave.weave_query.ops.make_list(
             a=filtered_data[timestamp_col_name].min(),
             b=filtered_data[timestamp_col_name].max(),
         ),
@@ -242,7 +242,7 @@ def board(
     ## 2.b: Setup a date picker to set the user_zoom_range
     varbar.add(
         "time_range",
-        weave_query.weave_query.panels.DateRange(
+        weave.weave_query.panels.DateRange(
             user_zoom_range, domain=source_data[timestamp_col_name]
         ),
     )
@@ -257,7 +257,7 @@ def board(
     window_data = varbar.add(
         "window_data",
         augmented_data.filter(
-            lambda row: weave_query.weave_query.ops.Boolean.bool_and(
+            lambda row: weave.weave_query.ops.Boolean.bool_and(
                 row[timestamp_col_name] >= bin_range[0],
                 row[timestamp_col_name] <= bin_range[1],
             )
@@ -267,7 +267,7 @@ def board(
 
     filters = varbar.add(
         "filters",
-        weave_query.weave_query.panels.FilterEditor(filter_fn, node=window_data),
+        weave.weave_query.panels.FilterEditor(filter_fn, node=window_data),
     )
 
     filtered_window_data = varbar.add(
@@ -276,14 +276,14 @@ def board(
 
     grouping = varbar.add(
         "grouping",
-        weave_query.weave_query.panels.GroupingEditor(grouping_fn, node=window_data),
+        weave.weave_query.panels.GroupingEditor(grouping_fn, node=window_data),
     )
 
     height = 5
 
     ### Overview tab
 
-    overview_tab = weave_query.weave_query.panels.Group(
+    overview_tab = weave.weave_query.panels.Group(
         layoutMode="grid",
         showExpressions=True,
         enableAddPanel=True,
@@ -302,7 +302,7 @@ def board(
             n_bins=100,
             mark="bar",
         ),
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=0, y=0, w=24, h=height),
+        layout=weave.weave_query.panels.GroupPanelLayout(x=0, y=0, w=24, h=height),
     )
 
     overview_tab.add(
@@ -318,7 +318,7 @@ def board(
             x_domain=user_zoom_range,
             n_bins=50,
         ),
-        layout=weave_query.weave_query.panels.GroupPanelLayout(
+        layout=weave.weave_query.panels.GroupPanelLayout(
             x=0, y=height, w=12, h=height
         ),
     )
@@ -336,7 +336,7 @@ def board(
             x_domain=user_zoom_range,
             n_bins=50,
         ),
-        layout=weave_query.weave_query.panels.GroupPanelLayout(
+        layout=weave.weave_query.panels.GroupPanelLayout(
             x=12, y=height, w=12, h=height
         ),
     )
@@ -344,23 +344,23 @@ def board(
     overview_tab.add(
         "avg_cost_per_req",
         filtered_window_data["summary.cost"].avg(),  # type: ignore
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=0, y=height * 2, w=6, h=3),
+        layout=weave.weave_query.panels.GroupPanelLayout(x=0, y=height * 2, w=6, h=3),
     )
     overview_tab.add(
         "avg_prompt_tokens_per_req",
         filtered_window_data["summary.prompt_tokens"].avg(),  # type: ignore
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=6, y=height * 2, w=6, h=3),
+        layout=weave.weave_query.panels.GroupPanelLayout(x=6, y=height * 2, w=6, h=3),
     )
     overview_tab.add(
         "avg_completion_tokens_per_req",
         filtered_window_data["summary.completion_tokens"].avg(),  # type: ignore
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=12, y=height * 2, w=6, h=3),
+        layout=weave.weave_query.panels.GroupPanelLayout(x=12, y=height * 2, w=6, h=3),
     )
     (
         overview_tab.add(
             "avg_total_tokens_per_req",
             filtered_window_data["summary.total_tokens"].avg(),  # type: ignore
-            layout=weave_query.weave_query.panels.GroupPanelLayout(
+            layout=weave.weave_query.panels.GroupPanelLayout(
                 x=18, y=height * 2, w=6, h=3
             ),
         ),
@@ -370,12 +370,12 @@ def board(
     # TODO: This doesn't really work yet (needs some manual UI configuration currently,
     # and it's ugly).
     # overview_tab.add(
-    #     "attributes", weave_query.weave_query.panels.EachColumn(filtered_window_data["attributes"])
+    #     "attributes", weave.weave_query.panels.EachColumn(filtered_window_data["attributes"])
     # )
 
     ### Requests tab
 
-    # requests_tab = weave_query.weave_query.panels.Group(
+    # requests_tab = weave.weave_query.panels.Group(
     #     layoutMode="grid",
     #     showExpressions=True,
     # )  # l, showExpressions="titleBar")
@@ -403,7 +403,7 @@ def board(
     requests_table_var = overview_tab.add(
         "table",
         requests_table,
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=0, y=13, w=24, h=8),
+        layout=weave.weave_query.panels.GroupPanelLayout(x=0, y=13, w=24, h=8),
     )
     overview_tab.add(
         "input",
@@ -411,19 +411,19 @@ def board(
             requests_table_var.active_data()["inputs.messages"],
             columns=[lambda row: row["role"], lambda row: row["content"]],
         ),
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=0, y=21, w=12, h=8),
+        layout=weave.weave_query.panels.GroupPanelLayout(x=0, y=21, w=12, h=8),
     )
     overview_tab.add(
         "output",
         requests_table_var.active_row(),
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=12, y=21, w=12, h=8),
+        layout=weave.weave_query.panels.GroupPanelLayout(x=12, y=21, w=12, h=8),
     )
 
-    # attributes_tab = weave_query.weave_query.panels.Group(layoutMode="grid")
+    # attributes_tab = weave.weave_query.panels.Group(layoutMode="grid")
 
-    # users_tab = weave_query.weave_query.panels.Group(layoutMode="grid")
+    # users_tab = weave.weave_query.panels.Group(layoutMode="grid")
 
-    # models_tab = weave_query.weave_query.panels.Group(layoutMode="grid")
+    # models_tab = weave.weave_query.panels.Group(layoutMode="grid")
 
     # tabs = panels.Group(
     #     layoutMode="tab",

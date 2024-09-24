@@ -21,7 +21,7 @@ class RunChain:
 
     def _history_node(self):
         with op_def.no_refine():
-            proj = weave_query.weave_query.ops.project(self.entity_name, self.project_name)
+            proj = weave.weave_query.ops.project(self.entity_name, self.project_name)
             history_nodes = []
             for seg in self.segments:
                 # This is the only use of the deprecated history2 op in the Weave
@@ -33,8 +33,8 @@ class RunChain:
 
                 history_nodes.append(hist_node)
 
-            history_node = weave_query.weave_query.ops.List.concat(
-                weave_query.weave_query.ops.make_list(
+            history_node = weave.weave_query.ops.List.concat(
+                weave.weave_query.ops.make_list(
                     **{f"node{i}": n for i, n in enumerate(history_nodes)}
                 )
             )
@@ -57,7 +57,7 @@ class RunChain:
 def run_chain(run_path: str) -> RunChain:
     with op_def.no_refine():
         entity, project, run_id = run_path.split("/")
-        proj = weave_query.weave_query.ops.project(entity, project)
+        proj = weave.weave_query.ops.project(entity, project)
         run = proj.run(run_id)
 
         # Get the checkpoint artifact for this one if one exists

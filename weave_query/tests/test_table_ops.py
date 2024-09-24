@@ -2,7 +2,7 @@ import os
 import time
 
 import pytest
-from weave.legacy.tests.util import weavejs_ops
+from weave_query.tests.util import weavejs_ops
 
 from weave_query.weave_query import api as weave
 from weave_query.weave_query import (

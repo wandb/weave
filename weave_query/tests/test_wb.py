@@ -4,7 +4,7 @@ import json
 import numpy as np
 import pytest
 import wandb
-from weave.legacy.tests.util import weavejs_ops
+from weave_query.tests.util import weavejs_ops
 
 from weave_query.weave_query import api as weave
 from weave_query.weave_query import (

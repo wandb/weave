@@ -2,8 +2,8 @@ import dataclasses
 
 import pytest
 import weave_query as weave
-import weave_query.weave_query
-import weave_query.weave_query.weave_types
+import weave.weave_query
+import weave.weave_query.weave_types
 
 from weave_query.weave_query import _dict_utils, runs
 from weave_query.weave_query import weave_types as types
@@ -155,23 +155,23 @@ def test_typeof_list_dict_merge():
 
 def test_typeof_nested_dict_merge():
     """Tests that nested merging is disabled."""
-    t1 = weave_query.weave_query.weave_types.TypedDict(
-        {"a": weave_query.weave_query.weave_types.TypedDict({"b": types.Int()})}
+    t1 = weave.weave_query.weave_types.TypedDict(
+        {"a": weave.weave_query.weave_types.TypedDict({"b": types.Int()})}
     )
-    t2 = weave_query.weave_query.weave_types.TypedDict(
-        {"a": weave_query.weave_query.weave_types.TypedDict({"c": types.String()})}
+    t2 = weave.weave_query.weave_types.TypedDict(
+        {"a": weave.weave_query.weave_types.TypedDict({"c": types.String()})}
     )
     merged_type = _dict_utils.typeddict_merge_output_type({"self": t1, "other": t2})
-    assert merged_type == weave_query.weave_query.weave_types.TypedDict(
-        {"a": weave_query.weave_query.weave_types.TypedDict({"c": types.String()})}
+    assert merged_type == weave.weave_query.weave_types.TypedDict(
+        {"a": weave.weave_query.weave_types.TypedDict({"c": types.String()})}
     )
 
 
 def test_dict_without_key_type():
-    fully_typed = weave_query.weave_query.weave_types.TypeRegistry.type_from_dict(
+    fully_typed = weave.weave_query.weave_types.TypeRegistry.type_from_dict(
         {"type": "dict", "keyType": "string", "objectType": "number"}
     )
-    partial_typed = weave_query.weave_query.weave_types.TypeRegistry.type_from_dict(
+    partial_typed = weave.weave_query.weave_types.TypeRegistry.type_from_dict(
         {"type": "dict", "objectType": "number"}
     )
     assert fully_typed.assign_type(partial_typed)
@@ -179,24 +179,24 @@ def test_dict_without_key_type():
 
 # def test_union_unknown():
 #     assert (
-#         weave_query.weave_query.weave_types.union(
-#             weave_query.weave_query.weave_types.String(), weave_query.weave_query.weave_types.UnknownType()
+#         weave.weave_query.weave_types.union(
+#             weave.weave_query.weave_types.String(), weave.weave_query.weave_types.UnknownType()
 #         )
-#         == weave_query.weave_query.weave_types.String()
+#         == weave.weave_query.weave_types.String()
 #     )
 #     assert (
-#         weave_query.weave_query.weave_types.union(
-#             weave_query.weave_query.weave_types.UnknownType(), weave_query.weave_query.weave_types.UnknownType()
+#         weave.weave_query.weave_types.union(
+#             weave.weave_query.weave_types.UnknownType(), weave.weave_query.weave_types.UnknownType()
 #         )
-#         == weave_query.weave_query.weave_types.UnknownType()
+#         == weave.weave_query.weave_types.UnknownType()
 #     )
 #     assert (
-#         weave_query.weave_query.weave_types.union(
-#             weave_query.weave_query.weave_types.UnknownType(),
-#             weave_query.weave_query.weave_types.UnknownType(),
+#         weave.weave_query.weave_types.union(
+#             weave.weave_query.weave_types.UnknownType(),
+#             weave.weave_query.weave_types.UnknownType(),
 #             weave.types.String(),
 #         )
-#         == weave_query.weave_query.weave_types.String()
+#         == weave.weave_query.weave_types.String()
 #     )
 
 
@@ -204,87 +204,87 @@ def test_union_access():
     ### Type return
 
     # Not all members have props
-    unioned = weave_query.weave_query.weave_types.union(
-        weave_query.weave_query.weave_types.String(),
-        weave_query.weave_query.weave_types.List(weave_query.weave_query.weave_types.String()),
+    unioned = weave.weave_query.weave_types.union(
+        weave.weave_query.weave_types.String(),
+        weave.weave_query.weave_types.List(weave.weave_query.weave_types.String()),
     )
     with pytest.raises(AttributeError):
         unioned.object_type
 
     # Combined dicts
-    unioned = weave_query.weave_query.weave_types.union(
-        weave_query.weave_query.weave_types.List(weave_query.weave_query.weave_types.String()),
-        weave_query.weave_query.weave_types.List(weave_query.weave_query.weave_types.Number()),
+    unioned = weave.weave_query.weave_types.union(
+        weave.weave_query.weave_types.List(weave.weave_query.weave_types.String()),
+        weave.weave_query.weave_types.List(weave.weave_query.weave_types.Number()),
     )
-    assert unioned.object_type == weave_query.weave_query.weave_types.union(
-        weave_query.weave_query.weave_types.String(), weave_query.weave_query.weave_types.Number()
+    assert unioned.object_type == weave.weave_query.weave_types.union(
+        weave.weave_query.weave_types.String(), weave.weave_query.weave_types.Number()
     )
 
     # Nullable type
-    unioned = weave_query.weave_query.weave_types.union(
-        weave_query.weave_query.weave_types.NoneType(),
-        weave_query.weave_query.weave_types.List(weave_query.weave_query.weave_types.String()),
+    unioned = weave.weave_query.weave_types.union(
+        weave.weave_query.weave_types.NoneType(),
+        weave.weave_query.weave_types.List(weave.weave_query.weave_types.String()),
     )
-    assert unioned.object_type == weave_query.weave_query.weave_types.union(
-        weave_query.weave_query.weave_types.String(),
-        weave_query.weave_query.weave_types.NoneType(),
+    assert unioned.object_type == weave.weave_query.weave_types.union(
+        weave.weave_query.weave_types.String(),
+        weave.weave_query.weave_types.NoneType(),
     )
 
     ### Dict Return
     # Not all members have props
-    unioned = weave_query.weave_query.weave_types.union(
-        weave_query.weave_query.weave_types.String(),
-        weave_query.weave_query.weave_types.TypedDict(
-            {"a": weave_query.weave_query.weave_types.String()}
+    unioned = weave.weave_query.weave_types.union(
+        weave.weave_query.weave_types.String(),
+        weave.weave_query.weave_types.TypedDict(
+            {"a": weave.weave_query.weave_types.String()}
         ),
     )
     with pytest.raises(AttributeError):
         unioned.property_types
 
     # Combined dicts
-    unioned = weave_query.weave_query.weave_types.union(
-        weave_query.weave_query.weave_types.TypedDict(
+    unioned = weave.weave_query.weave_types.union(
+        weave.weave_query.weave_types.TypedDict(
             {
-                "same": weave_query.weave_query.weave_types.Number(),
-                "solo_a": weave_query.weave_query.weave_types.Number(),
-                "differ": weave_query.weave_query.weave_types.Number(),
+                "same": weave.weave_query.weave_types.Number(),
+                "solo_a": weave.weave_query.weave_types.Number(),
+                "differ": weave.weave_query.weave_types.Number(),
             }
         ),
-        weave_query.weave_query.weave_types.TypedDict(
+        weave.weave_query.weave_types.TypedDict(
             {
-                "same": weave_query.weave_query.weave_types.Number(),
-                "solo_b": weave_query.weave_query.weave_types.String(),
-                "differ": weave_query.weave_query.weave_types.String(),
+                "same": weave.weave_query.weave_types.Number(),
+                "solo_b": weave.weave_query.weave_types.String(),
+                "differ": weave.weave_query.weave_types.String(),
             }
         ),
     )
     assert unioned.property_types == {
-        "same": weave_query.weave_query.weave_types.Number(),
-        "solo_a": weave_query.weave_query.weave_types.union(
-            weave_query.weave_query.weave_types.Number(),
-            weave_query.weave_query.weave_types.NoneType(),
+        "same": weave.weave_query.weave_types.Number(),
+        "solo_a": weave.weave_query.weave_types.union(
+            weave.weave_query.weave_types.Number(),
+            weave.weave_query.weave_types.NoneType(),
         ),
-        "solo_b": weave_query.weave_query.weave_types.union(
-            weave_query.weave_query.weave_types.String(),
-            weave_query.weave_query.weave_types.NoneType(),
+        "solo_b": weave.weave_query.weave_types.union(
+            weave.weave_query.weave_types.String(),
+            weave.weave_query.weave_types.NoneType(),
         ),
-        "differ": weave_query.weave_query.weave_types.union(
-            weave_query.weave_query.weave_types.Number(),
-            weave_query.weave_query.weave_types.String(),
+        "differ": weave.weave_query.weave_types.union(
+            weave.weave_query.weave_types.Number(),
+            weave.weave_query.weave_types.String(),
         ),
     }
 
     # Nullable type
-    unioned = weave_query.weave_query.weave_types.union(
-        weave_query.weave_query.weave_types.NoneType(),
-        weave_query.weave_query.weave_types.TypedDict(
-            {"a": weave_query.weave_query.weave_types.String()}
+    unioned = weave.weave_query.weave_types.union(
+        weave.weave_query.weave_types.NoneType(),
+        weave.weave_query.weave_types.TypedDict(
+            {"a": weave.weave_query.weave_types.String()}
         ),
     )
     assert unioned.property_types == {
-        "a": weave_query.weave_query.weave_types.union(
-            weave_query.weave_query.weave_types.String(),
-            weave_query.weave_query.weave_types.NoneType(),
+        "a": weave.weave_query.weave_types.union(
+            weave.weave_query.weave_types.String(),
+            weave.weave_query.weave_types.NoneType(),
         )
     }
 

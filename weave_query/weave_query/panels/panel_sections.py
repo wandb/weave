@@ -11,7 +11,7 @@ RenderType = typing.TypeVar("RenderType")
 @weave.type()
 class SectionsConfig(typing.Generic[RenderType]):
     section: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
-        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
+        default_factory=lambda: weave.weave_query.graph.VoidNode()
     )
     panel: RenderType = dataclasses.field(default_factory=lambda: graph.VoidNode())  # type: ignore
 

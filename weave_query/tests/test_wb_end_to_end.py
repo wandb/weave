@@ -11,7 +11,7 @@ def test_run_logging(user_by_api_key_in_env):
     run.finish()
 
     summary_node = (
-        weave_query.weave_query.ops.project(run.entity, run.project)
+        weave.weave_query.ops.project(run.entity, run.project)
         .run(run.id)
         .summary()["a"]
     )
@@ -19,11 +19,11 @@ def test_run_logging(user_by_api_key_in_env):
 
     assert summary == 1
 
-    is_none_node = weave_query.weave_query.ops.project(run.entity, run.project).isNone()
+    is_none_node = weave.weave_query.ops.project(run.entity, run.project).isNone()
 
     assert weave.use(is_none_node) == False
 
-    is_none_node = weave_query.weave_query.ops.project(
+    is_none_node = weave.weave_query.ops.project(
         run.entity, "project_does_not_exist"
     ).isNone()
 
@@ -62,7 +62,7 @@ def _test_basic_publish(user_fixture):
         uri
         == f"wandb-artifact:///{user_fixture.username}/weave/list:0cdf3358dc939f961ca9/obj"
     )
-    assert weave_query.weave_query.ref_base.Ref.from_str(uri).get() == [1, 2, 3]
+    assert weave.weave_query.ref_base.Ref.from_str(uri).get() == [1, 2, 3]
 
 
 # Example of end to end integration test
@@ -76,7 +76,7 @@ def test_run_histories(user_by_api_key_in_env):
     run.finish()
 
     history_node = (
-        weave_query.weave_query.ops.project(run.entity, run.project)
+        weave.weave_query.ops.project(run.entity, run.project)
         .runs()
         .history()
         .concat()["a"]
@@ -94,7 +94,7 @@ def test_run_history_count(user_by_api_key_in_env, cache_mode_minimal):
     run.log({"a": 2})
     run.finish()
 
-    run_node = weave_query.weave_query.ops.project(run.entity, run.project).run(run.id)
+    run_node = weave.weave_query.ops.project(run.entity, run.project).run(run.id)
     h_count_node = run_node.history().count()
     history_count = weave.use(h_count_node)
     assert history_count == 2
