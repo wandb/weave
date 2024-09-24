@@ -89,7 +89,7 @@ person = extract_person("My name is John and I am 20 years old")
 
 Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](../core-types/models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app. 
 
-In addition to versioning code and capturing inputs/outputs, [`Model`](../core-types/models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](../core-types/evaluations.md)s.
+In addition to versioning code and capturing inputs/outputs, [`Model`](../core-types/models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve` (see below), and [`Evaluation`](../core-types/evaluations.md)s.
 
 In the example below, you can experiment with `PersonExtractor`. Every time you change one of these, you'll get a new _version_ of `PersonExtractor`.
 
@@ -151,7 +151,7 @@ asyncio.run(model.predict("John is 30 years old"))
 
 ## Serving a Weave Model
 
-Given a weave reference any `weave.Model` object, you can spin up a fastapi server and [serve](https://wandb.github.io/weave/guides/tools/serve) it.
+Given a weave reference a `weave.Model` object, you can spin up a fastapi server and [`serve`](https://wandb.github.io/weave/guides/tools/serve) it.
 
 | [![](./imgs/instructor/instructor_serve.png)](https://wandb.ai/geekyrakshit/instructor-test/weave/objects/PersonExtractor/versions/xXpMsJvaiTOjKafz1TnHC8wMgH5ZAAwYOaBMvHuLArI) |
 |----------------------------------------------------------------------------------------------------------------------------------------------------------------|
