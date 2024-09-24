@@ -1,6 +1,7 @@
 """Defines the Op protocol and related functions."""
 
 import inspect
+import logging
 import sys
 import typing
 from functools import partial, wraps
@@ -23,9 +24,12 @@ from typing import (
 from weave.legacy.weave import context_state
 from weave.trace import box, call_context, settings
 from weave.trace.client_context import weave_client as weave_client_context
-from weave.trace.context import call_attributes
+from weave.trace.context import call_attributes, get_raise_on_captured_errors
 from weave.trace.errors import OpCallError
+from weave.trace.op_extensions.log_once import log_once
 from weave.trace.refs import ObjectRef
+
+logger = logging.getLogger(__name__)
 
 from .constants import TRACE_CALL_EMOJI
 
@@ -236,7 +240,21 @@ def _execute_call(
 
     def process(res: Any) -> Any:
         res = box.box(res)
-        res = on_output(res)
+        try:
+            # Here we do a try/catch because we don't want to
+            # break the user process if we trip up on processing
+            # the output
+            res = on_output(res)
+        except Exception as e:
+            log_once(logger.error, f"Error capturing call output: {e}")
+            if get_raise_on_captured_errors():
+                raise
+        finally:
+            # Is there a better place for this? We want to ensure that even
+            # if the final output fails to be captured, we still pop the call
+            # so we don't put future calls under the old call.
+            call_context.pop_call(call.id)
+
         return res, call
 
     def handle_exception(e: Exception) -> Any:
