@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Optional
 
 from pydantic import BaseModel
 
@@ -9,7 +9,7 @@ from weave.trace.op_extensions.accumulator import add_accumulator
 
 def instructor_iterable_accumulator(
     acc: Optional[BaseModel], value: BaseModel
-) -> List[BaseModel]:
+) -> list[BaseModel]:
     if acc is None:
         acc = [value]
     if acc[-1] != value:
@@ -17,7 +17,7 @@ def instructor_iterable_accumulator(
     return acc
 
 
-def should_accumulate_iterable(inputs: Dict) -> bool:
+def should_accumulate_iterable(inputs: dict) -> bool:
     if isinstance(inputs, dict):
         if "stream" in inputs:
             return inputs["stream"]
