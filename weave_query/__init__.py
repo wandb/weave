@@ -18,13 +18,13 @@ from weave_query.weave_query import storage
 from weave_query.weave_query.api import *
 from weave_query.weave_query.decorators import op
 
-# from .errors import *
+from .errors import *
 
 from weave_query.weave_query import mappers_python_def
 
 from weave_query.weave_query import wandb_api as _wandb_api
 
-from weave_query import version
+from weave_query.weave_query import version
 
 _wandb_api.init()
 
