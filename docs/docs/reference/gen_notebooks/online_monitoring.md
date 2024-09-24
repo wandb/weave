@@ -25,7 +25,7 @@ In this cookbook, we'll demonstrate how to leverage Weave's powerful APIs and fu
 * Creating aggregate views for user feedback and cost distribution
 * Creating visualizations for token usage and latency over time
 
-You can try out the dashboard with your own Weave project by installing streamlit and running [this script](https://github.com/NiWaRe/knowledge-worker-weave/blob/master/prod_dashboard.py)!
+You can try out the dashboard with your own Weave project by installing streamlit and running [this production dashboard script](https://github.com/NiWaRe/agent-dev-collection)!
 
 <img src="https://github.com/NiWaRe/knowledge-worker-weave/blob/master/screenshots/dashboard_weave_preview.jpg?raw=true" width="1000" alt="Example Production Dashboard with Weave" />
 
@@ -219,9 +219,4 @@ In this cookbook, we demonstrated how to create a custom production monitoring d
     * Easy download of the data in CSV, TSV, JSONL, JSON formats - see [here](https://weave-docs.wandb.ai/guides/tracking/tracing#querying--exporting-calls) for more details.
     * Easy export using programmatic access to the data - see "Use Python" section in the export panel as described in this cookbook. See [here](https://weave-docs.wandb.ai/guides/tracking/tracing#querying--exporting-calls) for more details.
 
-This custom dashboard extends Weave's native Traces view, allowing for tailored monitoring of LLM applications in production. If you're interested in viewing a more complex dashboard, check out a Streamlit example [here](https://github.com/NiWaRe/knowledge-worker-weave/blob/master/prod_dashboard.py).
-
-
-```python
-
-```
+This custom dashboard extends Weave's native Traces view, allowing for tailored monitoring of LLM applications in production. If you're interested in viewing a more complex dashboard, check out a Streamlit example where you can add your own Weave project URL [in this repo](https://github.com/NiWaRe/agent-dev-collection).
