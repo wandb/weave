@@ -1,4 +1,3 @@
-import OpenAI from "openai";
 import { op } from "../op";
 import { weaveImage } from "../media";
 
@@ -68,7 +67,7 @@ const openAIStreamReducer = {
 
 export function makeOpenAIChatCompletionsOp(originalCreate: any) {
   return op(
-    async function (...args: Parameters<typeof originalCreate>) {
+    function (...args: Parameters<typeof originalCreate>) {
       const [originalParams]: any[] = args;
       const params = { ...originalParams }; // Create a shallow copy of the params
 
@@ -79,9 +78,12 @@ export function makeOpenAIChatCompletionsOp(originalCreate: any) {
           include_usage: true,
         };
 
-        return await originalCreate(params);
+        return originalCreate(params);
       } else {
-        return await originalCreate(originalParams);
+        const result = originalCreate(originalParams);
+        // console.log("result", result, result._thenUnwrap);
+        return result;
+        // return originalCreate(originalParams);
       }
     },
     {
@@ -130,25 +132,95 @@ export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
   );
 }
 
-export function wrapOpenAI<T>(openai: T): T {
-  //   if (!openai) {
-  //     openai = new OpenAI() as T;
-  //   }
-  if (!(openai as any)?.chat?.completions?.create) {
-    throw new Error("OpenAI client does not have chat.completions.create");
-  }
+interface OpenAIAPI {
+  chat: {
+    completions: {
+      create: any;
+    };
+  };
+  images: {
+    generate: any;
+  };
+  beta: {
+    chat: {
+      completions: {
+        parse: any;
+      };
+    };
+  };
+}
 
-  const originalCreate = (openai as any).chat.completions.create.bind(
-    (openai as any).chat.completions
-  );
-  (openai as any).chat.completions.create =
-    makeOpenAIChatCompletionsOp(originalCreate);
+export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
+  const chatCompletionsProxy = new Proxy(openai.chat.completions, {
+    get(target, p, receiver) {
+      const targetVal = Reflect.get(target, p, receiver);
+      if (p === "create") {
+        return makeOpenAIChatCompletionsOp(targetVal.bind(target));
+      }
+      return targetVal;
+    },
+  });
+  const chatProxy = new Proxy(openai.chat, {
+    get(target, p, receiver) {
+      const targetVal = Reflect.get(target, p, receiver);
+      if (p === "completions") {
+        return chatCompletionsProxy;
+      }
+      return targetVal;
+    },
+  });
 
-  const originalGenerate = (openai as any).images.generate.bind(
-    (openai as any).images
-  );
-  (openai as any).images.generate =
-    makeOpenAIImagesGenerateOp(originalGenerate);
+  const imagesProxy = new Proxy(openai.images, {
+    get(target, p, receiver) {
+      const targetVal = Reflect.get(target, p, receiver);
+      if (p === "generate") {
+        return makeOpenAIImagesGenerateOp(targetVal.bind(target));
+      }
+      return targetVal;
+    },
+  });
 
-  return openai;
+  const betaChatCompletionsProxy = new Proxy(openai.beta.chat.completions, {
+    get(target, p, receiver) {
+      const targetVal = Reflect.get(target, p, receiver);
+      if (p === "parse") {
+        return makeOpenAIChatCompletionsOp(targetVal.bind(target));
+      }
+      return targetVal;
+    },
+  });
+  const betaChatProxy = new Proxy(openai.beta.chat, {
+    get(target, p, receiver) {
+      const targetVal = Reflect.get(target, p, receiver);
+      if (p === "completions") {
+        return betaChatCompletionsProxy;
+      }
+      return targetVal;
+    },
+  });
+  const betaProxy = new Proxy(openai.beta, {
+    get(target, p, receiver) {
+      const targetVal = Reflect.get(target, p, receiver);
+      if (p === "chat") {
+        return betaChatProxy;
+      }
+      return targetVal;
+    },
+  });
+
+  return new Proxy(openai, {
+    get(target, p, receiver) {
+      const targetVal = Reflect.get(target, p, receiver);
+      if (p === "chat") {
+        return chatProxy;
+      }
+      if (p === "images") {
+        return imagesProxy;
+      }
+      if (p === "beta") {
+        return betaProxy;
+      }
+      return targetVal;
+    },
+  });
 }
