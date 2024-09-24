@@ -703,8 +703,11 @@ class WeaveClient:
         *,
         postprocess_output: Optional[Callable[..., Any]] = None,
     ) -> None:
+        parse_obj_functions = []
         if should_convert_paths_to_images():
-            output = convert_paths_to_images(output)
+            parse_obj_functions.append(convert_paths_to_images)
+
+        output = parse_obj(output, parse_obj_functions)
         self._save_nested_objects(output)
         original_output = output
 
@@ -1482,51 +1485,71 @@ image_suffix = r".*\.(png|jpg|jpeg|gif|tiff)"
 local_image_pattern = re.compile(rf"^{image_suffix}$", re.IGNORECASE)
 remote_image_pattern = re.compile(rf"https://.*\.{image_suffix}", re.IGNORECASE)
 
-pil_dependency = False
+pil_package_available = False
 try:
     from PIL import Image
 
-    pil_dependency = True
+    pil_package_available = True
 except ImportError:
     pass
 
 
-def convert_paths_to_images(obj: Any) -> Any:
-    """
-    Iterate through the object and find paths to local and remote images.
+def convert_paths_to_images(obj: str) -> typing.Union[str, PathImage]:
+    """Load or download paths to images as PathImage objects.
 
     If the path is a local image, open it and return a PathImage object.
     If the path is a remote image, download it and return a PathImage object.
     """
-    if not pil_dependency:
+    if not pil_package_available:
         return obj
 
+    if remote_image_pattern.match(obj):
+        try:
+            # Load the image from remote resource
+            img = requests.get(obj, stream=True).raw
+            return PathImage(img=Image.open(img), path=obj)
+        except Exception as e:
+            logger.warning(f"Failed to load remote image file: {obj}. {e}")
+    elif local_image_pattern.match(obj):
+        try:
+            return PathImage(img=Image.open(obj), path=obj)
+        except Exception as e:
+            logger.warning(f"Failed to open image file: {obj}. {e}")
+
+    return obj
+
+
+def parse_obj(obj: Any, *parsers: Callable[[Any], Any]) -> Any:
+    """Parse an object with registered conversion parsers.
+    Acceps any number of functions that do operations on the object.
+    Returns the modified object
+    """
     # Dont mutate reffed objects
     if get_ref(obj):
         return obj
 
+    # recurse through container types
     if isinstance(obj, dict):
-        obj = {k: convert_paths_to_images(v) for k, v in obj.items()}
+        obj = {k: parse_obj(v, *parsers) for k, v in obj.items()}
     elif isinstance(obj, list):
-        obj = [convert_paths_to_images(v) for v in obj]
+        obj = [parse_obj(v, *parsers) for v in obj]
     elif isinstance_namedtuple(obj):
-        obj = {k: convert_paths_to_images(v) for k, v in obj._asdict().items()}
+        obj = {k: parse_obj(v, *parsers) for k, v in obj._asdict().items()}
     elif isinstance(obj, tuple):
-        obj = tuple([convert_paths_to_images(v) for v in obj])
-    elif isinstance(obj, str):
-        if remote_image_pattern.match(obj):
-            try:
-                # Load the image from remote resource
-                img = requests.get(obj, stream=True).raw
-                return PathImage(img=Image.open(img), path=obj)
-            except Exception as e:
-                logger.warning(f"Failed to load remote image file: {obj}. {e}")
-        elif local_image_pattern.match(obj):
-            try:
-                return PathImage(img=Image.open(obj), path=obj)
-            except Exception as e:
-                logger.warning(f"Failed to open image file: {obj}. {e}")
+        obj = tuple([parse_obj(v, *parsers) for v in obj])
 
+    # apply parsers to primatives
+    if isinstance(obj, str):
+        for parser in parsers:
+            try:
+                # Check if the parser accepts a string type as a parameter
+                param_types = typing.get_type_hints(parser)
+                if "obj" in param_types and param_types["obj"] == str:
+                    obj = parser(obj)
+            except TypeError:
+                # If the parser does not have type hints, don't operate
+                # on the object, just continue
+                continue
     return obj
 
 

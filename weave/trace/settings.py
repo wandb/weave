@@ -73,8 +73,9 @@ class UserSettings(BaseModel):
             text, url = generate_text_and_image(prompt)
             return {"text": text, "image": url}
 
-        If WEAVE_CONVERT_PATHS_TO_IMAGES=true, `image` will be converted to PathImage
-        and stored as an object."""
+        If WEAVE_CONVERT_PATHS_TO_IMAGES=false, `image` will be remain as a string.
+        Otherwise, it will automatically be converted to a PathImage object.
+    """
 
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
