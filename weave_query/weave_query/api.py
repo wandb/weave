@@ -25,7 +25,7 @@ from weave_query.weave_query import weave_types as types
 from . import types_numpy as _types_numpy
 
 from weave_query.weave_query import errors
-from weave_query.weave_query.decorators import weave_class, mutation, type
+from weave_query.weave_query.decorators import weave_class, mutation, type, op
 
 from weave_query.weave_query import usage_analytics
 from weave_query.weave_query.context import (
@@ -40,7 +40,7 @@ from weave_query.weave_query.panel import Panel
 from weave_query.weave_query.arrow.list_ import ArrowWeaveList as WeaveList
 
 # TODO: This is here because the op overloaded...
-from weave_query.weave_query.decorator_op import op
+# from weave_query.weave_query.decorator_op import op
 
 
 def save(node_or_obj, name=None):  # type: ignore

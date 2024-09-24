@@ -16,6 +16,7 @@ from weave_query.weave_query import weave_types as types
 from weave_query.weave_query import storage
 
 from weave_query.weave_query.api import *
+from weave_query.weave_query.decorators import op
 
 # from .errors import *
 
