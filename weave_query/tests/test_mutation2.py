@@ -1,5 +1,5 @@
-import weave
-from weave_query.weave_query import ref_base, uris, weave_internal
+import weave_query as weave
+from weave_query.weave_query import weave_internal
 
 
 def test_mutation_set_direct_call():

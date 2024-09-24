@@ -1,13 +1,8 @@
-import dataclasses
-import pickle
 import typing
 
 import huggingface_hub
-import torch
-import transformers
 
-import weave
-from weave_query.weave_query.ecosystem import pytorch
+import weave_query as weave
 from weave_query.weave_query.ecosystem.huggingface import (
     hfmodel,
     model_textclassification,

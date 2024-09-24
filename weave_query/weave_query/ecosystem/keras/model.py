@@ -8,7 +8,7 @@ TODOS:
     - [ ] Add a single `call` method to the model class where the input data type is
         dependent on the model type. Shawn has ideas around how to do this (to make the
         type of arguments dependent on previous arguments). Moreover, the return type
-        will also be dependent on the model. Currently we have a nasty `call_string_to_number` and `call_string_to_string` 
+        will also be dependent on the model. Currently we have a nasty `call_string_to_number` and `call_string_to_string`
         as placeholders.
     - [ ] Figure out the correct way to do batching. There are two considerations:
         1. We allow tensors to have any number of `None` dimensions. We may want to remove this allowance, or restrict to just a single `None` dimension.
@@ -18,16 +18,16 @@ TODOS:
         2. The input is a URL - we need a way to nicely interop with the rest of the Images in our ecosystem.
 """
 
-
+import typing
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Type, Union
-import typing
-from tensorflow import keras
+
 from keras.engine import keras_tensor
+from tensorflow import keras
 from tensorflow.python.framework import dtypes
 
-import weave
+import weave_query as weave
 
 
 class DTYPE_NAME(Enum):

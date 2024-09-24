@@ -3,8 +3,7 @@ import copy
 import dataclasses
 import typing
 
-import weave
-
+import weave_query as weave
 from weave_query.weave_query import (
     codifiable_value_mixin,
     codify,

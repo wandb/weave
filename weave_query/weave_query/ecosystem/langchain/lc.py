@@ -40,9 +40,8 @@ from langchain.schema import BaseRetriever
 from langchain.vectorstores import FAISS, VectorStore
 from langchain.vectorstores.base import VectorStoreRetriever
 
-import weave
-from weave_query.weave_query import storage
-from weave_query.weave_query import artifact_base
+import weave_query as weave
+from weave_query.weave_query import artifact_base, storage
 from weave_query.weave_query.artifact_fs import FilesystemArtifact
 from weave_query.weave_query.ecosystem.langchain import util
 from weave_query.weave_query.ops_domain import trace_tree

@@ -1,9 +1,8 @@
 import dataclasses
 import typing
 
-import weave
-from weave_query.weave_query import weave_internal
-from weave_query.weave_query import panel_util
+import weave_query as weave
+from weave_query.weave_query import panel_util, weave_internal
 from weave_query.weave_query.ecosystem.wandb import weave_plotly
 
 

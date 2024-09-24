@@ -1,5 +1,6 @@
-import weave
 import dataclasses
+
+import weave_query as weave
 
 
 class TweetType(weave.types.ObjectType):

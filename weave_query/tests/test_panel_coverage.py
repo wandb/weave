@@ -1,6 +1,3 @@
-import weave
-
-
 def inheritors(klass):
     subclasses = set()
     work = [klass]

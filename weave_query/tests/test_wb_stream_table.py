@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-import weave
+import weave_query as weave
 from weave_query.weave_query import (
     context,
     execute,

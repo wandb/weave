@@ -12,9 +12,8 @@ import numpy as np
 import shap
 import xgboost
 
-import weave
+import weave_query as weave
 from weave_query.weave_query.ecosystem import huggingface as hf
-from weave_query.weave_query.ecosystem import xgboost as weave_xgb
 
 
 @weave.op(

@@ -10,8 +10,8 @@ import itertools
 import typing
 
 import pytest
-import weave
 
+import weave_query as weave
 from weave_query.tests.util.concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,

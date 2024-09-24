@@ -1,8 +1,7 @@
 import dataclasses
 import typing
 
-import weave
-
+import weave_query as weave
 from weave_query.weave_query import graph, panel, panel_util, weave_internal
 from weave_query.weave_query import weave_types as types
 from weave_query.weave_query.arrow import list_

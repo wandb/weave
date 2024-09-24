@@ -5,7 +5,7 @@ import numpy as np
 import pyarrow as pa
 import pytest
 
-import weave
+import weave_query as weave
 from weave_query.weave_query import api, ops, storage, weave_internal
 from weave_query.weave_query import weave_types as types
 from weave_query.weave_query.ops_arrow import ArrowWeaveList, arrow_as_array

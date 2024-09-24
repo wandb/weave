@@ -1,7 +1,7 @@
 import pytest
 import wandb
 
-import weave
+import weave_query as weave
 from weave_query.weave_query import async_demo, compile, graph
 from weave_query.weave_query import weave_types as types
 from weave_query.weave_query.api import use
@@ -9,7 +9,7 @@ from weave_query.weave_query.dispatch import RuntimeOutputNode
 from weave_query.weave_query.ops_arrow import to_arrow
 from weave_query.weave_query.ops_arrow.vectorize import raise_on_python_bailout
 from weave_query.weave_query.wandb_interface.wandb_stream_table import StreamTable
-from weave_query.weave_query.weave_internal import const, define_fn, make_const_node
+from weave_query.weave_query.weave_internal import define_fn, make_const_node
 
 
 def test_automatic_await_compile():

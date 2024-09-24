@@ -1,5 +1,6 @@
-import weave
 from weave.file_base import Dir
+
+import weave_query as weave
 from weave_query.weave_query.ecosystem.slack import slackapi_readexport
 
 

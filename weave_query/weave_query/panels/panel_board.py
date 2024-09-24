@@ -1,9 +1,6 @@
 import dataclasses
 import typing
 
-import weave
-
-from weave_query.weave_query import panel, weave_internal
 from weave_query.weave_query.panels import panel_group
 
 

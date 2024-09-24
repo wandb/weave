@@ -1,11 +1,9 @@
 import os
 
-import weave
-
-from weave_query.weave_query import dispatch, graph, util, weave_internal
-from weave_query.weave_query import weave_internal as internal
+import weave_query as weave
+from weave_query.weave_query import graph, util, weave_internal
 from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.panels import panel_board, panel_group, panel_trace
+from weave_query.weave_query.panels import panel_board, panel_trace
 from weave_query.weave_query.panels.panel_trace_span import (
     TraceSpanModelPanel,
     TraceSpanPanel,

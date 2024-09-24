@@ -1,13 +1,13 @@
-import replicate
+import logging
 import os
+import shutil
 import tempfile
-import weave
 
+import replicate
+import requests
 from PIL import Image
 
-import requests
-import shutil
-import logging
+import weave_query as weave
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,6 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
-
 
 try:
     with open(os.path.expanduser("~/.replicate_api_token")) as f:

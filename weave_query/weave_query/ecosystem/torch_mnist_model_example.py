@@ -2,12 +2,11 @@ import dataclasses
 import typing
 
 import torch
-import weave
 from torch import nn, optim
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-from weave_query.weave_query import context_state as _context
+import weave_query as weave
 from weave_query.weave_query.ecosystem import pytorch
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -10,7 +10,7 @@ from typing_extensions import (
     TypedDict,
 )
 
-import weave
+import weave_query as weave
 from weave_query.weave_query import ops_arrow
 
 UMAP_LIB = None

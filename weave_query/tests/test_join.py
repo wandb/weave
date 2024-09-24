@@ -1,5 +1,4 @@
-import weave
-from weave_query.weave_query import ops_arrow
+import weave_query as weave
 from weave_query.weave_query.wandb_interface.wandb_stream_table import StreamTable
 
 

@@ -2,7 +2,7 @@
 
 import typing
 
-import weave
+import weave_query as weave
 from weave_query.weave_query import box, context_state
 from weave_query.weave_query.language_features.tagging import (
     make_tag_getter_op,

@@ -1,8 +1,6 @@
 import typing
 
-import pytest
-
-import weave
+import weave_query as weave
 from weave_query.weave_query import compile_domain, compile_table, weave_internal
 from weave_query.weave_query import context_state as _context
 from weave_query.weave_query.language_features.tagging import make_tag_getter_op

@@ -1,10 +1,9 @@
 import contextlib
 import os
-import time
 
 import pytest
 
-import weave
+import weave_query as weave
 from weave_query.weave_query.monitoring import monitor
 
 ### Skipping some tests here. They are for features that no longer exist. Since we're

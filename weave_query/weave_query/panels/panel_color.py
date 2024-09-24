@@ -1,9 +1,8 @@
 import dataclasses
 import typing
 
-import weave
-
-from weave_query.weave_query import graph, panel, panel_util
+import weave_query as weave
+from weave_query.weave_query import panel
 
 
 @weave.type()

@@ -3,7 +3,7 @@ import typing
 
 import pytest
 
-import weave
+import weave_query as weave
 from weave_query.weave_query.ops_primitives import date
 
 

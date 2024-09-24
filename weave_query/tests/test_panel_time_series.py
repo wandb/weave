@@ -2,7 +2,7 @@ import time
 
 import wandb
 
-import weave
+import weave_query as weave
 from weave_query.weave_query.ecosystem.wandb.panel_time_series import TimeSeries
 
 

@@ -1,8 +1,7 @@
 import json
 import typing
 
-import weave
-
+import weave_query as weave
 from weave_query.weave_query import compile, op_def, ops_arrow
 from weave_query.weave_query.ecosystem.wandb import gql_artifact_dag
 

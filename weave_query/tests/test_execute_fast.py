@@ -1,5 +1,4 @@
-import weave
-
+import weave_query as weave
 from weave_query.tests.util import weavejs_ops
 from weave_query.weave_query import dispatch, weave_internal
 from weave_query.weave_query import weave_types as types

@@ -1,10 +1,6 @@
-import weave
+import weave_query as weave
 from weave_query.weave_query import context_state as _context
-from weave_query.weave_query import graph
 from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.weave_internal import make_const_node
-
-from ...legacy.weave import registry_mem
 
 _loading_builtins_token = _context.set_loading_built_ins()
 

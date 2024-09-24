@@ -2,7 +2,7 @@ import dataclasses
 
 import pytest
 
-import weave
+import weave_query as weave
 import weave_query.weave_query
 import weave_query.weave_query.weave_types
 from weave_query.weave_query import _dict_utils, runs
@@ -11,8 +11,6 @@ from weave_query.weave_query.language_features.tagging.tagged_value_type import 
     TaggedValueType,
 )
 from weave_query.weave_query.ops_domain import wbmedia
-
-from ... import errors
 
 
 def test_typeof_string():

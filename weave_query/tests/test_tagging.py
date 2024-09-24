@@ -1,9 +1,8 @@
 import pytest
 
-import weave
+import weave_query as weave
 from weave_query.weave_query import box, weave_internal
 from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.artifact_fs import FilesystemArtifactFileType
 from weave_query.weave_query.language_features.tagging import (
     make_tag_getter_op,
     tag_store,

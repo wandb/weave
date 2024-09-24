@@ -2,7 +2,7 @@ import pickle
 
 import spacy as spacy_lib
 
-import weave
+import weave_query as weave
 
 
 class SpacyDocType(weave.types.Type):

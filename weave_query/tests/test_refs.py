@@ -1,10 +1,9 @@
 import pytest
-
-import weave
 from weave.flow.obj import Object
-from weave_query.weave_query import artifact_local, storage
+
+import weave_query as weave
+from weave_query.weave_query import artifact_local, ref_util, storage
 from weave_query.weave_query import ops_arrow as arrow
-from weave_query.weave_query import ref_util
 from weave_query.weave_query.refs_internal import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,

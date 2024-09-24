@@ -43,7 +43,7 @@ from hypothesis import example, given, settings
 from hypothesis import strategies as st
 from hypothesis.strategies import composite
 
-import weave
+import weave_query as weave
 from weave_query.weave_query import artifact_local, ops_arrow, ops_primitives, storage
 from weave_query.weave_query.arrow import convert
 from weave_query.weave_query.language_features.tagging import tag_store

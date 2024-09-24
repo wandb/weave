@@ -2,7 +2,7 @@ import typing
 
 import requests
 
-import weave
+import weave_query as weave
 
 
 @weave.type()

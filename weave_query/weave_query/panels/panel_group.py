@@ -2,8 +2,7 @@ import copy
 import dataclasses
 import typing
 
-import weave
-
+import weave_query as weave
 from weave_query.weave_query import (
     codifiable_value_mixin,
     codify,
@@ -18,7 +17,6 @@ from weave_query.weave_query.panels.bank import (
     default_panel_bank_flow_section_config,
     flow_layout,
 )
-from weave_query.weave_query.panels.panel_group_panel_info import PanelInfo
 
 ItemsType = typing.TypeVar("ItemsType")
 

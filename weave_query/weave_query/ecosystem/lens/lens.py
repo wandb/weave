@@ -1,9 +1,11 @@
-import numpy as np
+import io
+
 import matplotlib
 import matplotlib.pyplot as plt
-import io
+import numpy as np
 from PIL import Image
-import weave
+
+import weave_query as weave
 
 matplotlib.use("agg")
 
@@ -59,7 +61,7 @@ def histogram(
             alpha=0.5,
             label=series_names[series_id],
             color=curr_color,
-            **kwargs
+            **kwargs,
         )
 
     ax.set_xticks(np.arange(min_val - bin_size, max_val + bin_size, bin_size))

@@ -1,6 +1,6 @@
 import pytest
-import weave
 
+import weave_query as weave
 from weave_query.tests.util.list_arrow_test_helpers import ArrowNode
 from weave_query.weave_query import box, weave_internal
 from weave_query.weave_query.arrow.arrow import ArrowWeaveListType

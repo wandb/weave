@@ -1,12 +1,9 @@
 import os
-import typing
 
-import weave
-
-from weave_query.weave_query import dispatch, util, weave_internal
-from weave_query.weave_query import weave_internal as internal
+import weave_query as weave
+from weave_query.weave_query import util, weave_internal
 from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.panels import panel_board, panel_group
+from weave_query.weave_query.panels import panel_board
 from weave_query.weave_query.panels_py import panel_autoboard
 from weave_query.weave_query.panels_py.generator_templates import template_registry
 

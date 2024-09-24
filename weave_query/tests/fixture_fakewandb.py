@@ -9,8 +9,8 @@ from unittest import mock
 from urllib import parse
 
 import wandb
-import weave
 
+import weave_query as weave
 from weave_query.tests.util.tag_test_util import op_add_tag
 
 # Note: We're mocking out the whole io_service right now. This is too

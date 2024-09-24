@@ -1,6 +1,6 @@
 import pytest
 
-import weave
+import weave_query as weave
 
 types = weave.types.get_type_classes()
 

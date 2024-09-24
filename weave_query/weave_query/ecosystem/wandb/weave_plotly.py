@@ -6,9 +6,9 @@ import typing
 import pandas as pd
 import plotly
 import plotly.express as px
-import weave
 from plotly import graph_objs as go
 
+import weave_query as weave
 from weave_query.weave_query import infer_types, weave_internal
 
 

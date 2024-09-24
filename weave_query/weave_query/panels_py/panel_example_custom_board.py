@@ -1,5 +1,4 @@
-import weave
-
+import weave_query as weave
 from weave_query.weave_query import weave_internal as internal
 from weave_query.weave_query import weave_types as types
 from weave_query.weave_query.panels_py.generator_templates import template_registry

@@ -1,8 +1,9 @@
 import json
 import pathlib
 
-import weave
 from weave.file_base import Dir
+
+import weave_query as weave
 
 
 def dirsize(path) -> int:
