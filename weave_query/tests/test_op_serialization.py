@@ -1,6 +1,6 @@
 import pytest
 
-import weave
+import weave_query as weave
 import weave.legacy.weave
 
 ops = weave.legacy.weave.registry_mem.memory_registry.list_ops()

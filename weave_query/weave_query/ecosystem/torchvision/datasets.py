@@ -8,7 +8,7 @@ import typing
 from typing import TypeVar
 
 import PIL.Image
-import weave
+import weave_query as weave
 from torchvision import datasets
 
 from weave_query.weave_query import infer_types, panels

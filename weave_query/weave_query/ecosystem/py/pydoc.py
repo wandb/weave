@@ -10,7 +10,7 @@ Improvements we could make:
 import inspect
 import types
 
-import weave
+import weave_query as weave
 
 
 class PyModule(weave.types.Type):

@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-import weave
+import weave_query as weave
 import weave.legacy.weave.context_state
 import weave.legacy.weave.wandb_api
 

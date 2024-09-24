@@ -1,6 +1,6 @@
 import typing
 
-import weave
+import weave_query as weave
 
 from weave_query.weave_query import context_state, weave_internal
 

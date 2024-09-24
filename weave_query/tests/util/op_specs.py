@@ -2,7 +2,7 @@ import dataclasses
 import datetime
 import typing
 
-import weave
+import weave_query as weave
 
 from weave_query.weave_query import op_def, ops_primitives
 from weave_query.weave_query.language_features.tagging import tagged_value_type

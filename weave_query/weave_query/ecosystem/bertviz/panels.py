@@ -1,5 +1,5 @@
 import bertviz
-import weave
+import weave_query as weave
 
 from weave_query.weave_query.ecosystem import huggingface
 

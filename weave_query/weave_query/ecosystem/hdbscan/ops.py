@@ -4,7 +4,7 @@ import typing
 
 import hdbscan
 import pyarrow as pa
-import weave
+import weave_query as weave
 from typing_extensions import (
     NotRequired,
     TypedDict,

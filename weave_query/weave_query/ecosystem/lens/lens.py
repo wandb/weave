@@ -3,7 +3,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import io
 from PIL import Image
-import weave
+import weave_query as weave
 
 matplotlib.use("agg")
 

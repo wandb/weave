@@ -1,7 +1,7 @@
 import json
 import pathlib
 
-import weave
+import weave_query as weave
 from weave.file_base import Dir
 
 

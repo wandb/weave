@@ -1,5 +1,5 @@
 import torch
-import weave
+import weave_query as weave
 
 
 class TorchTensorType(weave.types.Type):

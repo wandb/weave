@@ -2,7 +2,7 @@ import os
 import typing
 
 import pytest
-import weave
+import weave_query as weave
 
 from weave_query.weave_query import api, environment, execute, ops, weave_internal
 from weave_query.weave_query import weave_types as types

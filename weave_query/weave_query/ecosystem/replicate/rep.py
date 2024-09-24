@@ -1,7 +1,7 @@
 import replicate
 import os
 import tempfile
-import weave
+import weave_query as weave
 
 from PIL import Image
 

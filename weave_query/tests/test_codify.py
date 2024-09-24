@@ -1,6 +1,6 @@
 import black
 import pytest
-import weave
+import weave_query as weave
 
 from weave_query.weave_query import panels
 

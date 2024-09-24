@@ -1,7 +1,7 @@
 import json
 
 import graphql
-import weave
+import weave_query as weave
 
 from weave_query.weave_query import ops
 from weave_query.weave_query.language_features.tagging import tagged_value_type

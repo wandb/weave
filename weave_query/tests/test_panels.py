@@ -1,5 +1,5 @@
 import pytest
-import weave
+import weave_query as weave
 
 from weave_query.weave_query import weave_internal
 from weave_query.weave_query.panels import panel_plot

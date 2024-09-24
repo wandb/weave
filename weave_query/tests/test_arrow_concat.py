@@ -1,7 +1,7 @@
 import dataclasses
 
 import pytest
-import weave
+import weave_query as weave
 
 from weave_query.weave_query import artifact_local, storage
 from weave_query.weave_query.ops_arrow import to_arrow

@@ -1,4 +1,4 @@
-import weave
+import weave_query as weave
 
 
 def inheritors(klass):

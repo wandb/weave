@@ -1,5 +1,5 @@
 import pytest
-import weave
+import weave_query as weave
 from weave.flow.obj import Object
 
 from weave_query.weave_query import artifact_local, ref_util, storage

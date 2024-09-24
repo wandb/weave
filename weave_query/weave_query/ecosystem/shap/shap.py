@@ -10,7 +10,7 @@ import typing
 import matplotlib.pyplot as plt
 import numpy as np
 import shap
-import weave
+import weave_query as weave
 import xgboost
 
 from weave_query.weave_query.ecosystem import huggingface as hf

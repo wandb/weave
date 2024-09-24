@@ -2,7 +2,7 @@ import dataclasses
 import typing
 
 import torch
-import weave
+import weave_query as weave
 from torch import nn, optim
 from torch.utils.data import Dataset
 from torchvision import transforms

@@ -4,7 +4,7 @@ import time
 import typing
 
 import faiss
-import weave
+import weave_query as weave
 from langchain.base_language import BaseLanguageModel
 from langchain.callbacks.tracers.base import BaseTracer
 from langchain.callbacks.tracers.schemas import Run

@@ -1,7 +1,7 @@
 # Tests for the AWL interface
 
 import pytest
-import weave
+import weave_query as weave
 import weave.legacy.weave.weave_types as types
 from weave.legacy.tests.util.concrete_tagged_value import (
     TaggedValue,

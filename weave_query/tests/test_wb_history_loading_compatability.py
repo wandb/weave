@@ -5,7 +5,7 @@ import time
 
 import numpy as np
 import pytest
-import weave
+import weave_query as weave
 from PIL import Image
 
 from weave_query.weave_query import context_state as _context

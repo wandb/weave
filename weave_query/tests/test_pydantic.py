@@ -1,7 +1,7 @@
 from typing import Any, Optional
 
 import pydantic
-import weave
+import weave_query as weave
 
 from weave_query.weave_query import weave_types as types
 

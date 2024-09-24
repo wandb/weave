@@ -27,7 +27,7 @@ from tensorflow import keras
 from keras.engine import keras_tensor
 from tensorflow.python.framework import dtypes
 
-import weave
+import weave_query as weave
 
 
 class DTYPE_NAME(Enum):

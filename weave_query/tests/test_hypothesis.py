@@ -39,7 +39,7 @@ import os
 
 import pyarrow as pa
 import pytest
-import weave
+import weave_query as weave
 from hypothesis import example, given, settings
 from hypothesis import strategies as st
 from hypothesis.strategies import composite

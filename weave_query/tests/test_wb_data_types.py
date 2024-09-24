@@ -5,7 +5,7 @@ import time
 import numpy as np
 import pytest
 import wandb
-import weave
+import weave_query as weave
 from bokeh.plotting import figure
 from wandb import data_types as wb_data_types
 from wandb.sdk.artifacts.artifact_state import ArtifactState

@@ -1,7 +1,7 @@
 import dataclasses
 import typing
 
-import weave
+import weave_query as weave
 
 from weave_query.weave_query import graph, panel
 from weave_query.weave_query.panels.bank import default_panel_bank_flow_section_config

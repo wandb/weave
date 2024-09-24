@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-import weave
+import weave_query as weave
 
 
 def test_timestamp_bins_fixed():
