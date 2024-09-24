@@ -1423,7 +1423,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_id_conditions: Optional[list[str]] = None,
         parameters: Optional[Dict[str, Any]] = None,
         is_latest: bool = False,
-        metadata_only: bool = False,
+        metadata_only: Optional[bool] = False,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
         sort_by: Optional[list[tsi.SortBy]] = None,
