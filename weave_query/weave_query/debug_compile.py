@@ -1,4 +1,4 @@
-from weave import types
+from weave_query.weave_query import weave_types as types
 
 from weave_query.weave_query import graph
 

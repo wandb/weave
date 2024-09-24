@@ -3,7 +3,7 @@ import os
 import pathlib
 import typing
 
-from weave import types
+from weave_query.weave_query import weave_types as types
 
 from weave_query.weave_query import artifact_fs, ref_base
 from weave_query.weave_query.api import op

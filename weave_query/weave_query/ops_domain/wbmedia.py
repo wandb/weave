@@ -4,7 +4,7 @@ import dataclasses
 import json
 import typing
 
-from weave import types
+from weave_query.weave_query import weave_types as types
 
 from weave_query.weave_query import api as weave
 from weave_query.weave_query import artifact_fs, engine_trace, errors, file_base
