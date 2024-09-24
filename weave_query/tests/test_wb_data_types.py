@@ -22,7 +22,7 @@ from weave_query.weave_query.ops_primitives import file
 from weave_query.weave_query.wandb_client_api import wandb_gql_query
 from weave_query.weave_query.wandb_util import weave0_type_json_to_weave1_type
 
-from ...tests.fixture_fakewandb import FakeApi
+from weave_query.tests.fixture_fakewandb import FakeApi
 
 
 class RandomClass:
