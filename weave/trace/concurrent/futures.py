@@ -23,14 +23,13 @@ file I/O, or other operations with significant waiting times.
 
 import atexit
 import concurrent.futures
-import contextlib
-import contextvars
 import logging
 import threading
 from concurrent.futures import Future, wait
 from threading import Lock
-from typing import Any, Callable, Dict, Generator, List, Optional, TypeVar
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 
+from weave.trace.context import get_raise_on_captured_errors
 from weave.trace.util import ContextAwareThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
@@ -41,19 +40,6 @@ THREAD_NAME_PREFIX = "WeaveThreadPool"
 
 T = TypeVar("T")
 U = TypeVar("U")
-
-should_raise_on_future_exceptions = contextvars.ContextVar(
-    "should_raise_on_future_exceptions", default=False
-)
-
-
-@contextlib.contextmanager
-def raise_on_future_exceptions(raise_value: bool = True) -> Generator[None, None, None]:
-    token = should_raise_on_future_exceptions.set(raise_value)
-    try:
-        yield
-    finally:
-        should_raise_on_future_exceptions.reset(token)
 
 
 class FutureExecutor:
@@ -126,7 +112,7 @@ class FutureExecutor:
         try:
             return self._executor.submit(f, *args, **kwargs)
         except Exception as e:
-            if should_raise_on_future_exceptions.get():
+            if get_raise_on_captured_errors():
                 raise e
             return self._execute_directly(f, *args, **kwargs)
 
@@ -255,7 +241,7 @@ class FutureExecutor:
                 future.result()
             except Exception as e:
                 logger.error(f"Job failed during flush: {e}")
-                if should_raise_on_future_exceptions.get():
+                if get_raise_on_captured_errors():
                     raise e
         return True
 

@@ -13,7 +13,6 @@ from weave.trace.client_context.weave_client import (
     get_weave_client,
 )
 from weave.trace.concurrent.futures import defer
-from weave.trace.client_context.weave_client import get_weave_client
 from weave.trace.context import get_raise_on_captured_errors
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
@@ -351,8 +350,6 @@ class WeaveTable(Traceable):
                     raise
                 yield from self._remote_iter()
                 return
-
-
 
         for ndx, row in enumerate(self._prefetched_rows):
             next_id_future = defer(lambda: cached_table_ref.row_digests[ndx])
