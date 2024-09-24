@@ -10,9 +10,10 @@ from pydantic import v1 as pydantic_v1
 
 from weave.trace import box
 from weave.trace.client_context.weave_client import get_weave_client
+from weave.trace.context import get_raise_on_captured_errors
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
-from weave.trace.op import Op, maybe_bind_method
+from weave.trace.op import is_op, maybe_bind_method
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
@@ -155,12 +156,20 @@ def attribute_access_result(
         return maybe_bind_method(val_attr_val, self)
 
     if (ref := getattr(self, "ref", None)) is None:
-        return val_attr_val
+        # Even if we have not parent ref, if our current value is an object
+        # ref, we should still process it with make_trace_obj. Practically,
+        # this allows a user to "get" a Model, update a field, then invoke it.
+        # Primary test: `test_dirty_model_op_retrieval`
+        if not isinstance(val_attr_val, ObjectRef):
+            return val_attr_val
+        new_ref = None
+    else:
+        new_ref = ref.with_attr(attr_name)
+
     if server is None:
         return val_attr_val
 
     root = getattr(self, "root", None)
-    new_ref = ref.with_attr(attr_name)
 
     return make_trace_obj(
         val_attr_val,
@@ -320,6 +329,8 @@ class WeaveTable(Traceable):
             logger.error(
                 "Expected all row digests and prefetched rows to be set, falling back to remote iteration"
             )
+            if get_raise_on_captured_errors():
+                raise
             yield from self._remote_iter()
             return
 
@@ -329,6 +340,8 @@ class WeaveTable(Traceable):
             logger.error(
                 f"Expected length of row digests ({row_digest_len}) to match prefetched rows ({prefetched_rows_len}). Falling back to remote iteration."
             )
+            if get_raise_on_captured_errors():
+                raise
             yield from self._remote_iter()
             return
 
@@ -364,6 +377,8 @@ class WeaveTable(Traceable):
                 logger.error(
                     f"Expected length of response rows ({len(response.rows)}) to match prefetched rows ({len(self._prefetched_rows)}). Ignoring prefetched rows."
                 )
+                if get_raise_on_captured_errors():
+                    raise
                 self._prefetched_rows = None
 
             for ndx, item in enumerate(response.rows):
@@ -653,7 +668,7 @@ def make_trace_obj(
             return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, dict):
             return WeaveDict(val, ref=new_ref, server=server, root=root)
-    if isinstance(val, Op) and inspect.signature(val.resolve_fn).parameters.get("self"):
+    if is_op(val) and inspect.signature(val.resolve_fn).parameters.get("self"):
         # This condition attempts to bind the current `self` to the attribute if
         # it happens to be both an `Op` and have a `self` argument. This is a
         # bit of a hack since we are not always sure that the current object is
@@ -677,7 +692,7 @@ def make_trace_obj(
         # val.call = partial(call, val, parent)
         val = maybe_bind_method(val, parent)
     box_val = box.box(val)
-    if isinstance(box_val, pydantic_v1.BaseModel) or isinstance(val, Op):
+    if isinstance(box_val, pydantic_v1.BaseModel) or is_op(val):
         box_val.__dict__["ref"] = new_ref
     elif box_val is None or isinstance(box_val, bool):
         # We intentionally don't box None and bools because it's imposible to

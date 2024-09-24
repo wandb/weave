@@ -139,6 +139,7 @@ export const IconNames = {
   Panel: 'panel',
   PanelAutoGen: 'panel-auto-gen',
   PanelManual: 'panel-manual',
+  ParallelCoordinates: 'parallel-coordinates',
   ParentBackUp: 'parent-back-up',
   Pause: 'pause',
   Paused: 'paused',

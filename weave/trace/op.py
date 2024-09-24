@@ -1,6 +1,8 @@
 """Defines the Op protocol and related functions."""
 
 import inspect
+import logging
+import sys
 import typing
 from functools import partial, wraps
 from types import MethodType
@@ -22,9 +24,12 @@ from typing import (
 from weave.legacy.weave import context_state
 from weave.trace import box, call_context, settings
 from weave.trace.client_context import weave_client as weave_client_context
-from weave.trace.context import call_attributes
+from weave.trace.context import call_attributes, get_raise_on_captured_errors
 from weave.trace.errors import OpCallError
+from weave.trace.op_extensions.log_once import log_once
 from weave.trace.refs import ObjectRef
+
+logger = logging.getLogger(__name__)
 
 from .constants import TRACE_CALL_EMOJI
 
@@ -235,7 +240,21 @@ def _execute_call(
 
     def process(res: Any) -> Any:
         res = box.box(res)
-        res = on_output(res)
+        try:
+            # Here we do a try/catch because we don't want to
+            # break the user process if we trip up on processing
+            # the output
+            res = on_output(res)
+        except Exception as e:
+            log_once(logger.error, f"Error capturing call output: {e}")
+            if get_raise_on_captured_errors():
+                raise
+        finally:
+            # Is there a better place for this? We want to ensure that even
+            # if the final output fails to be captured, we still pop the call
+            # so we don't put future calls under the old call.
+            call_context.pop_call(call.id)
+
         return res, call
 
     def handle_exception(e: Exception) -> Any:
@@ -477,7 +496,7 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
             wrapper._tracing_enabled = True  # type: ignore
 
-            if callable(call_name_func := kwargs.get("call_display_name")):
+            if callable(call_name_func := kwargs.get("call_display_name", "")):
                 params = inspect.signature(call_name_func).parameters
                 if len(params) != 1:
                     raise DisplayNameFuncError(
@@ -522,6 +541,32 @@ def maybe_unbind_method(oplike: Union[Op, MethodType, partial]) -> Op:
         op = oplike
 
     return cast(Op, op)
+
+
+def is_op(obj: Any) -> bool:
+    if sys.version_info < (3, 12):
+        return isinstance(obj, Op)
+
+    return all(hasattr(obj, attr) for attr in Op.__annotations__)
+
+
+def as_op(fn: Callable) -> Op:
+    """Given a @weave.op() decorated function, return its Op.
+
+    @weave.op() decorated functions are instances of Op already, so this
+    function should be a no-op at runtime. But you can use it to satisfy type checkers
+    if you need to access OpDef attributes in a typesafe way.
+
+    Args:
+        fn: A weave.op() decorated function.
+
+    Returns:
+        The Op of the function.
+    """
+    if not is_op(fn):
+        raise ValueError("fn must be a weave.op() decorated function")
+
+    return cast(Op, fn)
 
 
 __docspec__ = [call, calls]
