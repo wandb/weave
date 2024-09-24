@@ -8,7 +8,7 @@ from weave.legacy.weave import context_state as _context
 from weave.legacy.weave.language_features.tagging import make_tag_getter_op
 from weave.legacy.weave.ops_domain import run_ops
 
-from ...legacy.weave import stitch
+from weave_query.weave_query import stitch
 from ...tests import fixture_fakewandb as fwb
 from . import test_wb
 

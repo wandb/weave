@@ -4,7 +4,7 @@ from weave.legacy.weave import graph
 from weave.legacy.weave import weave_types as types
 from weave.legacy.weave.weave_internal import make_const_node
 
-from ...legacy.weave import registry_mem
+from weave_query.weave_query import registry_mem
 
 _loading_builtins_token = _context.set_loading_built_ins()
 

@@ -4,7 +4,7 @@
 
 from weave.legacy.weave import ops
 
-from ...legacy.weave.show import _show_params
+from weave_query.weave_query.show import _show_params
 from . import test_helpers
 
 
