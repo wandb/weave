@@ -97,7 +97,7 @@ export const DEFAULT_COLUMN_VISIBILITY_CALLS = {
 export const ALWAYS_PIN_LEFT_CALLS = ['CustomCheckbox'];
 
 export const DEFAULT_PIN_CALLS: GridPinnedColumns = {
-  left: ['CustomCheckbox', 'op_name', 'feedback'],
+  left: ['CustomCheckbox', 'op_name'],
 };
 
 export const DEFAULT_SORT_CALLS: GridSortModel = [
