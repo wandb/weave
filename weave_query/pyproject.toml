@@ -1,5 +1,5 @@
 [project]
-name = "weave"
+name = "weave_query"
 description = "A toolkit for building composable interactive data driven applications."
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -31,14 +31,14 @@ requires-python = ">=3.9"
 dynamic = ["version", "dependencies", "optional-dependencies"]
 
 [project.scripts]
-weave = "weave.cli:cli"
+weave_query = "weave_query.cli:cli"
 
 [project.urls]
 Company = "https://wandb.com"
 Documentation = "https://docs.wandb.com/"
-Changes = "https://github.com/wandb/weave/releases"
-"Source Code" = "https://github.com/wandb/weave"
-"Issue Tracker" = "https://github.com/wandb/weave/issues/"
+Changes = "https://github.com/wandb/weave_query/releases"
+"Source Code" = "https://github.com/wandb/weave_query"
+"Issue Tracker" = "https://github.com/wandb/weave_query/issues/"
 Twitter = "https://twitter.com/weights_biases"
 
 [build-system]
@@ -46,10 +46,10 @@ requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["weave"]
+packages = ["weave_query"]
 
 [tool.setuptools.dynamic]
-version = { attr = "weave.version.VERSION" }
+version = { attr = "weave_query.version.VERSION" }
 dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.dynamic.optional-dependencies]
@@ -60,7 +60,7 @@ datadog = { file = ["requirements.legacy.datadog.txt"] }
 modal = { file = ["requirements.modal.txt"] }
 
 [tool.pytest.ini_options]
-testpaths = ["weave"]
+testpaths = ["weave_query"]
 filterwarnings = ["error"]
 
 [tool.ruff.lint]
@@ -90,30 +90,30 @@ ignore = [
   "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/ - we use Google style
 ]
 exclude = [
-  "weave/api.py",
-  "weave/__init__.py",
-  "weave/legacy/**/*.py",
+  "weave_query/api.py",
+  "weave_query/__init__.py",
+  "weave_query/legacy/**/*.py",
   "examples",
-  "weave_query",
+  "weave_query_query",
 ]
 
 [tool.ruff.lint.isort]
 known-third-party = ["wandb"]
 
 [tool.ruff.lint.per-file-ignores]
-"weave/tests/*" = ["F401"]
-"weave/weave_server.py" = ["F401"]
+"weave_query/tests/*" = ["F401"]
+"weave_query/weave_query_server.py" = ["F401"]
 
 
 [tool.ruff]
 line-length = 88
 show-fixes = true
 exclude = [
-  "weave/query_api.py",
-  "weave/__init__.py",
-  "weave/legacy/**/*.py",
+  "weave_query/query_api.py",
+  "weave_query/__init__.py",
+  "weave_query/legacy/**/*.py",
   "examples",
-  "weave_query",
+  "weave_query_query",
 ]
 
 [tool.bumpversion]
