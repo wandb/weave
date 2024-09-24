@@ -74,7 +74,7 @@ type_cache = []
 
 
 def define_panel(p: LPanel):
-    class DummyClass(weave.legacy.weave.panel.Panel):
+    class DummyClass(weave.Panel):
         id = p.panel_id
 
     type_cache.append(DummyClass)
