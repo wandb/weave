@@ -1,7 +1,7 @@
 import black
 import pytest
+import weave_query
 import weave_query as weave
-
 from weave_query.weave_query import panels
 
 # IMPORTANT: Do not import other symbols inside of weave
@@ -23,7 +23,7 @@ from weave_query.weave_query import panels
         ),
         (
             lambda: panels.Table(
-                weave.weave_query.ops.range(1, 100, 1).map(
+                weave_query.weave_query.ops.range(1, 100, 1).map(
                     lambda row: weave.weave_query.ops_primitives.dict.dict_(
                         x=row,
                         y=weave.weave_query.ops_primitives.list_.make_list(
@@ -33,7 +33,7 @@ from weave_query.weave_query import panels
                 )
             ),
             lambda: """weave.weave_query.panels.panel_table.Table(
-            weave.weave_query.ops_arrow.list_range.range(1, 100, 1,).map(
+            weave_query.weave_query.ops_arrow.list_range.range(1, 100, 1,).map(
                 lambda row: weave.weave_query.ops_primitives.dict.dict_(
                     x=row,
                     y=weave.weave_query.ops_primitives.list_.make_list(
@@ -45,7 +45,7 @@ from weave_query.weave_query import panels
         ),
         (
             lambda: panels.Plot(
-                weave.weave_query.ops.range(1, 100, 1).map(
+                weave_query.weave_query.ops.range(1, 100, 1).map(
                     lambda row: weave.weave_query.ops_primitives.dict.dict_(
                         x=row,
                         y=row**2,
@@ -53,7 +53,7 @@ from weave_query.weave_query import panels
                 )
             ),
             lambda: """weave.weave_query.panels.panel_plot.Plot(
-            weave.weave_query.ops_arrow.list_range.range(1, 100, 1,).map(
+            weave_query.weave_query.ops_arrow.list_range.range(1, 100, 1,).map(
                 lambda row: weave.weave_query.ops_primitives.dict.dict_(
                     x=row,
                     y=row.powBinary(2,),
@@ -65,7 +65,7 @@ from weave_query.weave_query import panels
             lambda: panels.Group(
                 items={
                     "table": panels.Table(
-                        weave.weave_query.ops.range(1, 100, 1),
+                        weave_query.weave_query.ops.range(1, 100, 1),
                         columns=[
                             lambda row: row,
                             lambda row: row**2,
@@ -102,7 +102,7 @@ from weave_query.weave_query import panels
             lambda: """weave.weave_query.panels.panel_group.Group(
     items={
         "table": weave.weave_query.panels.panel_table.Table(
-            weave.weave_query.ops_arrow.list_range.range(1, 100, 1,),
+            weave_query.weave_query.ops_arrow.list_range.range(1, 100, 1,),
             columns=[
                 lambda row: row,
                 lambda row: row.powBinary(2,),
@@ -153,7 +153,7 @@ def test_group_case(cereal_csv, consistent_table_col_ids):
         panels.Group(
             items={
                 "plot": panels.Plot(
-                    weave.weave_query.ops.local_path(cereal_csv).readcsv(),
+                    weave_query.weave_query.ops.local_path(cereal_csv).readcsv(),
                     x=lambda row: row["protein"],
                     y=lambda row: row["calories"],
                 ),
@@ -169,7 +169,7 @@ def test_group_case(cereal_csv, consistent_table_col_ids):
         '''weave.weave_query.panels.panel_group.Group(
         items={
             "plot": weave.weave_query.panels.panel_plot.Plot(
-                weave.weave_query.ops.local_path("'''
+                weave_query.weave_query.ops.local_path("'''
         + cereal_csv
         + """",).readcsv(),
                 x=lambda row: row["protein"],
@@ -191,12 +191,12 @@ def test_group_case(cereal_csv, consistent_table_col_ids):
 def test_plot_case(cereal_csv, consistent_table_col_ids):
     _test_object_codification(
         panels.Plot(
-            weave.weave_query.ops.local_path(cereal_csv).readcsv(),
+            weave_query.weave_query.ops.local_path(cereal_csv).readcsv(),
             x=lambda row: row["protein"],
             y=lambda row: row["calories"],
         ),
         f"""weave.weave_query.panels.panel_plot.Plot(
-    weave.weave_query.ops.local_path('{cereal_csv}',).readcsv(),
+    weave_query.weave_query.ops.local_path('{cereal_csv}',).readcsv(),
     x=lambda row: row["protein"],
     y=lambda row: row["calories"],
 )""",
@@ -206,14 +206,14 @@ def test_plot_case(cereal_csv, consistent_table_col_ids):
 def test_table_case(cereal_csv, consistent_table_col_ids):
     _test_object_codification(
         panels.Table(
-            weave.weave_query.ops.local_path(cereal_csv).readcsv(),
+            weave_query.weave_query.ops.local_path(cereal_csv).readcsv(),
             columns=[
                 lambda row: row["protein"],
                 lambda row: row["calories"],
             ],
         ),
         f"""weave.weave_query.panels.panel_table.Table(
-    weave.weave_query.ops.local_path('{cereal_csv}',).readcsv(),
+    weave_query.weave_query.ops_primitives.file_local.local_path('{cereal_csv}',).readcsv(),
     columns=[
         lambda row: row["protein"],
         lambda row: row["calories"],
@@ -223,12 +223,12 @@ def test_table_case(cereal_csv, consistent_table_col_ids):
 
 
 def _test_object_codification(panel, code=None):
-    panel_code = weave.weave_query.codify.object_to_code(panel)
+    panel_code = weave_query.weave_query.codify.object_to_code(panel)
 
     generated_panel = eval(panel_code)
 
-    panel_json = weave.storage.to_python(panel)
-    generated_panel_json = weave.storage.to_python(generated_panel)
+    panel_json = weave_query.storage.to_python(panel)
+    generated_panel_json = weave_query.storage.to_python(generated_panel)
 
     assert panel_json == generated_panel_json
 
