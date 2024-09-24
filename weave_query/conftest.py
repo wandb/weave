@@ -133,7 +133,7 @@ def enable_touch_on_read():
 
 @pytest.fixture()
 def consistent_table_col_ids():
-    from weave.legacy.weave.panels import table_state
+    from weave_query.weave_query.panels import table_state
 
     with table_state.use_consistent_col_ids():
         yield
