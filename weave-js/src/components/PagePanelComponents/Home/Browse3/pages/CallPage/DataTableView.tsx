@@ -3,6 +3,7 @@ import {Box} from '@mui/material';
 import {
   GridColDef,
   GridPaginationModel,
+  GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import {
@@ -32,13 +33,12 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
+import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {TABLE_ID_EDGE_NAME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {SortBy} from '../wfReactInterface/traceServerClientTypes';
-
-const DEFAULT_PAGE_SIZE = 100;
 
 // Controls whether to use a table for arrays or not.
 export const USE_TABLE_FOR_ARRAYS = false;
@@ -92,6 +92,7 @@ export const WeaveCHTable: FC<{
   const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
   const [offset, setOffset] = useState(0);
   const [sortBy, setSortBy] = useState<SortBy[]>([]);
+  const [sortModel, setSortModel] = useState<GridSortModel>([]);
 
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
     page: 0,
@@ -102,6 +103,15 @@ export const WeaveCHTable: FC<{
     setOffset(paginationModel.page * paginationModel.pageSize);
     setLimit(paginationModel.pageSize);
   }, [paginationModel]);
+
+  useEffect(() => {
+    setSortBy(
+      sortModel.map(sort => ({
+        field: sort.field,
+        direction: sort.sort === 'asc' ? 'asc' : 'desc',
+      }))
+    );
+  }, [sortModel]);
 
   const fetchQuery = useTableRowsQuery(
     lookupKey?.entity ?? '',
@@ -114,9 +124,17 @@ export const WeaveCHTable: FC<{
     {skip: lookupKey == null}
   );
 
+  const [loadedRows, setLoadedRows] = useState<Array<{[key: string]: any}>>([]);
+
+  useEffect(() => {
+    if (!fetchQuery.loading && fetchQuery.result) {
+      setLoadedRows(fetchQuery.result.rows);
+    }
+  }, [fetchQuery.loading, fetchQuery.result]);
+
   const pagedRows = useMemo(() => {
-    return fetchQuery.result?.rows ?? [];
-  }, [fetchQuery.result]);
+    return loadedRows ?? [];
+  }, [loadedRows]);
 
   const totalRows = useMemo(() => {
     return numRowsQuery.result?.count ?? pagedRows.length;
@@ -130,6 +148,7 @@ export const WeaveCHTable: FC<{
     limit,
     offset,
     sortBy,
+    l: fetchQuery.loading,
   });
 
   // In this block, we setup a click handler. The underlying datatable is more general
@@ -163,13 +182,12 @@ export const WeaveCHTable: FC<{
     [history, sourceRef, router]
   );
 
-  if (parsedRef == null || !isWeaveObjectRef(parsedRef)) {
-    return null;
-  }
-
   return (
     <CustomWeaveTypeProjectContext.Provider
-      value={{entity: parsedRef.entityName, project: parsedRef.projectName}}>
+      value={{
+        entity: lookupKey?.entity ?? '',
+        project: lookupKey?.project ?? '',
+      }}>
       <DataTableView
         data={pagedRows}
         loading={fetchQuery.loading}
@@ -181,6 +199,8 @@ export const WeaveCHTable: FC<{
           onPaginationModelChange: setPaginationModel,
           rowCount: totalRows,
           pageSizeOptions: [DEFAULT_PAGE_SIZE],
+          sortModel,
+          onSortModelChange: setSortModel,
         }}
       />
     </CustomWeaveTypeProjectContext.Provider>
@@ -199,6 +219,8 @@ export const DataTableView: FC<{
     onPaginationModelChange: (model: GridPaginationModel) => void;
     rowCount: number;
     pageSizeOptions: number[];
+    sortModel: GridSortModel;
+    onSortModelChange: (model: GridSortModel) => void;
   };
   autoPageSize?: boolean;
 }> = props => {
@@ -413,6 +435,9 @@ export const DataTableView: FC<{
           pageSizeOptions={props.pageControl?.pageSizeOptions}
           paginationMode={props.pageControl ? 'server' : 'client'}
           rowCount={props.pageControl?.rowCount}
+          sortingMode={props.pageControl ? 'server' : 'client'}
+          sortModel={props.pageControl?.sortModel}
+          onSortModelChange={props.pageControl?.onSortModelChange}
         />
       </Box>
     </div>
