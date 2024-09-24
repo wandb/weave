@@ -1,4 +1,9 @@
+import logging
 from typing import Any, Callable, Optional, Sequence
+
+from weave.trace.context import get_raise_on_captured_errors
+
+logger = logging.getLogger(__name__)
 
 
 class Patcher:
@@ -16,13 +21,25 @@ class MultiPatcher(Patcher):
     def attempt_patch(self) -> bool:
         all_successful = True
         for patcher in self.patchers:
-            all_successful = all_successful and patcher.attempt_patch()
+            try:
+                all_successful = all_successful and patcher.attempt_patch()
+            except Exception as e:
+                logger.error(f"Error patching - some logs may not be captured: {e}")
+                if get_raise_on_captured_errors():
+                    raise
+                all_successful = False
         return all_successful
 
     def undo_patch(self) -> bool:
         all_successful = True
         for patcher in self.patchers:
-            all_successful = all_successful and patcher.undo_patch()
+            try:
+                all_successful = all_successful and patcher.undo_patch()
+            except Exception as e:
+                logger.error(f"Error unpatching: {e}")
+                if get_raise_on_captured_errors():
+                    raise
+                all_successful = False
         return all_successful
 
 
@@ -71,7 +88,7 @@ class SymbolPatcher(Patcher):
         try:
             new_val = self._make_new_value(original_value)
         except Exception:
-            print(f"Failed to patch {self._attribute_name}")
+            logger.error(f"Failed to patch {self._attribute_name}")
             return False
         setattr(
             target.base_symbol,

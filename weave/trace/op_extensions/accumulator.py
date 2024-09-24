@@ -1,4 +1,5 @@
 import atexit
+import logging
 import weakref
 from typing import (
     Any,
@@ -14,7 +15,11 @@ from typing import (
     Union,
 )
 
+from weave.trace.context import get_raise_on_captured_errors
 from weave.trace.op import FinishCallbackType, Op
+from weave.trace.op_extensions.log_once import log_once
+
+logger = logging.getLogger(__name__)
 
 S = TypeVar("S")
 V = TypeVar("V")
@@ -46,12 +51,28 @@ class _IteratorWrapper(Generic[V]):
 
     def _call_on_close_once(self) -> None:
         if not self._on_finished_called:
-            self._on_close()  # type: ignore
+            try:
+                self._on_close()  # type: ignore
+            except Exception as e:
+                log_once(
+                    logger.error,
+                    f"Error finishing call - some logs may not be captured: {e}",
+                )
+                if get_raise_on_captured_errors():
+                    raise
             self._on_finished_called = True
 
     def _call_on_error_once(self, e: Exception) -> None:
         if not self._on_finished_called:
-            self._on_error(e)
+            try:
+                self._on_error(e)
+            except Exception as e:
+                log_once(
+                    logger.error,
+                    f"Error finishing call with exception - some logs may not be captured: {e}",
+                )
+                if get_raise_on_captured_errors():
+                    raise
             self._on_finished_called = True
 
     def __iter__(self) -> "_IteratorWrapper":
@@ -64,7 +85,17 @@ class _IteratorWrapper(Generic[V]):
             )
         try:
             value = next(self._iterator_or_ctx_manager)  # type: ignore
-            self._on_yield(value)
+            try:
+                # Here we do a try/catch because we don't want to
+                # break the user process if we trip up on processing
+                # the yielded value
+                self._on_yield(value)
+            except Exception as e:
+                log_once(
+                    logger.error, f"Error capturing yielded value for call output: {e}"
+                )
+                if get_raise_on_captured_errors():
+                    raise
             return value
         except (StopIteration, StopAsyncIteration) as e:
             self._call_on_close_once()
@@ -83,7 +114,18 @@ class _IteratorWrapper(Generic[V]):
             )
         try:
             value = await self._iterator_or_ctx_manager.__anext__()  # type: ignore
-            self._on_yield(value)
+            try:
+                self._on_yield(value)
+                # Here we do a try/catch because we don't want to
+                # break the user process if we trip up on processing
+                # the yielded value
+            except Exception as e:
+                log_once(
+                    logger.error,
+                    f"Error capturing async yielded value for call output: {e}",
+                )
+                if get_raise_on_captured_errors():
+                    raise
             return value
         except (StopAsyncIteration, StopIteration) as e:
             self._call_on_close_once()
