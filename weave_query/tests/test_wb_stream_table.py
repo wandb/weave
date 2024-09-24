@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 from PIL import Image
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import context, execute, gql_json_cache, wandb_api, weave_types
 from weave_query.weave_query.wandb_interface.wandb_stream_table import StreamTable
 

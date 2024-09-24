@@ -1,6 +1,7 @@
 import typing
 
-import weave
+import weave_query as weave
+import weave_query
 
 
 def test_type_var_in_dict_any():

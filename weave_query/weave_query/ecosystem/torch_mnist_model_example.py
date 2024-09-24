@@ -6,7 +6,8 @@ from torch import nn, optim
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import context_state as _context
 from weave_query.weave_query.ecosystem import pytorch
 

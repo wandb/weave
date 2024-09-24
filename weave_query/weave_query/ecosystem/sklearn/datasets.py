@@ -1,6 +1,7 @@
 from sklearn.datasets import fetch_california_housing
 
-import weave
+import weave_query as weave
+import weave_query
 
 
 # TODO: this should return a Weave type, not a raw dataframe

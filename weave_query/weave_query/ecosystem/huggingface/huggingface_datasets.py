@@ -3,7 +3,8 @@ import typing
 import datasets
 import huggingface_hub
 
-import weave
+import weave_query as weave
+import weave_query
 
 
 class HFDatasetInfoTypedDict(typing.TypedDict):

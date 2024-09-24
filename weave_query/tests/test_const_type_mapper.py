@@ -1,6 +1,7 @@
 import typing
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import context_state, weave_internal
 
 _loading_builtins_token = context_state.set_loading_built_ins()

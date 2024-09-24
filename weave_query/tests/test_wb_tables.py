@@ -3,7 +3,8 @@ import time
 import numpy as np
 import wandb
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query.language_features.tagging import make_tag_getter_op
 from weave_query.weave_query.language_features.tagging.tagged_value_type import TaggedValueType
 from weave_query.weave_query.ops_arrow.list_ops import filter

@@ -3,7 +3,8 @@ import typing
 
 import PIL
 
-import weave
+import weave_query as weave
+import weave_query
 
 
 class OxfordIIITPetDatasetItem(typing.TypedDict):

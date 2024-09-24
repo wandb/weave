@@ -1,4 +1,5 @@
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query.panels import panel_board
 
 # This is not yet general, it describes a board for a specific

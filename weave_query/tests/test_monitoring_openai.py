@@ -11,7 +11,8 @@ from openai.types.chat.chat_completion_chunk import ChatCompletionChunk, ChoiceD
 from openai.types.chat.chat_completion_chunk import Choice as ChunkChoice
 from openai.types.completion_usage import CompletionUsage
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query.monitoring import init_monitor
 from weave_query.weave_query.monitoring.openai import util
 from weave_query.weave_query.monitoring.openai.models import *

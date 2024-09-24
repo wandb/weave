@@ -11,7 +11,8 @@ from wandb import data_types as wb_data_types
 from wandb.sdk.artifacts.artifact_state import ArtifactState
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import artifact_fs
 from weave_query.weave_query import weave_types as types
 from weave_query.weave_query.artifact_wandb import WandbArtifact, WeaveWBArtifactURI
