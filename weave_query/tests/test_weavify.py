@@ -1,9 +1,7 @@
 import pytest
 
-from weave_query.weave_query import graph, ops, weave_internal
+from weave_query.weave_query import graph, ops, weave_internal, weavify
 from weave_query.weave_query import weave_types as types
-
-from ...legacy.weave import weavify
 
 
 @pytest.mark.parametrize(

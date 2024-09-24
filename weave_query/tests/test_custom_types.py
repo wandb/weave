@@ -2,9 +2,7 @@ import pytest
 
 from weave_query.tests.util import geom
 from weave_query.weave_query import api as weave
-from weave_query.weave_query import ops_arrow
-
-from ... import errors
+from weave_query.weave_query import errors, ops_arrow
 
 
 def test_mapped_method_on_custom_type():

@@ -27,7 +27,7 @@ from weave_query.weave_query.ops_domain import wb_domain_types as wdt
 from weave_query.weave_query.ops_primitives import dict_, list_
 from weave_query.weave_query.ops_primitives.file import _as_w0_dict_
 
-from ...tests import fixture_fakewandb as fwb
+from weave_query.tests import fixture_fakewandb as fwb
 
 file_path_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {

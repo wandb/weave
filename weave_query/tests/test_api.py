@@ -1,8 +1,5 @@
-import shutil
-
 from weave_query.weave_query import api as weave
-
-from ...legacy.weave.show import _show_params
+from weave_query.weave_query.show import _show_params
 
 
 def test_print_save_val():

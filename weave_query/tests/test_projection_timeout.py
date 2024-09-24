@@ -1,9 +1,8 @@
 import numpy as np
 import pytest
 
+from weave_query.weave_query import errors
 from weave_query.weave_query.ops_primitives import projection_utils
-
-from ... import errors
 
 
 def test_projection_timeout():

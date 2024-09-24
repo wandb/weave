@@ -3,12 +3,11 @@ import json
 import graphql
 
 import weave_query as weave
-from weave_query.weave_query import ops
+from weave_query.weave_query import ops, registry_mem
 from weave_query.weave_query.language_features.tagging import tagged_value_type
 from weave_query.weave_query.ops_domain import wb_domain_types
 
-from ...legacy.weave import registry_mem
-from ...tests import fixture_fakewandb as fwb
+from weave_query.tests import fixture_fakewandb as fwb
 
 """
 Tests in this file whould be used to test the graphs that can be constructed
