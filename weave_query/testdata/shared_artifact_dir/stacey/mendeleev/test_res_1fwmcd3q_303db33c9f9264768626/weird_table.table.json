@@ -1,0 +1,11 @@
+{"columns": ["c", "b", "a"],
+ "column_types": {
+    "wb_type": "typedDict",
+    "params": {
+        "type_map": {
+            "a": {"wb_type": "number"},
+            "b": {"wb_type": "number"},
+            "c": {"wb_type": "pythonObject", "params": {"class_name": "some_weird_class"}}
+        }}},
+  "data": [[9.93, 2, 3], [2.0, 5, 6], [5.0, 8, 9]]
+}
