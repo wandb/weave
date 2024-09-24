@@ -1101,6 +1101,7 @@ def test_summary_descendents(client):
     ]
 
 
+@pytest.mark.skip("Skipping because it uses some query service code")
 def test_weave_server(client):
     class MyModel(weave.Model):
         prompt: str
