@@ -22,3 +22,15 @@ export const listToObject = <T>(list: T[]): Record<number, T> => {
   });
   return object;
 };
+
+export function initiateDownloadFromBlob(blob: Blob, fileName: string) {
+  const downloadUrl = URL.createObjectURL(blob);
+  // Create a download link and click it
+  const anchor = document.createElement('a');
+  anchor.href = downloadUrl;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(downloadUrl);
+}

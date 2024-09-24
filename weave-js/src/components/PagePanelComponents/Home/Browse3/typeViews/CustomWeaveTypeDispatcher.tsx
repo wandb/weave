@@ -1,6 +1,7 @@
 import React from 'react';
 
 import {CustomWeaveTypePayload} from './customWeaveType.types';
+import {JsonBlob} from './JSONblob/Jsonblob';
 import {PILImageImage} from './PIL.Image.Image/PILImageImage';
 
 type CustomWeaveTypeDispatcherProps = {
@@ -27,6 +28,9 @@ const customWeaveTypeRegistry: {
 } = {
   'PIL.Image.Image': {
     component: PILImageImage,
+  },
+  'weave.type_serializers.JSONBlob.jsonblob.JSONBlob': {
+    component: JsonBlob,
   },
 };
 
