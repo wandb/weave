@@ -8,7 +8,8 @@ import {
   MOON_500,
   MOON_800,
   TEAL_300,
-  TEAL_500,
+  TEAL_350,
+  TEAL_400,
   TEAL_600,
 } from '../../common/css/color.styles';
 import {hexToRGB} from '../../common/css/globals.styles';
@@ -27,13 +28,6 @@ const FONT_SIZES = {
   variable: '14px',
 };
 
-const PADDING = {
-  small: '2px 8px',
-  medium: '4px 12px',
-  large: '8px 12px',
-  variable: '2px 8px',
-};
-
 const getStyles = (props: AdditionalProps) => {
   const size = props.size ?? 'medium';
   const customTheme = createTheme({
@@ -42,48 +36,53 @@ const getStyles = (props: AdditionalProps) => {
         styleOverrides: {
           root: {
             '& .MuiOutlinedInput-root': {
-              height: HEIGHTS[size],
-              padding: PADDING[size],
+              paddingTop: '0px !important',
+              paddingBottom: '0px !important',
               fontSize: FONT_SIZES[size],
               fontFamily: 'Source Sans Pro',
+              minWidth: '100px',
               color: MOON_800,
-              '&& fieldset': {
+              maxWidth: props.maxWidth ? `${props.maxWidth}px` : '100%',
+              '& fieldset': {
                 borderColor: MOON_250,
               },
-              '&&:hover fieldset': {
-                borderColor: hexToRGB(TEAL_500, 0.4),
-                borderWidth: '2px',
-              },
-              '&&.Mui-focused fieldset': {
-                borderColor: hexToRGB(TEAL_500, 0.64),
-                borderWidth: '2px',
-              },
-              borderColor: MOON_250,
-              '&:hover fieldset': {
-                borderColor: hexToRGB(TEAL_500, 0.4),
-                borderWidth: '2px',
-              },
               '&.Mui-focused fieldset': {
-                borderColor: hexToRGB(TEAL_500, 0.64),
+                borderColor: TEAL_400,
                 borderWidth: '2px',
               },
-              '& input::placeholder': {
+              '&:hover:not(.Mui-focused) fieldset': {
+                borderColor: TEAL_350,
+                borderWidth: '2px',
+              },
+              '& .MuiInputBase-input::placeholder': {
                 color: MOON_500,
                 opacity: 1,
               },
+              '& .MuiInputBase-input': {
+                padding: '0px', // Adjust padding as needed
+                minHeight: `${HEIGHTS[size]} !important`,
+              },
             },
+            '&.MuiAutocomplete-hasPopupIcon .MuiOutlinedInput-root, &.MuiAutocomplete-hasClearIcon .MuiOutlinedInput-root':
+              {
+                paddingRight: props.hasInputValue ? '28px' : '0px', // Apply padding only if input exists
+              },
           },
           option: {
-            padding: '6px 10px',
+            borderColor: MOON_250,
+            borderWidth: '1px',
+            paddingLeft: '10px !important',
             margin: '0 6px',
             borderRadius: '4px',
             cursor: 'pointer',
             backgroundColor: 'transparent',
+            color: MOON_800,
+            fontSize: FONT_SIZES[size],
             '&[aria-selected="true"]': {
               backgroundColor: `${hexToRGB(TEAL_300, 0.32)} !important`,
               color: TEAL_600,
             },
-            '&.Mui-focused[aria-selected="true"]': {
+            '&:focus-within[aria-selected="true"]': {
               backgroundColor: `${hexToRGB(TEAL_300, 0.32)} !important`,
               color: TEAL_600,
             },
@@ -92,12 +91,40 @@ const getStyles = (props: AdditionalProps) => {
             },
           },
           clearIndicator: {
+            overflow: 'hidden',
             borderRadius: '4px',
             width: '24px',
             height: '24px',
             '&:hover': {
               backgroundColor: '#f5f5f5',
             },
+          },
+          endAdornment: {
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
+          inputRoot: {
+            '& .MuiInputBase-inputMultiline': {
+              overflow: 'hidden',
+              whiteSpace: 'pre-wrap',
+              overflowY: 'auto',
+              scrollbarWidth: 'none', // For Firefox (hides the scrollbar)
+              msOverflowStyle: 'none', // For IE and Edge (hides the scrollbar)
+              '&::-webkit-scrollbar': {
+                display: 'none', // For Chrome, Safari, and WebKit-based browsers (hides the scrollbar)
+              },
+            },
+          },
+          // menu dropdown
+          paper: {
+            boxShadow: '0 12px 24px rgba(0, 0, 0, 0.16)',
+            // MOON_100 is inverted to MOON_900 in dark mode automatically
+            // this is a nice hack that lets us avoid setting night-aware and
+            // attempting to override individual styles
+            backgroundColor: props.isDarkMode ? MOON_100 : 'white',
+            border: `1px solid ${MOON_250}`,
+            borderRadius: '4px',
           },
         },
       },
@@ -116,6 +143,9 @@ type SelectSize = (typeof SelectSizes)[keyof typeof SelectSizes];
 
 type AdditionalProps = {
   size?: SelectSize;
+  isDarkMode?: boolean;
+  maxWidth?: number;
+  hasInputValue?: boolean;
 };
 
 export const AutoComplete = <Option,>(
