@@ -881,6 +881,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for r in query_result.result_rows
         ]
 
+    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+        parameters: Dict[str, Any] = {
+            "project_id": req.project_id,
+            "digest": req.digest,
+        }
+
+        query = """
+        SELECT count(row_digests),
+            row_number() OVER (PARTITION BY project_id, digest) AS rn
+        FROM tables
+        WHERE project_id = {project_id:String} AND digest = {digest:String}
+        """
+
+        query_result = self.ch_client.query(query, parameters=parameters)
+        count = query_result.result_rows[0][0] if query_result.result_rows else 0
+
+        return tsi.TableQueryStatsRes(count=count)
+
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches
         # where it can. Like it should group by object that we need to read.

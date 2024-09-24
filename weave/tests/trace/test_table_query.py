@@ -185,6 +185,7 @@ def test_table_query_combined(client: WeaveClient):
             sort_by=[tsi.SortBy(field="id", direction="desc")],
         )
     )
+
     result_vals = [r.val for r in res.rows]
     result_digests = [r.digest for r in res.rows]
 
@@ -215,3 +216,42 @@ def test_table_query_multiple_sort_criteria(client: WeaveClient):
     assert [r.val["id"] for r in res.rows] != [
         d["id"] for d in data
     ]  # Ensure order is different from original  (assertion on the test itself)
+
+
+def test_table_query_stats(client: WeaveClient):
+    digest, row_digests, data = generate_table_data(client, 10, 10)
+
+    stats_res = client.server.table_query_stats(
+        tsi.TableQueryStatsReq(
+            project_id=client._project_id(),
+            digest=digest,
+        )
+    )
+
+    assert stats_res.count == len(data)
+
+
+def test_table_query_stats_empty(client: WeaveClient):
+    digest, row_digests, data = generate_table_data(client, 0, 0)
+
+    stats_res = client.server.table_query_stats(
+        tsi.TableQueryStatsReq(
+            project_id=client._project_id(),
+            digest=digest,
+        )
+    )
+
+    assert stats_res.count == len(data)
+
+
+def test_table_query_stats_missing(client: WeaveClient):
+    digest, row_digests, data = generate_table_data(client, 10, 10)
+
+    stats_res = client.server.table_query_stats(
+        tsi.TableQueryStatsReq(
+            project_id=client._project_id(),
+            digest="missing",
+        )
+    )
+
+    assert stats_res.count == 0

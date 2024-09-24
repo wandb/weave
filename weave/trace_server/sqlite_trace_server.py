@@ -885,6 +885,24 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             ]
         )
 
+    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+        parameters: list[Any] = [req.project_id, req.digest]
+
+        query = """
+        SELECT COUNT(row_digests)
+        FROM
+            tables
+        WHERE
+            tables.project_id = ? AND
+            tables.digest = ?
+        """
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(query, parameters)
+        count = cursor.fetchone()[0]
+
+        return tsi.TableQueryStatsRes(count=count)
+
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches
         # where it can. Like it should group by object that we need to read.
