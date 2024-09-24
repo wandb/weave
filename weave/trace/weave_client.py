@@ -15,7 +15,7 @@ from weave import version
 from weave.legacy.weave import ref_base, urls
 from weave.trace import call_context, trace_sentry
 from weave.trace.client_context import weave_client as weave_client_context
-from weave.trace.concurrent.futures import FutureExecutor, defer, then
+from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.object_record import (
@@ -654,7 +654,7 @@ class WeaveClient:
         attributes._set_weave_item("os_release", platform.release())
         attributes._set_weave_item("sys_version", sys.version)
 
-        op_name_future = defer(lambda: op_def_ref.uri())
+        op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
         call = Call(
             _op_name=op_name_future,
@@ -1215,7 +1215,9 @@ class WeaveClient:
 
         res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
 
-        digest_future: Future[str] = then([res_future], lambda res: res[0].digest)
+        digest_future: Future[str] = self.future_executor.then(
+            [res_future], lambda res: res[0].digest
+        )
 
         ref: Ref
         if is_opdef:
@@ -1261,8 +1263,10 @@ class WeaveClient:
             send_table_create
         )
 
-        digest_future: Future[str] = then([res_future], lambda res: res[0].digest)
-        row_digests_future: Future[list[str]] = then(
+        digest_future: Future[str] = self.future_executor.then(
+            [res_future], lambda res: res[0].digest
+        )
+        row_digests_future: Future[list[str]] = self.future_executor.then(
             [res_future], lambda res: res[0].row_digests
         )
 

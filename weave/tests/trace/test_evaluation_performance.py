@@ -153,12 +153,13 @@ async def test_evaluation_performance(client: WeaveClient):
 
 @pytest.mark.asyncio
 async def test_evaluation_resilience(client_with_throwing_server: WeaveClient):
+    client_with_throwing_server.project = "test_evaluation_performance"
     evaluation, predict = build_evaluation()
-
-    with pytest.raises(TestException):
-        res = await evaluation.evaluate(predict)
 
     # We should gracefully handle the error and return a value
     with raise_on_captured_errors(False):
         res = await evaluation.evaluate(predict)
         assert res["score"]["true_count"] == 1
+
+    with pytest.raises(TestException):
+        res = await evaluation.evaluate(predict)

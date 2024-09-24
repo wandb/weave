@@ -11,8 +11,8 @@ from pydantic import v1 as pydantic_v1
 from weave.trace import box
 from weave.trace.client_context.weave_client import (
     get_weave_client,
+    require_weave_client,
 )
-from weave.trace.concurrent.futures import defer
 from weave.trace.context import get_raise_on_captured_errors
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
@@ -350,9 +350,11 @@ class WeaveTable(Traceable):
                     raise
                 yield from self._remote_iter()
                 return
-
+        wc = require_weave_client()
         for ndx, row in enumerate(self._prefetched_rows):
-            next_id_future = defer(lambda: cached_table_ref.row_digests[ndx])
+            next_id_future = wc.future_executor.defer(
+                lambda: cached_table_ref.row_digests[ndx]
+            )
             new_ref = self.ref.with_item(next_id_future)
             val = self._prefetched_rows[ndx]
             res = from_json(

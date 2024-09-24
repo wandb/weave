@@ -4,7 +4,7 @@ from typing import Any, List
 
 import pytest
 
-from weave.trace.concurrent.futures import FutureExecutor, defer, then
+from weave.trace.concurrent.futures import FutureExecutor
 
 
 def test_defer_simple() -> None:
@@ -150,15 +150,17 @@ def test_chained_then_operations() -> None:
     assert future_sum.result() == 30
 
 
-def test_global_defer_and_then() -> None:
+def test_defer_and_then() -> None:
+    executor: FutureExecutor = FutureExecutor()
+
     def simple_task() -> int:
         return 42
 
     def process_data(data_list: List[int]) -> int:
         return data_list[0] * 2
 
-    future: Future[int] = defer(simple_task)
-    result_future: Future[int] = then([future], process_data)
+    future: Future[int] = executor.defer(simple_task)
+    result_future: Future[int] = executor.then([future], process_data)
 
     assert result_future.result() == 84
 

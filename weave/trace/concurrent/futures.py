@@ -1,12 +1,11 @@
-"""Global ThreadPoolExecutor for executing tasks in parallel.
+"""ThreadPoolExecutor for executing tasks in parallel.
 
-This module provides a thread-local ThreadPoolExecutor and utility functions for
-asynchronous task execution in Weave. It offers a simple interface for
-deferring tasks and chaining operations on futures, which is particularly
-useful for I/O-bound operations or long-running tasks that shouldn't block
-the main execution thread.
+This module provides a FutureExecutor class for asynchronous task execution in Weave.
+It offers a simple interface for deferring tasks and chaining operations on futures,
+which is particularly useful for I/O-bound operations or long-running tasks that
+shouldn't block the main execution thread.
 
-The module includes two main functions:
+The FutureExecutor class includes two main methods:
 1. defer: For submitting tasks to be executed asynchronously.
 2. then: For chaining operations on futures, allowing for easy composition
    of asynchronous workflows.
@@ -19,6 +18,13 @@ Usage of this module can significantly improve the performance and
 responsiveness of Weave applications by allowing concurrent execution
 of independent tasks, especially in scenarios involving network requests,
 file I/O, or other operations with significant waiting times.
+
+To use this module, create an instance of FutureExecutor and use its methods
+to manage asynchronous tasks:
+
+    executor = FutureExecutor()
+    future = executor.defer(some_function, arg1, arg2)
+    result_future = executor.then([future], process_result)
 """
 
 import atexit
@@ -50,7 +56,9 @@ class FutureExecutor:
     object is deleted or when the program exits.
 
     Args:
-        max_workers (int): The maximum number of worker threads to use per executor. Defaults to 1024.
+        max_workers (int): The maximum number of worker threads to use per executor. Defaults to None.
+        recursion_limit (int): The maximum recursion depth allowed. Defaults to 100.
+        thread_name_prefix (str): The prefix for thread names. Defaults to "WeaveThreadPool".
     """
 
     def __init__(
@@ -246,11 +254,4 @@ class FutureExecutor:
         return True
 
 
-# Create a global FutureExecutor instance
-future_executor = FutureExecutor()
-
-# Export defer and then directly
-defer = future_executor.defer
-then = future_executor.then
-
-__all__ = ["FutureExecutor", "defer", "then"]
+__all__ = ["FutureExecutor"]
