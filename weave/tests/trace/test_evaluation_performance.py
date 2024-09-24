@@ -6,6 +6,8 @@ import PIL
 import pytest
 
 import weave
+from weave.tests.trace.test_tracing_resilience import TestException, ThrowingServer
+from weave.trace.context import raise_on_captured_errors
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
@@ -40,8 +42,6 @@ class BlockingTraceServer(tsi.TraceServerInterface):
             return getattr(internal_trace_server, item)
 
         def wrapper(*args, **kwargs):
-            if item == "obj_create":
-                print("BLOCKING TRACE SERVER", item, args, kwargs)
             with self.lock:
                 inner_attr = getattr(internal_trace_server, item)
                 result = inner_attr(*args, **kwargs)
@@ -66,8 +66,7 @@ def paused_client(client: WeaveClient) -> Generator[WeaveClient, None, None]:
         client._flush()
 
 
-@pytest.mark.asyncio
-async def test_evaluation_performance(client: WeaveClient):
+def build_evaluation(client: WeaveClient):
     dataset = [
         {
             "question": "What is the capital of France?",
@@ -104,6 +103,13 @@ async def test_evaluation_performance(client: WeaveClient):
         dataset=dataset,
         scorers=[score],
     )
+
+    return evaluation, predict
+
+
+@pytest.mark.asyncio
+async def test_evaluation_performance(client: WeaveClient):
+    evaluation, predict = build_evaluation(client)
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
@@ -142,3 +148,17 @@ async def test_evaluation_performance(client: WeaveClient):
         len(list(calls)) == 14
     )  # eval, summary, 4 predict_and_score, 4 predicts, 4 scores
     assert len(list(objects)) == 3  # model, dataset, evaluation
+
+
+@pytest.mark.asyncio
+async def test_evaluation_resilience(client: WeaveClient):
+    client.server = ThrowingServer()
+    evaluation, predict = build_evaluation(client)
+
+    with pytest.raises(TestException):
+        res = await evaluation.evaluate(predict)
+
+    # We should gracefully handle the error and return a value
+    with raise_on_captured_errors(False):
+        res = await evaluation.evaluate(predict)
+        assert res["score"]["true_count"] == 1

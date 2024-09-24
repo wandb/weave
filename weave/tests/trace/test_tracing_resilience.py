@@ -131,9 +131,6 @@ class ThrowingServer(tsi.TraceServerInterface):
         raise TestException("FAILURE!")
 
 
-@pytest.mark.skip(
-    "TODO: Unskip after Tim's backgrounding PR goes in (add one for the entire eval workflow)"
-)
 def test_resilience_to_server_errors(client):
     client.server = ThrowingServer()
 
