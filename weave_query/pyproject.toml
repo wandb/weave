@@ -94,7 +94,7 @@ exclude = [
   "weave_query/__init__.py",
   "weave_query/legacy/**/*.py",
   "examples",
-  "weave_query_query",
+  "weave_query",
 ]
 
 [tool.ruff.lint.isort]
@@ -113,7 +113,7 @@ exclude = [
   "weave_query/__init__.py",
   "weave_query/legacy/**/*.py",
   "examples",
-  "weave_query_query",
+  "weave_query",
 ]
 
 [tool.bumpversion]
