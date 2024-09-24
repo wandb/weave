@@ -57,31 +57,39 @@ class FutureExecutor:
 
     Args:
         max_workers (int): The maximum number of worker threads to use per executor. Defaults to None.
+                           If set to 0, all tasks will be executed directly in the current thread.
         thread_name_prefix (str): The prefix for thread names. Defaults to "WeaveThreadPool".
     """
+
+    _executor: Optional[ContextAwareThreadPoolExecutor]
 
     def __init__(
         self,
         max_workers: Optional[int] = None,
         thread_name_prefix: str = THREAD_NAME_PREFIX,
     ):
-        self._executor = ContextAwareThreadPoolExecutor(
-            max_workers=max_workers, thread_name_prefix=thread_name_prefix
-        )
+        self._max_workers = max_workers
+        if max_workers != 0:
+            self._executor = ContextAwareThreadPoolExecutor(
+                max_workers=max_workers, thread_name_prefix=thread_name_prefix
+            )
+        else:
+            self._executor = None
         self._active_futures: List[Future] = []
         self._active_futures_lock = Lock()
         self._in_deferred_context = ContextVar("in_deferred_context", default=False)
         atexit.register(self._shutdown)
 
     def _shutdown(self) -> None:
-        self._executor.shutdown(wait=True)
+        if self._executor:
+            self._executor.shutdown(wait=True)
 
     def _safe_submit(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
         """
         Submit a function to the thread pool. If there is an error submitting to the thread pool,
-        execute the function directly in the current thread (this allows us to finish flushing the threads when shutting down)
+        or if max_workers is 0, execute the function directly in the current thread.
         """
-        if self._in_deferred_context.get():
+        if self._executor is None or self._in_deferred_context.get():
             return self._execute_directly(f, *args, **kwargs)
 
         try:

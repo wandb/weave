@@ -175,7 +175,7 @@ def test_empty_futures_list() -> None:
     assert future_result.result() == 0
 
 
-def test_nested_futures_with_max_workers() -> None:
+def test_nested_futures_with_1_max_worker_classic_deadlock_case() -> None:
     executor: FutureExecutor = FutureExecutor(max_workers=1)
 
     def inner_0() -> List[int]:
@@ -188,4 +188,22 @@ def test_nested_futures_with_max_workers() -> None:
         return executor.defer(inner_1).result() + [2]
 
     res = executor.defer(inner_2).result()
+    assert res == [0, 1, 2]
+
+
+def test_nested_futures_with_0_max_workers_direct() -> None:
+    executor: FutureExecutor = FutureExecutor(max_workers=0)
+    assert executor._executor is None
+
+    def inner_0() -> List[int]:
+        return [0]
+
+    def inner_1() -> List[int]:
+        return executor.defer(inner_0).result() + [1]
+
+    def inner_2() -> List[int]:
+        return executor.defer(inner_1).result() + [2]
+
+    res = executor.defer(inner_2).result()
+    assert executor._executor is None
     assert res == [0, 1, 2]
