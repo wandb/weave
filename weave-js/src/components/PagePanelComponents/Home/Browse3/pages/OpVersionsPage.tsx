@@ -223,7 +223,6 @@ export const FilterableOpVersionsTable: React.FC<{
       columnHeaderHeight={40}
       rowHeight={38}
       columns={columns}
-      experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
       rowSelectionModel={rowSelectionModel}
       columnGroupingModel={columnGroupingModel}

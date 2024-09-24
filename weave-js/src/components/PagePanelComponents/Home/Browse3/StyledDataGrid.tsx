@@ -46,12 +46,7 @@ export const StyledDataGrid = styled(
 
   fontFamily: 'Source Sans Pro',
 
-  '& .MuiDataGrid-columnHeaders': {
-    backgroundColor: MOON_50,
-    color: MOON_500,
-  },
-
-  '& .MuiDataGrid-pinnedColumnHeaders': {
+  '& .MuiDataGrid-columnHeader': {
     backgroundColor: MOON_50,
     color: MOON_500,
   },
