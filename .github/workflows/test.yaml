@@ -36,7 +36,7 @@ jobs:
       - name: Prune docker cache
         run: docker system prune -f
       - name: Build legacy (query sevice) unit test image
-        run: python3 weave/docker/docker_build.py build_deps weave-test-python-query-service builder . weave/legacy/Dockerfile.ci.test
+        run: python3 weave_query/docker/docker_build.py build_deps weave-test-python-query-service builder . weave_query/Dockerfile.ci.test
 
   test-query-service:
     name: Legacy (Query Service) Python unit tests
@@ -82,15 +82,13 @@ jobs:
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
           source /root/venv/bin/activate && \
-          pip install 'dspy-ai==2.4.13' && \
-          pip install pydantic -U && \
-          cd weave && \
+          cd weave_query && \
           pytest \
           --job-num=${{ matrix.job_num }} \
           --timeout=90 \
           --ddtrace \
           --durations=5 \
-          ./legacy
+          .
 
   test-query-service-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()

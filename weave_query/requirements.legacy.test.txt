@@ -27,3 +27,4 @@ cryptography>=42.0.7  # CVE 2023-23931
 # SQL Generation Tests
 sqlparse
 filelock
+sqlalchemy>=2.0.1
