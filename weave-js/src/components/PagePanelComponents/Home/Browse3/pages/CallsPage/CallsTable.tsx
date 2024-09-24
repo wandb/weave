@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
+  GridColDef,
   GridColumnVisibilityModel,
   GridFilterModel,
   GridLogicOperator,
@@ -418,7 +419,7 @@ export const CallsTable: FC<{
     setSelectedCalls([]);
   }, [setSelectedCalls]);
   const muiColumns = useMemo(() => {
-    const cols = [
+    const cols: GridColDef[] = [
       {
         minWidth: 30,
         width: 38,
@@ -427,6 +428,7 @@ export const CallsTable: FC<{
         disableColumnMenu: true,
         resizable: false,
         disableExport: true,
+        display: 'flex',
         renderHeader: (params: any) => {
           return (
             <Checkbox

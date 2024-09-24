@@ -184,7 +184,8 @@ function buildCallsTableColumns(
       minWidth: 100,
       width: 250,
       hideable: false,
-      valueGetter: (unused, row) => {
+      display: 'flex',
+      valueGetter: (unused: any, row: any) => {
         const op_name = row.op_name;
         if (!isWeaveRef(op_name)) {
           return op_name;
@@ -269,7 +270,8 @@ function buildCallsTableColumns(
       // disableColumnMenu: true,
       resizable: false,
       width: 59,
-      valueGetter: (unused, row) => {
+      display: 'flex',
+      valueGetter: (unused: any, row: any) => {
         return traceCallStatusCode(row);
       },
       renderCell: cellParams => {
@@ -309,6 +311,7 @@ function buildCallsTableColumns(
     align: 'center',
     sortable: false,
     resizable: false,
+    display: 'flex',
     renderCell: cellParams => {
       const userId = cellParams.row.wb_user_id;
       if (userId == null) {
@@ -363,7 +366,7 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
-    valueGetter: (unused, row) => {
+    valueGetter: (unused: any, row: any) => {
       const usage = getUsageFromCellParams(row);
       const {tokensNum} = getTokensAndCostFromUsage(usage);
       return tokensNum;
@@ -384,7 +387,7 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
-    valueGetter: (unused, row) => {
+    valueGetter: (unused: any, row: any) => {
       const usage = getUsageFromCellParams(row);
       const {costNum} = getTokensAndCostFromUsage(usage);
       return costNum;
@@ -405,7 +408,7 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
-    valueGetter: (unused, row) => {
+    valueGetter: (unused: any, row: any) => {
       if (traceCallStatusCode(row) === 'UNSET') {
         // Call is still in progress, latency will be 0.
         // Displaying nothing seems preferable to being misleading.

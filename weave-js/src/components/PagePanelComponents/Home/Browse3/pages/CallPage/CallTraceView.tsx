@@ -51,6 +51,7 @@ export const CallTraceView: FC<{
       headerName: 'Call Tree',
       headerAlign: 'center',
       flex: 1,
+      display: 'flex',
       renderCell: params => (
         <CustomGridTreeDataGroupingCell
           {...params}

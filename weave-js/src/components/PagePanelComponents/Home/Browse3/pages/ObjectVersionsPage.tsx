@@ -274,7 +274,8 @@ const ObjectVersionsTable: React.FC<{
     cols.push(
       basicField('baseObjectClass', 'Category', {
         width: 100,
-        valueGetter: (unused, row) => {
+        display: 'flex',
+        valueGetter: (unused: any, row: any) => {
           return row.obj.baseObjectClass;
         },
         renderCell: cellParams => {
@@ -290,7 +291,7 @@ const ObjectVersionsTable: React.FC<{
     cols.push(
       basicField('createdAtMs', 'Created', {
         width: 100,
-        valueGetter: (unused, row) => {
+        valueGetter: (unused: any, row: any) => {
           return row.obj.createdAtMs;
         },
         renderCell: cellParams => {
