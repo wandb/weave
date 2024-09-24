@@ -8,6 +8,7 @@ export const IconNames = {
   AudioVolume: 'audio-volume',
   AutomationRobotArm: 'automation-robot-arm',
   Back: 'back',
+  BaselineAlt: 'baseline-alt',
   BellNotifications: 'bell-notifications',
   BenchmarkSquare: 'benchmark-square',
   BlogReport: 'blog-report',

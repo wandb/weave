@@ -9,6 +9,7 @@ import {ReactComponent as ImportArtifactTypeAlt} from '../../assets/icons/icon-a
 import {ReactComponent as ImportAudioVolume} from '../../assets/icons/icon-audio-volume.svg';
 import {ReactComponent as ImportAutomationRobotArm} from '../../assets/icons/icon-automation-robot-arm.svg';
 import {ReactComponent as ImportBack} from '../../assets/icons/icon-back.svg';
+import {ReactComponent as ImportBaselineAlt} from '../../assets/icons/icon-baseline-alt.svg';
 import {ReactComponent as ImportBellNotifications} from '../../assets/icons/icon-bell-notifications.svg';
 import {ReactComponent as ImportBenchmarkSquare} from '../../assets/icons/icon-benchmark-square.svg';
 import {ReactComponent as ImportBlogReport} from '../../assets/icons/icon-blog-report.svg';
@@ -285,6 +286,9 @@ export const IconAutomationRobotArm = (props: SVGIconProps) => (
 );
 export const IconBack = (props: SVGIconProps) => (
   <ImportBack {...updateIconProps(props)} />
+);
+export const IconBaselineAlt = (props: SVGIconProps) => (
+  <ImportBaselineAlt {...updateIconProps(props)} />
 );
 export const IconBellNotifications = (props: SVGIconProps) => (
   <ImportBellNotifications {...updateIconProps(props)} />
@@ -1005,6 +1009,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'audio-volume': IconAudioVolume,
   'automation-robot-arm': IconAutomationRobotArm,
   back: IconBack,
+  'baseline-alt': IconBaselineAlt,
   'bell-notifications': IconBellNotifications,
   'benchmark-square': IconBenchmarkSquare,
   'blog-report': IconBlogReport,
