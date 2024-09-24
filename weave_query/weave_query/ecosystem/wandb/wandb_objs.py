@@ -24,7 +24,7 @@ def org_model(entity_name: str, model_name: str) -> FakeWandbModel:
     return FakeWandbModel(model_name)
 
 
-GHOSTWRITE_MD = weave.legacy.weave.ops.Markdown(
+GHOSTWRITE_MD = weave_query.weave_query.ops.Markdown(
     """
 # [ghostwrite.ai](https://ghostwrite.ai).
 
@@ -36,19 +36,19 @@ Ghostwrite is a tool for writing. Our mission is to increase human creativity.
 @weave.op()
 def fakewandbmodel_render(
     model_node: weave.Node[FakeWandbModel],
-) -> weave.legacy.weave.panels.Card:
+) -> weave_query.weave_query.panels.Card:
     model = typing.cast(FakeWandbModel, model_node)
-    return weave.legacy.weave.panels.Card(
+    return weave_query.weave_query.panels.Card(
         title=model.name,
         subtitle="",
         content=[
-            weave.legacy.weave.panels.CardTab(
+            weave_query.weave_query.panels.CardTab(
                 name="Description",
-                content=weave.legacy.weave.panels.PanelMarkdown(GHOSTWRITE_MD),  # type: ignore
+                content=weave_query.weave_query.panels.PanelMarkdown(GHOSTWRITE_MD),  # type: ignore
             ),
-            weave.legacy.weave.panels.CardTab(
+            weave_query.weave_query.panels.CardTab(
                 name="Predictions",
-                content=weave.legacy.weave.ops.project("shawn", "ghostwrite-test1")
+                content=weave_query.weave_query.ops.project("shawn", "ghostwrite-test1")
                 .runs()
                 .summary()["predictions"]
                 .table()
@@ -63,39 +63,39 @@ def fakewandbmodel_render(
 @weave.op()
 def entity_render(
     entity_node: weave.Node[wb_domain_types.Entity],
-) -> weave.legacy.weave.panels.Card:
+) -> weave_query.weave_query.panels.Card:
     entity = typing.cast(wb_domain_types.Entity, entity_node)
-    return weave.legacy.weave.panels.Card(
+    return weave_query.weave_query.panels.Card(
         title=entity_name_op(entity),
         subtitle="",
         content=[
-            weave.legacy.weave.panels.CardTab(
+            weave_query.weave_query.panels.CardTab(
                 name="Projects",
-                content=weave.legacy.weave.panels.Table(
+                content=weave_query.weave_query.panels.Table(
                     entity.projects(),  # type: ignore
                     columns=[
-                        lambda project: weave.legacy.weave.panels.WeaveLink(
+                        lambda project: weave_query.weave_query.panels.WeaveLink(
                             project_name_op(project),
                             vars={
                                 "entity_name": entity_name_op(project.entity()),
                                 "project_name": project_name_op(project),
                             },
-                            to=lambda input, vars: weave.legacy.weave.ops.project(
+                            to=lambda input, vars: weave_query.weave_query.ops.project(
                                 vars["entity_name"], vars["project_name"]
                             ),
                         ),
                     ],
                 ),
             ),
-            weave.legacy.weave.panels.CardTab(
+            weave_query.weave_query.panels.CardTab(
                 name="Registered Models",
-                content=weave.legacy.weave.panels.Table(
+                content=weave_query.weave_query.panels.Table(
                     weave.save(
                         ["ghostwrite", "credit card predictor", "stopsigns3"],
                         name="model_list",
                     ),
                     columns=[
-                        lambda model_name: weave.legacy.weave.panels.WeaveLink(
+                        lambda model_name: weave_query.weave_query.panels.WeaveLink(
                             model_name,
                             vars={
                                 "entity_name": entity_name_op(entity),
@@ -117,18 +117,18 @@ class ProjectRunsTable(weave.Panel):
     input_node: weave.Node[list[wb_domain_types.Run]]
 
     @weave.op()
-    def render(self) -> weave.legacy.weave.panels.Table:
-        return weave.legacy.weave.panels.Table(
+    def render(self) -> weave_query.weave_query.panels.Table:
+        return weave_query.weave_query.panels.Table(
             self.input_node,
             columns=[
-                lambda run: weave.legacy.weave.panels.WeaveLink(
+                lambda run: weave_query.weave_query.panels.WeaveLink(
                     run.id(),
                     vars={
                         "entity_name": entity_name_op(run.project().entity()),
                         "project_name": project_name_op(run.project()),
                         "run_id": run.id(),
                     },
-                    to=lambda input, vars: weave.legacy.weave.ops.project(
+                    to=lambda input, vars: weave_query.weave_query.ops.project(
                         vars["entity_name"], vars["project_name"]
                     ).run(vars["run_id"]),
                 ),
@@ -144,28 +144,28 @@ class ProjectArtifactsTable(weave.Panel):
     input_node: weave.Node[list[wb_domain_types.ArtifactCollection]]
 
     @weave.op()
-    def render(self) -> weave.legacy.weave.panels.Table:
+    def render(self) -> weave_query.weave_query.panels.Table:
         # This breaks if there is a variable in the node
         # types_names = weave.use(artifacts._get_op("type")().name().unique())
-        # return weave.legacy.weave.panels.Card(
+        # return weave_query.weave_query.panels.Card(
         #     title="Artifacts",
         #     subtitle="",
         #     content=[
-        #         weave.legacy.weave.panels.CardTab(name=type_name, content=[type_name])
+        #         weave_query.weave_query.panels.CardTab(name=type_name, content=[type_name])
         #         for type_name in types_names
         #     ],
         # )
-        return weave.legacy.weave.panels.Table(
+        return weave_query.weave_query.panels.Table(
             self.input_node,
             columns=[
-                lambda artifact: weave.legacy.weave.panels.WeaveLink(
+                lambda artifact: weave_query.weave_query.panels.WeaveLink(
                     artifact._get_op("name")(),
                     vars={
                         "entity_name": entity_name_op(artifact.project().entity()),
                         "project_name": project_name_op(artifact.project()),
                         "artifact_name": artifact._get_op("name")(),
                     },
-                    to=lambda input, vars: weave.legacy.weave.ops.project(
+                    to=lambda input, vars: weave_query.weave_query.ops.project(
                         vars["entity_name"], vars["project_name"]
                     ).artifact(vars["artifact_name"]),
                 ),

@@ -1,9 +1,9 @@
 import pytest
 
 import weave_query as weave
-import weave.legacy.weave
+import weave_query.weave_query
 
-ops = weave.legacy.weave.registry_mem.memory_registry.list_ops()
+ops = weave_query.weave_query.registry_mem.memory_registry.list_ops()
 
 
 def output_type_dict_is_const_function_node(output_type_dict):

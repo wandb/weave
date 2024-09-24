@@ -11,9 +11,9 @@ class SlackMessagesPanel(weave.Panel):
     input_node: weave.Node[list[slack.Message]]
 
     @weave.op()
-    def render(self) -> weave.legacy.weave.panels.Table:
+    def render(self) -> weave_query.weave_query.panels.Table:
         messages = typing.cast(list[slack.Message], self.input_node)  # type: ignore
-        return weave.legacy.weave.panels.Table(
+        return weave_query.weave_query.panels.Table(
             messages,
             columns=[
                 lambda message: message.user_id,
@@ -28,8 +28,8 @@ class SlackChannelsPanel(weave.Panel):
     input_node: weave.Node[list[slack.Channel]]
 
     @weave.op()
-    def render(self) -> weave.legacy.weave.panels.Table:
-        return weave.legacy.weave.panels.Table(
+    def render(self) -> weave_query.weave_query.panels.Table:
+        return weave_query.weave_query.panels.Table(
             self.input_node,
             columns=[
                 lambda channel: channel.channel_name,
@@ -44,13 +44,13 @@ class SlackChannelPanel(weave.Panel):
     input_node: weave.Node[slack.Channel]
 
     @weave.op()
-    def render(self) -> weave.legacy.weave.panels.Card:
+    def render(self) -> weave_query.weave_query.panels.Card:
         channel = typing.cast(slack.Channel, self.input_node)  # type: ignore
-        return weave.legacy.weave.panels.Card(
+        return weave_query.weave_query.panels.Card(
             title=channel.channel_name,
             subtitle="Slack channel",
             content=[
-                weave.legacy.weave.panels.CardTab(
+                weave_query.weave_query.panels.CardTab(
                     name="Messages", content=SlackMessagesPanel(channel.messages())
                 ),
             ],
@@ -63,13 +63,13 @@ class SlackPanel(weave.Panel):
     input_node: weave.Node[slack.Slack]
 
     @weave.op()
-    def slack_render(self) -> weave.legacy.weave.panels.Card:
+    def slack_render(self) -> weave_query.weave_query.panels.Card:
         s = typing.cast(slack.Slack, self.input_node)  # type: ignore
-        return weave.legacy.weave.panels.Card(
+        return weave_query.weave_query.panels.Card(
             title="Slack export data",
             subtitle="",
             content=[
-                weave.legacy.weave.panels.CardTab(
+                weave_query.weave_query.panels.CardTab(
                     name="Channels", content=SlackChannelsPanel(s.channels())
                 ),
             ],

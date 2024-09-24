@@ -54,27 +54,27 @@ mark_weave_type = weave.types.UnionType(
 @weave.type()
 class TimeSeriesConfig:
     x: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.VoidNode()
+        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
     )
     agg: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.VoidNode()
+        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
     )
     min_x: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.VoidNode()
+        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
     )
     max_x: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.VoidNode()
+        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
     )
     label: weave.Node[typing.Optional[typing.Union[str, weave.types.InvalidPy]]] = (
-        dataclasses.field(default_factory=lambda: weave.legacy.weave.graph.VoidNode())
+        dataclasses.field(default_factory=lambda: weave_query.weave_query.graph.VoidNode())
     )
     mark: weave.Node[str] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.ConstNode(
+        default_factory=lambda: weave_query.weave_query.graph.ConstNode(
             weave.types.String(), "bar"
         )
     )
     axis_labels: weave.Node[dict[str, str]] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.ConstNode(
+        default_factory=lambda: weave_query.weave_query.graph.ConstNode(
             weave.types.Dict(weave.types.String(), weave.types.String()),
             {},
         )
@@ -85,7 +85,7 @@ def first_column_of_type(
     node_type: weave.types.Type,
     desired_type: weave.types.Type,
 ) -> typing.Tuple[
-    weave.legacy.weave.graph.ConstNode, weave.legacy.weave.graph.ConstNode
+    weave_query.weave_query.graph.ConstNode, weave_query.weave_query.graph.ConstNode
 ]:
     if isinstance(node_type, tagged_value_type.TaggedValueType):
         node_type = node_type.value
@@ -122,8 +122,8 @@ def first_column_of_type(
                         {"item": object_type}, lambda item: item[key]
                     )
         # return weave_internal.define_fn(
-        #     {"input_node": node_type}, weave.legacy.weave.graph.VoidNode()
-        # ), weave_internal.define_fn({"item": object_type}, lambda _: weave.legacy.weave.graph.VoidNode())
+        #     {"input_node": node_type}, weave_query.weave_query.graph.VoidNode()
+        # ), weave_internal.define_fn({"item": object_type}, lambda _: weave_query.weave_query.graph.VoidNode())
     raise ValueError(
         f"Can't extract column with type {desired_type} from node of type {node_type}"
     )
@@ -163,7 +163,7 @@ class TimeSeries(weave.Panel):
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
 
-        unnested = weave.legacy.weave.ops.unnest(input_node)
+        unnested = weave_query.weave_query.ops.unnest(input_node)
 
         # TODO: add the ability to configure options here
         if self.config is None:
@@ -171,7 +171,7 @@ class TimeSeries(weave.Panel):
             for attr in ["x", "min_x", "max_x", "label", "mark", "agg", "axis_labels"]:
                 if attr in options:
                     value = options[attr]
-                    if not isinstance(value, weave.legacy.weave.graph.Node):
+                    if not isinstance(value, weave_query.weave_query.graph.Node):
                         if attr in ["min_x", "max_x", "mark", "axis_labels"]:
                             value = make_node(value)
                         if attr in ["min_x", "max_x"]:
@@ -189,7 +189,7 @@ class TimeSeries(weave.Panel):
                 else:
                     value = weave_internal.define_fn(
                         {"item": unnested.type.object_type},
-                        lambda item: weave.legacy.weave.graph.VoidNode(),
+                        lambda item: weave_query.weave_query.graph.VoidNode(),
                     )
                 setattr(self.config, attr, value)
 
@@ -242,33 +242,33 @@ class TimeSeries(weave.Panel):
 
     # The config render op. This renders the config editor.
     @weave.op()
-    def render_config(self) -> weave.legacy.weave.panels.Group:
+    def render_config(self) -> weave_query.weave_query.panels.Group:
         input_node = self.input_node
         config = typing.cast(TimeSeriesConfig, self.config)
-        return weave.legacy.weave.panels.Group(
+        return weave_query.weave_query.panels.Group(
             items={
-                "x": weave.legacy.weave.panels.LabeledItem(
-                    label="x", item=weave.legacy.weave.panels.FunctionEditor(config.x)
+                "x": weave_query.weave_query.panels.LabeledItem(
+                    label="x", item=weave_query.weave_query.panels.FunctionEditor(config.x)
                 ),
-                "label": weave.legacy.weave.panels.LabeledItem(
+                "label": weave_query.weave_query.panels.LabeledItem(
                     label="label",
-                    item=weave.legacy.weave.panels.FunctionEditor(config.label),
+                    item=weave_query.weave_query.panels.FunctionEditor(config.label),
                 ),
-                "min_x": weave.legacy.weave.panels.LabeledItem(
+                "min_x": weave_query.weave_query.panels.LabeledItem(
                     label="min_x",
-                    item=weave.legacy.weave.panels.FunctionEditor(config.min_x),
+                    item=weave_query.weave_query.panels.FunctionEditor(config.min_x),
                 ),
-                "max_x": weave.legacy.weave.panels.LabeledItem(
+                "max_x": weave_query.weave_query.panels.LabeledItem(
                     label="max_x",
-                    item=weave.legacy.weave.panels.FunctionEditor(config.max_x),
+                    item=weave_query.weave_query.panels.FunctionEditor(config.max_x),
                 ),
-                "agg": weave.legacy.weave.panels.LabeledItem(
+                "agg": weave_query.weave_query.panels.LabeledItem(
                     label="agg",
-                    item=weave.legacy.weave.panels.FunctionEditor(config.agg),
+                    item=weave_query.weave_query.panels.FunctionEditor(config.agg),
                 ),
-                "mark": weave.legacy.weave.panels.LabeledItem(
+                "mark": weave_query.weave_query.panels.LabeledItem(
                     label="mark",
-                    item=weave.legacy.weave.panels.ObjectPicker(
+                    item=weave_query.weave_query.panels.ObjectPicker(
                         weave_internal.make_const_node(
                             weave.types.List(weave.types.String()),
                             [
@@ -277,7 +277,7 @@ class TimeSeries(weave.Panel):
                                 "point",
                             ],
                         ),
-                        config=weave.legacy.weave.panels.ObjectPickerConfig(
+                        config=weave_query.weave_query.panels.ObjectPickerConfig(
                             choice=config.mark
                         ),
                     ),
@@ -300,15 +300,15 @@ class TimeSeries(weave.Panel):
         if not weave.types.optional(weave.types.Timestamp()).assign_type(
             min_x.type
         ) or not weave.types.optional(weave.types.Timestamp()).assign_type(max_x.type):
-            return weave.legacy.weave.panels.PanelHtml(
-                weave.legacy.weave.ops.Html("No data")
+            return weave_query.weave_query.panels.PanelHtml(
+                weave_query.weave_query.ops.Html("No data")
             )  # type: ignore
 
         exact_bin_size = ((max_x - min_x) / N_BINS).totalSeconds()  # type: ignore
         bin_size_index = TIME_SERIES_BIN_SIZES_SEC_NODE.map(  # type: ignore
             lambda x: (
                 (x - exact_bin_size).abs()
-                / weave.legacy.weave.ops.make_list(a=x, b=exact_bin_size).min()
+                / weave_query.weave_query.ops.make_list(a=x, b=exact_bin_size).min()
             )
             # lambda x: (x / exact_bin_size - 1).abs() # original
         ).argmin()
@@ -329,7 +329,7 @@ class TimeSeries(weave.Panel):
             bin_start = bin_start_ms
             bin_end = bin_end_ms
 
-            group_items["bin"] = weave.legacy.weave.ops.dict_(
+            group_items["bin"] = weave_query.weave_query.ops.dict_(
                 start=bin_start, stop=bin_end
             )
 
@@ -338,18 +338,18 @@ class TimeSeries(weave.Panel):
             else:
                 group_items["label"] = config.label(item)
 
-            return weave.legacy.weave.ops.dict_(**group_items)
+            return weave_query.weave_query.ops.dict_(**group_items)
 
         binned = (
             unnested.filter(
-                lambda item: weave.legacy.weave.ops.Boolean.bool_and(
+                lambda item: weave_query.weave_query.ops.Boolean.bool_and(
                     config.x(item) <= max_x,
                     config.x(item) >= min_x,  # type: ignore
                 )
             )
             .groupby(lambda item: bin_fn(item))
             .map(
-                lambda group: weave.legacy.weave.ops.dict_(
+                lambda group: weave_query.weave_query.ops.dict_(
                     x=group.groupkey()["bin"],
                     label=group.groupkey()["label"],
                     y=config.agg(group),  # type: ignore
@@ -357,12 +357,12 @@ class TimeSeries(weave.Panel):
             )
             # this is needed because otherwise the lines look like a scrambled mess
             .sort(
-                lambda item: weave.legacy.weave.ops.make_list(a=item["x"]["start"]),
+                lambda item: weave_query.weave_query.ops.make_list(a=item["x"]["start"]),
                 ["asc"],
             )
         )
 
-        default_labels = weave.legacy.weave.ops.dict_(
+        default_labels = weave_query.weave_query.ops.dict_(
             # x=function_to_string(config.x),
             # y=function_to_string(config.agg),
             # label=function_to_string(config.label),

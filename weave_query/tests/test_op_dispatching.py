@@ -73,7 +73,7 @@ def test_pick_map():
 
 
 def test_json_pick_map():
-    res = weave.legacy.weave.graph.OutputNode.from_json(
+    res = weave_query.weave_query.graph.OutputNode.from_json(
         {
             "nodeType": "output",
             "type": {"type": "list", "objectType": "number"},
@@ -171,7 +171,7 @@ def test_nested_js_dict_pick():
 
 
 def test_dispatch_of_ambiguous_ops():
-    artifacts_node = weave.legacy.weave.ops.project("a", "b").artifacts()
+    artifacts_node = weave_query.weave_query.ops.project("a", "b").artifacts()
     # just making this call is the test since it is
     # not clear if it should be artifact-project or
     # tag-project

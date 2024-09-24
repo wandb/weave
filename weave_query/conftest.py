@@ -46,7 +46,7 @@ logs.configure_logger()
 # tests.
 context_state._eager_mode.set(False)
 
-# A lot of tests rely on weave.legacy.weave.ops.* being in scope. Importing this here
+# A lot of tests rely on weave_query.weave_query.ops.* being in scope. Importing this here
 # makes that work...
 
 ### Disable datadog engine tracing

@@ -1,5 +1,6 @@
 import pytest
 import weave_query as weave
+from weave_query.weave_query import ops
 
 from weave_query.weave_query import (
     artifact_fs,
@@ -25,7 +26,7 @@ def public_env():
 
 def test_access_file(public_env):
     with pytest.raises(errors.WeaveAccessDeniedError):
-        weave.use(weave.legacy.weave.ops.local_path("/tmp/bad.json"))
+        weave.use(ops.local_path("/tmp/bad.json"))
 
 
 @pytest.mark.parametrize("path", ["..", "/tmp", "//tmp", "//tmp/bad.json", "/tmp/.../"])

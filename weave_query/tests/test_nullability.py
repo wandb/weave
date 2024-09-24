@@ -57,7 +57,7 @@ def test_basic_nullability():
 def test_basic_nullability_in_mappability():
     b_arr = weave.save([2])
     maybe_int_arr = weave.save(
-        weave.legacy.weave.graph.ConstNode(
+        weave_query.weave_query.graph.ConstNode(
             weave.types.List(weave.types.optional(weave.types.Int())), [1, None]
         )
     )

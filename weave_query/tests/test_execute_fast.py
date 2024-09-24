@@ -35,7 +35,7 @@ def test_empty_list():
     map_fn = weave_internal.define_fn(
         {"row": arr.type.object_type},
         lambda row: row.merge(
-            weave.legacy.weave.ops.dict_(output_classid=row["output_class"].id())
+            weave_query.weave_query.ops.dict_(output_classid=row["output_class"].id())
         ),
     )
 

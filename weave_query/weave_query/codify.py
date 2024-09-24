@@ -96,7 +96,7 @@ def _try_otc_using_codifiable_mixin(obj: typing.Any) -> typing.Optional[str]:
 #         assert weave_types.type_name_to_type(obj_type.name)() == obj_type
 #         d = obj_type.instance_to_dict(obj)
 #         obj_type_name = obj_type.name
-#         return f"""weave.legacy.weave.codify.load_type({obj_type_name}, {d})"""
+#         return f"""weave_query.weave_query.codify.load_type({obj_type_name}, {d})"""
 #     return None
 
 
@@ -127,7 +127,7 @@ def _try_otc_using_dataclasses(obj: typing.Any) -> typing.Optional[str]:
     if class_type.__module__.startswith("weave.decorator_type") and issubclass(
         class_type, weave_types.Type
     ):
-        qualified_classpath = "weave.legacy.weave.weave_types"
+        qualified_classpath = "weave_query.weave_query.weave_types"
         qualified_classname = f"type_name_to_type('{class_type.name}')"
     else:
         qualified_classpath = _module_name_corrections(class_type.__module__)
@@ -161,7 +161,7 @@ def _try_otc_using_dataclasses(obj: typing.Any) -> typing.Optional[str]:
 
 
 def _otc_using_storage_fallback(obj: typing.Any) -> str:
-    return f"""weave.legacy.weave.codify.load({storage.to_python(obj)})"""
+    return f"""weave_query.weave_query.codify.load({storage.to_python(obj)})"""
 
 
 # Helpers
@@ -169,8 +169,8 @@ def _otc_using_storage_fallback(obj: typing.Any) -> str:
 
 # Hack:
 def _module_name_corrections(qualified_name: str) -> str:
-    if qualified_name == "weave.legacy.weave.ops_primitives.file_local":
-        return "weave.legacy.weave.ops"
+    if qualified_name == "weave_query.weave_query.ops_primitives.file_local":
+        return "weave_query.weave_query.ops"
     elif qualified_name.startswith("weave.decorator_class"):
         raise ValueError("Decorator classes are not supported.")
     elif qualified_name.startswith("weave.decorator_type"):
@@ -200,7 +200,7 @@ def _node_to_code(node: graph.Node, wrap_const_node: bool = True) -> str:
 
         if current_frame is not None and node.name in current_frame:
             return node.name
-        return f"weave.legacy.weave.weave_internal.make_var_node({_type_to_code(node.type)}, '{node.name}')"
+        return f"weave_query.weave_query.weave_internal.make_var_node({_type_to_code(node.type)}, '{node.name}')"
     elif isinstance(node, graph.ConstNode):
         if isinstance(node.type, weave_types.Function):
             vars = list(node.type.input_types.keys())
@@ -208,7 +208,7 @@ def _node_to_code(node: graph.Node, wrap_const_node: bool = True) -> str:
         else:
             val_as_code = object_to_code_no_format(node.val)
             if wrap_const_node:
-                return f"weave.legacy.weave.weave_internal.const({val_as_code})"
+                return f"weave_query.weave_query.weave_internal.const({val_as_code})"
             else:
                 return val_as_code
     elif isinstance(node, graph.OutputNode):
@@ -225,7 +225,7 @@ def _node_to_code(node: graph.Node, wrap_const_node: bool = True) -> str:
             )
             if len(node.from_op.inputs) > 0:
                 args += ","
-            return f"weave.legacy.weave.ops_primitives.dict.dict_({args})"
+            return f"weave_query.weave_query.ops_primitives.dict.dict_({args})"
         elif node.from_op.name == "list":
             args = ",".join(
                 [
@@ -235,7 +235,7 @@ def _node_to_code(node: graph.Node, wrap_const_node: bool = True) -> str:
             )
             if len(node.from_op.inputs) > 0:
                 args += ","
-            return f"weave.legacy.weave.ops_primitives.list_.make_list({args})"
+            return f"weave_query.weave_query.ops_primitives.list_.make_list({args})"
 
         is_root = len(inputs) == 0 or not isinstance(
             inputs[0], (graph.OutputNode, graph.VarNode)

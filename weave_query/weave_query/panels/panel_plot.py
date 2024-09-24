@@ -703,7 +703,7 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             param_str = (
                 ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
             )
-        return f"""weave.legacy.weave.panels.panel_plot.Plot({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
+        return f"""weave_query.weave_query.panels.panel_plot.Plot({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
 
 
 def make_set_all_series(dim_name: str) -> typing.Callable[[Plot, typing.Any], None]:

@@ -448,7 +448,7 @@ def make_stream_table(*args, **kwargs):
 #     streamtable = make_stream_table(
 #         stream_name, project_name=project, entity_name=entity
 #     )
-#     chat_completions = weave.legacy.weave.monitoring.openai.openai.ChatCompletions(
+#     chat_completions = weave_query.weave_query.monitoring.openai.openai.ChatCompletions(
 #         mocked_create
 #     )
 #     create_input = dict(
@@ -476,7 +476,7 @@ def make_stream_table(*args, **kwargs):
 #     reassembled_chat_completion_message,
 #     client,
 # ):
-#     chat_completions = weave.legacy.weave.monitoring.openai.openai.ChatCompletions(
+#     chat_completions = weave_query.weave_query.monitoring.openai.openai.ChatCompletions(
 #         mocked_streaming_create
 #     )
 #     create_input = dict(
@@ -507,7 +507,7 @@ def make_stream_table(*args, **kwargs):
 #     reassembled_chat_completion_message,
 #     client,
 # ):
-#     chat_completions = weave.legacy.weave.monitoring.openai.openai.AsyncChatCompletions(
+#     chat_completions = weave_query.weave_query.monitoring.openai.openai.AsyncChatCompletions(
 #         mocked_async_streaming_create
 #     )
 #     create_input = dict(

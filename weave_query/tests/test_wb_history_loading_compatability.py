@@ -182,7 +182,7 @@ def do_batch_test(username, rows, do_assertion):
     row_accumulator, st, user_logged_keys = do_logging(username, rows)
 
     row_type = weave.types.TypeRegistry.type_of([{}, *row_accumulator])
-    run_node = weave.legacy.weave.ops.project(st._entity_name, st._project_name).run(
+    run_node = weave_query.weave_query.ops.project(st._entity_name, st._project_name).run(
         st._table_name
     )
 
@@ -394,7 +394,7 @@ def test_stream_table_perf(user_by_api_key_in_env, n_rows, n_cols):
     timings["log"] += time.time()
     print(f"Log Time: {timings['log']}")
 
-    run_node = weave.legacy.weave.ops.project(st._entity_name, st._project_name).run(
+    run_node = weave_query.weave_query.ops.project(st._entity_name, st._project_name).run(
         st._table_name
     )
 
