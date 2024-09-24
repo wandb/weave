@@ -19,7 +19,6 @@ from weave.trace_server import (
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
 
-from .tests import fixture_fakewandb
 from .tests.trace.trace_server_clickhouse_conftest import *
 from .tests.wandb_system_tests_conftest import *
 from .trace import autopatch
@@ -110,13 +109,6 @@ def cereal_csv():
         cereal_path = os.path.join(d, "cereal.csv")
         shutil.copy("testdata/cereal.csv", cereal_path)
         yield cereal_path
-
-
-@pytest.fixture()
-def fake_wandb():
-    setup_response = fixture_fakewandb.setup()
-    yield setup_response
-    fixture_fakewandb.teardown(setup_response)
 
 
 @pytest.fixture()
