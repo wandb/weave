@@ -123,10 +123,10 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
-            name: 'Evaluations',
+            name: 'Evals',
             slug: 'weave/evaluations',
             isShown: showWeaveSidebarItems || isShowAll,
-            iconName: IconNames.TypeBoolean,
+            iconName: IconNames.BaselineAlt,
             // path: baseRouter.callsUIUrl(entity, project, evaluationsFilter),
           },
           {
@@ -160,7 +160,7 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
-            name: 'Operations',
+            name: 'Ops',
             slug: 'weave/operations',
             additionalSlugs: ['weave/op-versions'],
             isShown: isWeaveOnly,
