@@ -174,14 +174,7 @@ class FutureExecutor:
             with self._recursion_depths_lock:
                 self._recursion_depths[executing_thread_id] = new_depth
 
-            try:
-                return f(*args, **kwargs)
-            finally:
-                with self._recursion_depths_lock:
-                    try:    
-                        del self._recursion_depths[executing_thread_id]
-                    except KeyError:
-                        pass
+            return f(*args, **kwargs)
 
         future = self._safe_submit(wrapped_f)
         with self._active_futures_lock:
