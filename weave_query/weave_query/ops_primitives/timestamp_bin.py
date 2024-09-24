@@ -1,10 +1,9 @@
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import op, use
-from weave.legacy.weave import graph
-from weave.legacy.weave.ops_primitives.dict import dict_
-from weave.legacy.weave.weave_internal import call_fn, define_fn, make_const_node
-from weave.legacy.weave.weave_types import Function, TimestampBinType
+from weave_query.weave_query import graph, weave_internal
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import op, use
+from weave_query.weave_query.ops_primitives.dict import dict_
+from weave_query.weave_query.weave_internal import call_fn, define_fn, make_const_node
+from weave_query.weave_query.weave_types import Function, TimestampBinType
 
 NICE_BIN_SIZES_SEC = [
     # TODO: will need more steps along here for smooth zooming.
@@ -60,7 +59,8 @@ def timestamp_bins_fixed(bin_size_s: float):
         "target_n_bins": types.Number(),
     },
     output_type=Function(
-        input_types={"ts": types.Timestamp()}, output_type=TimestampBinType  # type: ignore
+        input_types={"ts": types.Timestamp()},
+        output_type=TimestampBinType,  # type: ignore
     ),
     render_info={"type": "function"},
 )
@@ -82,7 +82,8 @@ def timestamp_bins_nice(arr, target_n_bins):
         "in_": types.Timestamp(),
         "bin_fn": types.optional(
             Function(
-                input_types={"row": types.Timestamp()}, output_type=TimestampBinType  # type: ignore
+                input_types={"row": types.Timestamp()},
+                output_type=TimestampBinType,  # type: ignore
             )
         ),
     },

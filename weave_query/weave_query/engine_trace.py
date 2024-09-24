@@ -18,7 +18,7 @@ import os
 import time
 import typing
 
-from weave.legacy.weave import environment, logs, stream_data_interfaces
+from weave_query.weave_query import environment, logs, stream_data_interfaces
 
 
 # Thanks co-pilot!
@@ -74,7 +74,7 @@ class DummyTrace:
         return None
 
     def current_span(self):  # type: ignore
-        return None 
+        return None
 
     def current_root_span(self):  # type: ignore
         return None
@@ -91,7 +91,9 @@ _weave_trace_stream = None
 def weave_trace_stream():  # type: ignore
     global _weave_trace_stream
     if _weave_trace_stream is None:
-        from weave.legacy.weave.wandb_interface.wandb_stream_table import StreamTable
+        from weave_query.weave_query.wandb_interface.wandb_stream_table import (
+            StreamTable,
+        )
 
         _weave_trace_stream = StreamTable(os.getenv("WEAVE_TRACE_STREAM"))
     return _weave_trace_stream

@@ -1,12 +1,11 @@
 import typing
 
-from weave.legacy.weave import weave_types
-from weave.legacy.weave import storage, graph, panel
+from weave_query.weave_query import graph, panel, storage, weave_types
 
 
 def make_node(v: typing.Any) -> graph.Node:
     """Business logic for how values passed to panels are converted to json."""
-    from weave.legacy.weave import ops
+    from weave_query.weave_query import ops
 
     if isinstance(v, graph.Node):
         return v

@@ -105,9 +105,9 @@ import typing
 
 import tabulate
 
-from weave.legacy.weave import graph
+from weave_query.weave_query import graph
+from weave_query.weave_query import weave_types as types
 
-from weave.legacy.weave import weave_types as types
 from .partial_object import PartialObjectType
 
 
@@ -137,7 +137,7 @@ def _node_type_name(node: graph.Node) -> str:
 
 
 def _type_name(node_type: types.Type) -> str:
-    from weave.legacy.weave.language_features.tagging import tagged_value_type
+    from weave_query.weave_query.language_features.tagging import tagged_value_type
 
     if isinstance(node_type, tagged_value_type.TaggedValueType):
         return f"TV({_type_name(node_type.value)})"

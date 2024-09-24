@@ -1,12 +1,12 @@
 import datetime
 import json
 
-from weave.legacy.weave import errors
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import op
-from weave.legacy.weave.gql_json_cache import use_json
-from weave.legacy.weave.gql_op_plugin import wb_gql_op_plugin
-from weave.legacy.weave.ops_domain.wandb_domain_gql import (
+from weave_query.weave_query import errors
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import op
+from weave_query.weave_query.gql_json_cache import use_json
+from weave_query.weave_query.gql_op_plugin import wb_gql_op_plugin
+from weave_query.weave_query.ops_domain.wandb_domain_gql import (
     _make_alias,
 )
 

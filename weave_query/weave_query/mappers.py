@@ -1,8 +1,8 @@
 import typing
 
 if typing.TYPE_CHECKING:
-    from weave.legacy.weave import weave_types as types
-    from weave.legacy.weave import artifact_local
+    from weave_query.weave_query import artifact_local
+    from weave_query.weave_query import weave_types as types
 
 
 class Mapper:

@@ -2,15 +2,14 @@ import random
 import typing
 
 import pytest
-
 import weave
-from weave.legacy.weave import ops_arrow
 
-from weave.legacy.tests.util.concrete_tagged_value import (
+from weave_query.tests.util.concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,
     concrete_to_tagstore,
 )
+from weave_query.weave_query import ops_arrow
 
 
 class ObjSubFields(typing.TypedDict):

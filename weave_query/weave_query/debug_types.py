@@ -1,7 +1,7 @@
 import textwrap
 
-from weave.legacy.weave.language_features.tagging import tagged_value_type
-from weave.legacy.weave.weave_types import *
+from weave_query.weave_query.language_features.tagging import tagged_value_type
+from weave_query.weave_query.weave_types import *
 
 
 def short_type(type: Type) -> str:

@@ -3,9 +3,7 @@ import contextlib
 import contextvars
 import typing
 
-from weave.legacy.weave import graph
-
-from weave.legacy.weave import errors
+from weave_query.weave_query import errors, graph
 
 ExecutableNode = typing.Union[graph.OutputNode, graph.ConstNode]
 
@@ -51,9 +49,9 @@ class NodeResultStore:
             self._store[key] = value
 
 
-_node_result_store: contextvars.ContextVar[
-    typing.Optional[NodeResultStore]
-] = contextvars.ContextVar("_top_level_forward_graph_ctx", default=None)
+_node_result_store: contextvars.ContextVar[typing.Optional[NodeResultStore]] = (
+    contextvars.ContextVar("_top_level_forward_graph_ctx", default=None)
+)
 
 
 # Each top level call to execute.execute_nodes creates its own result store.

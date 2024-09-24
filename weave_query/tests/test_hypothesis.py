@@ -44,9 +44,9 @@ from hypothesis import strategies as st
 from hypothesis.strategies import composite
 
 import weave
-from weave.legacy.weave import artifact_local, ops_arrow, ops_primitives, storage
-from weave.legacy.weave.arrow import convert
-from weave.legacy.weave.language_features.tagging import tag_store
+from weave_query.weave_query import artifact_local, ops_arrow, ops_primitives, storage
+from weave_query.weave_query.arrow import convert
+from weave_query.weave_query.language_features.tagging import tag_store
 
 # Jack this up to find more bugs.
 EXAMPLES_PER_TEST = 100

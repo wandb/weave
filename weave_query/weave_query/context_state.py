@@ -3,11 +3,10 @@ import contextvars
 import dataclasses
 import typing
 
-from weave.legacy.weave import server_interface
+from weave_query.weave_query import server_interface
 
 if typing.TYPE_CHECKING:
-    from weave.legacy.weave import client_interface, uris
-    from weave.legacy.weave.graph_client import GraphClient
+    from weave_query.weave_query import client_interface
 
 
 # colab currently runs ipykernel < 6.0.  This resets context on every
@@ -131,9 +130,9 @@ def set_client(client: "client_interface.ClientInterface"):
     _weave_client.set(client)
 
 
-_http_server: contextvars.ContextVar[
-    typing.Optional["server_interface.BaseServer"]
-] = contextvars.ContextVar("http_server", default=None)
+_http_server: contextvars.ContextVar[typing.Optional["server_interface.BaseServer"]] = (
+    contextvars.ContextVar("http_server", default=None)
+)
 
 
 @contextlib.contextmanager
@@ -226,9 +225,9 @@ def disable_analytics() -> contextvars.Token:
     return _analytics_enabled.set(False)
 
 
-_client_cache_key: contextvars.ContextVar[
-    typing.Optional[str]
-] = contextvars.ContextVar("client_cache_key", default=None)
+_client_cache_key: contextvars.ContextVar[typing.Optional[str]] = (
+    contextvars.ContextVar("client_cache_key", default=None)
+)
 
 
 @contextlib.contextmanager
@@ -264,9 +263,9 @@ class WandbApiContext:
 
 
 ## wandb_api.py context
-_wandb_api_context: contextvars.ContextVar[
-    typing.Optional[WandbApiContext]
-] = contextvars.ContextVar("wandb_api_context", default=None)
+_wandb_api_context: contextvars.ContextVar[typing.Optional[WandbApiContext]] = (
+    contextvars.ContextVar("wandb_api_context", default=None)
+)
 
 ## urls.py Context
 _use_local_urls: contextvars.ContextVar[bool] = contextvars.ContextVar(
@@ -274,14 +273,14 @@ _use_local_urls: contextvars.ContextVar[bool] = contextvars.ContextVar(
 )
 
 ## graph_client_context.py Context
-_graph_client: contextvars.ContextVar[
-    typing.Optional["GraphClient"]
-] = contextvars.ContextVar("graph_client", default=None)
+_graph_client: contextvars.ContextVar[typing.Optional["GraphClient"]] = (
+    contextvars.ContextVar("graph_client", default=None)
+)
 
 
-_cache_prefix_context: contextvars.ContextVar[
-    typing.Optional[str]
-] = contextvars.ContextVar("cache_prefix", default=None)
+_cache_prefix_context: contextvars.ContextVar[typing.Optional[str]] = (
+    contextvars.ContextVar("cache_prefix", default=None)
+)
 
 _ref_tracking_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "ref_tracking_enabled", default=False

@@ -12,13 +12,13 @@ from openai.types.chat.chat_completion_chunk import Choice as ChunkChoice
 from openai.types.completion_usage import CompletionUsage
 
 import weave
-from weave.legacy.weave.monitoring import init_monitor
-from weave.legacy.weave.monitoring.openai import util
-from weave.legacy.weave.monitoring.openai.models import *
-from weave.legacy.weave.monitoring.openai.models import Context
-from weave.legacy.weave.monitoring.openai.openai import patch, unpatch
-from weave.legacy.weave.monitoring.openai.util import Context
-from weave.legacy.weave.wandb_interface.wandb_stream_table import StreamTable
+from weave_query.weave_query.monitoring import init_monitor
+from weave_query.weave_query.monitoring.openai import util
+from weave_query.weave_query.monitoring.openai.models import *
+from weave_query.weave_query.monitoring.openai.models import Context
+from weave_query.weave_query.monitoring.openai.openai import patch, unpatch
+from weave_query.weave_query.monitoring.openai.util import Context
+from weave_query.weave_query.wandb_interface.wandb_stream_table import StreamTable
 
 
 @pytest.fixture
@@ -453,7 +453,7 @@ def make_stream_table(*args, **kwargs):
 #     streamtable = make_stream_table(
 #         stream_name, project_name=project, entity_name=entity
 #     )
-#     chat_completions = weave.legacy.weave.monitoring.openai.openai.ChatCompletions(
+#     chat_completions = weave_query.weave_query.monitoring.openai.openai.ChatCompletions(
 #         mocked_create
 #     )
 #     create_input = dict(
@@ -481,7 +481,7 @@ def make_stream_table(*args, **kwargs):
 #     reassembled_chat_completion_message,
 #     client,
 # ):
-#     chat_completions = weave.legacy.weave.monitoring.openai.openai.ChatCompletions(
+#     chat_completions = weave_query.weave_query.monitoring.openai.openai.ChatCompletions(
 #         mocked_streaming_create
 #     )
 #     create_input = dict(
@@ -512,7 +512,7 @@ def make_stream_table(*args, **kwargs):
 #     reassembled_chat_completion_message,
 #     client,
 # ):
-#     chat_completions = weave.legacy.weave.monitoring.openai.openai.AsyncChatCompletions(
+#     chat_completions = weave_query.weave_query.monitoring.openai.openai.AsyncChatCompletions(
 #         mocked_async_streaming_create
 #     )
 #     create_input = dict(

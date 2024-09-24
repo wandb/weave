@@ -3,8 +3,7 @@
 import typing
 
 if typing.TYPE_CHECKING:
-    from weave.legacy.weave import weave_types
-    from weave.legacy.weave import artifact_base, mappers
+    from weave_query.weave_query import artifact_base, mappers, weave_types
 
 
 def map_to_python(  # type: ignore[empty-body]

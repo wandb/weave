@@ -3,8 +3,9 @@ import time
 
 import pytest
 
-from weave.legacy.weave import api as weave
-from weave.legacy.weave import (
+from weave_query.tests.util import weavejs_ops
+from weave_query.weave_query import api as weave
+from weave_query.weave_query import (
     box,
     context,
     context_state,
@@ -13,10 +14,8 @@ from weave.legacy.weave import (
     storage,
     weave_internal,
 )
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.ops_domain import table as table_ops
-
-from weave.legacy.tests.util import weavejs_ops
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.ops_domain import table as table_ops
 
 TABLE_TYPES = ["list", "pandas", "sql"]
 

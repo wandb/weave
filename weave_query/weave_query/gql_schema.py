@@ -2,8 +2,7 @@ import typing
 
 import graphql
 
-from weave.legacy.weave import environment
-from weave.legacy.weave import wandb_client_api
+from weave_query.weave_query import environment, wandb_client_api
 
 _GQL_SCHEMA_CACHE: dict[typing.Optional[str], graphql.GraphQLSchema] = {}
 

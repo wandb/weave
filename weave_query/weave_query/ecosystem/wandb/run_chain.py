@@ -2,8 +2,9 @@ import json
 import typing
 
 import weave
-from weave.legacy.weave import compile, op_def, ops_arrow
-from weave.legacy.weave.ecosystem.wandb import gql_artifact_dag
+
+from weave_query.weave_query import compile, op_def, ops_arrow
+from weave_query.weave_query.ecosystem.wandb import gql_artifact_dag
 
 
 @weave.type()
@@ -20,7 +21,9 @@ class RunChain:
 
     def _history_node(self):
         with op_def.no_refine():
-            proj = weave.legacy.weave.ops.project(self.entity_name, self.project_name)
+            proj = weave_query.weave_query.ops.project(
+                self.entity_name, self.project_name
+            )
             history_nodes = []
             for seg in self.segments:
                 # This is the only use of the deprecated history2 op in the Weave
@@ -32,8 +35,8 @@ class RunChain:
 
                 history_nodes.append(hist_node)
 
-            history_node = weave.legacy.weave.ops.List.concat(
-                weave.legacy.weave.ops.make_list(
+            history_node = weave_query.weave_query.ops.List.concat(
+                weave_query.weave_query.ops.make_list(
                     **{f"node{i}": n for i, n in enumerate(history_nodes)}
                 )
             )
@@ -56,7 +59,7 @@ class RunChain:
 def run_chain(run_path: str) -> RunChain:
     with op_def.no_refine():
         entity, project, run_id = run_path.split("/")
-        proj = weave.legacy.weave.ops.project(entity, project)
+        proj = weave_query.weave_query.ops.project(entity, project)
         run = proj.run(run_id)
 
         # Get the checkpoint artifact for this one if one exists

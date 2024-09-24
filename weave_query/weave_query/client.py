@@ -1,5 +1,4 @@
-from weave.legacy.weave import weave_types
-from weave.legacy.weave import storage
+from weave_query.weave_query import storage, weave_types
 
 
 class Client:

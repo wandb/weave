@@ -22,19 +22,19 @@ from typing import Any, Callable, Dict, Iterator, TypeVar
 
 import aioprocessing
 
-from weave.legacy.weave import (
-    weave_http,
-    filesystem,
-    errors,
-    engine_trace,
-    server_error_handling,
+from weave_query.weave_query import (
     artifact_wandb,
     async_queue,
     cache,
     context_state,
+    engine_trace,
+    errors,
+    filesystem,
+    server_error_handling,
     uris,
     wandb_api,
     wandb_file_manager,
+    weave_http,
 )
 
 tracer = engine_trace.tracer()  # type: ignore
@@ -388,9 +388,9 @@ class Server:
             if isinstance(client, SyncClient):
                 self.client_response_queues[client.client_id] = queue.Queue()
             else:
-                self.client_response_queues[
-                    client.client_id
-                ] = async_queue.ThreadQueue()
+                self.client_response_queues[client.client_id] = (
+                    async_queue.ThreadQueue()
+                )
 
     def unregister_client(
         self, client: typing.Union["SyncClient", "AsyncClient"]

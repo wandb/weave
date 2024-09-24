@@ -6,9 +6,7 @@ import typing
 
 import typing_extensions
 
-from weave.legacy.weave import errors, graph
-
-from weave.legacy.weave import weave_types
+from weave_query.weave_query import errors, graph, weave_types
 
 
 class TypedDictLike:

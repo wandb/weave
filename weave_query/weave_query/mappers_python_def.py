@@ -4,22 +4,22 @@ import inspect
 import math
 import typing
 
-from weave.legacy.weave import storage
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import (
+from weave_query.weave_query import (
     artifact_fs,
     box,
+    errors,
     mappers,
     mappers_python,
     mappers_weave,
     ref_base,
+    storage,
     val_const,
-    errors,
 )
-from weave.legacy.weave import timestamp as weave_timestamp
-from weave.legacy.weave.language_features.tagging import tagged_value_type
-from weave.legacy.weave.partial_object import PartialObject, PartialObjectType
-from weave.legacy.weave import weave_client as weave_client_context
+from weave_query.weave_query import timestamp as weave_timestamp
+from weave_query.weave_query import weave_client as weave_client_context
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.language_features.tagging import tagged_value_type
+from weave_query.weave_query.partial_object import PartialObject, PartialObjectType
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -61,7 +61,7 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
 
 class ObjectDictToObject(mappers_weave.ObjectMapper):
     def apply(self, obj):
-        from weave.legacy.weave.op_def_type import OpDefType
+        from weave_query.weave_query.op_def_type import OpDefType
 
         # Only add keys that are accepted by the constructor.
         # This is used for Panels where we have an Class-level id attribute
@@ -333,7 +333,7 @@ class DefaultToPy(mappers.Mapper):
         self._use_stable_refs = use_stable_refs
 
     def apply(self, obj):
-        from weave.legacy.weave import op_def
+        from weave_query.weave_query import op_def
 
         try:
             return self.type.instance_to_dict(obj)
@@ -349,8 +349,7 @@ class DefaultToPy(mappers.Mapper):
                 # If we have a graph_client (weaveflow), only save
                 # a nested ref here if it is a ref to the same storage
                 # engine.
-                not gc
-                or (gc and gc._ref_is_own(existing_ref))
+                not gc or (gc and gc._ref_is_own(existing_ref))
             ) and existing_ref.is_saved:
                 if self._use_stable_refs:
                     uri = existing_ref.uri

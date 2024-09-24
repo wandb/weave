@@ -3,8 +3,8 @@ import json
 import os
 import zlib
 
-from weave.legacy.weave import serialize, storage
-from weave.legacy.weave.server import handle_request
+from weave_query.weave_query import serialize, storage
+from weave_query.weave_query.server import handle_request
 
 
 def test_graph_playback(dev_only_admin_env_override):

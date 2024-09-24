@@ -1,5 +1,6 @@
 import weave
-from weave.legacy.weave import panel
+
+from weave_query.weave_query import panel
 
 
 # Currently Auto is not a real panel, the system handles it.

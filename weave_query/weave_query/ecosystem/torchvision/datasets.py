@@ -11,8 +11,8 @@ import PIL.Image
 from torchvision import datasets
 
 import weave
-from weave.legacy.weave import infer_types
-from weave.legacy.weave import panels
+from weave_query.weave_query import infer_types
+from weave_query.weave_query import panels
 
 ExampleType = TypeVar("ExampleType")
 

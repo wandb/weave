@@ -4,17 +4,15 @@ import json
 import typing
 import weakref
 
-from weave.legacy.weave import box, context_state, object_context, uris
-from weave.legacy.weave.language_features.tagging import tag_store
-
-from weave.legacy.weave import errors
-from weave.legacy.weave import weave_types as types
+from weave_query.weave_query import box, context_state, errors, object_context, uris
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.language_features.tagging import tag_store
 
 # We store Refs here if we can't attach them directly to the object
 REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 
 if typing.TYPE_CHECKING:
-    from weave.legacy.weave import weave_types as types
+    from weave_query.weave_query import weave_types as types
 
 
 def _map_to_ref_strs(obj: typing.Any) -> typing.Any:

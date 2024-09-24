@@ -1,28 +1,30 @@
-from weave.legacy.weave import context_state as _context_state
+from weave_query.weave_query import context_state as _context_state
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 
 # Exporting these
-from . import wbgqlquery_op
-from . import entity_ops
-from . import user_ops
-from . import project_ops
-from . import run_ops
-from . import artifact_type_ops
-from . import artifact_collection_ops
-from . import artifact_alias_ops
-from . import artifact_membership_ops
-from . import artifact_version_ops
-from . import org_ops
-from . import report_ops
-from . import run_queue_ops
-from . import repo_insight_ops
-from . import stream_table_ops
+from . import (
+    artifact_alias_ops,
+    artifact_collection_ops,
+    artifact_membership_ops,
+    artifact_type_ops,
+    artifact_version_ops,
+    entity_ops,
+    org_ops,
+    project_ops,
+    repo_insight_ops,
+    report_ops,
+    run_ops,
+    run_queue_ops,
+    stream_table_ops,
+    user_ops,
+    wbgqlquery_op,
+)
+from .table import *
+from .trace_tree import *
 
 # TODO: Investigate these
 from .wbmedia import *
-from .table import *
-from .trace_tree import *
 
 # from . import wbartifact
 # from . import file_wbartifact

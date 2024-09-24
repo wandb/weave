@@ -1,10 +1,9 @@
 import json
 
-from weave.legacy.weave import errors
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import gql_json_cache, mappers
-from weave.legacy.weave.mappers_weave import UnionMapper
-from weave.legacy.weave.partial_object import PartialObjectType
+from weave_query.weave_query import errors, gql_json_cache, mappers
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.mappers_weave import UnionMapper
+from weave_query.weave_query.partial_object import PartialObjectType
 
 from .mappers_python_def import (
     BoolToPyBool,

@@ -3,23 +3,23 @@ import typing
 import numpy as np
 import pyarrow as pa
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import _dict_utils
-from weave.legacy.weave.arrow import convert
-from weave.legacy.weave.arrow.arrow import arrow_as_array, offsets_starting_at_zero
-from weave.legacy.weave.arrow.arrow_tags import direct_add_arrow_tags
-from weave.legacy.weave.arrow.constructors import (
+from weave_query.weave_query import _dict_utils
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.arrow import convert
+from weave_query.weave_query.arrow.arrow import arrow_as_array, offsets_starting_at_zero
+from weave_query.weave_query.arrow.arrow_tags import direct_add_arrow_tags
+from weave_query.weave_query.arrow.constructors import (
     vectorized_container_constructor_preprocessor,
     vectorized_input_types,
 )
-from weave.legacy.weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
-from weave.legacy.weave.decorator_arrow_op import arrow_op
-from weave.legacy.weave.decorator_op import op
-from weave.legacy.weave.language_features.tagging import (
+from weave_query.weave_query.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+from weave_query.weave_query.decorator_arrow_op import arrow_op
+from weave_query.weave_query.decorator_op import op
+from weave_query.weave_query.language_features.tagging import (
     process_opdef_output_type,
 )
-from weave.legacy.weave.op_args import OpVarArgs
-from weave.legacy.weave.ops_primitives import projection_utils
+from weave_query.weave_query.op_args import OpVarArgs
+from weave_query.weave_query.ops_primitives import projection_utils
 
 
 def typeddict_pick_output_type(input_types):

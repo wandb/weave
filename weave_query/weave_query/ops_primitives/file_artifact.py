@@ -1,7 +1,7 @@
 import typing
 
-from weave.legacy.weave.api import op
-from weave.legacy.weave import artifact_fs
+from weave_query.weave_query import artifact_fs
+from weave_query.weave_query.api import op
 
 
 @op(name="FilesystemArtifactFile-directUrl")

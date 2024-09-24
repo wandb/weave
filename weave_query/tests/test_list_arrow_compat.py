@@ -3,19 +3,18 @@ import itertools
 import numpy as np
 import pytest
 
-from weave.legacy.weave import api as weave
-from weave.legacy.weave import box, ops, weave_internal
-from weave.legacy.weave import ops_arrow as arrow
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.language_features.tagging import (
+from weave_query.tests.util import list_arrow_test_helpers as lath
+from weave_query.tests.util import tag_test_util as ttu
+from weave_query.weave_query import api as weave
+from weave_query.weave_query import box, ops, weave_internal
+from weave_query.weave_query import ops_arrow as arrow
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.language_features.tagging import (
     make_tag_getter_op,
     tag_store,
     tagged_value_type,
 )
-from weave.legacy.weave.ops_primitives import dict_, list_
-
-from weave.legacy.tests.util import tag_test_util as ttu
-from weave.legacy.tests.util import list_arrow_test_helpers as lath
+from weave_query.weave_query.ops_primitives import dict_, list_
 
 
 def filter_fn(row) -> bool:
@@ -636,7 +635,7 @@ def test_tag_pushdown_on_list_of_lists(use_arrow):
     if use_arrow:
         list_node = arrow.ops.list_to_arrow(list_node)
 
-    from weave.legacy.weave import context_state
+    from weave_query.weave_query import context_state
 
     _loading_builtins_token = context_state.set_loading_built_ins()
 

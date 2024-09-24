@@ -2,8 +2,8 @@ import itertools
 import textwrap
 import typing
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import forward_graph, graph
+from weave_query.weave_query import forward_graph, graph
+from weave_query.weave_query import weave_types as types
 
 
 class _CombinedConstVal:
@@ -123,7 +123,7 @@ def node_expr_str_full(node: graph.Node) -> str:
     This function is a copy/modification of of node_expr_str.
     """
 
-    from weave.legacy.weave import partial_object
+    from weave_query.weave_query import partial_object
 
     if isinstance(node, graph.OutputNode):
         if node.from_op.name == "dict":

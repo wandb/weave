@@ -2,9 +2,10 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import graph, panel
-from weave.legacy.weave.panels.bank import default_panel_bank_flow_section_config
-from weave.legacy.weave.panels.panel_group import PanelBankSectionConfig
+
+from weave_query.weave_query import graph, panel
+from weave_query.weave_query.panels.bank import default_panel_bank_flow_section_config
+from weave_query.weave_query.panels.panel_group import PanelBankSectionConfig
 
 PanelType = typing.TypeVar("PanelType")
 

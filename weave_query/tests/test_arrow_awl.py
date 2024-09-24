@@ -1,17 +1,19 @@
 # Tests for the AWL interface
 
 import pytest
-
 import weave
-import weave.legacy.weave.weave_types as types
-from weave.legacy.weave import box, ops_arrow
-from weave.legacy.weave.arrow.convert import to_arrow
-from weave.legacy.weave.language_features.tagging import tag_store, tagged_value_type
 
-from weave.legacy.tests.util.concrete_tagged_value import (
+import weave_query.weave_query.weave_types as types
+from weave_query.tests.util.concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,
     concrete_to_tagstore,
+)
+from weave_query.weave_query import box, ops_arrow
+from weave_query.weave_query.arrow.convert import to_arrow
+from weave_query.weave_query.language_features.tagging import (
+    tag_store,
+    tagged_value_type,
 )
 
 

@@ -12,11 +12,12 @@ from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 from packaging import version
 from weave.trace import call_context
 from weave.trace.client_context import weave_client as weave_client_context
-from weave.legacy.weave.monitoring.monitor import _get_global_monitor
-from weave.legacy.weave.monitoring.openai.models import *
-from weave.legacy.weave.monitoring.openai.util import *
 from weave.trace.op import Op
 from weave.trace.op import op as op_deco
+
+from weave_query.weave_query.monitoring.monitor import _get_global_monitor
+from weave_query.weave_query.monitoring.openai.models import *
+from weave_query.weave_query.monitoring.openai.util import *
 
 old_create = openai.resources.chat.completions.Completions.create
 old_async_create = openai.resources.chat.completions.AsyncCompletions.create

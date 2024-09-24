@@ -5,12 +5,10 @@ import copy
 import inspect
 import typing
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import (
-    weave_internal,
-    errors,
+from weave_query.weave_query import (
     context_state,
     engine_trace,
+    errors,
     graph,
     language_autocall,
     memo,
@@ -20,16 +18,16 @@ from weave.legacy.weave import (
     op_execute,
     pyfunc_type_util,
     uris,
+    weave_internal,
 )
-from weave.legacy.weave.language_features.tagging import (
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.language_features.tagging import (
     opdef_util,
     process_opdef_output_type,
     process_opdef_resolve_fn,
     tagged_value_type,
 )
-from weave.legacy.weave.weavejs_fixes import fixup_node
-
-
+from weave_query.weave_query.weavejs_fixes import fixup_node
 
 _no_refine: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_no_refine", default=False
@@ -284,7 +282,7 @@ class OpDef:
             # convert arguments to Const nodes. There is no type checking.
             # May need to fix this, but the patterns in test_mutation2 work
             # now.
-            from weave.legacy.weave import object_context
+            from weave_query.weave_query import object_context
 
             with object_context.object_context():
                 return _self.resolve_fn(*args, **kwargs)
@@ -308,7 +306,7 @@ class OpDef:
         return self.output_type(new_input_type)
 
     def is_gql_root_resolver(self):
-        from weave.legacy.weave import gql_op_plugin
+        from weave_query.weave_query import gql_op_plugin
 
         return self in gql_op_plugin._ROOT_RESOLVERS
 
@@ -351,14 +349,14 @@ class OpDef:
             tracer = engine_trace.tracer()  # type: ignore
             with tracer.trace("refine.%s" % _self.uri):
                 # api's use auto-creates client. TODO: Fix inline import
-                from weave.legacy.weave import api as api
+                from weave_query.weave_query import api as api
 
                 final_output_type = api.use(called_refine_output_type)  # type: ignore
             if final_output_type == None:
                 # This can happen due to nullability. In that case, accept the output type is null
                 final_output_type = types.NoneType()
             # Have to deref if in case a ref came back...
-            from weave.legacy.weave import storage
+            from weave_query.weave_query import storage
 
             final_output_type = storage.deref(final_output_type)
 
@@ -369,7 +367,7 @@ class OpDef:
             )
         else:
             final_output_type = _self.unrefined_output_type_for_params(bound_params)
-        from weave.legacy.weave import dispatch
+        from weave_query.weave_query import dispatch
 
         return dispatch.RuntimeOutputNode(final_output_type, _self.uri, bound_params)
 

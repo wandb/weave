@@ -7,9 +7,15 @@ import random
 import string
 import typing
 
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import decorator_type, graph, ops, panel, weave_types
-from weave.legacy.weave.language_features.tagging import tagged_value_type
+from weave_query.weave_query import (
+    decorator_type,
+    graph,
+    ops,
+    panel,
+    weave_internal,
+    weave_types,
+)
+from weave_query.weave_query.language_features.tagging import tagged_value_type
 
 
 @decorator_type.type()
@@ -24,9 +30,9 @@ class SortDef(typing.TypedDict):
     columnId: str
 
 
-_use_consistent_col_ids: contextvars.ContextVar[
-    typing.Optional[bool]
-] = contextvars.ContextVar("use_consistent_col_ids", default=False)
+_use_consistent_col_ids: contextvars.ContextVar[typing.Optional[bool]] = (
+    contextvars.ContextVar("use_consistent_col_ids", default=False)
+)
 
 
 @contextlib.contextmanager

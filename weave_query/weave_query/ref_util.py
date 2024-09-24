@@ -2,8 +2,7 @@ import dataclasses
 import typing
 from urllib import parse
 
-from weave.legacy.weave import box
-from weave.legacy.weave import refs_internal
+from weave_query.weave_query import box, refs_internal
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
@@ -22,8 +21,7 @@ def parse_local_ref_str(s: str) -> typing.Tuple[str, typing.Optional[list[str]]]
 def val_with_relative_ref(
     parent_object: typing.Any, child_object: typing.Any, ref_extra_parts: list[str]
 ) -> typing.Any:
-    from weave.legacy.weave import context_state
-    from weave.legacy.weave import ref_base
+    from weave_query.weave_query import context_state, ref_base
 
     # If we already have a ref, resolve it
     if isinstance(child_object, ref_base.Ref):
@@ -32,7 +30,7 @@ def val_with_relative_ref(
     # Only do this if ref_tracking_enabled right now. I just want to
     # avoid introducing new behavior into W&B prod for the moment.
     if context_state.ref_tracking_enabled():
-        from weave.legacy.weave import storage
+        from weave_query.weave_query import storage
 
         child_ref = storage.get_ref(child_object)
         parent_ref = ref_base.get_ref(parent_object)

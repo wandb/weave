@@ -2,25 +2,25 @@ import dataclasses
 import time
 import typing
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import mutation, op, weave_class
-from weave.legacy.weave import (
-    storage,
-    weave_internal,
-    errors,
-    ref_base,
-    registry_mem,
+from weave_query.weave_query import (
     artifact_fs,
     artifact_local,
     artifact_wandb,
     compile,
+    errors,
     graph,
     object_context,
+    ref_base,
+    registry_mem,
     runs,
+    storage,
     trace_legacy,
     uris,
+    weave_internal,
 )
-from weave.legacy.weave.graph import Node
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import mutation, op, weave_class
+from weave_query.weave_query.graph import Node
 
 
 @weave_class(weave_type=types.RefType)
@@ -261,7 +261,9 @@ def _save(
         if isinstance(source_uri, artifact_wandb.WeaveWBArtifactURI):
             target_branch = "user-" + target_branch
     target_uri = artifact_local.WeaveLocalArtifactURI(
-        source_uri.name, target_branch, source_uri.path  # type: ignore
+        source_uri.name,
+        target_branch,
+        source_uri.path,  # type: ignore
     )
 
     ctx = object_context.get_object_context()
@@ -633,7 +635,7 @@ def append(
 @op(mutation=True, name="stream_table-log")
 def stream_table_log(self: graph.Node, val: typing.Any) -> typing.Any:
     st_obj = weave_internal.use(self)
-    from weave.legacy.weave.monitoring import StreamTable
+    from weave_query.weave_query.monitoring import StreamTable
 
     if not isinstance(st_obj, StreamTable):
         raise errors.WeaveInternalError(

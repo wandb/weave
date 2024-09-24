@@ -3,11 +3,12 @@ import typing
 from typing import Optional, cast
 
 import weave
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import Node, get, use
-from weave.legacy.weave import context_state as _context
-from weave.legacy.weave import panels
-from weave.legacy.weave.ops_arrow import ArrowWeaveList, ArrowWeaveListType
+
+from weave_query.weave_query import context_state as _context
+from weave_query.weave_query import panels
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import Node, get, use
+from weave_query.weave_query.ops_arrow import ArrowWeaveList, ArrowWeaveListType
 
 _loading_builtins_token = _context.set_loading_built_ins()
 
@@ -36,7 +37,6 @@ class RunSegment:
         return self.metrics._index(self.prior_run_branch_index)["step"]
 
     def _experiment_body(self, limit: Optional[int] = None) -> ArrowWeaveList:
-
         if limit is None:
             limit = len(self.metrics)
 
@@ -80,7 +80,6 @@ class RunSegment:
 def run_segment_render(
     run_segment_node: Node[RunSegment],
 ) -> panels.Card:
-
     # All methods callable on X are callable on weave.Node[X], but
     # the types arent' setup properly, so cast to tell the type-checker
     # TODO: Fix!

@@ -1,10 +1,9 @@
 import typing
 from typing import Iterable
 
-from weave.legacy.weave import stream_data_interfaces
-from weave.legacy.weave.eager import WeaveIter
-from weave.legacy.weave import artifact_wandb, uris
-from weave.legacy.weave.run import Run
+from weave_query.weave_query import artifact_wandb, stream_data_interfaces, uris
+from weave_query.weave_query.eager import WeaveIter
+from weave_query.weave_query.run import Run
 
 
 class RunStreamTableSpan:
