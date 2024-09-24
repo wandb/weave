@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 import weave
 from weave import context_state
 from weave.trace import weave_init
-from weave.trace.concurrent.futures import raise_on_future_exceptions
+from weave.trace.context import raise_on_captured_errors
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     sqlite_trace_server,
@@ -82,6 +82,12 @@ def pytest_collection_modifyitems(config, items):
             selected_items.append(item)
 
     items[:] = selected_items
+
+
+@pytest.fixture(autouse=True)
+def always_raise_on_captured_errors():
+    with raise_on_captured_errors():
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -279,8 +285,7 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
     try:
-        with raise_on_future_exceptions():
-            yield inited_client.client
+        yield inited_client.client
     finally:
         inited_client.reset()
 
