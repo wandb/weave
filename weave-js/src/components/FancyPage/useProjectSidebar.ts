@@ -123,11 +123,17 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
+            name: 'Traces',
+            slug: 'weave/traces',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.LayoutTabs,
+          },
+          {
+            type: 'button' as const,
             name: 'Evals',
             slug: 'weave/evaluations',
             isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.BaselineAlt,
-            // path: baseRouter.callsUIUrl(entity, project, evaluationsFilter),
           },
           {
             type: 'button' as const,
@@ -147,16 +153,6 @@ export const useProjectSidebar = (
             type: 'divider' as const,
             key: 'dividerWithinWeave',
             isShown: isWeaveOnly,
-          },
-          {
-            type: 'button' as const,
-            name: 'Traces',
-            slug: 'weave/traces',
-            isShown: showWeaveSidebarItems || isShowAll,
-            iconName: IconNames.LayoutTabs,
-            // path: baseRouter.callsUIUrl(entity, project, {
-            //   traceRootsOnly: true,
-            // }),
           },
           {
             type: 'button' as const,
