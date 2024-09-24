@@ -142,3 +142,30 @@ def test_objs_query_filter_limit_offset_sort_by_object_id(client: WeaveClient):
     assert res.objs[1].val["i"] == 6
     assert res.objs[2].val["j"] == 9
     assert res.objs[2].val["i"] == 7
+
+
+def test_objs_query_filter_metadata_only(client: WeaveClient):
+    generate_objects(client, 10, 10)
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(latest_only=True),
+            metadata_only=True,
+        )
+    )
+    assert len(res.objs) == 10
+    for obj in res.objs:
+        assert obj.val == {}
+
+    # sanity check that we get the full object when we don't ask for metadata only
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(latest_only=True),
+            metadata_only=False,
+        )
+    )
+    assert len(res.objs) == 10
+    for obj in res.objs:
+        assert obj.val
