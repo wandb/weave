@@ -2,8 +2,8 @@ import dataclasses
 
 import pytest
 import weave_query as weave
-import weave.weave_query
-import weave.weave_query.weave_types
+import weave_query.weave_query
+import weave_query.weave_query.weave_types
 
 from weave_query.weave_query import _dict_utils, runs
 from weave_query.weave_query import weave_types as types

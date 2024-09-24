@@ -4,7 +4,7 @@ import weave_query as weave
 from weave_query.weave_query import weave_internal
 from weave_query.weave_query.panels import panel_plot
 
-from ...legacy.weave.panels.panel_group import Group
+from weave_query.weave_query.panels.panel_group import Group
 
 
 def test_panel_id():

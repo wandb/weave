@@ -2,7 +2,7 @@
 
 import pytest
 import weave_query as weave
-import weave.weave_query.weave_types as types
+import weave_query.weave_query.weave_types as types
 from weave_query.tests.util.concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,

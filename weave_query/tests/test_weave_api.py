@@ -3,8 +3,8 @@ import os
 import pytest
 
 import weave_query as weave
-import weave.weave_query.context_state
-import weave.weave_query.wandb_api
+import weave_query.weave_query.context_state
+import weave_query.weave_query.wandb_api
 
 
 def test_create_list_rename_delete():

@@ -1,6 +1,6 @@
 from weave_query.weave_query import api as weave
 
-from ...legacy.weave import node_ref
+from weave_query.weave_query import node_ref
 
 
 def test_node_to_ref():
