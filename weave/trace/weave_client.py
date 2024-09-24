@@ -1450,8 +1450,7 @@ def redact_sensitive_keys(obj: dict) -> dict:
         if k in REDACT_KEYS:
             dict_res[k] = REDACTED_VALUE
         else:
-            dict_res[k] = redact_sensitive_keys(v)
-
+            dict_res[k] = v
     return dict_res
 
 
