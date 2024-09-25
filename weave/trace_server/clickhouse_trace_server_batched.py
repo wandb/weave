@@ -54,9 +54,17 @@ from weave.trace_server.calls_query_builder import (
     HardCodedFilter,
     OrderField,
     QueryBuilderDynamicField,
+    QueryBuilderField,
     combine_conditions,
 )
 from weave.trace_server.ids import generate_id
+from weave.trace_server.table_query_builder import (
+    ROW_ORDER_COLUMN_NAME,
+    TABLE_ROWS_ALIAS,
+    VAL_DUMP_COLUMN_NAME,
+    make_natural_sort_table_query,
+    make_standard_table_query,
+)
 from weave.trace_server.trace_server_common import make_derived_summary_fields
 
 from . import clickhouse_trace_server_migrator as wf_migrator
@@ -775,7 +783,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conds.append("tr.digest IN {row_digests: Array(String)}")
                 parameters["row_digests"] = req.filter.row_digestså
 
-        sort_clause: Optional[str] = None
         pb = ParamBuilder()
         if req.sort_by:
             sort_fields = []
@@ -784,22 +791,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 extra_path = sort.field.split(".")
                 field = OrderField(
                     field=QueryBuilderDynamicField(
-                        field="val_dump", extra_path=extra_path
+                        field=VAL_DUMP_COLUMN_NAME, extra_path=extra_path
                     ),
                     direction="ASC" if sort.direction.lower() == "asc" else "DESC",
                 )
-                sort_fields.append(field.as_sql(pb, "tr"))
-            sort_clause = f"ORDER BY {', '.join(sort_fields)}"
-        sort_params = pb.get_params()
-        parameters.update(sort_params)
+                sort_fields.append(field)
         rows = self._table_query(
             req.project_id,
             req.digest,
-            conditions=conds,
+            pb,
+            sql_safe_conditions=conds,
+            sort_fields=sort_fields,
             limit=req.limit,
             offset=req.offset,
-            parameters=parameters,
-            sort_clause=sort_clause,
         )
         return tsi.TableQueryRes(rows=rows)
 
@@ -807,64 +811,47 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         digest: str,
-        conditions: Optional[list[str]] = None,
+        pb: ParamBuilder,
+        *,
+        sql_safe_conditions: Optional[list[str]] = None,
+        sort_fields: Optional[list[OrderField]] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
-        parameters: Optional[Dict[str, Any]] = None,
-        sort_clause: Optional[str] = None,
     ) -> list[tsi.TableRowSchema]:
-        # Would be nice to expose the "natural" order of the rows
-        # as a sortable field for users. Need to think of the right field
-        # name here. Maybe `__ndx__` or something like that?
-        if sort_clause is None:
-            sort_clause = "ORDER BY row_order ASC"
-        conds = ["tr.project_id = {project_id: String}"]
-        if conditions:
-            conds.extend(conditions)
+        if sort_fields is None or len(sort_fields) == 0:
+            sort_fields = [
+                OrderField(
+                    field=QueryBuilderField(field=ROW_ORDER_COLUMN_NAME),
+                    direction="ASC",
+                )
+            ]
 
-        predicate = combine_conditions(conds, "AND")
-        # The subqueries are for deduplication of table rows and tables by digest.
-        # It might be more efficient to do deduplication of table rows
-        # in the outer query instead of the right side of the JOIN clause here,
-        # that hasn't been tested yet.
+        if (
+            len(sort_fields) == 1
+            and sort_fields[0].field.field == ROW_ORDER_COLUMN_NAME
+            and (sql_safe_conditions is None or len(sql_safe_conditions) == 0)
+        ):
+            query = make_natural_sort_table_query(
+                project_id,
+                digest,
+                pb,
+                limit=limit,
+                offset=offset,
+                natural_direction=sort_fields[0].direction,
+            )
+        else:
+            sql_safe_sort_clause = f"ORDER BY {', '.join([sort_field.as_sql(pb, TABLE_ROWS_ALIAS) for sort_field in sort_fields])}"
+            query = make_standard_table_query(
+                project_id,
+                digest,
+                pb,
+                sql_safe_conditions=sql_safe_conditions,
+                sql_safe_sort_clause=sql_safe_sort_clause,
+                limit=limit,
+                offset=offset,
+            )
 
-        # TODO: Test when there are multple of the same row digest in the table
-        # TODO: test when there are multiple rows with the same digest 
-
-        # NOTE: This query looks a little odd, but the clickhouse query planner
-        # is not smart enough if do it differently. Future versions of clickhouse
-        # may differ.
-        query = f"""
-                SELECT tr.digest, tr.val_dump, row_order
-                FROM table_rows tr
-                RIGHT JOIN (
-                    SELECT row_digest, row_number() OVER () AS row_order
-                    FROM tables
-                    ARRAY JOIN row_digests AS row_digest
-                    WHERE project_id = {{project_id: String}}
-                    AND digest={{digest: String}}
-                ) AS t
-                ON tr.digest = t.row_digest
-                WHERE {predicate}
-                {sort_clause}
-            """
-        if parameters is None:
-            parameters = {}
-        if limit:
-            query += " LIMIT {limit: UInt64}"
-            parameters["limit"] = limit
-        if offset:
-            query += " OFFSET {offset: UInt64}"
-            parameters["offset"] = offset
-
-        query_result = self.ch_client.query(
-            query,
-            parameters={
-                "project_id": project_id,
-                "digest": digest,
-                **parameters,
-            },
-        )
+        query_result = self.ch_client.query(query, parameters=pb.get_params())
 
         return [
             tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
@@ -1136,11 +1123,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     # handles this check. However, out of caution, we add this check here.
                     # Hitting this would be a programming error, not a user error.
                     raise ValueError("Will not resolve cross-project refs.")
+                pb = ParamBuilder()
+                row_digests_name = pb.add_param(row_digests)
                 rows = self._table_query(
                     project_id=project_id_scope,
                     digest=digest,
-                    conditions=["digest IN {digests: Array(String)}"],
-                    parameters={"digests": row_digests},
+                    pb=pb,
+                    sql_safe_conditions=[
+                        f"digest IN {{{row_digests_name}: Array(String)}}"
+                    ],
                 )
                 # Unpack the results into the target rows
                 row_digest_vals = {r.digest: r.val for r in rows}
