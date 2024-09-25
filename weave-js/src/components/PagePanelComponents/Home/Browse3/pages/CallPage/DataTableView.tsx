@@ -2,6 +2,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import {Box} from '@mui/material';
 import {
   GridColDef,
+  GridEventListener,
   GridPaginationModel,
   GridSortModel,
   useGridApiRef,
@@ -14,6 +15,7 @@ import {
   typedDict,
   typedDictPropertyTypes,
 } from '@wandb/weave/core';
+import {useDeepMemo} from '@wandb/weave/hookUtils';
 import _ from 'lodash';
 import React, {
   FC,
@@ -21,6 +23,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {useHistory} from 'react-router-dom';
@@ -271,26 +274,6 @@ export const DataTableView: FC<{
     [dataAsListOfDict]
   );
 
-  // This effect will resize the columns after the table is rendered. We use a
-  // timeout to ensure that the table has been rendered before we resize the
-  // columns.
-  useEffect(() => {
-    let mounted = true;
-    const timeoutId = setTimeout(() => {
-      if (!mounted) {
-        return;
-      }
-      apiRef.current.autosizeColumns({
-        includeHeaders: true,
-        includeOutliers: true,
-      });
-    }, 0);
-    return () => {
-      mounted = false;
-      clearInterval(timeoutId);
-    };
-  }, [gridRows, apiRef]);
-
   // Next, we determine the type of the data. Previously, we used the WeaveJS
   // `Type` system to determine the type of the data. However, this is way to
   // slow for big tables and too detailed for our purposes. We just need to know
@@ -351,9 +334,16 @@ export const DataTableView: FC<{
     return typedDict(propertyTypes);
   }, [dataAsListOfDict]);
 
+  const propsDataRef = useRef(props.data);
+  useEffect(() => {
+    propsDataRef.current = props.data;
+  }, [props.data]);
+
+  const objectTypeDeepMemo = useDeepMemo(objectType);
+
   // Here we define the column spec for the table. It is based on
   // the type of the data and if we have a link or not.
-  const columnSpec: GridColDef[] = useMemo(() => {
+  const dataInitializedColumnSpec: GridColDef[] = useMemo(() => {
     const res: GridColDef[] = [];
     if (props.onLinkClick) {
       res.push({
@@ -365,21 +355,26 @@ export const DataTableView: FC<{
             style={{
               cursor: 'pointer',
             }}
-            onClick={() => props.onLinkClick!(props.data[params.id as number])}
+            onClick={() =>
+              props.onLinkClick!(propsDataRef.current[params.id as number])
+            }
           />
         ),
       });
     }
-    return [...res, ...typeToDataGridColumnSpec(objectType, isPeeking, true)];
-  }, [props.onLinkClick, props.data, objectType, isPeeking]);
+    return [
+      ...res,
+      ...typeToDataGridColumnSpec(objectTypeDeepMemo, isPeeking, true),
+    ];
+  }, [props.onLinkClick, objectTypeDeepMemo, isPeeking]);
 
   // Finally, we do some math to determine the height of the table.
   const isSingleColumn =
     USE_TABLE_FOR_ARRAYS &&
-    columnSpec.length === 1 &&
-    columnSpec[0].field === '';
+    dataInitializedColumnSpec.length === 1 &&
+    dataInitializedColumnSpec[0].field === '';
   if (isSingleColumn) {
-    columnSpec[0].flex = 1;
+    dataInitializedColumnSpec[0].flex = 1;
   }
   const hideHeader = isSingleColumn;
   const displayRows = 10;
@@ -393,6 +388,74 @@ export const DataTableView: FC<{
     (hideHeader ? 0 : headerHeight) +
     (hideFooter ? 0 : footerHeight) +
     (props.loading ? loadingHeight : contentHeight);
+
+  const [columnSpec, setColumnSpec] = useState<GridColDef[]>([]);
+
+  // This effect will resize the columns after the table is rendered. We use a
+  // timeout to ensure that the table has been rendered before we resize the
+  // columns.
+  const hasLinkClick = props.onLinkClick != null;
+  useEffect(() => {
+    let mounted = true;
+
+    // Update the column set if the column spec changes (ignore empty columns
+    // which can occur during loading)
+    setColumnSpec(curr => {
+      const dataFieldSet = new Set(
+        dataInitializedColumnSpec.map(col => col.field)
+      );
+      const currFieldSet = new Set(curr.map(col => col.field));
+      if (dataFieldSet.size > (hasLinkClick ? 1 : 0)) {
+        // Update if they are different
+        if (!_.isEqual(dataFieldSet, currFieldSet)) {
+          return dataInitializedColumnSpec;
+        }
+      }
+      return curr;
+    });
+
+    const timeoutId = setTimeout(() => {
+      if (!mounted) {
+        return;
+      }
+      apiRef.current.autosizeColumns({
+        includeHeaders: true,
+        includeOutliers: true,
+      });
+      // apiRef.current.forceUpdate()
+    }, 0);
+    return () => {
+      mounted = false;
+      clearInterval(timeoutId);
+    };
+  }, [dataInitializedColumnSpec, apiRef, hasLinkClick]);
+
+  const onColumnOrderChange: GridEventListener<'columnOrderChange'> =
+    useCallback(params => {
+      const oldIndex = params.oldIndex;
+      const newIndex = params.targetIndex;
+      setColumnSpec(currSpec => {
+        const col = currSpec[oldIndex];
+        currSpec.splice(oldIndex, 1);
+        currSpec.splice(newIndex, 0, col);
+        return currSpec;
+      });
+    }, []);
+
+  const onColumnWidthChange: GridEventListener<'columnWidthChange'> =
+    useCallback(params => {
+      const field = params.colDef.field;
+      const newWidth = params.width;
+      setColumnSpec(currSpec => {
+        for (const col of currSpec) {
+          if (col.field === field) {
+            col.width = newWidth;
+          }
+        }
+        return currSpec;
+      });
+    }, []);
+
   return (
     <div
       style={{
@@ -453,6 +516,8 @@ export const DataTableView: FC<{
           sortingMode={props.pageControl ? 'server' : 'client'}
           sortModel={props.pageControl?.sortModel}
           onSortModelChange={props.pageControl?.onSortModelChange}
+          onColumnOrderChange={onColumnOrderChange}
+          onColumnWidthChange={onColumnWidthChange}
         />
       </Box>
     </div>
@@ -467,6 +532,7 @@ export const typeToDataGridColumnSpec = (
 ): GridColDef[] => {
   if (isAssignableTo(type, {type: 'typedDict', propertyTypes: {}})) {
     const maxWidth = window.innerWidth * (isPeeking ? 0.5 : 0.75);
+    const minWidth = 100;
     const propertyTypes = typedDictPropertyTypes(type);
     return Object.entries(propertyTypes).flatMap(([key, valueType]) => {
       const innerKey = parentKey ? `${parentKey}.${key}` : key;
@@ -493,6 +559,7 @@ export const typeToDataGridColumnSpec = (
           return [
             {
               maxWidth,
+              minWidth,
               flex: 1,
               type: 'string' as const,
               editable: false,
@@ -512,6 +579,7 @@ export const typeToDataGridColumnSpec = (
         return [
           {
             maxWidth,
+            minWidth,
             flex: 1,
             type: colType,
             editable: editable && !disableEdits,
