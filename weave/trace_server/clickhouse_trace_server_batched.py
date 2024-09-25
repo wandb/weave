@@ -773,11 +773,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.filter:
             if req.filter.row_digests:
                 conds.append("tr.digest IN {row_digests: Array(String)}")
-                parameters["row_digests"] = req.filter.row_digests
-        else:
-            conds.append("1 = 1")
+                parameters["row_digests"] = req.filter.row_digestså
 
-        sort_clause = ""
+        sort_clause: Optional[str] = None
         pb = ParamBuilder()
         if req.sort_by:
             sort_fields = []
@@ -815,9 +813,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parameters: Optional[Dict[str, Any]] = None,
         sort_clause: Optional[str] = None,
     ) -> list[tsi.TableRowSchema]:
+        # Would be nice to expose the "natural" order of the rows
+        # as a sortable field for users. Need to think of the right field
+        # name here. Maybe `__ndx__` or something like that?
         if sort_clause is None:
-            sort_clause = ""
-        conds = ["project_id = {project_id: String}"]
+            sort_clause = "ORDER BY row_order ASC"
+        conds = ["tr.project_id = {project_id: String}"]
         if conditions:
             conds.extend(conditions)
 
@@ -826,35 +827,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # It might be more efficient to do deduplication of table rows
         # in the outer query instead of the right side of the JOIN clause here,
         # that hasn't been tested yet.
+
+        # TODO: Test when there are multple of the same row digest in the table
+        # TODO: test when there are multiple rows with the same digest 
+
+        # NOTE: This query looks a little odd, but the clickhouse query planner
+        # is not smart enough if do it differently. Future versions of clickhouse
+        # may differ.
         query = f"""
-                SELECT tr.digest, tr.val_dump
-                FROM (
-                    SELECT project_id, row_digest
-                    FROM (
-                        SELECT *
-                        FROM (
-                                SELECT *,
-                                    row_number() OVER (PARTITION BY project_id, digest) AS rn
-                                FROM tables
-                                WHERE project_id = {{project_id:String}} AND digest = {{digest:String}}
-                            )
-                        WHERE rn = 1
-                        ORDER BY project_id, digest
-                    )
+                SELECT tr.digest, tr.val_dump, row_order
+                FROM table_rows tr
+                RIGHT JOIN (
+                    SELECT row_digest, row_number() OVER () AS row_order
+                    FROM tables
                     ARRAY JOIN row_digests AS row_digest
-                    WHERE digest = {{digest:String}}
+                    WHERE project_id = {{project_id: String}}
+                    AND digest={{digest: String}}
                 ) AS t
-                JOIN (
-                    SELECT project_id, digest, val_dump
-                    FROM (
-                            SELECT *,
-                                row_number() OVER (PARTITION BY project_id, digest) AS rn
-                            FROM table_rows
-                            WHERE project_id = {{project_id:String}}
-                        )
-                    WHERE rn = 1
-                    ORDER BY project_id, digest
-                ) tr ON t.project_id = tr.project_id AND t.row_digest = tr.digest
+                ON tr.digest = t.row_digest
                 WHERE {predicate}
                 {sort_clause}
             """
