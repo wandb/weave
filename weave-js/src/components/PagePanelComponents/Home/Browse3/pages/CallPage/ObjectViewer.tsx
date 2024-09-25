@@ -294,6 +294,7 @@ export const ObjectViewer = ({
         field: 'value',
         headerName: 'Value',
         flex: 1,
+        display: 'flex',
         sortable: false,
         renderCell: ({row}) => {
           if (row.isCode) {

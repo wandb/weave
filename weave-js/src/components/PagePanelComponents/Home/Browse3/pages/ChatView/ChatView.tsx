@@ -1,5 +1,6 @@
 import React, {useEffect, useRef} from 'react';
 
+import {useDeepMemo} from '../../../../../../hookUtils';
 import {ChoicesView} from './ChoicesView';
 import {HorizontalRuleWithLabel} from './HorizontalRuleWithLabel';
 import {MessageList} from './MessageList';
@@ -12,22 +13,24 @@ type ChatViewProps = {
 export const ChatView = ({chat}: ChatViewProps) => {
   const outputRef = useRef<HTMLDivElement>(null);
 
+  const chatResult = useDeepMemo(chat.result);
+
   useEffect(() => {
-    if (outputRef.current && chat.result && chat.result.choices) {
+    if (outputRef.current && chatResult && chatResult.choices) {
       outputRef.current.scrollIntoView();
     }
-  }, [chat.result]);
+  }, [chatResult]);
 
   return (
     <div>
       <HorizontalRuleWithLabel label="Input" />
       <MessageList messages={chat.request.messages} />
-      {chat.result && chat.result.choices && (
+      {chatResult && chatResult.choices && (
         <div className="mt-12" ref={outputRef}>
           <HorizontalRuleWithLabel label="Output" />
           <ChoicesView
             isStructuredOutput={chat.isStructuredOutput}
-            choices={chat.result.choices}
+            choices={chatResult.choices}
           />
         </div>
       )}
