@@ -12,6 +12,7 @@ import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
+import {TEAL_600} from '../../../../../../common/css/color.styles';
 import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
@@ -205,6 +206,7 @@ function buildCallsTableColumns(
             callId={rowParams.row.id}
             fullWidth={true}
             preservePath={preservePath}
+            color={TEAL_600}
           />
         );
       },
