@@ -50,14 +50,13 @@ packages = ["weave_query"]
 
 [tool.setuptools.dynamic]
 version = { attr = "weave_query.version.VERSION" }
-dependencies = { file = ["requirements.txt"] }
+dependencies = { file = ["requirements.legacy.txt"] }
 
 [tool.setuptools.dynamic.optional-dependencies]
 examples = { file = ["requirements.legacy.ecosystem.txt"] }
 engine = { file = ["requirements.legacy.engine.txt"] }
 ecosystem = { file = ["requirements.legacy.ecosystem.txt"] }
 datadog = { file = ["requirements.legacy.datadog.txt"] }
-modal = { file = ["requirements.modal.txt"] }
 
 [tool.pytest.ini_options]
 testpaths = ["weave_query"]
