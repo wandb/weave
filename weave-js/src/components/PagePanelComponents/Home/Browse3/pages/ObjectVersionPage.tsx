@@ -99,7 +99,7 @@ const ObjectVersionPageInner: React.FC<{
   const refUri = objectVersionKeyToRefUri(objectVersion);
 
   const minimalColumns = useMemo(() => {
-    return ['id'];
+    return ['id', 'op_name', 'project_id'];
   }, []);
   const producingCalls = useCalls(
     entityName,
