@@ -1,6 +1,12 @@
 import datetime
 import re
 
+from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+
+
+def client_is_sqlite(client):
+    return isinstance(client.server._internal_trace_server, SqliteTraceServer)
+
 
 class AnyIntMatcher:
     """Matches any integer."""

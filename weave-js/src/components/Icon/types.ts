@@ -124,6 +124,7 @@ export const IconNames = {
   MagicWandStick: 'magic-wand-stick',
   Menu: 'menu',
   MicrophoneAudio: 'microphone-audio',
+  MillerColumns: 'miller-columns',
   MinimizeMode: 'minimize-mode',
   Model: 'model',
   ModelOnDark: 'model-on-dark',

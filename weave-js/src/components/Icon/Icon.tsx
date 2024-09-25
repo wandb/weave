@@ -125,6 +125,7 @@ import {ReactComponent as ImportMagicWandStar} from '../../assets/icons/icon-mag
 import {ReactComponent as ImportMagicWandStick} from '../../assets/icons/icon-magic-wand-stick.svg';
 import {ReactComponent as ImportMenu} from '../../assets/icons/icon-menu.svg';
 import {ReactComponent as ImportMicrophoneAudio} from '../../assets/icons/icon-microphone-audio.svg';
+import {ReactComponent as ImportMillerColumns} from '../../assets/icons/icon-miller-columns.svg';
 import {ReactComponent as ImportMinimizeMode} from '../../assets/icons/icon-minimize-mode.svg';
 import {ReactComponent as ImportModel} from '../../assets/icons/icon-model.svg';
 import {ReactComponent as ImportModelOnDark} from '../../assets/icons/icon-model-on-dark.svg';
@@ -635,6 +636,9 @@ export const IconMenu = (props: SVGIconProps) => (
 export const IconMicrophoneAudio = (props: SVGIconProps) => (
   <ImportMicrophoneAudio {...updateIconProps(props)} />
 );
+export const IconMillerColumns = (props: SVGIconProps) => (
+  <ImportMillerColumns {...updateIconProps(props)} />
+);
 export const IconMinimizeMode = (props: SVGIconProps) => (
   <ImportMinimizeMode {...updateIconProps(props)} />
 );
@@ -1125,6 +1129,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'magic-wand-stick': IconMagicWandStick,
   menu: IconMenu,
   'microphone-audio': IconMicrophoneAudio,
+  'miller-columns': IconMillerColumns,
   'minimize-mode': IconMinimizeMode,
   model: IconModel,
   'model-on-dark': IconModelOnDark,

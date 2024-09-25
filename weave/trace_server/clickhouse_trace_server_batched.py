@@ -542,20 +542,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parameters = {}
         conds: list[str] = ["is_op = 1"]
         object_id_conditions: list[str] = []
-        is_latest = False
         if req.filter:
             if req.filter.op_names:
                 object_id_conditions.append("object_id IN {op_names: Array(String)}")
                 parameters["op_names"] = req.filter.op_names
             if req.filter.latest_only:
-                is_latest = True
+                conds.append("is_latest = 1")
 
         ch_objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
             object_id_conditions=object_id_conditions,
             parameters=parameters,
-            is_latest=is_latest,
         )
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
@@ -586,8 +584,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conds: list[str] = []
         object_id_conditions = ["object_id = {object_id: String}"]
         parameters: Dict[str, Union[str, int]] = {"object_id": req.object_id}
-        is_latest = req.digest == "latest"
-        if not is_latest:
+        if req.digest == "latest":
+            conds.append("is_latest = 1")
+        else:
             (is_version, version_index) = _digest_is_version_like(req.digest)
             if is_version:
                 conds.append("version_index = {version_index: UInt64}")
@@ -600,7 +599,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conditions=conds,
             object_id_conditions=object_id_conditions,
             parameters=parameters,
-            is_latest=is_latest,
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
@@ -611,7 +609,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conds: list[str] = []
         object_id_conditions: list[str] = []
         parameters = {}
-        is_latest = False
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
@@ -622,7 +619,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 object_id_conditions.append("object_id IN {object_ids: Array(String)}")
                 parameters["object_ids"] = req.filter.object_ids
             if req.filter.latest_only:
-                is_latest = True
+                conds.append("is_latest = 1")
             if req.filter.base_object_classes:
                 conds.append(
                     "base_object_class IN {base_object_classes: Array(String)}"
@@ -634,7 +631,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conditions=conds,
             object_id_conditions=object_id_conditions,
             parameters=parameters,
-            is_latest=is_latest,
             metadata_only=req.metadata_only,
             limit=req.limit,
             offset=req.offset,
@@ -1422,7 +1418,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conditions: Optional[list[str]] = None,
         object_id_conditions: Optional[list[str]] = None,
         parameters: Optional[Dict[str, Any]] = None,
-        is_latest: bool = False,
         metadata_only: Optional[bool] = False,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
@@ -1440,9 +1435,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parameters:
             parameters to be passed to the query. Must include all parameters for both
             conditions and object_id_conditions.
-        is_latest:
-            if is_latest is True, then we add the condition "is_latest = 1" to the outer
-            query, and only return the most recent version of each object.
         metadata_only:
             if metadata_only is True, then we exclude the val_dump field in the select query.
             generally, "queries" should not include the val_dump, but "reads" should, as
@@ -1455,7 +1447,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         conditions_part = combine_conditions(conditions, "AND")
         object_id_conditions_part = combine_conditions(object_id_conditions, "AND")
-        is_latest_part = "is_latest = 1" if is_latest else "1 = 1"
 
         limit_part = ""
         offset_part = ""
@@ -1537,10 +1528,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     WHERE project_id = {{project_id: String}} AND
                         {object_id_conditions_part}
                 )
-                WHERE rn = 1 AND
-                    {conditions_part}
+                WHERE rn = 1
             )
-            WHERE {is_latest_part}
+            WHERE {conditions_part}
             {sort_part}
             {limit_part}
             {offset_part}
