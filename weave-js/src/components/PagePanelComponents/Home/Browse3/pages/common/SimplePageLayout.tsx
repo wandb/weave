@@ -69,7 +69,6 @@ export const SimplePageLayout: FC<{
           pb: 0,
           height: 55, // manual to match sidebar
 
-          borderBottom: '1px solid #e0e0e0',
           display: 'flex',
           flexDirection: 'row',
           alignItems: 'center',
@@ -92,7 +91,7 @@ export const SimplePageLayout: FC<{
             sx={{
               pb: 2,
               fontWeight: 600,
-              fontSize: '1.5rem',
+              fontSize: '1.25rem',
               flex: '1 1 auto',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
