@@ -1,6 +1,7 @@
 import io
 import json
 import logging
+import threading
 import typing as t
 
 import tenacity
@@ -12,7 +13,7 @@ from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.async_batch_processor import AsyncBatchProcessor
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("weave.remote_http_trace_server")
 
 
 class StartBatchItem(BaseModel):
@@ -139,6 +140,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
+        thread_id = threading.get_native_id()
+        logger.info(f"_flush_calls:: ({thread_id}) : BEGIN")
         if len(batch) == 0:
             return
 
@@ -148,6 +151,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
         # Update target batch size (this allows us to have a dynamic batch size based on the size of the data being sent)
         estimated_bytes_per_item = encoded_bytes / len(batch)
+        logger.info(
+            f"_flush_calls:: ({thread_id}) : ESTIMATED BYTES PER ITEM: {estimated_bytes_per_item}"
+        )
         if _should_update_batch_size and estimated_bytes_per_item > 0:
             target_batch_size = int(
                 self.remote_request_bytes_limit // estimated_bytes_per_item
@@ -156,21 +162,27 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
         # If the batch is too big, recursively split it in half
         if encoded_bytes > self.remote_request_bytes_limit and len(batch) > 1:
+            logger.info(f"_flush_calls:: ({thread_id}) : SPLITTING BATCH")
             split_idx = int(len(batch) // 2)
             self._flush_calls(batch[:split_idx], _should_update_batch_size=False)
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
             return
 
+        logger.info(f"_flush_calls:: ({thread_id}) : SENDING REQUEST")
         r = requests.post(
             self.trace_server_url + "/call/upsert_batch",
             data=encoded_data,
             auth=self._auth,
+        )
+        logger.info(
+            f"_flush_calls:: ({thread_id}) : RECEIVED RESPONSE - {r.status_code}"
         )
         if r.status_code == 413:
             # handle 413 explicitly to provide actionable error message
             reason = json.loads(r.text)["reason"]
             raise requests.HTTPError(f"413 Client Error: {reason}", response=r)
         r.raise_for_status()
+        logger.info(f"_flush_calls:: ({thread_id}) : DONE")
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
@@ -257,17 +269,25 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def call_start(
         self, req: t.Union[tsi.CallStartReq, t.Dict[str, t.Any]]
     ) -> tsi.CallStartRes:
+        thread_id = threading.get_native_id()
+        logger.info(f"call_start:: ({thread_id}) : BEGIN")
         if self.should_batch:
             req_as_obj: tsi.CallStartReq
             if isinstance(req, dict):
                 req_as_obj = tsi.CallStartReq.model_validate(req)
             else:
                 req_as_obj = req
+            logger.info(
+                f"call_start:: ({thread_id}) : REQUEST VALIDATED - CALL ID: {req_as_obj.start.id}"
+            )
             if req_as_obj.start.id == None or req_as_obj.start.trace_id == None:
                 raise ValueError(
                     "CallStartReq must have id and trace_id when batching."
                 )
             self.call_processor.enqueue([StartBatchItem(req=req_as_obj)])
+            logger.info(
+                f"call_start:: ({thread_id}) : ENQUEUED - CALL ID: {req_as_obj.start.id}"
+            )
             return tsi.CallStartRes(
                 id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id
             )
@@ -278,13 +298,21 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def call_end(
         self, req: t.Union[tsi.CallEndReq, t.Dict[str, t.Any]]
     ) -> tsi.CallEndRes:
+        thread_id = threading.get_native_id()
+        logger.info(f"call_end:: ({thread_id}) : BEGIN")
         if self.should_batch:
             req_as_obj: tsi.CallEndReq
             if isinstance(req, dict):
                 req_as_obj = tsi.CallEndReq.model_validate(req)
             else:
                 req_as_obj = req
+            logger.info(
+                f"call_end:: ({thread_id}) : REQUEST VALIDATED - CALL ID: {req_as_obj.end.id}"
+            )
             self.call_processor.enqueue([EndBatchItem(req=req_as_obj)])
+            logger.info(
+                f"call_end:: ({thread_id}) : ENQUEUED - CALL ID: {req_as_obj.end.id}"
+            )
             return tsi.CallEndRes()
         return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
 

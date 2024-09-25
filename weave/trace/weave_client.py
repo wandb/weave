@@ -1,5 +1,6 @@
 import dataclasses
 import datetime
+import logging
 import platform
 import re
 import sys
@@ -59,6 +60,8 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+
+logger = logging.getLogger("weave")
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -599,6 +602,8 @@ class WeaveClient:
         Returns:
             The created Call object.
         """
+        call_id = generate_id()
+        logger.info(f"weave_client.create_call::{call_id}: BEGIN")
         if isinstance(op, str):
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
@@ -609,6 +614,7 @@ class WeaveClient:
             op_str = op_def_ref.uri()
         else:
             op_str = op
+        logger.info(f"weave_client.create_call::{call_id}: OP: {op_str}")
 
         inputs_redacted = redact_sensitive_keys(inputs)
         if op.postprocess_inputs:
@@ -617,8 +623,10 @@ class WeaveClient:
             inputs_postprocessed = inputs_redacted
 
         self._save_nested_objects(inputs_postprocessed)
+
+        logger.info(f"weave_client.create_call::{call_id}: OBJECTS SAVED")
+
         inputs_with_refs = map_to_refs(inputs_postprocessed)
-        call_id = generate_id()
 
         if parent is None and use_stack:
             parent = call_context.get_current_call()
@@ -664,6 +672,7 @@ class WeaveClient:
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
+        logger.info(f"weave_client.create_call::{call_id}: SUBMITTING START CALL")
         self.async_job_queue.submit_job(
             send_start_call,
             project_id=project_id,
@@ -682,6 +691,7 @@ class WeaveClient:
         if use_stack:
             call_context.push_call(call)
 
+        logger.info(f"weave_client.create_call::{call_id}: FINISHED")
         return call
 
     @trace_sentry.global_trace_sentry.watch()
@@ -693,6 +703,8 @@ class WeaveClient:
         *,
         postprocess_output: Optional[Callable[..., Any]] = None,
     ) -> None:
+        logger.info(f"weave_client.finish_call::{call.id}: BEGIN")
+
         original_output = output
 
         if postprocess_output:
@@ -700,6 +712,8 @@ class WeaveClient:
         else:
             postprocessed_output = original_output
         self._save_nested_objects(postprocessed_output)
+
+        logger.info(f"weave_client.finish_call::{call.id}: SAVED OBJECTS")
 
         output = map_to_refs(postprocessed_output)
         call.output = output
@@ -737,6 +751,8 @@ class WeaveClient:
 
         project_id = self._project_id()
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
+
+        logger.info(f"weave_client.finish_call::{call.id}: SUBMITTING END CALL")
         self.async_job_queue.submit_job(
             send_end_call,
             project_id=project_id,
@@ -756,6 +772,7 @@ class WeaveClient:
         # )["successes"] += 1
         call.summary = summary
         call_context.pop_call(call.id)
+        logger.info(f"weave_client.finish_call::{call.id}: FINISHED")
 
     @trace_sentry.global_trace_sentry.watch()
     def fail_call(self, call: Call, exception: BaseException) -> None:

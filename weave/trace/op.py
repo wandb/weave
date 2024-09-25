@@ -29,7 +29,7 @@ from weave.trace.errors import OpCallError
 from weave.trace.op_extensions.log_once import log_once
 from weave.trace.refs import ObjectRef
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("weave")
 
 from .constants import TRACE_CALL_EMOJI
 
@@ -73,7 +73,7 @@ class DisplayNameFuncError(ValueError): ...
 
 def print_call_link(call: "Call") -> None:
     if settings.should_print_call_link():
-        print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
+        logger.info(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]

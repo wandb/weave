@@ -11,7 +11,7 @@ T = TypeVar("T")
 
 MAX_WORKER_DEFAULT = 2**3  # 8 workers to not overwhelm the DB
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("weave.async_job_queue")
 
 
 class AsyncJobQueue:
@@ -33,6 +33,8 @@ class AsyncJobQueue:
     """
 
     def __init__(self, max_workers: int = MAX_WORKER_DEFAULT) -> None:
+        thread_id = threading.get_native_id()
+        logger.info(f"__init__:: ({thread_id}) : BEGIN")
         self._max_workers = max_workers
         self._lock = threading.Lock()
         self._active_jobs: set[Future] = set()
@@ -40,6 +42,7 @@ class AsyncJobQueue:
             max_workers=self._max_workers, thread_name_prefix="AsyncJobQueue"
         )
         atexit.register(self._at_exit_handler)
+        logger.info(f"__init__:: ({thread_id}) : DONE")
 
     def submit_job(
         self, func: Callable[..., T], *args: Any, **kwargs: Any
@@ -76,30 +79,45 @@ class AsyncJobQueue:
         queue.shutdown()
         ```
         """
+        thread_id = threading.get_native_id()
+        logger.info(f"submit_job:: ({thread_id}) : BEGIN - OBTAINING LOCK")
         with self._lock:
+            logger.info(f"submit_job:: ({thread_id}) : GOT LOCK")
             future = self.executor.submit(func, *args, **kwargs)
             self._active_jobs.add(future)
+            logger.info(f"submit_job:: ({thread_id}) : SUBMITTED JOB")
 
         def callback(f: Future[T]) -> None:
+            logger.info(f"submit_job.callback:: ({thread_id}) : BEGIN - OBTAINING LOCK")
             with self._lock:
+                logger.info(f"submit_job.callback:: ({thread_id}) : GOT LOCK")
                 self._active_jobs.remove(f)
+                logger.info(f"submit_job.callback:: ({thread_id}) : REMOVED JOB")
+
             exception = f.exception()
             if exception:
-                logger.error(f"Job failed with exception: {exception}")
+                logger.error(
+                    f"submit_job.callback:: ({thread_id}) : JOB FAILED WITH EXCEPTION: {exception}"
+                )
                 if get_raise_on_captured_errors():
                     raise
+            logger.info(f"submit_job.callback:: ({thread_id}) : DONE")
 
         future.add_done_callback(callback)
+        logger.info(f"submit_job:: ({thread_id}) : DONE")
         return future
 
     def _at_exit_handler(self) -> None:
         """Ensures the executor is shut down when the program exits."""
+        thread_id = threading.get_native_id()
         try:
+            logger.info(f"_at_exit_handler:: ({thread_id}) : BEGIN SHUTDOWN")
             self.executor.shutdown(wait=True)
         except Exception as e:
             logger.error(f"Error shutting down executor: {e}")
             if get_raise_on_captured_errors():
                 raise
+        logger.info(f"_at_exit_handler:: ({thread_id}) : DONE SHUTDOWN")
 
     def flush(self) -> None:
         """Waits for all currently submitted jobs to complete.
@@ -108,9 +126,14 @@ class AsyncJobQueue:
         have finished executing. It prevents new jobs from interfering with the flush operation.
         """
         active_jobs = []
+        thread_id = threading.get_native_id()
+        logger.info(f"flush:: ({thread_id}) : BEGIN")
+        logger.info(f"flush:: ({thread_id}) : OBTAINING LOCK")
         with self._lock:
+            logger.info(f"flush:: ({thread_id}) : GOT LOCK")
             active_jobs = list(self._active_jobs)
 
+        logger.info(f"flush:: ({thread_id}) : WAITING FOR JOBS: {len(active_jobs)}")
         for future in concurrent.futures.as_completed(active_jobs):
             try:
                 future.result()
@@ -118,3 +141,4 @@ class AsyncJobQueue:
                 logger.error(f"Job failed during flush: {e}")
                 if get_raise_on_captured_errors():
                     raise
+        logger.info(f"flush:: ({thread_id}) : DONE")
