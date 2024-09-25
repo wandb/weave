@@ -1402,3 +1402,20 @@ def test_calls_stream_table_ref_expansion(client):
     calls = list(calls)
     assert len(calls) == 1
     assert calls[0].output["table"] == o.table.table_ref.uri()
+
+
+def test_object_version_read(client):
+    refs = []
+    for i in range(10):
+        refs.append(weave.publish({"a": i}))
+
+    # print(refs[6])
+    obj_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=refs[6].name,
+            digest=refs[6].digest,
+        )
+    )
+    assert obj_res.obj.val == {"a": 6}
+    assert obj_res.obj.version_index == 6
