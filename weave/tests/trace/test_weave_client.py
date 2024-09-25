@@ -12,7 +12,12 @@ import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation
 from weave.legacy.weave import op_def
-from weave.tests.trace.util import AnyIntMatcher, DatetimeMatcher, RegexStringMatcher
+from weave.tests.trace.util import (
+    AnyIntMatcher,
+    DatetimeMatcher,
+    RegexStringMatcher,
+    client_is_sqlite,
+)
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, is_op
@@ -24,7 +29,6 @@ from weave.trace.refs import (
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
-from weave.trace.util import client_is_sqlite
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,

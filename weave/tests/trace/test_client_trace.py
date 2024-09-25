@@ -20,10 +20,10 @@ from weave.tests.trace.util import (
     DatetimeMatcher,
     FuzzyDateTimeMatcher,
     MaybeStringMatcher,
+    client_is_sqlite,
 )
 from weave.trace import weave_client
 from weave.trace.object_record import ObjectRecord
-from weave.trace.util import client_is_sqlite
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
