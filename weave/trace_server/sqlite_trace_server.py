@@ -900,7 +900,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         conn, cursor = get_conn_cursor(self.db_path)
         cursor.execute(query, parameters)
-        count = cursor.fetchone()[0]
+        row = cursor.fetchone()
+        count = 0
+        if row is not None:
+            count = row[0]
 
         return tsi.TableQueryStatsRes(count=count)
 
