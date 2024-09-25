@@ -781,7 +781,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.filter:
             if req.filter.row_digests:
                 conds.append("tr.digest IN {row_digests: Array(String)}")
-                parameters["row_digests"] = req.filter.row_digestså
+                parameters["row_digests"] = req.filter.row_digests
 
         pb = ParamBuilder()
         sort_fields = []
