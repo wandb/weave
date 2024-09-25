@@ -1452,10 +1452,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conditions = ["1 = 1"]
         if not object_id_conditions:
             object_id_conditions = ["1 = 1"]
+        if is_latest:
+            conditions.append("is_latest = 1")
 
         conditions_part = combine_conditions(conditions, "AND")
         object_id_conditions_part = combine_conditions(object_id_conditions, "AND")
-        is_latest_part = "is_latest = 1" if is_latest else "1 = 1"
 
         limit_part = ""
         offset_part = ""
@@ -1537,10 +1538,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     WHERE project_id = {{project_id: String}} AND
                         {object_id_conditions_part}
                 )
-                WHERE rn = 1 AND
-                    {conditions_part}
+                WHERE rn = 1
             )
-            WHERE {is_latest_part}
+            WHERE {conditions_part}
             {sort_part}
             {limit_part}
             {offset_part}
