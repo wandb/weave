@@ -46,7 +46,7 @@ export const DesktopWindow = ({ images, alt }) => {
               <img 
                 src={src} 
                 alt={`${alt} ${index + 1}`}
-                className={styles['carousel-image']}
+                className={styles['carousel-image'] + " zoomable"}
               />
             </div>
           ))}
