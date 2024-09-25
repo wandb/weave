@@ -250,7 +250,7 @@ export const DataTableView: FC<{
     () =>
       (dataAsListOfDict ?? []).map((row, i) => ({
         id: i,
-        ...row,
+        data: row,
       })),
     [dataAsListOfDict]
   );
@@ -484,7 +484,7 @@ export const typeToDataGridColumnSpec = (
               field: innerKey,
               headerName: innerKey,
               renderCell: params => {
-                const listValue = params.row[innerKey];
+                const listValue = params.row.data[innerKey];
                 if (listValue == null) {
                   return '-';
                 }
@@ -503,7 +503,7 @@ export const typeToDataGridColumnSpec = (
             field: innerKey,
             headerName: innerKey,
             renderCell: params => {
-              const data = params.row[innerKey];
+              const data = params.row.data[innerKey];
               return <CellValue value={data ?? ''} />;
             },
           },
