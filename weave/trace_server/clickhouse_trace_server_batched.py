@@ -784,8 +784,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 parameters["row_digests"] = req.filter.row_digestså
 
         pb = ParamBuilder()
+        sort_fields = []
         if req.sort_by:
-            sort_fields = []
             for i, sort in enumerate(req.sort_by):
                 # TODO: better splitting of escaped dots (.) in field names
                 extra_path = sort.field.split(".")
