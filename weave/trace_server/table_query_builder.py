@@ -87,7 +87,7 @@ def make_standard_table_query(
         sql_safe_offset = f"OFFSET {{{offset_name}: Int64}}"
 
     query = f"""
-    SELECT tr.digest, tr.val_dump, t.row_order FROM
+    SELECT tr.digest, tr.val_dump, tr.row_order FROM
     (
         SELECT DISTINCT tr.digest, tr.val_dump, t.row_order
         FROM table_rows tr
