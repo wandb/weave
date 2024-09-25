@@ -17,7 +17,7 @@ import {
   voidNode,
 } from '@wandb/weave/core';
 import {TableState} from '@wandb/weave/index';
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useContext, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../../context';
@@ -31,6 +31,7 @@ import {PanelComp2} from '../PanelComp';
 import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as S from '../PanelTable.styles';
+import {WeaveFormatContext} from '../WeaveFormatContext';
 import * as Table from './tableState';
 import {stripTag} from './util';
 
@@ -152,6 +153,7 @@ export const ColumnHeader: React.FC<{
 }) => {
   const weave = useWeaveContext();
   const {stack} = usePanelContext();
+  const {columnFormat} = useContext(WeaveFormatContext);
 
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
 
@@ -495,7 +497,9 @@ export const ColumnHeader: React.FC<{
   }, [cellFrame, weave, propsSelectFunction, inputArrayNode]);
 
   return (
-    <S.ColumnHeader data-test="column-header">
+    <S.ColumnHeader
+      data-test="column-header"
+      style={{textAlign: columnFormat?.textAlign ?? 'center'}}>
       {simpleTable ? (
         workingColumnName !== '' ? (
           <S.ColumnNameText>{workingColumnName}</S.ColumnNameText>

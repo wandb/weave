@@ -32,7 +32,6 @@ export const ColumnName = styled.div`
     color: ${globals.primary};
   }
   overflow: hidden;
-  text-align: left;
 `;
 ColumnName.displayName = 'S.ColumnName';
 
