@@ -1409,7 +1409,6 @@ def test_object_version_read(client):
     for i in range(10):
         refs.append(weave.publish({"a": i}))
 
-    # print(refs[6])
     obj_res = client.server.obj_read(
         tsi.ObjReadReq(
             project_id=client._project_id(),
