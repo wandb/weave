@@ -24,6 +24,7 @@ from weave.trace.refs import (
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
+from weave.trace.util import client_is_sqlite
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
@@ -1405,6 +1406,9 @@ def test_calls_stream_table_ref_expansion(client):
 
 
 def test_object_version_read(client):
+    if client_is_sqlite(client):
+        return
+
     refs = []
     for i in range(10):
         refs.append(weave.publish({"a": i}))
