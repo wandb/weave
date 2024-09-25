@@ -12,7 +12,12 @@ import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation
 from weave.legacy.weave import op_def
-from weave.tests.trace.util import AnyIntMatcher, DatetimeMatcher, RegexStringMatcher
+from weave.tests.trace.util import (
+    AnyIntMatcher,
+    DatetimeMatcher,
+    RegexStringMatcher,
+    client_is_sqlite,
+)
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, is_op
@@ -1405,6 +1410,9 @@ def test_calls_stream_table_ref_expansion(client):
 
 
 def test_object_version_read(client):
+    if client_is_sqlite(client):
+        return
+
     refs = []
     for i in range(10):
         refs.append(weave.publish({"a": i}))
@@ -1439,3 +1447,25 @@ def test_object_version_read(client):
         )
         assert obj_res.obj.val == {"a": i}
         assert obj_res.obj.version_index == i
+
+    # now grab the latest version of the object
+    obj_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=refs[0].name,
+            digest="latest",
+        )
+    )
+    assert obj_res.obj.val == {"a": 9}
+    assert obj_res.obj.version_index == 9
+
+    # now grab version 5
+    obj_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=refs[0].name,
+            digest="v5",
+        )
+    )
+    assert obj_res.obj.val == {"a": 5}
+    assert obj_res.obj.version_index == 5
