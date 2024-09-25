@@ -77,9 +77,15 @@ const ObjectVersionPageInner: React.FC<{
   const objectName = objectVersion.objectId;
   const objectVersionIndex = objectVersion.versionIndex;
   const refExtra = objectVersion.refExtra;
-  const objectVersions = useRootObjectVersions(entityName, projectName, {
-    objectIds: [objectName],
-  });
+  const objectVersions = useRootObjectVersions(
+    entityName,
+    projectName,
+    {
+      objectIds: [objectName],
+    },
+    undefined,
+    true
+  );
   const objectVersionCount = (objectVersions.result ?? []).length;
   const baseObjectClass = useMemo(() => {
     if (objectVersion.baseObjectClass === 'Dataset') {
@@ -92,12 +98,35 @@ const ObjectVersionPageInner: React.FC<{
   }, [objectVersion.baseObjectClass]);
   const refUri = objectVersionKeyToRefUri(objectVersion);
 
-  const producingCalls = useCalls(entityName, projectName, {
-    outputObjectVersionRefs: [refUri],
-  });
-  const consumingCalls = useCalls(entityName, projectName, {
-    inputObjectVersionRefs: [refUri],
-  });
+  const minimalColumns = useMemo(() => {
+    return ['id'];
+  }, []);
+  const producingCalls = useCalls(
+    entityName,
+    projectName,
+    {
+      outputObjectVersionRefs: [refUri],
+    },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    minimalColumns
+  );
+
+  const consumingCalls = useCalls(
+    entityName,
+    projectName,
+    {
+      inputObjectVersionRefs: [refUri],
+    },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    minimalColumns
+  );
+
   const showCallsTab =
     !(producingCalls.loading || consumingCalls.loading) &&
     (producingCalls.result?.length ?? 0) +
