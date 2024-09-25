@@ -6,7 +6,13 @@ from typing import Annotated, Optional
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
-from weave.legacy.weave import cache, op_args, pyfunc_type_util, weave_pydantic
+# TODO (AT): Fix serving after ejecting query code
+from weave.legacy.weave import (  # type: ignore
+    cache,
+    op_args,
+    pyfunc_type_util,
+    weave_pydantic,
+)
 from weave.trace import errors
 from weave.trace.op import Op, is_op
 from weave.trace.refs import ObjectRef
