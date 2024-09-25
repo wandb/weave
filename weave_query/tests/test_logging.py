@@ -4,7 +4,7 @@ import re
 import pytest
 import requests
 
-from weave import weave_server
+from weave_query import weave_server
 from weave_query.weave_query import api, context, logs, ops, server
 
 
