@@ -1536,11 +1536,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             {offset_part}
         """
 
-        settings = {
-            # 2GB memory limit per query
-            "max_memory_usage": 2 * 1024 * 1024 * 1024,
-        }
-
+        # 2GB memory limit per query
+        settings = {"max_memory_usage": 2 * 1024**3}
         query_result = self._query_stream(
             select_query,
             {"project_id": project_id, **parameters},
