@@ -94,10 +94,24 @@ export const WeaveCHTable: FC<{
   const [sortBy, setSortBy] = useState<SortBy[]>([]);
   const [sortModel, setSortModel] = useState<GridSortModel>([]);
 
+  const onSortModelChange = useCallback(
+    (model: GridSortModel) => {
+      setSortModel(model);
+    },
+    [setSortModel]
+  );
+
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
     page: 0,
     pageSize: DEFAULT_PAGE_SIZE,
   });
+
+  const onPaginationModelChange = useCallback(
+    (model: GridPaginationModel) => {
+      setPaginationModel(model);
+    },
+    [setPaginationModel]
+  );
 
   useEffect(() => {
     setOffset(paginationModel.page * paginationModel.pageSize);
@@ -140,17 +154,6 @@ export const WeaveCHTable: FC<{
     return numRowsQuery.result?.count ?? pagedRows.length;
   }, [numRowsQuery.result, pagedRows]);
 
-  // TODO: Refactor `DataTableView` so that we can handle
-  // pagination, sorting, etc. in a more generic way.
-  console.log({
-    totalRows,
-    pagedRows,
-    limit,
-    offset,
-    sortBy,
-    l: fetchQuery.loading,
-  });
-
   // In this block, we setup a click handler. The underlying datatable is more general
   // and not aware of the nuances of our links and ref model. Therefore, we handle
   // the click in this component and navigate to the appropriate page.
@@ -182,6 +185,24 @@ export const WeaveCHTable: FC<{
     [history, sourceRef, router]
   );
 
+  const pageControl: DataTableServerSidePaginationControls = useMemo(
+    () => ({
+      paginationModel,
+      onPaginationModelChange,
+      totalRows,
+      pageSizeOptions: [DEFAULT_PAGE_SIZE],
+      sortModel,
+      onSortModelChange,
+    }),
+    [
+      paginationModel,
+      onPaginationModelChange,
+      totalRows,
+      sortModel,
+      onSortModelChange,
+    ]
+  );
+
   return (
     <CustomWeaveTypeProjectContext.Provider
       value={{
@@ -194,17 +215,19 @@ export const WeaveCHTable: FC<{
         displayKey="val"
         onLinkClick={onClickEnabled ? onClick : undefined}
         fullHeight={props.fullHeight}
-        pageControl={{
-          paginationModel,
-          onPaginationModelChange: setPaginationModel,
-          rowCount: totalRows,
-          pageSizeOptions: [DEFAULT_PAGE_SIZE],
-          sortModel,
-          onSortModelChange: setSortModel,
-        }}
+        pageControl={pageControl}
       />
     </CustomWeaveTypeProjectContext.Provider>
   );
+};
+
+type DataTableServerSidePaginationControls = {
+  paginationModel: GridPaginationModel;
+  onPaginationModelChange: (model: GridPaginationModel) => void;
+  totalRows: number;
+  pageSizeOptions: number[];
+  sortModel: GridSortModel;
+  onSortModelChange: (model: GridSortModel) => void;
 };
 
 // This is a general purpose table view that can be used to render any data.
@@ -214,14 +237,7 @@ export const DataTableView: FC<{
   loading?: boolean;
   displayKey?: string;
   onLinkClick?: (row: any) => void;
-  pageControl?: {
-    paginationModel: GridPaginationModel;
-    onPaginationModelChange: (model: GridPaginationModel) => void;
-    rowCount: number;
-    pageSizeOptions: number[];
-    sortModel: GridSortModel;
-    onSortModelChange: (model: GridSortModel) => void;
-  };
+  pageControl?: DataTableServerSidePaginationControls;
   autoPageSize?: boolean;
 }> = props => {
   const apiRef = useGridApiRef();
@@ -433,7 +449,7 @@ export const DataTableView: FC<{
           onPaginationModelChange={props.pageControl?.onPaginationModelChange}
           pageSizeOptions={props.pageControl?.pageSizeOptions}
           paginationMode={props.pageControl ? 'server' : 'client'}
-          rowCount={props.pageControl?.rowCount}
+          rowCount={props.pageControl?.totalRows}
           sortingMode={props.pageControl ? 'server' : 'client'}
           sortModel={props.pageControl?.sortModel}
           onSortModelChange={props.pageControl?.onSortModelChange}

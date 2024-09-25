@@ -778,13 +778,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
-        parameters: Dict[str, Any] = {}
+        pb = ParamBuilder()
         if req.filter:
             if req.filter.row_digests:
-                conds.append("tr.digest IN {row_digests: Array(String)}")
-                parameters["row_digests"] = req.filter.row_digests
+                conds.append(f"tr.digest IN {{{pb.add_paramreq.filter.row_digests)}: Array(String)}}")
 
-        pb = ParamBuilder()
         sort_fields = []
         if req.sort_by:
             for i, sort in enumerate(req.sort_by):
