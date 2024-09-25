@@ -1439,3 +1439,25 @@ def test_object_version_read(client):
         )
         assert obj_res.obj.val == {"a": i}
         assert obj_res.obj.version_index == i
+
+    # now grab the latest version of the object
+    obj_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=refs[0].name,
+            digest="latest",
+        )
+    )
+    assert obj_res.obj.val == {"a": 9}
+    assert obj_res.obj.version_index == 9
+
+    # now grab version 5
+    obj_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=refs[0].name,
+            digest="v5",
+        )
+    )
+    assert obj_res.obj.val == {"a": 5}
+    assert obj_res.obj.version_index == 5
