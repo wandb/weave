@@ -172,7 +172,7 @@ def digest_is_version_like(digest: str) -> Tuple[bool, int]:
 
     Examples:
     - v1 -> True, 1
-    - amniersvtkieaondriarstarst -> False, -1
+    - oioZ7zgsCq4K7tfFQZRubx3ZGPXmFyaeoeWHHd8KUl8 -> False, -1
     """
     if not digest.startswith("v"):
         return (False, -1)
