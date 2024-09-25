@@ -20,6 +20,7 @@ from weave.tests.trace.util import (
     DatetimeMatcher,
     FuzzyDateTimeMatcher,
     MaybeStringMatcher,
+    client_is_sqlite,
 )
 from weave.trace import weave_client
 from weave.trace.object_record import ObjectRecord
@@ -789,10 +790,6 @@ def test_trace_call_sort_with_mixed_types(client):
 
         for i, call in enumerate(inner_res.calls):
             assert call.inputs["in_val"].get("prim") == seq[i]
-
-
-def client_is_sqlite(client):
-    return isinstance(client.server._internal_trace_server, SqliteTraceServer)
 
 
 def test_trace_call_filter(client):

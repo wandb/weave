@@ -125,6 +125,7 @@ export {
   IconMagicWandStick,
   IconMenu,
   IconMicrophoneAudio,
+  IconMillerColumns,
   IconMinimizeMode,
   IconModel,
   IconModelOnDark,
