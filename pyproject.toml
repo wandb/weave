@@ -116,6 +116,32 @@ exclude = [
   "weave_query",
 ]
 
+[tool.mypy]
+warn_unused_configs = true
+exclude = [
+  ".*pyi$",
+  "weave_query",
+  "weave/tests",
+  "weave/trace_server/tests/*.py",
+  "weave/conftest.py",
+  "weave/trace/tests",
+  "integration_test",
+  "weave/tests/trace",
+  "weave/conftest.py",
+  "weave/trace_server/tests",
+  "examples",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "weave.*"
+disallow_untyped_defs = true
+disallow_untyped_calls = true
+
+[[tool.mypy.overrides]]
+module = "weave_query.*"
+ignore_errors = true
+
 [tool.bumpversion]
 current_version = "0.51.11-dev0"
 parse = """(?x)

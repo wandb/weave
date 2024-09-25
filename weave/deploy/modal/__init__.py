@@ -5,8 +5,9 @@ import time
 import typing
 from pathlib import Path
 
-from weave.legacy.weave import artifact_wandb as artifact_wandb
-from weave.legacy.weave import environment
+# TODO (AT): Fix serving after ejecting query code
+from weave.legacy.weave import artifact_wandb as artifact_wandb  # type: ignore
+from weave.legacy.weave import environment  # type: ignore
 from weave.trace.refs import ObjectRef, parse_uri
 
 try:
