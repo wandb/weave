@@ -1409,12 +1409,33 @@ def test_object_version_read(client):
     for i in range(10):
         refs.append(weave.publish({"a": i}))
 
-    obj_res = client.server.obj_read(
-        tsi.ObjReadReq(
+    # read all objects, check the version
+    objs = client.server.objs_query(
+        tsi.ObjQueryReq(
             project_id=client._project_id(),
-            object_id=refs[6].name,
-            digest=refs[6].digest,
+            object_id=refs[0].name,
         )
-    )
-    assert obj_res.obj.val == {"a": 6}
-    assert obj_res.obj.version_index == 6
+    ).objs
+    assert len(objs) == 10
+    assert objs[0].version_index == 0
+    assert objs[1].version_index == 1
+    assert objs[2].version_index == 2
+    assert objs[3].version_index == 3
+    assert objs[4].version_index == 4
+    assert objs[5].version_index == 5
+    assert objs[6].version_index == 6
+    assert objs[7].version_index == 7
+    assert objs[8].version_index == 8
+    assert objs[9].version_index == 9
+
+    # read each object one at a time, check the version
+    for i in range(10):
+        obj_res = client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client._project_id(),
+                object_id=refs[i].name,
+                digest=refs[i].digest,
+            )
+        )
+        assert obj_res.obj.val == {"a": i}
+        assert obj_res.obj.version_index == i
