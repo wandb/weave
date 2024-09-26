@@ -64,9 +64,9 @@ class AsyncBatchProcessor(Generic[T]):
                 except requests.HTTPError as e:
                     if e.response.status_code == 413:
                         # 413: payload too large, don't raise just log
-                        logger.error(f"Error processing batch: {e}")
                         if get_raise_on_captured_errors():
                             raise
+                        logger.error(f"Error processing batch: {e}")
                     else:
                         raise e
 

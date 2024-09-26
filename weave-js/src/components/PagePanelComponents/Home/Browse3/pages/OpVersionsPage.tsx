@@ -86,10 +86,16 @@ export const FilterableOpVersionsTable: React.FC<{
 
   const effectivelyLatestOnly = !effectiveFilter.opName;
 
-  const filteredOpVersions = useOpVersions(props.entity, props.project, {
-    opIds: effectiveFilter.opName ? [effectiveFilter.opName] : undefined,
-    latestOnly: effectivelyLatestOnly,
-  });
+  const filteredOpVersions = useOpVersions(
+    props.entity,
+    props.project,
+    {
+      opIds: effectiveFilter.opName ? [effectiveFilter.opName] : undefined,
+      latestOnly: effectivelyLatestOnly,
+    },
+    undefined,
+    true
+  );
 
   const rows: GridRowsProp = useMemo(() => {
     return (filteredOpVersions.result ?? []).map((ov, i) => {
@@ -244,7 +250,8 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
     {
       opIds: [obj.opId],
     },
-    100
+    100,
+    true // metadataOnly
   );
   if (ops.loading) {
     return <LoadingDots />;
