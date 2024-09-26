@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 import weave
 from weave import context_state
 from weave.trace import weave_init
-from weave.trace.context import raise_on_captured_errors
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     sqlite_trace_server,
@@ -120,9 +119,8 @@ def log_collector():
 
 
 @pytest.fixture(autouse=True)
-def always_raise_on_captured_errors(request, log_collector):
-    with raise_on_captured_errors():
-        yield log_collector
+def logging_error_check(request, log_collector):
+    yield
     if "disable_logging_error_check" in request.keywords:
         return
     error_logs = log_collector.get_error_logs()
