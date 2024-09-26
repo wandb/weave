@@ -1493,9 +1493,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         ) AS rn
                     FROM object_versions
                     WHERE project_id = {project_id: String} AND
-                        object_id = {object_id: String}
+                        object_id = {object_id: String} AND
+                        digest = {version_digest: String}
                 )
-                WHERE rn = 1 AND digest = {version_digest: String}
+                WHERE rn = 1
         """
         parameters = {
             "project_id": project_id,
