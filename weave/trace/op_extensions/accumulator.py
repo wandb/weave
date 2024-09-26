@@ -1,5 +1,6 @@
 import atexit
 import logging
+import traceback
 import weakref
 from typing import (
     Any,
@@ -54,9 +55,10 @@ class _IteratorWrapper(Generic[V]):
             try:
                 self._on_close()  # type: ignore
             except Exception as e:
+                full_exception = traceback.format_exc()
                 log_once(
                     logger.error,
-                    f"Error finishing call - some logs may not be captured: {e}",
+                    f"Error finishing call - some logs may not be captured: {full_exception}",
                 )
                 if get_raise_on_captured_errors():
                     raise
@@ -67,9 +69,10 @@ class _IteratorWrapper(Generic[V]):
             try:
                 self._on_error(e)
             except Exception as e:
+                full_exception = traceback.format_exc()
                 log_once(
                     logger.error,
-                    f"Error finishing call with exception - some logs may not be captured: {e}",
+                    f"Error finishing call with exception - some logs may not be captured: {full_exception}",
                 )
                 if get_raise_on_captured_errors():
                     raise
@@ -91,8 +94,15 @@ class _IteratorWrapper(Generic[V]):
                 # the yielded value
                 self._on_yield(value)
             except Exception as e:
+                # We actually use StopIteration to signal the end of the iterator
+                # in some cases (like when we don't want to surface the last chunk
+                # with usage info from openai integration).
+                if isinstance(e, (StopAsyncIteration, StopIteration)):
+                    raise
+                full_exception = traceback.format_exc()
                 log_once(
-                    logger.error, f"Error capturing yielded value for call output: {e}"
+                    logger.error,
+                    f"Error capturing yielded value for call output: {full_exception}",
                 )
                 if get_raise_on_captured_errors():
                     raise
@@ -120,9 +130,15 @@ class _IteratorWrapper(Generic[V]):
                 # break the user process if we trip up on processing
                 # the yielded value
             except Exception as e:
+                # We actually use StopIteration to signal the end of the iterator
+                # in some cases (like when we don't want to surface the last chunk
+                # with usage info from openai integration).
+                if isinstance(e, (StopAsyncIteration, StopIteration)):
+                    raise
+                full_exception = traceback.format_exc()
                 log_once(
                     logger.error,
-                    f"Error capturing async yielded value for call output: {e}",
+                    f"Error capturing async yielded value for call output: {full_exception}",
                 )
                 if get_raise_on_captured_errors():
                     raise

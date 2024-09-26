@@ -3,6 +3,7 @@
 import inspect
 import logging
 import sys
+import traceback
 import typing
 from functools import partial, wraps
 from types import MethodType
@@ -29,7 +30,7 @@ from weave.trace.errors import OpCallError
 from weave.trace.op_extensions.log_once import log_once
 from weave.trace.refs import ObjectRef
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("weave")
 
 from .constants import TRACE_CALL_EMOJI
 
@@ -73,7 +74,7 @@ class DisplayNameFuncError(ValueError): ...
 
 def print_call_link(call: "Call") -> None:
     if settings.should_print_call_link():
-        print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
+        logger.info(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
@@ -246,7 +247,8 @@ def _execute_call(
             # the output
             res = on_output(res)
         except Exception as e:
-            log_once(logger.error, f"Error capturing call output: {e}")
+            full_exception = traceback.format_exc()
+            log_once(logger.error, f"Error capturing call output: {full_exception}")
             if get_raise_on_captured_errors():
                 raise
         finally:
@@ -451,7 +453,16 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                         return await func(*args, **kwargs)
                     if not wrapper._tracing_enabled:  # type: ignore
                         return await func(*args, **kwargs)
-                    call = _create_call(wrapper, *args, **kwargs)  # type: ignore
+                    try:
+                        call = _create_call(wrapper, *args, **kwargs)  # type: ignore
+                    except Exception as e:
+                        full_exception = traceback.format_exc()
+                        log_once(
+                            logger.error, f"Error creating async call: {full_exception}"
+                        )
+                        if get_raise_on_captured_errors():
+                            raise
+                        return await func(*args, **kwargs)
                     res, _ = await _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
                     return res
             else:
@@ -464,7 +475,14 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                         return func(*args, **kwargs)
                     if not wrapper._tracing_enabled:  # type: ignore
                         return func(*args, **kwargs)
-                    call = _create_call(wrapper, *args, **kwargs)  # type: ignore
+                    try:
+                        call = _create_call(wrapper, *args, **kwargs)  # type: ignore
+                    except Exception as e:
+                        full_exception = traceback.format_exc()
+                        log_once(logger.error, f"Error creating call: {full_exception}")
+                        if get_raise_on_captured_errors():
+                            raise
+                        return func(*args, **kwargs)
                     res, _ = _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
                     return res
 
