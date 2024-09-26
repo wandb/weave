@@ -36,8 +36,10 @@ describe("OpenAI Integration", () => {
 
     mockOpenAI = { chat: { completions: { create: mockOpenAIChat } } };
     patchedOpenAI = wrapOpenAI(mockOpenAI);
-    patchedOpenAI.chat.completions.create =
-      makeOpenAIChatCompletionsOp(mockOpenAIChat);
+    patchedOpenAI.chat.completions.create = makeOpenAIChatCompletionsOp(
+      mockOpenAIChat,
+      "testOpenAIChat"
+    );
   });
 
   test("non-streaming chat completion", async () => {
@@ -233,8 +235,10 @@ describe("OpenAI Integration", () => {
       ],
     }));
     mockOpenAI.chat.completions.create = mockOpenAIChat;
-    patchedOpenAI.chat.completions.create =
-      makeOpenAIChatCompletionsOp(mockOpenAIChat);
+    patchedOpenAI.chat.completions.create = makeOpenAIChatCompletionsOp(
+      mockOpenAIChat,
+      "testOpenAIChat"
+    );
 
     // Direct API call
     const directResult = await mockOpenAI.chat.completions.create({

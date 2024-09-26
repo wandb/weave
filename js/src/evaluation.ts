@@ -6,6 +6,8 @@ import { isMedia } from "./media";
 import { DatasetRow } from "./dataset";
 import cliProgress from "cli-progress";
 
+const PROGRESS_BAR = false;
+
 interface EvaluationParameters<R extends DatasetRow, M>
   extends WeaveObjectParameters {
   dataset: Dataset<R>;
@@ -134,10 +136,12 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
       hideCursor: true,
     });
 
-    progressBar.start(this.dataset.length * nTrials, 0, {
-      running: 0,
-      modelErrors: 0,
-    });
+    if (PROGRESS_BAR) {
+      progressBar.start(this.dataset.length * nTrials, 0, {
+        running: 0,
+        modelErrors: 0,
+      });
+    }
 
     let modelErrors = 0;
     let datasetExamples = this.dataset;
@@ -161,10 +165,20 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
         model_latency: result.model_latency,
       });
       modelErrors += result.model_success ? 0 : 1;
-      progressBar.update(nDone, { running: nRunning, modelErrors });
+      if (PROGRESS_BAR) {
+        progressBar.update(nDone, { running: nRunning, modelErrors });
+      } else {
+        console.log(
+          `Evaluating ${nDone}/${
+            this.dataset.length * nTrials
+          } examples (${nRunning} running, ${modelErrors} errors)`
+        );
+      }
     }
 
-    progressBar.stop();
+    if (PROGRESS_BAR) {
+      progressBar.stop();
+    }
 
     return this.summarizeResults(results);
   }

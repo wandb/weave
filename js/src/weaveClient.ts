@@ -114,8 +114,24 @@ export class WeaveClient {
 
     this.isBatchProcessing = true;
 
-    const batchToProcess = [...this.callQueue];
-    this.callQueue = [];
+    // We count characters item by item, and try to limit batches to about
+    // this size.
+    const maxBatchSizeChars = 5 * 1024 * 1024;
+
+    let batchToProcess = [];
+    let currentBatchSize = 0;
+
+    while (this.callQueue.length > 0 && currentBatchSize < maxBatchSizeChars) {
+      const item = this.callQueue[0];
+      const itemSize = JSON.stringify(item).length;
+
+      if (currentBatchSize + itemSize <= maxBatchSizeChars) {
+        batchToProcess.push(this.callQueue.shift()!);
+        currentBatchSize += itemSize;
+      } else {
+        break;
+      }
+    }
 
     const batchReq = {
       batch: batchToProcess.map((item) => ({
