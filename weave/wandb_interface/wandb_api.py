@@ -14,7 +14,7 @@ from gql.transport.requests import RequestsHTTPTransport
 from requests.auth import HTTPBasicAuth
 from wandb.sdk.internal.internal_api import _thread_local_api_settings
 
-from weave.context_state import WandbApiContext, _wandb_api_context
+from weave.legacy.weave.context_state import WandbApiContext, _wandb_api_context
 from weave.trace import env
 
 
