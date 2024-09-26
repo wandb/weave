@@ -85,7 +85,7 @@ def pytest_collection_modifyitems(config, items):
     items[:] = selected_items
 
 
-class InMemoryHandler(logging.Handler):
+class InMemoryWeaveLogCollector(logging.Handler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.log_records = []
@@ -93,10 +93,17 @@ class InMemoryHandler(logging.Handler):
     def emit(self, record):
         self.log_records.append(record)
 
+    def get_error_logs(self):
+        return [
+            record
+            for record in self.log_records
+            if record.levelname == "ERROR" and record.name.startswith("weave")
+        ]
+
 
 @pytest.fixture
-def log_handler():
-    handler = InMemoryHandler()
+def log_collector():
+    handler = InMemoryWeaveLogCollector()
     logger = logging.getLogger()  # Get your specific logger here if needed
     logger.addHandler(handler)
     logger.setLevel(logging.ERROR)  # Set the level to capture all logs
@@ -104,23 +111,16 @@ def log_handler():
     logger.removeHandler(handler)  # Clean up after the test
 
 
-@pytest.fixture
-def assert_no_logger_errors(log_handler):
-    yield
-    error_logs = [
-        record
-        for record in log_handler.log_records
-        if record.levelname == "ERROR" and record.name.startswith("weave")
-    ]
+@pytest.fixture(autouse=True)
+def always_raise_on_captured_errors(request, log_collector):
+    with raise_on_captured_errors():
+        yield log_collector
+    if "disable_logging_error_check" in request.keywords:
+        return
+    error_logs = log_collector.get_error_logs()
     assert (
         len(error_logs) == 0
     ), f"Expected no errors, but found {len(error_logs)} error(s): {error_logs}"
-
-
-@pytest.fixture(autouse=True)
-def always_raise_on_captured_errors(assert_no_logger_errors):
-    with raise_on_captured_errors():
-        yield
 
 
 @pytest.fixture(autouse=True)

@@ -156,7 +156,8 @@ def test_resilience_to_server_errors(client):
     assert_no_current_call()
 
 
-def test_resilience_to_patcher_errors(client):
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_patcher_errors(client, log_collector):
     class Module:
         def method(self):
             return 0
@@ -184,8 +185,13 @@ def test_resilience_to_patcher_errors(client):
 
     assert_no_current_call()
 
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert "Failed to patch method" in logs[0].msg
 
-def test_resilience_to_output_handler_errors(client):
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_output_handler_errors(client, log_collector):
     def do_test():
         @weave.op
         def simple_op():
@@ -208,6 +214,10 @@ def test_resilience_to_output_handler_errors(client):
         assert res == "hello"
 
     assert_no_current_call()
+
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert "Error capturing call output" in logs[0].msg
 
 
 @pytest.mark.asyncio
@@ -289,7 +299,8 @@ async def test_resilience_to_accumulator_make_accumulator_errors_async(client):
     assert_no_current_call()
 
 
-def test_resilience_to_accumulator_accumulation_errors(client):
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_accumulator_accumulation_errors(client, log_collector):
     def do_test():
         @weave.op
         def simple_op():
@@ -316,9 +327,16 @@ def test_resilience_to_accumulator_accumulation_errors(client):
 
     assert_no_current_call()
 
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert "Error capturing yielded value for call output" in logs[0].msg
 
+
+@pytest.mark.disable_logging_error_check
 @pytest.mark.asyncio
-async def test_resilience_to_accumulator_accumulation_errors_async(client):
+async def test_resilience_to_accumulator_accumulation_errors_async(
+    client, log_collector
+):
     async def do_test():
         @weave.op
         async def simple_op():
@@ -347,6 +365,10 @@ async def test_resilience_to_accumulator_accumulation_errors_async(client):
         assert [item async for item in res] == [1, 2, 3]
 
     assert_no_current_call()
+
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert "Error capturing async yielded value for call output" in logs[0].msg
 
 
 def test_resilience_to_accumulator_should_accumulate_errors(client):
@@ -422,7 +444,10 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(client):
     assert_no_current_call()
 
 
-def test_resilience_to_accumulator_on_finish_post_processor_errors(client):
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_accumulator_on_finish_post_processor_errors(
+    client, log_collector
+):
     def do_test():
         @weave.op
         def simple_op():
@@ -455,6 +480,10 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(client):
         assert list(res) == [1, 2, 3]
 
     assert_no_current_call()
+
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert "Error finishing call - some logs may not be captured" in logs[0].msg
 
 
 @pytest.mark.asyncio
