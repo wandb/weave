@@ -38,9 +38,6 @@ from weave.trace_server.trace_server_interface_util import (
 )
 from weave.trace_server.validation import SHOULD_ENFORCE_OBJ_ID_CHARSET
 
-pytestmark = pytest.mark.trace
-
-
 ## Hacky interface compatibility helpers
 
 ClientType = weave_client.WeaveClient

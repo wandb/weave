@@ -19,7 +19,7 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 from weave.trace_server import trace_server_interface as tsi
 
 
-class TestException(Exception):
+class DummyTestException(Exception):
     pass
 
 
@@ -31,17 +31,17 @@ def test_resilience_to_user_code_errors(client):
     def do_test():
         @weave.op
         def throws():
-            raise TestException("This is a test exception")
+            raise DummyTestException("This is a test exception")
 
         throws()
 
     # The user's exception should be raised - even if we're capturing errors
-    with pytest.raises(TestException):
+    with pytest.raises(DummyTestException):
         do_test()
 
     # The user's exception should be raised - even if we're not capturing errors
     with raise_on_captured_errors(False):
-        with pytest.raises(TestException):
+        with pytest.raises(DummyTestException):
             do_test()
 
     assert_no_current_call()
@@ -50,85 +50,85 @@ def test_resilience_to_user_code_errors(client):
 class ThrowingServer(tsi.TraceServerInterface):
     # Call API
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     # Op API
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     # Cost API
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     # Obj API
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
 
 @pytest.mark.skip(
@@ -145,7 +145,7 @@ def test_resilience_to_server_errors(client):
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with pytest.raises(TestException):
+    with pytest.raises(DummyTestException):
         do_test()
 
     # We should gracefully handle the error and return a value
@@ -162,7 +162,7 @@ def test_resilience_to_patcher_errors(client):
             return 0
 
     def custom_patcher(m: Callable):
-        raise TestException("FAILURE!")
+        raise DummyTestException("FAILURE!")
 
     def do_test():
         test_patcher = MultiPatcher(
@@ -192,14 +192,14 @@ def test_resilience_to_output_handler_errors(client):
             return "hello"
 
         def on_output_handler(*args, **kwargs):
-            raise TestException("FAILURE!")
+            raise DummyTestException("FAILURE!")
 
         simple_op._set_on_output_handler(on_output_handler)
 
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with pytest.raises(TestException):
+    with pytest.raises(DummyTestException):
         do_test()
 
     # We should gracefully handle the error and return a value
@@ -218,14 +218,14 @@ async def test_resilience_to_output_handler_errors_async(client):
             return "hello"
 
         def on_output_handler(*args, **kwargs):
-            raise TestException("FAILURE!")
+            raise DummyTestException("FAILURE!")
 
         simple_op._set_on_output_handler(on_output_handler)
 
         return await simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with pytest.raises(TestException):
+    with pytest.raises(DummyTestException):
         await do_test()
 
     # We should gracefully handle the error and return a value
@@ -243,14 +243,14 @@ def test_resilience_to_accumulator_make_accumulator_errors(client):
             yield from [1, 2, 3]
 
         def make_accumulator(*args, **kwargs):
-            raise TestException("FAILURE!")
+            raise DummyTestException("FAILURE!")
 
         add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with pytest.raises(TestException):
+    with pytest.raises(DummyTestException):
         do_test()
 
     # We should gracefully handle the error and return a value
@@ -271,14 +271,14 @@ async def test_resilience_to_accumulator_make_accumulator_errors_async(client):
             yield 3
 
         def make_accumulator(*args, **kwargs):
-            raise TestException("FAILURE!")
+            raise DummyTestException("FAILURE!")
 
         add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with pytest.raises(TestException):
+    with pytest.raises(DummyTestException):
         await do_test()
 
     # We should gracefully handle the error and return a value
@@ -297,7 +297,7 @@ def test_resilience_to_accumulator_accumulation_errors(client):
 
         def make_accumulator(*args, **kwargs):
             def accumulate(*args, **kwargs):
-                raise TestException("FAILURE!")
+                raise DummyTestException("FAILURE!")
 
             return accumulate
 
@@ -306,7 +306,7 @@ def test_resilience_to_accumulator_accumulation_errors(client):
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with pytest.raises(TestException):
+    with pytest.raises(DummyTestException):
         list(do_test())
 
     # We should gracefully handle the error and return a value
@@ -328,7 +328,7 @@ async def test_resilience_to_accumulator_accumulation_errors_async(client):
 
         def make_accumulator(*args, **kwargs):
             def accumulate(*args, **kwargs):
-                raise TestException("FAILURE!")
+                raise DummyTestException("FAILURE!")
 
             return accumulate
 
@@ -337,7 +337,7 @@ async def test_resilience_to_accumulator_accumulation_errors_async(client):
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with pytest.raises(TestException):
+    with pytest.raises(DummyTestException):
         res = await do_test()
         l = [item async for item in res]
 
@@ -362,7 +362,7 @@ def test_resilience_to_accumulator_should_accumulate_errors(client):
             return accumulate
 
         def should_accumulate(*args, **kwargs):
-            raise TestException("FAILURE!")
+            raise DummyTestException("FAILURE!")
 
         add_accumulator(
             simple_op,
@@ -373,7 +373,7 @@ def test_resilience_to_accumulator_should_accumulate_errors(client):
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with pytest.raises(TestException):
+    with pytest.raises(DummyTestException):
         list(do_test())
 
     # We should gracefully handle the error and return a value
@@ -394,13 +394,13 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(client):
             yield 3
 
         def make_accumulator(*args, **kwargs):
-            async def accumulate(*args, **kwargs):
+            def accumulate(*args, **kwargs):
                 return {}
 
             return accumulate
 
         def should_accumulate(*args, **kwargs):
-            raise TestException("FAILURE!")
+            raise DummyTestException("FAILURE!")
 
         add_accumulator(
             simple_op,
@@ -411,7 +411,7 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(client):
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with pytest.raises(TestException):
+    with pytest.raises(DummyTestException):
         await do_test()
 
     # We should gracefully handle the error and return a value
@@ -422,6 +422,11 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(client):
     assert_no_current_call()
 
 
+# Here we are ignoring this warning because the exception IS being raised,
+# and that is expected and tested for. It happens to be at the deletion moment
+# so pytest is complaining that the exception is not being raised in the
+# expected manner.
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 def test_resilience_to_accumulator_on_finish_post_processor_errors(client):
     def do_test():
         @weave.op
@@ -435,7 +440,7 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(client):
             return accumulate
 
         def on_finish_post_processor(*args, **kwargs):
-            raise TestException("FAILURE!")
+            raise DummyTestException("FAILURE!")
 
         add_accumulator(
             simple_op,
@@ -446,7 +451,7 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(client):
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with pytest.raises(TestException):
+    with pytest.raises(DummyTestException):
         list(do_test())
 
     # We should gracefully handle the error and return a value
@@ -467,13 +472,13 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(c
             yield 3
 
         def make_accumulator(*args, **kwargs):
-            async def accumulate(*args, **kwargs):
+            def accumulate(*args, **kwargs):
                 return {}
 
             return accumulate
 
         def on_finish_post_processor(*args, **kwargs):
-            raise TestException("FAILURE!")
+            raise DummyTestException("FAILURE!")
 
         add_accumulator(
             simple_op,
@@ -484,7 +489,7 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(c
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with pytest.raises(TestException):
+    with pytest.raises(DummyTestException):
         res = await do_test()
         l = [item async for item in res]
 
@@ -501,7 +506,7 @@ def test_resilience_to_accumulator_internal_errors(client):
         @weave.op
         def simple_op():
             yield 1
-            raise TestException("FAILURE!")
+            raise DummyTestException("FAILURE!")
 
         def make_accumulator(*args, **kwargs):
             def accumulate(*args, **kwargs):
@@ -514,12 +519,12 @@ def test_resilience_to_accumulator_internal_errors(client):
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with pytest.raises(TestException):
+    with pytest.raises(DummyTestException):
         list(do_test())
 
     # User errors should still be raised
     with raise_on_captured_errors(False):
-        with pytest.raises(TestException):
+        with pytest.raises(DummyTestException):
             list(do_test())
 
     assert_no_current_call()
@@ -531,10 +536,10 @@ async def test_resilience_to_accumulator_internal_errors_async(client):
         @weave.op
         async def simple_op():
             yield 1
-            raise TestException("FAILURE!")
+            raise DummyTestException("FAILURE!")
 
         def make_accumulator(*args, **kwargs):
-            async def accumulate(*args, **kwargs):
+            def accumulate(*args, **kwargs):
                 return {}
 
             return accumulate
@@ -544,13 +549,13 @@ async def test_resilience_to_accumulator_internal_errors_async(client):
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with pytest.raises(TestException):
+    with pytest.raises(DummyTestException):
         res = await do_test()
         l = [item async for item in res]
 
     # User errors should still be raised
     with raise_on_captured_errors(False):
-        with pytest.raises(TestException):
+        with pytest.raises(DummyTestException):
             res = await do_test()
             l = [item async for item in res]
 
