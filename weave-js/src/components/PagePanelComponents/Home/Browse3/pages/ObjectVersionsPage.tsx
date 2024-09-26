@@ -394,7 +394,8 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
     {
       objectIds: [obj.objectId],
     },
-    100
+    100,
+    true // metadataOnly
   );
   if (objectVersionsNode.loading) {
     return <LoadingDots />;
