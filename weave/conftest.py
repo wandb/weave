@@ -87,19 +87,23 @@ def pytest_collection_modifyitems(config, items):
 PYTEST_CURRENT_TEST_ENV_VAR = "PYTEST_CURRENT_TEST"
 
 
+def get_test_name():
+    return os.environ.get(PYTEST_CURRENT_TEST_ENV_VAR).split(" ")[0]
+
+
 class InMemoryWeaveLogCollector(logging.Handler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.log_records = {}
 
     def emit(self, record):
-        curr_test = os.environ.get(PYTEST_CURRENT_TEST_ENV_VAR)
+        curr_test = get_test_name()
         if curr_test not in self.log_records:
             self.log_records[curr_test] = []
         self.log_records[curr_test].append(record)
 
     def get_error_logs(self):
-        curr_test = os.environ.get(PYTEST_CURRENT_TEST_ENV_VAR)
+        curr_test = get_test_name()
         logs = self.log_records.get(curr_test, [])
 
         return [
@@ -136,7 +140,7 @@ def logging_error_check(request, log_collector):
     if "disable_logging_error_check" in request.keywords:
         return
     error_logs = log_collector.get_error_logs()
-    if len(error_logs) > 0:
+    if error_logs:
         pytest.fail(
             f"Expected no errors, but found {len(error_logs)} error(s): {error_logs}"
         )
