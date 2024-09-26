@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 import shutil
@@ -337,3 +338,22 @@ def network_proxy_client(client):
         yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
+
+
+@pytest.fixture(autouse=True)
+def assert_no_logger_errors():
+    logger = logging.getLogger()
+    handler = logging.Handler()
+    handler.setLevel(logging.ERROR)
+    logger.addHandler(handler)
+
+    yield
+
+    error_records = [
+        record for record in handler.records if record.levelno >= logging.ERROR
+    ]
+    logger.removeHandler(handler)
+
+    if error_records:
+        error_messages = "\n".join(record.getMessage() for record in error_records)
+        pytest.fail(f"Logger errors were recorded:\n{error_messages}")
