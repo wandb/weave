@@ -621,7 +621,7 @@ class WeaveClient:
         if should_convert_paths_to_images():
             parse_obj_functions.append(convert_paths_to_images)
 
-        inputs = parse_obj(inputs, *parse_obj_functions)
+        inputs = parse_obj(inputs, parse_obj_functions)
 
         # user controlled parsing of inputs
         if op.postprocess_inputs:
@@ -710,7 +710,7 @@ class WeaveClient:
         if should_convert_paths_to_images():
             parse_obj_functions.append(convert_paths_to_images)
 
-        output = parse_obj(output, *parse_obj_functions)
+        output = parse_obj(output, parse_obj_functions)
         self._save_nested_objects(output)
         original_output = output
 
@@ -1505,9 +1505,9 @@ def convert_paths_to_images(obj: str) -> typing.Union[str, PathImage]:
     return obj
 
 
-def parse_obj(obj: Any, *parsers: Callable[[Any], Any]) -> Any:
-    """Parse an object with registered conversion parsers.
-    Acceps any number of functions that do operations on the object.
+def parse_obj(obj: Any, parsers: list[Callable[[Any], Any]]) -> Any:
+    """Parse an object with conversion parsers.
+    Accepts a list of functions that do operations on the object.
     Returns the modified object
     """
     # Dont mutate reffed objects
@@ -1523,13 +1523,13 @@ def parse_obj(obj: Any, *parsers: Callable[[Any], Any]) -> Any:
                 obj = parser(obj)
 
         # Then recurse through the items
-        obj = {k: parse_obj(v, *parsers) for k, v in obj.items()}
+        obj = {k: parse_obj(v, parsers) for k, v in obj.items()}
     elif isinstance(obj, list):
-        obj = [parse_obj(v, *parsers) for v in obj]
+        obj = [parse_obj(v, parsers) for v in obj]
     elif isinstance_namedtuple(obj):
-        obj = {k: parse_obj(v, *parsers) for k, v in obj._asdict().items()}
+        obj = {k: parse_obj(v, parsers) for k, v in obj._asdict().items()}
     elif isinstance(obj, tuple):
-        obj = tuple([parse_obj(v, *parsers) for v in obj])
+        obj = tuple([parse_obj(v, parsers) for v in obj])
 
     # apply parsers to primatives
     if isinstance(obj, str):
