@@ -341,7 +341,8 @@ class DefaultToPy(mappers.Mapper):
             pass
         # If the ref exists elsewhere, just return its uri.
         # TODO: This doesn't deal with MemArtifactRef!
-        gc = weave_client_context.get_weave_client()
+        # gc = weave_client_context.get_weave_client()
+        gc = None  # Dropped as part of query service refactor
 
         existing_ref = storage._get_ref(obj)
         if isinstance(existing_ref, artifact_fs.FilesystemArtifactRef):
