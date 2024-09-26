@@ -1,9 +1,11 @@
-"""The purpose of this utility is to simply ensure that a W&B project exists"""
-# This file should be in the trace SDK dir
+"""
+The purpose of this utility is to simply ensure that a W&B project exists
+"""
 
 import logging
 import typing
 from contextlib import contextmanager
+
 
 import wandb
 from wandb import errors as wandb_errors
