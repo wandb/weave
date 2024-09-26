@@ -46,7 +46,8 @@ requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["weave_query"]
+# packages = ["weave_query"]
+packages = ["find:"]
 
 [tool.setuptools.dynamic]
 version = { attr = "weave_query.version.VERSION" }
