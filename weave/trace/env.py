@@ -1,13 +1,13 @@
 import configparser
-import json
+import logging
 import netrc
 import os
 from typing import Optional
 from urllib.parse import urlparse
 
-from weave.trace.errors import WeaveConfigurationError
-
 WEAVE_PARALLELISM = "WEAVE_PARALLELISM"
+
+logger = logging.getLogger(__name__)
 
 
 class Settings:
@@ -44,14 +44,6 @@ def get_weave_parallelism() -> int:
     return int(os.getenv(WEAVE_PARALLELISM, "20"))
 
 
-def wandb_production() -> bool:
-    return os.getenv("WEAVE_ENV") == "wandb_production"
-
-
-def is_public() -> bool:
-    return wandb_production()
-
-
 def wandb_base_url() -> str:
     settings = Settings()
     return os.environ.get("WANDB_BASE_URL", settings.base_url).rstrip("/")
@@ -72,8 +64,6 @@ def weave_trace_server_url() -> str:
 
 def _wandb_api_key_via_env() -> Optional[str]:
     api_key = os.environ.get("WANDB_API_KEY")
-    if api_key and is_public():
-        raise WeaveConfigurationError("WANDB_API_KEY should not be set in public mode.")
     return api_key
 
 
@@ -94,49 +84,14 @@ def _wandb_api_key_via_netrc_file(filepath: str) -> Optional[str]:
     api_key = None
     if res:
         _, _, api_key = res
-    if api_key and is_public():
-        raise WeaveConfigurationError(f"{filepath} should not be set in public mode.")
     return api_key
 
 
 def weave_wandb_api_key() -> Optional[str]:
     env_api_key = _wandb_api_key_via_env()
     netrc_api_key = _wandb_api_key_via_netrc()
-    if env_api_key and netrc_api_key:
-        if wandb_production():
-            raise WeaveConfigurationError(
-                "WANDB_API_KEY should not be set in both ~/.netrc and the environment."
-            )
-        elif env_api_key != netrc_api_key:
-            print(
-                "There are different credentials in the netrc file and the environment. Using the environment value."
-            )
+    if env_api_key != netrc_api_key:
+        logger.warning(
+            "There are different credentials in the netrc file and the environment. Using the environment value."
+        )
     return env_api_key or netrc_api_key
-
-
-def weave_wandb_cookie() -> Optional[str]:
-    cookie = os.environ.get("WEAVE_WANDB_COOKIE")
-    if cookie:
-        if is_public():
-            raise WeaveConfigurationError(
-                "WEAVE_WANDB_COOKIE should not be set in public mode."
-            )
-        for netrc_file in ("~/.netrc", "~/_netrc"):
-            if os.path.exists(os.path.expanduser(netrc_file)):
-                raise WeaveConfigurationError(
-                    f"Please delete {netrc_file} while using WEAVE_WANDB_COOKIE to avoid using your credentials"
-                )
-    return cookie
-
-
-def weave_wandb_gql_headers() -> dict[str, str]:
-    # expects a json string
-    raw = os.environ.get("WEAVE_WANDB_GQL_HEADERS")
-    if raw:
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            raise WeaveConfigurationError(
-                "WEAVE_WANDB_GQL_HEADERS should be a json string"
-            )
-    return {}

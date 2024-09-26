@@ -28,7 +28,7 @@ from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef
 from weave.trace_server.trace_server_interface_util import str_digest
 
-from . import env, serializer
+from . import serializer
 
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
@@ -532,11 +532,6 @@ def load_instance(
     artifact: MemTraceFilesArtifact,
     name: str,
 ) -> Optional["Op"]:
-    if env.wandb_production():
-        # Returning None here instead of erroring allows the Weaveflow app
-        # to reference op defs without crashing.
-        return None
-
     file_name = f"{name}.py"
     module_path = artifact.path(file_name)
 
