@@ -457,6 +457,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                     if not wrapper._tracing_enabled:  # type: ignore
                         return await func(*args, **kwargs)
                     try:
+                        # This try/except allows us to fail gracefully and
+                        # still let the user code continue to execute
                         call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     except Exception as e:
                         log_once(
@@ -479,6 +481,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                     if not wrapper._tracing_enabled:  # type: ignore
                         return func(*args, **kwargs)
                     try:
+                        # This try/except allows us to fail gracefully and
+                        # still let the user code continue to execute
                         call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     except Exception as e:
                         log_once(
