@@ -191,7 +191,7 @@ const ObjectViewerSectionNonEmpty = ({
           icon="expand-uncollapse"
           active={mode === 'expanded'}
           onClick={onClickExpanded}
-          tooltip="Expand 100 rows"
+          tooltip="Expand next 100 rows"
         />
         <Button
           variant="quiet"

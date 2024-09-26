@@ -75,7 +75,8 @@ type TruncatedStore = {[key: string]: {values: any; index: number}};
 
 const RESOVLED_REF_KEY = '_ref';
 
-const ARRAY_TRUNCATION_LENGTH = 50;
+const ARRAY_TRUNCATION_LENGTH = 10;
+const TRUNCATION_KEY = '__weave_array_truncated__';
 
 // This is a general purpose object viewer that can be used to view any object.
 export const ObjectViewer = ({
@@ -87,7 +88,7 @@ export const ObjectViewer = ({
 }: ObjectViewerProps) => {
   const {useRefsData} = useWFHooks();
 
-  // `truncatedData` holds truncated data.
+  // `truncatedData` holds the data with all arrays truncated to ARRAY_TRUNCATION_LENGTH, unless the arary has show more added
   const [truncatedData, setTruncatedData] = useState<Data>(
     traverseAndTruncate(data).result
   );
@@ -321,8 +322,8 @@ export const ObjectViewer = ({
         display: 'flex',
         sortable: false,
         renderCell: ({row}) => {
-          const isTruncated = row.value.__weave_array_truncated__;
-          const parentPath = row.parent?.path.toString() ?? '';
+          const isTruncated = row?.value?.[TRUNCATION_KEY];
+          const parentPath = row?.parent?.path?.toString() ?? '';
           if (isTruncated && truncatedStore[parentPath]) {
             return (
               <ShowMoreButtons
@@ -396,7 +397,7 @@ export const ObjectViewer = ({
       hideDescendantCount: true,
       renderCell: params => {
         const refToExpand = params.row.value;
-        const isTruncated = params.row.value.__weave_array_truncated__;
+        const isTruncated = params.row?.value?.[TRUNCATION_KEY];
         if (isTruncated) {
           return null;
         }
@@ -570,7 +571,7 @@ const traverseAndTruncate = (data: Data): any => {
       value = [
         ...value.slice(0, ARRAY_TRUNCATION_LENGTH),
         {
-          __weave_array_truncated__: true,
+          [TRUNCATION_KEY]: true,
         },
       ];
       context.value = value;
@@ -614,7 +615,7 @@ const updateTruncatedDataFromStore = (
         // Add the new values and truncated indicator
         context.value.push(...storeValue.slice(0, truncatedCount));
         context.value.push({
-          __weave_array_truncated__: true,
+          [TRUNCATION_KEY]: true,
         });
         // Update the store
         store[key] = {
@@ -648,7 +649,7 @@ const ShowMoreButtons = ({
   setTruncatedData: (data: Data) => void;
   setTruncatedStore: (store: TruncatedStore) => void;
 }) => {
-  const truncatedCount = truncatedStore[parentPath]?.values?.length ?? 0;
+  const truncatedCount = truncatedStore[parentPath]?.values.length ?? 0;
   return (
     <Box
       sx={{
