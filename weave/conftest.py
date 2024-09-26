@@ -85,18 +85,26 @@ def pytest_collection_modifyitems(config, items):
     items[:] = selected_items
 
 
+PYTEST_CURRENT_TEST_ENV_VAR = "PYTEST_CURRENT_TEST"
+
+
 class InMemoryWeaveLogCollector(logging.Handler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.log_records = []
+        self.log_records = {}
 
     def emit(self, record):
-        self.log_records.append(record)
+        curr_test = os.environ.get(PYTEST_CURRENT_TEST_ENV_VAR)
+        if curr_test not in self.log_records:
+            self.log_records[curr_test] = []
+        self.log_records[curr_test].append(record)
 
     def get_error_logs(self):
+        curr_test = os.environ.get(PYTEST_CURRENT_TEST_ENV_VAR)
+        logs = self.log_records.get(curr_test, [])
         return [
             record
-            for record in self.log_records
+            for record in logs
             if record.levelname == "ERROR" and record.name.startswith("weave")
         ]
 
