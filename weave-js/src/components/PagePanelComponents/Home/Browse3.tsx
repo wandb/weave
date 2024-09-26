@@ -397,11 +397,7 @@ const MainPeekingLayout: FC = () => {
               <SimplePageLayoutContext.Provider
                 value={{
                   headerSuffix: (
-                    <Box
-                      sx={{
-                        height: '41px',
-                        flex: '0 0 auto',
-                      }}>
+                    <Box sx={{flex: '0 0 auto'}}>
                       <FullPageButton
                         query={query}
                         generalBase={generalBase}

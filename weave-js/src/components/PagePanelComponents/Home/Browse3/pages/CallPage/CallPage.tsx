@@ -191,10 +191,7 @@ const CallPageInnerVertical: FC<{
   return (
     <SimplePageLayoutWithHeader
       headerExtra={
-        <Box
-          sx={{
-            height: '41px',
-          }}>
+        <Box>
           <Button
             icon="layout-tabs"
             tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}

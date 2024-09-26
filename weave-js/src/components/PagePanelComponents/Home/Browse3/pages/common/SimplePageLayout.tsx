@@ -67,7 +67,7 @@ export const SimplePageLayout: FC<{
           zIndex: 1,
           backgroundColor: 'white',
           pb: 0,
-          height: 55, // manual to match sidebar
+          height: 44,
 
           display: 'flex',
           flexDirection: 'row',
@@ -77,11 +77,11 @@ export const SimplePageLayout: FC<{
         }}>
         <Box
           sx={{
-            height: 55, // manual to match sidebar
-            flex: '0 0 55px',
+            height: 44,
+            flex: '0 0 44px',
             display: 'flex',
             flexDirection: 'row',
-            alignItems: 'flex-end',
+            alignItems: 'center',
             gap: 1,
             pl: 2,
             pr: 2,
@@ -89,7 +89,6 @@ export const SimplePageLayout: FC<{
           {simplePageLayoutContextValue.headerPrefix}
           <Box
             sx={{
-              pb: 2,
               fontWeight: 600,
               fontSize: '1.25rem',
               flex: '1 1 auto',
@@ -159,7 +158,7 @@ export const SimplePageLayout: FC<{
 };
 
 export const SimplePageLayoutWithHeader: FC<{
-  title?: string;
+  title?: ReactNode;
   tabs: Array<{
     label: string;
     content: ReactNode;
@@ -198,11 +197,11 @@ export const SimplePageLayoutWithHeader: FC<{
       }}>
       <Box
         sx={{
-          height: 55, // manual to match sidebar
-          flex: '0 0 55px',
+          height: 44,
+          flex: '0 0 44px',
           display: 'flex',
           flexDirection: 'row',
-          alignItems: 'flex-end',
+          alignItems: 'center',
           pl: 2,
           pr: 2,
           // merge line
@@ -217,9 +216,8 @@ export const SimplePageLayoutWithHeader: FC<{
         {simplePageLayoutContextValue.headerPrefix}
         <Box
           sx={{
-            pb: 2,
             fontWeight: 600,
-            fontSize: '1.5rem',
+            fontSize: '1.25rem',
             flex: '1 1 auto',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
