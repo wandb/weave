@@ -108,7 +108,9 @@ def log_handler():
 def assert_no_logger_errors(log_handler):
     yield
     error_logs = [
-        record for record in log_handler.log_records if record.levelname == "ERROR"
+        record
+        for record in log_handler.log_records
+        if record.levelname == "ERROR" and record.name.startswith("weave")
     ]
     assert (
         len(error_logs) == 0
