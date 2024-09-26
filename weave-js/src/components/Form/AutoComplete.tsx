@@ -153,7 +153,6 @@ type AdditionalProps = {
 export const AutoComplete = <Option,>(
   props: AutocompleteProps<Option, boolean, boolean, boolean> & AdditionalProps
 ) => {
-  console.log(props);
   return (
     <ThemeProvider theme={getStyles(props)}>
       <Autocomplete ref={props.inputRef} {...props} />
