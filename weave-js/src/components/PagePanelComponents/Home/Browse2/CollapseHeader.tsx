@@ -7,7 +7,7 @@ import styled from 'styled-components';
 import {Button} from '../../../Button';
 import {Tooltip} from '../../../Tooltip';
 
-type CollapseGroupHeaderProps = {
+type CollapseHeaderProps = {
   headerName: string;
   field: string;
   onCollapse: (col: string) => void;
@@ -23,7 +23,7 @@ export const CollapseHeader = ({
   headerName,
   field,
   onCollapse,
-}: CollapseGroupHeaderProps) => {
+}: CollapseHeaderProps) => {
   const onClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onCollapse(field);
