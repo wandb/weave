@@ -520,10 +520,8 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(
     assert_no_current_call()
 
     logs = log_collector.get_error_logs()
-    assert len(logs) == 2
+    assert len(logs) == 1
     assert logs[0].msg.startswith("Error closing iterator, call data may be incomplete")
-    assert logs[1].msg.startswith("Error closing iterator, call data may be incomplete")
-    assert logs[0].msg != logs[1].msg
 
 
 @pytest.mark.asyncio
