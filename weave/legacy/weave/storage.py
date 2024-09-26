@@ -7,7 +7,6 @@ import pathlib
 import re
 import typing
 
-from weave.legacy.weave import weave_client as weave_client_context
 from weave.legacy.weave import (
     artifact_base,
     artifact_fs,
