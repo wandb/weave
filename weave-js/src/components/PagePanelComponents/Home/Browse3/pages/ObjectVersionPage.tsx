@@ -3,7 +3,10 @@ import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEve
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
+import {Icon, IconName} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
+import {Tailwind} from '../../../../Tailwind';
+import {Tooltip} from '../../../../Tooltip';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
@@ -22,7 +25,6 @@ import {
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
-import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
@@ -33,8 +35,33 @@ import {
 } from './wfReactInterface/utilities';
 import {
   CallSchema,
+  KnownBaseObjectClassType,
   ObjectVersionSchema,
 } from './wfReactInterface/wfDataModelHooksInterface';
+
+type ObjectIconProps = {
+  baseObjectClass: KnownBaseObjectClassType;
+};
+const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
+  Model: 'model',
+  Dataset: 'table',
+};
+const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
+  if (baseObjectClass in OBJECT_ICONS) {
+    const iconName = OBJECT_ICONS[baseObjectClass];
+    return (
+      <Tooltip
+        trigger={
+          <div className="flex h-22 w-22 items-center justify-center rounded-full bg-moon-300/[0.48] text-moon-600">
+            <Icon width={14} height={14} name={iconName} />
+          </div>
+        }
+        content={baseObjectClass}
+      />
+    );
+  }
+  return null;
+};
 
 export const ObjectVersionPage: React.FC<{
   entity: string;
@@ -126,7 +153,16 @@ const ObjectVersionPageInner: React.FC<{
 
   return (
     <SimplePageLayoutWithHeader
-      title={objectVersionText(objectName, objectVersionIndex)}
+      title={
+        <Tailwind>
+          <div className="flex items-center gap-8">
+            {baseObjectClass && (
+              <ObjectIcon baseObjectClass={baseObjectClass} />
+            )}
+            {objectVersionText(objectName, objectVersionIndex)}
+          </div>
+        </Tailwind>
+      }
       headerContent={
         <SimpleKeyValueTable
           data={{
@@ -154,15 +190,6 @@ const ObjectVersionPageInner: React.FC<{
               </>
             ),
             Version: <>{objectVersionIndex}</>,
-            ...(baseObjectClass
-              ? {
-                  Category: (
-                    <TypeVersionCategoryChip
-                      baseObjectClass={baseObjectClass}
-                    />
-                  ),
-                }
-              : {}),
             ...(refExtra
               ? {
                   Subpath: refExtra,

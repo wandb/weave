@@ -158,7 +158,7 @@ export const SimplePageLayout: FC<{
 };
 
 export const SimplePageLayoutWithHeader: FC<{
-  title?: string;
+  title?: ReactNode;
   tabs: Array<{
     label: string;
     content: ReactNode;
