@@ -121,6 +121,9 @@ class InMemoryWeaveLogCollector(logging.Handler):
             and not record.msg.startswith(
                 "Job failed with exception: 400 Client Error: Bad Request for url: https://trace.wandb.ai/"
             )
+            # Exclude legacy
+            and not record.name.startswith("weave.weave_server")
+            and not "legacy" in record.name
         ]
 
 
