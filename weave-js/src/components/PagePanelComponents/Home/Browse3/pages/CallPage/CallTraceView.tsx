@@ -183,8 +183,14 @@ export const CallTraceView: FC<{
           outline: 'none',
         },
       },
+      '& .MuiDataGrid-topContainer': {
+        display: 'none',
+      },
       '& .MuiDataGrid-columnHeaders': {
         borderBottom: 'none',
+      },
+      '& .MuiDataGrid-filler': {
+        display: 'none',
       },
       [callClass]: {
         backgroundColor: '#a9edf252',
