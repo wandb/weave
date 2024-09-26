@@ -147,7 +147,7 @@ type AdditionalProps = {
   maxWidth?: number;
   minWidth?: number;
   hasInputValue?: boolean;
-  inputRef?: React.MutableRefObject<HTMLDivElement | null>;
+  autocompleteRef?: React.MutableRefObject<HTMLDivElement | null>;
 };
 
 export const AutoComplete = <Option,>(
@@ -155,7 +155,7 @@ export const AutoComplete = <Option,>(
 ) => {
   return (
     <ThemeProvider theme={getStyles(props)}>
-      <Autocomplete ref={props.inputRef} {...props} />
+      <Autocomplete ref={props.autocompleteRef} {...props} />
     </ThemeProvider>
   );
 };
