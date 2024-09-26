@@ -30,7 +30,7 @@ from weave.trace.errors import OpCallError
 from weave.trace.op_extensions.log_once import log_once
 from weave.trace.refs import ObjectRef
 
-logger = logging.getLogger("weave")
+logger = logging.getLogger(__name__)
 
 from .constants import TRACE_CALL_EMOJI
 
@@ -68,13 +68,17 @@ try:
 except ImportError:
     CEREBRAS_NOT_GIVEN = None
 
+CALL_CREATE_MSG = "Error creating call:\n{}"
+ASYNC_CALL_CREATE_MSG = "Error creating async call:\n{}"
+ON_OUTPUT_MSG = "Error capturing call output:\n{}"
+
 
 class DisplayNameFuncError(ValueError): ...
 
 
 def print_call_link(call: "Call") -> None:
     if settings.should_print_call_link():
-        logger.info(f"{TRACE_CALL_EMOJI} {call.ui_url}")
+        print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
@@ -247,8 +251,7 @@ def _execute_call(
             # the output
             res = on_output(res)
         except Exception as e:
-            full_exception = traceback.format_exc()
-            log_once(logger.error, f"Error capturing call output: {full_exception}")
+            log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
             if get_raise_on_captured_errors():
                 raise
         finally:
@@ -456,9 +459,9 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                     try:
                         call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     except Exception as e:
-                        full_exception = traceback.format_exc()
                         log_once(
-                            logger.error, f"Error creating async call: {full_exception}"
+                            logger.error,
+                            ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
                         )
                         if get_raise_on_captured_errors():
                             raise
@@ -478,8 +481,9 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                     try:
                         call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     except Exception as e:
-                        full_exception = traceback.format_exc()
-                        log_once(logger.error, f"Error creating call: {full_exception}")
+                        log_once(
+                            logger.error, CALL_CREATE_MSG.format(traceback.format_exc())
+                        )
                         if get_raise_on_captured_errors():
                             raise
                         return func(*args, **kwargs)

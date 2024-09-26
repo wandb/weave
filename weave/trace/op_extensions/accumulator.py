@@ -30,6 +30,13 @@ _OnYieldType = Callable[[V], None]
 _OnErrorType = Callable[[Exception], None]
 _OnCloseType = Callable[[], None]
 
+ON_CLOSE_MSG = "Error closing iterator, call data may be incomplete:\n{}"
+ON_ERROR_MSG = "Error capturing error from iterator, call data may be incomplete:\n{}"
+ON_YIELD_MSG = "Error capturing value from iterator, call data may be incomplete:\n{}"
+ON_AYIELD_MSG = (
+    "Error capturing async value from iterator, call data may be incomplete:\n{}"
+)
+
 
 class _IteratorWrapper(Generic[V]):
     """This class wraps an iterator object allowing hooks to be added to the lifecycle of the iterator. It is likely
@@ -55,11 +62,7 @@ class _IteratorWrapper(Generic[V]):
             try:
                 self._on_close()  # type: ignore
             except Exception as e:
-                full_exception = traceback.format_exc()
-                log_once(
-                    logger.error,
-                    f"Error finishing call - some logs may not be captured: {full_exception}",
-                )
+                log_once(logger.error, ON_CLOSE_MSG.format(traceback.format_exc()))
                 if get_raise_on_captured_errors():
                     raise
             self._on_finished_called = True
@@ -69,11 +72,7 @@ class _IteratorWrapper(Generic[V]):
             try:
                 self._on_error(e)
             except Exception as e:
-                full_exception = traceback.format_exc()
-                log_once(
-                    logger.error,
-                    f"Error finishing call with exception - some logs may not be captured: {full_exception}",
-                )
+                log_once(logger.error, ON_ERROR_MSG.format(traceback.format_exc()))
                 if get_raise_on_captured_errors():
                     raise
             self._on_finished_called = True
@@ -99,11 +98,7 @@ class _IteratorWrapper(Generic[V]):
                 # with usage info from openai integration).
                 if isinstance(e, (StopAsyncIteration, StopIteration)):
                     raise
-                full_exception = traceback.format_exc()
-                log_once(
-                    logger.error,
-                    f"Error capturing yielded value for call output: {full_exception}",
-                )
+                log_once(logger.error, ON_YIELD_MSG.format(traceback.format_exc()))
                 if get_raise_on_captured_errors():
                     raise
             return value
@@ -135,11 +130,7 @@ class _IteratorWrapper(Generic[V]):
                 # with usage info from openai integration).
                 if isinstance(e, (StopAsyncIteration, StopIteration)):
                     raise
-                full_exception = traceback.format_exc()
-                log_once(
-                    logger.error,
-                    f"Error capturing async yielded value for call output: {full_exception}",
-                )
+                log_once(logger.error, ON_AYIELD_MSG.format(traceback.format_exc()))
                 if get_raise_on_captured_errors():
                     raise
             return value
