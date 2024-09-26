@@ -157,9 +157,7 @@ const CallPageInnerVertical: FC<{
   ]);
 
   const tree = useCallFlattenedTraceTree(call, path ?? null);
-  const {rows, expandKeys, loading} = tree;
-
-  const {selectedCall} = tree;
+  const {rows, expandKeys, loading, costLoading, selectedCall} = tree;
   const callComplete = useCall({
     entity: selectedCall.entity,
     project: selectedCall.project,
@@ -215,6 +213,7 @@ const CallPageInnerVertical: FC<{
             rows={rows}
             forcedExpandKeys={expandKeys}
             path={path}
+            costLoading={costLoading}
           />
         )
       }

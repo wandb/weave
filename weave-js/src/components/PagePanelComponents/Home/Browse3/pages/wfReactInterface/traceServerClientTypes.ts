@@ -5,6 +5,7 @@ type ExtraKeysAllowed = {
 
 type WeaveSummarySchema = {
   costs?: {[key: string]: LLMCostSchema};
+  latency_ms?: number; // latency in milliseconds
 } & ExtraKeysAllowed;
 
 export type LLMUsageSchema = {
