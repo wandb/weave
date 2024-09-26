@@ -52,7 +52,7 @@ export const StyledDataGrid = styled(
   },
 
   '& .MuiDataGrid-columnHeaderTitle': {
-    fontWeight: 600,
+    fontWeight: 400,
   },
 
   '& .MuiDataGrid-columnHeader:focus, .MuiDataGrid-cell:focus': {

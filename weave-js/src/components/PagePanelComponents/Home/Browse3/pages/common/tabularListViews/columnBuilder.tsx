@@ -264,14 +264,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       headerName: key,
       display: 'flex',
       renderHeader: () => {
-        return (
-          <div
-            style={{
-              fontWeight: 600,
-            }}>
-            {key.split('.').slice(-1)[0]}
-          </div>
-        );
+        return <div>{key.split('.').slice(-1)[0]}</div>;
       },
       valueGetter: (unused: any, row: any) => {
         const val = valueForKey(row, key);

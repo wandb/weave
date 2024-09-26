@@ -177,7 +177,7 @@ export const CallTraceView: FC<{
       fontFamily: 'Source Sans Pro',
       '&>.MuiDataGrid-main': {
         '& div div div div >.MuiDataGrid-cell': {
-          borderBottom: 'none',
+          borderTop: 'none',
         },
         '& div div div div >.MuiDataGrid-cell:focus': {
           outline: 'none',
