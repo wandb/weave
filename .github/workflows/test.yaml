@@ -170,6 +170,7 @@ jobs:
             'cohere',
             'dspy',
             'groq',
+            'instructor',
             'langchain',
             'litellm',
             'llamaindex',

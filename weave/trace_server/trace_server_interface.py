@@ -414,6 +414,11 @@ class ObjQueryReq(BaseModel):
         description="Sorting criteria for the query results. Currently only supports 'object_id' and 'created_at'.",
         examples=[[SortBy(field="created_at", direction="desc")]],
     )
+    metadata_only: Optional[bool] = Field(
+        default=False,
+        description="If true, the `val` column is not read from the database and is empty."
+        "All other fields are returned.",
+    )
 
 
 class ObjQueryRes(BaseModel):

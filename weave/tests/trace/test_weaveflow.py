@@ -6,8 +6,6 @@ from pydantic import Field
 
 import weave
 
-pytestmark = pytest.mark.trace
-
 
 def test_weaveflow_op_wandb(client):
     @weave.op()

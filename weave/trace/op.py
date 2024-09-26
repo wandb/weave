@@ -3,6 +3,7 @@
 import inspect
 import logging
 import sys
+import traceback
 import typing
 from functools import partial, wraps
 from types import MethodType
@@ -65,6 +66,10 @@ try:
     from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
 except ImportError:
     CEREBRAS_NOT_GIVEN = None
+
+CALL_CREATE_MSG = "Error creating call:\n{}"
+ASYNC_CALL_CREATE_MSG = "Error creating async call:\n{}"
+ON_OUTPUT_MSG = "Error capturing call output:\n{}"
 
 
 class DisplayNameFuncError(ValueError): ...
@@ -245,9 +250,9 @@ def _execute_call(
             # the output
             res = on_output(res)
         except Exception as e:
-            log_once(logger.error, f"Error capturing call output: {e}")
             if get_raise_on_captured_errors():
                 raise
+            log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
         finally:
             # Is there a better place for this? We want to ensure that even
             # if the final output fails to be captured, we still pop the call
@@ -451,7 +456,18 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                         return await func(*args, **kwargs)
                     if not wrapper._tracing_enabled:  # type: ignore
                         return await func(*args, **kwargs)
-                    call = _create_call(wrapper, *args, **kwargs)  # type: ignore
+                    try:
+                        # This try/except allows us to fail gracefully and
+                        # still let the user code continue to execute
+                        call = _create_call(wrapper, *args, **kwargs)  # type: ignore
+                    except Exception as e:
+                        if get_raise_on_captured_errors():
+                            raise
+                        log_once(
+                            logger.error,
+                            ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
+                        )
+                        return await func(*args, **kwargs)
                     res, _ = await _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
                     return res
             else:
@@ -464,7 +480,17 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                         return func(*args, **kwargs)
                     if not wrapper._tracing_enabled:  # type: ignore
                         return func(*args, **kwargs)
-                    call = _create_call(wrapper, *args, **kwargs)  # type: ignore
+                    try:
+                        # This try/except allows us to fail gracefully and
+                        # still let the user code continue to execute
+                        call = _create_call(wrapper, *args, **kwargs)  # type: ignore
+                    except Exception as e:
+                        if get_raise_on_captured_errors():
+                            raise
+                        log_once(
+                            logger.error, CALL_CREATE_MSG.format(traceback.format_exc())
+                        )
+                        return func(*args, **kwargs)
                     res, _ = _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
                     return res
 

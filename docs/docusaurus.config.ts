@@ -238,8 +238,8 @@ const config: Config = {
       ],
     },
     imageZoom: {
-      // CSS selector to apply the plugin to, defaults to '.markdown img'
-      selector: '.markdown img',
+      // CSS selector to apply the plugin to
+      selector: 'img.zoomable',
       // Optional medium-zoom options
       // see: https://www.npmjs.com/package/medium-zoom#options
       options: {},
