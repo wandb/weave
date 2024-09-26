@@ -69,7 +69,6 @@ class AsyncBatchProcessor(Generic[T]):
             # logger.info(f"_process_batches:: ({thread_id}) : BEGIN")
             while not self.queue.empty() and len(current_batch) < self.max_batch_size:
                 current_batch.append(self.queue.get())
-            
 
             if current_batch:
                 logger.info(

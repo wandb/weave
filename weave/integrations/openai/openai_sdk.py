@@ -1,10 +1,13 @@
 import importlib
+import logging
 import typing
 from functools import wraps
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
+
+logger = logging.getLogger("weave.openai")
 
 if typing.TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk

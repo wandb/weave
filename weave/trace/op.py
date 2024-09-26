@@ -3,6 +3,7 @@
 import inspect
 import logging
 import sys
+import traceback
 import typing
 from functools import partial, wraps
 from types import MethodType
@@ -246,7 +247,8 @@ def _execute_call(
             # the output
             res = on_output(res)
         except Exception as e:
-            log_once(logger.error, f"Error capturing call output: {e}")
+            full_exception = traceback.format_exc()
+            log_once(logger.error, f"Error capturing call output: {full_exception}")
             if get_raise_on_captured_errors():
                 raise
         finally:
