@@ -156,7 +156,11 @@ const ObjectViewerSectionNonEmpty = ({
       setTreeExpanded(true);
     }
     setMode('expanded');
-    setExpandedIds(getGroupIds());
+    if (getGroupIds().length > 100) {
+      setExpandedIds(getGroupIds().slice(0, expandedIds.length + 100));
+    } else {
+      setExpandedIds(getGroupIds());
+    }
   };
 
   // On first render and when data changes, recompute expansion state
@@ -187,7 +191,7 @@ const ObjectViewerSectionNonEmpty = ({
           icon="expand-uncollapse"
           active={mode === 'expanded'}
           onClick={onClickExpanded}
-          tooltip="View expanded"
+          tooltip="Expand 100 rows"
         />
         <Button
           variant="quiet"
