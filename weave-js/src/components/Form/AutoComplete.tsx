@@ -59,7 +59,7 @@ const getStyles = (props: AdditionalProps) => {
                 opacity: 1,
               },
               '& .MuiInputBase-input': {
-                padding: '0px', // Adjust padding as needed
+                padding: '0px',
                 minHeight: `${HEIGHTS[size]} !important`,
               },
             },
