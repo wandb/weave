@@ -75,7 +75,7 @@ type TruncatedStore = {[key: string]: {values: any; index: number}};
 
 const RESOVLED_REF_KEY = '_ref';
 
-const ARRAY_TRUNCATION_LENGTH = 10;
+const ARRAY_TRUNCATION_LENGTH = 50;
 const TRUNCATION_KEY = '__weave_array_truncated__';
 
 // This is a general purpose object viewer that can be used to view any object.
@@ -658,20 +658,22 @@ const ShowMoreButtons = ({
         justifyContent: 'flex-end',
         gap: 1,
       }}>
-      <Button
-        variant="quiet"
-        onClick={() => {
-          const {newData, store} = updateTruncatedDataFromStore(
-            parentPath,
-            truncatedData,
-            truncatedStore,
-            ARRAY_TRUNCATION_LENGTH
-          );
-          setTruncatedData(newData);
-          setTruncatedStore(store);
-        }}>
-        Show {ARRAY_TRUNCATION_LENGTH} more rows
-      </Button>
+      {truncatedCount > ARRAY_TRUNCATION_LENGTH && (
+        <Button
+          variant="quiet"
+          onClick={() => {
+            const {newData, store} = updateTruncatedDataFromStore(
+              parentPath,
+              truncatedData,
+              truncatedStore,
+              ARRAY_TRUNCATION_LENGTH
+            );
+            setTruncatedData(newData);
+            setTruncatedStore(store);
+          }}>
+          Show {ARRAY_TRUNCATION_LENGTH} more rows
+        </Button>
+      )}
       <Button
         variant="quiet"
         onClick={() => {
