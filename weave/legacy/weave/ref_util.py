@@ -3,11 +3,10 @@ import typing
 from urllib import parse
 
 from weave.legacy.weave import box
-from weave.legacy.weave import refs_internal
 
-DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
-LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
-OBJECT_ATTR_EDGE_NAME = refs_internal.OBJECT_ATTR_EDGE_NAME
+DICT_KEY_EDGE_NAME = "key"
+LIST_INDEX_EDGE_NAME = "index"
+OBJECT_ATTR_EDGE_NAME = "attr"
 AWL_ROW_EDGE_NAME = "row"
 AWL_COL_EDGE_NAME = "col"
 
