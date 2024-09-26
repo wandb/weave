@@ -156,7 +156,8 @@ def test_resilience_to_server_errors(client):
     assert_no_current_call()
 
 
-def test_resilience_to_patcher_errors(client):
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_patcher_errors(client, log_collector):
     class Module:
         def method(self):
             return 0
@@ -184,8 +185,13 @@ def test_resilience_to_patcher_errors(client):
 
     assert_no_current_call()
 
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert logs[0].msg.startswith("Failed to patch")
 
-def test_resilience_to_output_handler_errors(client):
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_output_handler_errors(client, log_collector):
     def do_test():
         @weave.op
         def simple_op():
@@ -209,9 +215,14 @@ def test_resilience_to_output_handler_errors(client):
 
     assert_no_current_call()
 
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert logs[0].msg.startswith("Error capturing call output")
+
 
 @pytest.mark.asyncio
-async def test_resilience_to_output_handler_errors_async(client):
+@pytest.mark.disable_logging_error_check
+async def test_resilience_to_output_handler_errors_async(client, log_collector):
     async def do_test():
         @weave.op
         async def simple_op():
@@ -235,8 +246,13 @@ async def test_resilience_to_output_handler_errors_async(client):
 
     assert_no_current_call()
 
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert logs[0].msg.startswith("Error capturing call output")
 
-def test_resilience_to_accumulator_make_accumulator_errors(client):
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_accumulator_make_accumulator_errors(client, log_collector):
     def do_test():
         @weave.op
         def simple_op():
@@ -260,9 +276,16 @@ def test_resilience_to_accumulator_make_accumulator_errors(client):
 
     assert_no_current_call()
 
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert logs[0].msg.startswith("Error capturing call output")
+
 
 @pytest.mark.asyncio
-async def test_resilience_to_accumulator_make_accumulator_errors_async(client):
+@pytest.mark.disable_logging_error_check
+async def test_resilience_to_accumulator_make_accumulator_errors_async(
+    client, log_collector
+):
     async def do_test():
         @weave.op
         async def simple_op():
@@ -288,8 +311,13 @@ async def test_resilience_to_accumulator_make_accumulator_errors_async(client):
 
     assert_no_current_call()
 
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert logs[0].msg.startswith("Error capturing call output")
 
-def test_resilience_to_accumulator_accumulation_errors(client):
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_accumulator_accumulation_errors(client, log_collector):
     def do_test():
         @weave.op
         def simple_op():
@@ -316,9 +344,18 @@ def test_resilience_to_accumulator_accumulation_errors(client):
 
     assert_no_current_call()
 
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert logs[0].msg.startswith(
+        "Error capturing value from iterator, call data may be incomplete"
+    )
+
 
 @pytest.mark.asyncio
-async def test_resilience_to_accumulator_accumulation_errors_async(client):
+@pytest.mark.disable_logging_error_check
+async def test_resilience_to_accumulator_accumulation_errors_async(
+    client, log_collector
+):
     async def do_test():
         @weave.op
         async def simple_op():
@@ -348,8 +385,15 @@ async def test_resilience_to_accumulator_accumulation_errors_async(client):
 
     assert_no_current_call()
 
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert logs[0].msg.startswith(
+        "Error capturing async value from iterator, call data may be incomplete"
+    )
 
-def test_resilience_to_accumulator_should_accumulate_errors(client):
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_accumulator_should_accumulate_errors(client, log_collector):
     def do_test():
         @weave.op
         def simple_op():
@@ -383,9 +427,16 @@ def test_resilience_to_accumulator_should_accumulate_errors(client):
 
     assert_no_current_call()
 
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert logs[0].msg.startswith("Error capturing call output")
+
 
 @pytest.mark.asyncio
-async def test_resilience_to_accumulator_should_accumulate_errors_async(client):
+@pytest.mark.disable_logging_error_check
+async def test_resilience_to_accumulator_should_accumulate_errors_async(
+    client, log_collector
+):
     async def do_test():
         @weave.op
         async def simple_op():
@@ -420,6 +471,10 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(client):
         assert [item async for item in res] == [1, 2, 3]
 
     assert_no_current_call()
+
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert logs[0].msg.startswith("Error capturing call output")
 
 
 # Here we are ignoring this warning because the exception IS being raised,
@@ -427,7 +482,10 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(client):
 # so pytest is complaining that the exception is not being raised in the
 # expected manner.
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
-def test_resilience_to_accumulator_on_finish_post_processor_errors(client):
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_accumulator_on_finish_post_processor_errors(
+    client, log_collector
+):
     def do_test():
         @weave.op
         def simple_op():
@@ -461,9 +519,18 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(client):
 
     assert_no_current_call()
 
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 2
+    assert logs[0].msg.startswith("Error closing iterator, call data may be incomplete")
+    assert logs[1].msg.startswith("Error closing iterator, call data may be incomplete")
+    assert logs[0].msg != logs[1].msg
+
 
 @pytest.mark.asyncio
-async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(client):
+@pytest.mark.disable_logging_error_check
+async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
+    client, log_collector
+):
     async def do_test():
         @weave.op
         async def simple_op():
@@ -499,6 +566,12 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(c
         assert [item async for item in res] == [1, 2, 3]
 
     assert_no_current_call()
+
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 2
+    assert logs[0].msg.startswith("Error closing iterator, call data may be incomplete")
+    assert logs[1].msg.startswith("Error closing iterator, call data may be incomplete")
+    assert logs[0].msg != logs[1].msg
 
 
 def test_resilience_to_accumulator_internal_errors(client):

@@ -251,9 +251,9 @@ def _execute_call(
             # the output
             res = on_output(res)
         except Exception as e:
-            log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
             if get_raise_on_captured_errors():
                 raise
+            log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
         finally:
             # Is there a better place for this? We want to ensure that even
             # if the final output fails to be captured, we still pop the call
@@ -461,12 +461,12 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                         # still let the user code continue to execute
                         call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     except Exception as e:
+                        if get_raise_on_captured_errors():
+                            raise
                         log_once(
                             logger.error,
                             ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
                         )
-                        if get_raise_on_captured_errors():
-                            raise
                         return await func(*args, **kwargs)
                     res, _ = await _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
                     return res
@@ -485,11 +485,11 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                         # still let the user code continue to execute
                         call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     except Exception as e:
+                        if get_raise_on_captured_errors():
+                            raise
                         log_once(
                             logger.error, CALL_CREATE_MSG.format(traceback.format_exc())
                         )
-                        if get_raise_on_captured_errors():
-                            raise
                         return func(*args, **kwargs)
                     res, _ = _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
                     return res

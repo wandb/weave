@@ -85,9 +85,9 @@ class AsyncJobQueue:
                 self._active_jobs.remove(f)
             exception = f.exception()
             if exception:
-                logger.error(f"Job failed with exception: {exception}")
                 if get_raise_on_captured_errors():
                     raise
+                logger.error(f"Job failed with exception: {exception}")
 
         future.add_done_callback(callback)
         return future
@@ -97,9 +97,9 @@ class AsyncJobQueue:
         try:
             self.executor.shutdown(wait=True)
         except Exception as e:
-            logger.error(f"Error shutting down executor: {e}")
             if get_raise_on_captured_errors():
                 raise
+            logger.error(f"Error shutting down executor: {e}")
 
     def flush(self) -> None:
         """Waits for all currently submitted jobs to complete.
@@ -115,6 +115,6 @@ class AsyncJobQueue:
             try:
                 future.result()
             except Exception as e:
-                logger.error(f"Job failed during flush: {e}")
                 if get_raise_on_captured_errors():
                     raise
+                logger.error(f"Job failed during flush: {e}")
