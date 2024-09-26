@@ -59,14 +59,3 @@ export type TokenTotals = {
     tokens: Record<string, number>;
   };
 };
-
-export type TokenAndCostMetrics = {
-  inputs: {
-    cost: Record<string, number>;
-    tokens: Record<string, number>;
-  };
-  outputs: {
-    cost: Record<string, number>;
-    tokens: Record<string, number>;
-  };
-};

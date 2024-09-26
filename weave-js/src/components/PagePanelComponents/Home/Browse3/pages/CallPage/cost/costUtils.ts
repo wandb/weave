@@ -2,7 +2,7 @@ import {
   LLMCostSchema,
   LLMUsageSchema,
 } from '../../wfReactInterface/traceServerClientTypes';
-import {DEFAULT_COST_DATA, isCostDataKey} from './costTypes';
+import {DEFAULT_COST_DATA, isCostDataKey, isUsageDataKey} from './costTypes';
 
 const COST_PARAM_PREFIX = 'summary.weave.costs.';
 
@@ -25,13 +25,27 @@ export const getCostFromCellParams = (params: {[key: string]: any}) => {
   return costData;
 };
 
-// This needs to updated eventually, to either include more possible keys or to be more dynamic
-// accounts for openai and anthropic usage objects (prompt_tokens, input_tokens)
-export const getInputTokens = (cost: LLMCostSchema) => {
-  return cost.input_tokens ?? cost.prompt_tokens ?? 0;
-};
-export const getOutputTokens = (cost: LLMCostSchema) => {
-  return cost.output_tokens ?? cost.completion_tokens ?? 0;
+export const getUsageFromCellParams = (params: {[key: string]: any}) => {
+  const usage: {[key: string]: LLMUsageSchema} = {};
+  for (const key in params) {
+    if (key.startsWith('summary.usage')) {
+      const usageKeys = key.replace('summary.usage.', '').split('.');
+      const usageKey = usageKeys.pop() || '';
+      if (isUsageDataKey(usageKey)) {
+        const model = usageKeys.join('.');
+        if (!usage[model]) {
+          usage[model] = {
+            requests: 0,
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0,
+          };
+        }
+        usage[model][usageKey] = params[key];
+      }
+    }
+  }
+  return usage;
 };
 
 // This needs to updated eventually, to either include more possible keys or to be more dynamic
