@@ -130,7 +130,9 @@ export const FilterableObjectVersionsTable: React.FC<{
         ? [effectiveFilter.objectName]
         : undefined,
       latestOnly: effectivelyLatestOnly,
-    }
+    },
+    undefined,
+    effectivelyLatestOnly // metadata only when getting latest
   );
 
   if (filteredObjectVersions.loading) {
