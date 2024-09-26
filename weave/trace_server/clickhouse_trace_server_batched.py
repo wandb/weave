@@ -581,29 +581,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds: list[str] = []
-        object_id_conditions = ["object_id = {object_id: String}"]
-        parameters: Dict[str, Union[str, int]] = {"object_id": req.object_id}
-        if req.digest == "latest":
-            conds.append("is_latest = 1")
-        else:
-            (is_version, version_index) = _digest_is_version_like(req.digest)
-            if is_version:
-                conds.append("version_index = {version_index: UInt64}")
-                parameters["version_index"] = version_index
-            else:
-                conds.append("digest = {version_digest: String}")
-                parameters["version_digest"] = req.digest
-        objs = self._select_objs_query(
-            req.project_id,
-            conditions=conds,
-            object_id_conditions=object_id_conditions,
-            parameters=parameters,
+        obj = self._select_single_obj_query(
+            project_id=req.project_id, object_id=req.object_id, given_digest=req.digest
         )
-        if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
-
-        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
+        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conds: list[str] = []
@@ -1411,6 +1392,150 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 column_names=all_call_insert_columns,
                 settings=settings,
             )
+
+    def _select_single_obj_query(
+        self,
+        project_id: str,
+        object_id: str,
+        given_digest: str,
+    ) -> SelectableCHObjSchema:
+        """Query for reading a single object by digest.
+
+        First, query all versions of the object by id to calculate the version index,
+        without the overhead of val_dump.
+        Then, run a second query to get the complete object with the given digest by
+        directly filtering on the digest.
+        """
+        if given_digest == "latest":
+            condition_part = "is_latest = 1"
+        else:
+            (is_version, given_version_index) = _digest_is_version_like(given_digest)
+            if is_version:
+                condition_part = f"version_index = '{given_version_index}'"
+            else:
+                condition_part = f"digest = '{given_digest}'"
+
+        # Get version counting fields
+        version_index_and_count_query = f"""
+            SELECT
+                digest,
+                version_index,
+                version_count,
+                is_latest
+            FROM (
+                SELECT
+                    digest,
+                    row_number() OVER (
+                        PARTITION BY project_id,
+                        kind,
+                        object_id
+                        ORDER BY created_at ASC
+                    ) - 1 AS version_index,
+                    count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
+                    if(version_index + 1 = version_count, 1, 0) AS is_latest
+                FROM (
+                    SELECT
+                        digest,
+                        project_id,
+                        kind,
+                        object_id,
+                        created_at,
+                        row_number() OVER (
+                            PARTITION BY project_id,
+                            kind,
+                            object_id,
+                            digest
+                            ORDER BY created_at ASC
+                        ) AS rn
+                    FROM object_versions
+                    WHERE project_id = {{project_id: String}} AND
+                        object_id = {{object_id: String}}
+                )
+                WHERE rn = 1
+            )
+            WHERE {condition_part}
+        """
+        query_result = self._query(
+            version_index_and_count_query,
+            {"project_id": project_id, "object_id": object_id},
+        )
+        if len(query_result.result_rows) == 0:
+            raise NotFoundError(f"Obj {object_id}:{given_digest} not found")
+
+        (digest, version_index, version_count, is_latest) = query_result.result_rows[0]
+
+        # Now get the full object by digest
+        select_query = """
+            SELECT
+                project_id,
+                object_id,
+                created_at,
+                kind,
+                base_object_class,
+                refs,
+                val_dump,
+                if (kind = 'op', 1, 0) AS is_op
+            FROM (
+                    SELECT project_id,
+                        object_id,
+                        created_at,
+                        kind,
+                        base_object_class,
+                        refs,
+                        val_dump,
+                        digest,
+                        row_number() OVER (
+                            PARTITION BY project_id,
+                            kind,
+                            object_id,
+                            digest
+                            ORDER BY created_at ASC
+                        ) AS rn
+                    FROM object_versions
+                    WHERE project_id = {project_id: String} AND
+                        object_id = {object_id: String}
+                )
+                WHERE rn = 1 AND digest = {version_digest: String}
+        """
+        parameters = {
+            "project_id": project_id,
+            "object_id": object_id,
+            "version_digest": digest,
+        }
+        query_result = self._query(select_query, parameters)
+        if len(query_result.result_rows) == 0:
+            raise NotFoundError(f"Obj {object_id}:{given_digest} not found")
+
+        combined = list(query_result.result_rows[0]) + [
+            digest,
+            version_index,
+            version_count,
+            is_latest,
+        ]
+
+        res = SelectableCHObjSchema.model_validate(
+            dict(
+                zip(
+                    [
+                        "project_id",
+                        "object_id",
+                        "created_at",
+                        "kind",
+                        "base_object_class",
+                        "refs",
+                        "val_dump",
+                        "is_op",
+                        "digest",
+                        "version_index",
+                        "version_count",
+                        "is_latest",
+                    ],
+                    combined,
+                )
+            )
+        )
+
+        return res
 
     def _select_objs_query(
         self,
