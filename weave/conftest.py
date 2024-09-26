@@ -91,6 +91,12 @@ def always_raise_on_captured_errors():
 
 
 @pytest.fixture(autouse=True)
+def disable_raise_on_captured_errors():
+    with raise_on_captured_errors(False):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def throw_on_error():
     os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"] = "true"
     yield

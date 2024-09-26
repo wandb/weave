@@ -4,6 +4,7 @@ import pytest
 from openai import AsyncOpenAI, OpenAI
 
 import weave
+from weave.conftest import disable_raise_on_captured_errors
 from weave.integrations.integration_utilities import op_name_from_ref
 
 model = "gpt-4o"
@@ -107,7 +108,13 @@ async def test_openai_async_quickstart(
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_openai_stream_quickstart(client: weave.trace.weave_client.WeaveClient) -> None:
+@pytest.mark.parametrize("raise_on_captured_errors", [True, False])
+def test_openai_stream_quickstart(
+    client: weave.trace.weave_client.WeaveClient, raise_on_captured_errors: bool
+) -> None:
+    if raise_on_captured_errors:
+        disable_raise_on_captured_errors()
+
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
@@ -163,9 +170,13 @@ def test_openai_stream_quickstart(client: weave.trace.weave_client.WeaveClient) 
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
+@pytest.mark.parametrize("raise_on_captured_errors", [True, False])
 async def test_openai_async_stream_quickstart(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient, raise_on_captured_errors: bool
 ) -> None:
+    if raise_on_captured_errors:
+        disable_raise_on_captured_errors()
+
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = AsyncOpenAI(api_key=api_key)
@@ -216,9 +227,13 @@ async def test_openai_async_stream_quickstart(
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
+@pytest.mark.parametrize("raise_on_captured_errors", [True, False])
 def test_openai_stream_usage_quickstart(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient, raise_on_captured_errors: bool
 ) -> None:
+    if raise_on_captured_errors:
+        disable_raise_on_captured_errors()
+
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
@@ -256,7 +271,13 @@ def test_openai_stream_usage_quickstart(
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_openai_function_call(client: weave.trace.weave_client.WeaveClient) -> None:
+@pytest.mark.parametrize("raise_on_captured_errors", [True, False])
+def test_openai_function_call(
+    client: weave.trace.weave_client.WeaveClient, raise_on_captured_errors: bool
+) -> None:
+    if raise_on_captured_errors:
+        disable_raise_on_captured_errors()
+
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
@@ -341,9 +362,13 @@ def test_openai_function_call(client: weave.trace.weave_client.WeaveClient) -> N
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
+@pytest.mark.parametrize("raise_on_captured_errors", [True, False])
 async def test_openai_function_call_async(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient, raise_on_captured_errors: bool
 ) -> None:
+    if raise_on_captured_errors:
+        disable_raise_on_captured_errors()
+
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = AsyncOpenAI(api_key=api_key)
@@ -427,9 +452,13 @@ async def test_openai_function_call_async(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
+@pytest.mark.parametrize("raise_on_captured_errors", [True, False])
 async def test_openai_function_call_async_stream(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient, raise_on_captured_errors: bool
 ) -> None:
+    if raise_on_captured_errors:
+        disable_raise_on_captured_errors()
+
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = AsyncOpenAI(api_key=api_key)
@@ -516,7 +545,13 @@ async def test_openai_function_call_async_stream(
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_openai_tool_call(client: weave.trace.weave_client.WeaveClient) -> None:
+@pytest.mark.parametrize("raise_on_captured_errors", [True, False])
+def test_openai_tool_call(
+    client: weave.trace.weave_client.WeaveClient, raise_on_captured_errors: bool
+) -> None:
+    if raise_on_captured_errors:
+        disable_raise_on_captured_errors()
+
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
@@ -603,9 +638,13 @@ def test_openai_tool_call(client: weave.trace.weave_client.WeaveClient) -> None:
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
+@pytest.mark.parametrize("raise_on_captured_errors", [True, False])
 async def test_openai_tool_call_async(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient, raise_on_captured_errors: bool
 ) -> None:
+    if raise_on_captured_errors:
+        disable_raise_on_captured_errors()
+
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = AsyncOpenAI(api_key=api_key)
@@ -690,9 +729,13 @@ async def test_openai_tool_call_async(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
+@pytest.mark.parametrize("raise_on_captured_errors", [True, False])
 async def test_openai_tool_call_async_stream(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient, raise_on_captured_errors: bool
 ) -> None:
+    if raise_on_captured_errors:
+        disable_raise_on_captured_errors()
+
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = AsyncOpenAI(api_key=api_key)
@@ -792,9 +835,13 @@ async def test_openai_tool_call_async_stream(
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
+@pytest.mark.parametrize("raise_on_captured_errors", [True, False])
 def test_openai_as_context_manager(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient, raise_on_captured_errors: bool
 ) -> None:
+    if raise_on_captured_errors:
+        disable_raise_on_captured_errors()
+
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
@@ -845,9 +892,13 @@ def test_openai_as_context_manager(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
+@pytest.mark.parametrize("raise_on_captured_errors", [True, False])
 async def test_openai_as_context_manager_async(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient, raise_on_captured_errors: bool
 ) -> None:
+    if raise_on_captured_errors:
+        disable_raise_on_captured_errors()
+
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = AsyncOpenAI(api_key=api_key)
