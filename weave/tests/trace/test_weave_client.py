@@ -29,6 +29,7 @@ from weave.trace.refs import (
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
+from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
@@ -1410,9 +1411,6 @@ def test_calls_stream_table_ref_expansion(client):
 
 
 def test_object_version_read(client):
-    if client_is_sqlite(client):
-        return
-
     refs = []
     for i in range(10):
         refs.append(weave.publish({"a": i}))
@@ -1469,3 +1467,26 @@ def test_object_version_read(client):
     )
     assert obj_res.obj.val == {"a": 5}
     assert obj_res.obj.version_index == 5
+
+    # check badly formatted digests
+    digests = ["v1111", "1", ""]
+    for digest in digests:
+        with pytest.raises(NotFoundError):
+            # grab non-existant version
+            obj_res = client.server.obj_read(
+                tsi.ObjReadReq(
+                    project_id=client._project_id(),
+                    object_id=refs[0].name,
+                    digest=digest,
+                )
+            )
+
+    # check non-existant object_id
+    with pytest.raises(NotFoundError):
+        obj_res = client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client._project_id(),
+                object_id="refs[0].name",
+                digest="v1",
+            )
+        )
