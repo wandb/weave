@@ -11,7 +11,7 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../../react';
 import {ErrorBoundary} from '../../../../../../ErrorBoundary';
 import {flattenObjectPreservingWeaveTypes} from '../../../../Browse2/browse2Util';
 import {CellValue} from '../../../../Browse2/CellValue';
-import {CollapseHeader} from '../../../../Browse2/CollapseGroupHeader';
+import {CollapseHeader} from '../../../../Browse2/CollapseHeader';
 import {ExpandHeader} from '../../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../../Browse2/SmallRef';

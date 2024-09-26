@@ -48,9 +48,15 @@ const OpVersionPageInner: React.FC<{
   const uri = opVersionKeyToRefUri(opVersion);
   const {entity, project, opId, versionIndex} = opVersion;
 
-  const opVersions = useOpVersions(entity, project, {
-    opIds: [opId],
-  });
+  const opVersions = useOpVersions(
+    entity,
+    project,
+    {
+      opIds: [opId],
+    },
+    undefined, // limit
+    true // metadataOnly
+  );
   const opVersionCount = (opVersions.result ?? []).length;
   const callsStats = useCallsStats(entity, project, {
     opVersionRefs: [uri],
