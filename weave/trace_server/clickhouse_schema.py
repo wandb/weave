@@ -150,4 +150,5 @@ class SelectableCHObjSchema(BaseModel):
     base_object_class: typing.Optional[str]
     digest: str
     version_index: int
+    version_count: int
     is_latest: int
