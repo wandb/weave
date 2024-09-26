@@ -2,8 +2,11 @@
 # Weave interactions with the Weave API should go through this
 # module.
 
+# NOTE: This was copied from the query service and contains way more than it needs to.
+
 import contextlib
 import contextvars
+import dataclasses
 import typing
 
 import aiohttp
@@ -14,8 +17,32 @@ from gql.transport.requests import RequestsHTTPTransport
 from requests.auth import HTTPBasicAuth
 from wandb.sdk.internal.internal_api import _thread_local_api_settings
 
-from weave.legacy.weave.context_state import WandbApiContext, _wandb_api_context
 from weave.trace import env
+
+
+# Context for wandb api
+# Instead of putting this in a shared file, we put it directly here
+# so that the patching at the top of this file will work correctly
+# for this symbol.
+@dataclasses.dataclass
+class WandbApiContext:
+    user_id: typing.Optional[str] = None  # TODO: delete
+    api_key: typing.Optional[str] = None
+    headers: typing.Optional[dict[str, str]] = None  # TODO: delete
+    cookies: typing.Optional[dict[str, str]] = None  # TODO: delete
+
+    @classmethod
+    def from_json(cls, json: typing.Any) -> "WandbApiContext":
+        return cls(**json)
+
+    def to_json(self) -> typing.Any:
+        return dataclasses.asdict(self)
+
+
+## wandb_api.py context
+_wandb_api_context: contextvars.ContextVar[typing.Optional[WandbApiContext]] = (
+    contextvars.ContextVar("wandb_api_context", default=None)
+)
 
 
 def set_wandb_thread_local_api_settings(
@@ -59,6 +86,7 @@ def reset_wandb_api_context(
     _wandb_api_context.reset(token)
 
 
+# api.py
 @contextlib.contextmanager
 def wandb_api_context(
     ctx: typing.Optional[WandbApiContext],
@@ -74,6 +102,7 @@ def wandb_api_context(
             reset_wandb_api_context(token)
 
 
+# api.py, weave_init.py
 def get_wandb_api_context() -> typing.Optional[WandbApiContext]:
     return _wandb_api_context.get()
 

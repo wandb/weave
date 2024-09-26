@@ -1,6 +1,6 @@
 import typing
 
-from weave.trace import autopatch, errors, init_message, trace_sentry, weave_client
+from weave.trace import autopatch, env, errors, init_message, trace_sentry, weave_client
 from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace_server import sqlite_trace_server
 from weave.trace_server_bindings import remote_http_trace_server
@@ -76,27 +76,20 @@ def init_weave(
         else:
             _current_inited_client.reset()
 
-    from weave.wandb_interface import wandb_api
-
     # Must init to read ensure we've read auth from the environment, in
     # case we're on a new thread.
-    wandb_api.init()
-    wandb_context = wandb_api.get_wandb_api_context()
-    if wandb_context is None:
+    api_key = env.weave_wandb_api_key()
+    if api_key is None:
         import wandb
 
         print("Please login to Weights & Biases (https://wandb.ai/) to continue:")
         wandb.login(anonymous="never", force=True)  # type: ignore
-        wandb_api.init()
-        wandb_context = wandb_api.get_wandb_api_context()
+        api_key = env.weave_wandb_api_key()
 
     entity_name, project_name = get_entity_project_from_project_name(project_name)
     wandb_run_id = weave_client.safe_current_wb_run_id()
     weave_client.check_wandb_run_matches(wandb_run_id, entity_name, project_name)
 
-    api_key = None
-    if wandb_context is not None and wandb_context.api_key is not None:
-        api_key = wandb_context.api_key
     remote_server = init_weave_get_server(api_key)
     # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
