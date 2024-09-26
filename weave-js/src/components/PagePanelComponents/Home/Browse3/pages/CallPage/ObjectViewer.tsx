@@ -671,7 +671,7 @@ const ShowMoreButtons = ({
             setTruncatedData(newData);
             setTruncatedStore(store);
           }}>
-          Show {ARRAY_TRUNCATION_LENGTH} more rows
+          {`Show ${ARRAY_TRUNCATION_LENGTH} more rows`}
         </Button>
       )}
       <Button
@@ -686,7 +686,7 @@ const ShowMoreButtons = ({
           setTruncatedData(newData);
           setTruncatedStore(store);
         }}>
-        Show {truncatedCount} more rows
+        {`Show ${truncatedCount} more rows`}
       </Button>
     </Box>
   );
