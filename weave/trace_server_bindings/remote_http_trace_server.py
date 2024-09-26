@@ -271,6 +271,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             return tsi.CallStartRes(
                 id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id
             )
+        raise Exception(req)
         return self._generic_request(
             "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
         )
@@ -286,6 +287,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 req_as_obj = req
             self.call_processor.enqueue([EndBatchItem(req=req_as_obj)])
             return tsi.CallEndRes()
+        raise Exception(req)
         return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
 
     def call_read(
@@ -467,6 +469,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         reraise=True,
     )
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        raise Exception(req)
         r = requests.post(
             self.trace_server_url + "/files/create",
             auth=self._auth,

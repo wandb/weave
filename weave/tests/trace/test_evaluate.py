@@ -6,8 +6,6 @@ import weave
 from weave import Dataset, Evaluation, Model
 from weave.flow.scorer import MultiTaskBinaryClassificationF1
 
-pytestmark = pytest.mark.webtest
-
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 dataset = Dataset(rows=dataset_rows)

@@ -11,12 +11,13 @@ from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 
 
-@weave.op
-def func():
-    return 1
 
 
 def test_disabled_setting(client):
+    @weave.op
+    def func():
+        return 1
+
     parse_and_apply_settings(UserSettings(disabled=True))
     disabled_time = timeit.timeit(func, number=10)
 
@@ -29,6 +30,10 @@ def test_disabled_setting(client):
 
 
 def test_disabled_env(client):
+    @weave.op
+    def func():
+        return 1
+
     os.environ["WEAVE_DISABLED"] = "true"
     disabled_time = timeit.timeit(func, number=10)
 
@@ -52,6 +57,7 @@ def test_disabled_env_client():
     def func():
         return 1
 
+
     assert func() == 1
 
     # No error implies that no calls were sent to the server
@@ -62,7 +68,12 @@ def test_disabled_env_client():
 
 
 def test_print_call_link_setting(client):
+    @weave.op
+    def func():
+        return 1
+
     captured_stdout = io.StringIO()
+    current_stdout = sys.stdout 
     sys.stdout = captured_stdout
 
     parse_and_apply_settings(UserSettings(print_call_link=False))
@@ -77,9 +88,16 @@ def test_print_call_link_setting(client):
     output = captured_stdout.getvalue()
     assert TRACE_CALL_EMOJI in output
 
+    sys.stdout = current_stdout
+
 
 def test_print_call_link_env(client):
+    @weave.op
+    def func():
+        return 1
+
     captured_stdout = io.StringIO()
+    current_stdout = sys.stdout
     sys.stdout = captured_stdout
 
     os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
@@ -93,6 +111,8 @@ def test_print_call_link_env(client):
 
     output = captured_stdout.getvalue()
     assert TRACE_CALL_EMOJI in output
+
+    sys.stdout = current_stdout
 
 
 def test_should_capture_code_setting(client):
