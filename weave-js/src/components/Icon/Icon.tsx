@@ -9,6 +9,7 @@ import {ReactComponent as ImportArtifactTypeAlt} from '../../assets/icons/icon-a
 import {ReactComponent as ImportAudioVolume} from '../../assets/icons/icon-audio-volume.svg';
 import {ReactComponent as ImportAutomationRobotArm} from '../../assets/icons/icon-automation-robot-arm.svg';
 import {ReactComponent as ImportBack} from '../../assets/icons/icon-back.svg';
+import {ReactComponent as ImportBaselineAlt} from '../../assets/icons/icon-baseline-alt.svg';
 import {ReactComponent as ImportBellNotifications} from '../../assets/icons/icon-bell-notifications.svg';
 import {ReactComponent as ImportBenchmarkSquare} from '../../assets/icons/icon-benchmark-square.svg';
 import {ReactComponent as ImportBlogReport} from '../../assets/icons/icon-blog-report.svg';
@@ -124,6 +125,7 @@ import {ReactComponent as ImportMagicWandStar} from '../../assets/icons/icon-mag
 import {ReactComponent as ImportMagicWandStick} from '../../assets/icons/icon-magic-wand-stick.svg';
 import {ReactComponent as ImportMenu} from '../../assets/icons/icon-menu.svg';
 import {ReactComponent as ImportMicrophoneAudio} from '../../assets/icons/icon-microphone-audio.svg';
+import {ReactComponent as ImportMillerColumns} from '../../assets/icons/icon-miller-columns.svg';
 import {ReactComponent as ImportMinimizeMode} from '../../assets/icons/icon-minimize-mode.svg';
 import {ReactComponent as ImportModel} from '../../assets/icons/icon-model.svg';
 import {ReactComponent as ImportModelOnDark} from '../../assets/icons/icon-model-on-dark.svg';
@@ -285,6 +287,9 @@ export const IconAutomationRobotArm = (props: SVGIconProps) => (
 );
 export const IconBack = (props: SVGIconProps) => (
   <ImportBack {...updateIconProps(props)} />
+);
+export const IconBaselineAlt = (props: SVGIconProps) => (
+  <ImportBaselineAlt {...updateIconProps(props)} />
 );
 export const IconBellNotifications = (props: SVGIconProps) => (
   <ImportBellNotifications {...updateIconProps(props)} />
@@ -630,6 +635,9 @@ export const IconMenu = (props: SVGIconProps) => (
 );
 export const IconMicrophoneAudio = (props: SVGIconProps) => (
   <ImportMicrophoneAudio {...updateIconProps(props)} />
+);
+export const IconMillerColumns = (props: SVGIconProps) => (
+  <ImportMillerColumns {...updateIconProps(props)} />
 );
 export const IconMinimizeMode = (props: SVGIconProps) => (
   <ImportMinimizeMode {...updateIconProps(props)} />
@@ -1005,6 +1013,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'audio-volume': IconAudioVolume,
   'automation-robot-arm': IconAutomationRobotArm,
   back: IconBack,
+  'baseline-alt': IconBaselineAlt,
   'bell-notifications': IconBellNotifications,
   'benchmark-square': IconBenchmarkSquare,
   'blog-report': IconBlogReport,
@@ -1120,6 +1129,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'magic-wand-stick': IconMagicWandStick,
   menu: IconMenu,
   'microphone-audio': IconMicrophoneAudio,
+  'miller-columns': IconMillerColumns,
   'minimize-mode': IconMinimizeMode,
   model: IconModel,
   'model-on-dark': IconModelOnDark,

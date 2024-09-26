@@ -147,7 +147,7 @@ export const CallDetails: FC<{
           ) : (
             <CustomWeaveTypeProjectContext.Provider
               value={{entity: call.entity, project: call.project}}>
-              <ObjectViewerSection title="Output" data={output} />
+              <ObjectViewerSection title="Output" data={output} isExpanded />
             </CustomWeaveTypeProjectContext.Provider>
           )}
         </Box>

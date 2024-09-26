@@ -160,19 +160,15 @@ export const ObjectViewer = ({
     }
     let resolved = data;
     let dirty = true;
-    const resolvedRefPaths = new Set<string>();
     const mapper = (context: TraverseContext) => {
       if (
         isWeaveRef(context.value) &&
         refValues[context.value] != null &&
-        // If this is a ref and the parent has been visited, we already resolved
-        // this ref. Example: `a._ref` where `a` is already in resolvedRefPaths
-        !resolvedRefPaths.has(context.parent?.toString() ?? '')
+        // Don't expand _ref keys
+        context.path.tail() !== RESOVLED_REF_KEY
       ) {
         dirty = true;
-        const res = refValues[context.value];
-        resolvedRefPaths.add(context.path.toString());
-        return res;
+        return refValues[context.value];
       }
       return _.clone(context.value);
     };
@@ -298,6 +294,7 @@ export const ObjectViewer = ({
         field: 'value',
         headerName: 'Value',
         flex: 1,
+        display: 'flex',
         sortable: false,
         renderCell: ({row}) => {
           if (row.isCode) {
@@ -431,6 +428,7 @@ export const ObjectViewer = ({
         isGroupExpandedByDefault={node => {
           return expandedIds.includes(node.id);
         }}
+        autoHeight
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
           const isNonRefString =

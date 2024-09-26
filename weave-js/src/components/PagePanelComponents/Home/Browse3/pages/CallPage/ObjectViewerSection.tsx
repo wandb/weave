@@ -242,7 +242,12 @@ export const ObjectViewerSection = ({
     );
   }
   if (numKeys === 1 && '_result' in data) {
-    const value = data._result;
+    let value = data._result;
+    if (isWeaveRef(value)) {
+      // Little hack to make sure that we render refs
+      // inside the expansion table view
+      value = {' ': value};
+    }
     const valueType = getValueType(value);
     if (valueType === 'object' || (valueType === 'array' && value.length > 0)) {
       return (

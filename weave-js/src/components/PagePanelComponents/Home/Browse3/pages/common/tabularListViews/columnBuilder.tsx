@@ -262,18 +262,12 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       field: key,
       sortable: columnIsSortable && columnIsSortable(key),
       headerName: key,
+      display: 'flex',
       renderHeader: () => {
-        return (
-          <div
-            style={{
-              fontWeight: 600,
-            }}>
-            {key.split('.').slice(-1)[0]}
-          </div>
-        );
+        return <div>{key.split('.').slice(-1)[0]}</div>;
       },
-      valueGetter: cellParams => {
-        const val = valueForKey(cellParams.row, key);
+      valueGetter: (unused: any, row: any) => {
+        const val = valueForKey(row, key);
         if (Array.isArray(val) || typeof val === 'object') {
           try {
             return JSON.stringify(val);
