@@ -25,6 +25,7 @@ from weave.trace.ipython import (
 )
 from weave.trace.mem_artifact import MemTraceFilesArtifact
 from weave.trace.op import Op, as_op, is_op
+from weave.trace.refs import ObjectRef
 from weave.trace_server.trace_server_interface_util import str_digest
 
 from . import env, serializer
@@ -169,6 +170,23 @@ def resolve_var(fn: typing.Callable, var_name: str) -> Any:
     if var_name in fn.__globals__:
         return fn.__globals__[var_name]
     return None
+
+
+class RefJSONEncoder(json.JSONEncoder):
+    """Json encoder used for convert storage.to_json_with_refs result to python code"""
+
+    SPECIAL_REF_TOKEN = "__WEAVE_REF__"
+
+    def default(self, o: Any) -> Any:
+        if isinstance(o, (ObjectRef)):
+            ref_code = f"weave.ref('{str(o)}')"
+
+        if ref_code is not None:
+            # This will be a quoted json string in the json.dumps result. We put special
+            # tokens in so we can remove the quotes in the final result
+            return f"{self.SPECIAL_REF_TOKEN}{ref_code}.get(){self.SPECIAL_REF_TOKEN}"
+        # Let the base class default method raise the TypeError
+        return json.JSONEncoder.default(self, o)
 
 
 class GetCodeDepsResult(typing.TypedDict):
@@ -421,7 +439,15 @@ def _get_code_deps(
                     )
                 else:
                     code_paragraph = (
-                        f"{var_name} = " + json.dumps(json_val, indent=4) + "\n"
+                        f"{var_name} = "
+                        + json.dumps(json_val, cls=RefJSONEncoder, indent=4)
+                        + "\n"
+                    )
+                    code_paragraph = code_paragraph.replace(
+                        f'"{RefJSONEncoder.SPECIAL_REF_TOKEN}', ""
+                    )
+                    code_paragraph = code_paragraph.replace(
+                        f'{RefJSONEncoder.SPECIAL_REF_TOKEN}"', ""
                     )
                     code.append(code_paragraph)
     return {"import_code": import_code, "code": code, "warnings": warnings}
