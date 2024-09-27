@@ -15,15 +15,14 @@ export const Overview = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 3px 0;
 `;
 Overview.displayName = 'S.Overview';
 
 export const CallName = styled.div`
   font-family: Source Sans Pro;
-  font-size: 24px;
+  font-size: 16px;
   font-weight: 600;
-  line-height: 32px;
+  line-height: 20px;
   letter-spacing: 0px;
   text-align: left;
 `;
@@ -50,6 +49,7 @@ export const CallOverview: React.FC<{
   return (
     <>
       <Overview>
+        <StatusChip value={statusCode} iconOnly />
         <CallName>
           <EditableCallName
             call={call}
@@ -57,7 +57,6 @@ export const CallOverview: React.FC<{
           />
         </CallName>
         <CopyableId id={call.callId} type="Call" />
-        <StatusChip value={statusCode} iconOnly />
         <Spacer />
         <Reactions weaveRef={refCall} forceVisible={true} />
         <OverflowBin>
