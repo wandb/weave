@@ -7,7 +7,7 @@ import PIL
 import pytest
 
 import weave
-from weave.conftest import TestException
+from weave.conftest import DummyTestException
 from weave.trace.context import raise_on_captured_errors
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
@@ -152,7 +152,7 @@ async def test_evaluation_resilience(
     evaluation, predict = build_evaluation()
 
     with raise_on_captured_errors(True):
-        with pytest.raises(TestException):
+        with pytest.raises(DummyTestException):
             res = await evaluation.evaluate(predict)
 
     client_with_throwing_server._flush()
@@ -169,6 +169,7 @@ async def test_evaluation_resilience(
 
     logs = log_collector.get_error_logs()
     ag_res = Counter([k.split(", req:")[0] for k in set([l.msg for l in logs])])
+
     assert ag_res == {
         "Job failed during flush: ('FAILURE - call_end": 14,  # 14 calls
         "Job failed during flush: ('FAILURE - obj_create": 6,  # 6 ops

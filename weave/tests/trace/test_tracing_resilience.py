@@ -4,24 +4,16 @@ The purpose of this test suite is to ensure that Weave can handle various types 
 We should never be breaking the user's program with an error.
 """
 
-import importlib
-from typing import Callable, Iterator
-
 # TODO: Test code capture resilience
 # TODO: Test postprocess input/output resilience
 import pytest
 
 import weave
-from weave.conftest import TestException
+from weave.conftest import DummyTestException
 from weave.trace import call_context
 from weave.trace.context import raise_on_captured_errors
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
-from weave.trace_server import trace_server_interface as tsi
-
-
-class DummyTestException(Exception):
-    pass
 
 
 def assert_no_current_call():
@@ -46,90 +38,6 @@ def test_resilience_to_user_code_errors(client):
         do_test()
 
     assert_no_current_call()
-
-
-class ThrowingServer(tsi.TraceServerInterface):
-    # Call API
-    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        raise DummyTestException("FAILURE!")
-
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        raise DummyTestException("FAILURE!")
-
-    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        raise DummyTestException("FAILURE!")
-
-    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        raise DummyTestException("FAILURE!")
-
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        raise DummyTestException("FAILURE!")
-
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        raise DummyTestException("FAILURE!")
-
-    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
-        raise DummyTestException("FAILURE!")
-
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
-        raise DummyTestException("FAILURE!")
-
-    # Op API
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        raise DummyTestException("FAILURE!")
-
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        raise DummyTestException("FAILURE!")
-
-    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        raise DummyTestException("FAILURE!")
-
-    # Cost API
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
-        raise DummyTestException("FAILURE!")
-
-    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
-        raise DummyTestException("FAILURE!")
-
-    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
-        raise DummyTestException("FAILURE!")
-
-    # Obj API
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        raise DummyTestException("FAILURE!")
-
-    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        raise DummyTestException("FAILURE!")
-
-    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        raise DummyTestException("FAILURE!")
-
-    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        raise DummyTestException("FAILURE!")
-
-    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        raise DummyTestException("FAILURE!")
-
-    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
-        raise DummyTestException("FAILURE!")
-
-    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
-        raise DummyTestException("FAILURE!")
-
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        raise DummyTestException("FAILURE!")
-
-    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        raise DummyTestException("FAILURE!")
-
-    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
-        raise DummyTestException("FAILURE!")
-
-    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
-        raise DummyTestException("FAILURE!")
-
-    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
-        raise DummyTestException("FAILURE!")
 
 
 def test_resilience_to_server_errors(client_with_throwing_server):
