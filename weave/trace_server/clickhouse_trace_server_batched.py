@@ -597,13 +597,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 parameters["version_digest"] = req.digest
 
         objs = self._select_objs_query(
-            project_id=req.project_id,
+            req.project_id,
             conditions=conds,
             object_id_conditions=object_id_conditions,
             parameters=parameters,
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
+
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
@@ -1424,6 +1425,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         offset: Optional[int] = None,
         sort_by: Optional[list[tsi.SortBy]] = None,
     ) -> list[SelectableCHObjSchema]:
+        """
+        Main query for fetching objects.
+        conditions:
+            conditions should include operations on version_index, digest, kind (is_op)
+            ALL conditions are AND'ed together.
+        object_id_conditions:
+            conditions should include operations on ONLY object_id
+            ALL conditions are AND'ed together.
+        parameters:
+            parameters to be passed to the query. Must include all parameters for both
+            conditions and object_id_conditions.
+        metadata_only:
+            if metadata_only is True, then we return early and dont grab the value.
+            Otherwise, make a second query to grab the val_dump from the db
+        """
         if not conditions:
             conditions = ["1 = 1"]
         if not object_id_conditions:
@@ -1517,9 +1533,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             {"project_id": project_id, **parameters},
         )
 
-        objects = []
+        result: list[SelectableCHObjSchema] = []
         for row in query_result:
-            objects.append(
+            result.append(
                 SelectableCHObjSchema.model_validate(
                     dict(
                         zip(
@@ -1543,12 +1559,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
             )
 
+        # --- Don't make second query for object values if metadata_only ---
         if metadata_only:
-            return objects
+            return result
 
         # now get the val_dump for each object
-        object_ids = list(set([row.object_id for row in objects]))
-        digests = list(set([row.digest for row in objects]))
+        object_ids = list(set([row.object_id for row in result]))
+        digests = list(set([row.digest for row in result]))
         query = """
             SELECT digest, any(val_dump)
             FROM object_versions
@@ -1564,16 +1581,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         }
         query_result = self._query_stream(query, parameters)
         # Map digest to val_dump
-        object_values: Dict[str, Any] = {
-            digest: val_dump
-            for (digest, val_dump) in query_result  # type: ignore
-        }
+        object_values: Dict[str, Any] = {}
+        for row in query_result:
+            digest, val_dump = row[0], row[1]  # type: ignore
+            object_values[digest] = val_dump
 
         # update the val_dump for each object
-        for obj in objects:
+        for obj in result:
             obj.val_dump = object_values[obj.digest]
 
-        return objects
+        return result
 
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
