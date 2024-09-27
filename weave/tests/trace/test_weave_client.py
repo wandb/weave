@@ -1448,6 +1448,29 @@ def test_object_version_read(client):
     assert obj_res.obj.val == {"a": 5}
     assert obj_res.obj.version_index == 5
 
+    # publish another, check that latest is updated
+    client._save_object({"a": 10}, refs[0].name)
+    obj_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=refs[0].name,
+            digest="latest",
+        )
+    )
+    assert obj_res.obj.val == {"a": 10}
+    assert obj_res.obj.version_index == 10
+
+    # check that v5 is still correct
+    obj_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=refs[0].name,
+            digest="v5",
+        )
+    )
+    assert obj_res.obj.val == {"a": 5}
+    assert obj_res.obj.version_index == 5
+
     # check badly formatted digests
     digests = ["v1111", "1", ""]
     for digest in digests:
