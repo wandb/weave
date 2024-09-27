@@ -3,9 +3,7 @@ import hashlib
 import json
 import typing
 import weakref
-from typing import Sequence
 
-from weave.trace.client_context import weave_client as weave_client_context
 from weave.legacy.weave import box, context_state, object_context, uris
 from weave.legacy.weave.language_features.tagging import tag_store
 
@@ -17,7 +15,6 @@ REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 
 if typing.TYPE_CHECKING:
     from weave.legacy.weave import weave_types as types
-    from ...trace import weave_client
 
 
 def _map_to_ref_strs(obj: typing.Any) -> typing.Any:
@@ -153,14 +150,6 @@ class Ref:
 
     def __str__(self) -> str:
         return str(self.uri)
-
-    def input_to(self) -> Sequence["weave_client.Call"]:
-        client = weave_client_context.require_weave_client()
-        return client._ref_input_to(self)
-
-    def value_input_to(self) -> Sequence["weave_client.Call"]:
-        client = weave_client_context.require_weave_client()
-        return client._ref_value_input_to(self)
 
 
 def get_ref(obj: typing.Any) -> typing.Optional[Ref]:

@@ -48,7 +48,7 @@ type IdProps = {
 };
 
 export const Id = ({id, type, className}: IdProps) => {
-  const truncatedId = id.slice(-4);
+  const truncatedId = id.slice(-3);
   const trigger = <IdPanel className={className}>{truncatedId}</IdPanel>;
   const prefix = type ? `${type} ID` : 'ID';
   const content = (
@@ -61,7 +61,7 @@ export const Id = ({id, type, className}: IdProps) => {
 
 export const CopyableId = ({id, type, className}: IdProps) => {
   const [isClicked, setIsClicked] = useState(false);
-  const truncatedId = id.slice(-4);
+  const truncatedId = id.slice(-3);
   const onClick = useCallback(() => {
     copyToClipboard(id);
     setIsClicked(true);

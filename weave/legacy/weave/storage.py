@@ -7,7 +7,6 @@ import pathlib
 import re
 import typing
 
-from weave.trace.client_context import weave_client as weave_client_context
 from weave.legacy.weave import (
     artifact_base,
     artifact_fs,
@@ -478,18 +477,9 @@ def to_json_with_refs(  # type: ignore
             for i, v in enumerate(obj)
         ]
     elif isinstance(obj, op_def.OpDef):
-        try:
-            gc = weave_client_context.require_weave_client()
-        except errors.WeaveInitError:
-            raise errors.WeaveSerializeError(
-                "Can't serialize OpDef with a client initialization"
-            )
-        return gc._save_object(obj, obj.name, "latest")
-    else:
-        res = artifact.set("/".join(path), wb_type, obj)
-        if res.artifact == artifact:
-            res.serialize_as_path_ref = True
-        return res
+        raise errors.WeaveSerializeError(
+            "Dropped as part of query service refactor"
+        )
 
 
 def make_js_serializer():  # type: ignore

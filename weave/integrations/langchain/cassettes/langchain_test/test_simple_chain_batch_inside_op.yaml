@@ -25,7 +25,7 @@ interactions:
       x-stainless-os:
       - Linux
       x-stainless-package-version:
-      - 1.35.13
+      - 1.48.0
       x-stainless-runtime:
       - CPython
       x-stainless-runtime-version:
@@ -117,7 +117,7 @@ interactions:
       x-stainless-os:
       - Linux
       x-stainless-package-version:
-      - 1.35.13
+      - 1.48.0
       x-stainless-runtime:
       - CPython
       x-stainless-runtime-version:
