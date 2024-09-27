@@ -5,10 +5,11 @@ import time
 import typing
 from pathlib import Path
 
-# TODO (AT): Fix serving after ejecting query code
-from weave.legacy.weave import artifact_wandb as artifact_wandb  # type: ignore
-from weave.legacy.weave import environment  # type: ignore
 from weave.trace.refs import ObjectRef, parse_uri
+
+# TODO (AT): Fix serving after ejecting query code
+from weave_query.weave_query import artifact_wandb as artifact_wandb  # type: ignore
+from weave_query.weave_query import environment  # type: ignore
 
 try:
     from modal.cli.import_refs import import_stub
