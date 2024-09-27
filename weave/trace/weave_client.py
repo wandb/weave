@@ -11,8 +11,7 @@ import pydantic
 from requests import HTTPError
 
 from weave import version
-from weave.legacy.weave import ref_base, urls
-from weave.trace import call_context, trace_sentry
+from weave.trace import call_context, trace_sentry, urls
 from weave.trace.async_job_queue import AsyncJobQueue
 from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.exception import exception_to_json_str
@@ -1288,12 +1287,6 @@ class WeaveClient:
 
     def _remove_call_display_name(self, call: Call) -> None:
         self._set_call_display_name(call, None)
-
-    def _ref_input_to(self, ref: ref_base.Ref) -> Sequence[Call]:
-        raise NotImplementedError()
-
-    def _ref_value_input_to(self, ref: ref_base.Ref) -> list[Call]:
-        raise NotImplementedError()
 
     def _ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
         raise NotImplementedError()
