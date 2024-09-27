@@ -12,7 +12,6 @@ import pydantic
 from requests import HTTPError
 
 from weave import version
-from weave.legacy.weave import urls
 from weave.trace import call_context, trace_sentry, urls
 from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.concurrent.futures import FutureExecutor
