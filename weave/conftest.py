@@ -61,7 +61,6 @@ def test_artifact_dir():
 
 def pytest_sessionfinish(session, exitstatus):
     if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED:
-        print("No tests were selected. Exiting gracefully.")
         session.exitstatus = 0
 
 
