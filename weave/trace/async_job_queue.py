@@ -6,6 +6,7 @@ from concurrent.futures import Future
 from typing import Any, Callable, TypeVar
 
 from weave.trace.context import get_raise_on_captured_errors
+from weave.trace.debug_logger import log_debug
 
 T = TypeVar("T")
 
@@ -41,6 +42,7 @@ class AsyncJobQueue:
         )
         atexit.register(self._at_exit_handler)
 
+    @log_debug()
     def submit_job(
         self, func: Callable[..., T], *args: Any, **kwargs: Any
     ) -> Future[T]:
@@ -92,6 +94,7 @@ class AsyncJobQueue:
         future.add_done_callback(callback)
         return future
 
+    @log_debug()
     def _at_exit_handler(self) -> None:
         """Ensures the executor is shut down when the program exits."""
         try:

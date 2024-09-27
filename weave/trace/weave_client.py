@@ -14,6 +14,7 @@ from weave import version
 from weave.trace import call_context, trace_sentry, urls
 from weave.trace.async_job_queue import AsyncJobQueue
 from weave.trace.client_context import weave_client as weave_client_context
+from weave.trace.debug_logger import log_debug
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.object_record import (
@@ -575,6 +576,7 @@ class WeaveClient:
         return self.get_call(call_id=call_id, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
+    @log_debug()
     def create_call(
         self,
         op: Union[str, Op],
@@ -684,6 +686,7 @@ class WeaveClient:
         return call
 
     @trace_sentry.global_trace_sentry.watch()
+    @log_debug()
     def finish_call(
         self,
         call: Call,
@@ -757,6 +760,7 @@ class WeaveClient:
         call_context.pop_call(call.id)
 
     @trace_sentry.global_trace_sentry.watch()
+    @log_debug()
     def fail_call(self, call: Call, exception: BaseException) -> None:
         """Fail a call with an exception. This is a convenience method for finish_call."""
         return self.finish_call(call, exception=exception)
@@ -1013,6 +1017,7 @@ class WeaveClient:
     #  but for Ops and Tables respectively.
 
     @trace_sentry.global_trace_sentry.watch()
+    @log_debug()
     def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
         """Save an object to the weave server and return it's Ref. This is the top
         level entry point for saving any data to the weave server. Importantly, it
@@ -1137,6 +1142,7 @@ class WeaveClient:
                 self._save_nested_objects(v)
 
     @trace_sentry.global_trace_sentry.watch()
+    @log_debug()
     def _save_object_basic(
         self, val: Any, name: Optional[str] = None, branch: str = "latest"
     ) -> ObjectRef:
@@ -1194,6 +1200,7 @@ class WeaveClient:
         return ref
 
     @trace_sentry.global_trace_sentry.watch()
+    @log_debug()
     def _save_op(self, op: Op, name: Optional[str] = None) -> ObjectRef:
         """
         Saves an Op to the weave server and returns the Ref. This is the sister
@@ -1309,6 +1316,7 @@ class WeaveClient:
             self.server.call_processor.wait_until_all_processed()  # type: ignore
 
 
+@log_debug()
 def send_start_call(
     project_id: str,
     call_id: str,
@@ -1338,6 +1346,7 @@ def send_start_call(
     server.call_start(CallStartReq(start=start))
 
 
+@log_debug()
 def send_end_call(
     project_id: str,
     call_id: str,
