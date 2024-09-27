@@ -16,7 +16,6 @@ from weave.tests.trace.util import (
     DatetimeMatcher,
     RegexStringMatcher,
 )
-from weave.trace_server.sqlite_trace_server import NotFoundError as sqliteNotFoundError
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, is_op
@@ -29,6 +28,7 @@ from weave.trace.refs import (
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
+from weave.trace_server.sqlite_trace_server import NotFoundError as sqliteNotFoundError
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
