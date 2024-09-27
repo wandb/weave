@@ -1,6 +1,6 @@
+import sys
 from collections import Counter
 from contextlib import contextmanager
-import sys
 from threading import Lock
 from typing import Any, Generator
 
