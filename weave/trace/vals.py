@@ -9,10 +9,7 @@ from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
 from weave.trace import box
-from weave.trace.client_context.weave_client import (
-    get_weave_client
-
-)
+from weave.trace.client_context.weave_client import get_weave_client
 from weave.trace.context import get_raise_on_captured_errors
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord

@@ -24,7 +24,6 @@ class DummyTestException(Exception):
     pass
 
 
-
 def assert_no_current_call():
     assert call_context.get_current_call() is None
 

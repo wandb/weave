@@ -171,9 +171,9 @@ class FutureExecutor:
             try:
                 future.result()
             except Exception as e:
-                logger.error(f"Job failed during flush: {e}")
                 if get_raise_on_captured_errors():
                     raise
+                logger.error(f"Job failed during flush: {e}")
         return True
 
     def _future_done_callback(self, future: Future) -> None:
