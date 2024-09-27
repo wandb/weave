@@ -18,7 +18,7 @@ from weave_query.weave_query.language_features.tagging.tag_store import (
 )
 
 from weave_query.weave_query import logs
-# from .tests.wandb_system_tests_conftest import *
+from .tests.wandb_system_tests_conftest import *
 
 
 import os
