@@ -12,7 +12,7 @@ import wandb
 
 import weave_query as weave
 import weave_query
-from weave.legacy.tests.util.tag_test_util import op_add_tag
+from weave_query.tests.util.tag_test_util import op_add_tag
 
 # Note: We're mocking out the whole io_service right now. This is too
 # high level and doesn't test the actual io implementation. We should

@@ -37,8 +37,8 @@ from weave_query.weave_query.ops_domain import project_ops
 from weave_query.weave_query.ops_primitives import list_, make_list
 from .util import list_arrow_test_helpers as lath
 
-from weave.legacy.tests.util import tag_test_util as ttu
-from weave.legacy.tests.util import weavejs_ops
+from weave_query.tests.util import tag_test_util as ttu
+from weave_query.tests.util import weavejs_ops
 from . import test_wb
 
 _loading_builtins_token = context_state.set_loading_built_ins()
