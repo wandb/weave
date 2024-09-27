@@ -16,7 +16,8 @@ import time
 
 import pytest
 
-import weave
+import weave_query as weave
+import weave_query
 
 
 def do_assigns(assigns):

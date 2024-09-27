@@ -1,7 +1,8 @@
 import dataclasses
 import typing
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import weave_internal
 from weave_query.weave_query.ecosystem.wandb import weave_plotly
 from weave_query.weave_query.language_features.tagging import tagged_value_type

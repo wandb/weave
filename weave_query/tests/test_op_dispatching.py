@@ -1,6 +1,7 @@
 import pytest
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import context_state as _context
 from weave_query.weave_query import graph, weave_internal
 from weave_query.weave_query.dispatch import _dispatch_first_arg, _resolve_op_ambiguity

@@ -6,7 +6,8 @@ import huggingface_hub
 import torch
 import transformers
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import op_def_type
 from weave_query.weave_query.ecosystem import pytorch
 

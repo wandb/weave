@@ -4,7 +4,8 @@ import time
 
 import pytest
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import ops_arrow, ops_primitives
 
 

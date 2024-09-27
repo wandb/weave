@@ -1,7 +1,8 @@
 import os
 import typing
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import weave_internal
 from weave_query.weave_query import weave_internal as internal
 from weave_query.weave_query import weave_types as types
