@@ -92,7 +92,15 @@ export const ExportSelector = ({
     // TODO(gst): allow specifying offset
     const offset = 0;
     const limit = MAX_EXPORT;
-    // TODO(gst): add support for JSONL and JSON column selection
+
+    // Explicitly add feedback column for CSV/TSV exports
+    if (
+      [ContentType.csv, ContentType.tsv].includes(contentType) &&
+      includeFeedback
+    ) {
+      visibleColumns.push('summary.weave.feedback');
+    }
+
     const leafColumns = [ContentType.csv, ContentType.tsv].includes(contentType)
       ? makeLeafColumns(visibleColumns)
       : undefined;
