@@ -757,7 +757,7 @@ const convertTraceServerObjectVersionToOpSchema = (
 
 const useOpVersions = makeTraceServerEndpointHook<
   'objsQuery',
-  [string, string, OpVersionFilter, number?, {skip?: boolean}?],
+  [string, string, OpVersionFilter, number?, boolean?, {skip?: boolean}?],
   OpVersionSchema[]
 >(
   'objsQuery',
@@ -766,17 +766,18 @@ const useOpVersions = makeTraceServerEndpointHook<
     project: string,
     filter: OpVersionFilter,
     limit?: number,
+    metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => ({
     params: {
       project_id: projectIdFromParts({entity, project}),
-      // entity,
-      // project,
       filter: {
         object_ids: filter.opIds,
         latest_only: filter.latestOnly,
         is_op: true,
       },
+      limit,
+      metadata_only: metadataOnly,
     },
     skip: opts?.skip,
   }),
@@ -916,6 +917,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     project: string,
     filter: ObjectVersionFilter,
     limit?: number,
+    metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => ({
     params: {
@@ -926,6 +928,8 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
         latest_only: filter.latestOnly,
         is_op: false,
       },
+      limit,
+      metadata_only: metadataOnly,
     },
     skip: opts?.skip,
   }),
@@ -935,6 +939,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     inputProject,
     filter,
     limit,
+    metadataOnly,
     opts
   ): ObjectVersionSchema[] =>
     res.objs.map(convertTraceServerObjectVersionToSchema)

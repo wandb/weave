@@ -5,6 +5,8 @@ import threading
 from concurrent.futures import Future
 from typing import Any, Callable, TypeVar
 
+from weave.trace.context import get_raise_on_captured_errors
+
 T = TypeVar("T")
 
 MAX_WORKER_DEFAULT = 2**3  # 8 workers to not overwhelm the DB
@@ -83,6 +85,8 @@ class AsyncJobQueue:
                 self._active_jobs.remove(f)
             exception = f.exception()
             if exception:
+                if get_raise_on_captured_errors():
+                    raise
                 logger.error(f"Job failed with exception: {exception}")
 
         future.add_done_callback(callback)
@@ -93,6 +97,8 @@ class AsyncJobQueue:
         try:
             self.executor.shutdown(wait=True)
         except Exception as e:
+            if get_raise_on_captured_errors():
+                raise
             logger.error(f"Error shutting down executor: {e}")
 
     def flush(self) -> None:
@@ -109,4 +115,6 @@ class AsyncJobQueue:
             try:
                 future.result()
             except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
                 logger.error(f"Job failed during flush: {e}")

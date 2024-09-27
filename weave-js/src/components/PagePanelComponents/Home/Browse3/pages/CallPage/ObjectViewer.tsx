@@ -294,6 +294,7 @@ export const ObjectViewer = ({
         field: 'value',
         headerName: 'Value',
         flex: 1,
+        display: 'flex',
         sortable: false,
         renderCell: ({row}) => {
           if (row.isCode) {
@@ -427,6 +428,7 @@ export const ObjectViewer = ({
         isGroupExpandedByDefault={node => {
           return expandedIds.includes(node.id);
         }}
+        autoHeight
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
           const isNonRefString =

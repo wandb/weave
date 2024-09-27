@@ -1,4 +1,6 @@
 import atexit
+import logging
+import traceback
 import weakref
 from typing import (
     Any,
@@ -14,7 +16,11 @@ from typing import (
     Union,
 )
 
+from weave.trace.context import get_raise_on_captured_errors
 from weave.trace.op import FinishCallbackType, Op
+from weave.trace.op_extensions.log_once import log_once
+
+logger = logging.getLogger(__name__)
 
 S = TypeVar("S")
 V = TypeVar("V")
@@ -23,6 +29,13 @@ V = TypeVar("V")
 _OnYieldType = Callable[[V], None]
 _OnErrorType = Callable[[Exception], None]
 _OnCloseType = Callable[[], None]
+
+ON_CLOSE_MSG = "Error closing iterator, call data may be incomplete:\n{}"
+ON_ERROR_MSG = "Error capturing error from iterator, call data may be incomplete:\n{}"
+ON_YIELD_MSG = "Error capturing value from iterator, call data may be incomplete:\n{}"
+ON_AYIELD_MSG = (
+    "Error capturing async value from iterator, call data may be incomplete:\n{}"
+)
 
 
 class _IteratorWrapper(Generic[V]):
@@ -46,12 +59,22 @@ class _IteratorWrapper(Generic[V]):
 
     def _call_on_close_once(self) -> None:
         if not self._on_finished_called:
-            self._on_close()  # type: ignore
+            try:
+                self._on_close()  # type: ignore
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_CLOSE_MSG.format(traceback.format_exc()))
             self._on_finished_called = True
 
     def _call_on_error_once(self, e: Exception) -> None:
         if not self._on_finished_called:
-            self._on_error(e)
+            try:
+                self._on_error(e)
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_ERROR_MSG.format(traceback.format_exc()))
             self._on_finished_called = True
 
     def __iter__(self) -> "_IteratorWrapper":
@@ -64,7 +87,20 @@ class _IteratorWrapper(Generic[V]):
             )
         try:
             value = next(self._iterator_or_ctx_manager)  # type: ignore
-            self._on_yield(value)
+            try:
+                # Here we do a try/catch because we don't want to
+                # break the user process if we trip up on processing
+                # the yielded value
+                self._on_yield(value)
+            except Exception as e:
+                # We actually use StopIteration to signal the end of the iterator
+                # in some cases (like when we don't want to surface the last chunk
+                # with usage info from openai integration).
+                if isinstance(e, (StopAsyncIteration, StopIteration)):
+                    raise
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_YIELD_MSG.format(traceback.format_exc()))
             return value
         except (StopIteration, StopAsyncIteration) as e:
             self._call_on_close_once()
@@ -83,7 +119,20 @@ class _IteratorWrapper(Generic[V]):
             )
         try:
             value = await self._iterator_or_ctx_manager.__anext__()  # type: ignore
-            self._on_yield(value)
+            try:
+                self._on_yield(value)
+                # Here we do a try/catch because we don't want to
+                # break the user process if we trip up on processing
+                # the yielded value
+            except Exception as e:
+                # We actually use StopIteration to signal the end of the iterator
+                # in some cases (like when we don't want to surface the last chunk
+                # with usage info from openai integration).
+                if isinstance(e, (StopAsyncIteration, StopIteration)):
+                    raise
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_AYIELD_MSG.format(traceback.format_exc()))
             return value
         except (StopAsyncIteration, StopIteration) as e:
             self._call_on_close_once()

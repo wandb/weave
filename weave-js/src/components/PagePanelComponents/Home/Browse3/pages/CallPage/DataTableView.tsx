@@ -335,7 +335,6 @@ export const DataTableView: FC<{
           keepBorders={false}
           apiRef={apiRef}
           density="compact"
-          experimentalFeatures={{columnGrouping: true}}
           rows={gridRows}
           columns={columnSpec}
           loading={props.loading}
@@ -367,7 +366,7 @@ export const typeToDataGridColumnSpec = (
         innerKey
       );
       if (valTypeCols.length === 0) {
-        let colType = 'string';
+        let colType: GridColDef['type'] = 'string';
         let editable = false;
         if (isAssignableTo(valueType, maybe('boolean'))) {
           editable = true;
@@ -383,7 +382,7 @@ export const typeToDataGridColumnSpec = (
           return [
             {
               maxWidth,
-              type: 'string',
+              type: 'string' as const,
               editable: false,
               field: innerKey,
               headerName: innerKey,

@@ -1,3 +1,5 @@
+# NOTE: Artifact of weave refactor -- this file may be deleted in the near future
+
 from urllib.parse import quote
 
 from wandb import util as wb_util
@@ -27,12 +29,14 @@ def project_weave_root_url(entity_name: str, project_name: str) -> str:
         return remote_project_weave_root_url(entity_name, project_name)
 
 
+# artifact_wandb.py
 def op_version_path(
     entity_name: str, project_name: str, op_name: str, op_version: str
 ) -> str:
     return f"{project_weave_root_url(entity_name, project_name)}/ops/{op_name}/versions/{op_version}"
 
 
+# artifact_wandb.py
 def object_version_path(
     entity_name: str, project_name: str, object_name: str, obj_version: str
 ) -> str:
@@ -47,6 +51,7 @@ def redirect_call(entity_name: str, project_name: str, call_id: str) -> str:
     return f"{remote_project_root_url(entity_name, project_name)}/r/call/{call_id}"
 
 
+# context.py
 def use_local_urls() -> None:
     context_state._use_local_urls.set(True)
 

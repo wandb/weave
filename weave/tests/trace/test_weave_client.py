@@ -11,8 +11,12 @@ import requests
 import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation
-from weave.legacy.weave import op_def
-from weave.tests.trace.util import AnyIntMatcher, DatetimeMatcher, RegexStringMatcher
+from weave.tests.trace.util import (
+    AnyIntMatcher,
+    DatetimeMatcher,
+    RegexStringMatcher,
+    client_is_sqlite,
+)
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, is_op
@@ -559,25 +563,6 @@ def test_opdef(client):
     assert isinstance(weave_client.get_ref(add2), refs.OpRef)
     assert res == 4
     assert len(list(client.get_calls())) == 1
-
-
-@pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
-def test_saveload_op(client):
-    @weave.op()
-    def add2(x, y):
-        return x + y
-
-    @weave.op()
-    def add3(x, y, z):
-        return x + y + z
-
-    obj = {"a": add2, "b": add3}
-    ref = client._save_object(obj, "my-ops")
-    obj2 = client.get(ref)
-    assert isinstance(obj2["a"], op_def.OpDef)
-    assert obj2["a"].name == "op-add2"
-    assert isinstance(obj2["b"], op_def.OpDef)
-    assert obj2["b"].name == "op-add3"
 
 
 def test_object_mismatch_project_ref(client):
@@ -1402,3 +1387,65 @@ def test_calls_stream_table_ref_expansion(client):
     calls = list(calls)
     assert len(calls) == 1
     assert calls[0].output["table"] == o.table.table_ref.uri()
+
+
+def test_object_version_read(client):
+    if client_is_sqlite(client):
+        return
+
+    refs = []
+    for i in range(10):
+        refs.append(weave.publish({"a": i}))
+
+    # read all objects, check the version
+    objs = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            object_id=refs[0].name,
+        )
+    ).objs
+    assert len(objs) == 10
+    assert objs[0].version_index == 0
+    assert objs[1].version_index == 1
+    assert objs[2].version_index == 2
+    assert objs[3].version_index == 3
+    assert objs[4].version_index == 4
+    assert objs[5].version_index == 5
+    assert objs[6].version_index == 6
+    assert objs[7].version_index == 7
+    assert objs[8].version_index == 8
+    assert objs[9].version_index == 9
+
+    # read each object one at a time, check the version
+    for i in range(10):
+        obj_res = client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client._project_id(),
+                object_id=refs[i].name,
+                digest=refs[i].digest,
+            )
+        )
+        assert obj_res.obj.val == {"a": i}
+        assert obj_res.obj.version_index == i
+
+    # now grab the latest version of the object
+    obj_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=refs[0].name,
+            digest="latest",
+        )
+    )
+    assert obj_res.obj.val == {"a": 9}
+    assert obj_res.obj.version_index == 9
+
+    # now grab version 5
+    obj_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=refs[0].name,
+            digest="v5",
+        )
+    )
+    assert obj_res.obj.val == {"a": 5}
+    assert obj_res.obj.version_index == 5

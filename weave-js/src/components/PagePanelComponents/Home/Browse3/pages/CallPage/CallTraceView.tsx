@@ -55,6 +55,7 @@ export const CallTraceView: FC<{
       headerName: 'Call Tree',
       headerAlign: 'center',
       flex: 1,
+      display: 'flex',
       renderCell: params => (
         <CustomGridTreeDataGroupingCell
           {...params}
@@ -181,14 +182,20 @@ export const CallTraceView: FC<{
       fontFamily: 'Source Sans Pro',
       '&>.MuiDataGrid-main': {
         '& div div div div >.MuiDataGrid-cell': {
-          borderBottom: 'none',
+          borderTop: 'none',
         },
         '& div div div div >.MuiDataGrid-cell:focus': {
           outline: 'none',
         },
       },
+      '& .MuiDataGrid-topContainer': {
+        display: 'none',
+      },
       '& .MuiDataGrid-columnHeaders': {
         borderBottom: 'none',
+      },
+      '& .MuiDataGrid-filler': {
+        display: 'none',
       },
       [callClass]: {
         backgroundColor: '#a9edf252',

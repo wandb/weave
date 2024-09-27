@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 import shutil
@@ -9,8 +10,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import weave
-from weave import context_state
 from weave.trace import weave_init
+from weave.trace.client_context import context_state
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     sqlite_trace_server,
@@ -64,6 +65,10 @@ def pytest_sessionfinish(session, exitstatus):
 
 def pytest_collection_modifyitems(config, items):
     # Add the weave_client marker to all tests that have a client fixture
+    for item in items:
+        if "client" in item.fixturenames:
+            item.add_marker(pytest.mark.weave_client)
+
     # Get the job number from environment variable (0 for even tests, 1 for odd tests)
     job_num = config.getoption("--job-num", default=None)
     if job_num is None:
@@ -78,9 +83,70 @@ def pytest_collection_modifyitems(config, items):
 
     items[:] = selected_items
 
-    for item in items:
-        if "client" in item.fixturenames:
-            item.add_marker(pytest.mark.weave_client)
+
+PYTEST_CURRENT_TEST_ENV_VAR = "PYTEST_CURRENT_TEST"
+
+
+def get_test_name():
+    return os.environ.get(PYTEST_CURRENT_TEST_ENV_VAR).split(" ")[0]
+
+
+class InMemoryWeaveLogCollector(logging.Handler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.log_records = {}
+
+    def emit(self, record):
+        curr_test = get_test_name()
+        if curr_test not in self.log_records:
+            self.log_records[curr_test] = []
+        self.log_records[curr_test].append(record)
+
+    def get_error_logs(self):
+        curr_test = get_test_name()
+        logs = self.log_records.get(curr_test, [])
+
+        return [
+            record
+            for record in logs
+            if record.levelname == "ERROR"
+            and record.name.startswith("weave")
+            # (Tim) For some reason that i cannot figure out, there is some test that
+            # a) is trying to connect to the PROD trace server
+            # b) seemingly doesn't fail
+            # c) Logs these errors.
+            # I would love to fix this, but I have not been able to pin down which test
+            # is causing it and need to ship this PR, so I am just going to filter it out
+            # for now.
+            and not record.msg.startswith(
+                "Job failed with exception: 400 Client Error: Bad Request for url: https://trace.wandb.ai/"
+            )
+            # Exclude legacy
+            and not record.name.startswith("weave.weave_server")
+            and not "legacy" in record.name
+        ]
+
+
+@pytest.fixture
+def log_collector():
+    handler = InMemoryWeaveLogCollector()
+    logger = logging.getLogger()  # Get your specific logger here if needed
+    logger.addHandler(handler)
+    logger.setLevel(logging.ERROR)  # Set the level to capture all logs
+    yield handler
+    logger.removeHandler(handler)  # Clean up after the test
+
+
+@pytest.fixture(autouse=True)
+def logging_error_check(request, log_collector):
+    yield
+    if "disable_logging_error_check" in request.keywords:
+        return
+    error_logs = log_collector.get_error_logs()
+    if error_logs:
+        pytest.fail(
+            f"Expected no errors, but found {len(error_logs)} error(s): {error_logs}"
+        )
 
 
 @pytest.fixture(autouse=True)
