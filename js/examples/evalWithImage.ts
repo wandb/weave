@@ -47,12 +47,12 @@ async function main() {
   const evaluation = new Evaluation({
     dataset: ds,
     scorers: [
-      op(function fruitEqual(modelOutput: any, datasetItem: any) {
+      op(function fruitEqual({ modelOutput, datasetItem }) {
         return {
           correct: modelOutput.fruit == datasetItem.target.fruit,
         };
       }),
-      op(async function genImage(modelOutput: any, datasetItem: any) {
+      op(async function genImage({ modelOutput, datasetItem }) {
         const result = await openaiClient.images.generate({
           prompt: `A fruit that's ${modelOutput.color} and ${modelOutput.flavor}`,
           n: 1,

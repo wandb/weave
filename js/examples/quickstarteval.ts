@@ -52,7 +52,7 @@ async function main() {
   const evaluation = new Evaluation({
     dataset: ds,
     scorers: [
-      op(function fruitEqual(modelOutput: any, datasetItem: any) {
+      op(function fruitEqual({ modelOutput, datasetItem }) {
         return {
           correct: modelOutput.fruit == datasetItem.target.fruit,
         };
