@@ -15,7 +15,11 @@ import pytest
 import requests
 import wandb
 
-from weave.wandb_interface.wandb_api import from_environment
+from weave_query.weave_query.wandb_api import (
+    WandbApiContext,
+    from_environment,
+    wandb_api_context,
+)
 
 
 # The following code snippet was copied from:
@@ -81,6 +85,27 @@ def bootstrap_user(
             base_url=base_url,
             cookie="NOT-IMPLEMENTED",
         )
+
+
+@pytest.fixture(scope=determine_scope)
+def user_by_api_key_in_context(
+    bootstrap_user: LocalBackendFixturePayload,
+) -> Generator[LocalBackendFixturePayload, None, None]:
+    with wandb_api_context(WandbApiContext(api_key=bootstrap_user.api_key)):
+        yield bootstrap_user
+
+
+@pytest.fixture(scope=determine_scope)
+def user_by_http_headers_in_context(
+    bootstrap_user: LocalBackendFixturePayload,
+) -> Generator[LocalBackendFixturePayload, None, None]:
+    headers = {
+        "use-admin-privileges": "true",
+        "cookie": f"wandb={bootstrap_user.cookie};",
+    }
+    cookies = {"wandb": bootstrap_user.cookie}
+    with wandb_api_context(WandbApiContext(headers=headers, cookies=cookies)):
+        yield bootstrap_user
 
 
 @pytest.fixture(scope=determine_scope)

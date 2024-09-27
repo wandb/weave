@@ -1,8 +1,6 @@
 import logging
 import os
-import random
 
-import numpy as np
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -25,30 +23,6 @@ from .trace import autopatch
 os.environ["WANDB_ERROR_REPORTING"] = "false"
 
 
-class FakeTracer:
-    def trace(*args, **kwargs):
-        pass
-
-
-def make_fake_tracer():
-    return FakeTracer()
-
-
-### End disable datadog engine tracing
-### disable internet access
-
-
-def guard(*args, **kwargs):
-    raise Exception("I told you not to use the Internet!")
-
-
-### End disable internet access
-
-# Uncomment these two lines to disable internet access entirely.
-# engine_trace.tracer = make_fake_tracer
-# socket.socket = guard
-
-
 def pytest_sessionfinish(session, exitstatus):
     if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED:
         print("No tests were selected. Exiting gracefully.")
@@ -60,20 +34,6 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "client" in item.fixturenames:
             item.add_marker(pytest.mark.weave_client)
-
-    # Get the job number from environment variable (0 for even tests, 1 for odd tests)
-    job_num = config.getoption("--job-num", default=None)
-    if job_num is None:
-        return
-
-    job_num = int(job_num)
-
-    selected_items = []
-    for index, item in enumerate(items):
-        if index % 2 == job_num:
-            selected_items.append(item)
-
-    items[:] = selected_items
 
 
 PYTEST_CURRENT_TEST_ENV_VAR = "PYTEST_CURRENT_TEST"
@@ -139,50 +99,6 @@ def logging_error_check(request, log_collector):
         pytest.fail(
             f"Expected no errors, but found {len(error_logs)} error(s): {error_logs}"
         )
-
-
-@pytest.fixture(autouse=True)
-def throw_on_error():
-    os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"] = "true"
-    yield
-    del os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"]
-
-
-@pytest.fixture()
-def cache_mode_minimal():
-    os.environ["WEAVE_NO_CACHE"] = "true"
-    yield
-    del os.environ["WEAVE_NO_CACHE"]
-
-
-@pytest.fixture()
-def fixed_random_seed():
-    random.seed(8675309)
-    np.random.seed(8675309)
-    yield
-    random.seed(None)
-    np.random.seed(None)
-
-
-@pytest.fixture()
-def app():
-    from . import weave_server
-
-    app = weave_server.make_app()
-    app.config.update(
-        {
-            "TESTING": True,
-        }
-    )
-
-    yield app
-
-
-@pytest.fixture()
-def enable_touch_on_read():
-    os.environ["WEAVE_ENABLE_TOUCH_ON_READ"] = "1"
-    yield
-    del os.environ["WEAVE_ENABLE_TOUCH_ON_READ"]
 
 
 @pytest.fixture()

@@ -1,22 +1,28 @@
 import logging
 import os
 import pathlib
+import random
 import shutil
 import tempfile
 import typing
 
+import numpy as np
 import pytest
 from flask.testing import FlaskClient
 
 from weave_query.tests import fixture_fakewandb
+from weave_query.tests.wandb_system_tests_conftest import *
 from weave_query.weave_query import client as client_legacy
-from weave_query.weave_query import context_state, environment, io_service, serialize
+from weave_query.weave_query import (
+    context_state,
+    environment,
+    io_service,
+    logs,
+    serialize,
+)
 from weave_query.weave_query.language_features.tagging.tag_store import (
     isolated_tagging_context,
 )
-
-from weave_query.weave_query import logs
-from weave.tests.wandb_system_tests_conftest import *
 
 logs.configure_logger()
 
@@ -28,7 +34,78 @@ context_state._eager_mode.set(False)
 # A lot of tests rely on weave_query.weave_query.ops.* being in scope. Importing this here
 # makes that work...
 
+
+def pytest_collection_modifyitems(config, items):
+    # Get the job number from environment variable (0 for even tests, 1 for odd tests)
+    job_num = config.getoption("--job-num", default=None)
+    if job_num is None:
+        return
+
+    job_num = int(job_num)
+
+    selected_items = []
+    for index, item in enumerate(items):
+        if index % 2 == job_num:
+            selected_items.append(item)
+
+    items[:] = selected_items
+
+
+@pytest.fixture(autouse=True)
+def throw_on_error():
+    os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"] = "true"
+    yield
+    del os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"]
+
+
 ### Disable datadog engine tracing
+
+
+class FakeTracer:
+    def trace(*args, **kwargs):
+        pass
+
+
+def make_fake_tracer():
+    return FakeTracer()
+
+
+### End disable datadog engine tracing
+### disable internet access
+
+
+def guard(*args, **kwargs):
+    raise Exception("I told you not to use the Internet!")
+
+
+### End disable internet access
+
+# Uncomment these two lines to disable internet access entirely.
+# engine_trace.tracer = make_fake_tracer
+# socket.socket = guard
+
+
+@pytest.fixture()
+def fixed_random_seed():
+    random.seed(8675309)
+    np.random.seed(8675309)
+    yield
+    random.seed(None)
+    np.random.seed(None)
+
+
+@pytest.fixture()
+def app():
+    from weave_query import weave_server
+
+    app = weave_server.make_app()
+    app.config.update(
+        {
+            "TESTING": True,
+        }
+    )
+
+    yield app
 
 
 @pytest.fixture()
@@ -45,12 +122,26 @@ def fake_wandb():
 
 @pytest.fixture()
 def consistent_table_col_ids():
-    from weave_query.panels import table_state
+    from weave_query.weave_query.panels import table_state
 
     with table_state.use_consistent_col_ids():
         yield
-        
-        
+
+
+@pytest.fixture()
+def enable_touch_on_read():
+    os.environ["WEAVE_ENABLE_TOUCH_ON_READ"] = "1"
+    yield
+    del os.environ["WEAVE_ENABLE_TOUCH_ON_READ"]
+
+
+@pytest.fixture()
+def cache_mode_minimal():
+    os.environ["WEAVE_NO_CACHE"] = "true"
+    yield
+    del os.environ["WEAVE_NO_CACHE"]
+
+
 @pytest.fixture()
 def cereal_csv():
     with tempfile.TemporaryDirectory() as d:
@@ -71,7 +162,7 @@ def pre_post_each_test(test_artifact_dir, caplog):
     # Tests rely on full cache mode right now.
     os.environ["WEAVE_CACHE_MODE"] = "full"
     os.environ["WEAVE_GQL_SCHEMA_PATH"] = str(
-        pathlib.Path(__file__).parent.parent.parent / "wb_schema.gql"
+        pathlib.Path(__file__).parent.parent / "wb_schema.gql"
     )
     try:
         shutil.rmtree(test_artifact_dir)
@@ -81,8 +172,6 @@ def pre_post_each_test(test_artifact_dir, caplog):
     with isolated_tagging_context():
         yield
     del os.environ["WEAVE_LOCAL_ARTIFACT_DIR"]
-
-
 
 
 @pytest.fixture()
@@ -96,6 +185,7 @@ def fresh_server_logfile():
     _clearlog()
     yield
     _clearlog()
+
 
 @pytest.fixture()
 def eager_mode():
@@ -163,7 +253,7 @@ def io_server_factory():
 
 @pytest.fixture()
 def http_server_test_client(app):
-    from .. import weave_server
+    from weave_query import weave_server
 
     app = weave_server.make_app()
     flask_client = app.test_client()
@@ -175,11 +265,7 @@ def weave_test_client(http_server_test_client):
     return client_legacy.Client(http_server_test_client)
 
 
-
-
 @pytest.fixture()
 def ref_tracking():
     with context_state.ref_tracking(True):
         yield
-
-
