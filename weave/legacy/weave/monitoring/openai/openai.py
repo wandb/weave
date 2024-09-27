@@ -10,7 +10,6 @@ import openai
 from openai import AsyncStream, Stream
 from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 from packaging import version
-from weave.trace import call_context
 from weave.trace.client_context import weave_client as weave_client_context
 from weave.legacy.weave.monitoring.monitor import _get_global_monitor
 from weave.legacy.weave.monitoring.openai.models import *
@@ -256,7 +255,8 @@ def log_call(
     call_name: typing.Union[str, Op], inputs: dict[str, Any]
 ) -> Iterator[Callable]:
     client = weave_client_context.require_weave_client()
-    parent_call = call_context.get_current_call()
+    raise Exception("NO LONGER SUPPORTED")
+    # parent_call = call_context.get_current_call()
     # TODO: client should not need refs passed in.
     call = client.create_call(call_name, inputs, parent_call)
 

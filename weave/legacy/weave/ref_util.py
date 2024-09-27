@@ -3,11 +3,10 @@ import typing
 from urllib import parse
 
 from weave.legacy.weave import box
-from weave.trace_server import refs_internal
 
-DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
-LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
-OBJECT_ATTR_EDGE_NAME = refs_internal.OBJECT_ATTR_EDGE_NAME
+DICT_KEY_EDGE_NAME = "key"
+LIST_INDEX_EDGE_NAME = "index"
+OBJECT_ATTR_EDGE_NAME = "attr"
 AWL_ROW_EDGE_NAME = "row"
 AWL_COL_EDGE_NAME = "col"
 
@@ -22,7 +21,8 @@ def parse_local_ref_str(s: str) -> typing.Tuple[str, typing.Optional[list[str]]]
 def val_with_relative_ref(
     parent_object: typing.Any, child_object: typing.Any, ref_extra_parts: list[str]
 ) -> typing.Any:
-    from weave.legacy.weave import context_state, ref_base
+    from weave.legacy.weave import context_state
+    from weave.legacy.weave import ref_base
 
     # If we already have a ref, resolve it
     if isinstance(child_object, ref_base.Ref):

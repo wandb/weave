@@ -1,6 +1,6 @@
 import typing
 
-from weave.legacy.weave import urls
+from weave.trace import urls
 from weave.trace.pypi_version_check import check_available
 
 if typing.TYPE_CHECKING:

@@ -11,8 +11,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import weave
-from weave import context_state
 from weave.trace import weave_init
+from weave.trace.client_context import context_state
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     sqlite_trace_server,
