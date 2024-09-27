@@ -1,7 +1,7 @@
 import copy
 import datetime
 from collections import OrderedDict, defaultdict
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional, Tuple, cast
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
@@ -164,3 +164,19 @@ class LRUCache(OrderedDict):
         if key not in self and len(self) >= self.max_size:
             self.popitem(last=False)
         super().__setitem__(key, value)
+
+
+def digest_is_version_like(digest: str) -> Tuple[bool, int]:
+    """
+    Check if a digest is a version like string.
+
+    Examples:
+    - v1 -> True, 1
+    - oioZ7zgsCq4K7tfFQZRubx3ZGPXmFyaeoeWHHd8KUl8 -> False, -1
+    """
+    if not digest.startswith("v"):
+        return (False, -1)
+    try:
+        return (True, int(digest[1:]))
+    except ValueError:
+        return (False, -1)

@@ -83,6 +83,7 @@ from .orm import ParamBuilder, Row
 from .token_costs import LLM_TOKEN_PRICES_TABLE, validate_cost_purge_req
 from .trace_server_common import (
     LRUCache,
+    digest_is_version_like,
     empty_str_to_none,
     get_nested_key,
     hydrate_calls_with_feedback,
@@ -581,8 +582,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        if req.digest == "latest":
+            condition_part = "is_latest = 1"
+        else:
+            (is_version, given_version_index) = digest_is_version_like(req.digest)
+            if is_version:
+                condition_part = f"version_index = '{given_version_index}'"
+            else:
+                condition_part = f"digest = '{req.digest}'"
+
         obj = self._select_single_obj_query(
-            project_id=req.project_id, object_id=req.object_id, given_digest=req.digest
+            project_id=req.project_id,
+            object_id=req.object_id,
+            conditions=[condition_part],
         )
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
 
@@ -1397,7 +1409,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         object_id: str,
-        given_digest: str,
+        conditions: list[str],
     ) -> SelectableCHObjSchema:
         """Query for reading a single object by digest.
 
@@ -1406,14 +1418,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         Then, run a second query to get the complete object with the given digest by
         directly filtering on the digest.
         """
-        if given_digest == "latest":
-            condition_part = "is_latest = 1"
-        else:
-            (is_version, given_version_index) = _digest_is_version_like(given_digest)
-            if is_version:
-                condition_part = f"version_index = '{given_version_index}'"
-            else:
-                condition_part = f"digest = '{given_digest}'"
+        condition_part = combine_conditions(conditions, "AND")
 
         # Get version counting fields
         version_index_and_count_query = f"""
@@ -1460,7 +1465,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             {"project_id": project_id, "object_id": object_id},
         )
         if len(query_result.result_rows) == 0:
-            raise NotFoundError(f"Obj {object_id}:{given_digest} not found")
+            raise NotFoundError(f"Obj {object_id} not found")
 
         (digest, version_index, version_count, is_latest) = query_result.result_rows[0]
 
@@ -1505,7 +1510,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         }
         query_result = self._query(select_query, parameters)
         if len(query_result.result_rows) == 0:
-            raise NotFoundError(f"Obj {object_id}:{given_digest} not found")
+            raise NotFoundError(f"Obj {object_id} not found")
 
         combined = list(query_result.result_rows[0]) + [
             digest,
@@ -2074,15 +2079,6 @@ def get_base_object_class(val: Any) -> Optional[str]:
                             elif "_class_name" in val:
                                 return val["_class_name"]
     return None
-
-
-def _digest_is_version_like(digest: str) -> Tuple[bool, int]:
-    if not digest.startswith("v"):
-        return (False, -1)
-    try:
-        return (True, int(digest[1:]))
-    except ValueError:
-        return (False, -1)
 
 
 def find_call_descendants(
