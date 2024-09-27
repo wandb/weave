@@ -156,7 +156,7 @@ def test_objs_query_filter_metadata_only(client: WeaveClient):
     )
     assert len(res.objs) == 10
     for obj in res.objs:
-        assert obj.val == {}
+        assert obj.val is None
 
     # sanity check that we get the full object when we don't ask for metadata only
     res = client.server.objs_query(
