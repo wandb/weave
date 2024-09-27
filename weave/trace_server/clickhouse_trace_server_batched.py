@@ -1433,20 +1433,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 kind,
                 base_object_class,
                 refs,
-                if (kind = 'op', 1, 0) AS is_op
+                if (kind = 'op', 1, 0) AS is_op,
                 digest,
                 version_index,
                 version_count,
                 is_latest
             FROM (
                 SELECT
-                    digest,
                     project_id,
                     object_id,
                     created_at,
                     kind,
                     base_object_class,
                     refs,
+                    digest,
                     row_number() OVER (
                         PARTITION BY project_id,
                         kind,
@@ -1457,14 +1457,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     if(version_index + 1 = version_count, 1, 0) AS is_latest
                 FROM (
                     SELECT
-                        digest,
                         project_id,
                         object_id,
+                        created_at,
+                        kind,
                         base_object_class,
                         refs,
-                        kind,
-                        object_id,
-                        created_at,
+                        digest,
                         row_number() OVER (
                             PARTITION BY project_id,
                             kind,
