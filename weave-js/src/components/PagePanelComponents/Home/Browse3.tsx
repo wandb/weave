@@ -14,10 +14,10 @@ import {
   GridColumnVisibilityModel,
   GridFilterModel,
   GridPaginationModel,
-  GridPinnedColumns,
+  GridPinnedColumnFields,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
-import {LicenseInfo} from '@mui/x-license-pro';
+import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
@@ -397,11 +397,7 @@ const MainPeekingLayout: FC = () => {
               <SimplePageLayoutContext.Provider
                 value={{
                   headerSuffix: (
-                    <Box
-                      sx={{
-                        height: '41px',
-                        flex: '0 0 auto',
-                      }}>
+                    <Box sx={{flex: '0 0 auto'}}>
                       <FullPageButton
                         query={query}
                         generalBase={generalBase}
@@ -727,7 +723,7 @@ const CallsPageBinding = () => {
     () => getValidPinModel(query.pin, DEFAULT_PIN_CALLS, ALWAYS_PIN_LEFT_CALLS),
     [query.pin]
   );
-  const setPinModel = (newModel: GridPinnedColumns) => {
+  const setPinModel = (newModel: GridPinnedColumnFields) => {
     const newQuery = new URLSearchParams(location.search);
     newQuery.set(
       'pin',

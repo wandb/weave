@@ -10,8 +10,8 @@ from pydantic import v1 as pydantic_v1
 
 from weave.trace import box
 from weave.trace.client_context.weave_client import (
-    get_weave_client,
-    require_weave_client,
+    get_weave_client
+
 )
 from weave.trace.context import get_raise_on_captured_errors
 from weave.trace.errors import InternalError
@@ -323,17 +323,19 @@ class WeaveTable(Traceable):
 
         In this case, we don't need to make any calls and can just return the rows
         """
+        wc = get_weave_client()
         if (
-            self.ref is None
+            wc is None
+            or self.ref is None
             or self.table_ref is None
             or self.table_ref._row_digests is None
             or self._prefetched_rows is None
         ):
+            if get_raise_on_captured_errors():
+                raise
             logger.error(
                 "Expected all row digests and prefetched rows to be set, falling back to remote iteration"
             )
-            if get_raise_on_captured_errors():
-                raise
             yield from self._remote_iter()
             return
 
@@ -343,14 +345,14 @@ class WeaveTable(Traceable):
             row_digest_len = len(self.table_ref._row_digests)
             prefetched_rows_len = len(self._prefetched_rows)
             if row_digest_len != prefetched_rows_len:
+                if get_raise_on_captured_errors():
+                    raise
                 logger.error(
                     f"Expected length of row digests ({row_digest_len}) to match prefetched rows ({prefetched_rows_len}). Falling back to remote iteration."
                 )
-                if get_raise_on_captured_errors():
-                    raise
                 yield from self._remote_iter()
                 return
-        wc = require_weave_client()
+
         for ndx, row in enumerate(self._prefetched_rows):
             next_id_future = wc.future_executor.defer(
                 lambda: cached_table_ref.row_digests[ndx]
@@ -383,11 +385,11 @@ class WeaveTable(Traceable):
             if self._prefetched_rows is not None and len(response.rows) != len(
                 self._prefetched_rows
             ):
+                if get_raise_on_captured_errors():
+                    raise
                 logger.error(
                     f"Expected length of response rows ({len(response.rows)}) to match prefetched rows ({len(self._prefetched_rows)}). Ignoring prefetched rows."
                 )
-                if get_raise_on_captured_errors():
-                    raise
                 self._prefetched_rows = None
 
             for ndx, item in enumerate(response.rows):

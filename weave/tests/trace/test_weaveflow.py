@@ -7,8 +7,6 @@ from pydantic import Field
 import weave
 from weave.legacy.weave import ref_base
 
-pytestmark = pytest.mark.trace
-
 
 @pytest.mark.skip("failing in ci")
 def test_digestrefs(client):

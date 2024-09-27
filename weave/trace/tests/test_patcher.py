@@ -1,5 +1,7 @@
 import importlib
 
+import pytest
+
 from weave.trace.patcher import SymbolPatcher
 
 
@@ -48,7 +50,8 @@ def test_symbol_patcher_invalid_attr():
     assert not patcher.undo_patch()
 
 
-def test_symbol_patcher_invalid_patching():
+@pytest.mark.disable_logging_error_check
+def test_symbol_patcher_invalid_patching(log_collector):
     from .test_patcher_module.example_class import ExampleClass
 
     patcher = SymbolPatcher(
@@ -63,3 +66,7 @@ def test_symbol_patcher_invalid_patching():
     assert not patcher.undo_patch()
     obj = ExampleClass()
     assert obj.example_fn() == 42
+
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert "Failed to patch ExampleClass.example_fn" in logs[0].msg
