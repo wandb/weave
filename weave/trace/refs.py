@@ -134,7 +134,7 @@ class ObjectRef(RefWithExtra):
         if isinstance(self._digest, str):
             refs_internal.validate_no_slashes(self._digest, "digest")
             refs_internal.validate_no_colons(self._digest, "digest")
-        # TODO: FIx me!
+
         refs_internal.validate_no_slashes(self.name, "name")
         refs_internal.validate_no_colons(self.name, "name")
 

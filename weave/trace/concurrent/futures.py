@@ -153,10 +153,11 @@ class FutureExecutor:
             timeout (Optional[float]): Maximum time to wait in seconds. If None, wait indefinitely.
 
         Returns:
-            bool: True if all tasks completed, False if timeout was reached.
+            bool: True if all tasks completed
 
         Raises:
             RuntimeError: If called from within a thread context.
+            TimeoutError: If the timeout is reached.
         """
         with self._active_futures_lock:
             if not self._active_futures:

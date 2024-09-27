@@ -1,3 +1,4 @@
+from collections import Counter
 from contextlib import contextmanager
 from threading import Lock
 from typing import Any, Generator
@@ -29,12 +30,7 @@ class BlockingTraceServer(tsi.TraceServerInterface):
         self.lock.release()
 
     def __getattribute__(self, item: str) -> Any:
-        if (
-            item == "internal_trace_server"
-            or item == "lock"
-            or item == "resume"
-            or item == "pause"
-        ):
+        if item in ("internal_trace_server", "lock", "resume", "pause"):
             return super().__getattribute__(item)
         internal_trace_server = super().__getattribute__("internal_trace_server")
 
@@ -124,11 +120,7 @@ async def test_evaluation_performance(client: WeaveClient):
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
-    counts = {}
-    for l in log:
-        if l not in counts:
-            counts[l] = 0
-        counts[l] += 1
+    counts = Counter(log)
 
     assert (
         counts
