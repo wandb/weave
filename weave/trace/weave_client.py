@@ -617,7 +617,7 @@ class WeaveClient:
         else:
             op_str = op
 
-        parse_obj_functions = [redact_sensitive_keys]
+        parse_obj_functions: list[Callable] = [redact_sensitive_keys]
         if should_convert_paths_to_images():
             parse_obj_functions.append(convert_paths_to_images)
 
@@ -706,7 +706,7 @@ class WeaveClient:
         *,
         postprocess_output: Optional[Callable[..., Any]] = None,
     ) -> None:
-        parse_obj_functions = []
+        parse_obj_functions: list[Callable] = []
         if should_convert_paths_to_images():
             parse_obj_functions.append(convert_paths_to_images)
 
@@ -1505,9 +1505,16 @@ def convert_paths_to_images(obj: str) -> typing.Union[str, PathImage]:
     return obj
 
 
-def parse_obj(obj: Any, parsers: list[Callable[[Any], Any]]) -> Any:
+def parse_obj(obj: Any, parsers: list[Callable[..., Any]]) -> Any:
     """Parse an object with conversion parsers.
     Accepts a list of functions that do operations on the object.
+        parser functions must include type hints, and accept exactly
+        one parameter called "obj" that can be modified and returned
+        example:
+            def atoi(obj: str):
+                return int(obj)
+
+
     Returns the modified object
     """
     # Dont mutate reffed objects
