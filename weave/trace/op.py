@@ -431,13 +431,6 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
     await extract()  # calls the function and tracks the call in the Weave UI
     ```
     """
-    # TODO: (AT): Remove
-    from weave_query.weave_query import context_state
-
-    if context_state.get_loading_built_ins():
-        from weave_query.weave_query.decorator_op import op as legacy_op
-
-        return legacy_op(*args, **kwargs)  # type: ignore
 
     def op_deco(func: Callable) -> Op:
         # Check function type
