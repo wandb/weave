@@ -122,6 +122,8 @@ async def test_evaluation_performance(client: WeaveClient):
 
     counts = Counter(log)
 
+    # Tim: This is very specific and intentiaion, please don't change
+    # this unless you are sure that is the expected behavior
     assert (
         counts
         == {
@@ -148,7 +150,7 @@ async def test_evaluation_performance(client: WeaveClient):
 async def test_evaluation_resilience(
     client_with_throwing_server: WeaveClient, log_collector
 ):
-    client_with_throwing_server.project = "test_evaluation_performance"
+    client_with_throwing_server.project = "test_evaluation_resilience"
     evaluation, predict = build_evaluation()
 
     with raise_on_captured_errors(True):
@@ -170,6 +172,8 @@ async def test_evaluation_resilience(
     logs = log_collector.get_error_logs()
     ag_res = Counter([k.split(", req:")[0] for k in set([l.msg for l in logs])])
 
+    # Tim: This is very specific and intentiaion, please don't change
+    # this unless you are sure that is the expected behavior
     assert ag_res == {
         "Job failed during flush: ('FAILURE - call_end": 14,  # 14 calls
         "Job failed during flush: ('FAILURE - obj_create": 6,  # 6 ops

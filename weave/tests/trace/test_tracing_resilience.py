@@ -6,6 +6,9 @@ We should never be breaking the user's program with an error.
 
 # TODO: Test code capture resilience
 # TODO: Test postprocess input/output resilience
+from collections import Counter
+from typing import Callable
+
 import pytest
 
 import weave
@@ -40,7 +43,8 @@ def test_resilience_to_user_code_errors(client):
     assert_no_current_call()
 
 
-def test_resilience_to_server_errors(client_with_throwing_server):
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_server_errors(client_with_throwing_server, log_collector):
     def do_test():
         @weave.op
         def simple_op():
@@ -58,6 +62,15 @@ def test_resilience_to_server_errors(client_with_throwing_server):
     assert res == "hello"
 
     assert_no_current_call()
+
+    logs = log_collector.get_error_logs()
+    ag_res = Counter([k.split(", req:")[0] for k in set([l.msg for l in logs])])
+    # Tim: This is very specific and intentiaion, please don't change
+    # this unless you are sure that is the expected behavior
+    assert ag_res == {
+        "Job failed during flush: ('FAILURE - call_end": 1,
+        "Job failed during flush: ('FAILURE - obj_create": 1,
+    }
 
 
 @pytest.mark.disable_logging_error_check
