@@ -7,9 +7,9 @@ import tempfile
 import typing
 from pathlib import Path
 
-from weave import __version__
 from weave.trace import env
 from weave.trace.refs import ObjectRef, parse_uri
+from weave_query import __version__
 
 from ..util import execute, safe_name
 

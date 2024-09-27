@@ -20,7 +20,7 @@ from weave.legacy.weave import mappers_python_def
 from weave.legacy.weave import wandb_api as _wandb_api
 from weave.legacy.weave import context as _context
 
-from weave import version
+from weave_query import version
 
 _wandb_api.init()
 

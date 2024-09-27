@@ -5,7 +5,7 @@ import json
 import typing
 
 from weave.legacy.weave import api as weave
-from weave import types
+from weave_query import types
 from weave.legacy.weave import errors, engine_trace, artifact_fs, file_base
 from weave.legacy.weave.language_features.tagging.tag_store import isolated_tagging_context
 from weave.legacy.weave.ops_primitives import html, markdown
