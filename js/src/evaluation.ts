@@ -11,7 +11,9 @@ const PROGRESS_BAR = false;
 interface EvaluationParameters<R extends DatasetRow, M>
   extends WeaveObjectParameters {
   dataset: Dataset<R>;
-  scorers: Op<(...args: [M, R]) => any>[];
+  scorers: WeaveCallable<
+    (...args: [{ datasetRow: R; modelOutput: M }]) => any
+  >[];
   maxConcurrency?: number;
 }
 
@@ -96,7 +98,9 @@ async function* asyncParallelMap<T, U>(
 
 export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
   private dataset: Dataset<R>;
-  private scorers: Op<(...args: [M, R]) => any>[];
+  private scorers: WeaveCallable<
+    (...args: [{ datasetRow: R; modelOutput: M }]) => any
+  >[];
 
   constructor(parameters: EvaluationParameters<R, M>) {
     super(parameters);
@@ -117,7 +121,7 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
     nTrials = 1,
     maxConcurrency = 5,
   }: {
-    model: WeaveCallable<(...args: [R]) => Promise<M>>;
+    model: WeaveCallable<(...args: [{ datasetRow: R }]) => Promise<M>>;
     nTrials?: number;
     maxConcurrency?: number;
   }) {
@@ -187,14 +191,14 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
     model,
     example,
   }: {
-    model: WeaveCallable<(...args: [R]) => Promise<M>>;
+    model: WeaveCallable<(...args: [{ datasetRow: R }]) => Promise<M>>;
     example: R;
   }) {
     const startTime = new Date();
     let modelOutput;
     let modelError = false;
     try {
-      modelOutput = await callWeaveCallable(model, example);
+      modelOutput = await callWeaveCallable(model, { datasetRow: example });
     } catch (e) {
       console.error(e);
       modelError = true;
@@ -206,8 +210,11 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
     if (!modelError) {
       for (const scorer of this.scorers) {
         try {
-          const score = await scorer(modelOutput, example);
-          scores[getOpName(scorer)] = score;
+          const score = await callWeaveCallable(scorer, {
+            datasetRow: example,
+            modelOutput,
+          });
+          scores[weaveCallableName(scorer)] = score;
         } catch (e) {
           console.error(e);
           scores[getOpName(scorer)] = undefined;

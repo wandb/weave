@@ -204,7 +204,7 @@ describe("Op Flow", () => {
 
     const openaiLikeOp = makeOpenAIChatCompletionsOp(
       testOpenAIChat,
-      "testOpenaChat"
+      "testOpenAIChat"
     );
 
     await openaiLikeOp({ messages: [{ role: "user", content: "Hello, AI!" }] });
@@ -215,7 +215,7 @@ describe("Op Flow", () => {
     const calls = await getCalls(inMemoryTraceServer, testProjectName);
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].op_name).toContain("openai.chat.completions.create");
+    expect(calls[0].op_name).toContain("testOpenAIChat");
     expect(calls[0].inputs).toEqual({
       messages: [{ role: "user", content: "Hello, AI!" }],
     });
