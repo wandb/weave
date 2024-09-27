@@ -2,11 +2,13 @@ import logging
 import os
 import pathlib
 import shutil
+import tempfile
 import typing
 
 import pytest
 from flask.testing import FlaskClient
 
+from weave_query.tests import fixture_fakewandb
 from weave_query.weave_query import client as client_legacy
 from weave_query.weave_query import context_state, environment, io_service, serialize
 from weave_query.weave_query.language_features.tagging.tag_store import (
@@ -14,7 +16,7 @@ from weave_query.weave_query.language_features.tagging.tag_store import (
 )
 
 from weave_query.weave_query import logs
-# from .tests.wandb_system_tests_conftest import *
+from weave.tests.wandb_system_tests_conftest import *
 
 logs.configure_logger()
 
@@ -27,6 +29,35 @@ context_state._eager_mode.set(False)
 # makes that work...
 
 ### Disable datadog engine tracing
+
+
+@pytest.fixture()
+def test_artifact_dir():
+    return "/tmp/weave/pytest/%s" % os.environ.get("PYTEST_CURRENT_TEST")
+
+
+@pytest.fixture()
+def fake_wandb():
+    setup_response = fixture_fakewandb.setup()
+    yield setup_response
+    fixture_fakewandb.teardown(setup_response)
+
+
+@pytest.fixture()
+def consistent_table_col_ids():
+    from weave_query.panels import table_state
+
+    with table_state.use_consistent_col_ids():
+        yield
+        
+        
+@pytest.fixture()
+def cereal_csv():
+    with tempfile.TemporaryDirectory() as d:
+        cereal_path = os.path.join(d, "cereal.csv")
+        shutil.copy("testdata/cereal.csv", cereal_path)
+        yield cereal_path
+
 
 def pytest_sessionstart(session):
     context_state.disable_analytics()
