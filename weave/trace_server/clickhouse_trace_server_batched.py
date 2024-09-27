@@ -1504,7 +1504,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Now grab the val_dump directly by digest
         select_query = """
-            SELECT val_dump,
+            SELECT val_dump
             FROM object_versions
             WHERE project_id = {project_id: String} AND
                 object_id = {object_id: String} AND
