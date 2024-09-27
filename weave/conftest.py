@@ -3,7 +3,8 @@ import os
 import random
 import shutil
 import tempfile
-from typing import Iterator
+from contextlib import _GeneratorContextManager
+from typing import Callable, Iterator
 
 import numpy as np
 import pytest
@@ -67,7 +68,7 @@ def pytest_sessionfinish(session, exitstatus):
 def pytest_collection_modifyitems(config, items):
     # Add the weave_client marker to all tests that have a client fixture
     for item in items:
-        if "client" in item.fixturenames:
+        if "client" in item.fixturenames or "client_creator" in item.fixturenames:
             item.add_marker(pytest.mark.weave_client)
 
     # Get the job number from environment variable (0 for even tests, 1 for odd tests)
@@ -306,8 +307,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     return ServerRecorder(server)
 
 
-@pytest.fixture()
-def client(request) -> Generator[weave_client.WeaveClient, None, None]:
+def create_client(request) -> weave_init.InitializedClient:
     inited_client = None
     weave_server_flag = request.config.getoption("--weave-server")
     server: tsi.TraceServerInterface
@@ -344,10 +344,38 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         )
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
+
+    return inited_client
+
+
+@pytest.fixture()
+def client(request) -> Generator[weave_client.WeaveClient, None, None]:
+    """This is the standard fixture used everywhere in tests to test end to end
+    client functionality"""
+    inited_client = create_client(request)
     try:
         yield inited_client.client
     finally:
         inited_client.reset()
+
+
+@pytest.fixture()
+def client_creator(
+    request,
+) -> Generator[
+    Callable[[], _GeneratorContextManager[weave_client.WeaveClient]], None, None
+]:
+    """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
+
+    @contextlib.contextmanager
+    def client():
+        inited_client = create_client(request)
+        try:
+            yield inited_client.client
+        finally:
+            inited_client.reset()
+
+    yield client
 
 
 @pytest.fixture
