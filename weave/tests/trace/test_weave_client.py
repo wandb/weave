@@ -1437,16 +1437,17 @@ def test_object_version_read(client):
     assert obj_res.obj.val == {"a": 9}
     assert obj_res.obj.version_index == 9
 
-    # now grab version 5
-    obj_res = client.server.obj_read(
-        tsi.ObjReadReq(
-            project_id=client._project_id(),
-            object_id=refs[0].name,
-            digest="v5",
+    # now grab each by their digests
+    for i, digest in enumerate([obj.digest for obj in objs]):
+        obj_res = client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client._project_id(),
+                object_id=refs[0].name,
+                digest=digest,
+            )
         )
-    )
-    assert obj_res.obj.val == {"a": 5}
-    assert obj_res.obj.version_index == 5
+        assert obj_res.obj.val == {"a": i}
+        assert obj_res.obj.version_index == i
 
     # publish another, check that latest is updated
     client._save_object({"a": 10}, refs[0].name)

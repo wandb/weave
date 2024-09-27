@@ -1550,9 +1550,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 "version_index",
                                 "version_count",
                                 "is_latest",
-                                "val_dump",
                             ],
-                            list(row) + ["{}"],  # type: ignore
+                            row,
                         )
                     )
                 )
@@ -1566,12 +1565,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_ids = list(set([row.object_id for row in result]))
         digests = list(set([row.digest for row in result]))
         query = """
-            SELECT digest, any(val_dump)
+            SELECT object_id, digest, any(val_dump)
             FROM object_versions
             WHERE project_id = {project_id: String} AND
                 object_id IN {object_ids: Array(String)} AND
                 digest IN {digests: Array(String)}
-            GROUP BY digest
+            GROUP BY object_id, digest
         """
         parameters = {
             "project_id": project_id,
@@ -1579,16 +1578,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             "digests": digests,
         }
         query_result = self._query_stream(query, parameters)
-        # Map digest to val_dump
-        object_values: Dict[str, Any] = {}
+        # Map (object_id, digest) to val_dump
+        object_values: Dict[tuple[str, str], Any] = {}
         for row in query_result:
-            digest, val_dump = row[0], row[1]  # type: ignore
-            object_values[digest] = val_dump
+            object_id, digest, val_dump = row[0], row[1], row[2]  # type: ignore
+            object_values[(object_id, digest)] = val_dump
 
         # update the val_dump for each object
         for obj in result:
-            obj.val_dump = object_values[obj.digest]
-
+            obj.val_dump = object_values.get((obj.object_id, obj.digest))
         return result
 
     def _run_migrations(self) -> None:
@@ -1867,7 +1865,7 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         digest=ch_obj.digest,
         kind=ch_obj.kind,
         base_object_class=ch_obj.base_object_class,
-        val=json.loads(ch_obj.val_dump),
+        val=json.loads(ch_obj.val_dump) if ch_obj.val_dump else None,
     )
 
 
