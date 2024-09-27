@@ -582,19 +582,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        parameters: Dict[str, Any] = {}
         if req.digest == "latest":
             condition_part = "is_latest = 1"
         else:
             (is_version, given_version_index) = digest_is_version_like(req.digest)
             if is_version:
-                condition_part = f"version_index = '{given_version_index}'"
+                condition_part = "version_index = {given_version_index: String}"
+                parameters["given_version_index"] = given_version_index
             else:
-                condition_part = f"digest = '{req.digest}'"
+                condition_part = "digest = {given_digest: String}"
+                parameters["given_digest"] = req.digest
 
         obj = self._select_single_obj_query(
             project_id=req.project_id,
             object_id=req.object_id,
             conditions=[condition_part],
+            parameters=parameters,
         )
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
 
@@ -1410,6 +1414,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         project_id: str,
         object_id: str,
         conditions: list[str],
+        parameters: Dict[str, Any] = {},
     ) -> SelectableCHObjSchema:
         """Query for reading a single object by digest.
 
@@ -1423,6 +1428,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Get version counting fields
         version_index_and_count_query = f"""
             SELECT
+                project_id,
+                object_id,
+                created_at,
+                kind,
+                base_object_class,
+                refs,
+                if (kind = 'op', 1, 0) AS is_op
                 digest,
                 version_index,
                 version_count,
@@ -1430,6 +1442,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             FROM (
                 SELECT
                     digest,
+                    project_id,
+                    object_id,
+                    created_at,
+                    kind,
+                    base_object_class,
+                    refs,
                     row_number() OVER (
                         PARTITION BY project_id,
                         kind,
@@ -1442,6 +1460,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     SELECT
                         digest,
                         project_id,
+                        object_id,
+                        base_object_class,
+                        refs,
                         kind,
                         object_id,
                         created_at,
@@ -1462,46 +1483,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """
         query_result = self._query(
             version_index_and_count_query,
-            {"project_id": project_id, "object_id": object_id},
+            {"project_id": project_id, "object_id": object_id, **parameters},
         )
         if len(query_result.result_rows) == 0:
             raise NotFoundError(f"Obj {object_id} not found")
 
-        (digest, version_index, version_count, is_latest) = query_result.result_rows[0]
+        (
+            project_id,
+            object_id,
+            created_at,
+            kind,
+            base_object_class,
+            refs,
+            is_op,
+            digest,
+            version_index,
+            version_count,
+            is_latest,
+        ) = query_result.result_rows[0]
 
         # Now get the full object by digest
         select_query = """
-            SELECT
-                project_id,
-                object_id,
-                created_at,
-                kind,
-                base_object_class,
-                refs,
-                val_dump,
-                if (kind = 'op', 1, 0) AS is_op
-            FROM (
-                    SELECT project_id,
-                        object_id,
-                        created_at,
-                        kind,
-                        base_object_class,
-                        refs,
-                        val_dump,
-                        digest,
-                        row_number() OVER (
-                            PARTITION BY project_id,
-                            kind,
-                            object_id,
-                            digest
-                            ORDER BY created_at ASC
-                        ) AS rn
-                    FROM object_versions
-                    WHERE project_id = {project_id: String} AND
-                        object_id = {object_id: String} AND
-                        digest = {version_digest: String}
-                )
-                WHERE rn = 1
+            SELECT val_dump,
+            FROM object_versions
+            WHERE project_id = {project_id: String} AND
+                object_id = {object_id: String} AND
+                digest = {version_digest: String}
         """
         parameters = {
             "project_id": project_id,
@@ -1512,35 +1519,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(query_result.result_rows) == 0:
             raise NotFoundError(f"Obj {object_id} not found")
 
-        combined = list(query_result.result_rows[0]) + [
-            digest,
-            version_index,
-            version_count,
-            is_latest,
-        ]
+        val_dump = query_result.result_rows[0][0]
 
         res = SelectableCHObjSchema.model_validate(
-            dict(
-                zip(
-                    [
-                        "project_id",
-                        "object_id",
-                        "created_at",
-                        "kind",
-                        "base_object_class",
-                        "refs",
-                        "val_dump",
-                        "is_op",
-                        "digest",
-                        "version_index",
-                        "version_count",
-                        "is_latest",
-                    ],
-                    combined,
-                )
-            )
+            {
+                "project_id": project_id,
+                "object_id": object_id,
+                "created_at": created_at,
+                "kind": kind,
+                "base_object_class": base_object_class,
+                "refs": refs,
+                "val_dump": val_dump,
+                "digest": digest,
+                "is_op": is_op,
+                "version_index": version_index,
+                "version_count": version_count,
+                "is_latest": is_latest,
+            }
         )
-
         return res
 
     def _select_objs_query(
