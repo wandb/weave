@@ -582,22 +582,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        parameters: Dict[str, Any] = {}
+        conds: list[str] = []
+        parameters: Dict[str, Union[str, int]] = {}
         if req.digest == "latest":
-            condition_part = "is_latest = 1"
+            conds.append("is_latest = 1")
         else:
-            (is_version, given_version_index) = digest_is_version_like(req.digest)
+            (is_version, version_index) = digest_is_version_like(req.digest)
             if is_version:
-                condition_part = "version_index = {given_version_index: String}"
-                parameters["given_version_index"] = given_version_index
+                conds.append("version_index = {version_index: String}")
+                parameters["version_index"] = version_index
             else:
-                condition_part = "digest = {given_digest: String}"
-                parameters["given_digest"] = req.digest
+                conds.append("digest = {version_digest: String}")
+                parameters["version_digest"] = req.digest
 
         obj = self._select_single_obj_query(
             project_id=req.project_id,
             object_id=req.object_id,
-            conditions=[condition_part],
+            conditions=conds,
             parameters=parameters,
         )
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
