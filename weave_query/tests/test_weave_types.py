@@ -11,7 +11,7 @@ from weave_query.weave_query import weave_types as types
 from weave_query.weave_query.language_features.tagging.tagged_value_type import TaggedValueType
 from weave_query.weave_query.ops_domain import wbmedia
 
-from ... import errors
+from weave_query import errors
 
 
 def test_typeof_string():
