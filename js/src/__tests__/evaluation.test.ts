@@ -17,31 +17,41 @@ describe("Evaluation", () => {
     });
 
     // Mock model
-    const mockModel = op(async function mockPrediction(example: {
-      id: number;
-      text: string;
+    const mockModel = op(async function mockPrediction({
+      datasetRow,
+    }: {
+      datasetRow: {
+        id: number;
+        text: string;
+      };
     }) {
-      if (example.id === 0) throw new Error("Model failed");
-      return `Prediction for ${example.text}`;
+      if (datasetRow.id === 0) throw new Error("Model failed");
+      return `Prediction for ${datasetRow.text}`;
     });
 
     // Mock scorers
     const mockScorers = [
-      op(async function lengthScorer(
-        prediction: string,
-        example: { id: number; text: string }
-      ) {
-        if (example.id === 3) throw new Error("Scorer 1 failed");
+      op(async function lengthScorer({
+        datasetRow,
+        modelOutput,
+      }: {
+        datasetRow: { id: number; text: string };
+        modelOutput: string;
+      }) {
+        if (datasetRow.id === 3) throw new Error("Scorer 1 failed");
         return {
-          explanation: "length is " + prediction.length,
-          length: prediction.length,
+          explanation: "length is " + modelOutput.length,
+          length: modelOutput.length,
         };
       }),
-      op(async function inclusionScorer(
-        prediction: string,
-        example: { id: number; text: string }
-      ) {
-        return prediction.includes(example.text);
+      op(async function inclusionScorer({
+        modelOutput,
+        datasetRow,
+      }: {
+        modelOutput: string;
+        datasetRow: { id: number; text: string };
+      }) {
+        return modelOutput.includes(datasetRow.text);
       }),
     ];
 
