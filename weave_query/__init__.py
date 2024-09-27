@@ -18,7 +18,7 @@ from weave_query.weave_query import storage
 from weave_query.weave_query.api import *
 from weave_query.weave_query.decorators import op
 
-# from .errors import *
+from weave_query.weave_query.errors import *
 
 from weave_query.weave_query import mappers_python_def
 
