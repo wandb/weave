@@ -7,6 +7,8 @@ We'll also show how to evaluate it using an LLM judge.
 
 ![Evals hero](../static/img/evals-hero.png)
 
+Check out the [RAG++ course](https://www.wandb.courses/courses/rag-in-production?utm_source=wandb_docs&utm_medium=code&utm_campaign=weave_docs) for a more advanced dive into practical RAG techniques for engineers, where you'll learn production-ready solutions from Weights & Biases, Cohere and Weaviate to optimize performance, cut costs, and enhance the accuracy and relevance of your applications.
+
 ## 1. Build a knowledge base
 
 First, we compute the embeddings for our articles. You would typically do this once with your articles and put the embeddings & metadata in a database, but here we're doing it every time we run our script for simplicity.

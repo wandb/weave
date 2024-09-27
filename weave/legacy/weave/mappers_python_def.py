@@ -19,7 +19,6 @@ from weave.legacy.weave import (
 from weave.legacy.weave import timestamp as weave_timestamp
 from weave.legacy.weave.language_features.tagging import tagged_value_type
 from weave.legacy.weave.partial_object import PartialObject, PartialObjectType
-from weave.trace.client_context import weave_client as weave_client_context
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -341,7 +340,8 @@ class DefaultToPy(mappers.Mapper):
             pass
         # If the ref exists elsewhere, just return its uri.
         # TODO: This doesn't deal with MemArtifactRef!
-        gc = weave_client_context.get_weave_client()
+        # gc = weave_client_context.get_weave_client()
+        gc = None  # Dropped as part of query service refactor
 
         existing_ref = storage._get_ref(obj)
         if isinstance(existing_ref, artifact_fs.FilesystemArtifactRef):

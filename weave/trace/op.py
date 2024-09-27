@@ -22,7 +22,6 @@ from typing import (
     runtime_checkable,
 )
 
-from weave.legacy.weave import context_state
 from weave.trace import box, call_context, settings
 from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.context import call_attributes, get_raise_on_captured_errors
@@ -382,8 +381,6 @@ def op(
     ...
 
 
-# type ignore here is because we have the legacy decorators above.  Once they are
-# removed, we can remove the overloads this type ignore.
 @overload
 def op(*, name: str) -> Callable[[Any], Op]:  # type: ignore
     """Use name to set the name of the op itself."""
@@ -434,6 +431,9 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
     await extract()  # calls the function and tracks the call in the Weave UI
     ```
     """
+    # TODO: (AT): Remove
+    from weave.legacy.weave import context_state
+
     if context_state.get_loading_built_ins():
         from weave.legacy.weave.decorator_op import op as legacy_op
 

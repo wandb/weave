@@ -4,7 +4,6 @@ import contextvars
 import copy
 import inspect
 import typing
-from typing import Iterator, Sequence
 
 from weave.legacy.weave import weave_types as types
 from weave.legacy.weave import (
@@ -28,12 +27,8 @@ from weave.legacy.weave.language_features.tagging import (
     process_opdef_resolve_fn,
     tagged_value_type,
 )
-from weave.legacy.weave.run import Run
 from weave.legacy.weave.weavejs_fixes import fixup_node
 
-if typing.TYPE_CHECKING:
-    from weave.trace import weave_client
-    from weave.legacy.weave.run_streamtable_span import RunStreamTableSpan
 
 
 _no_refine: contextvars.ContextVar[bool] = contextvars.ContextVar(
