@@ -4,7 +4,7 @@ from weave_query.weave_query import api as weave
 from weave_query.weave_query import graph, storage
 from weave_query.weave_query.weave_internal import make_const_node
 
-from ...legacy.weave import trace_legacy
+from weave_query.weave_query import trace_legacy
 
 
 def test_node_expr():
