@@ -984,7 +984,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     parameters=parameters,
                 )
                 for obj in objs:
-                    root_val_cache[make_obj_cache_key(obj)] = json.loads(obj.val_dump)
+                    val_dump = json.loads(obj.val_dump) if obj.val_dump else None
+                    root_val_cache[make_obj_cache_key(obj)] = val_dump
 
             return [
                 root_val_cache.get(make_root_ref_cache_key(ref), None) for ref in refs
