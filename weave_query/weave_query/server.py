@@ -198,7 +198,7 @@ _REQUESTED_SERVER_LOG_LEVEL: typing.Optional[int] = None
 
 class HttpServer(threading.Thread):
     def __init__(self, port=0, host="localhost"):  # type: ignore
-        from weave import weave_server
+        from weave_query import weave_server
 
         self.host = host
 

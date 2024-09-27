@@ -4,7 +4,7 @@ import pathlib
 import typing
 
 from weave_query.weave_query.api import op
-from weave import types
+from weave_query import types
 from weave_query.weave_query import artifact_fs, ref_base
 from weave_query.weave_query.artifact_local import WORKING_DIR_PREFIX, LocalArtifact
 
