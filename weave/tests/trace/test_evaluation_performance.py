@@ -129,8 +129,8 @@ async def test_evaluation_performance(client: WeaveClient):
             "table_create": 2,  # dataset and score results
             "obj_create": 9,  # Evaluate Op, Score Op, Predict and Score Op, Summarize Op, predict Op, PIL Image Serializer, Eval Results DS, MainDS, Evaluation Object
             "file_create": 10,  # 4 images, 6 ops
-            "call_start": 14,
-            "call_end": 14,
+            "call_start": 14,  # Eval, summary, 4 predict and score sequences of 3 calls each
+            "call_end": 14,  # Eval, summary, 4 predict and score sequences of 3 calls each
         }
     )
 
@@ -144,14 +144,33 @@ async def test_evaluation_performance(client: WeaveClient):
 
 
 @pytest.mark.asyncio
-async def test_evaluation_resilience(client_with_throwing_server: WeaveClient):
+@pytest.mark.disable_logging_error_check
+async def test_evaluation_resilience(
+    client_with_throwing_server: WeaveClient, log_collector
+):
     client_with_throwing_server.project = "test_evaluation_performance"
     evaluation, predict = build_evaluation()
+
+    with raise_on_captured_errors(True):
+        with pytest.raises(TestException):
+            res = await evaluation.evaluate(predict)
+
+    client_with_throwing_server._flush()
+
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 0
 
     # We should gracefully handle the error and return a value
     with raise_on_captured_errors(False):
         res = await evaluation.evaluate(predict)
         assert res["score"]["true_count"] == 1
 
-    with pytest.raises(TestException):
-        res = await evaluation.evaluate(predict)
+    client_with_throwing_server._flush()
+
+    logs = log_collector.get_error_logs()
+    ag_res = Counter([k.split(", req:")[0] for k in set([l.msg for l in logs])])
+    assert ag_res == {
+        "Job failed during flush: ('FAILURE - call_end": 14,  # 14 calls
+        "Job failed during flush: ('FAILURE - obj_create": 6,  # 6 ops
+        "Job failed during flush: ('FAILURE - table_create": 1,  # Table
+    }

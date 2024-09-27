@@ -410,85 +410,85 @@ class TestException(Exception):
 class ThrowingServer(tsi.TraceServerInterface):
     # Call API
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - call_start, req:", req)
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - call_end, req:", req)
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - call_read, req:", req)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - calls_query, req:", req)
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - calls_query_stream, req:", req)
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - calls_delete, req:", req)
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - calls_query_stats, req:", req)
 
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - call_update, req:", req)
 
     # Op API
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - op_create, req:", req)
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - op_read, req:", req)
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - ops_query, req:", req)
 
     # Cost API
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - cost_create, req:", req)
 
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - cost_query, req:", req)
 
     def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - cost_purge, req:", req)
 
     # Obj API
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - obj_create, req:", req)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - obj_read, req:", req)
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - objs_query, req:", req)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - table_create, req:", req)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - table_update, req:", req)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - table_query, req:", req)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - refs_read_batch, req:", req)
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - file_create, req:", req)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - file_content_read, req:", req)
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - feedback_create, req:", req)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - feedback_query, req:", req)
 
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
-        raise TestException("FAILURE!")
+        raise TestException("FAILURE - feedback_purge, req:", req)
 
 
 @pytest.fixture()
