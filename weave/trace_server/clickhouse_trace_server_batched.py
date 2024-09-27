@@ -582,7 +582,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds: list[str] = ["object_id = {object_id: String}"]
+        conds: list[str] = []
+        object_id_conditions = ["object_id = {object_id: String}"]
         parameters: Dict[str, Union[str, int]] = {"object_id": req.object_id}
         if req.digest == "latest":
             conds.append("is_latest = 1")
@@ -595,12 +596,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conds.append("digest = {version_digest: String}")
                 parameters["version_digest"] = req.digest
 
-        obj = self._select_single_obj_query(
+        objs = self._select_objs_query(
             project_id=req.project_id,
             conditions=conds,
+            object_id_conditions=object_id_conditions,
             parameters=parameters,
         )
-        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
+        if len(objs) == 0:
+            raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
+        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conds: list[str] = []
@@ -1409,135 +1413,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 settings=settings,
             )
 
-    def _select_single_obj_query(
-        self,
-        project_id: str,
-        conditions: list[str],
-        parameters: Dict[str, Union[str, int]] = {},
-    ) -> SelectableCHObjSchema:
-        """Query for reading a single object by digest.
-
-        First, query all versions of the object by id to calculate the version index,
-        without the overhead of val_dump.
-        Then, run a second query to get the complete object with the given digest by
-        directly filtering on the digest.
-        """
-        condition_part = combine_conditions(conditions, "AND")
-
-        # Get version counting fields
-        version_index_and_count_query = f"""
-            SELECT
-                project_id,
-                object_id,
-                created_at,
-                kind,
-                base_object_class,
-                refs,
-                if (kind = 'op', 1, 0) AS is_op,
-                digest,
-                version_index,
-                version_count,
-                is_latest
-            FROM (
-                SELECT
-                    project_id,
-                    object_id,
-                    created_at,
-                    kind,
-                    base_object_class,
-                    refs,
-                    digest,
-                    row_number() OVER (
-                        PARTITION BY project_id,
-                        kind,
-                        object_id
-                        ORDER BY created_at ASC
-                    ) - 1 AS version_index,
-                    count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-                    if(version_index + 1 = version_count, 1, 0) AS is_latest
-                FROM (
-                    SELECT
-                        project_id,
-                        object_id,
-                        created_at,
-                        kind,
-                        base_object_class,
-                        refs,
-                        digest,
-                        row_number() OVER (
-                            PARTITION BY project_id,
-                            kind,
-                            object_id,
-                            digest
-                            ORDER BY created_at ASC
-                        ) AS rn
-                    FROM object_versions
-                    WHERE project_id = {{project_id: String}} AND
-                        object_id = {{object_id: String}}
-                )
-                WHERE rn = 1
-            )
-            WHERE {condition_part}
-        """
-        query_result = self._query(
-            version_index_and_count_query,
-            {"project_id": project_id, **parameters},
-        )
-        if len(query_result.result_rows) == 0:
-            raise NotFoundError(f"Obj {parameters.get('object_id')} not found")
-
-        (
-            project_id,
-            object_id,
-            created_at,
-            kind,
-            base_object_class,
-            refs,
-            is_op,
-            digest,
-            version_index,
-            version_count,
-            is_latest,
-        ) = query_result.result_rows[0]
-
-        # Now grab the val_dump directly by digest
-        select_query = """
-            SELECT val_dump
-            FROM object_versions
-            WHERE project_id = {project_id: String} AND
-                object_id = {object_id: String} AND
-                digest = {version_digest: String}
-            LIMIT 1
-        """
-        parameters = {
-            "project_id": project_id,
-            "object_id": object_id,
-            "version_digest": digest,
-        }
-        query_result = self._query(select_query, parameters)
-        if len(query_result.result_rows) == 0:
-            raise NotFoundError(f"Obj value for {object_id}:{digest} not found")
-
-        val_dump = query_result.result_rows[0][0]
-
-        res = SelectableCHObjSchema.model_validate(
-            {
-                "project_id": project_id,
-                "object_id": object_id,
-                "created_at": created_at,
-                "kind": kind,
-                "base_object_class": base_object_class,
-                "refs": refs,
-                "val_dump": val_dump,
-                "digest": digest,
-                "is_op": is_op,
-                "version_index": version_index,
-                "version_count": version_count,
-                "is_latest": is_latest,
-            }
-        )
-        return res
-
     def _select_objs_query(
         self,
         project_id: str,
@@ -1549,23 +1424,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         offset: Optional[int] = None,
         sort_by: Optional[list[tsi.SortBy]] = None,
     ) -> list[SelectableCHObjSchema]:
-        """
-        Main query for fetching objects.
-
-        conditions:
-            conditions should include operations on version_index, digest, kind (is_op)
-            ALL conditions are AND'ed together.
-        object_id_conditions:
-            conditions should include operations on ONLY object_id
-            ALL conditions are AND'ed together.
-        parameters:
-            parameters to be passed to the query. Must include all parameters for both
-            conditions and object_id_conditions.
-        metadata_only:
-            if metadata_only is True, then we exclude the val_dump field in the select query.
-            generally, "queries" should not include the val_dump, but "reads" should, as
-            the val_dump is the most expensive part of the query.
-        """
         if not conditions:
             conditions = ["1 = 1"]
         if not object_id_conditions:
@@ -1597,11 +1455,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if parameters is None:
             parameters = {}
 
-        # When metadata_only is false, dont actually read from the field
-        val_dump_field = "'{}' AS val_dump" if metadata_only else "val_dump"
-
-        # The subquery is for deduplication of object versions by digest
-        select_query = f"""
+        select_without_val_dump_query = f"""
             SELECT
                 project_id,
                 object_id,
@@ -1609,7 +1463,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 kind,
                 base_object_class,
                 refs,
-                val_dump,
                 digest,
                 is_op,
                 version_index,
@@ -1622,7 +1475,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     kind,
                     base_object_class,
                     refs,
-                    val_dump,
                     digest,
                     is_op,
                     row_number() OVER (
@@ -1640,7 +1492,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         kind,
                         base_object_class,
                         refs,
-                        {val_dump_field},
                         digest,
                         if (kind = 'op', 1, 0) AS is_op,
                         row_number() OVER (
@@ -1662,12 +1513,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             {offset_part}
         """
         query_result = self._query_stream(
-            select_query,
+            select_without_val_dump_query,
             {"project_id": project_id, **parameters},
         )
-        result: list[SelectableCHObjSchema] = []
+
+        objects = []
         for row in query_result:
-            result.append(
+            objects.append(
                 SelectableCHObjSchema.model_validate(
                     dict(
                         zip(
@@ -1678,20 +1530,50 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 "kind",
                                 "base_object_class",
                                 "refs",
-                                "val_dump",
                                 "digest",
                                 "is_op",
                                 "version_index",
                                 "version_count",
                                 "is_latest",
+                                "val_dump",
                             ],
-                            row,
+                            list(row) + ["{}"],  # type: ignore
                         )
                     )
                 )
             )
 
-        return result
+        if metadata_only:
+            return objects
+
+        # now get the val_dump for each object
+        object_ids = list(set([row.object_id for row in objects]))
+        digests = list(set([row.digest for row in objects]))
+        query = """
+            SELECT digest, any(val_dump)
+            FROM object_versions
+            WHERE project_id = {project_id: String} AND
+                object_id IN {object_ids: Array(String)} AND
+                digest IN {digests: Array(String)}
+            GROUP BY digest
+        """
+        parameters = {
+            "project_id": project_id,
+            "object_ids": object_ids,
+            "digests": digests,
+        }
+        query_result = self._query_stream(query, parameters)
+        # Map digest to val_dump
+        object_values: Dict[str, Any] = {
+            digest: val_dump
+            for (digest, val_dump) in query_result  # type: ignore
+        }
+
+        # update the val_dump for each object
+        for obj in objects:
+            obj.val_dump = object_values[obj.digest]
+
+        return objects
 
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
