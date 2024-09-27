@@ -1535,9 +1535,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             {limit_part}
             {offset_part}
         """
+
+        # 2GB memory limit per query
+        settings = {"max_memory_usage": 2 * 1024**3}
         query_result = self._query_stream(
             select_query,
             {"project_id": project_id, **parameters},
+            settings=settings,
         )
         result: list[SelectableCHObjSchema] = []
         for row in query_result:
@@ -1577,12 +1581,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query: str,
         parameters: Dict[str, Any],
         column_formats: Optional[Dict[str, Any]] = None,
+        settings: Optional[Dict[str, Any]] = None,
     ) -> Iterator[QueryResult]:
         """Streams the results of a query from the database."""
         summary = None
         parameters = _process_parameters(parameters)
         with self.ch_client.query_rows_stream(
-            query, parameters=parameters, column_formats=column_formats, use_none=True
+            query,
+            parameters=parameters,
+            column_formats=column_formats,
+            use_none=True,
+            settings=settings,
         ) as stream:
             if isinstance(stream.source, QueryResult):
                 summary = stream.source.summary
@@ -1592,6 +1601,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "query": query,
                     "parameters": parameters,
                     "summary": summary,
+                    "settings": settings,
                 },
             )
             for row in stream:
