@@ -20,7 +20,7 @@ repos:
         # You have to exclude in 3 places. 1) here. 2) mypi.ini exclude, 3) follow_imports = skip for each module in mypy.ini
         # exclude: (.*pyi$)|(weave/legacy)|(weave/tests)
         args: ['--config-file=pyproject.toml']
-        exclude: (.*pyi$)|(weave_query)|(weave/tests)|(weave/trace_server/tests/*.py)|(weave/conftest.py)|(weave/trace/tests)|(integration_test)|(weave/tests/trace)|(weave/conftest.py)|(weave/trace_server/tests)|(examples)|(weave/integrations)
+        exclude: (.*pyi$)|(weave_query)|(weave/tests)|(weave/trace_server/tests)|(weave/conftest.py)|(weave/trace/tests)|(integration_test)|(weave/tests/trace)|(weave/conftest.py)|(weave/trace_server/tests)|(examples)|(weave/integrations)|(weave/docker)
   # This is legacy Weave when we were building a notebook product - should be removed
   - repo: local
     hooks:

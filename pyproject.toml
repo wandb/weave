@@ -122,14 +122,13 @@ exclude = [
   ".*pyi$",
   "weave_query",
   "weave/tests",
-  "weave/trace_server/tests/*.py",
+  "weave/trace_server/tests",
   "weave/conftest.py",
   "weave/trace/tests",
   "integration_test",
-  "weave/tests/trace",
-  "weave/conftest.py",
   "weave/trace_server/tests",
   "examples",
+  "weave/docker",
 ]
 ignore_missing_imports = true
 
