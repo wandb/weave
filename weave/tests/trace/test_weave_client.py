@@ -15,8 +15,8 @@ from weave.tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
     RegexStringMatcher,
-    client_is_sqlite,
 )
+from weave.trace_server.sqlite_trace_server import NotFoundError as sqliteNotFoundError
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, is_op
@@ -1474,7 +1474,7 @@ def test_object_version_read(client):
     # check badly formatted digests
     digests = ["v1111", "1", ""]
     for digest in digests:
-        with pytest.raises(NotFoundError):
+        with pytest.raises((NotFoundError, sqliteNotFoundError)):
             # grab non-existant version
             obj_res = client.server.obj_read(
                 tsi.ObjReadReq(
@@ -1485,7 +1485,7 @@ def test_object_version_read(client):
             )
 
     # check non-existant object_id
-    with pytest.raises(NotFoundError):
+    with pytest.raises((NotFoundError, sqliteNotFoundError)):
         obj_res = client.server.obj_read(
             tsi.ObjReadReq(
                 project_id=client._project_id(),
