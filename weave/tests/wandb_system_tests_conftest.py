@@ -15,11 +15,7 @@ import pytest
 import requests
 import wandb
 
-from weave_query.weave_query.wandb_api import (
-    WandbApiContext,
-    from_environment,
-    wandb_api_context,
-)
+from weave.wandb_interface.wandb_api import from_environment
 
 
 # The following code snippet was copied from:
@@ -88,27 +84,6 @@ def bootstrap_user(
 
 
 @pytest.fixture(scope=determine_scope)
-def user_by_api_key_in_context(
-    bootstrap_user: LocalBackendFixturePayload,
-) -> Generator[LocalBackendFixturePayload, None, None]:
-    with wandb_api_context(WandbApiContext(api_key=bootstrap_user.api_key)):
-        yield bootstrap_user
-
-
-@pytest.fixture(scope=determine_scope)
-def user_by_http_headers_in_context(
-    bootstrap_user: LocalBackendFixturePayload,
-) -> Generator[LocalBackendFixturePayload, None, None]:
-    headers = {
-        "use-admin-privileges": "true",
-        "cookie": f"wandb={bootstrap_user.cookie};",
-    }
-    cookies = {"wandb": bootstrap_user.cookie}
-    with wandb_api_context(WandbApiContext(headers=headers, cookies=cookies)):
-        yield bootstrap_user
-
-
-@pytest.fixture(scope=determine_scope)
 def user_by_api_key_in_env(
     bootstrap_user: LocalBackendFixturePayload, serial
 ) -> Generator[LocalBackendFixturePayload, None, None]:
@@ -122,31 +97,6 @@ def user_by_api_key_in_env(
             wandb.teardown()  # type: ignore
             yield bootstrap_user
             wandb.teardown()  # type: ignore
-
-
-@pytest.fixture(scope=determine_scope)
-def user_by_api_key_netrc(
-    bootstrap_user: LocalBackendFixturePayload,
-) -> Generator[LocalBackendFixturePayload, None, None]:
-    netrc_path = os.path.expanduser("~/.netrc")
-    old_netrc = None
-    if os.path.exists(netrc_path):
-        with open(netrc_path, "r") as f:
-            old_netrc = f.read()
-    try:
-        with open(netrc_path, "w") as f:
-            url = urllib.parse.urlparse(bootstrap_user.base_url).netloc
-            f.write(
-                f"machine {url}\n  login user\n  password {bootstrap_user.api_key}\n"
-            )
-        with from_environment():
-            yield bootstrap_user
-    finally:
-        if old_netrc is None:
-            os.remove(netrc_path)
-        else:
-            with open(netrc_path, "w") as f:
-                f.write(old_netrc)
 
 
 ##################################################################
