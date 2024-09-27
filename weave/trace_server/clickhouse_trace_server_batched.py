@@ -1502,7 +1502,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             is_latest,
         ) = query_result.result_rows[0]
 
-        # Now get the full object by digest
+        # Now grab the val_dump directly by digest
         select_query = """
             SELECT val_dump,
             FROM object_versions
