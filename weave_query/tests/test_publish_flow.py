@@ -2,7 +2,8 @@ import typing
 
 import pytest
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import panels, storage
 from weave_query.weave_query.artifact_fs import BranchPointType, FilesystemArtifactRef
 from weave_query.weave_query.artifact_local import (

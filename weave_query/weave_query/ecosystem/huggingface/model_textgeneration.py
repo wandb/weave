@@ -3,7 +3,8 @@ import typing
 
 import transformers
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query.ecosystem.huggingface import hfmodel
 
 # We have to forward-declare the Weave types to avoid circular reference

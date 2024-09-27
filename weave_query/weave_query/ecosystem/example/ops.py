@@ -1,6 +1,7 @@
 # Put your types, ops and panels here.
 
-import weave
+import weave_query as weave
+import weave_query
 
 
 @weave.op()

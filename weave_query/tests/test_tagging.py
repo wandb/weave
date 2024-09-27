@@ -1,6 +1,7 @@
 import pytest
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import box, weave_internal
 from weave_query.weave_query import weave_types as types
 from weave_query.weave_query.artifact_fs import FilesystemArtifactFileType

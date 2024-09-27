@@ -3,7 +3,8 @@ import json
 import graphql
 import wandb
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import ops
 from weave_query.weave_query.language_features.tagging import tagged_value_type
 from weave_query.weave_query.ops_domain import wb_domain_types

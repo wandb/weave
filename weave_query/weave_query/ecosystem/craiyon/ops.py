@@ -2,7 +2,8 @@ import base64
 import io
 import requests
 from PIL import Image
-import weave
+import weave_query as weave
+import weave_query
 
 
 class ServiceError(Exception):

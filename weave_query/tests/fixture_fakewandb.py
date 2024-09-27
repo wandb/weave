@@ -10,7 +10,8 @@ from urllib import parse
 
 import wandb
 
-import weave
+import weave_query as weave
+import weave_query
 from weave.legacy.tests.util.tag_test_util import op_add_tag
 
 # Note: We're mocking out the whole io_service right now. This is too

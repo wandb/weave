@@ -2,7 +2,8 @@ import os
 import xgboost
 import typing
 
-import weave
+import weave_query as weave
+import weave_query
 
 
 class XGBoostModelType(weave.types.Type):

@@ -2,7 +2,8 @@
 
 import pytest
 
-import weave
+import weave_query as weave
+import weave_query
 import weave_query.weave_query.weave_types as types
 from weave_query.weave_query import box, ops_arrow
 from weave_query.weave_query.arrow.convert import to_arrow

@@ -1,6 +1,7 @@
 import pytest
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import api, context_state, environment, errors, ops
 
 

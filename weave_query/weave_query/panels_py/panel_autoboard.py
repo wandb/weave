@@ -25,7 +25,8 @@
 import os
 import typing
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import weave_internal
 from weave_query.weave_query.panels import panel_plot
 from weave_query.weave_query.panels_py.generator_templates import template_registry

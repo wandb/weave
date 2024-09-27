@@ -8,7 +8,8 @@ import plotly
 import plotly.express as px
 from plotly import graph_objs as go
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import weave_internal
 from weave_query.weave_query import infer_types
 

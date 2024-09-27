@@ -11,7 +11,8 @@ from this list and defined manually.
 import dataclasses
 import typing
 
-import weave
+import weave_query as weave
+import weave_query
 
 
 @dataclasses.dataclass

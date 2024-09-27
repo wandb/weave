@@ -1,4 +1,5 @@
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import panel
 
 # TODO: This id conflicts with the histogram type! Panel types

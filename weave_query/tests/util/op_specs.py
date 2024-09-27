@@ -2,7 +2,8 @@ import dataclasses
 import datetime
 import typing
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import op_def, ops_primitives
 from weave_query.weave_query.language_features.tagging import tagged_value_type
 from weave_query.weave_query.timestamp import PY_DATETIME_MAX_MS, PY_DATETIME_MIN_MS

@@ -3,8 +3,7 @@
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](http://wandb.me/weave_colab)
 [![Stable Version](https://img.shields.io/pypi/v/weave?color=green)](https://pypi.org/project/weave)
 [![Download Stats](https://img.shields.io/pypi/dm/weave)](https://pypistats.org/packages/weave)
-[![Github Checks](https://img.shields.io/github/check-runs/wandb/weave/master
-)](https://github.com/wandb/weave)
+[![Github Checks](https://img.shields.io/github/check-runs/wandb/weave/master)](https://github.com/wandb/weave)
 
 Weave is a toolkit for developing Generative AI applications, built by [Weights & Biases](https://wandb.ai/).
 
@@ -27,6 +26,7 @@ Our goal is to bring rigor, best-practices, and composability to the inherently 
 Our documentation site can be found [here](https://wandb.me/weave)
 
 ## Installation
+
 ```
 pip install weave
 ```
@@ -34,12 +34,14 @@ pip install weave
 ## Usage
 
 ### Tracing
+
 You can trace any function using `weave.op()` - from api calls to OpenAI, Anthropic, Google AI Studio etc to generation calls from Hugging Face and other open source models to any other validation functions or data transformations in your code you'd like to keep track of.
 
 Decorate all the functions you want to trace, this will generate a trace tree of the inputs and outputs of all your functions:
 
 ```python
-import weave
+import weave_query as weave
+import weave_query
 weave.init("weave-example")
 
 @weave.op()
@@ -59,10 +61,11 @@ def main():
 main()
 ```
 
-### Fuller Example 
+### Fuller Example
 
 ```python
-import weave
+import weave_query as weave
+import weave_query
 import json
 from openai import OpenAI
 

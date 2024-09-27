@@ -1,6 +1,7 @@
 import pytest
 
-import weave
+import weave_query as weave
+import weave_query
 from weave_query.weave_query import api as api
 from weave_query.weave_query import graph, op_args, ops, registry_mem, serialize, weave_internal
 from weave_query.weave_query import weave_types as types
