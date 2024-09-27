@@ -582,14 +582,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds: list[str] = []
-        parameters: Dict[str, Union[str, int]] = {}
+        conds: list[str] = ["object_id = {object_id: String}"]
+        parameters: Dict[str, Union[str, int]] = {"object_id": req.object_id}
         if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
             (is_version, version_index) = digest_is_version_like(req.digest)
             if is_version:
-                conds.append("version_index = {version_index: String}")
+                conds.append("version_index = {version_index: UInt64}")
                 parameters["version_index"] = version_index
             else:
                 conds.append("digest = {version_digest: String}")
@@ -597,7 +597,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         obj = self._select_single_obj_query(
             project_id=req.project_id,
-            object_id=req.object_id,
             conditions=conds,
             parameters=parameters,
         )
@@ -1413,9 +1412,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _select_single_obj_query(
         self,
         project_id: str,
-        object_id: str,
         conditions: list[str],
-        parameters: Dict[str, Any] = {},
+        parameters: Dict[str, Union[str, int]] = {},
     ) -> SelectableCHObjSchema:
         """Query for reading a single object by digest.
 
@@ -1484,10 +1482,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """
         query_result = self._query(
             version_index_and_count_query,
-            {"project_id": project_id, "object_id": object_id, **parameters},
+            {"project_id": project_id, **parameters},
         )
         if len(query_result.result_rows) == 0:
-            raise NotFoundError(f"Obj {object_id} not found")
+            raise NotFoundError(f"Obj {parameters.get('object_id')} not found")
 
         (
             project_id,
@@ -1519,7 +1517,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         }
         query_result = self._query(select_query, parameters)
         if len(query_result.result_rows) == 0:
-            raise NotFoundError(f"Obj digest {object_id}:{digest} not found")
+            raise NotFoundError(f"Obj value for {object_id}:{digest} not found")
 
         val_dump = query_result.result_rows[0][0]
 
