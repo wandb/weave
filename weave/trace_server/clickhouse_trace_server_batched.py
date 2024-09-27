@@ -1509,6 +1509,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             WHERE project_id = {project_id: String} AND
                 object_id = {object_id: String} AND
                 digest = {version_digest: String}
+            LIMIT 1
         """
         parameters = {
             "project_id": project_id,
@@ -1517,7 +1518,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         }
         query_result = self._query(select_query, parameters)
         if len(query_result.result_rows) == 0:
-            raise NotFoundError(f"Obj {object_id} not found")
+            raise NotFoundError(f"Obj digest {object_id}:{digest} not found")
 
         val_dump = query_result.result_rows[0][0]
 
