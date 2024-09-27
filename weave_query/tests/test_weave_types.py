@@ -3,12 +3,12 @@ import dataclasses
 import pytest
 
 import weave
-import weave.legacy.weave
-import weave.legacy.weave.weave_types
-from weave.legacy.weave import _dict_utils, runs
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.language_features.tagging.tagged_value_type import TaggedValueType
-from weave.legacy.weave.ops_domain import wbmedia
+import weave_query.weave_query
+import weave_query.weave_query.weave_types
+from weave_query.weave_query import _dict_utils, runs
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.language_features.tagging.tagged_value_type import TaggedValueType
+from weave_query.weave_query.ops_domain import wbmedia
 
 from ... import errors
 
@@ -155,23 +155,23 @@ def test_typeof_list_dict_merge():
 
 def test_typeof_nested_dict_merge():
     """Tests that nested merging is disabled."""
-    t1 = weave.legacy.weave.weave_types.TypedDict(
-        {"a": weave.legacy.weave.weave_types.TypedDict({"b": types.Int()})}
+    t1 = weave_query.weave_query.weave_types.TypedDict(
+        {"a": weave_query.weave_query.weave_types.TypedDict({"b": types.Int()})}
     )
-    t2 = weave.legacy.weave.weave_types.TypedDict(
-        {"a": weave.legacy.weave.weave_types.TypedDict({"c": types.String()})}
+    t2 = weave_query.weave_query.weave_types.TypedDict(
+        {"a": weave_query.weave_query.weave_types.TypedDict({"c": types.String()})}
     )
     merged_type = _dict_utils.typeddict_merge_output_type({"self": t1, "other": t2})
-    assert merged_type == weave.legacy.weave.weave_types.TypedDict(
-        {"a": weave.legacy.weave.weave_types.TypedDict({"c": types.String()})}
+    assert merged_type == weave_query.weave_query.weave_types.TypedDict(
+        {"a": weave_query.weave_query.weave_types.TypedDict({"c": types.String()})}
     )
 
 
 def test_dict_without_key_type():
-    fully_typed = weave.legacy.weave.weave_types.TypeRegistry.type_from_dict(
+    fully_typed = weave_query.weave_query.weave_types.TypeRegistry.type_from_dict(
         {"type": "dict", "keyType": "string", "objectType": "number"}
     )
-    partial_typed = weave.legacy.weave.weave_types.TypeRegistry.type_from_dict(
+    partial_typed = weave_query.weave_query.weave_types.TypeRegistry.type_from_dict(
         {"type": "dict", "objectType": "number"}
     )
     assert fully_typed.assign_type(partial_typed)
@@ -179,24 +179,24 @@ def test_dict_without_key_type():
 
 # def test_union_unknown():
 #     assert (
-#         weave.legacy.weave.weave_types.union(
-#             weave.legacy.weave.weave_types.String(), weave.legacy.weave.weave_types.UnknownType()
+#         weave_query.weave_query.weave_types.union(
+#             weave_query.weave_query.weave_types.String(), weave_query.weave_query.weave_types.UnknownType()
 #         )
-#         == weave.legacy.weave.weave_types.String()
+#         == weave_query.weave_query.weave_types.String()
 #     )
 #     assert (
-#         weave.legacy.weave.weave_types.union(
-#             weave.legacy.weave.weave_types.UnknownType(), weave.legacy.weave.weave_types.UnknownType()
+#         weave_query.weave_query.weave_types.union(
+#             weave_query.weave_query.weave_types.UnknownType(), weave_query.weave_query.weave_types.UnknownType()
 #         )
-#         == weave.legacy.weave.weave_types.UnknownType()
+#         == weave_query.weave_query.weave_types.UnknownType()
 #     )
 #     assert (
-#         weave.legacy.weave.weave_types.union(
-#             weave.legacy.weave.weave_types.UnknownType(),
-#             weave.legacy.weave.weave_types.UnknownType(),
+#         weave_query.weave_query.weave_types.union(
+#             weave_query.weave_query.weave_types.UnknownType(),
+#             weave_query.weave_query.weave_types.UnknownType(),
 #             weave.types.String(),
 #         )
-#         == weave.legacy.weave.weave_types.String()
+#         == weave_query.weave_query.weave_types.String()
 #     )
 
 
@@ -204,78 +204,78 @@ def test_union_access():
     ### Type return
 
     # Not all members have props
-    unioned = weave.legacy.weave.weave_types.union(
-        weave.legacy.weave.weave_types.String(),
-        weave.legacy.weave.weave_types.List(weave.legacy.weave.weave_types.String()),
+    unioned = weave_query.weave_query.weave_types.union(
+        weave_query.weave_query.weave_types.String(),
+        weave_query.weave_query.weave_types.List(weave_query.weave_query.weave_types.String()),
     )
     with pytest.raises(AttributeError):
         unioned.object_type
 
     # Combined dicts
-    unioned = weave.legacy.weave.weave_types.union(
-        weave.legacy.weave.weave_types.List(weave.legacy.weave.weave_types.String()),
-        weave.legacy.weave.weave_types.List(weave.legacy.weave.weave_types.Number()),
+    unioned = weave_query.weave_query.weave_types.union(
+        weave_query.weave_query.weave_types.List(weave_query.weave_query.weave_types.String()),
+        weave_query.weave_query.weave_types.List(weave_query.weave_query.weave_types.Number()),
     )
-    assert unioned.object_type == weave.legacy.weave.weave_types.union(
-        weave.legacy.weave.weave_types.String(), weave.legacy.weave.weave_types.Number()
+    assert unioned.object_type == weave_query.weave_query.weave_types.union(
+        weave_query.weave_query.weave_types.String(), weave_query.weave_query.weave_types.Number()
     )
 
     # Nullable type
-    unioned = weave.legacy.weave.weave_types.union(
-        weave.legacy.weave.weave_types.NoneType(),
-        weave.legacy.weave.weave_types.List(weave.legacy.weave.weave_types.String()),
+    unioned = weave_query.weave_query.weave_types.union(
+        weave_query.weave_query.weave_types.NoneType(),
+        weave_query.weave_query.weave_types.List(weave_query.weave_query.weave_types.String()),
     )
-    assert unioned.object_type == weave.legacy.weave.weave_types.union(
-        weave.legacy.weave.weave_types.String(), weave.legacy.weave.weave_types.NoneType()
+    assert unioned.object_type == weave_query.weave_query.weave_types.union(
+        weave_query.weave_query.weave_types.String(), weave_query.weave_query.weave_types.NoneType()
     )
 
     ### Dict Return
     # Not all members have props
-    unioned = weave.legacy.weave.weave_types.union(
-        weave.legacy.weave.weave_types.String(),
-        weave.legacy.weave.weave_types.TypedDict({"a": weave.legacy.weave.weave_types.String()}),
+    unioned = weave_query.weave_query.weave_types.union(
+        weave_query.weave_query.weave_types.String(),
+        weave_query.weave_query.weave_types.TypedDict({"a": weave_query.weave_query.weave_types.String()}),
     )
     with pytest.raises(AttributeError):
         unioned.property_types
 
     # Combined dicts
-    unioned = weave.legacy.weave.weave_types.union(
-        weave.legacy.weave.weave_types.TypedDict(
+    unioned = weave_query.weave_query.weave_types.union(
+        weave_query.weave_query.weave_types.TypedDict(
             {
-                "same": weave.legacy.weave.weave_types.Number(),
-                "solo_a": weave.legacy.weave.weave_types.Number(),
-                "differ": weave.legacy.weave.weave_types.Number(),
+                "same": weave_query.weave_query.weave_types.Number(),
+                "solo_a": weave_query.weave_query.weave_types.Number(),
+                "differ": weave_query.weave_query.weave_types.Number(),
             }
         ),
-        weave.legacy.weave.weave_types.TypedDict(
+        weave_query.weave_query.weave_types.TypedDict(
             {
-                "same": weave.legacy.weave.weave_types.Number(),
-                "solo_b": weave.legacy.weave.weave_types.String(),
-                "differ": weave.legacy.weave.weave_types.String(),
+                "same": weave_query.weave_query.weave_types.Number(),
+                "solo_b": weave_query.weave_query.weave_types.String(),
+                "differ": weave_query.weave_query.weave_types.String(),
             }
         ),
     )
     assert unioned.property_types == {
-        "same": weave.legacy.weave.weave_types.Number(),
-        "solo_a": weave.legacy.weave.weave_types.union(
-            weave.legacy.weave.weave_types.Number(), weave.legacy.weave.weave_types.NoneType()
+        "same": weave_query.weave_query.weave_types.Number(),
+        "solo_a": weave_query.weave_query.weave_types.union(
+            weave_query.weave_query.weave_types.Number(), weave_query.weave_query.weave_types.NoneType()
         ),
-        "solo_b": weave.legacy.weave.weave_types.union(
-            weave.legacy.weave.weave_types.String(), weave.legacy.weave.weave_types.NoneType()
+        "solo_b": weave_query.weave_query.weave_types.union(
+            weave_query.weave_query.weave_types.String(), weave_query.weave_query.weave_types.NoneType()
         ),
-        "differ": weave.legacy.weave.weave_types.union(
-            weave.legacy.weave.weave_types.Number(), weave.legacy.weave.weave_types.String()
+        "differ": weave_query.weave_query.weave_types.union(
+            weave_query.weave_query.weave_types.Number(), weave_query.weave_query.weave_types.String()
         ),
     }
 
     # Nullable type
-    unioned = weave.legacy.weave.weave_types.union(
-        weave.legacy.weave.weave_types.NoneType(),
-        weave.legacy.weave.weave_types.TypedDict({"a": weave.legacy.weave.weave_types.String()}),
+    unioned = weave_query.weave_query.weave_types.union(
+        weave_query.weave_query.weave_types.NoneType(),
+        weave_query.weave_query.weave_types.TypedDict({"a": weave_query.weave_query.weave_types.String()}),
     )
     assert unioned.property_types == {
-        "a": weave.legacy.weave.weave_types.union(
-            weave.legacy.weave.weave_types.String(), weave.legacy.weave.weave_types.NoneType()
+        "a": weave_query.weave_query.weave_types.union(
+            weave_query.weave_query.weave_types.String(), weave_query.weave_query.weave_types.NoneType()
         )
     }
 
@@ -713,7 +713,7 @@ def test_deserializes_single_member_union():
 
 
 def test_wbrun_not_assignable_to_weave_run():
-    from weave.legacy.weave.ops_domain import wb_domain_types
+    from weave_query.weave_query.ops_domain import wb_domain_types
 
     assert not weave.types.optional(wb_domain_types.Run().WeaveType()).assign_type(
         weave.types.RunType(

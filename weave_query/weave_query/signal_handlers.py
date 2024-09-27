@@ -10,7 +10,7 @@ import traceback
 import typing
 from types import FrameType
 
-from weave.legacy.weave import environment
+from weave_query.weave_query import environment
 
 
 def dump_folder() -> pathlib.Path:

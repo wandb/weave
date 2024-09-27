@@ -1,6 +1,6 @@
 from PIL import Image
 
-from weave.legacy.weave import api as weave
+from weave_query.weave_query import api as weave
 
 
 @weave.type()

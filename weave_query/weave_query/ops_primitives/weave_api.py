@@ -2,9 +2,9 @@ import dataclasses
 import time
 import typing
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import mutation, op, weave_class
-from weave.legacy.weave import (
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import mutation, op, weave_class
+from weave_query.weave_query import (
     storage,
     weave_internal,
     errors,
@@ -20,7 +20,7 @@ from weave.legacy.weave import (
     trace_legacy,
     uris,
 )
-from weave.legacy.weave.graph import Node
+from weave_query.weave_query.graph import Node
 
 
 @weave_class(weave_type=types.RefType)
@@ -633,7 +633,7 @@ def append(
 @op(mutation=True, name="stream_table-log")
 def stream_table_log(self: graph.Node, val: typing.Any) -> typing.Any:
     st_obj = weave_internal.use(self)
-    from weave.legacy.weave.monitoring import StreamTable
+    from weave_query.weave_query.monitoring import StreamTable
 
     if not isinstance(st_obj, StreamTable):
         raise errors.WeaveInternalError(

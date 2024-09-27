@@ -1,8 +1,8 @@
 import typing
 
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import gql_op_plugin, graph, input_provider, op_def, partial_object, registry_mem
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query import gql_op_plugin, graph, input_provider, op_def, partial_object, registry_mem
 
 
 def _propagate_gql_keys_for_node(
@@ -13,7 +13,7 @@ def _propagate_gql_keys_for_node(
 ) -> types.Type:
     # Mutates node
     # TODO: see if this can be done without mutations
-    from weave.legacy.weave.language_features.tagging import (
+    from weave_query.weave_query.language_features.tagging import (
         opdef_util,
         tagged_value_type,
         tagged_value_type_helpers,

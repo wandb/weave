@@ -10,8 +10,8 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import typing_extensions
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import (
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query import (
     weave_internal,
     errors,
     _dict_utils,
@@ -25,7 +25,7 @@ from weave.legacy.weave import (
     node_ref,
     ref_base,
 )
-from weave.legacy.weave.arrow.arrow import (
+from weave_query.weave_query.arrow.arrow import (
     ArrowWeaveListType,
     arrow_as_array,
     arrow_zip,
@@ -33,11 +33,11 @@ from weave.legacy.weave.arrow.arrow import (
     pretty_print_arrow_type,
     safe_is_null,
 )
-from weave.legacy.weave.language_features.tagging import (
+from weave_query.weave_query.language_features.tagging import (
     tag_store,
     tagged_value_type,
 )
-from weave.legacy.weave import ref_util
+from weave_query.weave_query import ref_util
 
 
 def reverse_dict(d: dict) -> dict:
@@ -494,7 +494,7 @@ ArrowWeaveListObjectTypeVar = typing.TypeVar("ArrowWeaveListObjectTypeVar")
 
 
 def dict_of_columns_to_awl(d: dict[str, typing.Any]) -> "ArrowWeaveList":
-    from weave.legacy.weave.arrow import constructors
+    from weave_query.weave_query.arrow import constructors
 
     cols = {}
     for k, v in d.items():
@@ -522,7 +522,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         artifact: typing.Optional[artifact_base.Artifact] = None,
         invalid_reason=None,
     ) -> None:
-        from weave.legacy.weave.arrow import constructors, convert
+        from weave_query.weave_query.arrow import constructors, convert
 
         # Do not dictionary decode this array! That will break performance.
         # Note we combine chunks here, to make the internal interface easy
@@ -610,7 +610,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         if not isinstance(other, ArrowWeaveList):
             raise TypeError(f"Expected list or ArrowWeaveList, got {type(other)}")
 
-        from weave.legacy.weave.arrow import concat
+        from weave_query.weave_query.arrow import concat
 
         return concat.concatenate(self, other)
 
@@ -901,7 +901,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                                 type_codes,
                                 pa.scalar(i, pa.int8()),
                             )
-                            from weave.legacy.weave.arrow import concat
+                            from weave_query.weave_query.arrow import concat
 
                             members[i] = concat.concatenate(member_i, member_j)
                             members[j] = None
@@ -1499,12 +1499,12 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         self, fn: typing.Union[typing.Callable[[typing.Any], typing.Any], graph.Node]
     ):
         fn = self._make_lambda_node(fn)
-        from weave.legacy.weave.ops_arrow.vectorize import _apply_fn_node_with_tag_pushdown
+        from weave_query.weave_query.ops_arrow.vectorize import _apply_fn_node_with_tag_pushdown
 
         return _apply_fn_node_with_tag_pushdown(self, fn)  # type: ignore
 
     def concat(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
-        from weave.legacy.weave.arrow import concat
+        from weave_query.weave_query.arrow import concat
 
         return concat.concatenate(self, other)
 
@@ -1518,7 +1518,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         leftOuter: bool = False,
         rightOuter: bool = False,
     ):
-        from weave.legacy.weave.ops_arrow import list_join
+        from weave_query.weave_query.ops_arrow import list_join
 
         join1Fn = self._make_lambda_node(join1Fn)
         join2Fn = other._make_lambda_node(join2Fn)
@@ -1666,7 +1666,7 @@ def make_vec_taggedvalue(
 def awl_zip(*arrs: ArrowWeaveList) -> ArrowWeaveList:
     if not arrs:
         raise ValueError("Cannot zip empty list")
-    from weave.legacy.weave.arrow import convert
+    from weave_query.weave_query.arrow import convert
 
     arrs = convert.unify_types(*arrs)
     zipped = arrow_zip(*[a._arrow_data for a in arrs])

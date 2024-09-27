@@ -1,9 +1,9 @@
 import inspect
 import typing
 
-from weave.legacy.weave import errors
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import context_state, derive_op, op_def, registry_mem
+from weave_query.weave_query import errors
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query import context_state, derive_op, op_def, registry_mem
 
 # Contrary to the way it is read, the weave.class() decorator runs AFTER the
 # inner methods are defined. Therefore, this function runs after the ops are

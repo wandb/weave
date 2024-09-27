@@ -1,8 +1,8 @@
-from weave.legacy.weave import context_state as _context_state
+from weave_query.weave_query import context_state as _context_state
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 
-from weave.legacy.weave.panels_py import (
+from weave_query.weave_query.panels_py import (
     generator_templates,
     panel_autoboard,
     panel_llm_monitor,
@@ -12,6 +12,6 @@ from weave.legacy.weave.panels_py import (
 )
 
 # This is just an example, uncomment to enable
-# from weave.legacy.weave.panels_py import panel_example_custom_board
+# from weave_query.weave_query.panels_py import panel_example_custom_board
 
 _context_state.clear_loading_built_ins(_loading_builtins_token)

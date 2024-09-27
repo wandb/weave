@@ -12,9 +12,9 @@ import numpy as np
 import pyarrow as pa
 from pyarrow import compute as pc
 
-from weave.legacy.weave import errors
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.arrow.list_ import (
+from weave_query.weave_query import errors
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.arrow.list_ import (
     ArrowWeaveList,
     ArrowWeaveListGeneric,
     is_list_arrowweavelist,
@@ -26,11 +26,11 @@ from weave.legacy.weave.arrow.list_ import (
     offsets_starting_at_zero,
     unsafe_awl_construction,
 )
-from weave.legacy.weave.language_features.tagging import tagged_value_type
+from weave_query.weave_query.language_features.tagging import tagged_value_type
 
 DEBUG = False
 
-from weave.legacy.weave import engine_trace
+from weave_query.weave_query import engine_trace
 
 tracer = engine_trace.tracer()
 

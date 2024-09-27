@@ -11,20 +11,20 @@ from collections.abc import Iterable
 import pydantic
 from dateutil.parser import isoparse
 
-from weave.legacy.weave import (
+from weave_query.weave_query import (
     box,
     context_state,
     errors,
     mappers_python,
     object_type_ref_util,
 )
-from weave.legacy.weave import timestamp as weave_timestamp
+from weave_query.weave_query import timestamp as weave_timestamp
 
 if typing.TYPE_CHECKING:
-    from weave.legacy.weave import artifact_base
-    from weave.legacy.weave.artifact_fs import FilesystemArtifact
+    from weave_query.weave_query import artifact_base
+    from weave_query.weave_query.artifact_fs import FilesystemArtifact
 
-    from weave.legacy.weave import weave_inspector
+    from weave_query.weave_query import weave_inspector
 
 
 def to_weavejs_typekey(k: str) -> str:
@@ -126,7 +126,7 @@ class TypeRegistry:
 
     @staticmethod
     def type_of(obj: typing.Any) -> "Type":  # type: ignore
-        from weave.legacy.weave import ref_base
+        from weave_query.weave_query import ref_base
 
         if (
             context_state.ref_tracking_enabled()
@@ -460,7 +460,7 @@ class Type(metaclass=_TypeSubclassWatcher):
     def _inspect(self) -> "weave_inspector.TypeInspector":  # type: ignore
         """Only intended to be used by developers to help debug the graph."""
         # Circular import, so we do it here.
-        from weave.legacy.weave import weave_inspector
+        from weave_query.weave_query import weave_inspector
 
         return weave_inspector.TypeInspector(self)
 
@@ -1061,7 +1061,7 @@ class ObjectType(Type):
 
     @classmethod
     def typeclass_of_class(cls, check_class):  # type: ignore
-        from weave.legacy.weave import weave_pydantic
+        from weave_query.weave_query import weave_pydantic
 
         if not issubclass(check_class, pydantic.BaseModel):
             return cls
@@ -1278,7 +1278,7 @@ class TypeType(ObjectType):
 
     @classmethod
     def type_of_instance(cls, obj):  # type: ignore
-        from weave.legacy.weave import infer_types
+        from weave_query.weave_query import infer_types
 
         attr_types = {}
         for field in dataclasses.fields(obj):
@@ -1361,7 +1361,7 @@ class Function(Type):
     def load_instance(self, artifact, name, extra=None):  # type: ignore
         with artifact.open(f"{name}.object.json") as f:
             # TODO: no circular imports!
-            from weave.legacy.weave import graph
+            from weave_query.weave_query import graph
 
             return graph.Node.node_from_json(json.load(f))
 
@@ -1385,7 +1385,7 @@ class RefType(Type):
         return None
 
     def save_instance(self, obj, artifact, name):  # type: ignore
-        from weave.legacy.weave import ref_base
+        from weave_query.weave_query import ref_base
 
         obj_ref = ref_base.get_ref(obj)
         if obj_ref is None:
@@ -1419,7 +1419,7 @@ class LocalArtifactRefType(FilesystemArtifactRefType):
 @dataclasses.dataclass(frozen=True)
 class WandbArtifactRefType(FilesystemArtifactRefType):
     def load_instance(self, artifact, name, extra=None):  # type: ignore
-        from weave.legacy.weave import artifact_wandb
+        from weave_query.weave_query import artifact_wandb
 
         return artifact_wandb.WandbArtifactRef(artifact, name)
 
@@ -1571,7 +1571,7 @@ def merge_types(a: Type, b: Type) -> Type:
     This implementation must match list.concat implementations (which is the only
     way to extend a list in Weave). Ie list.concat(list[a], [b]) -> list[merge_types(a, b)]
     """
-    from weave.legacy.weave.language_features.tagging import tagged_value_type
+    from weave_query.weave_query.language_features.tagging import tagged_value_type
 
     if a == b:
         return a

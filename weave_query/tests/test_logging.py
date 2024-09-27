@@ -5,7 +5,7 @@ import pytest
 import requests
 
 from weave import weave_server
-from weave.legacy.weave import api, context, logs, ops, server
+from weave_query.weave_query import api, context, logs, ops, server
 
 
 def test_logfile_created(fresh_server_logfile):

@@ -2,8 +2,8 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import panel
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query import panel
 
 
 @weave.type()
@@ -28,7 +28,7 @@ class Slider(panel.Panel):
 
     def __post_init__(self, *args):
         super().__post_init__(*args)
-        if isinstance(self.input_node, weave.legacy.weave.graph.VoidNode):
+        if isinstance(self.input_node, weave_query.weave_query.graph.VoidNode):
             self.__dict__["input_node"] = weave_internal.const(0)
 
     @weave.op()

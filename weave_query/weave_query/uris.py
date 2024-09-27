@@ -2,7 +2,7 @@ import dataclasses
 import typing
 from urllib import parse
 
-from weave.legacy.weave import errors
+from weave_query.weave_query import errors
 
 if typing.TYPE_CHECKING:
     from . import ref_base

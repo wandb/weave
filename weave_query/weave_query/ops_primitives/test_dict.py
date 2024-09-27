@@ -1,6 +1,6 @@
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave.language_features.tagging import tagged_value_type
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query.language_features.tagging import tagged_value_type
 
 
 def test_keys_type():
@@ -25,7 +25,7 @@ def test_pick():
         ),
         "a",
     )
-    assert weave.use(weave.legacy.weave.ops.TypedDict.pick(obj, key)) == "x"
+    assert weave.use(weave_query.weave_query.ops.TypedDict.pick(obj, key)) == "x"
 
 
 def test_pick_none_key():

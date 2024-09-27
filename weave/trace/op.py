@@ -432,10 +432,10 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
     ```
     """
     # TODO: (AT): Remove
-    from weave.legacy.weave import context_state
+    from weave_query.weave_query import context_state
 
     if context_state.get_loading_built_ins():
-        from weave.legacy.weave.decorator_op import op as legacy_op
+        from weave_query.weave_query.decorator_op import op as legacy_op
 
         return legacy_op(*args, **kwargs)  # type: ignore
 

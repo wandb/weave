@@ -12,7 +12,7 @@ import typing
 import requests
 from werkzeug.serving import make_server
 
-from weave.legacy.weave import (
+from weave_query.weave_query import (
     cache,
     context,
     engine_trace,
@@ -27,8 +27,8 @@ from weave.legacy.weave import (
     storage,
     weave_types,
 )
-from weave.legacy.weave.language_features.tagging import tag_store
-from weave.legacy.weave.language_features.tagging.tag_store import isolated_tagging_context
+from weave_query.weave_query.language_features.tagging import tag_store
+from weave_query.weave_query.language_features.tagging.tag_store import isolated_tagging_context
 
 # A function to monkeypatch the request post method
 # def patch_request_post():

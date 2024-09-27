@@ -1,9 +1,9 @@
 import typing
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import op_def
-from weave.legacy.weave.arrow.arrow import ArrowWeaveListType
-from weave.legacy.weave.language_features.tagging import tagged_value_type
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query import op_def
+from weave_query.weave_query.arrow.arrow import ArrowWeaveListType
+from weave_query.weave_query.language_features.tagging import tagged_value_type
 
 from .decorator_op import op
 
