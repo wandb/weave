@@ -595,7 +595,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             else:
                 conds.append("digest = {version_digest: String}")
                 parameters["version_digest"] = req.digest
-
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
@@ -1427,6 +1426,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> list[SelectableCHObjSchema]:
         """
         Main query for fetching objects.
+
         conditions:
             conditions should include operations on version_index, digest, kind (is_op)
             ALL conditions are AND'ed together.
@@ -1532,7 +1532,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             select_without_val_dump_query,
             {"project_id": project_id, **parameters},
         )
-
         result: list[SelectableCHObjSchema] = []
         for row in query_result:
             result.append(
@@ -1559,7 +1558,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
             )
 
-        # --- Don't make second query for object values if metadata_only ---
+        # -- Don't make second query for object values if metadata_only --
         if metadata_only:
             return result
 
