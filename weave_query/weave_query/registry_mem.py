@@ -1,12 +1,12 @@
 import datetime
 import typing
 
-from weave.legacy.weave import weave_types
-from weave.legacy.weave import storage, errors, context_state, op_aliases, op_args, uris
-from weave.legacy.weave.op_args import OpNamedArgs
+from weave_query.weave_query import weave_types
+from weave_query.weave_query import storage, errors, context_state, op_aliases, op_args, uris
+from weave_query.weave_query.op_args import OpNamedArgs
 
 if typing.TYPE_CHECKING:
-    from weave.legacy.weave.op_def import OpDef
+    from weave_query.weave_query.op_def import OpDef
 
 
 class Registry:
@@ -122,7 +122,7 @@ class Registry:
         return [op for op in self._ops.values() if is_chainable(op)]  # type: ignore[no-untyped-call]
 
     def load_saved_ops(self):  # type: ignore
-        from weave.legacy.weave import op_def_type
+        from weave_query.weave_query import op_def_type
 
         for op_ref in storage.objects(op_def_type.OpDefType()):
             try:

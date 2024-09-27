@@ -2,7 +2,7 @@ import datetime
 import os
 import time
 
-from weave.legacy.weave import cache, environment
+from weave_query.weave_query import cache, environment
 
 
 def test_lru_time_window_cache():

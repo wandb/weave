@@ -4,8 +4,8 @@ import typing
 
 import numpy as np
 
-from weave.legacy.weave import ref_util
-from weave.legacy.weave import context_state
+from weave_query.weave_query import ref_util
+from weave_query.weave_query import context_state
 
 
 def make_id() -> int:

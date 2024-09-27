@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 
 from langchain.callbacks.tracers.schemas import Run, RunTypeEnum
 
-from weave.legacy.weave.ops_domain import trace_tree
+from weave_query.weave_query.ops_domain import trace_tree
 
 if TYPE_CHECKING:
     from langchain.chains.base import Chain

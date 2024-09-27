@@ -2,7 +2,7 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import panel
+from weave_query.weave_query import panel
 
 span_typed_dict_type = weave.types.TypedDict(
     {
@@ -62,4 +62,4 @@ class Trace(panel.Panel):
 )
 def active_span(self: Trace):
     index = 0 if self.config is None else self.config.selectedSpanIndex
-    return weave.legacy.weave.ops_arrow.list_ops.index(self.input_node, index)
+    return weave_query.weave_query.ops_arrow.list_ops.index(self.input_node, index)

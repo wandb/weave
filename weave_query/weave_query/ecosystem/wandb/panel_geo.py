@@ -3,8 +3,8 @@ import inspect
 import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave.ecosystem.wandb import weave_plotly
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query.ecosystem.wandb import weave_plotly
 
 
 # This is the panel's config (the state that is stored in the panel and configurable
@@ -12,13 +12,13 @@ from weave.legacy.weave.ecosystem.wandb import weave_plotly
 @weave.type()
 class GeoConfig:
     x_fn: weave.Node[float] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.VoidNode()
+        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
     )
     y_fn: weave.Node[float] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.VoidNode()
+        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
     )
     color_fn: weave.Node[float] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.VoidNode()
+        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
     )
 
 
@@ -69,10 +69,10 @@ def geo_default_config(
 def geo(
     input_node: weave.Node[list[typing.Any]], config: GeoConfig
 ) -> weave_plotly.PanelPlotly:
-    unnested = weave.legacy.weave.ops.unnest(input_node)
+    unnested = weave_query.weave_query.ops.unnest(input_node)
     config = geo_default_config(config, unnested)
     plot_data = unnested.map(
-        lambda item: weave.legacy.weave.ops.dict_(
+        lambda item: weave_query.weave_query.ops.dict_(
             long=config.x_fn(item),  # type: ignore
             lat=config.y_fn(item),  # type: ignore
             color=config.color_fn(item),  # type: ignore
@@ -86,27 +86,27 @@ def geo(
 @weave.op(name="Geo_config")
 def geo_config(
     input_node: weave.Node[list[typing.Any]], config: GeoConfig
-) -> weave.legacy.weave.panels.Group:
-    unnested = weave.legacy.weave.ops.unnest(input_node)
+) -> weave_query.weave_query.panels.Group:
+    unnested = weave_query.weave_query.ops.unnest(input_node)
     config = geo_default_config(config, unnested)
-    return weave.legacy.weave.panels.Group(
+    return weave_query.weave_query.panels.Group(
         items={
-            "x_fn": weave.legacy.weave.panels.LabeledItem(
+            "x_fn": weave_query.weave_query.panels.LabeledItem(
                 label="x",
-                item=weave.legacy.weave.panels.FunctionEditor(
-                    config=weave.legacy.weave.panels.FunctionEditorConfig(config.x_fn)
+                item=weave_query.weave_query.panels.FunctionEditor(
+                    config=weave_query.weave_query.panels.FunctionEditorConfig(config.x_fn)
                 ),
             ),
-            "y_fn": weave.legacy.weave.panels.LabeledItem(
+            "y_fn": weave_query.weave_query.panels.LabeledItem(
                 label="y",
-                item=weave.legacy.weave.panels.FunctionEditor(
-                    config=weave.legacy.weave.panels.FunctionEditorConfig(config.y_fn)
+                item=weave_query.weave_query.panels.FunctionEditor(
+                    config=weave_query.weave_query.panels.FunctionEditorConfig(config.y_fn)
                 ),
             ),
-            "color_fn": weave.legacy.weave.panels.LabeledItem(
+            "color_fn": weave_query.weave_query.panels.LabeledItem(
                 label="color",
-                item=weave.legacy.weave.panels.FunctionEditor(
-                    config=weave.legacy.weave.panels.FunctionEditorConfig(config.color_fn)
+                item=weave_query.weave_query.panels.FunctionEditor(
+                    config=weave_query.weave_query.panels.FunctionEditorConfig(config.color_fn)
                 ),
             ),
         }
@@ -134,7 +134,7 @@ class Geo(weave.Panel):
         if self.config is None:
             self.config = GeoConfig()
 
-            unnested = weave.legacy.weave.ops.unnest(self.input_node)
+            unnested = weave_query.weave_query.ops.unnest(self.input_node)
             if "x_fn" in options:
                 sig = inspect.signature(options["x_fn"])
                 param_name = list(sig.parameters.values())[0].name
@@ -171,28 +171,28 @@ class Geo(weave.Panel):
     @weave.op(output_type=lambda input_type: input_type["self"].input_node.output_type)
     def selected(self):
         # TODO: This function is not right! We need to do a range selection in polar space!
-        unnested = weave.legacy.weave.ops.unnest(self.input_node)
+        unnested = weave_query.weave_query.ops.unnest(self.input_node)
         config = geo_default_config(self.config, unnested)
         filtered = unnested.filter(
-            lambda item: weave.legacy.weave.ops.Boolean.bool_and(
-                weave.legacy.weave.ops.Boolean.bool_and(
-                    weave.legacy.weave.ops.Boolean.bool_and(
+            lambda item: weave_query.weave_query.ops.Boolean.bool_and(
+                weave_query.weave_query.ops.Boolean.bool_and(
+                    weave_query.weave_query.ops.Boolean.bool_and(
                         config.x_fn(item)
-                        > weave.legacy.weave.ops.TypedDict.pick(
+                        > weave_query.weave_query.ops.TypedDict.pick(
                             self._renderAsPanel.config.selected, "xMin"
                         ),
                         config.x_fn(item)
-                        < weave.legacy.weave.ops.TypedDict.pick(
+                        < weave_query.weave_query.ops.TypedDict.pick(
                             self._renderAsPanel.config.selected, "xMax"
                         ),
                     ),
                     config.y_fn(item)
-                    > weave.legacy.weave.ops.TypedDict.pick(
+                    > weave_query.weave_query.ops.TypedDict.pick(
                         self._renderAsPanel.config.selected, "yMin"
                     ),
                 ),
                 config.y_fn(item)
-                < weave.legacy.weave.ops.TypedDict.pick(
+                < weave_query.weave_query.ops.TypedDict.pick(
                     self._renderAsPanel.config.selected, "yMax"
                 ),
             )

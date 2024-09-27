@@ -3,7 +3,7 @@
 import time
 
 import weave
-from weave.legacy.weave import context_state as _context_state
+from weave_query.weave_query import context_state as _context_state
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 

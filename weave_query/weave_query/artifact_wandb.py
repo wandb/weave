@@ -13,8 +13,8 @@ from wandb import Artifact
 from wandb.apis.public import api as wb_public
 from wandb.sdk.lib.hashutil import b64_to_hex_id, hex_to_b64_id
 
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import (
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query import (
     filesystem,
     urls,
     errors,
@@ -28,10 +28,10 @@ from weave.legacy.weave import (
     wandb_client_api,
     util,
 )
-from weave.legacy.weave.wandb_interface import wandb_artifact_pusher
+from weave_query.weave_query.wandb_interface import wandb_artifact_pusher
 
 if typing.TYPE_CHECKING:
-    from weave.legacy.weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+    from weave_query.weave_query.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
 
     from .run_streamtable_span import RunStreamTableSpan
 
@@ -417,7 +417,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             ]
         ] = None,
     ):
-        from weave.legacy.weave import io_service
+        from weave_query.weave_query import io_service
 
         self.io_service = io_service.get_sync_client()
         self.name = name
@@ -857,7 +857,7 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
     @property
     def ui_url(self):
         root_type = self.type.root_type_class()
-        from weave.legacy.weave.op_def_type import OpDefType
+        from weave_query.weave_query.op_def_type import OpDefType
 
         if issubclass(root_type, OpDefType):
             return urls.op_version_path(

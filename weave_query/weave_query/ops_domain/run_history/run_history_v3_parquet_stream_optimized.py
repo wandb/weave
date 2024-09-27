@@ -5,10 +5,10 @@ import typing
 
 import pyarrow as pa
 
-from weave.legacy.weave import errors
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import op
-from weave.legacy.weave import (
+from weave_query.weave_query import errors
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import op
+from weave_query.weave_query import (
     engine_trace,
     artifact_base,
     artifact_fs,
@@ -16,8 +16,8 @@ from weave.legacy.weave import (
     gql_json_cache,
     io_service,
 )
-from weave.legacy.weave.arrow import convert
-from weave.legacy.weave.arrow.list_ import (
+from weave_query.weave_query.arrow import convert
+from weave_query.weave_query.arrow.list_ import (
     ArrowWeaveList,
     ArrowWeaveListType,
     PathItemType,
@@ -25,16 +25,16 @@ from weave.legacy.weave.arrow.list_ import (
     make_vec_none,
     weave_arrow_type_check,
 )
-from weave.legacy.weave.gql_op_plugin import wb_gql_op_plugin
-from weave.legacy.weave.op_def import map_type
-from weave.legacy.weave.ops_domain import trace_tree, wb_util, wbmedia
-from weave.legacy.weave.ops_domain import wb_domain_types as wdt
-from weave.legacy.weave.ops_domain.run_history import history_op_common
-from weave.legacy.weave.ops_domain.run_history.context import (
+from weave_query.weave_query.gql_op_plugin import wb_gql_op_plugin
+from weave_query.weave_query.op_def import map_type
+from weave_query.weave_query.ops_domain import trace_tree, wb_util, wbmedia
+from weave_query.weave_query.ops_domain import wb_domain_types as wdt
+from weave_query.weave_query.ops_domain.run_history import history_op_common
+from weave_query.weave_query.ops_domain.run_history.context import (
     get_error_on_non_vectorized_history_transform,
 )
-from weave.legacy.weave.ops_domain.table import _patch_legacy_image_file_types
-from weave.legacy.weave.wandb_interface import wandb_stream_table
+from weave_query.weave_query.ops_domain.table import _patch_legacy_image_file_types
+from weave_query.weave_query.wandb_interface import wandb_stream_table
 
 tracer = engine_trace.tracer()
 

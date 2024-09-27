@@ -4,7 +4,7 @@ import typing
 import transformers
 
 import weave
-from weave.legacy.weave.ecosystem.huggingface import hfmodel
+from weave_query.weave_query.ecosystem.huggingface import hfmodel
 
 # We have to forward-declare the Weave types to avoid circular reference
 # issues that weave.type() can't resolve yet.
@@ -70,13 +70,13 @@ class ClassificationResultPanel(weave.Panel):
     input_node: weave.Node[list[ClassificationResult]]
 
     @weave.op()
-    def render(self) -> weave.legacy.weave.panels.Table:
-        from weave.legacy.weave.ecosystem.huggingface.huggingface_models import huggingface
+    def render(self) -> weave_query.weave_query.panels.Table:
+        from weave_query.weave_query.ecosystem.huggingface.huggingface_models import huggingface
 
-        return weave.legacy.weave.panels.Table(
+        return weave_query.weave_query.panels.Table(
             self.input_node,
             columns=[
-                lambda result_row: weave.legacy.weave.panels.WeaveLink(
+                lambda result_row: weave_query.weave_query.panels.WeaveLink(
                     result_row.model_name(),
                     to=lambda input: huggingface().model(input),  # type: ignore
                 ),
@@ -115,17 +115,17 @@ class FullTextClassificationResultPanel(weave.Panel):
     input_node: weave.Node[FullTextClassificationPipelineOutput]
 
     @weave.op()
-    def render(self) -> weave.legacy.weave.panels.Group:
+    def render(self) -> weave_query.weave_query.panels.Group:
         output = typing.cast(FullTextClassificationPipelineOutput, self.input_node)
-        return weave.legacy.weave.panels.Group(
+        return weave_query.weave_query.panels.Group(
             preferHorizontal=True,
             items={
-                "input": weave.legacy.weave.panels.LabeledItem(
+                "input": weave_query.weave_query.panels.LabeledItem(
                     label="input", item=output.model_input
                 ),
-                "output": weave.legacy.weave.panels.LabeledItem(
+                "output": weave_query.weave_query.panels.LabeledItem(
                     label="output",
-                    item=weave.legacy.weave.panels.Plot(
+                    item=weave_query.weave_query.panels.Plot(
                         input_node=typing.cast(weave.Node, output.model_output),
                         x=lambda class_score: class_score["score"],
                         y=lambda class_score: class_score["label"],

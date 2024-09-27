@@ -8,9 +8,9 @@ import copy
 import math
 import typing
 
-from weave.legacy.weave import graph
+from weave_query.weave_query import graph
 
-from weave.legacy.weave import weave_types
+from weave_query.weave_query import weave_types
 
 
 def _convert_specific_opname_to_generic_opname(

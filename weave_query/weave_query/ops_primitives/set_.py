@@ -1,5 +1,5 @@
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.decorators import op
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.decorators import op
 
 
 def get_const_union_vals(type_, of_type):

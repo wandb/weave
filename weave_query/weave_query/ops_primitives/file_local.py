@@ -1,10 +1,10 @@
 import os
 import typing
 
-from weave.legacy.weave import environment
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import op
-from weave.legacy.weave import file_local
+from weave_query.weave_query import environment
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import op
+from weave_query.weave_query import file_local
 
 
 @op(name="LocalFile-directUrl")

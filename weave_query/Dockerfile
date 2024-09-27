@@ -48,4 +48,4 @@ RUN mkdir /local-artifacts
 EXPOSE 9239
 
 ENTRYPOINT [ "tini", "-g", "--" ]
-CMD ["gunicorn", "weave.legacy.weave.weave_server:app"]
+CMD ["gunicorn", "weave_query.weave_query.weave_server:app"]

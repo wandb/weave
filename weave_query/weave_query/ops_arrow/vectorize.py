@@ -6,18 +6,18 @@ import typing
 import numpy as np
 import pyarrow as pa
 
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import errors,weavify, registry_mem
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import op, use
-from weave.legacy.weave import dispatch, graph, graph_debug, op_args, op_def
-from weave.legacy.weave.arrow import convert
-from weave.legacy.weave.arrow.arrow import ArrowWeaveListType
-from weave.legacy.weave.arrow.arrow_tags import pushdown_list_tags
-from weave.legacy.weave.arrow.list_ import ArrowWeaveList
-from weave.legacy.weave.ops_arrow import arraylist_ops, convert_ops
-from weave.legacy.weave.ops_arrow.dict import preprocess_merge
-from weave.legacy.weave.ops_primitives.dict import dict_
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query import errors,weavify, registry_mem
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import op, use
+from weave_query.weave_query import dispatch, graph, graph_debug, op_args, op_def
+from weave_query.weave_query.arrow import convert
+from weave_query.weave_query.arrow.arrow import ArrowWeaveListType
+from weave_query.weave_query.arrow.arrow_tags import pushdown_list_tags
+from weave_query.weave_query.arrow.list_ import ArrowWeaveList
+from weave_query.weave_query.ops_arrow import arraylist_ops, convert_ops
+from weave_query.weave_query.ops_arrow.dict import preprocess_merge
+from weave_query.weave_query.ops_primitives.dict import dict_
 
 
 class VectorizeError(errors.WeaveBaseError):
@@ -73,7 +73,7 @@ def _create_manually_mapped_op(
     mapped_inputs = {k: v for k, v in inputs.items() if k in vectorized_keys}
     rest_inputs = {k: v for k, v in inputs.items() if k not in vectorized_keys}
 
-    from weave.legacy.weave.ops_arrow import dict
+    from weave_query.weave_query.ops_arrow import dict
 
     input_arr = dict.arrow_dict_(**mapped_inputs).to_py()
 
@@ -643,7 +643,7 @@ def raise_on_python_bailout():
 def _call_and_ensure_awl(
     awl: ArrowWeaveList, called: graph.OutputNode
 ) -> ArrowWeaveList:
-    from weave.legacy.weave import compile
+    from weave_query.weave_query import compile
 
     with compile.disable_compile():
         res = use(called)
@@ -726,7 +726,7 @@ def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
         )
         return convert.to_arrow([], types.List(fn.type), artifact=awl._artifact)
 
-    from weave.legacy.weave import execute_fast
+    from weave_query.weave_query import execute_fast
 
     fn = execute_fast._resolve_static_branches(fn)
     logging.info("Vectorizing. Static branch resolution complete.: %s", debug_str)

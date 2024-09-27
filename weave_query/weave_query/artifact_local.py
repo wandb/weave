@@ -9,9 +9,9 @@ import tempfile
 import typing
 from datetime import datetime
 
-from weave.legacy.weave import filesystem
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import (
+from weave_query.weave_query import filesystem
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query import (
     artifact_fs,
     artifact_wandb,
     environment,
