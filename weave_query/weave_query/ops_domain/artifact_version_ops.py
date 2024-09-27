@@ -2,14 +2,14 @@ import json
 import typing
 from urllib.parse import quote
 
-from weave.legacy.weave import errors
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave.api import op
-from weave.legacy.weave import artifact_fs, artifact_wandb, input_provider
-from weave.legacy.weave.gql_op_plugin import wb_gql_op_plugin
-from weave.legacy.weave.ops_domain import wb_domain_types as wdt
-from weave.legacy.weave.ops_domain import wb_util
-from weave.legacy.weave.ops_domain.wandb_domain_gql import (
+from weave_query.weave_query import errors
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query.api import op
+from weave_query.weave_query import artifact_fs, artifact_wandb, input_provider
+from weave_query.weave_query.gql_op_plugin import wb_gql_op_plugin
+from weave_query.weave_query.ops_domain import wb_domain_types as wdt
+from weave_query.weave_query.ops_domain import wb_util
+from weave_query.weave_query.ops_domain.wandb_domain_gql import (
     _make_alias,
     gql_connection_op,
     gql_direct_edge_op,
@@ -460,10 +460,10 @@ def artifact_version_weave_type(
 def _get_history_metrics(
     artifactVersion: wdt.ArtifactVersion,
 ) -> dict[str, typing.Any]:
-    from weave.legacy.weave import weave_internal
-    from weave.legacy.weave.compile import enable_compile
-    from weave.legacy.weave.graph import ConstNode, OutputNode
-    from weave.legacy.weave.ops_domain import wb_domain_types
+    from weave_query.weave_query import weave_internal
+    from weave_query.weave_query.compile import enable_compile
+    from weave_query.weave_query.graph import ConstNode, OutputNode
+    from weave_query.weave_query.ops_domain import wb_domain_types
 
     created_by = artifactVersion["createdBy"]
     if created_by == None or created_by["__typename"] != "Run":

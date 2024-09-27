@@ -3,19 +3,19 @@ import typing
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from weave.legacy.weave import api as api
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import errors, arrow_util, artifact_base, artifact_mem, box, mappers_arrow
-from weave.legacy.weave.arrow.arrow import (
+from weave_query.weave_query import api as api
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query import errors, arrow_util, artifact_base, artifact_mem, box, mappers_arrow
+from weave_query.weave_query.arrow.arrow import (
     ArrowWeaveListType,
 )
-from weave.legacy.weave.arrow.list_ import (
+from weave_query.weave_query.arrow.list_ import (
     ArrowWeaveList,
     PathType,
     unsafe_awl_construction,
 )
-from weave.legacy.weave.language_features.tagging import tag_store, tagged_value_type
+from weave_query.weave_query.language_features.tagging import tag_store, tagged_value_type
 
 # Hmm... this doesn't work on ObjectType, which contains a Union of Struct...
 # We need that because our ImageFileArtifactRefType has a union of structs
@@ -502,7 +502,7 @@ def simple_to_string(arr: pa.Array):
 
 def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
     """Converts any ArrowWeaveList to simple type that pa.compute.equal can compare."""
-    from weave.legacy.weave.ops_domain.wbmedia import ArtifactAssetType
+    from weave_query.weave_query.ops_domain.wbmedia import ArtifactAssetType
 
     # Returns a number of string arrow weave list, possibly with Nones
     def _to_compare_safe(

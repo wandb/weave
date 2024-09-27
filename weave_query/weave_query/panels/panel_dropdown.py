@@ -2,7 +2,7 @@ import dataclasses
 import typing
 
 import weave
-from weave.legacy.weave import graph, panel, panel_util
+from weave_query.weave_query import graph, panel, panel_util
 
 
 @weave.type()
@@ -28,7 +28,7 @@ class Dropdown(panel.Panel):
             self.config = DropdownConfig()
         if "choices" in options:
             self.config.choices = options["choices"]
-        if isinstance(self.input_node, weave.legacy.weave.graph.VoidNode):
+        if isinstance(self.input_node, weave_query.weave_query.graph.VoidNode):
             choices_type = typing.cast(weave.types.List, self.config.choices.type)
             self.input_node = weave_internal.const(
                 [], weave.types.List(choices_type.object_type)

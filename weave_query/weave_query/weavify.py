@@ -1,12 +1,12 @@
 import typing
 
-from weave.legacy.weave import errors, graph, op_args, val_const
+from weave_query.weave_query import errors, graph, op_args, val_const
 
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import weave_types as types
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query import weave_types as types
 
 if typing.TYPE_CHECKING:
-    from weave.legacy.weave import op_def
+    from weave_query.weave_query import op_def
 
 
 def verify_weave_fn_is_valid(op: "op_def.OpDef", weavified: graph.Node) -> None:
@@ -79,7 +79,7 @@ def op_to_weave_fn(opdef: "op_def.OpDef") -> graph.Node:
 
 
 def weavify_object(obj: typing.Any) -> graph.Node:
-    from weave.legacy.weave.ops_primitives import dict_, make_list
+    from weave_query.weave_query.ops_primitives import dict_, make_list
 
     if isinstance(obj, graph.Node):
         return obj

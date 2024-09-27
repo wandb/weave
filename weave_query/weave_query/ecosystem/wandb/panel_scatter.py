@@ -3,20 +3,20 @@ import inspect
 import typing
 
 import weave
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave.ecosystem.wandb import weave_plotly
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query.ecosystem.wandb import weave_plotly
 
 
 @weave.type()
 class ScatterConfig:
     x_fn: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.VoidNode()
+        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
     )
     y_fn: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.VoidNode()
+        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
     )
     label_fn: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.legacy.weave.graph.VoidNode()
+        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
     )
 
 
@@ -30,7 +30,7 @@ class Scatter(weave.Panel):
     @weave.op()
     def initialize(self) -> ScatterConfig:
         input_node = self.input_node
-        unnested = weave.legacy.weave.ops.unnest(input_node)
+        unnested = weave_query.weave_query.ops.unnest(input_node)
         return ScatterConfig(
             x_fn=weave_internal.define_fn(
                 {"item": unnested.type.object_type},
@@ -48,19 +48,19 @@ class Scatter(weave.Panel):
 
     # The config render op. This renders the config editor.
     @weave.op()
-    def render_config(self) -> weave.legacy.weave.panels.Group:
+    def render_config(self) -> weave_query.weave_query.panels.Group:
         config = typing.cast(ScatterConfig, self.config)
-        return weave.legacy.weave.panels.Group(
+        return weave_query.weave_query.panels.Group(
             items={
-                "x_fn": weave.legacy.weave.panels.LabeledItem(
-                    label="x", item=weave.legacy.weave.panels.FunctionEditor(config.x_fn)
+                "x_fn": weave_query.weave_query.panels.LabeledItem(
+                    label="x", item=weave_query.weave_query.panels.FunctionEditor(config.x_fn)
                 ),
-                "y_fn": weave.legacy.weave.panels.LabeledItem(
-                    label="y", item=weave.legacy.weave.panels.FunctionEditor(config.y_fn)
+                "y_fn": weave_query.weave_query.panels.LabeledItem(
+                    label="y", item=weave_query.weave_query.panels.FunctionEditor(config.y_fn)
                 ),
-                "label_fn": weave.legacy.weave.panels.LabeledItem(
+                "label_fn": weave_query.weave_query.panels.LabeledItem(
                     label="label",
-                    item=weave.legacy.weave.panels.FunctionEditor(config.label_fn),
+                    item=weave_query.weave_query.panels.FunctionEditor(config.label_fn),
                 ),
             }
         )
@@ -70,7 +70,7 @@ class Scatter(weave.Panel):
     def render(self) -> weave_plotly.PanelPlotly:
         input_node = self.input_node
         config = typing.cast(ScatterConfig, self.config)
-        unnested = weave.legacy.weave.ops.unnest(input_node)
+        unnested = weave_query.weave_query.ops.unnest(input_node)
         if (
             not weave.types.optional(weave.types.Float()).assign_type(config.x_fn.type)
             or not weave.types.optional(weave.types.Float()).assign_type(
@@ -80,14 +80,14 @@ class Scatter(weave.Panel):
                 config.label_fn.type
             )
         ):
-            return weave.legacy.weave.panels.PanelHtml(weave.legacy.weave.ops.Html("No data"))  # type: ignore
+            return weave_query.weave_query.panels.PanelHtml(weave_query.weave_query.ops.Html("No data"))  # type: ignore
         if config.label_fn.type == weave.types.Invalid():
             plot_data = unnested.map(
-                lambda item: weave.legacy.weave.ops.dict_(x=config.x_fn(item), y=config.y_fn(item))  # type: ignore
+                lambda item: weave_query.weave_query.ops.dict_(x=config.x_fn(item), y=config.y_fn(item))  # type: ignore
             )
         else:
             plot_data = unnested.map(
-                lambda item: weave.legacy.weave.ops.dict_(
+                lambda item: weave_query.weave_query.ops.dict_(
                     x=config.x_fn(item),
                     y=config.y_fn(item),
                     label=config.label_fn(item),
@@ -100,28 +100,28 @@ class Scatter(weave.Panel):
     # TODO: Fix
     @weave.op(output_type=lambda input_type: input_type["self"].input_node.output_type)
     def selected(self):
-        unnested = weave.legacy.weave.ops.unnest(self.input_node)
+        unnested = weave_query.weave_query.ops.unnest(self.input_node)
         config = self.config
         filtered = unnested.filter(
-            lambda item: weave.legacy.weave.ops.Boolean.bool_and(
-                weave.legacy.weave.ops.Boolean.bool_and(
-                    weave.legacy.weave.ops.Boolean.bool_and(
+            lambda item: weave_query.weave_query.ops.Boolean.bool_and(
+                weave_query.weave_query.ops.Boolean.bool_and(
+                    weave_query.weave_query.ops.Boolean.bool_and(
                         config.x_fn(item)
-                        > weave.legacy.weave.ops.TypedDict.pick(
+                        > weave_query.weave_query.ops.TypedDict.pick(
                             self._renderAsPanel.config.selected, "xMin"
                         ),
                         config.x_fn(item)
-                        < weave.legacy.weave.ops.TypedDict.pick(
+                        < weave_query.weave_query.ops.TypedDict.pick(
                             self._renderAsPanel.config.selected, "xMax"
                         ),
                     ),
                     config.y_fn(item)
-                    > weave.legacy.weave.ops.TypedDict.pick(
+                    > weave_query.weave_query.ops.TypedDict.pick(
                         self._renderAsPanel.config.selected, "yMin"
                     ),
                 ),
                 config.y_fn(item)
-                < weave.legacy.weave.ops.TypedDict.pick(
+                < weave_query.weave_query.ops.TypedDict.pick(
                     self._renderAsPanel.config.selected, "yMax"
                 ),
             )

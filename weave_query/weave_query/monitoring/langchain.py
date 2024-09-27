@@ -11,8 +11,8 @@ from langchain.callbacks.tracers.base import BaseTracer
 from langchain.callbacks.tracers.schemas import Run
 from wandb.sdk.data_types import trace_tree
 
-from weave.legacy.weave import stream_data_interfaces
-from weave.legacy.weave.monitoring import StreamTable
+from weave_query.weave_query import stream_data_interfaces
+from weave_query.weave_query.monitoring import StreamTable
 
 
 def _hash_id(s: str) -> str:

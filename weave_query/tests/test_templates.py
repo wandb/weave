@@ -3,8 +3,8 @@ import typing
 import wandb
 
 import weave
-from weave.legacy.weave import context_state as _context
-from weave.legacy.weave.wandb_interface.wandb_stream_table import StreamTable
+from weave_query.weave_query import context_state as _context
+from weave_query.weave_query.wandb_interface.wandb_stream_table import StreamTable
 
 from weave_query.weave_query.panels_py import generator_templates
 
@@ -34,17 +34,17 @@ board_input_type = weave.types.List(
 def dummy_board(
     input_node,
     config: typing.Optional[DummyBoardConfig] = None,
-) -> weave.legacy.weave.panels.Group:
+) -> weave_query.weave_query.panels.Group:
     assert board_input_type.assign_type(input_node.type)
 
     control_items = [
-        weave.legacy.weave.panels.GroupPanel(
+        weave_query.weave_query.panels.GroupPanel(
             input_node,
             id="data",
         ),
     ]
 
-    return weave.legacy.weave.panels.Board(vars=control_items, panels=[])
+    return weave_query.weave_query.panels.Board(vars=control_items, panels=[])
 
 
 generator_templates.template_registry.register(
@@ -77,13 +77,13 @@ def _assert_valid_node_raw(node):
     output_group = weave.use(dummy_node)
 
     # Assert the out template is successfully generated
-    assert isinstance(output_group, weave.legacy.weave.panels.Group)
+    assert isinstance(output_group, weave_query.weave_query.panels.Group)
 
     data_node = output_group.config.items["sidebar"].config.items["data"]
 
     # assert that the node sent to the generator is the same as the node that is used
     # Note: this is a heuristic, but probably close enough
-    assert isinstance(data_node, weave.legacy.weave.graph.OutputNode)
+    assert isinstance(data_node, weave_query.weave_query.graph.OutputNode)
     assert data_node.from_op.name == node.from_op.name
     assert str(data_node) == str(node)
 
@@ -102,7 +102,7 @@ def test_templates_for_run_logs_valid(user_by_api_key_in_env):
     run.finish()
 
     run_history_node = (
-        weave.legacy.weave.ops.project(run.entity, run.project).run(run.id).history()
+        weave_query.weave_query.ops.project(run.entity, run.project).run(run.id).history()
     )
 
     assert_valid_node(run_history_node)
@@ -114,7 +114,7 @@ def test_templates_for_run_logs_invalid(user_by_api_key_in_env):
     run.finish()
 
     run_history_node = (
-        weave.legacy.weave.ops.project(run.entity, run.project).run(run.id).history()
+        weave_query.weave_query.ops.project(run.entity, run.project).run(run.id).history()
     )
 
     assert_invalid_node(run_history_node)
@@ -126,7 +126,7 @@ def test_templates_for_logged_table_valid(user_by_api_key_in_env):
     run.finish()
 
     table_node = (
-        weave.legacy.weave.ops.project(run.entity, run.project)
+        weave_query.weave_query.ops.project(run.entity, run.project)
         .run(run.id)
         .summary()["table"]
         .table()
@@ -142,7 +142,7 @@ def test_templates_for_logged_table_invalid(user_by_api_key_in_env):
     run.finish()
 
     table_node = (
-        weave.legacy.weave.ops.project(run.entity, run.project)
+        weave_query.weave_query.ops.project(run.entity, run.project)
         .run(run.id)
         .summary()["table"]
         .table()

@@ -1,6 +1,6 @@
 import weave
 from weave.file_base import Dir
-from weave.legacy.weave.ecosystem.slack import slackapi_readexport
+from weave_query.weave_query.ecosystem.slack import slackapi_readexport
 
 
 @weave.type()

@@ -7,9 +7,9 @@ import random
 import string
 import typing
 
-from weave.legacy.weave import weave_internal
-from weave.legacy.weave import decorator_type, graph, ops, panel, weave_types
-from weave.legacy.weave.language_features.tagging import tagged_value_type
+from weave_query.weave_query import weave_internal
+from weave_query.weave_query import decorator_type, graph, ops, panel, weave_types
+from weave_query.weave_query.language_features.tagging import tagged_value_type
 
 
 @decorator_type.type()

@@ -5,11 +5,11 @@ import logging
 import typing
 from dataclasses import dataclass
 
-from weave.legacy.weave import util
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import graph, memo, op_args, op_def, pyfunc_type_util, registry_mem, errors
-from weave.legacy.weave.language_features.tagging.is_tag_getter import is_tag_getter
-from weave.legacy.weave.language_features.tagging.tagged_value_type import TaggedValueType
+from weave_query.weave_query import util
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query import graph, memo, op_args, op_def, pyfunc_type_util, registry_mem, errors
+from weave_query.weave_query.language_features.tagging.is_tag_getter import is_tag_getter
+from weave_query.weave_query.language_features.tagging.tagged_value_type import TaggedValueType
 
 
 # I originally wrote this thinking that we could always choose the more specific

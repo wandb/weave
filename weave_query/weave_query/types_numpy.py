@@ -1,6 +1,6 @@
 import numpy as np
 
-from weave.legacy.weave import weave_types as types
+from weave_query.weave_query import weave_types as types
 
 
 # TODO: this doesn't match how extra works for list types...

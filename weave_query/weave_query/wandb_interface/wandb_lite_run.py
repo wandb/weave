@@ -15,8 +15,8 @@ from wandb.sdk.internal.internal_api import Api as InternalApi
 from wandb.sdk.internal.sender import _manifest_json_from_proto
 from wandb.sdk.lib import runid
 
-from weave.legacy.weave import errors
-from weave.legacy.weave import engine_trace, wandb_client_api
+from weave_query.weave_query import errors
+from weave_query.weave_query import engine_trace, wandb_client_api
 
 logger = logging.getLogger(__name__)
 

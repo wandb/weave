@@ -3,9 +3,9 @@ import contextlib
 import contextvars
 import typing
 
-from weave.legacy.weave import graph
+from weave_query.weave_query import graph
 
-from weave.legacy.weave import errors
+from weave_query.weave_query import errors
 
 ExecutableNode = typing.Union[graph.OutputNode, graph.ConstNode]
 

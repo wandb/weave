@@ -1,7 +1,7 @@
 import os
 import time
 
-from weave.legacy.weave import cache
+from weave_query.weave_query import cache
 
 # Script to run to delete expired caches
 if __name__ == "__main__":

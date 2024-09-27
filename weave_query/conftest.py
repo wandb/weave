@@ -7,13 +7,13 @@ import typing
 import pytest
 from flask.testing import FlaskClient
 
-from weave.legacy.weave import client as client_legacy
-from weave.legacy.weave import context_state, environment, io_service, serialize
-from weave.legacy.weave.language_features.tagging.tag_store import (
+from weave_query.weave_query import client as client_legacy
+from weave_query.weave_query import context_state, environment, io_service, serialize
+from weave_query.weave_query.language_features.tagging.tag_store import (
     isolated_tagging_context,
 )
 
-from weave.legacy.weave import logs
+from weave_query.weave_query import logs
 # from .tests.wandb_system_tests_conftest import *
 
 logs.configure_logger()
@@ -23,7 +23,7 @@ logs.configure_logger()
 # tests.
 context_state._eager_mode.set(False)
 
-# A lot of tests rely on weave.legacy.weave.ops.* being in scope. Importing this here
+# A lot of tests rely on weave_query.weave_query.ops.* being in scope. Importing this here
 # makes that work...
 
 ### Disable datadog engine tracing

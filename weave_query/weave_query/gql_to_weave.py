@@ -17,9 +17,9 @@ from graphql import (
     parse,
 )
 
-from weave.legacy.weave import errors
-from weave.legacy.weave import weave_types as types
-from weave.legacy.weave import gql_schema
+from weave_query.weave_query import errors
+from weave_query.weave_query import weave_types as types
+from weave_query.weave_query import gql_schema
 
 
 def get_outermost_alias(query_str: str) -> str:

@@ -1,1 +1,1 @@
-from weave.legacy.weave.ecosystem.root import *
+from weave_query.weave_query.ecosystem.root import *

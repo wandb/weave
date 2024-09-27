@@ -4,7 +4,7 @@ import typing
 import transformers
 
 import weave
-from weave.legacy.weave.ecosystem.huggingface import hfmodel
+from weave_query.weave_query.ecosystem.huggingface import hfmodel
 
 # We have to forward-declare the Weave types to avoid circular reference
 # issues that weave.type() can't resolve yet.
@@ -50,15 +50,15 @@ class FullTextGenerationPanel(weave.Panel):
     input_node: weave.Node[FullTextGenerationPipelineOutput]
 
     @weave.op()
-    def render(self) -> weave.legacy.weave.panels.Group:
+    def render(self) -> weave_query.weave_query.panels.Group:
         output = typing.cast(FullTextGenerationPipelineOutput, self.input_node)
-        return weave.legacy.weave.panels.Group(
+        return weave_query.weave_query.panels.Group(
             preferHorizontal=True,
             items={
-                "input": weave.legacy.weave.panels.LabeledItem(
+                "input": weave_query.weave_query.panels.LabeledItem(
                     label="input", item=output.model_input
                 ),
-                "output": weave.legacy.weave.panels.LabeledItem(
+                "output": weave_query.weave_query.panels.LabeledItem(
                     label="output", item=output.model_output
                 ),
             },

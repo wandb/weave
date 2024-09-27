@@ -1,6 +1,6 @@
 from pydantic import BaseModel, create_model
 
-from weave.legacy.weave import weave_types as types
+from weave_query.weave_query import weave_types as types
 from . import infer_types
 
 
