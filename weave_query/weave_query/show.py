@@ -5,10 +5,10 @@ import urllib
 
 from IPython.display import IFrame, display
 
-from weave_query.weave_query import storage, artifact_fs, context, errors, graph, ops, node_ref, panel, ref_base
-from weave_query.weave_query import util
+from weave_query import storage, artifact_fs, context, errors, graph, ops, node_ref, panel, ref_base
+from weave_query import util
 from . import usage_analytics
-from weave_query.weave_query import weave_types as types
+from weave_query import weave_types as types
 from . import weavejs_fixes
 
 
@@ -21,7 +21,7 @@ def make_varname_for_type(t: types.Type):  # type: ignore
 def make_container(
     obj: typing.Union[panel.Panel, graph.Node], name: str
 ) -> panel.Panel:
-    from weave_query.weave_query.panels import Group
+    from weave_query.panels import Group
 
     if isinstance(obj, graph.Node):
         return Group(

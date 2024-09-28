@@ -2,11 +2,11 @@ import copy
 import functools
 import math
 
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op, weave_class
-from weave_query.weave_query import decorator_type
-from weave_query.weave_query.language_features.tagging import tagged_value_type
-from weave_query.weave_query.ops_primitives import graph, list_
+from weave_query import weave_types as types
+from weave_query.api import op, weave_class
+from weave_query import decorator_type
+from weave_query.language_features.tagging import tagged_value_type
+from weave_query.ops_primitives import graph, list_
 
 try:
     import sqlalchemy

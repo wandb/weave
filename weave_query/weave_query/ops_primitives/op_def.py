@@ -1,7 +1,7 @@
-from weave_query.weave_query import api as weave
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.op_def import OpDef
-from weave_query.weave_query.op_def_type import OpDefType
+from weave_query import api as weave
+from weave_query import weave_types as types
+from weave_query.op_def import OpDef
+from weave_query.op_def_type import OpDefType
 
 
 @weave.weave_class(weave_type=OpDefType)

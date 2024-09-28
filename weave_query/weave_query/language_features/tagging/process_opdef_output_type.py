@@ -5,21 +5,21 @@ function exported is `process_opdef_output_type`
 
 import typing
 
-from weave_query.weave_query import registry_mem
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import graph
-from weave_query.weave_query.language_features.tagging.opdef_util import (
+from weave_query import registry_mem
+from weave_query import weave_types as types
+from weave_query import graph
+from weave_query.language_features.tagging.opdef_util import (
     should_flow_tags,
     should_tag_op_def_outputs,
 )
-from weave_query.weave_query.language_features.tagging.tagging_op_logic import (
+from weave_query.language_features.tagging.tagging_op_logic import (
     op_get_tag_type_resolver,
     op_make_type_key_tag_resolver,
     op_make_type_tagged_resolver,
 )
 
 if typing.TYPE_CHECKING:
-    from weave_query.weave_query import op_def as OpDef
+    from weave_query import op_def as OpDef
 
 
 # The following 3 functions are used to get the ops without introducing circular references

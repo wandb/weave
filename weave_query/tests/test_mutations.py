@@ -1,5 +1,5 @@
-from weave_query.weave_query import api as weave
-from weave_query.weave_query import ops, storage, weave_internal
+from weave_query import api as weave
+from weave_query import ops, storage, weave_internal
 
 
 def test_autocommit(cereal_csv):

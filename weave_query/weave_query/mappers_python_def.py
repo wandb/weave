@@ -4,9 +4,9 @@ import inspect
 import math
 import typing
 
-from weave_query.weave_query import storage
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import (
+from weave_query import storage
+from weave_query import weave_types as types
+from weave_query import (
     artifact_fs,
     box,
     mappers,
@@ -16,9 +16,9 @@ from weave_query.weave_query import (
     val_const,
     errors,
 )
-from weave_query.weave_query import timestamp as weave_timestamp
-from weave_query.weave_query.language_features.tagging import tagged_value_type
-from weave_query.weave_query.partial_object import PartialObject, PartialObjectType
+from weave_query import timestamp as weave_timestamp
+from weave_query.language_features.tagging import tagged_value_type
+from weave_query.partial_object import PartialObject, PartialObjectType
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -60,7 +60,7 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
 
 class ObjectDictToObject(mappers_weave.ObjectMapper):
     def apply(self, obj):
-        from weave_query.weave_query.op_def_type import OpDefType
+        from weave_query.op_def_type import OpDefType
 
         # Only add keys that are accepted by the constructor.
         # This is used for Panels where we have an Class-level id attribute
@@ -332,7 +332,7 @@ class DefaultToPy(mappers.Mapper):
         self._use_stable_refs = use_stable_refs
 
     def apply(self, obj):
-        from weave_query.weave_query import op_def
+        from weave_query import op_def
 
         try:
             return self.type.instance_to_dict(obj)

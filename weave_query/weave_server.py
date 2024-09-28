@@ -25,7 +25,7 @@ from flask import (
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
-from weave_query.weave_query import (
+from weave_query import (
     context_state,
     engine_trace,
     environment,
@@ -41,8 +41,8 @@ from weave_query.weave_query import (
     wandb_api,
     weavejs_fixes,
 )
-from weave_query.weave_query.language_features.tagging import tag_store
-from weave_query.weave_query.server_error_handling import (
+from weave_query.language_features.tagging import tag_store
+from weave_query.server_error_handling import (
     client_safe_http_exceptions_as_werkzeug,
 )
 
@@ -93,7 +93,7 @@ if engine_trace.datadog_is_enabled():
 
 
 # Ensure these are imported and registered
-from weave_query.weave_query import ops
+from weave_query import ops
 
 # NOTE: Fixes flask dev server's auto-reload capability, by forcing it to use
 # stat mode instead of watchdog mode. It turns out that "import wandb" breaks
@@ -112,11 +112,11 @@ blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
 def import_ecosystem():
-    from weave_query.weave_query import ops, panels, panels_py
+    from weave_query import ops, panels, panels_py
 
     # Attempt to import MVP ecosystem modules
     try:
-        from weave_query.weave_query.ecosystem import langchain, replicate
+        from weave_query.ecosystem import langchain, replicate
     except ImportError:
         pass
 
@@ -129,7 +129,7 @@ def import_ecosystem():
         # except (ImportError, OSError, wandb.Error):
         #     print("Error: Couldn't import faiss module for Weaveflow.")
         try:
-            from weave_query.weave_query.ecosystem import all
+            from weave_query.ecosystem import all
         except (ImportError, OSError, wandb.Error):
             pass
 

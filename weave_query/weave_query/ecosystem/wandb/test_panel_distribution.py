@@ -2,8 +2,8 @@ import random
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import weave_internal
-from weave_query.weave_query.ecosystem.wandb import panel_distribution
+from weave_query import weave_internal
+from weave_query.ecosystem.wandb import panel_distribution
 
 
 def test_flow():

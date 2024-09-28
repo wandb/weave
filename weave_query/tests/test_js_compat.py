@@ -7,9 +7,9 @@
 # Note: This file is not yet complete, there are existing fixups in the
 #     weave Python code that I haven't documented here.
 
-from weave_query.weave_query import partial_object, weavejs_fixes
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.ops_domain import wb_domain_types
+from weave_query import partial_object, weavejs_fixes
+from weave_query import weave_types as types
+from weave_query.ops_domain import wb_domain_types
 
 
 def test_const_serialization():

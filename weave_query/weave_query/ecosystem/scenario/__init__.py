@@ -2,8 +2,8 @@ import typing
 
 import weave_query as weave
 import weave_query
-import weave_query.weave_query
-from weave_query.weave_query import val_const
+import weave_query
+from weave_query import val_const
 
 
 class ScenarioResult(typing.TypedDict):
@@ -27,14 +27,14 @@ class MetricsBankPanel(weave.Panel):
     input_node: weave.Node[MetricsBankInput]
 
     @weave.op()
-    def render(self) -> weave_query.weave_query.panels.Each:
+    def render(self) -> weave_query.panels.Each:
         input = typing.cast(MetricsBankInput, self.input_node)
 
         baseline = input["baseline"]
         candidate = input["candidate"]
 
-        joined = weave_query.weave_query.ops.join_all(
-            weave_query.weave_query.ops.make_list(l0=baseline, l1=candidate),
+        joined = weave_query.ops.join_all(
+            weave_query.ops.make_list(l0=baseline, l1=candidate),
             lambda row: row["scenario_id"],
             False,
         )
@@ -43,17 +43,17 @@ class MetricsBankPanel(weave.Panel):
         joined_keys = joined[0].keys()
 
         # The output type of difference is List["metric1" | "metric2" | "metric3"]
-        metrics = weave_query.weave_query.ops.difference(
+        metrics = weave_query.ops.difference(
             joined_keys, [val_const.const("scenario_id")]
         )
 
         # TODO: broken
-        return weave_query.weave_query.panels.Each(
+        return weave_query.panels.Each(
             metrics,
-            render=lambda metric_name: weave_query.weave_query.panels.Group(
+            render=lambda metric_name: weave_query.panels.Group(
                 items={
                     "title": metric_name,
-                    "plot": weave_query.weave_query.panels.Plot(
+                    "plot": weave_query.panels.Plot(
                         joined,
                         # TODO: bring this back
                         # title=metric_name,

@@ -13,7 +13,7 @@ import pytest
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import (
+from weave_query import (
     graph,
     graph_debug,
     language_nullability,
@@ -23,12 +23,12 @@ from weave_query.weave_query import (
     storage,
     weave_internal,
 )
-from weave_query.weave_query.language_features.tagging import make_tag_getter_op
-from weave_query.weave_query.language_features.tagging.tagged_value_type import (
+from weave_query.language_features.tagging import make_tag_getter_op
+from weave_query.language_features.tagging.tagged_value_type import (
     TaggedValueType,
 )
 
-from weave_query.weave_query import registry_mem
+from weave_query import registry_mem
 from weave_query.tests.util.concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,
@@ -84,7 +84,7 @@ def check_case(called: graph.Node, result_type: weave.types.Type, result: typing
     ), f"Expected op output type: {result_type}, but got {called.type}"
 
     # This is a way to save the final output, preserving tags.
-    result_ref = weave.use(weave_query.weave_query.ops.save_to_ref(called, None))
+    result_ref = weave.use(weave_query.ops.save_to_ref(called, None))
     if result_ref == None:
         actual_result = None
     else:

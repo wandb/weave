@@ -15,8 +15,8 @@ from wandb.sdk.lib.ipython import _get_python_type
 from wandb.sdk.lib.paths import LogicalPath
 from wandb.sdk.lib.printer import get_printer
 
-from weave_query.weave_query import weave_types
-from weave_query.weave_query import (
+from weave_query import weave_types
+from weave_query import (
     storage, 
     errors, 
     artifact_base,
@@ -27,8 +27,8 @@ from weave_query.weave_query import (
     runfiles_wandb,
     wandb_api,
 )
-from weave_query.weave_query.core_types.stream_table_type import StreamTableType
-from weave_query.weave_query.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+from weave_query.core_types.stream_table_type import StreamTableType
+from weave_query.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
 
 if typing.TYPE_CHECKING:
     from wandb.sdk.internal.file_pusher import FilePusher
@@ -201,8 +201,8 @@ class _StreamTableSync:
             self._log_row(row)
 
     def rows(self) -> graph.Node:
-        from weave_query.weave_query.ops_domain import stream_table_ops
-        from weave_query.weave_query.ops_primitives import weave_api
+        from weave_query.ops_domain import stream_table_ops
+        from weave_query.ops_primitives import weave_api
 
         if self._weave_stream_table_ref is None:
             raise errors.WeaveInternalError("ref is None after ensure")
@@ -211,7 +211,7 @@ class _StreamTableSync:
         )
 
     def _ipython_display_(self) -> graph.Node:
-        from weave_query.weave_query import show
+        from weave_query import show
 
         return show.show(self.rows())
 

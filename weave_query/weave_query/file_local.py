@@ -2,7 +2,7 @@ import contextlib
 import os
 import typing
 
-from weave_query.weave_query import weave_types as types
+from weave_query import weave_types as types
 
 from . import file_base, file_util
 

@@ -1,10 +1,10 @@
-from weave_query.weave_query import api as weave
-from weave_query.weave_query import compile, ops
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.language_features.tagging.tagged_value_type import TaggedValueType
-from weave_query.weave_query.ops_domain import wb_domain_types as wdt
-from weave_query.weave_query.ops_domain.project_ops import root_all_projects
-from weave_query.weave_query.ops_domain.report_ops import root_all_reports
+from weave_query import api as weave
+from weave_query import compile, ops
+from weave_query import weave_types as types
+from weave_query.language_features.tagging.tagged_value_type import TaggedValueType
+from weave_query.ops_domain import wb_domain_types as wdt
+from weave_query.ops_domain.project_ops import root_all_projects
+from weave_query.ops_domain.report_ops import root_all_reports
 
 from .test_wb import table_mock1_no_display_name
 

@@ -1,7 +1,7 @@
 import logging
 
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import (
+from weave_query import weave_types as types
+from weave_query import (
     weave_internal,
     errors,
     engine_trace,
@@ -14,7 +14,7 @@ from weave_query.weave_query import (
     language_nullability,
     op_policy,
 )
-from weave_query.weave_query.language_features.tagging import tag_store
+from weave_query.language_features.tagging import tag_store
 
 # from . import object_context
 

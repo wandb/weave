@@ -1,10 +1,10 @@
 # WeaveJS ops used for testing. These are not used in production.
 
-from weave_query.weave_query import graph, weave_internal
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query._dict_utils import typeddict_pick_output_type
-from weave_query.weave_query.language_features.tagging import tagged_value_type
-from weave_query.weave_query.language_features.tagging.tagging_op_logic import (
+from weave_query import graph, weave_internal
+from weave_query import weave_types as types
+from weave_query._dict_utils import typeddict_pick_output_type
+from weave_query.language_features.tagging import tagged_value_type
+from weave_query.language_features.tagging.tagging_op_logic import (
     op_get_tag_type_resolver,
     op_make_type_tagged_resolver,
 )

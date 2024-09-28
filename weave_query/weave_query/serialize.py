@@ -7,9 +7,9 @@ import json
 import random
 import typing
 
-from weave_query.weave_query import weave_internal
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import storage, errors, graph, memo, value_or_error
+from weave_query import weave_internal
+from weave_query import weave_types as types
+from weave_query import storage, errors, graph, memo, value_or_error
 
 NodeOrOp = typing.Union[graph.Node, graph.Op]
 

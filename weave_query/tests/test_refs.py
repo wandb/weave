@@ -3,10 +3,10 @@ import pytest
 import weave_query as weave
 import weave_query
 from weave.flow.obj import Object
-from weave_query.weave_query import artifact_local, storage
-from weave_query.weave_query import ops_arrow as arrow
-from weave_query.weave_query import ref_util
-from weave_query.weave_query.ref_util import (
+from weave_query import artifact_local, storage
+from weave_query import ops_arrow as arrow
+from weave_query import ref_util
+from weave_query.ref_util import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,

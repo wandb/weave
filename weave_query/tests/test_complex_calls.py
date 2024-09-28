@@ -1,6 +1,6 @@
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import weave_internal
+from weave_query import weave_internal
 
 
 def test_weave_fn_in_data():

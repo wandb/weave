@@ -4,8 +4,8 @@ import typing
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import weave_internal
-from weave_query.weave_query import (
+from weave_query import weave_internal
+from weave_query import (
     errors, 
     codifiable_value_mixin,
     codify,
@@ -14,11 +14,11 @@ from weave_query.weave_query import (
     panel,
     panel_util,
 )
-from weave_query.weave_query.panels.bank import (
+from weave_query.panels.bank import (
     default_panel_bank_flow_section_config,
     flow_layout,
 )
-from weave_query.weave_query.panels.panel_group_panel_info import PanelInfo
+from weave_query.panels.panel_group_panel_info import PanelInfo
 
 ItemsType = typing.TypeVar("ItemsType")
 
@@ -338,7 +338,7 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                 ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
             )
         return (
-            f"""weave_query.weave_query.panels.panel_group.Group({input_node_str} {param_str})"""
+            f"""weave_query.panels.panel_group.Group({input_node_str} {param_str})"""
         )
 
     # @property

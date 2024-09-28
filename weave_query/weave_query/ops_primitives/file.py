@@ -1,13 +1,13 @@
 import json
 import typing
 
-from weave_query.weave_query import environment as weave_env
-from weave_query.weave_query import errors
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op
-from weave_query.weave_query import file_base, wandb_file_manager
-from weave_query.weave_query.artifact_fs import FilesystemArtifactDir, FilesystemArtifactFile
-from weave_query.weave_query.artifact_wandb import WandbArtifact, WandbArtifactManifest
+from weave_query import environment as weave_env
+from weave_query import errors
+from weave_query import weave_types as types
+from weave_query.api import op
+from weave_query import file_base, wandb_file_manager
+from weave_query.artifact_fs import FilesystemArtifactDir, FilesystemArtifactFile
+from weave_query.artifact_wandb import WandbArtifact, WandbArtifactManifest
 
 
 @op(name="dir-pathReturnType", hidden=True)

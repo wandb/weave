@@ -4,9 +4,9 @@ import pytest
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import artifact_local, storage
-from weave_query.weave_query.ops_arrow import to_arrow
-from weave_query.weave_query.ops_domain import wbmedia
+from weave_query import artifact_local, storage
+from weave_query.ops_arrow import to_arrow
+from weave_query.ops_domain import wbmedia
 
 # This is not a valid artifact, but we need one to test. We set _read_dirname
 # so that the artifact's is_saved property is True, so that everything works

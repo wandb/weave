@@ -8,8 +8,8 @@ from torchvision import transforms
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import context_state as _context
-from weave_query.weave_query.ecosystem import pytorch
+from weave_query import context_state as _context
+from weave_query.ecosystem import pytorch
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -55,7 +55,7 @@ class Model:
         output_type=weave.types.List(
             weave.types.TypedDict(
                 {
-                    "X": weave_query.weave_query.ops.image.PILImageType(),  # type: ignore
+                    "X": weave_query.ops.image.PILImageType(),  # type: ignore
                     "y": weave.types.Int(),
                 }
             )
@@ -132,7 +132,7 @@ def train_epoch(network, loader, optimizer):
 @weave.op(
     render_info={"type": "function"},
     input_type={
-        "X": weave.types.List(weave_query.weave_query.ops.image.PILImageType()),  # type: ignore
+        "X": weave.types.List(weave_query.ops.image.PILImageType()),  # type: ignore
         "y": weave.types.List(weave.types.Int()),  # TODO: class enum?
     },
     # TODO: WeaveJS doesn't support callable output type yet.

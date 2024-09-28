@@ -4,14 +4,14 @@ from inspect import Parameter, signature
 
 import pyarrow as pa
 
-from weave_query.weave_query import weave_types
-from weave_query.weave_query.api import op
-from weave_query.weave_query import errors, gql_op_plugin, op_def, partial_object
-from weave_query.weave_query.decorator_arrow_op import arrow_op
-from weave_query.weave_query.gql_op_plugin import wb_gql_op_plugin
-from weave_query.weave_query.input_provider import InputProvider
-from weave_query.weave_query.ops_arrow import ArrowWeaveList, ArrowWeaveListType
-from weave_query.weave_query.ops_domain import wb_domain_types
+from weave_query import weave_types
+from weave_query.api import op
+from weave_query import errors, gql_op_plugin, op_def, partial_object
+from weave_query.decorator_arrow_op import arrow_op
+from weave_query.gql_op_plugin import wb_gql_op_plugin
+from weave_query.input_provider import InputProvider
+from weave_query.ops_arrow import ArrowWeaveList, ArrowWeaveListType
+from weave_query.ops_domain import wb_domain_types
 
 """
 This file contains utilities for constructing GQL ops (used by all the ops in

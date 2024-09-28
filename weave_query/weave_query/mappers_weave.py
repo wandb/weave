@@ -1,8 +1,8 @@
 import typing
 
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import mappers
-from weave_query.weave_query.partial_object import PartialObjectType
+from weave_query import weave_types as types
+from weave_query import mappers
+from weave_query.partial_object import PartialObjectType
 
 
 class TypedDictMapper(mappers.Mapper):

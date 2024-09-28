@@ -1,7 +1,7 @@
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import ops_arrow
-from weave_query.weave_query.wandb_interface.wandb_stream_table import StreamTable
+from weave_query import ops_arrow
+from weave_query.wandb_interface.wandb_stream_table import StreamTable
 
 
 def make_stream_table(*args, **kwargs):
@@ -25,7 +25,7 @@ def test_join_awls_with_stitch(user_by_api_key_in_env):
         feedback_st.log(row)
     feedback_st.finish()
 
-    joined = weave_query.weave_query.ops.join_2(
+    joined = weave_query.ops.join_2(
         dataset_st.rows(),
         feedback_st.rows(),
         lambda row: row["id"],

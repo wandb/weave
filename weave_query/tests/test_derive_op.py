@@ -1,6 +1,6 @@
-from weave_query.weave_query import api as weave
+from weave_query import api as weave
 
-from weave_query.weave_query import registry_mem
+from weave_query import registry_mem
 
 
 def test_mapped_add():

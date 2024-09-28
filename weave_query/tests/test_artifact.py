@@ -2,8 +2,8 @@ import pytest
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import artifact_fs, artifact_local, storage
-from weave_query.weave_query import ops_arrow as arrow
+from weave_query import artifact_fs, artifact_local, storage
+from weave_query import ops_arrow as arrow
 
 
 def test_artifact():

@@ -1,8 +1,8 @@
 from PIL import Image
 
-from weave_query.weave_query import api as weave
-from weave_query.weave_query import context_state
-from weave_query.weave_query.ops_primitives import geom as media_user
+from weave_query import api as weave
+from weave_query import context_state
+from weave_query.ops_primitives import geom as media_user
 
 
 def test_im_with_metadata():

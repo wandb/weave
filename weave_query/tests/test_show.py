@@ -2,9 +2,9 @@
 # The outputs of weave.show (the generated panel urls and their arguments)
 # need to match what javascript expects.
 
-from weave_query.weave_query import ops
+from weave_query import ops
 
-from weave_query.weave_query.show import _show_params
+from weave_query.show import _show_params
 from . import test_helpers
 
 

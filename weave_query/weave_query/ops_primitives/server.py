@@ -1,5 +1,5 @@
-from weave_query.weave_query.decorator_op import op
-from weave_query.weave_query.version import VERSION
+from weave_query.decorator_op import op
+from weave_query.version import VERSION
 
 
 @op(

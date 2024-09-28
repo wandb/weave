@@ -3,11 +3,11 @@ import typing
 import pyarrow as pa
 from pyarrow import compute as pc
 
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.arrow.arrow import ArrowWeaveListType, arrow_as_array
-from weave_query.weave_query.arrow.list_ import ArrowWeaveList
-from weave_query.weave_query.decorator_arrow_op import arrow_op
-from weave_query.weave_query.language_features.tagging import tagged_value_type
+from weave_query import weave_types as types
+from weave_query.arrow.arrow import ArrowWeaveListType, arrow_as_array
+from weave_query.arrow.list_ import ArrowWeaveList
+from weave_query.decorator_arrow_op import arrow_op
+from weave_query.language_features.tagging import tagged_value_type
 
 
 def _arrowweavelistlist_listindex_output_type(input_types):
@@ -70,7 +70,7 @@ def listindex(self, index):
 
 def _list_op_output_object_type(input_types):
     self_type = input_types["self"]
-    from weave_query.weave_query import op_def
+    from weave_query import op_def
 
     def _remove_tags(t):
         if isinstance(t, tagged_value_type.TaggedValueType):

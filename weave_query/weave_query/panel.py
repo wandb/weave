@@ -3,10 +3,10 @@ import inspect
 import typing
 from tarfile import DEFAULT_FORMAT
 
-from weave_query.weave_query import api as weave
-from weave_query.weave_query import weave_internal
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import graph, panel_util, errors, storage
+from weave_query import api as weave
+from weave_query import weave_internal
+from weave_query import weave_types as types
+from weave_query import graph, panel_util, errors, storage
 
 
 def run_variable_lambdas(
@@ -157,6 +157,6 @@ class Panel(typing.Generic[InputNodeType, VarsType]):
         }
 
     def _ipython_display_(self):
-        from weave_query.weave_query import show
+        from weave_query import show
 
         show.show(self)

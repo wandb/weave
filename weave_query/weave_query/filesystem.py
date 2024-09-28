@@ -20,7 +20,7 @@ import aiofiles.os as aiofiles_os
 from aiofiles.threadpool import binary as aiofiles_binary
 from aiofiles.threadpool import text as aiofiles_text
 
-from weave_query.weave_query import cache, engine_trace, environment, errors, util
+from weave_query import cache, engine_trace, environment, errors, util
 
 tracer = engine_trace.tracer()  # type: ignore
 async_utime = aiofiles_os.wrap(os.utime)  # type: ignore

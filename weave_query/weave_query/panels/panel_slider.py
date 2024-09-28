@@ -3,8 +3,8 @@ import typing
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import weave_internal
-from weave_query.weave_query import panel
+from weave_query import weave_internal
+from weave_query import panel
 
 
 @weave.type()
@@ -29,7 +29,7 @@ class Slider(panel.Panel):
 
     def __post_init__(self, *args):
         super().__post_init__(*args)
-        if isinstance(self.input_node, weave_query.weave_query.graph.VoidNode):
+        if isinstance(self.input_node, weave_query.graph.VoidNode):
             self.__dict__["input_node"] = weave_internal.const(0)
 
     @weave.op()

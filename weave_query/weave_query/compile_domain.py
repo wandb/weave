@@ -2,13 +2,13 @@ import typing
 
 import graphql
 
-from weave_query.weave_query import errors
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import gql_op_plugin, gql_to_weave, graph, op_args, stitch, registry_mem
-from weave_query.weave_query.input_provider import InputAndStitchProvider
+from weave_query import errors
+from weave_query import weave_types as types
+from weave_query import gql_op_plugin, gql_to_weave, graph, op_args, stitch, registry_mem
+from weave_query.input_provider import InputAndStitchProvider
 
 if typing.TYPE_CHECKING:
-    from weave_query.weave_query import op_def
+    from weave_query import op_def
 
 
 def fragment_to_query(fragment: str) -> str:

@@ -5,8 +5,8 @@ import io
 import PIL
 import PIL.Image
 
-from weave_query.weave_query import api as weave
-from weave_query.weave_query import weave_types as types
+from weave_query import api as weave
+from weave_query import weave_types as types
 
 
 class ImageType(types.Type):

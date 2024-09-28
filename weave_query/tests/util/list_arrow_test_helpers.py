@@ -1,6 +1,6 @@
-from weave_query.weave_query import api as weave
-from weave_query.weave_query import ops_arrow as arrow
-from weave_query.weave_query.ops_primitives import list_
+from weave_query import api as weave
+from weave_query import ops_arrow as arrow
+from weave_query.ops_primitives import list_
 
 
 class ListLikeNodeInterface:

@@ -1,8 +1,8 @@
-from weave_query.weave_query.server import handle_request
+from weave_query.server import handle_request
 
 
 def test_playback():
-    from weave_query.weave_query import ecosystem
+    from weave_query import ecosystem
 
     for payload in [execute_payloads[-1]]:
         res = handle_request(payload, True)

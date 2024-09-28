@@ -1,8 +1,8 @@
 # Ideas for ops, but not production ready.
 
-from weave_query.weave_query import api as api
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op, weave_class
+from weave_query import api as api
+from weave_query import weave_types as types
+from weave_query.api import op, weave_class
 
 op(
     name="root-compare_versions",

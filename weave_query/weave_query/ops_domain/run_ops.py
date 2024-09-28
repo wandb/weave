@@ -37,26 +37,26 @@
 import json
 import typing
 
-from weave_query.weave_query import engine_trace
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op
-from weave_query.weave_query import compile_table
-from weave_query.weave_query.gql_op_plugin import wb_gql_op_plugin
-from weave_query.weave_query.input_provider import InputAndStitchProvider
-from weave_query.weave_query.language_features.tagging.make_tag_getter_op import (
+from weave_query import engine_trace
+from weave_query import weave_types as types
+from weave_query.api import op
+from weave_query import compile_table
+from weave_query.gql_op_plugin import wb_gql_op_plugin
+from weave_query.input_provider import InputAndStitchProvider
+from weave_query.language_features.tagging.make_tag_getter_op import (
     make_tag_getter_op,
 )
-from weave_query.weave_query.ops_domain import wb_domain_types as wdt
-from weave_query.weave_query.ops_domain import wb_util
+from weave_query.ops_domain import wb_domain_types as wdt
+from weave_query.ops_domain import wb_util
 
 # Important to re-export ops
-from weave_query.weave_query.ops_domain.run_history import (
+from weave_query.ops_domain.run_history import (
     history_op_common,
     run_history_v1_legacy_ops,
     run_history_v2_parquet_media,
     run_history_v3_parquet_stream_optimized,
 )
-from weave_query.weave_query.ops_domain.wandb_domain_gql import (
+from weave_query.ops_domain.wandb_domain_gql import (
     _make_alias,
     gql_connection_op,
     gql_direct_edge_op,

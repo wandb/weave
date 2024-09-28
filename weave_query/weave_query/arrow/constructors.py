@@ -3,13 +3,13 @@ import typing
 
 import pyarrow as pa
 
-from weave_query.weave_query import errors
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import artifact_base, box
-from weave_query.weave_query.arrow import arrow_tags, convert
-from weave_query.weave_query.arrow.arrow import ArrowWeaveListType, arrow_as_array
-from weave_query.weave_query.arrow.list_ import ArrowWeaveList
-from weave_query.weave_query.language_features.tagging import tag_store, tagged_value_type
+from weave_query import errors
+from weave_query import weave_types as types
+from weave_query import artifact_base, box
+from weave_query.arrow import arrow_tags, convert
+from weave_query.arrow.arrow import ArrowWeaveListType, arrow_as_array
+from weave_query.arrow.list_ import ArrowWeaveList
+from weave_query.language_features.tagging import tag_store, tagged_value_type
 
 
 def repeat(value: typing.Any, count: int) -> pa.Array:

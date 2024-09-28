@@ -4,9 +4,9 @@ import typing
 
 import numpy as np
 
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op, weave_class
-from weave_query.weave_query import timestamp as weave_timestamp
+from weave_query import weave_types as types
+from weave_query.api import op, weave_class
+from weave_query import timestamp as weave_timestamp
 
 binary_number_op_input_type = {
     "lhs": types.Number(),

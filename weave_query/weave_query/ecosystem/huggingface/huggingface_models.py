@@ -8,8 +8,8 @@ import transformers
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query.ecosystem import pytorch
-from weave_query.weave_query.ecosystem.huggingface import (
+from weave_query.ecosystem import pytorch
+from weave_query.ecosystem.huggingface import (
     hfmodel,
     model_textclassification,
     model_textgeneration,
@@ -41,11 +41,11 @@ class HuggingfaceModelsPanel(weave.Panel):
     input_node: weave.Node[list[hfmodel.HFModel]]
 
     @weave.op()
-    def render(self) -> weave_query.weave_query.panels.Table:
-        return weave_query.weave_query.panels.Table(
+    def render(self) -> weave_query.panels.Table:
+        return weave_query.panels.Table(
             self.input_node,
             columns=[
-                lambda model_row: weave_query.weave_query.panels.WeaveLink(
+                lambda model_row: weave_query.panels.WeaveLink(
                     model_row.id(),
                     to=lambda input: huggingface().model(input),  # type: ignore
                 ),
@@ -65,24 +65,24 @@ class HuggingfaceModelPanel(weave.Panel):
     input_node: weave.Node[hfmodel.HFModel]
 
     @weave.op(pure=False)
-    def render(self) -> weave_query.weave_query.panels.Card:
+    def render(self) -> weave_query.panels.Card:
         model = typing.cast(hfmodel.HFModel, self.input_node)
-        return weave_query.weave_query.panels.Card(
+        return weave_query.panels.Card(
             title=model.id(),
             subtitle="HuggingFace Hub Model",
             content=[
-                weave_query.weave_query.panels.CardTab(
+                weave_query.panels.CardTab(
                     name="Model Card",
-                    content=weave_query.weave_query.panels.PanelMarkdown(model.readme()),  # type: ignore
+                    content=weave_query.panels.PanelMarkdown(model.readme()),  # type: ignore
                 ),
-                weave_query.weave_query.panels.CardTab(
+                weave_query.panels.CardTab(
                     name="Metadata",
-                    content=weave_query.weave_query.panels.Group(
+                    content=weave_query.panels.Group(
                         items={
-                            "id": weave_query.weave_query.panels.LabeledItem(
+                            "id": weave_query.panels.LabeledItem(
                                 item=model.id(), label="ID"
                             ),
-                            "pipeline_tag": weave_query.weave_query.panels.LabeledItem(
+                            "pipeline_tag": weave_query.panels.LabeledItem(
                                 item=model.pipeline_tag(), label="Pipeline tag"
                             ),
                         }
@@ -90,10 +90,10 @@ class HuggingfaceModelPanel(weave.Panel):
                 ),
                 # Broke in panel refactor. Don't have concrete op name available here so
                 # can't get the right type for the output.
-                # weave_query.weave_query.panels.CardTab(
+                # weave_query.panels.CardTab(
                 #     name="Inference Logs",
-                #     content=weave_query.weave_query.panels.Table(
-                #         weave_query.weave_query.ops.used_by(model, model.call.op_name()),
+                #     content=weave_query.panels.Table(
+                #         weave_query.ops.used_by(model, model.call.op_name()),
                 #         columns=[
                 #             lambda run: run.output.model_input,
                 #             lambda run: run.output.model_output[0]["generated_text"],
@@ -142,12 +142,12 @@ class HuggingfacePackagePanel(weave.Panel):
     input_node: weave.Node[HuggingFacePackage]
 
     @weave.op()
-    def render(self) -> weave_query.weave_query.panels.Card:
+    def render(self) -> weave_query.panels.Card:
         pack = typing.cast(HuggingFacePackage, self.input_node)  # type: ignore
-        return weave_query.weave_query.panels.Card(
+        return weave_query.panels.Card(
             title="Huggingface Package",
             subtitle="Browse Models and Datasets",
             content=[
-                weave_query.weave_query.panels.CardTab(name="Models", content=pack.models()),  # type: ignore
+                weave_query.panels.CardTab(name="Models", content=pack.models()),  # type: ignore
             ],
         )

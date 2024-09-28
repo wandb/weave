@@ -22,9 +22,9 @@ import weakref
 from collections import defaultdict
 from contextlib import contextmanager
 
-from weave_query.weave_query import errors
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import engine_trace, box
+from weave_query import errors
+from weave_query import weave_types as types
+from weave_query import engine_trace, box
 
 statsd = engine_trace.statsd()  # type: ignore
 

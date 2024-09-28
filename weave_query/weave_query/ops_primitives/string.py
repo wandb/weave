@@ -4,8 +4,8 @@ import typing
 
 import numpy as np
 
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op, weave_class
+from weave_query import weave_types as types
+from weave_query.api import op, weave_class
 
 
 @op(name="root-string")

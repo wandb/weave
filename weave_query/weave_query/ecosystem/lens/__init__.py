@@ -1,1 +1,1 @@
-from weave_query.weave_query.ecosystem.lens.lens import *
+from weave_query.ecosystem.lens.lens import *

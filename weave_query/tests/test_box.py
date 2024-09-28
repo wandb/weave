@@ -1,6 +1,6 @@
 import datetime
 
-from weave_query.weave_query import box
+from weave_query import box
 
 
 def test_boxdatetime():

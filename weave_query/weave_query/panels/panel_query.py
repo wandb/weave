@@ -3,9 +3,9 @@ import typing
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import weave_internal
-from weave_query.weave_query import graph, panel
-from weave_query.weave_query.panels import table_state
+from weave_query import weave_internal
+from weave_query import graph, panel
+from weave_query.panels import table_state
 
 
 @weave.type()
@@ -19,7 +19,7 @@ EditorType = typing.TypeVar("EditorType")
 @weave.type()
 class QueryCondition:
     expression: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave_query.weave_query.graph.VoidNode()
+        default_factory=lambda: weave_query.graph.VoidNode()
     )
     editor: EditorType = dataclasses.field(default_factory=lambda: graph.VoidNode())  # type: ignore
 
@@ -77,7 +77,7 @@ class Query(panel.Panel):
             and self.config.tableState.preFilterFunction is not None
             and self.config.tableState.preFilterFunction.type != weave.types.Invalid()
         ):
-            table_node = weave_query.weave_query.ops.List.filter(
+            table_node = weave_query.ops.List.filter(
                 table_node,
                 lambda row: weave_internal.call_fn(
                     self.config.tableState.preFilterFunction, {"row": row}

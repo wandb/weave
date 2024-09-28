@@ -2,8 +2,8 @@ import typing
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import weave_internal
-from weave_query.weave_query.panels_py.generator_templates import template_registry
+from weave_query import weave_internal
+from weave_query.panels_py.generator_templates import template_registry
 
 
 @weave.type()
@@ -18,22 +18,22 @@ class PyBoardSeedBoardConfig:
 def seed_board(
     input_node: weave.Node[typing.Any],
     config: typing.Optional[PyBoardSeedBoardConfig] = None,
-) -> weave_query.weave_query.panels.Group:
+) -> weave_query.panels.Group:
     control_items = [
-        weave_query.weave_query.panels.GroupPanel(
+        weave_query.panels.GroupPanel(
             input_node,
             id="data",
         ),
     ]
 
     panels = [
-        weave_query.weave_query.panels.BoardPanel(
+        weave_query.panels.BoardPanel(
             weave_internal.make_var_node(input_node.type, "data"),
             id="panel",
-            layout=weave_query.weave_query.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
+            layout=weave_query.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
         ),
     ]
-    return weave_query.weave_query.panels.Board(vars=control_items, panels=panels)
+    return weave_query.panels.Board(vars=control_items, panels=panels)
 
 
 template_registry.register(

@@ -5,7 +5,7 @@ import pytest
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query.ops_primitives import date
+from weave_query.ops_primitives import date
 
 
 def assert_date_string(

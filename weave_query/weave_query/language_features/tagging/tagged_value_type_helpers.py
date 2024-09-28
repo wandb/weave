@@ -1,7 +1,7 @@
 import typing
 
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.language_features.tagging import tagged_value_type
+from weave_query import weave_types as types
+from weave_query.language_features.tagging import tagged_value_type
 
 
 def push_down_tags_from_container_type_to_element_type(

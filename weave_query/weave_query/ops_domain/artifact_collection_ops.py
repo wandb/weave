@@ -1,12 +1,12 @@
 import typing
 import urllib
 
-from weave_query.weave_query import errors
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op
-from weave_query.weave_query.gql_op_plugin import wb_gql_op_plugin
-from weave_query.weave_query.ops_domain import wb_domain_types as wdt
-from weave_query.weave_query.ops_domain.wandb_domain_gql import (
+from weave_query import errors
+from weave_query import weave_types as types
+from weave_query.api import op
+from weave_query.gql_op_plugin import wb_gql_op_plugin
+from weave_query.ops_domain import wb_domain_types as wdt
+from weave_query.ops_domain.wandb_domain_gql import (
     gql_connection_op,
     gql_direct_edge_op,
     gql_prop_op,

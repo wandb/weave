@@ -42,12 +42,12 @@ from langchain.vectorstores.base import VectorStoreRetriever
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import storage
-from weave_query.weave_query import artifact_base
-from weave_query.weave_query.artifact_fs import FilesystemArtifact
-from weave_query.weave_query.ecosystem.langchain import util
-from weave_query.weave_query.ops_domain import trace_tree
-from weave_query.weave_query.weave_types import Type
+from weave_query import storage
+from weave_query import artifact_base
+from weave_query.artifact_fs import FilesystemArtifact
+from weave_query.ecosystem.langchain import util
+from weave_query.ops_domain import trace_tree
+from weave_query.weave_types import Type
 
 
 class WeaveTracer(BaseTracer):

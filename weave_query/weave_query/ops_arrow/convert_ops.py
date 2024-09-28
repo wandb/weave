@@ -1,7 +1,7 @@
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op
-from weave_query.weave_query.arrow import convert
-from weave_query.weave_query.arrow.arrow import ArrowWeaveListType
+from weave_query import weave_types as types
+from weave_query.api import op
+from weave_query.arrow import convert
+from weave_query.arrow.arrow import ArrowWeaveListType
 
 
 @op(

@@ -22,7 +22,7 @@ from typing import Any, Callable, Dict, Iterator, TypeVar
 
 import aioprocessing
 
-from weave_query.weave_query import (
+from weave_query import (
     weave_http,
     filesystem,
     errors,

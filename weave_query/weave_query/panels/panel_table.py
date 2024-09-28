@@ -3,11 +3,11 @@ import typing
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import weave_internal
-from weave_query.weave_query import codifiable_value_mixin, codify, panel
-from weave_query.weave_query.graph import ConstNode, Node, OutputNode, VoidNode
-from weave_query.weave_query.panels import table_state
-from weave_query.weave_query.panels.panel_query import Query
+from weave_query import weave_internal
+from weave_query import codifiable_value_mixin, codify, panel
+from weave_query.graph import ConstNode, Node, OutputNode, VoidNode
+from weave_query.panels import table_state
+from weave_query.panels.panel_query import Query
 
 
 @weave.type("tablePanelConfig")
@@ -21,7 +21,7 @@ class TableConfig:
 
 class ColumnDef(typing.TypedDict):
     columnName: str
-    columnSelectFunction: weave_query.weave_query.graph.Node
+    columnSelectFunction: weave_query.graph.Node
 
 
 @dataclasses.dataclass
@@ -129,7 +129,7 @@ class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             param_str = (
                 ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
             )
-        return f"""weave_query.weave_query.panels.panel_table.Table({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
+        return f"""weave_query.panels.panel_table.Table({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
 
     def add_column(
         self,
@@ -166,14 +166,14 @@ def _get_composite_group_key(self: typing.Union[Table, Query]) -> str:
 # TODO: preserve arrow
 def _get_pinned_node(self: typing.Union[Table, Query], data_or_rows_node: Node) -> Node:
     if self.config is None:
-        return weave_query.weave_query.ops.make_list()
+        return weave_query.ops.make_list()
 
     composite_group_key = _get_composite_group_key(self)
     pinned_data = self.config.pinnedRows.get(composite_group_key)
     if pinned_data is None or len(pinned_data) == 0:
-        return weave_query.weave_query.ops.make_list()
+        return weave_query.ops.make_list()
 
-    return weave_query.weave_query.ops.make_list(
+    return weave_query.ops.make_list(
         **{
             f"v_{pin_ndx}": OutputNode(
                 data_or_rows_node.type,
@@ -214,7 +214,7 @@ def _get_rows_node(self: Table, apply_sort: bool = True) -> Node:
         and self.config.tableState.preFilterFunction is not None
         and self.config.tableState.preFilterFunction.type != weave.types.Invalid()
     ):
-        data_node = weave_query.weave_query.ops.List.filter(
+        data_node = weave_query.ops.List.filter(
             data_node,
             lambda row, index: weave_internal.call_fn(
                 self.config.tableState.preFilterFunction, {"row": row, "index": index}
@@ -227,9 +227,9 @@ def _get_rows_node(self: Table, apply_sort: bool = True) -> Node:
     group_ids: typing.Set[str] = set()
     if self.config and self.config.tableState.groupBy:
         group_ids = set(self.config.tableState.groupBy)
-        data_node = weave_query.weave_query.ops.List.groupby(
+        data_node = weave_query.ops.List.groupby(
             data_node,
-            lambda row: weave_query.weave_query.ops.dict_(
+            lambda row: weave_query.ops.dict_(
                 **{
                     columns[col_id]["columnName"]: weave_internal.call_fn(
                         columns[col_id]["columnSelectFunction"],
@@ -243,9 +243,9 @@ def _get_rows_node(self: Table, apply_sort: bool = True) -> Node:
         )
 
     # Apply Selection
-    data_node = weave_query.weave_query.ops.List.map(
+    data_node = weave_query.ops.List.map(
         data_node,
-        lambda row, index: weave_query.weave_query.ops.dict_(
+        lambda row, index: weave_query.ops.dict_(
             **{
                 col_def["columnName"]: (
                     weave_internal.call_fn(
@@ -276,9 +276,9 @@ def _get_rows_node(self: Table, apply_sort: bool = True) -> Node:
             # else:
             #     return row_node[col_name]
 
-        data_node = weave_query.weave_query.ops.List.sort(
+        data_node = weave_query.ops.List.sort(
             data_node,
-            lambda row: weave_query.weave_query.ops.make_list(
+            lambda row: weave_query.ops.make_list(
                 **{
                     f"{sort_ndx}": make_sort_fn(sort_def, row)
                     for sort_ndx, sort_def in enumerate(sort_defs)

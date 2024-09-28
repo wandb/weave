@@ -1,10 +1,10 @@
 import numpy as np
 
-from weave_query.weave_query import artifact_fs, artifact_wandb
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.ops_domain import table
+from weave_query import artifact_fs, artifact_wandb
+from weave_query import weave_types as types
+from weave_query.ops_domain import table
 
-from weave_query.weave_query import types_numpy as numpy_types
+from weave_query import types_numpy as numpy_types
 
 
 def test_construct_numpy_type():

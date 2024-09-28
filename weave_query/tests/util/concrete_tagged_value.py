@@ -5,8 +5,8 @@
 import dataclasses
 import typing
 
-from weave_query.weave_query import box
-from weave_query.weave_query.language_features.tagging import tag_store
+from weave_query import box
+from weave_query.language_features.tagging import tag_store
 
 
 @dataclasses.dataclass

@@ -12,15 +12,15 @@ from flask.testing import FlaskClient
 
 from weave_query.tests import fixture_fakewandb
 from weave_query.tests.wandb_system_tests_conftest import *
-from weave_query.weave_query import client as client_legacy
-from weave_query.weave_query import (
+from weave_query import client as client_legacy
+from weave_query import (
     context_state,
     environment,
     io_service,
     logs,
     serialize,
 )
-from weave_query.weave_query.language_features.tagging.tag_store import (
+from weave_query.language_features.tagging.tag_store import (
     isolated_tagging_context,
 )
 
@@ -31,7 +31,7 @@ logs.configure_logger()
 # tests.
 context_state._eager_mode.set(False)
 
-# A lot of tests rely on weave_query.weave_query.ops.* being in scope. Importing this here
+# A lot of tests rely on weave_query.ops.* being in scope. Importing this here
 # makes that work...
 
 
@@ -122,7 +122,7 @@ def fake_wandb():
 
 @pytest.fixture()
 def consistent_table_col_ids():
-    from weave_query.weave_query.panels import table_state
+    from weave_query.panels import table_state
 
     with table_state.use_consistent_col_ids():
         yield

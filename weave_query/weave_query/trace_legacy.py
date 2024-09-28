@@ -1,11 +1,11 @@
 import os
 import typing
 
-from weave_query.weave_query import artifact_local, graph, runs
+from weave_query import artifact_local, graph, runs
 
 from . import ref_base
 from . import errors
-from weave_query.weave_query import weave_types as types
+from weave_query import weave_types as types
 
 
 def get_obj_creator(ref: ref_base.Ref) -> typing.Optional[runs.Run]:

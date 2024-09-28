@@ -1,11 +1,11 @@
-from weave_query.weave_query import context_state as _context
+from weave_query import context_state as _context
 
 _loading_builtins_token = _context.set_loading_built_ins()
 
-from weave_query.weave_query.ecosystem.huggingface.hfmodel import ModelOutputAttention
-from weave_query.weave_query.ecosystem.huggingface.huggingface_datasets import *
-from weave_query.weave_query.ecosystem.huggingface.huggingface_models import *
-from weave_query.weave_query.ecosystem.huggingface.model_textclassification import (
+from weave_query.ecosystem.huggingface.hfmodel import ModelOutputAttention
+from weave_query.ecosystem.huggingface.huggingface_datasets import *
+from weave_query.ecosystem.huggingface.huggingface_models import *
+from weave_query.ecosystem.huggingface.model_textclassification import (
     FullTextClassificationPipelineOutput,
 )
 

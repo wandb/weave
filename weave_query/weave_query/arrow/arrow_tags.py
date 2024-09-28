@@ -3,10 +3,10 @@ import typing
 import pyarrow as pa
 from pyarrow import compute as pc
 
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.arrow import convert
-from weave_query.weave_query.arrow.arrow import offsets_starting_at_zero
-from weave_query.weave_query.language_features.tagging import (
+from weave_query import weave_types as types
+from weave_query.arrow import convert
+from weave_query.arrow.arrow import offsets_starting_at_zero
+from weave_query.language_features.tagging import (
     process_opdef_output_type,
     tag_store,
 )
@@ -109,7 +109,7 @@ def awl_add_arrow_tags(
     new_object_type = process_opdef_output_type.op_make_type_tagged_resolver(
         l.object_type, tag_type
     )
-    from weave_query.weave_query.arrow.list_ import ArrowWeaveList
+    from weave_query.arrow.list_ import ArrowWeaveList
 
     res: ArrowWeaveList = ArrowWeaveList(new_value, new_object_type, l._artifact)
     if tag_store.is_tagged(l):

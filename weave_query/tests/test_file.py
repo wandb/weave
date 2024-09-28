@@ -2,7 +2,7 @@ import pytest
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import api, context_state, environment, errors, ops
+from weave_query import api, context_state, environment, errors, ops
 
 
 def test_dir():

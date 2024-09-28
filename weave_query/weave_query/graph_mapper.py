@@ -1,7 +1,7 @@
-from weave_query.weave_query import ref_base
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import graph, mappers, node_ref
-from weave_query.weave_query import mappers_python_def as mappers_python
+from weave_query import ref_base
+from weave_query import weave_types as types
+from weave_query import graph, mappers, node_ref
+from weave_query import mappers_python_def as mappers_python
 
 
 class FunctionToPyFunction(mappers.Mapper):

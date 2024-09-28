@@ -1,8 +1,8 @@
 import typing
 
-from weave_query.weave_query import errors
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op
+from weave_query import errors
+from weave_query import weave_types as types
+from weave_query.api import op
 
 
 @op(

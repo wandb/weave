@@ -1,1 +1,1 @@
-from weave_query.weave_query.ecosystem.slurm.ops import *
+from weave_query.ecosystem.slurm.ops import *

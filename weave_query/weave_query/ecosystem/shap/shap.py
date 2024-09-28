@@ -14,8 +14,8 @@ import xgboost
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query.ecosystem import huggingface as hf
-from weave_query.weave_query.ecosystem import xgboost as weave_xgb
+from weave_query.ecosystem import huggingface as hf
+from weave_query.ecosystem import xgboost as weave_xgb
 
 
 @weave.op(
@@ -43,7 +43,7 @@ class ShapValues:
         path = "/tmp/shap-%s.png" % random.randrange(0, 1000000)
         plt.savefig(path)
         plt.close()
-        return weave_query.weave_query.ops.LocalFile(path)
+        return weave_query.ops.LocalFile(path)
 
 
 class ShapExplanationType(weave.types.Type):
@@ -77,9 +77,9 @@ def shap_explain(
 
 
 @weave.op()
-def shap_plot_text(shap_values: shap.Explanation) -> weave_query.weave_query.ops.Html:
+def shap_plot_text(shap_values: shap.Explanation) -> weave_query.ops.Html:
     html = shap.plots.text(shap_values, display=False)
-    return weave_query.weave_query.ops.Html(html)
+    return weave_query.ops.Html(html)
 
 
 @weave.type()
@@ -88,5 +88,5 @@ class ShapPlotText(weave.Panel):
     input_node: weave.Node[shap.Explanation]
 
     @weave.op()
-    def render(self) -> weave_query.weave_query.panels.PanelHtml:
-        return weave_query.weave_query.panels.PanelHtml(shap_plot_text(self.input_node))
+    def render(self) -> weave_query.panels.PanelHtml:
+        return weave_query.panels.PanelHtml(shap_plot_text(self.input_node))

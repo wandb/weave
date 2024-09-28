@@ -5,12 +5,12 @@ import typing
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import weave_internal
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import errors, codifiable_value_mixin, codify, graph, panel
-from weave_query.weave_query.ops_primitives import boolean, list_
-from weave_query.weave_query.ops_primitives import dict as dict_
-from weave_query.weave_query.panels import panel_table, table_state
+from weave_query import weave_internal
+from weave_query import weave_types as types
+from weave_query import errors, codifiable_value_mixin, codify, graph, panel
+from weave_query.ops_primitives import boolean, list_
+from weave_query.ops_primitives import dict as dict_
+from weave_query.panels import panel_table, table_state
 
 
 @weave.type()
@@ -697,7 +697,7 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             param_str = (
                 ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
             )
-        return f"""weave_query.weave_query.panels.panel_plot.Plot({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
+        return f"""weave_query.panels.panel_plot.Plot({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
 
 
 def make_set_all_series(dim_name: str) -> typing.Callable[[Plot, typing.Any], None]:

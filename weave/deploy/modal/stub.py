@@ -5,7 +5,7 @@ from modal import Image, Secret, Stub, asgi_app
 
 from weave.deploy.util import safe_name
 from weave.trace.refs import ObjectRef, parse_uri
-from weave_query.weave_query.uris import WeaveURI
+from weave_query.uris import WeaveURI
 
 image = (
     Image.debian_slim()

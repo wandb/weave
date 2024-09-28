@@ -12,8 +12,8 @@ from torchvision import datasets
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import infer_types
-from weave_query.weave_query import panels
+from weave_query import infer_types
+from weave_query import panels
 
 ExampleType = TypeVar("ExampleType")
 

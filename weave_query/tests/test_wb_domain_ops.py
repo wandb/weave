@@ -5,12 +5,12 @@ import wandb
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import ops
-from weave_query.weave_query.language_features.tagging import tagged_value_type
-from weave_query.weave_query.ops_domain import wb_domain_types
-from weave_query.weave_query.ops_primitives import _dict_utils
+from weave_query import ops
+from weave_query.language_features.tagging import tagged_value_type
+from weave_query.ops_domain import wb_domain_types
+from weave_query.ops_primitives import _dict_utils
 
-from weave_query.weave_query import registry_mem
+from weave_query import registry_mem
 from weave_query.tests import fixture_fakewandb as fwb
 
 """

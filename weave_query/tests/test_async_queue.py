@@ -4,7 +4,7 @@ import threading
 import aioprocessing
 import pytest
 
-from weave_query.weave_query.async_queue import ProcessQueue, Queue, ThreadQueue
+from weave_query.async_queue import ProcessQueue, Queue, ThreadQueue
 
 
 async def process_producer(queue: Queue) -> None:

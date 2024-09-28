@@ -8,28 +8,28 @@ import sys
 # the engine and UI layers which should be kept separate from the core layer).
 pre_init_modules = set(sys.modules.keys())
 
-from weave_query.weave_query import context_state as _context_state
+from weave_query import context_state as _context_state
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import storage
+from weave_query import weave_types as types
+from weave_query import storage
 
-from weave_query.weave_query.api import *
-from weave_query.weave_query.decorators import op
+from weave_query.api import *
+from weave_query.decorators import op
 
-from weave_query.weave_query.errors import *
+from weave_query.errors import *
 
-from weave_query.weave_query import mappers_python_def
+from weave_query import mappers_python_def
 
-from weave_query.weave_query import wandb_api as _wandb_api
+from weave_query import wandb_api as _wandb_api
 
-from weave_query.weave_query import version
+from weave_query import version
 
 _wandb_api.init()
 
 # Ensure there is a client available for eager mode
-from weave_query.weave_query import context as _context
+from weave_query import context as _context
 
 
 _context_state.clear_loading_built_ins(_loading_builtins_token)

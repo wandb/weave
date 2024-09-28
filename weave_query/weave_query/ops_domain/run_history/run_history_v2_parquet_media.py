@@ -6,17 +6,17 @@ import json
 
 import pyarrow as pa
 
-from weave_query.weave_query import engine_trace
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op, use
-from weave_query.weave_query import artifact_mem, gql_json_cache
-from weave_query.weave_query.arrow import convert
-from weave_query.weave_query.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
-from weave_query.weave_query.gql_op_plugin import wb_gql_op_plugin
-from weave_query.weave_query.ops_arrow.list_ops import concat
-from weave_query.weave_query.ops_domain import wb_domain_types as wdt
-from weave_query.weave_query.ops_domain import wb_util, wbmedia
-from weave_query.weave_query.ops_domain.run_history import history_op_common
+from weave_query import engine_trace
+from weave_query import weave_types as types
+from weave_query.api import op, use
+from weave_query import artifact_mem, gql_json_cache
+from weave_query.arrow import convert
+from weave_query.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+from weave_query.gql_op_plugin import wb_gql_op_plugin
+from weave_query.ops_arrow.list_ops import concat
+from weave_query.ops_domain import wb_domain_types as wdt
+from weave_query.ops_domain import wb_util, wbmedia
+from weave_query.ops_domain.run_history import history_op_common
 
 tracer = engine_trace.tracer()
 

@@ -1,11 +1,11 @@
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
-from weave_query.weave_query.decorator_arrow_op import arrow_op
-from weave_query.weave_query.decorator_op import op
-from weave_query.weave_query.ops_arrow import util
+from weave_query import weave_types as types
+from weave_query.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+from weave_query.decorator_arrow_op import arrow_op
+from weave_query.decorator_op import op
+from weave_query.ops_arrow import util
 
 unary_input_type = {
     "self": ArrowWeaveListType(types.Boolean()),

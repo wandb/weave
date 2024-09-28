@@ -1,15 +1,15 @@
 import pytest
 
-from weave_query.weave_query import api as weave
-from weave_query.weave_query import weave_internal
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import box
-from weave_query.weave_query.language_features.tagging import (
+from weave_query import api as weave
+from weave_query import weave_internal
+from weave_query import weave_types as types
+from weave_query import box
+from weave_query.language_features.tagging import (
     make_tag_getter_op,
     tag_store,
     tagged_value_type,
 )
-from weave_query.weave_query.ops_primitives import dict, errors, list_, number, runs
+from weave_query.ops_primitives import dict, errors, list_, number, runs
 from weave_query.tests.util import geom, weavejs_ops
 
 

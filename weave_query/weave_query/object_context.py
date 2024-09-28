@@ -12,9 +12,9 @@ import typing
 from typing import Any
 
 if typing.TYPE_CHECKING:
-    from weave_query.weave_query import ref_base
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import box, uris
+    from weave_query import ref_base
+from weave_query import weave_types as types
+from weave_query import box, uris
 
 
 @dataclasses.dataclass
@@ -90,7 +90,7 @@ class ObjectContext:
                 self.objects[target_uri].mutations.append(mutation)
 
     def finish_mutation(self, target_uri: str) -> None:
-        from weave_query.weave_query import artifact_fs, artifact_local, artifact_wandb
+        from weave_query import artifact_fs, artifact_local, artifact_wandb
 
         target_record = self.objects.get(target_uri)
         if target_record is None:
@@ -115,7 +115,7 @@ class ObjectContext:
         if target_branch is None:
             raise ValueError("No branch to finish mutation on")
 
-        from weave_query.weave_query import artifact_wandb
+        from weave_query import artifact_wandb
 
         # Hack: if the target branch looks like a commit hash, then we
         # don't want to use it as a branch - this is the case that we are

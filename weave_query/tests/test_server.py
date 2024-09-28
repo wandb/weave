@@ -6,13 +6,13 @@ import numpy as np
 import pytest
 import requests
 
-from weave_query.weave_query import api as weave
-from weave_query.weave_query import client as _client
-from weave_query.weave_query import context_state, ops
-from weave_query.weave_query import server as _server
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.decorator_op import op
-from weave_query.weave_query.weave_internal import make_const_node
+from weave_query import api as weave
+from weave_query import client as _client
+from weave_query import context_state, ops
+from weave_query import server as _server
+from weave_query import weave_types as types
+from weave_query.decorator_op import op
+from weave_query.weave_internal import make_const_node
 
 SERVER_TYPES = ["inprocess", "subprocess", "http"]
 

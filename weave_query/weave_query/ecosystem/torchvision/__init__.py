@@ -1,1 +1,1 @@
-from weave_query.weave_query.ecosystem.torchvision.datasets import *
+from weave_query.ecosystem.torchvision.datasets import *

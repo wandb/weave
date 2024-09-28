@@ -1,8 +1,8 @@
 import pandas as pd
 
-from weave_query.weave_query import api as weave
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.ops_primitives import pandas_ as op_pandas
+from weave_query import api as weave
+from weave_query import weave_types as types
+from weave_query.ops_primitives import pandas_ as op_pandas
 
 
 def test_save_dataframe():

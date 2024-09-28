@@ -1,1 +1,1 @@
-from weave_query.weave_query.ecosystem.craiyon.ops import *
+from weave_query.ecosystem.craiyon.ops import *

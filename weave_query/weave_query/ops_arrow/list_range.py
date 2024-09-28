@@ -2,9 +2,9 @@
 
 import pyarrow as pa
 
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op
-from weave_query.weave_query.arrow.list_ import ArrowWeaveList
+from weave_query import weave_types as types
+from weave_query.api import op
+from weave_query.arrow.list_ import ArrowWeaveList
 
 py_range = range
 

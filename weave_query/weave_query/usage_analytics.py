@@ -3,7 +3,7 @@ from typing import Optional
 
 import analytics
 
-from weave_query.weave_query import context_state
+from weave_query import context_state
 
 from . import environment
 

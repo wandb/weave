@@ -4,8 +4,8 @@ import typing
 import dateutil
 import dateutil.parser
 
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op, type
+from weave_query import weave_types as types
+from weave_query.api import op, type
 
 
 @op(

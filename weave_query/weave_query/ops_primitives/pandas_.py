@@ -8,12 +8,12 @@ import pandas
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from weave_query.weave_query import errors
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op, weave_class
-from weave_query.weave_query import box, file_base, graph, mappers_python
-from weave_query.weave_query.language_features.tagging import tag_store, tagged_value_type
-from weave_query.weave_query.ops_primitives import list_
+from weave_query import errors
+from weave_query import weave_types as types
+from weave_query.api import op, weave_class
+from weave_query import box, file_base, graph, mappers_python
+from weave_query.language_features.tagging import tag_store, tagged_value_type
+from weave_query.ops_primitives import list_
 
 
 # Hack hack hack

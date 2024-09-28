@@ -4,12 +4,12 @@ import typing
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op
-from weave_query.weave_query import timestamp as weave_timestamp
-from weave_query.weave_query.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
-from weave_query.weave_query.decorator_arrow_op import arrow_op
-from weave_query.weave_query.ops_arrow import util
+from weave_query import weave_types as types
+from weave_query.api import op
+from weave_query import timestamp as weave_timestamp
+from weave_query.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+from weave_query.decorator_arrow_op import arrow_op
+from weave_query.ops_arrow import util
 
 ARROW_WEAVE_LIST_NUMBER_TYPE = ArrowWeaveListType(types.Number())
 ARROW_WEAVE_LIST_BOOLEAN_TYPE = ArrowWeaveListType(types.Boolean())

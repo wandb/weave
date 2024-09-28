@@ -1,8 +1,8 @@
 import typing
 from dataclasses import dataclass
 
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import debug_types
+from weave_query import weave_types as types
+from weave_query import debug_types
 
 BT = typing.TypeVar("BT")
 

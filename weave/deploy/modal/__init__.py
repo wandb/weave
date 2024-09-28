@@ -6,8 +6,8 @@ import typing
 from pathlib import Path
 
 from weave.trace.refs import ObjectRef, parse_uri
-from weave_query.weave_query import artifact_wandb as artifact_wandb
-from weave_query.weave_query import environment
+from weave_query import artifact_wandb as artifact_wandb
+from weave_query import environment
 
 try:
     from modal.cli.import_refs import import_stub

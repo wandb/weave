@@ -6,20 +6,20 @@ import typing
 import numpy as np
 import pandas as pd
 
-from weave_query.weave_query import storage
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import box, execute_fast, errors
-from weave_query.weave_query._dict_utils import tag_aware_dict_val_for_escaped_key
-from weave_query.weave_query.decorator_class import weave_class
-from weave_query.weave_query.decorator_op import op
-from weave_query.weave_query.graph import Node
-from weave_query.weave_query.language_features.tagging import (
+from weave_query import storage
+from weave_query import weave_types as types
+from weave_query import box, execute_fast, errors
+from weave_query._dict_utils import tag_aware_dict_val_for_escaped_key
+from weave_query.decorator_class import weave_class
+from weave_query.decorator_op import op
+from weave_query.graph import Node
+from weave_query.language_features.tagging import (
     tag_store,
     tagged_value_type,
     tagged_value_type_helpers,
 )
-from weave_query.weave_query.op_args import OpVarArgs
-from weave_query.weave_query.ops_primitives import projection_utils
+from weave_query.op_args import OpVarArgs
+from weave_query.ops_primitives import projection_utils
 
 
 def getitem_output_type(input_types, list_type=types.List):
@@ -392,8 +392,8 @@ def flatten_return_type(input_types):
 
 
 def _flatten(l):
-    from weave_query.weave_query.arrow.arrow_tags import pushdown_list_tags
-    from weave_query.weave_query.ops_arrow import ArrowWeaveList
+    from weave_query.arrow.arrow_tags import pushdown_list_tags
+    from weave_query.ops_arrow import ArrowWeaveList
 
     if isinstance(l, list):
         tags = None

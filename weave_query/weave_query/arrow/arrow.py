@@ -11,9 +11,9 @@ from pyarrow import compute as pc
 
 py_type = type
 
-from weave_query.weave_query import errors
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import artifact_fs, partial_object
+from weave_query import errors
+from weave_query import weave_types as types
+from weave_query import artifact_fs, partial_object
 
 
 def arrow_type_to_weave_type(pa_type: pa.DataType) -> types.Type:
@@ -184,7 +184,7 @@ class ArrowWeaveListType(types.Type):
             )
 
         # v1 AWL format
-        # from weave_query.weave_query.arrow import convert
+        # from weave_query.arrow import convert
 
         # parquet_friendly = convert.to_parquet_friendly(obj)
         # table = pa.table({"arr": parquet_friendly._arrow_data})
@@ -223,7 +223,7 @@ class ArrowWeaveListType(types.Type):
         with artifact.open(f"{name}.ArrowWeaveList.type.json") as f:
             object_type = json.load(f)
             object_type = types.TypeRegistry.type_from_dict(object_type)
-        from weave_query.weave_query.arrow import list_
+        from weave_query.arrow import list_
 
         if "_weave_awl_format" not in artifact.metadata:
             # v1 AWL format
@@ -232,7 +232,7 @@ class ArrowWeaveListType(types.Type):
             arr = table["arr"].combine_chunks()
             with list_.unsafe_awl_construction("load_from_parquet"):
                 l = self.instance_class(arr, object_type=object_type, artifact=artifact)  # type: ignore
-                from weave_query.weave_query.arrow import convert
+                from weave_query.arrow import convert
 
                 res = convert.from_parquet_friendly(l)
         elif artifact.metadata["_weave_awl_format"] == 2:
@@ -366,7 +366,7 @@ def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_arti
 
 
 def _object_type_has_props(object_type):
-    from weave_query.weave_query.language_features.tagging import tagged_value_type
+    from weave_query.language_features.tagging import tagged_value_type
 
     return (
         isinstance(object_type, types.TypedDict)
@@ -376,7 +376,7 @@ def _object_type_has_props(object_type):
 
 
 def _object_type_prop_types(object_type):
-    from weave_query.weave_query.language_features.tagging import tagged_value_type
+    from weave_query.language_features.tagging import tagged_value_type
 
     if isinstance(object_type, tagged_value_type.TaggedValueType):
         return {

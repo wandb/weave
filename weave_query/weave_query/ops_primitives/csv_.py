@@ -3,8 +3,8 @@ import csv
 import pyarrow as pa
 import pyarrow.csv as pa_csv
 
-from weave_query.weave_query import api as weave
-from weave_query.weave_query import file_base
+from weave_query import api as weave
+from weave_query import file_base
 
 
 def sniff_dialect(path: str) -> type[csv.Dialect]:

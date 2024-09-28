@@ -1,6 +1,6 @@
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import panel
+from weave_query import panel
 
 
 @weave.type()

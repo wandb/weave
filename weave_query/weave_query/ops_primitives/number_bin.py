@@ -1,12 +1,12 @@
 import math
 
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op, use
-from weave_query.weave_query import graph
-from weave_query.weave_query.ops_primitives import date
-from weave_query.weave_query.ops_primitives.dict import dict_
-from weave_query.weave_query.weave_internal import call_fn, define_fn, make_const_node
-from weave_query.weave_query.weave_types import Function, NumberBinType
+from weave_query import weave_types as types
+from weave_query.api import op, use
+from weave_query import graph
+from weave_query.ops_primitives import date
+from weave_query.ops_primitives.dict import dict_
+from weave_query.weave_internal import call_fn, define_fn, make_const_node
+from weave_query.weave_types import Function, NumberBinType
 
 
 @op(

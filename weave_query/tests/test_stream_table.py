@@ -1,7 +1,7 @@
 import os
 import time
 
-from weave_query.weave_query.wandb_interface.wandb_stream_table import StreamTable
+from weave_query.wandb_interface.wandb_stream_table import StreamTable
 
 
 def main(table_name, project_name, entity_name, sample_limit, gap_ms):

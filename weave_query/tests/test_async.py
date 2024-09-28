@@ -1,6 +1,6 @@
 import pytest
 
-from weave_query.weave_query import api, async_demo, ops, runs, storage
+from weave_query import api, async_demo, ops, runs, storage
 
 
 def test_run_basic():

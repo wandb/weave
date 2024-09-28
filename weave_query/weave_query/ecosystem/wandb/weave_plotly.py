@@ -10,8 +10,8 @@ from plotly import graph_objs as go
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import weave_internal
-from weave_query.weave_query import infer_types
+from weave_query import weave_internal
+from weave_query import infer_types
 
 
 class PlotlyType(weave.types.Type):
@@ -179,7 +179,7 @@ def plotly_time_series(data, mark, labels, label_overrides) -> plotly.graph_objs
 
 @weave.op()
 def plotly_scatter(data: list[ScatterData]) -> plotly.graph_objs.Figure:
-    from weave_query.weave_query import storage
+    from weave_query import storage
 
     data = storage.to_weavejs(data)
     color = None

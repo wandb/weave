@@ -2,13 +2,13 @@ import copy
 import dataclasses
 import typing
 
-from weave_query.weave_query import storage
-from weave_query.weave_query import weave_internal
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.node_ref import ref_to_node
+from weave_query import storage
+from weave_query import weave_internal
+from weave_query import weave_types as types
+from weave_query.node_ref import ref_to_node
 
-# from weave_query.weave_query.ops_primitives import weave_api
-from weave_query.weave_query import (
+# from weave_query.ops_primitives import weave_api
+from weave_query import (
     artifact_local,
     box,
     context,
@@ -19,9 +19,9 @@ from weave_query.weave_query import (
     ref_base,
     errors,
 )
-from weave_query.weave_query.artifact_wandb import likely_commit_hash
-from weave_query.weave_query.language_features.tagging import tag_store, tagged_value_type
-from weave_query.weave_query.uris import WeaveURI
+from weave_query.artifact_wandb import likely_commit_hash
+from weave_query.language_features.tagging import tag_store, tagged_value_type
+from weave_query.uris import WeaveURI
 
 
 class RefToPyRef(mappers.Mapper):
@@ -128,7 +128,7 @@ map_to_python_remote = mappers.make_mapper(map_to_python_remote_)
 
 
 def _node_publish_mapper(node: graph.Node) -> typing.Optional[graph.Node]:
-    from weave_query.weave_query.ops_primitives import weave_api
+    from weave_query.ops_primitives import weave_api
 
     if _node_is_op_get(node):
         node = typing.cast(graph.OutputNode, node)

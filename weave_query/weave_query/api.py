@@ -2,48 +2,48 @@
 
 import typing
 
-from weave_query.weave_query import graph as _graph
-from weave_query.weave_query.graph import Node
+from weave_query import graph as _graph
+from weave_query.graph import Node
 
 # If this is not imported, serialization of Weave Nodes is incorrect!
-from weave_query.weave_query import graph_mapper as _graph_mapper
+from weave_query import graph_mapper as _graph_mapper
 
 from . import storage as _storage
 from . import ref_base as _ref_base
-from weave_query.weave_query import wandb_api as _wandb_api
+from weave_query import wandb_api as _wandb_api
 
-from weave_query.weave_query import weave_internal as _weave_internal
+from weave_query import weave_internal as _weave_internal
 
-from weave_query.weave_query import util as _util
+from weave_query import util as _util
 
-from weave_query.weave_query import context as _context
+from weave_query import context as _context
 
 # exposed as part of api
-from weave_query.weave_query import weave_types as types
+from weave_query import weave_types as types
 
 # needed to enable automatic numpy serialization
 from . import types_numpy as _types_numpy
 
-from weave_query.weave_query import errors
-from weave_query.weave_query.decorators import weave_class, mutation, type
+from weave_query import errors
+from weave_query.decorators import weave_class, mutation, type
 
-from weave_query.weave_query import usage_analytics
-from weave_query.weave_query.context import (
+from weave_query import usage_analytics
+from weave_query.context import (
     use_fixed_server_port,
     use_frontend_devmode,
     # eager_execution,
     use_lazy_execution,
 )
 
-from weave_query.weave_query.panel import Panel
+from weave_query.panel import Panel
 
-from weave_query.weave_query.arrow.list_ import ArrowWeaveList as WeaveList
+from weave_query.arrow.list_ import ArrowWeaveList as WeaveList
 
 # TODO: This is here because the op overloaded...
-from weave_query.weave_query.decorator_op import op
+from weave_query.decorator_op import op
 
 def save(node_or_obj, name=None):  # type: ignore
-    from weave_query.weave_query.ops_primitives.weave_api import get, save
+    from weave_query.ops_primitives.weave_api import get, save
 
     if isinstance(node_or_obj, _graph.Node):
         return save(node_or_obj, name=name)

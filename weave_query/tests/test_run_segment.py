@@ -7,10 +7,10 @@ import pytest
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import api, ops, storage, weave_internal
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.ops_arrow import ArrowWeaveList, arrow_as_array
-from weave_query.weave_query.ops_domain.run_segment import RunSegment
+from weave_query import api, ops, storage, weave_internal
+from weave_query import weave_types as types
+from weave_query.ops_arrow import ArrowWeaveList, arrow_as_array
+from weave_query.ops_domain.run_segment import RunSegment
 
 N_NUMERIC_METRICS = 99  # number of numerical columns in the metrics table
 

@@ -20,8 +20,8 @@ class SlurmJob:
 @weave.op()
 def jobs_render(
     jobs: weave.Node[list[SlurmJob]],
-) -> weave_query.weave_query.panels.Table:
-    return weave_query.weave_query.panels.Table(
+) -> weave_query.panels.Table:
+    return weave_query.panels.Table(
         jobs,
         columns=[
             lambda job: job.job_id,
@@ -44,8 +44,8 @@ class SlurmNode:
 @weave.op()
 def nodes_render(
     nodes: weave.Node[list[SlurmNode]],
-) -> weave_query.weave_query.panels.Table:
-    return weave_query.weave_query.panels.Table(
+) -> weave_query.panels.Table:
+    return weave_query.panels.Table(
         nodes,
         columns=[
             lambda node: node.node_name,
@@ -97,27 +97,27 @@ def slurm(restapi_url: str) -> Slurm:
 @weave.op()
 def slurm_render(
     slurm_node: weave.Node[Slurm],
-) -> weave_query.weave_query.panels.Card:
+) -> weave_query.panels.Card:
     slurm = typing.cast(Slurm, slurm_node)
-    return weave_query.weave_query.panels.Card(
+    return weave_query.panels.Card(
         title="slurm",
         subtitle="",
         content=[
-            weave_query.weave_query.panels.CardTab(
+            weave_query.panels.CardTab(
                 name="Overview",
-                content=weave_query.weave_query.panels.Group(
+                content=weave_query.panels.Group(
                     prefer_horizontal=True,
                     items=[
-                        weave_query.weave_query.panels.LabeledItem(
+                        weave_query.panels.LabeledItem(
                             item=slurm.jobs().count(), label="Total jobs"
                         ),
-                        weave_query.weave_query.panels.LabeledItem(
+                        weave_query.panels.LabeledItem(
                             item=slurm.nodes().count(), label="Total nodes"
                         ),
                     ],
                 ),
             ),
-            weave_query.weave_query.panels.CardTab(name="Nodes", content=slurm.nodes()),
-            weave_query.weave_query.panels.CardTab(name="Jobs", content=slurm.jobs()),
+            weave_query.panels.CardTab(name="Nodes", content=slurm.nodes()),
+            weave_query.panels.CardTab(name="Jobs", content=slurm.jobs()),
         ],
     )

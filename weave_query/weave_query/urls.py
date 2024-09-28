@@ -4,7 +4,7 @@ from urllib.parse import quote
 
 from wandb import util as wb_util
 
-from weave_query.weave_query import context_state, environment
+from weave_query import context_state, environment
 
 BROWSE3_PATH = "browse3"
 WEAVE_SLUG = "weave"

@@ -4,24 +4,24 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from weave_query.weave_query import engine_trace
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query.api import op
-from weave_query.weave_query import graph
-from weave_query.weave_query.arrow import convert
-from weave_query.weave_query.arrow.arrow import (
+from weave_query import engine_trace
+from weave_query import weave_types as types
+from weave_query.api import op
+from weave_query import graph
+from weave_query.arrow import convert
+from weave_query.arrow.arrow import (
     ArrowWeaveListType,
     safe_coalesce,
 )
-from weave_query.weave_query.arrow.arrow_tags import pushdown_list_tags
-from weave_query.weave_query.arrow.list_ import (
+from weave_query.arrow.arrow_tags import pushdown_list_tags
+from weave_query.arrow.list_ import (
     ArrowWeaveList,
     awl_zip,
     make_vec_dict,
     make_vec_taggedvalue,
 )
-from weave_query.weave_query.language_features.tagging import tagged_value_type
-from weave_query.weave_query.ops_primitives import list_ as primitive_list
+from weave_query.language_features.tagging import tagged_value_type
+from weave_query.ops_primitives import list_ as primitive_list
 
 tracer = engine_trace.tracer()  # type: ignore
 

@@ -3,7 +3,7 @@ import typing
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import graph, panel, panel_util
+from weave_query import graph, panel, panel_util
 
 CardContentType = typing.TypeVar("CardContentType")
 

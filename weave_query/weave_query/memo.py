@@ -2,7 +2,7 @@ import contextlib
 import contextvars
 import typing
 
-from weave_query.weave_query import engine_trace
+from weave_query import engine_trace
 
 statsd = engine_trace.statsd()  # type: ignore
 

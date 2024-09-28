@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from weave_query.weave_query import storage
-from weave_query.weave_query.ops_primitives import api as weave
+from weave_query import storage
+from weave_query.ops_primitives import api as weave
 
 
 def test_image():

@@ -3,8 +3,8 @@ import typing
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import weave_internal
-from weave_query.weave_query import graph, panel
+from weave_query import weave_internal
+from weave_query import graph, panel
 
 
 @weave.type()
@@ -28,7 +28,7 @@ class SelectEditor(panel.Panel):
             self.config = SelectEditorConfig()
         if "choices" in options:
             self.config.choices = options["choices"]
-        if isinstance(self.input_node, weave_query.weave_query.graph.VoidNode):
+        if isinstance(self.input_node, weave_query.graph.VoidNode):
             # TODO: not string!
             self.input_node = weave_internal.const(
                 [], weave.types.List(self.config.choices.type.object_type)

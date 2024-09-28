@@ -2,17 +2,17 @@ import os
 
 import weave_query as weave
 import weave_query
-from weave_query.weave_query import weave_internal
-from weave_query.weave_query import weave_internal as internal
-from weave_query.weave_query import weave_types as types
-from weave_query.weave_query import util, dispatch, graph
-from weave_query.weave_query.panels import panel_board, panel_group, panel_trace
-from weave_query.weave_query.panels.panel_trace_span import TraceSpanModelPanel, TraceSpanPanel
-from weave_query.weave_query.panels_py import panel_autoboard
-from weave_query.weave_query.panels_py.generator_templates import template_registry
+from weave_query import weave_internal
+from weave_query import weave_internal as internal
+from weave_query import weave_types as types
+from weave_query import util, dispatch, graph
+from weave_query.panels import panel_board, panel_group, panel_trace
+from weave_query.panels.panel_trace_span import TraceSpanModelPanel, TraceSpanPanel
+from weave_query.panels_py import panel_autoboard
+from weave_query.panels_py.generator_templates import template_registry
 
-panels = weave_query.weave_query.panels
-ops = weave_query.weave_query.ops
+panels = weave_query.panels
+ops = weave_query.ops
 
 
 # BOARD_ID must be unique across all ops. It must only contain letters and underscores.
@@ -102,7 +102,7 @@ def board(
     ## 1. raw_data_range is derived from raw_data
     filtered_range = varbar.add(
         "filtered_range",
-        weave_query.weave_query.ops.make_list(
+        weave_query.ops.make_list(
             a=filtered_data[timestamp_col_name].min(),
             b=filtered_data[timestamp_col_name].max(),
         ),
@@ -115,7 +115,7 @@ def board(
     ## 2.b: Setup a date picker to set the user_zoom_range
     varbar.add(
         "time_range",
-        weave_query.weave_query.panels.DateRange(
+        weave_query.panels.DateRange(
             user_zoom_range, domain=trace_roots[timestamp_col_name]
         ),
     )
@@ -130,7 +130,7 @@ def board(
     window_data = varbar.add(
         "window_data",
         trace_roots.filter(
-            lambda row: weave_query.weave_query.ops.Boolean.bool_and(
+            lambda row: weave_query.ops.Boolean.bool_and(
                 row[timestamp_col_name] >= bin_range[0],
                 row[timestamp_col_name] <= bin_range[1],
             )
@@ -140,7 +140,7 @@ def board(
 
     filters = varbar.add(
         "filters",
-        weave_query.weave_query.panels.FilterEditor(filter_fn, node=window_data),
+        weave_query.panels.FilterEditor(filter_fn, node=window_data),
     )
 
     filtered_window_data = varbar.add(
@@ -149,7 +149,7 @@ def board(
 
     ### Overview tab
 
-    overview_tab = weave_query.weave_query.panels.Group(
+    overview_tab = weave_query.panels.Group(
         layoutMode="grid",
         showExpressions=True,
         enableAddPanel=True,
@@ -172,13 +172,13 @@ def board(
             x_domain=user_zoom_range,
             n_bins=50,
         ),
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=0, y=0, w=6, h=6),
+        layout=weave_query.panels.GroupPanelLayout(x=0, y=0, w=6, h=6),
     )
 
     overview_tab.add(
         "latency_distribution",
         filtered_window_data.map(lambda row: row["end_time_s"] - row["start_time_s"]),
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=6, y=0, w=6, h=6),
+        layout=weave_query.panels.GroupPanelLayout(x=6, y=0, w=6, h=6),
     )
 
     overview_tab.add(
@@ -199,12 +199,12 @@ def board(
             x_domain=user_zoom_range,
             n_bins=50,
         ),
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=12, y=0, w=6, h=6),
+        layout=weave_query.panels.GroupPanelLayout(x=12, y=0, w=6, h=6),
     )
 
     overview_tab.add(
         "success_distribution",
-        weave_query.weave_query.ops.dict_(
+        weave_query.ops.dict_(
             **{
                 "success": filtered_window_data.filter(
                     lambda row: row["status_code"] == "SUCCESS"
@@ -214,13 +214,13 @@ def board(
                 ).count(),
             }
         ),
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=18, y=0, w=6, h=6),
+        layout=weave_query.panels.GroupPanelLayout(x=18, y=0, w=6, h=6),
     )
 
     traces_table_var = overview_tab.add(
         "traces_table",
         make_span_table(filtered_window_data),
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=0, y=6, w=24, h=6),
+        layout=weave_query.panels.GroupPanelLayout(x=0, y=6, w=24, h=6),
     )
 
     trace_spans = all_spans.filter(
@@ -232,13 +232,13 @@ def board(
     trace_viewer_var = overview_tab.add(
         "trace_viewer",
         trace_viewer,
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=0, y=12, w=16, h=6),
+        layout=weave_query.panels.GroupPanelLayout(x=0, y=12, w=16, h=6),
     )
 
     selected_trace_model = overview_tab.add(
         "selected_trace_model",
         TraceSpanModelPanel(traces_table_var.active_data()),
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=0, y=18, w=16, h=6),
+        layout=weave_query.panels.GroupPanelLayout(x=0, y=18, w=16, h=6),
     )
 
     active_span = trace_viewer_var.active_span()
@@ -246,7 +246,7 @@ def board(
     selected_span_details = overview_tab.add(
         "selected_span_details",
         TraceSpanPanel(active_span),
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=16, y=12, w=8, h=12),
+        layout=weave_query.panels.GroupPanelLayout(x=16, y=12, w=8, h=12),
     )
 
     similar_spans = all_spans.filter(lambda row: row["name"] == active_span["name"])
@@ -255,7 +255,7 @@ def board(
     similar_spans_table_var = overview_tab.add(
         "similar_spans_table",
         similar_spans_table,
-        layout=weave_query.weave_query.panels.GroupPanelLayout(x=0, y=22, w=24, h=6),
+        layout=weave_query.panels.GroupPanelLayout(x=0, y=22, w=24, h=6),
     )
 
     return panels.Board(vars=varbar, panels=overview_tab)
