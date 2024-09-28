@@ -2,7 +2,6 @@ import pytest
 
 import weave_query as weave
 import weave_query
-from weave.flow.obj import Object
 from weave_query import artifact_local, storage
 from weave_query import ops_arrow as arrow
 from weave_query import ref_util
@@ -251,19 +250,9 @@ def make_custom_object_classes_classic_type():
     return CustomObjectA, CustomObjectB
 
 
-def make_custom_object_classes_pydantic():
-    class CustomObjectA(Object):
-        inner_a: int
-
-    class CustomObjectB(Object):
-        inner_b: CustomObjectA
-
-    return CustomObjectA, CustomObjectB
-
-
 @pytest.mark.parametrize(
     "get_custom_object_classes",
-    [make_custom_object_classes_classic_type, make_custom_object_classes_pydantic],
+    [make_custom_object_classes_classic_type],
 )
 def test_ref_extra_object(ref_tracking, get_custom_object_classes):
     CustomObjectA, CustomObjectB = get_custom_object_classes()
@@ -308,7 +297,7 @@ def test_ref_extra_table(ref_tracking):
 
 @pytest.mark.parametrize(
     "get_custom_object_classes",
-    [make_custom_object_classes_classic_type, make_custom_object_classes_pydantic],
+    [make_custom_object_classes_classic_type],
 )
 def test_ref_extra_table_very_nested(ref_tracking, get_custom_object_classes):
     CustomObjectA, CustomObjectB = get_custom_object_classes()
@@ -389,7 +378,7 @@ def test_refs_across_artifacts(ref_tracking):
 
 @pytest.mark.parametrize(
     "get_custom_object_classes",
-    [make_custom_object_classes_classic_type, make_custom_object_classes_pydantic],
+    [make_custom_object_classes_classic_type],
 )
 def test_ref_objects_across_artifacts_nocross(ref_tracking, get_custom_object_classes):
     CustomObjectA, CustomObjectB = get_custom_object_classes()
