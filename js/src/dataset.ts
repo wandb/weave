@@ -24,7 +24,6 @@ export type DatasetRow = Record<string, any> & {
 };
 
 export class Dataset<R extends DatasetRow> extends WeaveObject {
-  saveAttrNames = ["rows"];
   public rows: Table<R>;
 
   constructor(parameters: DatasetParameters<R>) {
