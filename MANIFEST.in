@@ -10,6 +10,7 @@ graft weave/trace
 graft weave/trace_server
 graft weave/type_serializers
 graft weave/trace_server_bindings
+graft weave/wandb_interface
 global-exclude */__pycache__/*
 global-exclude *.pyc
 global-exclude */cassettes/*
