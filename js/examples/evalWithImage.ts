@@ -21,8 +21,8 @@ const examples = [
 
 const openaiClient = wrapOpenAI(new OpenAI());
 
-const model = op(async function myModel(input) {
-  const prompt = `Extract fields ("fruit": <str>, "color": <str>, "flavor") from the following text, as json: ${input.sentence}`;
+const model = op(async function myModel({ datasetRow }) {
+  const prompt = `Extract fields ("fruit": <str>, "color": <str>, "flavor") from the following text, as json: ${datasetRow.sentence}`;
   const response = await openaiClient.chat.completions.create({
     model: "gpt-3.5-turbo",
     messages: [{ role: "user", content: prompt }],
@@ -32,7 +32,7 @@ const model = op(async function myModel(input) {
   if (result == null) {
     throw new Error("No response from model");
   }
-  if (input.id == "3") {
+  if (datasetRow.id == "3") {
     throw new Error("This is an error");
   }
   return JSON.parse(result);
@@ -47,12 +47,12 @@ async function main() {
   const evaluation = new Evaluation({
     dataset: ds,
     scorers: [
-      op(function fruitEqual({ modelOutput, datasetItem }) {
+      op(function fruitEqual({ modelOutput, datasetRow }) {
         return {
-          correct: modelOutput.fruit == datasetItem.target.fruit,
+          correct: modelOutput.fruit == datasetRow.target.fruit,
         };
       }),
-      op(async function genImage({ modelOutput, datasetItem }) {
+      op(async function genImage({ modelOutput, datasetRow }) {
         const result = await openaiClient.images.generate({
           prompt: `A fruit that's ${modelOutput.color} and ${modelOutput.flavor}`,
           n: 1,
