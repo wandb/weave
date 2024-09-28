@@ -9,7 +9,7 @@ from weave_query import box, ops_arrow
 from weave_query.arrow.convert import to_arrow
 from weave_query.language_features.tagging import tag_store, tagged_value_type
 
-from weave_query.tests.util.concrete_tagged_value import (
+from tests.util.concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,
     concrete_to_tagstore,

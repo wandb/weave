@@ -10,8 +10,8 @@ import numpy as np
 import pytest
 from flask.testing import FlaskClient
 
-from weave_query.tests import fixture_fakewandb
-from weave_query.tests.wandb_system_tests_conftest import *
+from tests import fixture_fakewandb
+from tests.wandb_system_tests_conftest import *
 from weave_query import client as client_legacy
 from weave_query import (
     context_state,

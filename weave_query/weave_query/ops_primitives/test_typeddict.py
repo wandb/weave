@@ -6,7 +6,7 @@ from weave_query import weave_internal
 from weave_query import box
 from weave_query.arrow.arrow import ArrowWeaveListType
 from weave_query.language_features.tagging import tag_store, tagged_value_type
-from weave_query.tests.util.list_arrow_test_helpers import ArrowNode
+from tests.util.list_arrow_test_helpers import ArrowNode
 
 pick_options = [
     # Basic Pick

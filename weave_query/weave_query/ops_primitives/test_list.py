@@ -10,7 +10,7 @@ from weave_query.language_features.tagging import (
     tagged_value_type,
 )
 from weave_query.ops_primitives import dict, errors, list_, number, runs
-from weave_query.tests.util import geom, weavejs_ops
+from tests.util import geom, weavejs_ops
 
 
 def test_unnest():

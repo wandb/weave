@@ -14,8 +14,8 @@ from weave_query.language_features.tagging import (
 )
 from weave_query.ops_primitives import dict_, list_
 
-from weave_query.tests.util import tag_test_util as ttu
-from weave_query.tests.util import list_arrow_test_helpers as lath
+from tests.util import tag_test_util as ttu
+from tests.util import list_arrow_test_helpers as lath
 
 
 def filter_fn(row) -> bool:

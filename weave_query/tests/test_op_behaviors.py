@@ -29,12 +29,12 @@ from weave_query.language_features.tagging.tagged_value_type import (
 )
 
 from weave_query import registry_mem
-from weave_query.tests.util.concrete_tagged_value import (
+from tests.util.concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,
     concrete_to_tagstore,
 )
-from weave_query.tests.util.op_specs import OP_TEST_SPECS, OpSpec, OpSpecTestCase
+from tests.util.op_specs import OP_TEST_SPECS, OpSpec, OpSpecTestCase
 
 
 def assert_equal_with_tags(node: graph.Node, v: typing.Any, expected: typing.Any):

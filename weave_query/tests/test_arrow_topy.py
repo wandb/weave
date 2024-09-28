@@ -7,7 +7,7 @@ import weave_query as weave
 import weave_query
 from weave_query import ops_arrow
 
-from weave_query.tests.util.concrete_tagged_value import (
+from tests.util.concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,
     concrete_to_tagstore,
