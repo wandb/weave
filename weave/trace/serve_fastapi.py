@@ -10,7 +10,7 @@ from weave.trace import errors
 from weave.trace.op import Op, is_op
 from weave.trace.refs import ObjectRef
 from weave.wandb_interface.wandb_api import WandbApiAsync
-from weave_query import cache, op_args, pyfunc_type_util, weave_pydantic
+from weave_query import cache, op_args, pyfunc_type_util, weave_pydantic  # type: ignore
 
 key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = (
     cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
