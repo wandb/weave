@@ -155,44 +155,16 @@ export class WeaveClient {
     }
   }
 
-  private async saveFileBlob(
-    typeName: string,
-    fileName: string,
-    fileContent: Blob
-  ): Promise<any> {
-    const buffer = await fileContent.arrayBuffer().then(Buffer.from);
-    const digest = computeDigest(buffer);
+  // save* methods attached __savedRef promises to their values. These must
+  // be synchronous, so we can guarantee that calling savedWeaveValues
+  // immediately makes __savedRef promises available.
 
-    const placeholder = {
-      _type: "CustomWeaveType",
-      weave_type: { type: typeName },
-      files: {
-        [fileName]: digest,
-      },
-      load_op: "NO_LOAD_OP",
-    };
-
-    try {
-      await this.traceServerApi.file.fileCreateFileCreatePost({
-        project_id: this.projectId,
-        // @ts-ignore
-        file: fileContent,
-      });
-    } catch (error) {
-      console.error("Error saving file:", error);
-    }
-
-    return placeholder;
-  }
-
-  private async saveImage(imageData: Buffer, imageType: "png"): Promise<any> {
-    const blob = new Blob([imageData], { type: `image/${imageType}` });
-    return this.saveFileBlob("PIL.Image.Image", "image.png", blob);
-  }
-
-  public async saveObject(obj: WeaveObject, objId?: string): Promise<any> {
+  public saveObject(obj: WeaveObject, objId?: string): void {
     if (obj.__savedRef) {
-      return obj.__savedRef;
+      return;
+    }
+    for (const [key, value] of Object.entries(obj)) {
+      this.saveWeaveValues(value);
     }
 
     obj.__savedRef = (async () => {
@@ -203,7 +175,7 @@ export class WeaveClient {
       }
 
       let saveAttrs = obj.saveAttrs();
-      saveAttrs = await this.saveWeaveValues(saveAttrs);
+      saveAttrs = await this.serializedVal(saveAttrs);
       // Frontend does this overly specific check for datasets, so we need to add both _type and _class_name
       // for now.
       //   data._type === 'Dataset' &&
@@ -226,20 +198,18 @@ export class WeaveClient {
       // console.log(`Saved object: ${ref.ui_url()}`);
       return ref;
     })();
-
-    return obj.__savedRef;
   }
 
-  private async saveTable(table: Table): Promise<TableRef> {
+  private saveTable(table: Table): void {
     if (table.__savedRef) {
-      return table.__savedRef;
+      return;
     }
 
     table.__savedRef = (async () => {
       const rowsWithoutRefs = table.rows.map((row) => {
         return { ...row, __savedRef: undefined };
       });
-      const rows = await this.saveWeaveValues(rowsWithoutRefs);
+      const rows = await this.serializedVal(rowsWithoutRefs);
       const response =
         await this.traceServerApi.table.tableCreateTableCreatePost({
           table: {
@@ -273,27 +243,100 @@ export class WeaveClient {
         );
       })();
     }
-
-    return table.__savedRef;
   }
 
-  private async saveWeaveValues(val: any): Promise<any> {
+  /**
+   * Recursively save a Weave value, attaching __savedRef Promises to
+   * nested value that gets its own ref.
+   *
+   * This function must be synchronous, so that code that does ref-tracking
+   * (currently only Dataset/DatasetRow in the js client) has refs
+   * available immediately.
+   */
+  private saveWeaveValues(val: any): void {
     if (Array.isArray(val)) {
-      return Promise.all(val.map((item) => this.saveWeaveValues(item)));
+      val.map((item) => this.saveWeaveValues(item));
+    } else if (val != null && val.__savedRef) {
+      return;
+    } else if (val instanceof WeaveObject) {
+      this.saveObject(val);
+    } else if (val instanceof Table) {
+      this.saveTable(val);
+    } else if (isWeaveImage(val)) {
+    } else if (isOp(val)) {
+      this.saveOp(val);
+    } else if (typeof val === "object" && val !== null) {
+      for (const [key, value] of Object.entries(val)) {
+        this.saveWeaveValues(value);
+      }
+    }
+  }
+
+  // serialize* methods are async, and return the serialized value
+  // of a Weave value.
+
+  private async serializedFileBlob(
+    typeName: string,
+    fileName: string,
+    fileContent: Blob
+  ): Promise<any> {
+    const buffer = await fileContent.arrayBuffer().then(Buffer.from);
+    const digest = computeDigest(buffer);
+
+    const placeholder = {
+      _type: "CustomWeaveType",
+      weave_type: { type: typeName },
+      files: {
+        [fileName]: digest,
+      },
+      load_op: "NO_LOAD_OP",
+    };
+
+    try {
+      await this.traceServerApi.file.fileCreateFileCreatePost({
+        project_id: this.projectId,
+        // @ts-ignore
+        file: fileContent,
+      });
+    } catch (error) {
+      console.error("Error saving file:", error);
+    }
+
+    return placeholder;
+  }
+
+  private async serializedImage(
+    imageData: Buffer,
+    imageType: "png"
+  ): Promise<any> {
+    const blob = new Blob([imageData], { type: `image/${imageType}` });
+    return this.serializedFileBlob("PIL.Image.Image", "image.png", blob);
+  }
+
+  /**
+   * Get the serialized value of a Weave value, by recursively
+   * resolving any __savedRef promises to their uri().
+   *
+   * This function is asynchronous, and must be called after saveWeaveValues
+   * has been called on the value.
+   */
+  private async serializedVal(val: any): Promise<any> {
+    if (Array.isArray(val)) {
+      return Promise.all(val.map(async (item) => this.serializedVal(item)));
     } else if (val != null && val.__savedRef) {
       return (await val.__savedRef).uri();
-    } else if (val instanceof WeaveObject) {
-      return (await this.saveObject(val)).uri();
-    } else if (val instanceof Table) {
-      return (await this.saveTable(val)).uri();
     } else if (isWeaveImage(val)) {
-      return await this.saveImage(val.data, val.imageType);
+      return await this.serializedImage(val.data, val.imageType);
+    } else if (val instanceof WeaveObject) {
+      throw new Error("Programming error:  WeaveObject not saved");
+    } else if (val instanceof Table) {
+      throw new Error("Programming error: Table not saved");
     } else if (isOp(val)) {
-      return (await this.saveOp(val)).uri();
+      throw new Error("Programming error: Op not saved");
     } else if (typeof val === "object" && val !== null) {
       const result: { [key: string]: any } = {};
       for (const [key, value] of Object.entries(val)) {
-        result[key] = await this.saveWeaveValues(value);
+        result[key] = await this.serializedVal(value);
       }
       return result;
     } else {
@@ -345,8 +388,8 @@ export class WeaveClient {
         inputs[`arg${index}`] = arg;
       });
     }
-
-    return await this.saveWeaveValues(inputs);
+    this.saveWeaveValues(inputs);
+    return await this.serializedVal(inputs);
   }
 
   public async saveOp(op: Op<(...args: any[]) => any>): Promise<any> {
@@ -356,7 +399,7 @@ export class WeaveClient {
     op.__savedRef = (async () => {
       const objId = getOpName(op);
       const opFn = getOpWrappedFunction(op);
-      const saveValue = await this.saveFileBlob(
+      const saveValue = await this.serializedFileBlob(
         "Op",
         "obj.py",
         new Blob([opFn.toString()])
@@ -392,7 +435,8 @@ export class WeaveClient {
       parameterNames
     );
     if (isOp(opRef)) {
-      opRef = await this.saveOp(opRef);
+      this.saveOp(opRef);
+      opRef = await opRef.__savedRef;
     }
     const startReq = {
       project_id: this.projectId,
@@ -431,7 +475,8 @@ export class WeaveClient {
     );
     // ensure end is logged after start is logged
     await startCallPromise;
-    result = await this.saveWeaveValues(result);
+    this.saveWeaveValues(result);
+    result = await this.serializedVal(result);
     await this.saveCallEnd({
       project_id: this.projectId,
       id: currentCall.callId,
