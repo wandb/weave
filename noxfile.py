@@ -2,8 +2,10 @@ import nox
 
 nox.options.default_venv_backend = "uv"
 
+SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12"]
 
-@nox.session(python=["3.9", "3.10", "3.11", "3.12"])
+
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS)
 def tests(session):
     session.install("-r", "requirements.test.txt")
     session.chdir("weave")
@@ -17,7 +19,7 @@ def lint(session):
     session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
 
 
-@nox.session(python=["3.9", "3.10", "3.11", "3.12"])
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS)
 @nox.parametrize(
     "integration",
     [
