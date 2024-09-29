@@ -27,7 +27,6 @@ weave/tests/zlib.txt
 weave/tests/execute.json
 weave-js/src/generated
 .integration-deps
-.tox
 .ruff_cache
 .pytest_cache
 *.log
