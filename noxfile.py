@@ -10,7 +10,6 @@ def lint(session):
     session.install("pre-commit", "jupyter")
     session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
 
-
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
 @nox.parametrize(
     "shard",
@@ -46,19 +45,19 @@ def tests(session, shard):
         ]
     }
 
-    if shard == "trace":
-        test_dirs = ["tests/trace/", "trace/"]
-    elif shard == "trace_server":
-        test_dirs = ["trace_server/"]
-    elif shard == "llamaindex":
-        test_dirs = ["integrations/llamaindex/"]
+    default_test_dirs = [f"integrations/{shard}/"]
+    test_dirs_dict = {
+        "trace": ["tests/trace/", "trace/"],
+        "trace_server": ["trace_server/"],
+        "mistral0": ["integrations/mistral/v0/"],
+        "mistral1": ["integrations/mistral/v1/"],
+    }
+    
+    test_dirs = test_dirs_dict.get(shard, default_test_dirs)
+
+    # seems to resolve ci issues
+    if shard == "llamaindex":
         session.posargs.insert(0, "-n4")
-    elif shard == "mistral0":
-        test_dirs = ["integrations/mistral/v0/"]
-    elif shard == "mistral1":
-        test_dirs = ["integrations/mistral/v1/"]
-    else:
-        test_dirs = [f"integrations/{shard}/"]
 
     session.run("pytest", *session.posargs, *test_dirs, env=env)
 
