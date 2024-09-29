@@ -28,8 +28,15 @@ jobs:
       - run: git fetch origin ${{ github.base_ref }}
       - id: query_service
         run: |
-          changed_files=$(git diff --name-only origin/${{ github.base_ref }}..HEAD)
-          for path in ${{ env.QUERY_SERVICE_PATHS }}; do
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_sha=$(git rev-parse origin/${{ github.base_ref }})
+            head_sha=$(git rev-parse HEAD)
+            changed_files=$(git diff --name-only $base_sha $head_sha)
+          else
+            changed_files=$(git diff --name-only HEAD^)
+          fi
+
+          for path in ${{ env.WATCHED_PATHS }}; do
             if echo "$changed_files" | grep -q "$path"; then
               echo "should_run_query_tests=true" >> $GITHUB_OUTPUT
               exit 0
