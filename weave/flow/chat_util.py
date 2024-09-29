@@ -102,7 +102,7 @@ class OpenAIStream:
     def final_response(self) -> "ChatCompletion":
         if self.first_chunk is None:
             raise ValueError("No chunks received")
-        return "ChatCompletion"(
+        return ChatCompletion(
             id=self.first_chunk.id,
             choices=self.output_choices,  # type: ignore
             created=self.first_chunk.created,
