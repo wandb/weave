@@ -2,7 +2,7 @@
 name = "weave"
 description = "A toolkit for building composable interactive data driven applications."
 readme = "README.md"
-license = { text = "Apache-2.0" }
+license = { file = "LICENSE" }
 maintainers = [{ name = "W&B", email = "support@wandb.com" }]
 authors = [
   { name = "Shawn Lewis", email = "shawn@wandb.com" },
