@@ -11,15 +11,38 @@ name: test
 on:
   push:
 
+env:
+  QUERY_SERVICE_PATHS: 'weave-js/ weave_query/'
+
 jobs:
+  check_paths:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.query_service.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - id: query_service
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          changed_files=$(git diff --name-only origin/${{ github.base_ref }}..HEAD)
+          for path in ${{ env.WATCHED_PATHS }}; do
+            if echo "$changed_files" | grep -q "$path"; then
+              echo "should_run=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+          echo "should_run=false" >> $GITHUB_OUTPUT
+
   # ==== Query Service Jobs ====
   build-container-query-service:
     name: Build Legacy (Query Service) test container
     timeout-minutes: 30
     runs-on: [self-hosted, builder]
-    if: |
-      contains(github.event.pull_request.files.*.path, 'weave-js/') ||
-      contains(github.event.pull_request.files.*.path, 'weave_query/')
+    needs: check_paths
+    if: ${{ needs.check_paths.outputs.should_run == 'true' }}
+
     # runs-on: ubuntu-latest
     env:
       REGISTRY: us-east4-docker.pkg.dev/weave-support-367421/weave-images
@@ -94,11 +117,10 @@ jobs:
           .
 
   test-query-service-matrix-check: # This job does nothing and is only used for the branch protection
-    if: |
-      contains(github.event.pull_request.files.*.path, 'weave-js/') ||
-      contains(github.event.pull_request.files.*.path, 'weave_query/')
     needs:
       - test-query-service
+      - check_paths
+    if: ${{ needs.check_paths.outputs.should_run == 'true' }}
 
     runs-on: ubuntu-latest
 
@@ -112,9 +134,8 @@ jobs:
   weavejs-lint-compile:
     name: WeaveJS Lint and Compile
     runs-on: ubuntu-latest
-    if: |
-      contains(github.event.pull_request.files.*.path, 'weave-js/') ||
-      contains(github.event.pull_request.files.*.path, 'weave_query/')
+    needs: check_paths
+    if: ${{ needs.check_paths.outputs.should_run == 'true' }}
     # runs-on: [self-hosted, gke-runner]
     steps:
       - uses: actions/checkout@v2
