@@ -62,7 +62,6 @@ langchain = [
   "langchain-community>=0.2.1",
   "chromadb>=0.5.0",
   "pysqlite3",
-  "protobuf<=3.20.0",
 ]
 litellm = ["litellm>=1.36.1"]
 llamaindex = ["llama-index>=0.10.35"]
