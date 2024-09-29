@@ -7,7 +7,6 @@ SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12"]
 
 @nox.session
 def lint(session):
-    session.install("-r", "requirements.test.txt")
     session.install("pre-commit", "jupyter")
     session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
 
@@ -37,28 +36,28 @@ def tests(session, shard):
     session.install("-r", "requirements.test.txt")
     session.chdir("weave")
 
-    # Set environment variables
     env = {
-        "WEAVE_SENTRY_ENV": session.env.get("WEAVE_SENTRY_ENV"),
-        "CI": session.env.get("CI"),
-        "WB_SERVER_HOST": session.env.get("WB_SERVER_HOST"),
-        "WF_CLICKHOUSE_HOST": session.env.get("WF_CLICKHOUSE_HOST"),
-        "WEAVE_SERVER_DISABLE_ECOSYSTEM": session.env.get(
-            "WEAVE_SERVER_DISABLE_ECOSYSTEM"
-        ),
+        k: session.env.get(k)
+        for k in [
+            "WEAVE_SENTRY_ENV",
+            "CI",
+            "WB_SERVER_HOST",
+            "WF_CLICKHOUSE_HOST",
+            "WEAVE_SERVER_DISABLE_ECOSYSTEM",
+        ]
     }
 
-    # Run tests
     if shard == "trace":
-        session.run("pytest", *session.posargs, "tests/trace/", "trace/", env=env)
+        test_dirs = ["tests/trace/", "trace/"]
     elif shard == "trace_server":
-        session.run("pytest", *session.posargs, "trace_server/", env=env)
+        test_dirs = ["trace_server/"]
     elif shard == "llamaindex":
-        session.run(
-            "pytest", "-n4", *session.posargs, "integrations/llamaindex/", env=env
-        )
+        test_dirs = ["integrations/llamaindex/"]
+        session.posargs.insert(0, "-n4")
     else:
-        session.run("pytest", *session.posargs, f"integrations/{shard}/", env=env)
+        test_dirs = [f"integrations/{shard}/"]
+
+    session.run("pytest", *session.posargs, *test_dirs, env=env)
 
 
 # Configure pytest
