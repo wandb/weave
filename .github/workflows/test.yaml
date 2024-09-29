@@ -11,15 +11,18 @@ name: test
 on:
   push:
 
+env:
+  QUERY_PATHS: 'weave-js/ weave_query/'
+
 jobs:
   # ==== Query Service Jobs ====
   build-container-query-service:
     name: Build Legacy (Query Service) test container
     timeout-minutes: 30
     runs-on: [self-hosted, builder]
-    if: |
-      contains(github.event.pull_request.files.*.path, 'weave-js/') ||
-      contains(github.event.pull_request.files.*.path, 'weave_query/')
+    if: >-
+      ${{ contains(toJson(github.event.pull_request.files.*.path), fromJson('["' + join(env.QUERY_PATHS, '","') + '"]')[*]) }}
+
     # runs-on: ubuntu-latest
     env:
       REGISTRY: us-east4-docker.pkg.dev/weave-support-367421/weave-images
@@ -94,8 +97,8 @@ jobs:
           .
 
   test-query-service-matrix-check: # This job does nothing and is only used for the branch protection
-    if: always()
-
+    if: >-
+      ${{ contains(toJson(github.event.pull_request.files.*.path), fromJson('["' + join(env.QUERY_PATHS, '","') + '"]')[*]) }}
     needs:
       - test-query-service
 
