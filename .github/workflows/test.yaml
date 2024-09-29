@@ -141,7 +141,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox
+          pip install nox uv
       - name: Run nox
         run: nox -e lint
 
@@ -206,7 +206,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox
+          pip install nox uv
       - name: Run nox (Clickhouse Only)
         env:
           WEAVE_SENTRY_ENV: ci
