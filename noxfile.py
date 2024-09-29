@@ -53,6 +53,10 @@ def tests(session, shard):
     elif shard == "llamaindex":
         test_dirs = ["integrations/llamaindex/"]
         session.posargs.insert(0, "-n4")
+    elif shard == "mistral0":
+        test_dirs = ["integrations/mistral/v0/"]
+    elif shard == "mistral1":
+        test_dirs = ["integrations/mistral/v1/"]
     else:
         test_dirs = [f"integrations/{shard}/"]
 
