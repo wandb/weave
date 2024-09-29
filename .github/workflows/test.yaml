@@ -17,6 +17,9 @@ jobs:
     name: Build Legacy (Query Service) test container
     timeout-minutes: 30
     runs-on: [self-hosted, builder]
+    if: |
+      contains(github.event.pull_request.files.*.path, 'weave-js/') ||
+      contains(github.event.pull_request.files.*.path, 'weave_query/')
     # runs-on: ubuntu-latest
     env:
       REGISTRY: us-east4-docker.pkg.dev/weave-support-367421/weave-images
