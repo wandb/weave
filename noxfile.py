@@ -32,8 +32,7 @@ def lint(session):
     ],
 )
 def tests(session, shard):
-    session.install("-e", f".[{shard}]")
-    session.install("-r", "requirements.test.txt")
+    session.install("-e", f".[{shard},test]")
     session.chdir("weave")
 
     env = {
