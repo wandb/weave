@@ -14,7 +14,9 @@ from setuptools.command.sdist import sdist  # type: ignore[import]
 
 ROOT = Path(__file__).resolve().parent
 SKIP_BUILD = os.environ.get("WEAVE_SKIP_BUILD", False)
-IS_BUILT = (ROOT / "weave_query" / "weave_query" / "frontend" / "assets").is_dir() or SKIP_BUILD
+IS_BUILT = (
+    ROOT / "weave_query" / "weave_query" / "frontend" / "assets"
+).is_dir() or SKIP_BUILD
 FORCE_BUILD = os.environ.get("WEAVE_FORCE_BUILD", False)
 
 
@@ -71,10 +73,16 @@ def download_and_extract_tarball(
 
 
 def download_frontend() -> None:
-    sha = open(ROOT / "weave_query" / "weave_query" / "frontend" / "sha1.txt").read().strip()
+    sha = (
+        open(ROOT / "weave_query" / "weave_query" / "frontend" / "sha1.txt")
+        .read()
+        .strip()
+    )
     url = f"https://storage.googleapis.com/wandb-cdn-prod/weave/{sha}.tar.gz"
     try:
-        download_and_extract_tarball(url, extract_path=ROOT / "weave_query" / "weave_query")
+        download_and_extract_tarball(
+            url, extract_path=ROOT / "weave_query" / "weave_query"
+        )
     except HTTPError:
         print(f"Warning: Failed to download frontend for sha {sha}")
 
