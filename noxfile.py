@@ -5,13 +5,6 @@ nox.options.default_venv_backend = "uv"
 SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12"]
 
 
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS)
-def tests(session):
-    session.install("-r", "requirements.test.txt")
-    session.chdir("weave")
-    session.run("pytest", *session.posargs)
-
-
 @nox.session
 def lint(session):
     session.install("-r", "requirements.test.txt")
@@ -21,7 +14,7 @@ def lint(session):
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
 @nox.parametrize(
-    "integration",
+    "shard",
     [
         "trace",
         "trace_server",
@@ -39,41 +32,9 @@ def lint(session):
         "openai",
     ],
 )
-def integration_tests(session, integration):
+def tests(session, shard):
+    session.install("-e", f".[{shard}]")
     session.install("-r", "requirements.test.txt")
-
-    # Install integration-specific dependencies
-    if integration == "anthropic":
-        session.install("anthropic>=0.18.0")
-    elif integration == "cerebras":
-        session.install("cerebras-cloud-sdk")
-    elif integration == "cohere":
-        session.install("cohere>=5.9.1,<5.9.3")
-    elif integration == "dspy":
-        session.install("dspy>=0.1.5")
-    elif integration == "groq":
-        session.install("groq>=0.9.0")
-    elif integration == "instructor":
-        session.install("instructor>=1.4.3")
-    elif integration == "langchain":
-        session.install(
-            "langchain-core>=0.2.1",
-            "langchain-openai>=0.1.7",
-            "langchain-community>=0.2.1",
-            "chromadb>=0.5.0",
-            "pysqlite3",
-        )
-    elif integration == "litellm":
-        session.install("litellm>=1.36.1", "semver")
-    elif integration == "llamaindex":
-        session.install("llama-index>=0.10.35")
-    elif integration == "mistral0":
-        session.install("mistralai>=0.1.8,<1.0.0")
-    elif integration == "mistral1":
-        session.install("mistralai>=1.0.0")
-    elif integration == "openai":
-        session.install("openai>=1.0.0")
-
     session.chdir("weave")
 
     # Set environment variables
@@ -88,19 +49,19 @@ def integration_tests(session, integration):
     }
 
     # Run tests
-    if integration == "trace":
+    if shard == "trace":
         session.run("pytest", *session.posargs, "tests/trace/", "trace/", env=env)
-    elif integration == "trace_server":
+    elif shard == "trace_server":
         session.run("pytest", *session.posargs, "trace_server/", env=env)
-    elif integration == "llamaindex":
+    elif shard == "llamaindex":
         session.run(
             "pytest", "-n4", *session.posargs, "integrations/llamaindex/", env=env
         )
     else:
-        session.run("pytest", *session.posargs, f"integrations/{integration}/", env=env)
+        session.run("pytest", *session.posargs, f"integrations/{shard}/", env=env)
 
 
 # Configure pytest
-nox.options.sessions = ["tests", "lint", "integration_tests"]
+# nox.options.sessions = ["tests", "lint", "integration_tests"]
 nox.options.reuse_existing_virtualenvs = True
 nox.options.stop_on_first_error = True

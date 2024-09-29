@@ -28,7 +28,7 @@ classifiers = [
   "Topic :: Software Development :: Widget Sets",
 ]
 requires-python = ">=3.9"
-dynamic = ["version", "optional-dependencies"]
+dynamic = ["version"]
 dependencies = [
   "pydantic>=2.0.0",
   "wandb>=0.17.1",
@@ -38,7 +38,36 @@ dependencies = [
   "tenacity>=8.3.0,!=8.4.0",
   "emoji>=2.12.1",
   "uuid-utils>=0.9.0",
+  "numpy>1.21.0",
+  "rich",
+
+  # dependencies for remaining legacy code.  Remove when possible
+  "httpx",
+  "aiohttp",
+  "gql",
+  "requests_toolbelt",
 ]
+
+[project.optional-dependencies]
+trace_server = []
+anthropic = ["anthropic>=0.18.0"]
+cerebras = ["cerebras-cloud-sdk"]
+cohere = ["cohere>=5.9.1,<5.9.3"]
+dspy = ["dspy>=0.1.5"]
+groq = ["groq>=0.9.0"]
+instructor = ["instructor>=1.4.3"]
+langchain = [
+  "langchain-core>=0.2.1",
+  "langchain-openai>=0.1.7",
+  "langchain-community>=0.2.1",
+  "chromadb>=0.5.0",
+  "pysqlite3",
+]
+litellm = ["litellm>=1.36.1"]
+llamaindex = ["llama-index>=0.10.35"]
+mistral0 = ["mistralai>=0.1.8,<1.0.0"]
+mistral1 = ["mistralai>=1.0.0"]
+openai = ["openai>=1.0.0"]
 
 [project.scripts]
 weave = "weave.cli:cli"
