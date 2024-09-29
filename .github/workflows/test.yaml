@@ -112,6 +112,9 @@ jobs:
   weavejs-lint-compile:
     name: WeaveJS Lint and Compile
     runs-on: ubuntu-latest
+    if: |
+      contains(github.event.pull_request.files.*.path, 'weave-js/') ||
+      contains(github.event.pull_request.files.*.path, 'weave_query/')
     # runs-on: [self-hosted, gke-runner]
     steps:
       - uses: actions/checkout@v2
