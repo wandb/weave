@@ -10,6 +10,7 @@ def lint(session):
     session.install("pre-commit", "jupyter")
     session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
 
+
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
 @nox.parametrize(
     "shard",
@@ -52,7 +53,7 @@ def tests(session, shard):
         "mistral0": ["integrations/mistral/v0/"],
         "mistral1": ["integrations/mistral/v1/"],
     }
-    
+
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
 
     # seems to resolve ci issues
