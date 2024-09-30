@@ -150,11 +150,6 @@ ignore = [
   "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/
   "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/
   "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/
-
-  # redundant with formatter
-  "D206", # https://docs.astral.sh/ruff/rules/indent-with-spaces/
-  "D207", # https://docs.astral.sh/ruff/rules/under-indentation/
-  "D208", # https://docs.astral.sh/ruff/rules/over-indentation/
 ]
 exclude = [
   "weave/api.py",
