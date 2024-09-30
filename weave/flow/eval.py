@@ -49,6 +49,16 @@ def async_call(
     return asyncio.to_thread(func, *args, **kwargs)
 
 
+def async_call_op(
+    func: Op, *args: Any, **kwargs: Any
+) -> typing.Coroutine:
+    func = as_op(func)
+    is_async = inspect.iscoroutinefunction(func.resolve_fn)
+    if is_async:
+        return func.call(*args, **kwargs)  # type: ignore
+    return asyncio.to_thread(func.call, *args, **kwargs)
+
+
 class EvaluationResults(weave.Object):
     rows: weave.Table
 
@@ -136,9 +146,11 @@ class Evaluation(Object):
         else:
             model_input = self.preprocess_model_input(example)  # type: ignore
 
+        self_arg = None
         if callable(model):
             model_predict = model
         else:
+            self_arg = model
             model_predict = get_infer_method(model)
 
         model_predict_fn_name = (
@@ -167,7 +179,11 @@ class Evaluation(Object):
                 )
         try:
             model_start_time = time.time()
-            model_output = await async_call(model_predict, **model_predict_args)
+            # TODO: Test different error cases
+            model_args_with_self = {**model_predict_args}
+            if self_arg is not None:
+                model_args_with_self["self"] = self_arg
+            (model_output, model_output_call) = await async_call_op(model_predict, **model_args_with_self)
         except OpCallError as e:
             dataset_column_names = list(example.keys())
             dataset_column_names_str = ", ".join(dataset_column_names[:3])
@@ -222,9 +238,11 @@ class Evaluation(Object):
                         f"{score_fn} expects arguments: {score_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
                     )
             score_args["model_output"] = model_output
+            non_output_args = {k: v for k, v in score_args.items() if k != "model_output"}
 
             try:
-                result = await async_call(score_fn, **score_args)
+                # TODO: Test different error cases
+                (result, result_call) = await async_call_op(score_fn, **score_args)
             except OpCallError as e:
                 dataset_column_names = list(example.keys())
                 dataset_column_names_str = ", ".join(dataset_column_names[:3])
@@ -248,6 +266,14 @@ class Evaluation(Object):
                 )
                 raise OpCallError(message)
             scores[scorer_name] = result
+            model_output_call.add_score(scorer_name, {
+                "call": result_call,
+                # Denormalizing for performance
+                "op": score_fn,
+                # Denormalizing for performance
+                "score_args": non_output_args,
+                "result": result,
+            })
 
         return {
             "model_output": model_output,
@@ -364,3 +390,19 @@ def is_valid_model(model: Any) -> bool:
             and is_op(model.predict)
         )
     )
+
+# Notes:
+# * Add score without a call
+
+# * Group by:
+# * 
+
+
+
+# Benefits of this approach:
+# 1. Scores are all stored the same way (human eval & programmatic scores) allowing for common ways to analyze, query, etc..
+# 2. Scores needn't be calculated in an evaluation loop (they can be calculated anytime after predictions are made).
+#    * Enables scoring logic to be modified, improved, changed without re-running the entire evaluation.
+# 3. Performance:Given 2 predictions, it is an O(1) lookup to compare scores.
+# 4. Summarization (trial-level and eval-level) can be performed lazily or after the predictions are made.
+# 5. You can obtain "evaluation scores" for live/online predictions not made with the eval framework.

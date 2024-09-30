@@ -44,6 +44,7 @@ from weave.trace_server.trace_server_interface import (
     CostQueryOutput,
     CostQueryReq,
     EndedCallSchemaForInsert,
+    FeedbackCreateReq,
     ObjCreateReq,
     ObjectVersionFilter,
     ObjQueryReq,
@@ -259,6 +260,26 @@ class Call:
 
     def remove_display_name(self) -> None:
         self.set_display_name(None)
+
+    def add_score(self, score_name: str, score: dict):
+        # This needs to be moved to the client and backgrounded.
+        client = weave_client_context.require_weave_client()
+        payload = {
+                "name": score_name,
+                "score": score,
+            }
+        payload = map_to_refs(payload)
+        payload_json = to_json(payload, client._project_id(), client.server)
+        freq = FeedbackCreateReq(
+            project_id=client._project_id(),
+            weave_ref=get_ref(self).uri(),
+            feedback_type="score", # should this be score_name?
+            payload=payload_json,
+        )
+        response = client.server.feedback_create(freq)
+        return response.id
+
+
 
 
 class CallsIter:
@@ -649,6 +670,11 @@ class WeaveClient:
             inputs=inputs_with_refs,
             attributes=attributes,
         )
+        set_ref(call, CallRef(
+            entity=self.entity,
+            project=self.project,
+            id=call_id,
+        ))
         # feels like this should be in post init, but keping here
         # because the func needs to be resolved for schema insert below
         if callable(name_func := display_name):
