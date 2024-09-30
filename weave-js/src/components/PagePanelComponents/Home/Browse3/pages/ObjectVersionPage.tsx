@@ -14,9 +14,9 @@ import styled from 'styled-components';
 import {maybePluralizeWord} from '../../../../../core/util/string';
 import {Icon, IconName} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
-import {useClosePeek} from '../context';
 import {Tailwind} from '../../../../Tailwind';
 import {Tooltip} from '../../../../Tooltip';
+import {useClosePeek} from '../context';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
@@ -235,21 +235,21 @@ const ObjectVersionPageInner: React.FC<{
                       </>
                     )}
                   </>
-              ),
-              Version: <>{objectVersionIndex}</>,
-              ...(refExtra
-                ? {
-                    Subpath: refExtra,
-                  }
-                : {}),
-              // 'Type Version': (
-              //   <TypeVersionLink
-              //     entityName={entityName}
-              //     projectName={projectName}
-              //     typeName={typeName}
-              //     version={typeVersionHash}
-              //   />
-              // ),
+                ),
+                Version: <>{objectVersionIndex}</>,
+                ...(refExtra
+                  ? {
+                      Subpath: refExtra,
+                    }
+                  : {}),
+                // 'Type Version': (
+                //   <TypeVersionLink
+                //     entityName={entityName}
+                //     projectName={projectName}
+                //     typeName={typeName}
+                //     version={typeVersionHash}
+                //   />
+                // ),
               }}
             />
           </Box>

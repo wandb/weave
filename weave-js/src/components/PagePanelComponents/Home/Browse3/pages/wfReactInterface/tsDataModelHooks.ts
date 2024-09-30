@@ -957,7 +957,15 @@ const useRootObjectVersions = (
       setObjectVersionRes({loading: false, error: e, result: null});
     };
     getTsClient().objsQuery(req).then(onSuccess).catch(onError);
-  }, [deepFilter, getTsClient, opts?.skip, entity, project]);
+  }, [
+    deepFilter,
+    getTsClient,
+    opts?.skip,
+    entity,
+    project,
+    limit,
+    metadataOnly,
+  ]);
 
   useEffect(() => {
     doFetch();

@@ -1532,7 +1532,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 is_op,
                 version_index,
                 version_count,
-                is_latest
+                is_latest,
+                deleted_at
             FROM (
                 SELECT project_id,
                     object_id,
@@ -1544,6 +1545,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     val_dump,
                     digest,
                     is_op,
+                    deleted_at,
                     row_number() OVER (
                         PARTITION BY project_id, kind, object_id
                         ORDER BY created_at ASC
@@ -1559,6 +1561,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         refs,
                         {val_dump_field},
                         digest,
+                        deleted_at,
                         if (kind = 'op', 1, 0) AS is_op,
                         row_number() OVER (
                             PARTITION BY project_id,
@@ -1603,6 +1606,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 "version_index",
                                 "version_count",
                                 "is_latest",
+                                "deleted_at",
                             ],
                             row,
                         )
