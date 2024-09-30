@@ -75,7 +75,7 @@ type TruncatedStore = {[key: string]: {values: any; index: number}};
 
 const RESOVLED_REF_KEY = '_ref';
 
-const ARRAY_TRUNCATION_LENGTH = 50;
+export const ARRAY_TRUNCATION_LENGTH = 50;
 const TRUNCATION_KEY = '__weave_array_truncated__';
 
 // This is a general purpose object viewer that can be used to view any object.
@@ -88,12 +88,10 @@ export const ObjectViewer = ({
 }: ObjectViewerProps) => {
   const {useRefsData} = useWFHooks();
 
-  // `truncatedData` holds the data with all arrays truncated to ARRAY_TRUNCATION_LENGTH, unless the arary has show more added
-  const [truncatedData, setTruncatedData] = useState<Data>(
-    traverseAndTruncate(data).result
-  );
-
-  const [truncatedStore, setTruncatedStore] = useState<TruncatedStore>({});
+  // `truncatedData` holds the data with all arrays truncated to ARRAY_TRUNCATION_LENGTH, unless we have specifically added more rows to the array
+  // `truncatedStore` is used to store the additional rows that we can add to the array when the user clicks "Show more"
+  const {truncatedData, truncatedStore, setTruncatedData, setTruncatedStore} =
+    useTruncatedData(data);
 
   // `resolvedData` holds ref-resolved data.
   const [resolvedData, setResolvedData] = useState<Data>(truncatedData);
@@ -110,12 +108,6 @@ export const ObjectViewer = ({
   const addExpandedRef = useCallback((path: string, ref: string) => {
     setExpandedRefs(eRefs => ({...eRefs, [path]: ref}));
   }, []);
-
-  useEffect(() => {
-    const {store, result} = traverseAndTruncate(data);
-    setTruncatedData(result);
-    setTruncatedStore(store);
-  }, [data]);
 
   // This effect will ensure that all "expandedIds" whose value is a ref
   // have the ref added to the `expandedRefs` state.
@@ -690,4 +682,17 @@ const ShowMoreButtons = ({
       </Button>
     </Box>
   );
+};
+
+const useTruncatedData = (data: Data) => {
+  const [truncatedData, setTruncatedData] = useState<Data>(data);
+  const [truncatedStore, setTruncatedStore] = useState<TruncatedStore>({});
+
+  useEffect(() => {
+    const {store, result} = traverseAndTruncate(data);
+    setTruncatedData(result);
+    setTruncatedStore(store);
+  }, [data]);
+
+  return {truncatedData, truncatedStore, setTruncatedData, setTruncatedStore};
 };

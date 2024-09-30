@@ -19,7 +19,7 @@ import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
 import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
-import {ObjectViewer} from './ObjectViewer';
+import {ARRAY_TRUNCATION_LENGTH, ObjectViewer} from './ObjectViewer';
 import {getValueType, traverse} from './traverse';
 import {ValueView} from './ValueView';
 
@@ -156,8 +156,10 @@ const ObjectViewerSectionNonEmpty = ({
       setTreeExpanded(true);
     }
     setMode('expanded');
-    if (getGroupIds().length > 100) {
-      setExpandedIds(getGroupIds().slice(0, expandedIds.length + 100));
+    if (getGroupIds().length > ARRAY_TRUNCATION_LENGTH) {
+      setExpandedIds(
+        getGroupIds().slice(0, expandedIds.length + ARRAY_TRUNCATION_LENGTH)
+      );
     } else {
       setExpandedIds(getGroupIds());
     }
@@ -191,7 +193,7 @@ const ObjectViewerSectionNonEmpty = ({
           icon="expand-uncollapse"
           active={mode === 'expanded'}
           onClick={onClickExpanded}
-          tooltip="Expand next 100 rows"
+          tooltip={`Expand next ${ARRAY_TRUNCATION_LENGTH} rows`}
         />
         <Button
           variant="quiet"
