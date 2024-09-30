@@ -277,7 +277,9 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     @weave.op()
     def multiplier(
         a: Number, b
-    ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
+    ) -> (
+        int
+    ):  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op()
@@ -2664,12 +2666,13 @@ def test_calls_stream_column_expansion(client):
     assert call_result.output == nested_ref.uri()
 
 
-def test_calls_stream_column_expansion_dynamic_batch_size(client):
+@pytest.mark.parametrize("batch_size", [1, 11, 101, 120])
+def test_calls_stream_column_expansion_dynamic_batch_size(client, batch_size):
     @weave.op
     def test_op(x):
         return x
 
-    for i in range(1000):
+    for i in range(batch_size):
         test_op(i)
 
     res = client.server.calls_query_stream(
@@ -2680,8 +2683,8 @@ def test_calls_stream_column_expansion_dynamic_batch_size(client):
         )
     )
     calls = list(res)
-    assert len(calls) == 1000
-    for i in range(1000):
+    assert len(calls) == batch_size
+    for i in range(batch_size):
         assert calls[i].output == i
 
     res = client.server.calls_query_stream(
@@ -2694,8 +2697,8 @@ def test_calls_stream_column_expansion_dynamic_batch_size(client):
         )
     )
     calls = list(res)
-    assert len(calls) == 1000
-    for i in range(1000):
+    assert len(calls) == batch_size
+    for i in range(batch_size):
         assert calls[i].output == i
 
 
