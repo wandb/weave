@@ -1,17 +1,17 @@
 import importlib
-import typing
+from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from litellm.utils import ModelResponse
 
 
 # This accumulator is nearly identical to the mistral accumulator, just with different types.
 def litellm_accumulator(
-    acc: typing.Optional["ModelResponse"],
+    acc: Optional["ModelResponse"],
     value: "ModelResponse",
 ) -> "ModelResponse":
     # This import should be safe at this point
@@ -67,7 +67,7 @@ def litellm_accumulator(
 
 # LiteLLM does so odd stuff with pydantic objects which result in our auto
 # serialization not working correctly. Here we just blindly dump to a dict instead.
-def litellm_on_finish_post_processor(value: typing.Any) -> typing.Any:
+def litellm_on_finish_post_processor(value: Any) -> Any:
     import pydantic
 
     value_to_finish = value
@@ -78,12 +78,12 @@ def litellm_on_finish_post_processor(value: typing.Any) -> typing.Any:
 
 
 # Unlike other integrations, streaming is based on input flag, not
-def should_use_accumulator(inputs: typing.Dict) -> bool:
+def should_use_accumulator(inputs: Dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
-def make_wrapper(name: str) -> typing.Callable:
-    def litellm_wrapper(fn: typing.Callable) -> typing.Callable:
+def make_wrapper(name: str) -> Callable:
+    def litellm_wrapper(fn: Callable) -> Callable:
         op = weave.op()(fn)
         op.name = name  # type: ignore
         return add_accumulator(
