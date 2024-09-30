@@ -170,7 +170,7 @@ known-third-party = ["wandb", "weave_query"]
 [tool.ruff]
 line-length = 88
 show-fixes = true
-exclude = ["examples", "weave_query"]
+exclude = ["weave_query"]
 
 [tool.mypy]
 warn_unused_configs = true

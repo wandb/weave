@@ -1,8 +1,8 @@
 import subprocess
-from rich import print
-from rich.console import Console
 import sys
 
+from rich import print
+from rich.console import Console
 
 import weave
 from weave.flow.agent import Agent, AgentState
