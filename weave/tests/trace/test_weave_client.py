@@ -1101,6 +1101,7 @@ def test_summary_descendents(client):
     ]
 
 
+@pytest.mark.skip("skipping since it depends on query service deps atm")
 def test_weave_server(client):
     class MyModel(weave.Model):
         prompt: str

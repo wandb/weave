@@ -1,10 +1,6 @@
 import logging
 import os
-import random
-import shutil
-import tempfile
 
-import numpy as np
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -19,42 +15,12 @@ from weave.trace_server import (
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
 
-from .tests import fixture_fakewandb
 from .tests.trace.trace_server_clickhouse_conftest import *
 from .tests.wandb_system_tests_conftest import *
 from .trace import autopatch
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
-
-
-class FakeTracer:
-    def trace(*args, **kwargs):
-        pass
-
-
-def make_fake_tracer():
-    return FakeTracer()
-
-
-### End disable datadog engine tracing
-### disable internet access
-
-
-def guard(*args, **kwargs):
-    raise Exception("I told you not to use the Internet!")
-
-
-### End disable internet access
-
-# Uncomment these two lines to disable internet access entirely.
-# engine_trace.tracer = make_fake_tracer
-# socket.socket = guard
-
-
-@pytest.fixture()
-def test_artifact_dir():
-    return "/tmp/weave/pytest/%s" % os.environ.get("PYTEST_CURRENT_TEST")
 
 
 def pytest_sessionfinish(session, exitstatus):
@@ -68,20 +34,6 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "client" in item.fixturenames:
             item.add_marker(pytest.mark.weave_client)
-
-    # Get the job number from environment variable (0 for even tests, 1 for odd tests)
-    job_num = config.getoption("--job-num", default=None)
-    if job_num is None:
-        return
-
-    job_num = int(job_num)
-
-    selected_items = []
-    for index, item in enumerate(items):
-        if index % 2 == job_num:
-            selected_items.append(item)
-
-    items[:] = selected_items
 
 
 PYTEST_CURRENT_TEST_ENV_VAR = "PYTEST_CURRENT_TEST"
@@ -147,73 +99,6 @@ def logging_error_check(request, log_collector):
         pytest.fail(
             f"Expected no errors, but found {len(error_logs)} error(s): {error_logs}"
         )
-
-
-@pytest.fixture(autouse=True)
-def throw_on_error():
-    os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"] = "true"
-    yield
-    del os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"]
-
-
-@pytest.fixture()
-def cache_mode_minimal():
-    os.environ["WEAVE_NO_CACHE"] = "true"
-    yield
-    del os.environ["WEAVE_NO_CACHE"]
-
-
-@pytest.fixture()
-def cereal_csv():
-    with tempfile.TemporaryDirectory() as d:
-        cereal_path = os.path.join(d, "cereal.csv")
-        shutil.copy("testdata/cereal.csv", cereal_path)
-        yield cereal_path
-
-
-@pytest.fixture()
-def fake_wandb():
-    setup_response = fixture_fakewandb.setup()
-    yield setup_response
-    fixture_fakewandb.teardown(setup_response)
-
-
-@pytest.fixture()
-def fixed_random_seed():
-    random.seed(8675309)
-    np.random.seed(8675309)
-    yield
-    random.seed(None)
-    np.random.seed(None)
-
-
-@pytest.fixture()
-def app():
-    from . import weave_server
-
-    app = weave_server.make_app()
-    app.config.update(
-        {
-            "TESTING": True,
-        }
-    )
-
-    yield app
-
-
-@pytest.fixture()
-def enable_touch_on_read():
-    os.environ["WEAVE_ENABLE_TOUCH_ON_READ"] = "1"
-    yield
-    del os.environ["WEAVE_ENABLE_TOUCH_ON_READ"]
-
-
-@pytest.fixture()
-def consistent_table_col_ids():
-    from weave.legacy.weave.panels import table_state
-
-    with table_state.use_consistent_col_ids():
-        yield
 
 
 @pytest.fixture()
