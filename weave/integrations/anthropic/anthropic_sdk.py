@@ -1,5 +1,5 @@
 import importlib
-import typing
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Union
 from functools import wraps
 from typing import Any, Union
 
@@ -9,13 +9,13 @@ import weave
 from weave.trace.op_extensions.accumulator import _IteratorWrapper, add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from anthropic.lib.streaming import MessageStream
     from anthropic.types import Message, MessageStreamEvent
 
 
 def anthropic_accumulator(
-    acc: typing.Optional["Message"],
+    acc: Optional["Message"],
     value: "MessageStreamEvent",
 ) -> "Message":
     from anthropic.types import (
@@ -65,14 +65,14 @@ def anthropic_accumulator(
 
 
 # Unlike other integrations, streaming is based on input flag
-def should_use_accumulator(inputs: typing.Dict) -> bool:
+def should_use_accumulator(inputs: Dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
 def create_wrapper_sync(
     name: str,
-) -> typing.Callable[[typing.Callable], typing.Callable]:
-    def wrapper(fn: typing.Callable) -> typing.Callable:
+) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
         "We need to do this so we can check if `stream` is used"
         op = weave.op()(fn)
         op.name = name  # type: ignore
@@ -90,13 +90,13 @@ def create_wrapper_sync(
 # it manually here...
 def create_wrapper_async(
     name: str,
-) -> typing.Callable[[typing.Callable], typing.Callable]:
-    def wrapper(fn: typing.Callable) -> typing.Callable:
-        def _fn_wrapper(fn: typing.Callable) -> typing.Callable:
+) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
+        def _fn_wrapper(fn: Callable) -> Callable:
             @wraps(fn)
             async def _async_wrapper(
-                *args: typing.Any, **kwargs: typing.Any
-            ) -> typing.Any:
+                *args: Any, **kwargs: Any
+            ) -> Any:
                 return await fn(*args, **kwargs)
 
             return _async_wrapper
@@ -121,7 +121,7 @@ def create_wrapper_async(
 
 
 def anthropic_stream_accumulator(
-    acc: typing.Optional["Message"],
+    acc: Optional["Message"],
     value: "MessageStream",
 ) -> "Message":
     from anthropic.lib.streaming._types import MessageStopEvent
@@ -171,8 +171,8 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
 
 def create_stream_wrapper(
     name: str,
-) -> typing.Callable[[typing.Callable], typing.Callable]:
-    def wrapper(fn: typing.Callable) -> typing.Callable:
+) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
         op = weave.op()(fn)
         op.name = name  # type: ignore
         return add_accumulator(
