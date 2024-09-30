@@ -174,14 +174,14 @@ export type WFDataModelHooksInterface = {
     columns?: string[],
     expandedRefColumns?: Set<string>,
     opts?: {skip?: boolean; refetchOnDelete?: boolean}
-  ) => Loadable<CallSchema[]>;
+  ) => Loadable<CallSchema[]> & Refetchable;
   useCallsStats: (
     entity: string,
     project: string,
     filter: CallFilter,
     query?: Query,
     opts?: {skip?: boolean; refetchOnDelete?: boolean}
-  ) => Loadable<traceServerClientTypes.TraceCallsQueryStatsRes>;
+  ) => Loadable<traceServerClientTypes.TraceCallsQueryStatsRes> & Refetchable;
   useCallsDeleteFunc: () => (
     entity: string,
     project: string,
@@ -203,7 +203,8 @@ export type WFDataModelHooksInterface = {
     sortBy?: traceServerClientTypes.SortBy[],
     query?: Query,
     columns?: string[],
-    expandedRefCols?: string[]
+    expandedRefCols?: string[],
+    includeFeedback?: boolean
   ) => Promise<Blob>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
@@ -211,6 +212,7 @@ export type WFDataModelHooksInterface = {
     project: string,
     filter: OpVersionFilter,
     limit?: number,
+    metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (
@@ -221,6 +223,7 @@ export type WFDataModelHooksInterface = {
     project: string,
     filter: ObjectVersionFilter,
     limit?: number,
+    metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => LoadableWithError<ObjectVersionSchema[]>;
   useObjectDeleteFunc: () => (key: ObjectVersionKey) => Promise<void>;

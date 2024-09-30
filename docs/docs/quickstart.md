@@ -27,6 +27,7 @@ To get started with tracking your first project with Weave:
 - Call `weave.init('project-name')` to start tracking
     - You will be prompted to log in with your API key if you are not yet logged in on your machine.
     - To log to a specific W&B Team name, replace `project-name` with `team-name/project-name`
+    - **NOTE:** In automated environments, you can define the environment variable `WANDB_API_KEY` with your API key to login without prompting.
 - Add the `@weave.op()` decorator to the python functions you want to track
 
 *In this example, we're using openai so you will need to add an OpenAI [API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key).*

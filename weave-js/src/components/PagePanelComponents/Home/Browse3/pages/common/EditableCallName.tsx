@@ -49,6 +49,7 @@ export const EditableCallName: React.FC<{
   return (
     <EditableField
       ref={editableFieldRef}
+      className="m-0"
       value={currNameToDisplay}
       onFinish={saveName}
       placeholder={defaultDisplayName}

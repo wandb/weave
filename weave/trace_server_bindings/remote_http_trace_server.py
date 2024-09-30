@@ -6,11 +6,11 @@ import typing as t
 import tenacity
 from pydantic import BaseModel, ValidationError
 
-from weave.legacy.weave.environment import weave_trace_server_url
-from weave.legacy.weave.wandb_interface import project_creator
+from weave.trace.env import weave_trace_server_url
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.async_batch_processor import AsyncBatchProcessor
+from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +166,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             data=encoded_data,
             auth=self._auth,
         )
+        if r.status_code == 413:
+            # handle 413 explicitly to provide actionable error message
+            reason = json.loads(r.text)["reason"]
+            raise requests.HTTPError(f"413 Client Error: {reason}", response=r)
         r.raise_for_status()
 
     @tenacity.retry(
@@ -400,7 +404,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             )
             update_res = self.table_update(update_req)
 
-            return tsi.TableCreateRes(digest=update_res.digest)
+            return tsi.TableCreateRes(
+                digest=update_res.digest, row_digests=update_res.updated_row_digests
+            )
         else:
             return self._generic_request(
                 "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
@@ -430,10 +436,15 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 updates=req.updates[split_ndx:],
             )
             second_half_res = self.table_update(second_half_req)
-            return tsi.TableUpdateRes(digest=second_half_res.digest)
+            all_digests = (
+                first_half_res.updated_row_digests + second_half_res.updated_row_digests
+            )
+            return tsi.TableUpdateRes(
+                digest=second_half_res.digest, updated_row_digests=all_digests
+            )
         else:
             return self._generic_request(
-                "/table/update", req, tsi.TableCreateReq, tsi.TableCreateRes
+                "/table/update", req, tsi.TableUpdateReq, tsi.TableUpdateRes
             )
 
     def table_query(

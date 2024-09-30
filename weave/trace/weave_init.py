@@ -18,7 +18,7 @@ class InitializedClient:
 
 
 def get_username() -> typing.Optional[str]:
-    from weave.legacy.weave import wandb_api
+    from weave.wandb_interface import wandb_api
 
     api = wandb_api.get_wandb_api_sync()
     try:
@@ -28,7 +28,7 @@ def get_username() -> typing.Optional[str]:
 
 
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
-    from weave.legacy.weave import wandb_api
+    from weave.wandb_interface import wandb_api
 
     fields = project_name.split("/")
     if len(fields) == 1:
@@ -76,7 +76,7 @@ def init_weave(
         else:
             _current_inited_client.reset()
 
-    from weave.legacy.weave import wandb_api
+    from weave_query import wandb_api  # type: ignore
 
     # Must init to read ensure we've read auth from the environment, in
     # case we're on a new thread.
@@ -97,6 +97,7 @@ def init_weave(
     api_key = None
     if wandb_context is not None and wandb_context.api_key is not None:
         api_key = wandb_context.api_key
+
     remote_server = init_weave_get_server(api_key)
     # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
@@ -148,10 +149,36 @@ def init_weave(
     return _current_inited_client
 
 
+def init_weave_disabled() -> InitializedClient:
+    """Initialize a dummy client that does nothing.
+
+    This is used when the program is execuring with Weave disabled.
+
+    Note: as currently implemented, any explicit calls to client.{X} will
+    likely fail, since the user is not authenticated. The purpose of
+    disabling weave is to disable _tracing_. Programs that attempt to
+    make requests (eg. publishing, fetching, querying) while disabled
+    will fail.
+    """
+    global _current_inited_client
+    if _current_inited_client is not None:
+        _current_inited_client.reset()
+
+    client = weave_client.WeaveClient(
+        "DISABLED",
+        "DISABLED",
+        init_weave_get_server("DISABLED", should_batch=False),
+        ensure_project_exists=False,
+    )
+
+    return InitializedClient(client)
+
+
 def init_weave_get_server(
     api_key: typing.Optional[str] = None,
+    should_batch: bool = True,
 ) -> remote_http_trace_server.RemoteHTTPTraceServer:
-    res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
+    res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(should_batch)
     if api_key is not None:
         res.set_auth(("api", api_key))
     return res

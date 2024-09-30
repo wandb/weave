@@ -13,11 +13,16 @@ import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
-import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {
+  ScrollableTabContent,
+  SimplePageLayoutWithHeader,
+} from '../common/SimplePageLayout';
+import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
 import {TabUseCall} from '../TabUseCall';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallChat, isCallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
@@ -49,6 +54,35 @@ const useCallTabs = (call: CallSchema) => {
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
   return [
+    // Disabling Evaluation tab until it's better for single evaluation
+    ...(false && isEvaluateOp(call.spanName)
+      ? [
+          {
+            label: 'Evaluation',
+            content: (
+              <CompareEvaluationsPageContent
+                entity={call.entity}
+                project={call.project}
+                evaluationCallIds={[call.callId]}
+              />
+            ),
+          },
+        ]
+      : []),
+    ...(isCallChat(call)
+      ? [
+          {
+            label: 'Chat',
+            content: (
+              <ScrollableTabContent>
+                <Tailwind>
+                  <CallChat call={call.traceCall!} />
+                </Tailwind>
+              </ScrollableTabContent>
+            ),
+          },
+        ]
+      : []),
     {
       label: 'Call',
       content: <CallDetails call={call} />,
@@ -80,7 +114,11 @@ const useCallTabs = (call: CallSchema) => {
     },
     {
       label: 'Use',
-      content: <TabUseCall call={call} />,
+      content: (
+        <Tailwind>
+          <TabUseCall call={call} />
+        </Tailwind>
+      ),
     },
   ];
 };
@@ -157,10 +195,7 @@ const CallPageInnerVertical: FC<{
   return (
     <SimplePageLayoutWithHeader
       headerExtra={
-        <Box
-          sx={{
-            height: '41px',
-          }}>
+        <Box>
           <Button
             icon="layout-tabs"
             tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
@@ -173,17 +208,21 @@ const CallPageInnerVertical: FC<{
       isSidebarOpen={showTraceTree}
       headerContent={<CallOverview call={currentCall} />}
       leftSidebar={
-        loading ? (
-          <Loading centered />
-        ) : (
-          <CallTraceView
-            call={call}
-            selectedCall={currentCall}
-            rows={rows}
-            forcedExpandKeys={expandKeys}
-            path={path}
-          />
-        )
+        <Tailwind style={{display: 'contents'}}>
+          <div className="h-full bg-moon-50">
+            {loading ? (
+              <Loading centered />
+            ) : (
+              <CallTraceView
+                call={call}
+                selectedCall={currentCall}
+                rows={rows}
+                forcedExpandKeys={expandKeys}
+                path={path}
+              />
+            )}
+          </div>
+        </Tailwind>
       }
       tabs={callTabs}
     />

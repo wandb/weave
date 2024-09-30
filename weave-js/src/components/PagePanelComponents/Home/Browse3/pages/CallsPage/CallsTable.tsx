@@ -15,11 +15,12 @@ import {
 } from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
+  GridColDef,
   GridColumnVisibilityModel,
   GridFilterModel,
   GridLogicOperator,
   GridPaginationModel,
-  GridPinnedColumns,
+  GridPinnedColumnFields,
   GridRowSelectionModel,
   GridSortModel,
   useGridApiRef,
@@ -68,6 +69,7 @@ import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
   ExportSelector,
+  RefreshButton,
 } from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
 import {WFHighLevelCallFilter} from './callsTableFilter';
@@ -95,8 +97,8 @@ export const DEFAULT_COLUMN_VISIBILITY_CALLS = {
 
 export const ALWAYS_PIN_LEFT_CALLS = ['CustomCheckbox'];
 
-export const DEFAULT_PIN_CALLS: GridPinnedColumns = {
-  left: ['CustomCheckbox', 'op_name', 'feedback'],
+export const DEFAULT_PIN_CALLS: GridPinnedColumnFields = {
+  left: ['CustomCheckbox', 'op_name'],
 };
 
 export const DEFAULT_SORT_CALLS: GridSortModel = [
@@ -127,8 +129,8 @@ export const CallsTable: FC<{
   columnVisibilityModel?: GridColumnVisibilityModel;
   setColumnVisibilityModel?: (newModel: GridColumnVisibilityModel) => void;
 
-  pinModel?: GridPinnedColumns;
-  setPinModel?: (newModel: GridPinnedColumns) => void;
+  pinModel?: GridPinnedColumnFields;
+  setPinModel?: (newModel: GridPinnedColumnFields) => void;
 
   filterModel?: GridFilterModel;
   setFilterModel?: (newModel: GridFilterModel) => void;
@@ -417,18 +419,20 @@ export const CallsTable: FC<{
     setSelectedCalls([]);
   }, [setSelectedCalls]);
   const muiColumns = useMemo(() => {
-    const cols = [
+    const cols: GridColDef[] = [
       {
         minWidth: 30,
-        width: 38,
+        width: 34,
         field: 'CustomCheckbox',
         sortable: false,
         disableColumnMenu: true,
         resizable: false,
         disableExport: true,
+        display: 'flex',
         renderHeader: (params: any) => {
           return (
             <Checkbox
+              size="small"
               checked={
                 selectedCalls.length === 0
                   ? false
@@ -478,6 +482,7 @@ export const CallsTable: FC<{
               {/* To accommodate disabled elements, add a simple wrapper element, such as a span. */}
               <span>
                 <Checkbox
+                  size="small"
                   disabled={disabled}
                   checked={isSelected}
                   onCheckedChange={() => {
@@ -531,7 +536,7 @@ export const CallsTable: FC<{
     : undefined;
 
   const onPinnedColumnsChange = useCallback(
-    (newModel: GridPinnedColumns) => {
+    (newModel: GridPinnedColumnFields) => {
       if (!setPinModel || callsLoading) {
         return;
       }
@@ -700,6 +705,8 @@ export const CallsTable: FC<{
               />
             </div>
           )}
+          <ButtonDivider />
+
           <div className="flex-none">
             <ExportSelector
               selectedCalls={selectedCalls}
@@ -721,7 +728,7 @@ export const CallsTable: FC<{
           </div>
           {columnVisibilityModel && setColumnVisibilityModel && (
             <>
-              <div className="h-24 flex-none border-l-[1px] border-moon-250"></div>
+              <ButtonDivider />
               <div className="flex-none">
                 <ManageColumnsButton
                   columnInfo={columns}
@@ -731,6 +738,8 @@ export const CallsTable: FC<{
               </div>
             </>
           )}
+          <ButtonDivider />
+          <RefreshButton onClick={() => calls.refetch()} />
         </Tailwind>
       }>
       <StyledDataGrid
@@ -776,7 +785,6 @@ export const CallsTable: FC<{
         // PAGINATION SECTION END
         rowHeight={38}
         columns={muiColumns}
-        experimentalFeatures={{columnGrouping: true}}
         disableRowSelectionOnClick
         rowSelectionModel={rowSelectionModel}
         // columnGroupingModel={groupingModel}
@@ -852,6 +860,10 @@ export const CallsTable: FC<{
     </FilterLayoutTemplate>
   );
 };
+
+const ButtonDivider = () => (
+  <div className="h-24 flex-none border-l-[1px] border-moon-250"></div>
+);
 
 const useParentIdOptions = (
   entity: string,

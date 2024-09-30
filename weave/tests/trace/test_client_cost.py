@@ -11,7 +11,7 @@ from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 def test_cost_apis(client):
     is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
     if is_sqlite:
-        # only run this test for sqlite
+        # dont run this test for sqlite
         return
 
     project_id = client._project_id()
@@ -81,19 +81,11 @@ def test_cost_apis(client):
         assert res[1].completion_token_cost_unit == "USD"
 
     # Add another cost of the same llm_id
-    costs = {
-        "my_model_to_delete3": {
-            "prompt_token_cost": 500,
-            "completion_token_cost": 1000,
-            "effective_date": datetime(1998, 10, 3),
-        },
-    }
-    res = client.server.cost_create(
-        tsi.CostCreateReq(
-            project_id=project_id,
-            costs=costs,
-            wb_user_id="VXNlcjo0NTI1NDQ=",
-        )
+    res = client.add_cost(
+        llm_id="my_model_to_delete3",
+        prompt_token_cost=500,
+        completion_token_cost=1000,
+        effective_date=datetime(1998, 10, 3),
     )
 
     assert len(res.ids) == 1
@@ -153,7 +145,7 @@ def test_cost_apis(client):
 def test_purge_only_ids(client):
     is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
     if is_sqlite:
-        # only run this test for sqlite
+        # dont run this test for sqlite
         return
 
     project_id = client._project_id()

@@ -58,6 +58,7 @@ const sidebars: SidebarsConfig = {
         "guides/core-types/datasets",
         "guides/core-types/evaluations",
         "guides/tracking/feedback",
+        "guides/tracking/costs",
         {
           type: "category",
           collapsible: true,
@@ -101,6 +102,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/langchain",
             "guides/integrations/llamaindex",
             "guides/integrations/dspy",
+            "guides/integrations/instructor",
           ],
         },
       ],

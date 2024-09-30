@@ -6,9 +6,6 @@ import weave
 from weave import Dataset, Evaluation, Model
 from weave.flow.scorer import MultiTaskBinaryClassificationF1
 
-pytestmark = pytest.mark.webtest
-
-
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 dataset = Dataset(rows=dataset_rows)
 
@@ -96,7 +93,7 @@ def test_evaluate_rows_only(client):
     assert result == expected_eval_result
 
 
-def test_evaluate_other_model_method_names(eager_mode):
+def test_evaluate_other_model_method_names():
     class EvalModel(Model):
         @weave.op()
         async def infer(self, input) -> str:

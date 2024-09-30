@@ -16,13 +16,25 @@ class InvalidRequest(Error):
     pass
 
 
+class InsertTooLarge(Error):
+    """Raised when a single insert is too large."""
+
+    pass
+
+
+class InvalidFieldError(Error):
+    """Raised when a field is invalid."""
+
+    pass
+
+
 class ObjectDeletedError(Error):
     """Raised when an object has been deleted."""
 
     pass
 
 
-class NotFoundError(Error):
-    """Raised when not found."""
+class ObjectNotFoundError(Error):
+    """Raised when an object is not found."""
 
     pass

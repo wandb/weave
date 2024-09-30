@@ -60,6 +60,7 @@ export type TraceCallsQueryReq = {
   query?: Query;
   columns?: string[];
   expand_columns?: string[];
+  include_feedback?: boolean;
 };
 
 export type TraceCallsQueryRes = {
@@ -147,6 +148,8 @@ interface TraceObjectsFilter {
 export type TraceObjQueryReq = {
   project_id: string;
   filter?: TraceObjectsFilter;
+  limit?: number;
+  metadata_only?: boolean;
 };
 
 export interface TraceObjSchema {
