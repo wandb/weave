@@ -175,16 +175,11 @@ exclude = ["weave_query"]
 [tool.mypy]
 warn_unused_configs = true
 exclude = [
-  ".*pyi$",
   "weave_query",
   "weave/tests",
-  "weave/trace_server/tests",
-  "weave/conftest.py",
   "weave/trace/tests",
-  "integration_test",
   "weave/trace_server/tests",
   "examples",
-  "weave/docker",
 ]
 ignore_missing_imports = true
 
