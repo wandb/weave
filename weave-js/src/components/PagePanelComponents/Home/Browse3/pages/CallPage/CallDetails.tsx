@@ -93,7 +93,8 @@ export const CallDetails: FC<{
     undefined,
     undefined,
     undefined,
-    columns
+    columns,
+    undefined
   );
 
   const {singularChildCalls, multipleChildCallOpRefs} = useMemo(

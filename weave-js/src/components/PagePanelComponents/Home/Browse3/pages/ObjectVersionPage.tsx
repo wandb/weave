@@ -138,7 +138,8 @@ const ObjectVersionPageInner: React.FC<{
     undefined,
     undefined,
     undefined,
-    minimalColumns
+    minimalColumns,
+    undefined
   );
 
   const consumingCalls = useCalls(
@@ -151,7 +152,8 @@ const ObjectVersionPageInner: React.FC<{
     undefined,
     undefined,
     undefined,
-    minimalColumns
+    minimalColumns,
+    undefined
   );
 
   const showCallsTab =

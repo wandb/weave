@@ -239,6 +239,7 @@ const useCallsNoExpansion = (
   sortBy?: traceServerTypes.SortBy[],
   query?: Query,
   columns?: string[],
+  includeFeedback?: boolean,
   opts?: {skip?: boolean; refetchOnDelete?: boolean}
 ): Loadable<CallSchema[]> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
@@ -271,6 +272,9 @@ const useCallsNoExpansion = (
       sort_by: sortBy,
       query,
       columns,
+      // # TODO: remove this hack
+      expand_columns: includeFeedback ? ["inputs"] : undefined,
+      include_feedback: includeFeedback ?? false,
     };
     const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -374,6 +378,7 @@ const useCalls = (
   query?: Query,
   columns?: string[],
   expandedRefColumns?: Set<string>,
+  includeFeedback?: boolean,
   opts?: {skip?: boolean; refetchOnDelete?: boolean}
 ): Loadable<CallSchema[]> & Refetchable => {
   const calls = useCallsNoExpansion(
@@ -385,6 +390,7 @@ const useCalls = (
     sortBy,
     query,
     columns,
+    includeFeedback,
     opts
   );
 
@@ -1018,6 +1024,7 @@ const useChildCallsForCompare = (
     undefined,
     undefined,
     undefined,
+    undefined,
     {skip: skipParent}
   );
 
@@ -1035,6 +1042,7 @@ const useChildCallsForCompare = (
       parentIds: subParentCallIds,
       opVersionRefs: selectedOpVersionRef ? [selectedOpVersionRef] : [],
     },
+    undefined,
     undefined,
     undefined,
     undefined,

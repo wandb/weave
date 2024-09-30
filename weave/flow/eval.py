@@ -406,3 +406,7 @@ def is_valid_model(model: Any) -> bool:
 # 3. Performance:Given 2 predictions, it is an O(1) lookup to compare scores.
 # 4. Summarization (trial-level and eval-level) can be performed lazily or after the predictions are made.
 # 5. You can obtain "evaluation scores" for live/online predictions not made with the eval framework.
+# 6. Scores can be analyzed outside of evals
+# 7. Filtering/Soring by scores is no longer a double query on calls.
+# 8. Both scores and feedback can be attached to the same conceptual "predict" call.
+# 9. You can "score" anything - not just predictions.
