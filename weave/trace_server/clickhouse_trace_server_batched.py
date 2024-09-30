@@ -784,7 +784,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         sort_fields = []
         if req.sort_by:
-            for i, sort in enumerate(req.sort_by):
+            for sort in req.sort_by:
                 # TODO: better splitting of escaped dots (.) in field names
                 extra_path = sort.field.split(".")
                 field = OrderField(
@@ -811,12 +811,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         digest: str,
         pb: ParamBuilder,
         *,
+        # using the `sql_safe_*` prefix is a way to signal to the caller
+        # that these strings should have been santized by the caller.
         sql_safe_conditions: Optional[list[str]] = None,
         sort_fields: Optional[list[OrderField]] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> list[tsi.TableRowSchema]:
-        if sort_fields is None or len(sort_fields) == 0:
+        if not sort_fields:
             sort_fields = [
                 OrderField(
                     field=QueryBuilderField(field=ROW_ORDER_COLUMN_NAME),
@@ -827,7 +829,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if (
             len(sort_fields) == 1
             and sort_fields[0].field.field == ROW_ORDER_COLUMN_NAME
-            and (sql_safe_conditions is None or len(sql_safe_conditions) == 0)
+            and not sql_safe_conditions
         ):
             query = make_natural_sort_table_query(
                 project_id,
@@ -838,7 +840,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 natural_direction=sort_fields[0].direction,
             )
         else:
-            sql_safe_sort_clause = f"ORDER BY {', '.join([sort_field.as_sql(pb, TABLE_ROWS_ALIAS) for sort_field in sort_fields])}"
+            order_by_components = ", ".join(
+                [sort_field.as_sql(pb, TABLE_ROWS_ALIAS) for sort_field in sort_fields]
+            )
+            sql_safe_sort_clause = f"ORDER BY {order_by_components}"
             query = make_standard_table_query(
                 project_id,
                 digest,
@@ -852,8 +857,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query_result = self.ch_client.query(query, parameters=pb.get_params())
 
         return [
-            tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
-            for r in query_result.result_rows
+            tsi.TableRowSchema(digest=digest, val=json.loads(val_dumps))
+            for digest, val_dumps in query_result.result_rows
         ]
 
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:

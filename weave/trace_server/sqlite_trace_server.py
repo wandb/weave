@@ -886,8 +886,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.TableQueryRes(
             rows=[
-                tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
-                for r in query_result
+                tsi.TableRowSchema(digest=digest, val=json.loads(val_dumps))
+                for digest, val_dumps in query_result
             ]
         )
 
