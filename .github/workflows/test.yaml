@@ -20,6 +20,7 @@ env:
   QUERY_SERVICE_PATHS: 'weave-js/ weave_query/'
 
 jobs:
+  # Ideally this job and the QUERY_SERVICE_PATHS env are in its own workflow, but I can't get that to work.  Maybe there are repo settings blocking this?
   check_paths:
     runs-on: ubuntu-latest
     outputs:
