@@ -277,9 +277,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     @weave.op()
     def multiplier(
         a: Number, b
-    ) -> (
-        int
-    ):  # intentionally deviant in returning plain int - so that we have a different type
+    ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op()
