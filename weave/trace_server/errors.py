@@ -38,9 +38,3 @@ class ObjectDeletedError(Error):
     """Raised when an object has been deleted."""
 
     pass
-
-
-class ObjectNotFoundError(Error):
-    """Raised when an object is not found."""
-
-    pass

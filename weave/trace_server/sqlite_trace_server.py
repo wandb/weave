@@ -17,7 +17,6 @@ from weave.trace_server.errors import (
     InvalidRequest,
     NotFoundError,
     ObjectDeletedError,
-    ObjectNotFoundError,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
@@ -679,7 +678,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             include_deleted=True,
         )
         if len(objs) == 0:
-            raise ObjectNotFoundError(f"Obj {req.object_id}:{req.digest} not found")
+            raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
         if objs[0].deleted_at is not None:
             raise ObjectDeletedError(
                 f"Obj {req.object_id}:{req.digest} was deleted at {objs[0].deleted_at}"
@@ -935,7 +934,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 conditions=conds,
             )
             if len(objs) == 0:
-                raise ObjectNotFoundError(f"Obj {r.name}:{r.version} not found")
+                raise NotFoundError(f"Obj {r.name}:{r.version} not found")
             obj = objs[0]
             val = obj.val
             extra = r.extra
