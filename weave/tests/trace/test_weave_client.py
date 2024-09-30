@@ -1515,7 +1515,8 @@ def test_recursive_object_deletion(client):
 
     # Make sure we can't get obj1
     with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
-        client.get(obj1_ref)
+        out = client.get(obj1_ref)
+        print(out)
 
     # Make sure we can get obj2, but the ref to object 1 should return None
     assert client.get(obj2_ref) == {"b": None}
