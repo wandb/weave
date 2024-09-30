@@ -11,7 +11,6 @@ import requests
 import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation
-from weave.legacy.weave import op_def
 from weave.tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
@@ -566,25 +565,6 @@ def test_opdef(client):
     assert len(list(client.get_calls())) == 1
 
 
-@pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
-def test_saveload_op(client):
-    @weave.op()
-    def add2(x, y):
-        return x + y
-
-    @weave.op()
-    def add3(x, y, z):
-        return x + y + z
-
-    obj = {"a": add2, "b": add3}
-    ref = client._save_object(obj, "my-ops")
-    obj2 = client.get(ref)
-    assert isinstance(obj2["a"], op_def.OpDef)
-    assert obj2["a"].name == "op-add2"
-    assert isinstance(obj2["b"], op_def.OpDef)
-    assert obj2["b"].name == "op-add3"
-
-
 def test_object_mismatch_project_ref(client):
     client.project = "test-project"
 
@@ -1121,6 +1101,7 @@ def test_summary_descendents(client):
     ]
 
 
+@pytest.mark.skip("skipping since it depends on query service deps atm")
 def test_weave_server(client):
     class MyModel(weave.Model):
         prompt: str
@@ -1410,9 +1391,6 @@ def test_calls_stream_table_ref_expansion(client):
 
 
 def test_object_version_read(client):
-    if client_is_sqlite(client):
-        return
-
     refs = []
     for i in range(10):
         refs.append(weave.publish({"a": i}))

@@ -91,6 +91,7 @@ from .orm import ParamBuilder, Row
 from .token_costs import LLM_TOKEN_PRICES_TABLE, validate_cost_purge_req
 from .trace_server_common import (
     LRUCache,
+    digest_is_version_like,
     empty_str_to_none,
     get_nested_key,
     hydrate_calls_with_feedback,
@@ -595,7 +596,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
-            (is_version, version_index) = _digest_is_version_like(req.digest)
+            (is_version, version_index) = digest_is_version_like(req.digest)
             if is_version:
                 conds.append("version_index = {version_index: UInt64}")
                 parameters["version_index"] = version_index
@@ -1946,15 +1947,6 @@ def get_base_object_class(val: Any) -> Optional[str]:
                             elif "_class_name" in val:
                                 return val["_class_name"]
     return None
-
-
-def _digest_is_version_like(digest: str) -> Tuple[bool, int]:
-    if not digest.startswith("v"):
-        return (False, -1)
-    try:
-        return (True, int(digest[1:]))
-    except ValueError:
-        return (False, -1)
 
 
 def find_call_descendants(

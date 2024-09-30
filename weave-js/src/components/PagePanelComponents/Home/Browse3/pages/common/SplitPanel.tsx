@@ -3,7 +3,6 @@
  * to collapse the left panel.
  */
 
-import Collapse from '@mui/material/Collapse';
 import {hexToRGB, MOON_250} from '@wandb/weave/common/css/globals.styles';
 import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
 import React, {ReactNode, useCallback, useRef, useState} from 'react';
@@ -19,15 +18,24 @@ type SplitPanelProps = {
   defaultWidth?: number | string;
 };
 
-const Divider = styled.span`
+const DIVIDER_LINE_WIDTH = 1;
+const DIVIDER_BORDER_WIDTH = 4;
+const DIVIDER_WIDTH = 2 * DIVIDER_BORDER_WIDTH + DIVIDER_LINE_WIDTH;
+
+const Divider = styled.span<{left: number}>`
   background-color: ${MOON_250};
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
+  border-left: ${DIVIDER_BORDER_WIDTH}px solid transparent;
+  border-right: ${DIVIDER_BORDER_WIDTH}px solid transparent;
   background-clip: padding-box;
   cursor: col-resize;
-  flex: 0 0 9px;
-  transition: border 1s ease;
-  transition-delay: 0.5s;
+  width: ${DIVIDER_WIDTH}px;
+  box-sizing: border-box;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: ${props => props.left}px;
+  transition: border 0.5s ease;
+  transition-delay: 0.2s;
 
   &:hover {
     border-left-color: ${hexToRGB(MOON_250, 0.5)};
@@ -75,7 +83,7 @@ export const SplitPanel = ({
   }, [setIsDragging]);
   const onMouseMove = (e: React.MouseEvent) => {
     if (isDragging) {
-      const panel = e.target as HTMLElement;
+      const panel = (e.target as HTMLElement).parentElement!;
       const bounds = panel.getBoundingClientRect();
       const x = e.clientX - bounds.left;
       if (minWidth && x < getWidth(minWidth, bounds.width)) {
@@ -110,41 +118,55 @@ export const SplitPanel = ({
         } else if (numW > maxW) {
           numW = maxW;
         }
+
+        const leftPanelR = numW;
+        const rightPanelL = isDrawerOpen ? numW + DIVIDER_LINE_WIDTH : 0;
+
         return (
           <div
             className="splitpanel"
             ref={ref}
-            style={{width: '100%', height: '100%', display: 'flex', cursor}}
+            style={{
+              width: '100%',
+              height: '100%',
+              position: 'relative',
+              cursor,
+            }}
             onMouseMove={onMouseMove}
             onMouseUp={onMouseUp}
             onMouseLeave={onMouseLeave}>
-            {isDrawerOpen && (
-              <>
-                <Collapse
-                  in={isDrawerOpen}
-                  orientation="horizontal"
+            <div style={{userSelect, pointerEvents}}>
+              {isDrawerOpen && (
+                <div
                   style={{
-                    alignSelf: 'stretch',
-                    flex: `0 0 ${numW}px`,
+                    position: 'absolute',
+                    inset: `0 ${leftPanelR}px 0 0`,
                     overflow: 'auto',
-                    pointerEvents,
-                    userSelect,
+                    width: leftPanelR,
                   }}>
-                  <div style={{width: numW, height: '100%'}}>{drawer}</div>
-                </Collapse>
-                <Divider className="divider" onMouseDown={onMouseDown} />
-              </>
-            )}
-            <div
-              className="right"
-              style={{
-                flex: '1 1 auto',
-                pointerEvents,
-                userSelect,
-                overflow: 'hidden',
-              }}>
-              {main}
+                  {drawer}
+                </div>
+              )}
+              <div
+                className="right"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  right: 0,
+                  left: rightPanelL,
+                  overflow: 'hidden',
+                }}>
+                {main}
+              </div>
             </div>
+            {isDrawerOpen && (
+              <Divider
+                className="divider"
+                onMouseDown={onMouseDown}
+                left={numW - DIVIDER_BORDER_WIDTH}
+              />
+            )}
           </div>
         );
       }}

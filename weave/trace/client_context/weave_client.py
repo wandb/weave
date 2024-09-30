@@ -1,7 +1,6 @@
 import threading
 from typing import TYPE_CHECKING, Optional
 
-from weave.legacy.weave import context_state
 from weave.trace.errors import WeaveInitError
 
 if TYPE_CHECKING:
@@ -26,13 +25,14 @@ def set_weave_client_global(client: Optional["WeaveClient"]) -> None:
                 _global_weave_client = client
 
 
-def set_weave_client_context(client: Optional["WeaveClient"]) -> None:
-    context_state._graph_client.set(client)
+# This is no longer a concept, but should be
+# def set_weave_client_context(client: Optional["WeaveClient"]) -> None:
+#     context_state._graph_client.set(client)
 
 
 def get_weave_client() -> Optional["WeaveClient"]:
-    if (context_client := context_state._graph_client.get()) is not None:
-        return context_client
+    # if (context_client := context_state._graph_client.get()) is not None:
+    #     return context_client
     return _global_weave_client
 
 

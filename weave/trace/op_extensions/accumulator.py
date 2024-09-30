@@ -62,9 +62,9 @@ class _IteratorWrapper(Generic[V]):
             try:
                 self._on_close()  # type: ignore
             except Exception as e:
-                log_once(logger.error, ON_CLOSE_MSG.format(traceback.format_exc()))
                 if get_raise_on_captured_errors():
                     raise
+                log_once(logger.error, ON_CLOSE_MSG.format(traceback.format_exc()))
             self._on_finished_called = True
 
     def _call_on_error_once(self, e: Exception) -> None:
@@ -72,9 +72,9 @@ class _IteratorWrapper(Generic[V]):
             try:
                 self._on_error(e)
             except Exception as e:
-                log_once(logger.error, ON_ERROR_MSG.format(traceback.format_exc()))
                 if get_raise_on_captured_errors():
                     raise
+                log_once(logger.error, ON_ERROR_MSG.format(traceback.format_exc()))
             self._on_finished_called = True
 
     def __iter__(self) -> "_IteratorWrapper":
@@ -98,9 +98,9 @@ class _IteratorWrapper(Generic[V]):
                 # with usage info from openai integration).
                 if isinstance(e, (StopAsyncIteration, StopIteration)):
                     raise
-                log_once(logger.error, ON_YIELD_MSG.format(traceback.format_exc()))
                 if get_raise_on_captured_errors():
                     raise
+                log_once(logger.error, ON_YIELD_MSG.format(traceback.format_exc()))
             return value
         except (StopIteration, StopAsyncIteration) as e:
             self._call_on_close_once()
@@ -130,9 +130,9 @@ class _IteratorWrapper(Generic[V]):
                 # with usage info from openai integration).
                 if isinstance(e, (StopAsyncIteration, StopIteration)):
                     raise
-                log_once(logger.error, ON_AYIELD_MSG.format(traceback.format_exc()))
                 if get_raise_on_captured_errors():
                     raise
+                log_once(logger.error, ON_AYIELD_MSG.format(traceback.format_exc()))
             return value
         except (StopAsyncIteration, StopIteration) as e:
             self._call_on_close_once()

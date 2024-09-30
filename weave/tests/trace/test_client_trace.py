@@ -38,9 +38,6 @@ from weave.trace_server.trace_server_interface_util import (
 )
 from weave.trace_server.validation import SHOULD_ENFORCE_OBJ_ID_CHARSET
 
-pytestmark = pytest.mark.trace
-
-
 ## Hacky interface compatibility helpers
 
 ClientType = weave_client.WeaveClient
@@ -1705,7 +1702,7 @@ def map_with_copying_thread_executor(fn, vals):
     [
         map_simple,
         map_with_threads_no_executor,
-        # map_with_thread_executor,  # <-- Flakes in CI
+        # # map_with_thread_executor,  # <-- Flakes in CI
         # map_with_copying_thread_executor, # <-- Flakes in CI
     ],
 )
