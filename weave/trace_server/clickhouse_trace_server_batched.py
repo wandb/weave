@@ -857,8 +857,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query_result = self.ch_client.query(query, parameters=pb.get_params())
 
         return [
-            tsi.TableRowSchema(digest=digest, val=json.loads(val_dumps))
-            for digest, val_dumps in query_result.result_rows
+            tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
+            for r in query_result.result_rows
         ]
 
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
