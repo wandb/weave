@@ -1101,6 +1101,7 @@ def test_summary_descendents(client):
     ]
 
 
+@pytest.mark.skip("skipping since it depends on query service deps atm")
 def test_weave_server(client):
     class MyModel(weave.Model):
         prompt: str
@@ -1390,9 +1391,6 @@ def test_calls_stream_table_ref_expansion(client):
 
 
 def test_object_version_read(client):
-    if client_is_sqlite(client):
-        return
-
     refs = []
     for i in range(10):
         refs.append(weave.publish({"a": i}))

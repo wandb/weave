@@ -292,22 +292,25 @@ const ObjectVersionPageInner: React.FC<{
         },
         {
           label: 'Use',
-          content:
-            baseObjectClass === 'Dataset' ? (
-              <TabUseDataset
-                name={objectName}
-                uri={refUri}
-                versionIndex={objectVersionIndex}
-              />
-            ) : baseObjectClass === 'Model' ? (
-              <TabUseModel
-                name={objectName}
-                uri={refUri}
-                projectName={projectName}
-              />
-            ) : (
-              <TabUseObject name={objectName} uri={refUri} />
-            ),
+          content: (
+            <Tailwind>
+              {baseObjectClass === 'Dataset' ? (
+                <TabUseDataset
+                  name={objectName}
+                  uri={refUri}
+                  versionIndex={objectVersionIndex}
+                />
+              ) : baseObjectClass === 'Model' ? (
+                <TabUseModel
+                  name={objectName}
+                  uri={refUri}
+                  projectName={projectName}
+                />
+              ) : (
+                <TabUseObject name={objectName} uri={refUri} />
+              )}
+            </Tailwind>
+          ),
         },
 
         // {
