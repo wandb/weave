@@ -175,15 +175,18 @@ const PanelStringHistogramInner: React.FC<
     if (isColorable && colorNodeValue.loading) {
       return [];
     }
+    if (nodeValueQuery.result == null) {
+      return [];
+    }
     if (!isColorable) {
-      return nodeValueQuery.result?.map(v => ({
+      return nodeValueQuery.result.map(v => ({
         value: v,
-      })) ?? [];
+      }));
     } else {
-      return nodeValueQuery.result?.map((v, ndx) => ({
+      return nodeValueQuery.result.map((v, ndx) => ({
         value: v,
         color: colorNodeValue.result[ndx] ?? '#94aecb',
-      })) ?? [];
+      }));
     }
   }, [nodeValueQuery, isColorable, colorNodeValue]);
   const spec = useMemo(() => {
