@@ -50,7 +50,8 @@ packages = ["weave_query"]
 
 [tool.setuptools.dynamic]
 version = { attr = "weave_query.version.VERSION" }
-dependencies = { file = ["requirements.txt"] }
+dependencies = { file = ["requirements.legacy.txt"] }
+
 
 [tool.setuptools.dynamic.optional-dependencies]
 examples = { file = ["requirements.legacy.ecosystem.txt"] }
