@@ -348,8 +348,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     for call in hydrated_batch:
                         yield tsi.CallSchema.model_validate(call)
 
-                    # *** Dynamic increase from 10 to 1000 ***
-                    batch_size = min(1000, batch_size * 10)
+                    # *** Dynamic increase from 10 to 500 ***
+                    batch_size = min(500, batch_size * 10)
                     batch = []
 
             hydrated_batch = self._hydrate_calls(
