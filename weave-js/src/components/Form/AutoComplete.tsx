@@ -160,7 +160,7 @@ export const AutoComplete = <Option,>(
     maxWidth,
     minWidth,
     size,
-    ...safeProps // we're just destructuring the other values out since they're recognized by the autocomplete component
+    ...safeProps // we're just destructuring the other values out since they're unrecognized by the autocomplete component
   } = props;
   return (
     <ThemeProvider theme={getStyles(props)}>
