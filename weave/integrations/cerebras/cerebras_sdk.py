@@ -1,5 +1,5 @@
 import importlib
-import typing
+from typing import Any, Callable
 from functools import wraps
 
 import weave
@@ -8,8 +8,8 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 def create_wrapper_sync(
     name: str,
-) -> typing.Callable[[typing.Callable], typing.Callable]:
-    def wrapper(fn: typing.Callable) -> typing.Callable:
+) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
         op = weave.op()(fn)
         op.name = name  # type: ignore
         return op
@@ -19,13 +19,13 @@ def create_wrapper_sync(
 
 def create_wrapper_async(
     name: str,
-) -> typing.Callable[[typing.Callable], typing.Callable]:
-    def wrapper(fn: typing.Callable) -> typing.Callable:
-        def _fn_wrapper(fn: typing.Callable) -> typing.Callable:
+) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
+        def _fn_wrapper(fn: Callable) -> Callable:
             @wraps(fn)
             async def _async_wrapper(
-                *args: typing.Any, **kwargs: typing.Any
-            ) -> typing.Any:
+                *args: Any, **kwargs: Any
+            ) -> Any:
                 return await fn(*args, **kwargs)
 
             return _async_wrapper
