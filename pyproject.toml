@@ -83,7 +83,6 @@ test = [
   # Integration Tests
   "pytest-recording==0.13.1",
   "vcrpy==6.0.1",
-  "semver==2.13.0",           # Used for switching logic based on package versions (should be replaced with packaging!)
 
   # serving tests
   "flask",

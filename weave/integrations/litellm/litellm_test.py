@@ -4,7 +4,7 @@ from typing import Any, Generator
 
 import litellm
 import pytest
-import semver
+from packaging.version import parse as version_parse
 
 import weave
 
@@ -16,7 +16,7 @@ from .litellm import litellm_patcher
 # We can handle this in non-streaming mode, but in streaming mode, we
 # have no way of correctly capturing the output and not messing up the
 # users' code (that i can see). In these cases, model cost is not captured.
-USES_RAW_OPENAI_RESPONSE = semver.compare(version("litellm"), "1.42.11") > 0
+USES_RAW_OPENAI_RESPONSE = version_parse(version("litellm")) < version_parse("1.42.11")
 
 
 class Nearly:
