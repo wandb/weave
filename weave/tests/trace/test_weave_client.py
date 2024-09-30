@@ -11,8 +11,12 @@ import requests
 import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation
-from weave.legacy.weave import op_def
-from weave.tests.trace.util import AnyIntMatcher, DatetimeMatcher, RegexStringMatcher
+from weave.tests.trace.util import (
+    AnyIntMatcher,
+    DatetimeMatcher,
+    RegexStringMatcher,
+    client_is_sqlite,
+)
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, is_op
@@ -561,25 +565,6 @@ def test_opdef(client):
     assert len(list(client.get_calls())) == 1
 
 
-@pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
-def test_saveload_op(client):
-    @weave.op()
-    def add2(x, y):
-        return x + y
-
-    @weave.op()
-    def add3(x, y, z):
-        return x + y + z
-
-    obj = {"a": add2, "b": add3}
-    ref = client._save_object(obj, "my-ops")
-    obj2 = client.get(ref)
-    assert isinstance(obj2["a"], op_def.OpDef)
-    assert obj2["a"].name == "op-add2"
-    assert isinstance(obj2["b"], op_def.OpDef)
-    assert obj2["b"].name == "op-add3"
-
-
 def test_object_mismatch_project_ref(client):
     client.project = "test-project"
 
@@ -1116,6 +1101,7 @@ def test_summary_descendents(client):
     ]
 
 
+@pytest.mark.skip("skipping since it depends on query service deps atm")
 def test_weave_server(client):
     class MyModel(weave.Model):
         prompt: str
@@ -1439,3 +1425,25 @@ def test_object_version_read(client):
         )
         assert obj_res.obj.val == {"a": i}
         assert obj_res.obj.version_index == i
+
+    # now grab the latest version of the object
+    obj_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=refs[0].name,
+            digest="latest",
+        )
+    )
+    assert obj_res.obj.val == {"a": 9}
+    assert obj_res.obj.version_index == 9
+
+    # now grab version 5
+    obj_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=refs[0].name,
+            digest="v5",
+        )
+    )
+    assert obj_res.obj.val == {"a": 5}
+    assert obj_res.obj.version_index == 5

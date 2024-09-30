@@ -94,6 +94,7 @@ exclude = [
   "weave/__init__.py",
   "weave/legacy/**/*.py",
   "examples",
+  "weave_query",
 ]
 
 [tool.ruff.lint.isort]
@@ -112,10 +113,36 @@ exclude = [
   "weave/__init__.py",
   "weave/legacy/**/*.py",
   "examples",
+  "weave_query",
 ]
 
+[tool.mypy]
+warn_unused_configs = true
+exclude = [
+  ".*pyi$",
+  "weave_query",
+  "weave/tests",
+  "weave/trace_server/tests",
+  "weave/conftest.py",
+  "weave/trace/tests",
+  "integration_test",
+  "weave/trace_server/tests",
+  "examples",
+  "weave/docker",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "weave.*"
+disallow_untyped_defs = true
+disallow_untyped_calls = true
+
+[[tool.mypy.overrides]]
+module = "weave_query.*"
+ignore_errors = true
+
 [tool.bumpversion]
-current_version = "0.51.10-dev0"
+current_version = "0.51.11-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

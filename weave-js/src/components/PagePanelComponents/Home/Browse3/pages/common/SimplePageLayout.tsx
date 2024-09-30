@@ -67,7 +67,7 @@ export const SimplePageLayout: FC<{
           zIndex: 1,
           backgroundColor: 'white',
           pb: 0,
-          height: 55, // manual to match sidebar
+          height: 44,
 
           display: 'flex',
           flexDirection: 'row',
@@ -77,11 +77,11 @@ export const SimplePageLayout: FC<{
         }}>
         <Box
           sx={{
-            height: 55, // manual to match sidebar
-            flex: '0 0 55px',
+            height: 44,
+            flex: '0 0 44px',
             display: 'flex',
             flexDirection: 'row',
-            alignItems: 'flex-end',
+            alignItems: 'center',
             gap: 1,
             pl: 2,
             pr: 2,
@@ -89,7 +89,6 @@ export const SimplePageLayout: FC<{
           {simplePageLayoutContextValue.headerPrefix}
           <Box
             sx={{
-              pb: 2,
               fontWeight: 600,
               fontSize: '1.25rem',
               flex: '1 1 auto',
@@ -159,7 +158,7 @@ export const SimplePageLayout: FC<{
 };
 
 export const SimplePageLayoutWithHeader: FC<{
-  title?: string;
+  title?: ReactNode;
   tabs: Array<{
     label: string;
     content: ReactNode;
@@ -198,11 +197,11 @@ export const SimplePageLayoutWithHeader: FC<{
       }}>
       <Box
         sx={{
-          height: 55, // manual to match sidebar
-          flex: '0 0 55px',
+          height: 44,
+          flex: '0 0 44px',
           display: 'flex',
           flexDirection: 'row',
-          alignItems: 'flex-end',
+          alignItems: 'center',
           pl: 2,
           pr: 2,
           // merge line
@@ -217,9 +216,8 @@ export const SimplePageLayoutWithHeader: FC<{
         {simplePageLayoutContextValue.headerPrefix}
         <Box
           sx={{
-            pb: 2,
             fontWeight: 600,
-            fontSize: '1.5rem',
+            fontSize: '1.25rem',
             flex: '1 1 auto',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -252,20 +250,23 @@ export const SimplePageLayoutWithHeader: FC<{
                   flex: '0 0 auto',
                   width: '100%',
                   overflow: 'auto',
-                  borderBottom: '1px solid #e0e0e0',
-                  p: 1,
+                  pt: 1,
+                  px: 2,
                   alignContent: 'center',
                 }}>
                 {props.headerContent}
               </Box>
               {(!props.hideTabsIfSingle || tabs.length > 1) && (
                 <Tabs.Root
-                  style={{margin: '12px 8px 0 8px'}}
+                  style={{margin: '12px 16px 0 16px'}}
                   value={tabs[tabValue].label}
                   onValueChange={handleTabChange}>
                   <Tabs.List>
                     {tabs.map(tab => (
-                      <Tabs.Trigger key={tab.label} value={tab.label}>
+                      <Tabs.Trigger
+                        key={tab.label}
+                        value={tab.label}
+                        className="h-[30px] text-sm">
                         {tab.label}
                       </Tabs.Trigger>
                     ))}

@@ -422,7 +422,7 @@ export const CallsTable: FC<{
     const cols: GridColDef[] = [
       {
         minWidth: 30,
-        width: 38,
+        width: 34,
         field: 'CustomCheckbox',
         sortable: false,
         disableColumnMenu: true,
@@ -432,6 +432,7 @@ export const CallsTable: FC<{
         renderHeader: (params: any) => {
           return (
             <Checkbox
+              size="small"
               checked={
                 selectedCalls.length === 0
                   ? false
@@ -481,6 +482,7 @@ export const CallsTable: FC<{
               {/* To accommodate disabled elements, add a simple wrapper element, such as a span. */}
               <span>
                 <Checkbox
+                  size="small"
                   disabled={disabled}
                   checked={isSelected}
                   onCheckedChange={() => {

@@ -40,9 +40,9 @@ const getStyles = (props: AdditionalProps) => {
               paddingBottom: '0px !important',
               fontSize: FONT_SIZES[size],
               fontFamily: 'Source Sans Pro',
-              minWidth: '100px',
               color: MOON_800,
               maxWidth: props.maxWidth ? `${props.maxWidth}px` : '100%',
+              minWidth: props.minWidth ? `${props.minWidth}px` : '100px',
               '& fieldset': {
                 borderColor: MOON_250,
               },
@@ -59,7 +59,7 @@ const getStyles = (props: AdditionalProps) => {
                 opacity: 1,
               },
               '& .MuiInputBase-input': {
-                padding: '0px', // Adjust padding as needed
+                padding: '0px',
                 minHeight: `${HEIGHTS[size]} !important`,
               },
             },
@@ -145,7 +145,9 @@ type AdditionalProps = {
   size?: SelectSize;
   isDarkMode?: boolean;
   maxWidth?: number;
+  minWidth?: number;
   hasInputValue?: boolean;
+  autocompleteRef?: React.MutableRefObject<HTMLDivElement | null>;
 };
 
 export const AutoComplete = <Option,>(
@@ -153,7 +155,7 @@ export const AutoComplete = <Option,>(
 ) => {
   return (
     <ThemeProvider theme={getStyles(props)}>
-      <Autocomplete {...props} />
+      <Autocomplete ref={props.autocompleteRef} {...props} />
     </ThemeProvider>
   );
 };

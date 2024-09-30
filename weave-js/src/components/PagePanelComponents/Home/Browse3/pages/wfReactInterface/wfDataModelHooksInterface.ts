@@ -203,7 +203,8 @@ export type WFDataModelHooksInterface = {
     sortBy?: traceServerClientTypes.SortBy[],
     query?: Query,
     columns?: string[],
-    expandedRefCols?: string[]
+    expandedRefCols?: string[],
+    includeFeedback?: boolean
   ) => Promise<Blob>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
@@ -211,6 +212,7 @@ export type WFDataModelHooksInterface = {
     project: string,
     filter: OpVersionFilter,
     limit?: number,
+    metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (
@@ -221,6 +223,7 @@ export type WFDataModelHooksInterface = {
     project: string,
     filter: ObjectVersionFilter,
     limit?: number,
+    metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => LoadableWithError<ObjectVersionSchema[]>;
   // `useRefsData` is in beta while we integrate Shawn's new Object DB
