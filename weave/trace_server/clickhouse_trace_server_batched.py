@@ -329,7 +329,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             expand_columns = req.expand_columns or []
             ref_cache = LRUCache(max_size=1000)
 
-            batch_size = 100
+            batch_size = 10
             batch = []
             for row in raw_res:
                 call_dict = _ch_call_dict_to_call_schema_dict(
@@ -349,7 +349,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         yield tsi.CallSchema.model_validate(call)
 
                     # *** Dynamic increase from 100 to 1000 ***
-                    batch_size = min(1000, batch_size * 2)
+                    batch_size = min(1000, batch_size * 10)
                     batch = []
 
             hydrated_batch = self._hydrate_calls(
