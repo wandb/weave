@@ -1,21 +1,9 @@
 import os
-from typing import Any
 
 import pytest
+from mistralai import Mistral
 
 import weave
-from weave.trace_server import trace_server_interface as tsi
-
-
-def _get_call_output(call: tsi.CallSchema) -> Any:
-    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
-
-    Keeping this here for now, but it should be removed in the future once we have a better solution.
-    """
-    call_output = call.output
-    if isinstance(call_output, str) and call_output.startswith("weave://"):
-        return weave.ref(call_output).get()
-    return call_output
 
 
 @pytest.mark.skip_clickhouse_client
@@ -24,7 +12,6 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
 )
 def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> None:
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
-    from mistralai import Mistral  # type: ignore
 
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
@@ -61,12 +48,12 @@ def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> Non
 
 Each of these cheeses has its unique characteristics, so the "best" one depends on your preferences. It's always fun to try several and decide which you like the most!"""
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
-    print(f"{output['choices'][0]=}")
+    output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chat_response.id
@@ -92,8 +79,6 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
 async def test_mistral_quickstart_async(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from mistralai import Mistral  # type: ignore
-
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
@@ -123,11 +108,12 @@ async def test_mistral_quickstart_async(
 Each of these cheeses offers a unique taste and texture, so the "best" one is a matter of personal preference."""
 
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chat_response.id
@@ -152,8 +138,6 @@ Each of these cheeses offers a unique taste and texture, so the "best" one is a 
 def test_mistral_quickstart_with_stream(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from mistralai import Mistral  # type: ignore
-
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
@@ -185,12 +169,12 @@ def test_mistral_quickstart_with_stream(
 
 Each of these cheeses offers a unique taste and texture, so the "best" one depends on your personal preference. It's always fun to try a variety to see which you like best!"""
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
-    print(f"{output=}")
+    output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chunk.data.id
@@ -216,8 +200,6 @@ Each of these cheeses offers a unique taste and texture, so the "best" one depen
 async def test_mistral_quickstart_with_stream_async(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from mistralai import Mistral  # type: ignore
-
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
@@ -257,11 +239,12 @@ async def test_mistral_quickstart_with_stream_async(
 
 Each of these cheeses has its unique characteristics, so the "best" one depends on your preferences. It's always fun to try several types to discover your favorite!"""
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chunk.data.id
