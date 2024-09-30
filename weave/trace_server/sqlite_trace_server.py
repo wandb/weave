@@ -1168,7 +1168,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     created_at=row[2],
                     kind=row[3],
                     base_object_class=row[4],
-                    val=json.loads(row[5]) if not metadata_only else {},
+                    val=json.loads(row[5]),
                     digest=row[6],
                     version_index=row[7],
                     is_latest=row[8],
