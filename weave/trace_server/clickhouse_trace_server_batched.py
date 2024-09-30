@@ -329,7 +329,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             expand_columns = req.expand_columns or []
             ref_cache = LRUCache(max_size=1000)
 
-            batch_size = 10
+            batch_size = 100
             batch = []
             for row in raw_res:
                 call_dict = _ch_call_dict_to_call_schema_dict(
@@ -348,22 +348,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     for call in hydrated_batch:
                         yield tsi.CallSchema.model_validate(call)
 
-                    # *** Dynamic Batch Size for ref expansion***
-                    if expand_columns:
-                        # count the number of columns at each depth
-                        depths = Counter(col.count(".") for col in expand_columns)
-                        # take the max number of columns at any depth
-                        max_count_at_ref_depth = max(depths.values())
-                        if max_count_at_ref_depth == 0:
-                            max_count_at_ref_depth = 1
-                        # divide max refs that we can resolve 1000 refs at any depth
-                        max_size = 1000 // max_count_at_ref_depth
-                        # double batch size up to what refs_read_batch can handle
-                        batch_size = min(max_size, batch_size * 2)
-                        batch = []
-                    else:
-                        batch_size = 1000
-                        batch = []
+                    # *** Dynamic increase from 100 to 1000 ***
+                    batch_size = min(1000, batch_size * 2)
+                    batch = []
 
             hydrated_batch = self._hydrate_calls(
                 req.project_id,

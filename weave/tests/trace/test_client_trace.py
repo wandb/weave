@@ -2664,6 +2664,41 @@ def test_calls_stream_column_expansion(client):
     assert call_result.output == nested_ref.uri()
 
 
+def test_calls_stream_column_expansion_dynamic_batch_size(client):
+    @weave.op
+    def test_op(x):
+        return x
+
+    for i in range(1000):
+        test_op(i)
+
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output"],
+            expand_columns=["output"],
+        )
+    )
+    calls = list(res)
+    assert len(calls) == 1000
+    for i in range(1000):
+        assert calls[i].output == i
+
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output"],
+            expand_columns=[
+                "output.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.w.x.y.z"
+            ],
+        )
+    )
+    calls = list(res)
+    assert len(calls) == 1000
+    for i in range(1000):
+        assert calls[i].output == i
+
+
 class Custom(weave.Object):
     val: dict
 
