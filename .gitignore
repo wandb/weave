@@ -10,7 +10,7 @@ artifacts
 local-artifacts
 weave_internal.egg-info
 weave.egg-info/
-weave/frontend/assets
+weave_query/weave_query/frontend/assets
 build/
 MNIST
 food-101
