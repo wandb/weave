@@ -354,6 +354,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         depths = Counter(col.count(".") for col in expand_columns)
                         # take the max number of columns at any depth
                         max_count_at_ref_depth = max(depths.values())
+                        if max_count_at_ref_depth == 0:
+                            max_count_at_ref_depth = 1
                         # divide max refs that we can resolve 1000 refs at any depth
                         max_size = 1000 // max_count_at_ref_depth
                         # double batch size up to what refs_read_batch can handle
