@@ -92,7 +92,7 @@ test = [
 ]
 
 [project.scripts]
-weave = "weave.cli:cli"
+weave = "weave.trace.cli:cli"
 
 [project.urls]
 Company = "https://wandb.com"
@@ -111,9 +111,6 @@ packages = ["weave"]
 
 [tool.setuptools.dynamic]
 version = { attr = "weave.version.VERSION" }
-
-[tool.setuptools.dynamic.optional-dependencies]
-modal = { file = ["requirements.modal.txt"] }
 
 [tool.pytest.ini_options]
 filterwarnings = [
@@ -141,20 +138,18 @@ select = [
   "D211",   # https://docs.astral.sh/ruff/rules/blank-line-before-class/
   "D214",   # https://docs.astral.sh/ruff/rules/section-not-over-indented/
   "FIX001", # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
-  "FIX003",
-  "F541",
+  "FIX003", # https://docs.astral.sh/ruff/rules/line-contains-xxx/
+  "F541",   # https://docs.astral.sh/ruff/rules/f-string-missing-placeholders/
   "I",      # https://docs.astral.sh/ruff/rules/#isort-i
   "W291",   # https://docs.astral.sh/ruff/rules/trailing-whitespace/
   "W391",   # https://docs.astral.sh/ruff/rules/too-many-newlines-at-end-of-file/
   "F401",   # https://docs.astral.sh/ruff/rules/unused-import/
 ]
 ignore = [
-  "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/ - we use Google style
-  "D206", # https://docs.astral.sh/ruff/rules/indent-with-spaces/ - redundant with formatter
-  "D207", # https://docs.astral.sh/ruff/rules/under-indentation/ - redundant with formatter
-  "D208", # https://docs.astral.sh/ruff/rules/over-indentation/ - redundant with formatter
-  "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/ - we use Google style
-  "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/ - we use Google style
+  # we use Google style
+  "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/
+  "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/
+  "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/
 ]
 exclude = [
   "weave/api.py",
@@ -165,7 +160,7 @@ exclude = [
 ]
 
 [tool.ruff.lint.isort]
-known-third-party = ["wandb"]
+known-third-party = ["wandb", "weave_query"]
 
 [tool.ruff.lint.per-file-ignores]
 "weave/tests/*" = ["F401"]
