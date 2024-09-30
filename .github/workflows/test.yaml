@@ -10,6 +10,11 @@ name: test
 
 on:
   push:
+  workflow_call:
+    outputs:
+      should_run_core_integration_tests:
+        description: 'Whether core integration tests should run'
+        value: ${{ jobs.check_paths.outputs.should_run_query_tests }}
 
 env:
   QUERY_SERVICE_PATHS: 'weave-js/ weave_query/'

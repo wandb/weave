@@ -6,11 +6,16 @@ name: Notify wandb/core
 on:
   push:
     branches:
-      - "**"
+      - '**'
   workflow_dispatch:
 
 jobs:
+  check_paths:
+    uses: ./.github/workflows/test.yml
+
   notify-wandb-core:
+    needs: check_paths
+    if: needs.check_paths.outputs.should_run_core_integration_tests == "true"
     runs-on: ubuntu-latest
     steps:
       - name: Repository dispatch
