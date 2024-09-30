@@ -3,9 +3,7 @@ include wb_schema.gql
 graft weave/client_context
 graft weave/deploy
 graft weave/flow
-graft weave_query/weave_query/frontend
 graft weave/integrations
-graft weave/legacy
 graft weave/trace
 graft weave/trace_server
 graft weave/type_serializers
