@@ -53,10 +53,6 @@ version = { attr = "weave.version.VERSION" }
 dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.dynamic.optional-dependencies]
-examples = { file = ["requirements.legacy.ecosystem.txt"] }
-engine = { file = ["requirements.legacy.engine.txt"] }
-ecosystem = { file = ["requirements.legacy.ecosystem.txt"] }
-datadog = { file = ["requirements.legacy.datadog.txt"] }
 modal = { file = ["requirements.modal.txt"] }
 
 [tool.pytest.ini_options]
