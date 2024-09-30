@@ -1,6 +1,6 @@
 import importlib
-from typing import Any, Callable
 from functools import wraps
+from typing import Any, Callable
 
 import weave
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
@@ -23,9 +23,7 @@ def create_wrapper_async(
     def wrapper(fn: Callable) -> Callable:
         def _fn_wrapper(fn: Callable) -> Callable:
             @wraps(fn)
-            async def _async_wrapper(
-                *args: Any, **kwargs: Any
-            ) -> Any:
+            async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 return await fn(*args, **kwargs)
 
             return _async_wrapper

@@ -1,7 +1,6 @@
 import importlib
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Union
 from functools import wraps
-from typing import Any, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Union
 
 from typing_extensions import AsyncIterator, Iterator
 
@@ -94,9 +93,7 @@ def create_wrapper_async(
     def wrapper(fn: Callable) -> Callable:
         def _fn_wrapper(fn: Callable) -> Callable:
             @wraps(fn)
-            async def _async_wrapper(
-                *args: Any, **kwargs: Any
-            ) -> Any:
+            async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 return await fn(*args, **kwargs)
 
             return _async_wrapper

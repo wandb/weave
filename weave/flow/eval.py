@@ -3,7 +3,7 @@ import inspect
 import textwrap
 import time
 import traceback
-from typing import Any, Callable, Optional, Union, Coroutine
+from typing import Any, Callable, Coroutine, Optional, Union, cast
 
 from rich import print
 from rich.console import Console
@@ -34,9 +34,7 @@ INVALID_MODEL_ERROR = (
 )
 
 
-def async_call(
-    func: Union[Callable, Op], *args: Any, **kwargs: Any
-) -> Coroutine:
+def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutine:
     is_async = False
     if is_op(func):
         func = as_op(func)

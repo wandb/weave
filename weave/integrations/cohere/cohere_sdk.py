@@ -1,6 +1,6 @@
 import importlib
-from typing import Any, Callable, TYPE_CHECKING, Optional
 from functools import wraps
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
