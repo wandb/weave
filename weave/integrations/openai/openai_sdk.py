@@ -1,20 +1,20 @@
 import importlib
-import typing
+from typing import TYPE_CHECKING, Any, Callable, Optional
 from functools import wraps
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
 
 
-def maybe_unwrap_api_response(value: typing.Any) -> typing.Any:
+def maybe_unwrap_api_response(value: Any) -> Any:
     """If the caller requests a raw response, we unwrap the APIResponse object.
     We take a very conservative approach to only unwrap the types we know about.
     """
-    maybe_value: typing.Any = None
+    maybe_value: Any = None
     try:
         from openai._legacy_response import LegacyAPIResponse
 
@@ -43,8 +43,8 @@ def maybe_unwrap_api_response(value: typing.Any) -> typing.Any:
 
 
 def openai_on_finish_post_processor(
-    value: typing.Optional["ChatCompletionChunk"],
-) -> typing.Optional[typing.Dict]:
+    value: Optional["ChatCompletionChunk"],
+) -> Optional[dict]:
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
         ChoiceDeltaFunctionCall,
@@ -59,8 +59,8 @@ def openai_on_finish_post_processor(
     value = maybe_unwrap_api_response(value)
 
     def _get_function_call(
-        function_call: typing.Optional[ChoiceDeltaFunctionCall],
-    ) -> typing.Optional[FunctionCall]:
+        function_call: Optional[ChoiceDeltaFunctionCall],
+    ) -> Optional[FunctionCall]:
         if function_call is None:
             return function_call
         if isinstance(function_call, ChoiceDeltaFunctionCall):
@@ -72,8 +72,8 @@ def openai_on_finish_post_processor(
             return None
 
     def _get_tool_calls(
-        tool_calls: typing.Optional[typing.List[ChoiceDeltaToolCall]],
-    ) -> typing.Optional[typing.List[ChatCompletionMessageToolCall]]:
+        tool_calls: Optional[list[ChoiceDeltaToolCall]],
+    ) -> Optional[list[ChatCompletionMessageToolCall]]:
         if tool_calls is None:
             return tool_calls
 
@@ -122,7 +122,7 @@ def openai_on_finish_post_processor(
 
 
 def openai_accumulator(
-    acc: typing.Optional["ChatCompletionChunk"],
+    acc: Optional["ChatCompletionChunk"],
     value: "ChatCompletionChunk",
     skip_last: bool = False,
 ) -> "ChatCompletionChunk":
@@ -135,7 +135,7 @@ def openai_accumulator(
 
     def _process_chunk(
         chunk: ChatCompletionChunk, acc_choices: list[dict] = []
-    ) -> typing.List[typing.Dict]:
+    ) -> list[dict]:
         """Once the first_chunk is set (acc), take the next chunk and append the message content
         to the message content of acc or first_chunk.
         """
@@ -265,7 +265,7 @@ def openai_accumulator(
 
 
 # Unlike other integrations, streaming is based on input flag
-def should_use_accumulator(inputs: typing.Dict) -> bool:
+def should_use_accumulator(inputs: dict) -> bool:
     return (
         isinstance(inputs, dict)
         and bool(inputs.get("stream"))
@@ -279,13 +279,13 @@ def should_use_accumulator(inputs: typing.Dict) -> bool:
 
 def create_wrapper_sync(
     name: str,
-) -> typing.Callable[[typing.Callable], typing.Callable]:
-    def wrapper(fn: typing.Callable) -> typing.Callable:
+) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
         "We need to do this so we can check if `stream` is used"
 
-        def _add_stream_options(fn: typing.Callable) -> typing.Callable:
+        def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
-            def _wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+            def _wrapper(*args: Any, **kwargs: Any) -> Any:
                 if bool(kwargs.get("stream")) and kwargs.get("stream_options") is None:
                     kwargs["stream_options"] = {"include_usage": True}
                 return fn(
@@ -294,7 +294,7 @@ def create_wrapper_sync(
 
             return _wrapper
 
-        def _openai_stream_options_is_set(inputs: typing.Dict) -> bool:
+        def _openai_stream_options_is_set(inputs: dict) -> bool:
             if inputs.get("stream_options") is not None:
                 return True
             return False
@@ -318,20 +318,20 @@ def create_wrapper_sync(
 # it manually here...
 def create_wrapper_async(
     name: str,
-) -> typing.Callable[[typing.Callable], typing.Callable]:
-    def wrapper(fn: typing.Callable) -> typing.Callable:
+) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
         "We need to do this so we can check if `stream` is used"
 
-        def _add_stream_options(fn: typing.Callable) -> typing.Callable:
+        def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
-            async def _wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+            async def _wrapper(*args: Any, **kwargs: Any) -> Any:
                 if bool(kwargs.get("stream")) and kwargs.get("stream_options") is None:
                     kwargs["stream_options"] = {"include_usage": True}
                 return await fn(*args, **kwargs)
 
             return _wrapper
 
-        def _openai_stream_options_is_set(inputs: typing.Dict) -> bool:
+        def _openai_stream_options_is_set(inputs: dict) -> bool:
             if inputs.get("stream_options") is not None:
                 return True
             return False
