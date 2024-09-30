@@ -3,8 +3,7 @@ import inspect
 import textwrap
 import time
 import traceback
-import typing
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Union, Coroutine
 
 from rich import print
 from rich.console import Console
@@ -36,8 +35,8 @@ INVALID_MODEL_ERROR = (
 
 
 def async_call(
-    func: typing.Union[Callable, Op], *args: Any, **kwargs: Any
-) -> typing.Coroutine:
+    func: Union[Callable, Op], *args: Any, **kwargs: Any
+) -> Coroutine:
     is_async = False
     if is_op(func):
         func = as_op(func)
@@ -197,7 +196,7 @@ class Evaluation(Object):
         model_latency = time.time() - model_start_time
 
         scores = {}
-        scorers = typing.cast(list[Union[Op, Scorer]], self.scorers or [])
+        scorers = cast(list[Union[Op, Scorer]], self.scorers or [])
         for scorer in scorers:
             scorer_name, score_fn, _ = get_scorer_attributes(scorer)
             if is_op(score_fn):
@@ -298,7 +297,7 @@ class Evaluation(Object):
 
         n_complete = 0
         # with console.status("Evaluating...") as status:
-        dataset = typing.cast(Dataset, self.dataset)
+        dataset = cast(Dataset, self.dataset)
         _rows = dataset.rows
         trial_rows = list(_rows) * self.trials
         async for example, eval_row in util.async_foreach(
