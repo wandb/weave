@@ -92,7 +92,7 @@ test = [
 ]
 
 [project.scripts]
-weave = "weave.cli:cli"
+weave = "weave.trace.cli:cli"
 
 [project.urls]
 Company = "https://wandb.com"
@@ -111,9 +111,6 @@ packages = ["weave"]
 
 [tool.setuptools.dynamic]
 version = { attr = "weave.version.VERSION" }
-
-[tool.setuptools.dynamic.optional-dependencies]
-modal = { file = ["requirements.modal.txt"] }
 
 [tool.pytest.ini_options]
 filterwarnings = [
