@@ -13,7 +13,12 @@ import emoji
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server.emoji_util import detone_emojis
-from weave.trace_server.errors import InvalidRequest, NotFoundError, ObjectDeletedError
+from weave.trace_server.errors import (
+    InvalidRequest,
+    NotFoundError,
+    ObjectDeletedError,
+    ObjectNotFoundError,
+)
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
@@ -563,9 +568,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     WHERE c.deleted_at IS NULL
                 )
                 SELECT id FROM Descendants;
-            """.format(
-                ", ".join("?" * len(req.call_ids))
-            )
+            """.format(", ".join("?" * len(req.call_ids)))
 
             params = [req.project_id] + req.call_ids
             cursor.execute(recursive_query, params)
@@ -577,9 +580,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 SET deleted_at = CURRENT_TIMESTAMP
                 WHERE deleted_at is NULL AND
                     id IN ({})
-            """.format(
-                ", ".join("?" * len(all_ids))
-            )
+            """.format(", ".join("?" * len(all_ids)))
             print("MUTATION", delete_query)
             cursor.execute(delete_query, all_ids)
             conn.commit()
@@ -678,7 +679,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             include_deleted=True,
         )
         if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
+            raise ObjectNotFoundError(f"Obj {req.object_id}:{req.digest} not found")
         if objs[0].deleted_at is not None:
             raise ObjectDeletedError(
                 f"Obj {req.object_id}:{req.digest} was deleted at {objs[0].deleted_at}"
@@ -934,7 +935,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 conditions=conds,
             )
             if len(objs) == 0:
-                raise NotFoundError(f"Obj {r.name}:{r.version} not found")
+                raise ObjectNotFoundError(f"Obj {r.name}:{r.version} not found")
             obj = objs[0]
             val = obj.val
             extra = r.extra

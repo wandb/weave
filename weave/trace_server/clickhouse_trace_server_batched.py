@@ -56,7 +56,11 @@ from weave.trace_server.calls_query_builder import (
     QueryBuilderDynamicField,
     combine_conditions,
 )
-from weave.trace_server.errors import NotFoundError, ObjectDeletedError
+from weave.trace_server.errors import (
+    NotFoundError,
+    ObjectDeletedError,
+    ObjectNotFoundError,
+)
 from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_common import make_derived_summary_fields
 
@@ -533,7 +537,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters=parameters,
         )
         if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
+            raise ObjectDeletedError(f"Obj {req.name}:{req.digest} not found")
 
         return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(objs[0]))
 
@@ -601,7 +605,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             include_deleted=True,
         )
         if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
+            raise ObjectNotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
         if objs[0].deleted_at is not None:
             raise ObjectDeletedError(

@@ -28,6 +28,12 @@ class InvalidFieldError(Error):
     pass
 
 
+class NotFoundError(Error):
+    """Raised when a general not found error occurs."""
+
+    pass
+
+
 class ObjectDeletedError(Error):
     """Raised when an object has been deleted."""
 
