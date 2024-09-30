@@ -1,19 +1,19 @@
 import importlib
-import typing
+from typing import Any, Callable, TYPE_CHECKING, Optional
 from functools import wraps
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from cohere.types.non_streamed_chat_response import NonStreamedChatResponse
     from cohere.v2.types.non_streamed_chat_response2 import NonStreamedChatResponse2
 
 
 def cohere_accumulator(
-    acc: typing.Optional[dict],
-    value: typing.Any,
+    acc: Optional[dict],
+    value: Any,
 ) -> "NonStreamedChatResponse":
     # don't need to accumulate, is build-in by cohere!
     # https://docs.cohere.com/docs/streaming
@@ -32,8 +32,8 @@ def cohere_accumulator(
 
 
 def cohere_accumulator_v2(
-    acc: typing.Optional[dict],
-    value: typing.Any,
+    acc: Optional[dict],
+    value: Any,
 ) -> "NonStreamedChatResponse2":
     from cohere.v2.types.assistant_message_response import AssistantMessageResponse
     from cohere.v2.types.non_streamed_chat_response2 import NonStreamedChatResponse2
@@ -86,8 +86,8 @@ def cohere_accumulator_v2(
     return acc
 
 
-def cohere_wrapper(name: str) -> typing.Callable:
-    def wrapper(fn: typing.Callable) -> typing.Callable:
+def cohere_wrapper(name: str) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
         op = weave.op()(fn)
         op.name = name  # type: ignore
         return op
@@ -95,11 +95,11 @@ def cohere_wrapper(name: str) -> typing.Callable:
     return wrapper
 
 
-def cohere_wrapper_v2(name: str) -> typing.Callable:
-    def wrapper(fn: typing.Callable) -> typing.Callable:
-        def _post_process_response(fn: typing.Callable) -> typing.Any:
+def cohere_wrapper_v2(name: str) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
+        def _post_process_response(fn: Callable) -> Any:
             @wraps(fn)
-            def _wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+            def _wrapper(*args: Any, **kwargs: Any) -> Any:
                 response = fn(*args, **kwargs)
 
                 try:
@@ -129,11 +129,11 @@ def cohere_wrapper_v2(name: str) -> typing.Callable:
     return wrapper
 
 
-def cohere_wrapper_async_v2(name: str) -> typing.Callable:
-    def wrapper(fn: typing.Callable) -> typing.Callable:
-        def _post_process_response(fn: typing.Callable) -> typing.Any:
+def cohere_wrapper_async_v2(name: str) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
+        def _post_process_response(fn: Callable) -> Any:
             @wraps(fn)
-            async def _wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+            async def _wrapper(*args: Any, **kwargs: Any) -> Any:
                 response = await fn(*args, **kwargs)
 
                 try:
@@ -163,8 +163,8 @@ def cohere_wrapper_async_v2(name: str) -> typing.Callable:
     return wrapper
 
 
-def cohere_stream_wrapper(name: str) -> typing.Callable:
-    def wrapper(fn: typing.Callable) -> typing.Callable:
+def cohere_stream_wrapper(name: str) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
         op = weave.op()(fn)
         op.name = name  # type: ignore
         return add_accumulator(op, lambda inputs: cohere_accumulator)  # type: ignore
@@ -172,8 +172,8 @@ def cohere_stream_wrapper(name: str) -> typing.Callable:
     return wrapper
 
 
-def cohere_stream_wrapper_v2(name: str) -> typing.Callable:
-    def wrapper(fn: typing.Callable) -> typing.Callable:
+def cohere_stream_wrapper_v2(name: str) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
         op = weave.op()(fn)
         op.name = name  # type: ignore
         return add_accumulator(
