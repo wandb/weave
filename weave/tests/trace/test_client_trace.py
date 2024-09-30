@@ -2793,16 +2793,18 @@ def test_objects_and_keys_with_special_characters(client):
 
 
 def test_calls_stream_feedback(client):
+    BATCH_SIZE = 10
+    num_calls = BATCH_SIZE + 1
+
     @weave.op
     def test_call(x):
         return "ello chap"
 
-    test_call(1)
-    test_call(2)
-    test_call(3)
+    for i in range(num_calls):
+        test_call(i)
 
     calls = list(test_call.calls())
-    assert len(calls) == 3
+    assert len(calls) == num_calls
 
     # add feedback to the first call
     calls[0].feedback.add("note", {"note": "this is a note on call1"})
@@ -2821,7 +2823,7 @@ def test_calls_stream_feedback(client):
     )
     calls = list(res)
 
-    assert len(calls) == 3
+    assert len(calls) == num_calls
     assert len(calls[0].summary["weave"]["feedback"]) == 4
     assert len(calls[1].summary["weave"]["feedback"]) == 1
     assert not calls[2].summary.get("weave", {}).get("feedback")
