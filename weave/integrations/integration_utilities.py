@@ -95,3 +95,16 @@ def op_name_from_ref(ref: str) -> str:
 def filter_body(r: Any) -> Any:
     r.body = ""
     return r
+
+
+def _make_string_of_length(n: int) -> str:
+    return "a" * n
+
+
+def _truncated_str(tail_len: int, total_len: int) -> tuple:
+    name = (
+        _make_string_of_length(total_len - tail_len - 1)
+        + "."
+        + _make_string_of_length(tail_len)
+    )
+    return name, truncate_op_name(name)
