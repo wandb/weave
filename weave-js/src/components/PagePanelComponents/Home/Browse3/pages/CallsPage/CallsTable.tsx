@@ -6,6 +6,11 @@
  *    * (BackendExpansion) Move Expansion to Backend, and support filter/sort
  */
 
+
+// Two objectives:
+// 1. If a user cmd-clicks a cell that is an expanded ref value, make the filter respect the ref
+// 2. If any column is expanded, then it is not a candidate for filtering.
+
 import {
   Autocomplete,
   Chip,
