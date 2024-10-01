@@ -71,6 +71,7 @@ mistral1 = ["mistralai>=1.0.0"]
 openai = ["openai>=1.0.0"]
 modal = ["modal", "python-dotenv"]
 test = [
+  "nox",
   "pytest>=8.2.0",
   "pytest-asyncio>=0.23.6",
   "pytest-xdist>=3.1.0",
