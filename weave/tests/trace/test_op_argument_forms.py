@@ -1,8 +1,7 @@
 import pytest
 
 import weave
-
-from ...trace_server import trace_server_interface as tsi
+from weave.trace_server import trace_server_interface as tsi
 
 # This file tests the different argument variations that can be passed to an op.
 #

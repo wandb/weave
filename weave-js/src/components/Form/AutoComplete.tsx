@@ -142,20 +142,29 @@ const SelectSizes = {
 type SelectSize = (typeof SelectSizes)[keyof typeof SelectSizes];
 
 type AdditionalProps = {
-  size?: SelectSize;
+  autocompleteRef?: React.MutableRefObject<HTMLDivElement | null>;
+  hasInputValue?: boolean;
   isDarkMode?: boolean;
   maxWidth?: number;
   minWidth?: number;
-  hasInputValue?: boolean;
-  autocompleteRef?: React.MutableRefObject<HTMLDivElement | null>;
+  size?: SelectSize;
 };
 
 export const AutoComplete = <Option,>(
   props: AutocompleteProps<Option, boolean, boolean, boolean> & AdditionalProps
 ) => {
+  const {
+    autocompleteRef,
+    hasInputValue,
+    isDarkMode,
+    maxWidth,
+    minWidth,
+    size,
+    ...safeProps // we're just destructuring the other values out since they're unrecognized by the autocomplete component
+  } = props;
   return (
     <ThemeProvider theme={getStyles(props)}>
-      <Autocomplete ref={props.autocompleteRef} {...props} />
+      <Autocomplete ref={props.autocompleteRef} {...safeProps} />
     </ThemeProvider>
   );
 };
