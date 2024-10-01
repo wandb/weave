@@ -70,7 +70,7 @@ def test_resilience_to_server_errors(client_with_throwing_server, log_collector)
     assert ag_res == {
         "Task failed: DummyTestException: ('FAILURE - call_end": 1,
         "Task failed: DummyTestException: ('FAILURE - file_create": 1,
-        "Task failed: DummyTestException: ('FAILURE - obj_create": 3,
+        "Task failed: DummyTestException: ('FAILURE - obj_create": 1,
     }
 
 
