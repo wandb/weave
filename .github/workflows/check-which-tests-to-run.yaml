@@ -2,6 +2,11 @@ name: Check which tests to run
 
 on:
   workflow_call:
+    outputs:
+      weave_query_tests:
+        value: ${{ jobs.check.outputs.weave_query_tests}}
+      core_integration_tests:
+        value: ${{ jobs.check.outputs.core_integration_tests }}
 
 env:
   WEAVE_QUERY_PATHS: 'weave_query/'
