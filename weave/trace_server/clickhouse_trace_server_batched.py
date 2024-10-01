@@ -1549,6 +1549,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 "is_latest",
                                 "val_dump",
                             ],
+                            # Add an empty val_dump to the end of the row
                             list(row) + ["{}"],
                         )
                     )
