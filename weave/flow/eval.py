@@ -46,7 +46,7 @@ def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutin
     return asyncio.to_thread(func, *args, **kwargs)
 
 
-class EvaluationResults(weave.Object):
+class EvaluationResults(Object):
     rows: weave.Table
 
 

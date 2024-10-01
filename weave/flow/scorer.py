@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 import weave
 from weave.flow.obj import Object
-from weave.trace.isinstance import weave_isinstance
+from weave.trace.isinstance_checks import weave_isinstance
 from weave.trace.op import Op, as_op, is_op
 
 
