@@ -28,7 +28,69 @@ classifiers = [
   "Topic :: Software Development :: Widget Sets",
 ]
 requires-python = ">=3.9"
-dynamic = ["version", "dependencies", "optional-dependencies"]
+dynamic = ["version"]
+dependencies = [
+  "pydantic>=2.0.0",
+  "wandb>=0.17.1",
+  "analytics-python>=1.2.9", # Segment logging
+  "python-dateutil>=2.8.2",  # For ISO date parsing
+  "packaging>=21.0",         # For version parsing in integrations
+  "tenacity>=8.3.0,!=8.4.0", # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
+  "emoji>=2.12.1",           # For emoji shortcode support in Feedback
+  "uuid-utils>=0.9.0",       # Used for ID generation - remove once python's built-in uuid supports UUIDv7
+  "numpy>1.21.0",
+  "rich",
+
+  # dependencies for remaining legacy code.  Remove when possible
+  "httpx",
+  "aiohttp",
+  "gql",
+  "requests_toolbelt",
+]
+
+[project.optional-dependencies]
+trace_server = []
+anthropic = ["anthropic>=0.18.0"]
+cerebras = ["cerebras-cloud-sdk"]
+cohere = ["cohere>=5.9.1,<5.9.3"]
+dspy = ["dspy>=0.1.5"]
+groq = ["groq>=0.9.0"]
+instructor = ["instructor>=1.4.3"]
+langchain = [
+  "langchain-core>=0.2.1",
+  "langchain-openai>=0.1.7",
+  "langchain-community>=0.2.1",
+  "chromadb>=0.5.0",
+  "pysqlite3",
+  "opentelemetry-exporter-otlp",
+]
+litellm = ["litellm>=1.36.1"]
+llamaindex = ["llama-index>=0.10.35"]
+mistral0 = ["mistralai>=0.1.8,<1.0.0"]
+mistral1 = ["mistralai>=1.0.0"]
+openai = ["openai>=1.0.0"]
+modal = ["modal", "python-dotenv"]
+test = [
+  "nox",
+  "pytest>=8.2.0",
+  "pytest-asyncio>=0.23.6",
+  "pytest-xdist>=3.1.0",
+  "pytest-rerunfailures>=12.0",
+  "clickhouse_connect==0.7.0",
+  "fastapi>=0.110.0",
+  "sqlparse==0.5.0",
+
+  # Integration Tests
+  "pytest-recording==0.13.1",
+  "vcrpy==6.0.1",
+  "semver==2.13.0",           # Used for switching logic based on package versions (should be replaced with packaging!)
+
+  # serving tests
+  "flask",
+  "uvicorn>=0.27.0",
+  "pillow",
+  "filelock",
+]
 
 [project.scripts]
 weave = "weave.trace.cli:cli"
@@ -50,10 +112,6 @@ packages = ["weave"]
 
 [tool.setuptools.dynamic]
 version = { attr = "weave.version.VERSION" }
-dependencies = { file = ["requirements.txt"] }
-
-[tool.setuptools.dynamic.optional-dependencies]
-modal = { file = ["requirements.modal.txt"] }
 
 [tool.pytest.ini_options]
 filterwarnings = [
