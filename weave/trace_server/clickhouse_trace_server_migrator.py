@@ -10,18 +10,30 @@ logger = logging.getLogger(__name__)
 
 class ClickHouseTraceServerMigrator:
     ch_client: CHClient
+    migration_dir: str
 
     def __init__(
         self,
         ch_client: CHClient,
+        migration_dir: typing.Optional[str] = "migrations",
     ):
         super().__init__()
         self.ch_client = ch_client
+        self.migration_dir = migration_dir or "migrations"
         self._initialize_migration_db()
 
     def apply_migrations(
-        self, target_db: str, target_version: typing.Optional[int] = None
+        self,
+        target_db: str,
+        target_version: typing.Optional[int] = None,
+        target_db_migration_alias: typing.Optional[str] = None,
     ) -> None:
+        actual_target_db = f"{target_db}"
+        target_db = (
+            target_db_migration_alias
+            if target_db_migration_alias is not None
+            else target_db
+        )
         status = self._get_migration_status(target_db)
         logger.info(f"""`{target_db}` migration status: {status}""")
         if status["partially_applied_version"]:
@@ -38,9 +50,14 @@ class ClickHouseTraceServerMigrator:
             return
         logger.info(f"Migrations to apply: {migrations_to_apply}")
         if status["curr_version"] == 0:
-            self.ch_client.command(f"CREATE DATABASE IF NOT EXISTS {target_db}")
+            self.ch_client.command(f"CREATE DATABASE IF NOT EXISTS {actual_target_db}")
         for target_version, migration_file in migrations_to_apply:
-            self._apply_migration(target_db, target_version, migration_file)
+            self._apply_migration(
+                actual_target_db,
+                target_version,
+                migration_file,
+                target_db_migration_alias,
+            )
 
     def _initialize_migration_db(self) -> None:
         self.ch_client.command(
@@ -85,7 +102,7 @@ class ClickHouseTraceServerMigrator:
     def _get_migrations(
         self,
     ) -> typing.Dict[int, typing.Dict[str, typing.Optional[str]]]:
-        migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
+        migration_dir = os.path.join(os.path.dirname(__file__), self.migration_dir)
         migration_files = os.listdir(migration_dir)
         migration_map: typing.Dict[int, typing.Dict[str, typing.Optional[str]]] = {}
         max_version = 0
@@ -163,16 +180,20 @@ class ClickHouseTraceServerMigrator:
         return []
 
     def _apply_migration(
-        self, target_db: str, target_version: int, migration_file: str
+        self,
+        target_db: str,
+        target_version: int,
+        migration_file: str,
+        target_db_migration_alias: typing.Optional[str] = None,
     ) -> None:
         logger.info(f"Applying migration {migration_file} to `{target_db}`")
-        migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
+        migration_dir = os.path.join(os.path.dirname(__file__), self.migration_dir)
         migration_file_path = os.path.join(migration_dir, migration_file)
         with open(migration_file_path, "r") as f:
             migration_sql = f.read()
         self.ch_client.command(
             f"""
-            ALTER TABLE db_management.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db}'
+            ALTER TABLE db_management.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db_migration_alias or target_db}'
         """
         )
         migration_sub_commands = migration_sql.split(";")
@@ -186,7 +207,7 @@ class ClickHouseTraceServerMigrator:
             self.ch_client.database = curr_db
         self.ch_client.command(
             f"""
-            ALTER TABLE db_management.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'
+            ALTER TABLE db_management.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db_migration_alias or target_db}'
         """
         )
         logger.info(f"Migration {migration_file} applied to `{target_db}`")
