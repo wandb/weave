@@ -47,3 +47,6 @@ jobs:
             fi
           done
           echo "run_tests=false" >> $GITHUB_OUTPUT
+      - run: |
+          echo "Weave Query Tests: ${{ steps.weave_query.outputs.run_tests }}"
+          echo "Core Integration Tests: ${{ steps.core_integration.outputs.run_tests }}"
