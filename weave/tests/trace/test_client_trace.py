@@ -2664,7 +2664,10 @@ def test_calls_stream_column_expansion(client):
     assert call_result.output == nested_ref.uri()
 
 
-@pytest.mark.parametrize("batch_size", [1, 11, 101, 120])
+# Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
+# in clickhouse_trace_server_batched.py, this test verifies that the dynamic
+# increase works as expected
+@pytest.mark.parametrize("batch_size", [1, 10, 100, 110])
 def test_calls_stream_column_expansion_dynamic_batch_size(client, batch_size):
     @weave.op
     def test_op(x):
