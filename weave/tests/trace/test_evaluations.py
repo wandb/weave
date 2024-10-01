@@ -641,6 +641,8 @@ async def test_eval_is_robust_to_missing_values(client):
 
 @pytest.mark.asyncio
 async def test_eval_with_complex_types(client):
+    client.project = "test_eval_with_complex_types"
+
     @dataclasses.dataclass(frozen=True)
     class MyDataclass:
         a_string: str

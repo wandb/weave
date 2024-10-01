@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Union
 from urllib.error import HTTPError
 
-from setuptools import setup  # type: ignore[import]
+from setuptools import find_namespace_packages, setup  # type: ignore[import]
 from setuptools.command.build import build  # type: ignore[import]
 from setuptools.command.editable_wheel import editable_wheel  # type: ignore[import]
 from setuptools.command.sdist import sdist  # type: ignore[import]
@@ -116,4 +116,5 @@ class Sdist(sdist):  # type: ignore
 
 setup(
     cmdclass={"build": Build, "editable_wheel": EditableWheel, "sdist": Sdist},
+    packages=find_namespace_packages(include=["weave*"]),
 )

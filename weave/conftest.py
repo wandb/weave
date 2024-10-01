@@ -1,5 +1,7 @@
 import logging
 import os
+from contextlib import _GeneratorContextManager
+from typing import Callable, Iterator
 
 import pytest
 from fastapi import FastAPI
@@ -25,14 +27,13 @@ os.environ["WANDB_ERROR_REPORTING"] = "false"
 
 def pytest_sessionfinish(session, exitstatus):
     if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED:
-        print("No tests were selected. Exiting gracefully.")
         session.exitstatus = 0
 
 
 def pytest_collection_modifyitems(config, items):
     # Add the weave_client marker to all tests that have a client fixture
     for item in items:
-        if "client" in item.fixturenames:
+        if "client" in item.fixturenames or "client_creator" in item.fixturenames:
             item.add_marker(pytest.mark.weave_client)
 
 
@@ -129,15 +130,19 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
     read operation(s) are performed.
     """
 
+    def set_autoflush(self, value: bool):
+        self._autoflush = value
+
     def __getattribute__(self, name):
         self_super = super()
         attr = self_super.__getattribute__(name)
 
-        if callable(attr) and not name.startswith("_") and name != "flush":
+        if callable(attr) and name != "flush":
 
             def wrapper(*args, **kwargs):
                 res = attr(*args, **kwargs)
-                self_super._flush()
+                if self.__dict__.get("_autoflush", True):
+                    self_super._flush()
                 return res
 
             return wrapper
@@ -186,8 +191,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     return ServerRecorder(server)
 
 
-@pytest.fixture()
-def client(request) -> Generator[weave_client.WeaveClient, None, None]:
+def create_client(request) -> weave_init.InitializedClient:
     inited_client = None
     weave_server_flag = request.config.getoption("--weave-server")
     server: tsi.TraceServerInterface
@@ -224,10 +228,38 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         )
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
+
+    return inited_client
+
+
+@pytest.fixture()
+def client(request) -> Generator[weave_client.WeaveClient, None, None]:
+    """This is the standard fixture used everywhere in tests to test end to end
+    client functionality"""
+    inited_client = create_client(request)
     try:
         yield inited_client.client
     finally:
         inited_client.reset()
+
+
+@pytest.fixture()
+def client_creator(
+    request,
+) -> Generator[
+    Callable[[], _GeneratorContextManager[weave_client.WeaveClient]], None, None
+]:
+    """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
+
+    @contextlib.contextmanager
+    def client():
+        inited_client = create_client(request)
+        try:
+            yield inited_client.client
+        finally:
+            inited_client.reset()
+
+    yield client
 
 
 @pytest.fixture
@@ -281,3 +313,101 @@ def network_proxy_client(client):
         yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
+
+
+class DummyTestException(Exception):
+    pass
+
+
+class ThrowingServer(tsi.TraceServerInterface):
+    # Call API
+    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        raise DummyTestException("FAILURE - call_start, req:", req)
+
+    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+        raise DummyTestException("FAILURE - call_end, req:", req)
+
+    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
+        raise DummyTestException("FAILURE - call_read, req:", req)
+
+    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+        raise DummyTestException("FAILURE - calls_query, req:", req)
+
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+        raise DummyTestException("FAILURE - calls_query_stream, req:", req)
+
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        raise DummyTestException("FAILURE - calls_delete, req:", req)
+
+    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+        raise DummyTestException("FAILURE - calls_query_stats, req:", req)
+
+    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+        raise DummyTestException("FAILURE - call_update, req:", req)
+
+    # Op API
+    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
+        raise DummyTestException("FAILURE - op_create, req:", req)
+
+    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
+        raise DummyTestException("FAILURE - op_read, req:", req)
+
+    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
+        raise DummyTestException("FAILURE - ops_query, req:", req)
+
+    # Cost API
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        raise DummyTestException("FAILURE - cost_create, req:", req)
+
+    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+        raise DummyTestException("FAILURE - cost_query, req:", req)
+
+    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+        raise DummyTestException("FAILURE - cost_purge, req:", req)
+
+    # Obj API
+    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        raise DummyTestException("FAILURE - obj_create, req:", req)
+
+    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        raise DummyTestException("FAILURE - obj_read, req:", req)
+
+    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
+        raise DummyTestException("FAILURE - objs_query, req:", req)
+
+    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        raise DummyTestException("FAILURE - table_create, req:", req)
+
+    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        raise DummyTestException("FAILURE - table_update, req:", req)
+
+    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+        raise DummyTestException("FAILURE - table_query, req:", req)
+
+    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
+        raise DummyTestException("FAILURE - refs_read_batch, req:", req)
+
+    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        raise DummyTestException("FAILURE - file_create, req:", req)
+
+    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        raise DummyTestException("FAILURE - file_content_read, req:", req)
+
+    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        raise DummyTestException("FAILURE - feedback_create, req:", req)
+
+    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+        raise DummyTestException("FAILURE - feedback_query, req:", req)
+
+    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+        raise DummyTestException("FAILURE - feedback_purge, req:", req)
+
+
+@pytest.fixture()
+def client_with_throwing_server(client: weave_client.WeaveClient):
+    curr_server = client.server
+    client.server = ThrowingServer()
+    try:
+        yield client
+    finally:
+        client.server = curr_server

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       is_test:
-        description: "Use Test Pypi"
+        description: 'Use Test Pypi'
         required: true
         type: boolean
         default: true
@@ -24,11 +24,11 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v1
         with:
-          node-version: "18.x"
+          node-version: '18.x'
       - run: |
           pip install build twine
           ./build_dist.py
-          if [[ -n "$(git status weave/frontend/sha1.txt --porcelain)" ]]
+          if [[ -n "$(git status weave_query/weave_query/frontend/sha1.txt --porcelain)" ]]
           then
             echo "::error cannot publish release, commited SHA does not match build SHA"
             exit 1
