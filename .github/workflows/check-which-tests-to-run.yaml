@@ -4,12 +4,15 @@ on:
   workflow_call:
     outputs:
       weave_query_tests:
-        value: ${{ jobs.check.outputs.weave_query_tests}}
+        value: ${{ jobs.check.outputs.weave_query_tests }}
       core_integration_tests:
         value: ${{ jobs.check.outputs.core_integration_tests }}
+      weave_js_tests:
+        value: ${{ jobs.check.outputs.weave_js_tests }}
 
 env:
   WEAVE_QUERY_PATHS: 'weave_query/'
+  WEAVE_JS_PATHS: 'weave-js/'
   CORE_INTEGRATION_PATHS: 'weave-js/ weave_query/'
   # Everything else is implicitly trace server
 
@@ -19,6 +22,7 @@ jobs:
     outputs:
       weave_query_tests: ${{ steps.weave_query.outputs.run_tests }}
       core_integration_tests: ${{ steps.core_integration.outputs.run_tests }}
+      weave_js_tests: ${{ steps.weave_js.outputs.run_tests }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -52,6 +56,12 @@ jobs:
             fi
           done
           echo "run_tests=false" >> $GITHUB_OUTPUT
-      - run: |
-          echo "Weave Query Tests: ${{ steps.weave_query.outputs.run_tests }}"
-          echo "Core Integration Tests: ${{ steps.core_integration.outputs.run_tests }}"
+      - id: weave_js
+        run: |
+          for path in ${{ env.WEAVE_JS_PATHS }}; do
+            if echo "$changed_files" | grep -q "$path"; then
+              echo "run_tests=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+          echo "run_tests=false" >> $GITHUB_OUTPUT
