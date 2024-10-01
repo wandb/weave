@@ -4,7 +4,7 @@ import cohere
 import pytest
 
 import weave
-from weave.integrations.integration_utilities import _get_call_output, op_name_from_ref
+from weave.integrations.integration_utilities import op_name_from_ref
 
 cohere_model = "command"  # You can change this to a specific model if needed
 
@@ -256,7 +256,7 @@ def test_cohere_v2(
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.ClientV2.chat"
-    output = _get_call_output(call)
+    output = call.output
 
     assert output.message.content[0].text == response.message.content[0].text
     assert output.id == response.id
@@ -303,7 +303,7 @@ async def test_cohere_async_v2(
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.AsyncClientV2.chat"
-    output = _get_call_output(call)
+    output = call.output
 
     assert output.message.content[0].text == response.message.content[0].text
     assert output.id == response.id
@@ -361,7 +361,7 @@ def test_cohere_stream_v2(
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.ClientV2.chat_stream"
-    output = _get_call_output(call)
+    output = call.output
 
     assert output.message.content[0] == all_content
     assert output.id == id
@@ -411,7 +411,7 @@ async def test_cohere_async_stream_v2(
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.AsyncClientV2.chat_stream"
-    output = _get_call_output(call)
+    output = call.output
 
     assert output.message.content[0] == all_content
     assert output.id == id
