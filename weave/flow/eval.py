@@ -278,7 +278,7 @@ class Evaluation(Object):
         return summary
 
     @weave.op()
-    async def evaluate(self, model: Union[Callable, Model]) -> dict:
+    async def get_eval_results(self, model: Union[Callable, Model]) -> EvaluationResults:
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
         eval_rows = []
@@ -319,6 +319,11 @@ class Evaluation(Object):
                 if scorer_name not in eval_row["scores"]:
                     eval_row["scores"][scorer_name] = {}
             eval_rows.append(eval_row)
+        return EvaluationResults(rows=weave.Table(eval_rows))
+
+    @weave.op()
+    async def evaluate(self, model: Union[Callable, Model]) -> dict:
+        eval_results = await self._get_eval_rows(model)
 
         # The need for this pattern is quite unfortunate and highlights a gap in our
         # data model. As a user, I just want to pass a list of data `eval_rows` to
@@ -330,7 +335,6 @@ class Evaluation(Object):
         # also bad. In the near-term, this will at least solve the problem of
         # breaking summarization with big datasets, but this is not the correct
         # long-term solution.
-        eval_results = EvaluationResults(rows=weave.Table(eval_rows))
         summary = await self.summarize(eval_results)
 
         print("Evaluation summary", summary)
