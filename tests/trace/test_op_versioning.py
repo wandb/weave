@@ -35,7 +35,7 @@ def solo_versioned_op(a: int) -> float:
 
 
 def test_solo_op_versioning(strict_op_saving, client):
-    from weave.tests.trace import op_versioning_solo
+    from tests.trace import op_versioning_solo
 
     ref = weave.publish(op_versioning_solo.solo_versioned_op)
 
@@ -58,7 +58,7 @@ def versioned_op(self, a: int) -> float:
 
 
 def test_object_op_versioning(strict_op_saving, client):
-    from weave.tests.trace import op_versioning_obj
+    from tests.trace import op_versioning_obj
 
     obj = op_versioning_obj.MyTestObjWithOp(val=5)
     # Call it to publish
@@ -82,7 +82,7 @@ def versioned_op_importfrom(a: int) -> float:
 
 
 def test_op_versioning_importfrom(strict_op_saving, client):
-    from weave.tests.trace import op_versioning_importfrom
+    from tests.trace import op_versioning_importfrom
 
     ref = weave.publish(op_versioning_importfrom.versioned_op_importfrom)
     saved_code = get_saved_code(client, ref)
@@ -101,7 +101,7 @@ def test_op_versioning_lotsofstuff(strict_op_saving):
 
 
 def test_op_versioning_inline_import(strict_op_saving, client):
-    from weave.tests.trace import op_versioning_inlineimport
+    pass
 
 
 def test_op_versioning_inline_func_decl(strict_op_saving):

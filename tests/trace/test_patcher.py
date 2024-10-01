@@ -6,12 +6,10 @@ from weave.trace.patcher import SymbolPatcher
 
 
 def test_symbol_patcher():
-    from weave.tests.test_patcher_module.example_class import ExampleClass
+    from tests.test_patcher_module.example_class import ExampleClass
 
     patcher = SymbolPatcher(
-        lambda: importlib.import_module(
-            "weave.tests.test_patcher_module.example_class"
-        ),
+        lambda: importlib.import_module("tests.test_patcher_module.example_class"),
         "ExampleClass.example_fn",
         lambda original_fn: lambda self: 43,
     )
@@ -39,9 +37,7 @@ def test_symbol_patcher_invalid_module():
 
 def test_symbol_patcher_invalid_attr():
     patcher = SymbolPatcher(
-        lambda: importlib.import_module(
-            "weave.tests.test_patcher_module.example_class"
-        ),
+        lambda: importlib.import_module("tests.test_patcher_module.example_class"),
         "NotARealExampleClass.example_fn",
         lambda original_fn: lambda self: 43,
     )
@@ -52,12 +48,10 @@ def test_symbol_patcher_invalid_attr():
 
 @pytest.mark.disable_logging_error_check
 def test_symbol_patcher_invalid_patching(log_collector):
-    from weave.tests.test_patcher_module.example_class import ExampleClass
+    from tests.test_patcher_module.example_class import ExampleClass
 
     patcher = SymbolPatcher(
-        lambda: importlib.import_module(
-            "weave.tests.test_patcher_module.example_class"
-        ),
+        lambda: importlib.import_module("tests.test_patcher_module.example_class"),
         "ExampleClass.example_fn",
         lambda original_fn: [] + 42,
     )
