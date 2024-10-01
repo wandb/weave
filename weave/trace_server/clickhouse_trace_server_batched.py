@@ -28,7 +28,7 @@ import hashlib
 import json
 import logging
 import threading
-from collections import Counter, defaultdict
+from collections import defaultdict
 from contextlib import contextmanager
 from typing import (
     Any,
@@ -114,6 +114,7 @@ MAX_FLUSH_AGE = 15
 FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 100
+MAX_CALLS_STREAM_BATCH_SIZE = 500
 
 
 class NotFoundError(Exception):
@@ -356,15 +357,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     for call in hydrated_batch:
                         yield tsi.CallSchema.model_validate(call)
 
-                    # *** Dynamic Batch Size ***
-                    # count the number of columns at each depth
-                    depths = Counter(col.count(".") for col in expand_columns)
-                    # take the max number of columns at any depth
-                    max_count_at_ref_depth = max(depths.values())
-                    # divide max refs that we can resolve 1000 refs at any depth
-                    max_size = 1000 // max_count_at_ref_depth
-                    # double batch size up to what refs_read_batch can handle
-                    batch_size = min(max_size, batch_size * 2)
+                    # *** Dynamic increase from 10 to 500 ***
+                    batch_size = min(MAX_CALLS_STREAM_BATCH_SIZE, batch_size * 10)
                     batch = []
 
             hydrated_batch = self._hydrate_calls(
