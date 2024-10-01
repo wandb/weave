@@ -1,13 +1,14 @@
 # Costs
 
 :::info
-Custom costs are accessible via Python and REST queries. UI uptake is under development and expected to be complete by end of Sept 2024
+Custom costs are accessible via Python and REST queries. UI uptake is under development and expected to be complete by middle of October 2024
 :::
 
 ## Adding a custom cost
 
 You can add a custom cost by using the [`add_cost`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-add_cost) method.
-The three required fields are `llm_id`,`prompt_token_cost` and `completion_token_cost`.
+The three required fields are `llm_id`, `prompt_token_cost`, and `completion_token_cost`.
+`llm_id` is the name of the LLM (e.g. `gpt-4o`). `prompt_token_cost` and `completion_token_cost` are cost per token for the LLM (if the LLM prices were specified inper million tokens, make sure to convert the value).
 You can also set `effective_date` to a datetime, to make the cost effective at a specific date, this defaults to the current date.
 
 ```python

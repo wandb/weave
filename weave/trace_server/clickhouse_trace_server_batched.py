@@ -54,6 +54,7 @@ from weave.trace_server.calls_query_builder import (
     HardCodedFilter,
     OrderField,
     QueryBuilderDynamicField,
+    QueryBuilderField,
     combine_conditions,
 )
 from weave.trace_server.errors import (
@@ -61,6 +62,13 @@ from weave.trace_server.errors import (
     ObjectDeletedError,
 )
 from weave.trace_server.ids import generate_id
+from weave.trace_server.table_query_builder import (
+    ROW_ORDER_COLUMN_NAME,
+    TABLE_ROWS_ALIAS,
+    VAL_DUMP_COLUMN_NAME,
+    make_natural_sort_table_query,
+    make_standard_table_query,
+)
 from weave.trace_server.trace_server_common import make_derived_summary_fields
 
 from . import clickhouse_trace_server_migrator as wf_migrator
@@ -808,39 +816,33 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
-        parameters: Dict[str, Any] = {}
+        pb = ParamBuilder()
         if req.filter:
             if req.filter.row_digests:
-                conds.append("tr.digest IN {row_digests: Array(String)}")
-                parameters["row_digests"] = req.filter.row_digests
-        else:
-            conds.append("1 = 1")
+                conds.append(
+                    f"tr.digest IN {{{pb.add_param(req.filter.row_digests)}: Array(String)}}"
+                )
 
-        sort_clause = ""
-        pb = ParamBuilder()
+        sort_fields = []
         if req.sort_by:
-            sort_fields = []
-            for i, sort in enumerate(req.sort_by):
+            for sort in req.sort_by:
                 # TODO: better splitting of escaped dots (.) in field names
                 extra_path = sort.field.split(".")
                 field = OrderField(
                     field=QueryBuilderDynamicField(
-                        field="val_dump", extra_path=extra_path
+                        field=VAL_DUMP_COLUMN_NAME, extra_path=extra_path
                     ),
                     direction="ASC" if sort.direction.lower() == "asc" else "DESC",
                 )
-                sort_fields.append(field.as_sql(pb, "tr"))
-            sort_clause = f"ORDER BY {', '.join(sort_fields)}"
-        sort_params = pb.get_params()
-        parameters.update(sort_params)
+                sort_fields.append(field)
         rows = self._table_query(
             req.project_id,
             req.digest,
-            conditions=conds,
+            pb,
+            sql_safe_conditions=conds,
+            sort_fields=sort_fields,
             limit=req.limit,
             offset=req.offset,
-            parameters=parameters,
-            sort_clause=sort_clause,
         )
         return tsi.TableQueryRes(rows=rows)
 
@@ -848,77 +850,74 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         digest: str,
-        conditions: Optional[list[str]] = None,
+        pb: ParamBuilder,
+        *,
+        # using the `sql_safe_*` prefix is a way to signal to the caller
+        # that these strings should have been santized by the caller.
+        sql_safe_conditions: Optional[list[str]] = None,
+        sort_fields: Optional[list[OrderField]] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
-        parameters: Optional[Dict[str, Any]] = None,
-        sort_clause: Optional[str] = None,
     ) -> list[tsi.TableRowSchema]:
-        if sort_clause is None:
-            sort_clause = ""
-        conds = ["project_id = {project_id: String}"]
-        if conditions:
-            conds.extend(conditions)
+        if not sort_fields:
+            sort_fields = [
+                OrderField(
+                    field=QueryBuilderField(field=ROW_ORDER_COLUMN_NAME),
+                    direction="ASC",
+                )
+            ]
 
-        predicate = combine_conditions(conds, "AND")
-        # The subqueries are for deduplication of table rows and tables by digest.
-        # It might be more efficient to do deduplication of table rows
-        # in the outer query instead of the right side of the JOIN clause here,
-        # that hasn't been tested yet.
-        query = f"""
-                SELECT tr.digest, tr.val_dump
-                FROM (
-                    SELECT project_id, row_digest
-                    FROM (
-                        SELECT *
-                        FROM (
-                                SELECT *,
-                                    row_number() OVER (PARTITION BY project_id, digest) AS rn
-                                FROM tables
-                                WHERE project_id = {{project_id:String}} AND digest = {{digest:String}}
-                            )
-                        WHERE rn = 1
-                        ORDER BY project_id, digest
-                    )
-                    ARRAY JOIN row_digests AS row_digest
-                    WHERE digest = {{digest:String}}
-                ) AS t
-                JOIN (
-                    SELECT project_id, digest, val_dump
-                    FROM (
-                            SELECT *,
-                                row_number() OVER (PARTITION BY project_id, digest) AS rn
-                            FROM table_rows
-                            WHERE project_id = {{project_id:String}}
-                        )
-                    WHERE rn = 1
-                    ORDER BY project_id, digest
-                ) tr ON t.project_id = tr.project_id AND t.row_digest = tr.digest
-                WHERE {predicate}
-                {sort_clause}
-            """
-        if parameters is None:
-            parameters = {}
-        if limit:
-            query += " LIMIT {limit: UInt64}"
-            parameters["limit"] = limit
-        if offset:
-            query += " OFFSET {offset: UInt64}"
-            parameters["offset"] = offset
+        if (
+            len(sort_fields) == 1
+            and sort_fields[0].field.field == ROW_ORDER_COLUMN_NAME
+            and not sql_safe_conditions
+        ):
+            query = make_natural_sort_table_query(
+                project_id,
+                digest,
+                pb,
+                limit=limit,
+                offset=offset,
+                natural_direction=sort_fields[0].direction,
+            )
+        else:
+            order_by_components = ", ".join(
+                [sort_field.as_sql(pb, TABLE_ROWS_ALIAS) for sort_field in sort_fields]
+            )
+            sql_safe_sort_clause = f"ORDER BY {order_by_components}"
+            query = make_standard_table_query(
+                project_id,
+                digest,
+                pb,
+                sql_safe_conditions=sql_safe_conditions,
+                sql_safe_sort_clause=sql_safe_sort_clause,
+                limit=limit,
+                offset=offset,
+            )
 
-        query_result = self.ch_client.query(
-            query,
-            parameters={
-                "project_id": project_id,
-                "digest": digest,
-                **parameters,
-            },
-        )
+        query_result = self.ch_client.query(query, parameters=pb.get_params())
 
         return [
             tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
             for r in query_result.result_rows
         ]
+
+    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+        parameters: Dict[str, Any] = {
+            "project_id": req.project_id,
+            "digest": req.digest,
+        }
+
+        query = """
+        SELECT length(row_digests)
+        FROM tables
+        WHERE project_id = {project_id:String} AND digest = {digest:String}
+        """
+
+        query_result = self.ch_client.query(query, parameters=parameters)
+        count = query_result.result_rows[0][0] if query_result.result_rows else 0
+
+        return tsi.TableQueryStatsRes(count=count)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches
@@ -1168,11 +1167,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     # handles this check. However, out of caution, we add this check here.
                     # Hitting this would be a programming error, not a user error.
                     raise ValueError("Will not resolve cross-project refs.")
+                pb = ParamBuilder()
+                row_digests_name = pb.add_param(row_digests)
                 rows = self._table_query(
                     project_id=project_id_scope,
                     digest=digest,
-                    conditions=["digest IN {digests: Array(String)}"],
-                    parameters={"digests": row_digests},
+                    pb=pb,
+                    sql_safe_conditions=[
+                        f"digest IN {{{row_digests_name}: Array(String)}}"
+                    ],
                 )
                 # Unpack the results into the target rows
                 row_digest_vals = {r.digest: r.val for r in rows}
