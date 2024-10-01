@@ -170,7 +170,6 @@ class FutureExecutor:
             except Exception as e:
                 if get_raise_on_captured_errors():
                     raise
-                logger.error(f"Job failed during flush: {e}")
         return True
 
     def _future_done_callback(self, future: Future) -> None:
@@ -180,7 +179,7 @@ class FutureExecutor:
                 self._active_futures.remove(future)
                 exception = future.exception()
                 if exception:
-                    logger.error(f"Async task failed: {_format_exception(exception)}")
+                    logger.error(f"Task failed: {_format_exception(exception)}")
 
     def _shutdown(self) -> None:
         """Shutdown the thread pool executor. Should only be called when the program is exiting."""
