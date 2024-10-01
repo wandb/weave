@@ -2,13 +2,17 @@
 name = "weave"
 description = "A toolkit for building composable interactive data driven applications."
 readme = "README.md"
-license = { text = "Apache-2.0" }
+license = { file = "LICENSE" }
 maintainers = [{ name = "W&B", email = "support@wandb.com" }]
 authors = [
   { name = "Shawn Lewis", email = "shawn@wandb.com" },
-  { name = "Danny Goldstein", email = "danny@wandb.com" },
   { name = "Tim Sweeney", email = "tim@wandb.com" },
   { name = "Nick Peneranda", email = "nick.penaranda@wandb.com" },
+  { name = "Jeff Raubitschek", email = "jeff@wandb.com" },
+  { name = "Jamie Rasmussen", email = "jamie.rasmussen@wandb.com" },
+  { name = "Griffin Tarpenning", email = "griffin.tarpenning@wandb.com" },
+  { name = "Josiah Lee", email = "josiah.lee@wandb.com" },
+  { name = "Andrew Truong", email = "andrew@wandb.com" },
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
