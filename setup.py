@@ -7,14 +7,16 @@ from pathlib import Path
 from typing import Union
 from urllib.error import HTTPError
 
-from setuptools import setup  # type: ignore[import]
+from setuptools import find_namespace_packages, setup  # type: ignore[import]
 from setuptools.command.build import build  # type: ignore[import]
 from setuptools.command.editable_wheel import editable_wheel  # type: ignore[import]
 from setuptools.command.sdist import sdist  # type: ignore[import]
 
 ROOT = Path(__file__).resolve().parent
 SKIP_BUILD = os.environ.get("WEAVE_SKIP_BUILD", False)
-IS_BUILT = (ROOT / "weave" / "frontend" / "assets").is_dir() or SKIP_BUILD
+IS_BUILT = (
+    ROOT / "weave_query" / "weave_query" / "frontend" / "assets"
+).is_dir() or SKIP_BUILD
 FORCE_BUILD = os.environ.get("WEAVE_FORCE_BUILD", False)
 
 
@@ -40,7 +42,7 @@ def check_build_deps() -> bool:
 def build_frontend() -> None:
     check_build_deps()
     try:
-        build_script = str(Path("weave", "frontend", "build.sh"))
+        build_script = str(Path("weave_query", "weave_query", "frontend", "build.sh"))
         subprocess.run(["bash", build_script], cwd=ROOT)
     except OSError:
         raise RuntimeError("Failed to build frontend.")
@@ -71,10 +73,16 @@ def download_and_extract_tarball(
 
 
 def download_frontend() -> None:
-    sha = open(ROOT / "weave" / "frontend" / "sha1.txt").read().strip()
+    sha = (
+        open(ROOT / "weave_query" / "weave_query" / "frontend" / "sha1.txt")
+        .read()
+        .strip()
+    )
     url = f"https://storage.googleapis.com/wandb-cdn-prod/weave/{sha}.tar.gz"
     try:
-        download_and_extract_tarball(url, extract_path=ROOT / "weave")
+        download_and_extract_tarball(
+            url, extract_path=ROOT / "weave_query" / "weave_query"
+        )
     except HTTPError:
         print(f"Warning: Failed to download frontend for sha {sha}")
 
@@ -108,4 +116,5 @@ class Sdist(sdist):  # type: ignore
 
 setup(
     cmdclass={"build": Build, "editable_wheel": EditableWheel, "sdist": Sdist},
+    packages=find_namespace_packages(include=["weave*"]),
 )

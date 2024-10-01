@@ -1,24 +1,15 @@
 import logging
 import os
-import pathlib
-import random
-import shutil
-import tempfile
-import typing
+from contextlib import _GeneratorContextManager
+from typing import Callable, Iterator
 
-import numpy as np
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from flask.testing import FlaskClient
 
 import weave
-from weave.legacy.weave import client as client_legacy
-from weave.legacy.weave import context_state, environment, io_service, serialize
-from weave.legacy.weave.language_features.tagging.tag_store import (
-    isolated_tagging_context,
-)
 from weave.trace import weave_init
+from weave.trace.client_context import context_state
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     sqlite_trace_server,
@@ -26,261 +17,89 @@ from weave.trace_server import (
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
 
-from .legacy.weave import logs
-from .tests import fixture_fakewandb
 from .tests.trace.trace_server_clickhouse_conftest import *
 from .tests.wandb_system_tests_conftest import *
 from .trace import autopatch
 
-logs.configure_logger()
-
-# Lazy mode was the default for a long time. Eager is now the default for the user API.
-# A lot of tests are written to expect lazy mode, so just make lazy mode the default for
-# tests.
-context_state._eager_mode.set(False)
-
-# A lot of tests rely on weave.legacy.weave.ops.* being in scope. Importing this here
-# makes that work...
-
-### Disable datadog engine tracing
+# Force testing to never report wandb sentry events
+os.environ["WANDB_ERROR_REPORTING"] = "false"
 
 
-class FakeTracer:
-    def trace(*args, **kwargs):
-        pass
-
-
-def make_fake_tracer():
-    return FakeTracer()
-
-
-### End disable datadog engine tracing
-### disable internet access
-
-
-def guard(*args, **kwargs):
-    raise Exception("I told you not to use the Internet!")
-
-
-### End disable internet access
-
-# Uncomment these two lines to disable internet access entirely.
-# engine_trace.tracer = make_fake_tracer
-# socket.socket = guard
-
-
-def pytest_sessionstart(session):
-    context_state.disable_analytics()
-
-
-@pytest.fixture()
-def test_artifact_dir():
-    return "/tmp/weave/pytest/%s" % os.environ.get("PYTEST_CURRENT_TEST")
+def pytest_sessionfinish(session, exitstatus):
+    if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED:
+        session.exitstatus = 0
 
 
 def pytest_collection_modifyitems(config, items):
-    # Get the job number from environment variable (0 for even tests, 1 for odd tests)
-    job_num = config.getoption("--job-num", default=None)
-    if job_num is None:
-        return
-
-    job_num = int(job_num)
-
-    selected_items = []
-    for index, item in enumerate(items):
-        if index % 2 == job_num:
-            selected_items.append(item)
-
-    items[:] = selected_items
-
     # Add the weave_client marker to all tests that have a client fixture
     for item in items:
-        if "client" in item.fixturenames:
+        if "client" in item.fixturenames or "client_creator" in item.fixturenames:
             item.add_marker(pytest.mark.weave_client)
 
 
-@pytest.fixture(autouse=True)
-def pre_post_each_test(test_artifact_dir, caplog):
-    # TODO: can't get this to work. I was trying to setup pytest log capture
-    # to use our custom log stuff, so that it indents nested logs properly.
-    caplog.handler.setFormatter(logging.Formatter(logs.default_log_format))
-    # Tests rely on full cache mode right now.
-    os.environ["WEAVE_CACHE_MODE"] = "full"
-    os.environ["WEAVE_GQL_SCHEMA_PATH"] = str(
-        pathlib.Path(__file__).parent.parent / "wb_schema.gql"
-    )
-    try:
-        shutil.rmtree(test_artifact_dir)
-    except (FileNotFoundError, OSError):
-        pass
-    os.environ["WEAVE_LOCAL_ARTIFACT_DIR"] = test_artifact_dir
-    with isolated_tagging_context():
-        yield
-    del os.environ["WEAVE_LOCAL_ARTIFACT_DIR"]
+PYTEST_CURRENT_TEST_ENV_VAR = "PYTEST_CURRENT_TEST"
+
+
+def get_test_name():
+    return os.environ.get(PYTEST_CURRENT_TEST_ENV_VAR).split(" ")[0]
+
+
+class InMemoryWeaveLogCollector(logging.Handler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.log_records = {}
+
+    def emit(self, record):
+        curr_test = get_test_name()
+        if curr_test not in self.log_records:
+            self.log_records[curr_test] = []
+        self.log_records[curr_test].append(record)
+
+    def get_error_logs(self):
+        curr_test = get_test_name()
+        logs = self.log_records.get(curr_test, [])
+
+        return [
+            record
+            for record in logs
+            if record.levelname == "ERROR"
+            and record.name.startswith("weave")
+            # (Tim) For some reason that i cannot figure out, there is some test that
+            # a) is trying to connect to the PROD trace server
+            # b) seemingly doesn't fail
+            # c) Logs these errors.
+            # I would love to fix this, but I have not been able to pin down which test
+            # is causing it and need to ship this PR, so I am just going to filter it out
+            # for now.
+            and not record.msg.startswith(
+                "Task failed: HTTPError: 400 Client Error: Bad Request for url: https://trace.wandb.ai/"
+            )
+            # Exclude legacy
+            and not record.name.startswith("weave.weave_server")
+            and not "legacy" in record.name
+        ]
+
+
+@pytest.fixture
+def log_collector():
+    handler = InMemoryWeaveLogCollector()
+    logger = logging.getLogger()  # Get your specific logger here if needed
+    logger.addHandler(handler)
+    logger.setLevel(logging.ERROR)  # Set the level to capture all logs
+    yield handler
+    logger.removeHandler(handler)  # Clean up after the test
 
 
 @pytest.fixture(autouse=True)
-def throw_on_error():
-    os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"] = "true"
+def logging_error_check(request, log_collector):
     yield
-    del os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"]
-
-
-@pytest.fixture()
-def cache_mode_minimal():
-    os.environ["WEAVE_NO_CACHE"] = "true"
-    yield
-    del os.environ["WEAVE_NO_CACHE"]
-
-
-@pytest.fixture()
-def fresh_server_logfile():
-    def _clearlog():
-        try:
-            os.remove(logs.default_log_filename())
-        except (OSError, FileNotFoundError) as e:
-            pass
-
-    _clearlog()
-    yield
-    _clearlog()
-
-
-@pytest.fixture()
-def cereal_csv():
-    with tempfile.TemporaryDirectory() as d:
-        cereal_path = os.path.join(d, "cereal.csv")
-        shutil.copy("testdata/cereal.csv", cereal_path)
-        yield cereal_path
-
-
-@pytest.fixture()
-def eager_mode():
-    with context_state.eager_execution():
-        yield
-
-
-@pytest.fixture()
-def fake_wandb():
-    setup_response = fixture_fakewandb.setup()
-    yield setup_response
-    fixture_fakewandb.teardown(setup_response)
-
-
-@pytest.fixture()
-def use_server_gql_schema():
-    old_schema_path = environment.gql_schema_path()
-    if old_schema_path is not None:
-        del os.environ["WEAVE_GQL_SCHEMA_PATH"]
-    yield
-    if old_schema_path is not None:
-        os.environ["WEAVE_GQL_SCHEMA_PATH"] = old_schema_path
-
-
-@pytest.fixture()
-def fixed_random_seed():
-    random.seed(8675309)
-    np.random.seed(8675309)
-    yield
-    random.seed(None)
-    np.random.seed(None)
-
-
-@pytest.fixture()
-def app():
-    from . import weave_server
-
-    app = weave_server.make_app()
-    app.config.update(
-        {
-            "TESTING": True,
-        }
-    )
-
-    yield app
-
-
-class HttpServerTestClient:
-    def __init__(self, flask_test_client: FlaskClient):
-        """Constructor.
-
-        Args:
-            flask_test_client: A flask test client to use for sending requests to the test application
-        """
-        self.flask_test_client = flask_test_client
-        self.execute_endpoint = "/__weave/execute"
-
-    def execute(
-        self,
-        nodes,
-        headers: typing.Optional[dict[str, typing.Any]] = None,
-        no_cache=False,
-    ):
-        _headers: dict[str, typing.Any] = {}
-        if headers is not None:
-            _headers = headers
-
-        serialized = serialize.serialize(nodes)
-        r = self.flask_test_client.post(
-            self.execute_endpoint,
-            json={"graphs": serialized},
-            headers=_headers,
+    if "disable_logging_error_check" in request.keywords:
+        return
+    error_logs = log_collector.get_error_logs()
+    if error_logs:
+        pytest.fail(
+            f"Expected no errors, but found {len(error_logs)} error(s): {error_logs}"
         )
-
-        return r.json["data"]
-
-
-@pytest.fixture()
-def http_server_test_client(app):
-    from . import weave_server
-
-    app = weave_server.make_app()
-    flask_client = app.test_client()
-    return HttpServerTestClient(flask_client)
-
-
-@pytest.fixture()
-def weave_test_client(http_server_test_client):
-    return client_legacy.Client(http_server_test_client)
-
-
-@pytest.fixture()
-def enable_touch_on_read():
-    os.environ["WEAVE_ENABLE_TOUCH_ON_READ"] = "1"
-    yield
-    del os.environ["WEAVE_ENABLE_TOUCH_ON_READ"]
-
-
-@pytest.fixture()
-def io_server_factory():
-    original_server = io_service.SERVER
-
-    def factory(process=False):
-        server = io_service.Server(process=process)
-        server.start()
-        io_service.SERVER = server
-        return server
-
-    yield factory
-
-    if io_service.SERVER and io_service.SERVER is not original_server:
-        io_service.SERVER.shutdown()
-
-    io_service.SERVER = original_server
-
-
-@pytest.fixture()
-def consistent_table_col_ids():
-    from weave.legacy.weave.panels import table_state
-
-    with table_state.use_consistent_col_ids():
-        yield
-
-
-@pytest.fixture()
-def ref_tracking():
-    with context_state.ref_tracking(True):
-        yield
 
 
 @pytest.fixture()
@@ -289,19 +108,90 @@ def strict_op_saving():
         yield
 
 
-# we already were doing pytest_addoption in wandb_system_tests_conftest so
-# the weave flag is there as well
-# def pytest_addoption(parser):
-#     parser.addoption(
-#         "--weave-server",
-#         action="store",
-#         default="sqlite",
-#         help="Specify the client object to use: sqlite or clickhouse",
-#     )
+class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
+    """
+    A WeaveClient that automatically flushes after every method call.
+
+    This subclass overrides the behavior of the standard WeaveClient to ensure
+    that all write operations are immediately flushed to the underlying storage
+    before any subsequent read operation is performed. This is particularly
+    useful in testing scenarios where data is written and then immediately read
+    back, as it eliminates potential race conditions or inconsistencies that
+    might arise from delayed writes.
+
+    The flush operation is applied to all public methods (those not starting with
+    an underscore) except for the 'flush' method itself, to avoid infinite recursion.
+    This aggressive flushing strategy may impact performance and should primarily
+    be used in testing environments rather than production scenarios.
+
+    Note: Due to this, the test suite essentially "blocks" on every operation. So
+    if we are to test timing, this might not be the best choice. As an alternative,
+    we could explicitly call flush() in every single test that reads data, before the
+    read operation(s) are performed.
+    """
+
+    def set_autoflush(self, value: bool):
+        self._autoflush = value
+
+    def __getattribute__(self, name):
+        self_super = super()
+        attr = self_super.__getattribute__(name)
+
+        if callable(attr) and name != "flush":
+
+            def wrapper(*args, **kwargs):
+                res = attr(*args, **kwargs)
+                if self.__dict__.get("_autoflush", True):
+                    self_super._flush()
+                return res
+
+            return wrapper
+
+        return attr
 
 
-@pytest.fixture()
-def client(request) -> Generator[weave_client.WeaveClient, None, None]:
+def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
+    """A wrapper around a trace server that records all attribute access.
+
+    This is extremely helpful for tests to assert that a certain series of
+    attribute accesses happen (or don't happen), and in order. We will
+    probably want to make this a bit more sophisticated in the future, but
+    this is a pretty good start.
+
+    For example, you can do something like the followng to assert that various
+    read operations do not happen!
+
+    ```pyth
+    access_log = client.server.attribute_access_log
+    assert "table_query" not in access_log
+    assert "obj_read" not in access_log
+    assert "file_content_read" not in access_log
+    ```
+    """
+
+    class ServerRecorder(type(server)):  # type: ignore
+        attribute_access_log: list[str]
+
+        def __init__(self, server: tsi.TraceServerInterface):  # type: ignore
+            self.server = server
+            self.attribute_access_log = []
+
+        def __getattribute__(self, name):
+            self_server = super().__getattribute__("server")
+            access_log = super().__getattribute__("attribute_access_log")
+            if name == "server":
+                return self_server
+            if name == "attribute_access_log":
+                return access_log
+            attr = self_server.__getattribute__(name)
+            if name != "attribute_access_log":
+                access_log.append(name)
+            return attr
+
+    return ServerRecorder(server)
+
+
+def create_client(request) -> weave_init.InitializedClient:
     inited_client = None
     weave_server_flag = request.config.getoption("--weave-server")
     server: tsi.TraceServerInterface
@@ -317,9 +207,7 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
             sqlite_server, DummyIdConverter(), entity
         )
     elif weave_server_flag == "clickhouse":
-        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
-            use_async_insert=False
-        )
+        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
         ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
         ch_server._run_migrations()
@@ -335,13 +223,43 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
-        client = weave_client.WeaveClient(entity, project, server)
+        client = TestOnlyFlushingWeaveClient(
+            entity, project, make_server_recorder(server)
+        )
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
+
+    return inited_client
+
+
+@pytest.fixture()
+def client(request) -> Generator[weave_client.WeaveClient, None, None]:
+    """This is the standard fixture used everywhere in tests to test end to end
+    client functionality"""
+    inited_client = create_client(request)
     try:
         yield inited_client.client
     finally:
         inited_client.reset()
+
+
+@pytest.fixture()
+def client_creator(
+    request,
+) -> Generator[
+    Callable[[], _GeneratorContextManager[weave_client.WeaveClient]], None, None
+]:
+    """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
+
+    @contextlib.contextmanager
+    def client():
+        inited_client = create_client(request)
+        try:
+            yield inited_client.client
+        finally:
+            inited_client.reset()
+
+    yield client
 
 
 @pytest.fixture
@@ -395,3 +313,101 @@ def network_proxy_client(client):
         yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
+
+
+class DummyTestException(Exception):
+    pass
+
+
+class ThrowingServer(tsi.TraceServerInterface):
+    # Call API
+    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        raise DummyTestException("FAILURE - call_start, req:", req)
+
+    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+        raise DummyTestException("FAILURE - call_end, req:", req)
+
+    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
+        raise DummyTestException("FAILURE - call_read, req:", req)
+
+    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+        raise DummyTestException("FAILURE - calls_query, req:", req)
+
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+        raise DummyTestException("FAILURE - calls_query_stream, req:", req)
+
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        raise DummyTestException("FAILURE - calls_delete, req:", req)
+
+    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+        raise DummyTestException("FAILURE - calls_query_stats, req:", req)
+
+    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+        raise DummyTestException("FAILURE - call_update, req:", req)
+
+    # Op API
+    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
+        raise DummyTestException("FAILURE - op_create, req:", req)
+
+    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
+        raise DummyTestException("FAILURE - op_read, req:", req)
+
+    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
+        raise DummyTestException("FAILURE - ops_query, req:", req)
+
+    # Cost API
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        raise DummyTestException("FAILURE - cost_create, req:", req)
+
+    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+        raise DummyTestException("FAILURE - cost_query, req:", req)
+
+    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+        raise DummyTestException("FAILURE - cost_purge, req:", req)
+
+    # Obj API
+    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        raise DummyTestException("FAILURE - obj_create, req:", req)
+
+    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        raise DummyTestException("FAILURE - obj_read, req:", req)
+
+    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
+        raise DummyTestException("FAILURE - objs_query, req:", req)
+
+    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        raise DummyTestException("FAILURE - table_create, req:", req)
+
+    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        raise DummyTestException("FAILURE - table_update, req:", req)
+
+    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+        raise DummyTestException("FAILURE - table_query, req:", req)
+
+    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
+        raise DummyTestException("FAILURE - refs_read_batch, req:", req)
+
+    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        raise DummyTestException("FAILURE - file_create, req:", req)
+
+    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        raise DummyTestException("FAILURE - file_content_read, req:", req)
+
+    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        raise DummyTestException("FAILURE - feedback_create, req:", req)
+
+    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+        raise DummyTestException("FAILURE - feedback_query, req:", req)
+
+    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+        raise DummyTestException("FAILURE - feedback_purge, req:", req)
+
+
+@pytest.fixture()
+def client_with_throwing_server(client: weave_client.WeaveClient):
+    curr_server = client.server
+    client.server = ThrowingServer()
+    try:
+        yield client
+    finally:
+        client.server = curr_server

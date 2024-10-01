@@ -1,0 +1,152 @@
+[project]
+name = "weave_query"
+description = "A toolkit for building composable interactive data driven applications."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+maintainers = [{ name = "W&B", email = "support@wandb.com" }]
+authors = [
+    { name = "Shawn Lewis", email = "shawn@wandb.com" },
+    { name = "Danny Goldstein", email = "danny@wandb.com" },
+    { name = "Tim Sweeney", email = "tim@wandb.com" },
+    { name = "Nick Peneranda", email = "nick.penaranda@wandb.com" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Framework :: Flask",
+    "Framework :: Jupyter",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Topic :: Database :: Front-Ends",
+    "Topic :: Office/Business :: Financial :: Spreadsheet",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Software Development :: Widget Sets",
+]
+requires-python = ">=3.9"
+dynamic = ["version", "dependencies", "optional-dependencies"]
+
+[project.scripts]
+weave_query = "weave_query.cli:cli"
+
+[project.urls]
+Company = "https://wandb.com"
+Documentation = "https://docs.wandb.com/"
+Changes = "https://github.com/wandb/weave_query/releases"
+"Source Code" = "https://github.com/wandb/weave_query"
+"Issue Tracker" = "https://github.com/wandb/weave_query/issues/"
+Twitter = "https://twitter.com/weights_biases"
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["weave_query"]
+
+[tool.setuptools.dynamic]
+version = { attr = "weave_query.version.VERSION" }
+dependencies = { file = ["requirements.legacy.txt"] }
+
+
+[tool.setuptools.dynamic.optional-dependencies]
+examples = { file = ["requirements.legacy.ecosystem.txt"] }
+engine = { file = ["requirements.legacy.engine.txt"] }
+ecosystem = { file = ["requirements.legacy.ecosystem.txt"] }
+datadog = { file = ["requirements.legacy.datadog.txt"] }
+modal = { file = ["requirements.modal.txt"] }
+
+[tool.pytest.ini_options]
+testpaths = ["weave_query"]
+filterwarnings = ["error"]
+
+[tool.ruff.lint]
+preview = true
+select = [
+    "D200",   # https://docs.astral.sh/ruff/rules/fits-on-one-line/
+    "D201",   # https://docs.astral.sh/ruff/rules/no-blank-line-before-function/
+    "D202",   # https://docs.astral.sh/ruff/rules/no-blank-line-after-function/
+    "D204",   # https://docs.astral.sh/ruff/rules/one-blank-line-after-class/
+    "D210",   # https://docs.astral.sh/ruff/rules/surrounding-whitespace/
+    "D211",   # https://docs.astral.sh/ruff/rules/blank-line-before-class/
+    "D214",   # https://docs.astral.sh/ruff/rules/section-not-over-indented/
+    "FIX001", # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
+    "FIX003",
+    "F541",
+    "I",      # https://docs.astral.sh/ruff/rules/#isort-i
+    "W291",   # https://docs.astral.sh/ruff/rules/trailing-whitespace/
+    "W391",   # https://docs.astral.sh/ruff/rules/too-many-newlines-at-end-of-file/
+    "F401",   # https://docs.astral.sh/ruff/rules/unused-import/
+]
+ignore = [
+    "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/ - we use Google style
+    "D206", # https://docs.astral.sh/ruff/rules/indent-with-spaces/ - redundant with formatter
+    "D207", # https://docs.astral.sh/ruff/rules/under-indentation/ - redundant with formatter
+    "D208", # https://docs.astral.sh/ruff/rules/over-indentation/ - redundant with formatter
+    "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/ - we use Google style
+    "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/ - we use Google style
+]
+exclude = [
+    "weave_query/api.py",
+    "weave_query/__init__.py",
+    "weave_query/legacy/**/*.py",
+    "examples",
+    "weave_query_query",
+]
+
+[tool.ruff.lint.isort]
+known-third-party = ["wandb"]
+
+[tool.ruff.lint.per-file-ignores]
+"weave_query/tests/*" = ["F401"]
+"weave_query/weave_query_server.py" = ["F401"]
+
+
+[tool.ruff]
+line-length = 88
+show-fixes = true
+exclude = [
+    "weave_query/query_api.py",
+    "weave_query/__init__.py",
+    "weave_query/legacy/**/*.py",
+    "examples",
+    "weave_query_query",
+]
+
+[tool.bumpversion]
+current_version = "0.51.9-dev0"
+parse = """(?x)
+    (?P<major>0|[1-9]\\d*)\\.
+    (?P<minor>0|[1-9]\\d*)\\.
+    (?P<patch>0|[1-9]\\d*)
+    (?:
+        -                             # dash separator for pre-release section
+        (?P<pre_l>[a-zA-Z-]+)         # pre-release label
+        (?P<pre_n>0|[1-9]\\d*)        # pre-release version number
+    )?                                # pre-release section is optional
+"""
+serialize = [
+    "{major}.{minor}.{patch}-{pre_l}{pre_n}",
+    "{major}.{minor}.{patch}",
+]
+search = "{current_version}"
+replace = "{new_version}"
+regex = false
+ignore_missing_version = false
+ignore_missing_files = false
+tag = false
+sign_tags = false
+tag_name = "v{new_version}"
+tag_message = "Release version: {current_version} → {new_version}"
+allow_dirty = false
+commit = false
+message = "Release version: {current_version} → {new_version}"
+commit_args = ""
+
+[tool.bumpversion.parts.pre_l]
+values = ["dev", "final"]
+optional_value = "final"

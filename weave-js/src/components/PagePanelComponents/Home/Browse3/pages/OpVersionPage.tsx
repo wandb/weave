@@ -1,6 +1,7 @@
 import React, {useMemo} from 'react';
 
 import {LoadingDots} from '../../../../LoadingDots';
+import {Tailwind} from '../../../../Tailwind';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {OpCodeViewer} from '../OpCodeViewer';
 import {
@@ -48,9 +49,15 @@ const OpVersionPageInner: React.FC<{
   const uri = opVersionKeyToRefUri(opVersion);
   const {entity, project, opId, versionIndex} = opVersion;
 
-  const opVersions = useOpVersions(entity, project, {
-    opIds: [opId],
-  });
+  const opVersions = useOpVersions(
+    entity,
+    project,
+    {
+      opIds: [opId],
+    },
+    undefined, // limit
+    true // metadataOnly
+  );
   const opVersionCount = (opVersions.result ?? []).length;
   const callsStats = useCallsStats(entity, project, {
     opVersionRefs: [uri],
@@ -128,7 +135,11 @@ const OpVersionPageInner: React.FC<{
           ? [
               {
                 label: 'Use',
-                content: <TabUseOp name={opNiceName(opId)} uri={uri} />,
+                content: (
+                  <Tailwind>
+                    <TabUseOp name={opNiceName(opId)} uri={uri} />
+                  </Tailwind>
+                ),
               },
             ]
           : []),

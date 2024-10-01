@@ -5,87 +5,6 @@ import pytest
 from pydantic import Field
 
 import weave
-from weave.legacy.weave import ref_base
-
-pytestmark = pytest.mark.trace
-
-
-@pytest.mark.skip("failing in ci")
-def test_digestrefs(client):
-    ds = weave.WeaveList(
-        [
-            {
-                "id": "0",
-                "val": 100,
-            },
-            {
-                "id": "0",
-                "val": 101,
-            },
-        ]
-    )
-
-    ds0_ref = weave.publish(ds, "digestrefs")
-
-    ds0 = weave.ref(str(ds0_ref)).get()
-
-    @weave.op()
-    def add5_to_row(row: typing.Any) -> int:
-        return row["val"] + 5
-
-    ds0_row0 = ds0[0]
-
-    ds0_row0_ref = ref_base.get_ref(ds0_row0)
-    assert ds0_row0_ref != None
-
-    x = add5_to_row(ds0_row0)
-
-    calls = ds0_row0_ref.input_to()
-    assert len(calls) == 1
-
-    ds = ds + [{"id": 2, "val": -10}]
-    ds1_ref = weave.publish(ds, "digestrefs")
-
-    ds1 = weave.ref(str(ds1_ref)).get()
-    ds1_row0 = ds1[0]
-    ds1_row0_ref = ref_base.get_ref(ds1_row0)
-
-    assert ds1_row0_ref is not None
-
-    assert ds0_row0_ref.digest == ds1_row0_ref.digest
-
-    assert len(ds1_row0_ref.input_to()) == 0
-    assert len(ds1_row0_ref.value_input_to()) == 1
-
-
-@pytest.mark.skip()
-def test_output_of(client):
-    @weave.op()
-    def add_5(v: int) -> int:
-        return v + 5
-
-    result = add_5(10)
-
-    call = weave.output_of(result)
-    assert call is not None
-    assert "add_5" in call.op_name
-    assert call.inputs["v"] == 10
-
-    result2 = add_5(result)
-    call = weave.output_of(result2)
-    assert call is not None
-    assert "add_5" in call.op_name
-
-    # v_input is a ref here and we have to deref it
-    # TODO: this is not consistent. Shouldn't it already be
-    # dereffed recursively when we get it from weave.output_of() ?
-    v_input = call.inputs["v"].get()
-    assert v_input == 15
-
-    call = weave.output_of(v_input)
-    assert call is not None
-    assert "add_5" in call.op_name
-    assert call.inputs["v"] == 10
 
 
 def test_weaveflow_op_wandb(client):
@@ -158,7 +77,7 @@ def test_weaveflow_publish_numpy(client):
     ref = weave.publish(v, "dict-with-numpy")
 
 
-def test_weaveflow_unknown_type_op_param_undeclared(eager_mode):
+def test_weaveflow_unknown_type_op_param_undeclared():
     class SomeUnknownObject:
         x: int
 
@@ -172,7 +91,7 @@ def test_weaveflow_unknown_type_op_param_undeclared(eager_mode):
     assert op_with_unknown_param(SomeUnknownObject(x=10)) == 12
 
 
-def test_weaveflow_unknown_type_op_param_declared(eager_mode):
+def test_weaveflow_unknown_type_op_param_declared():
     class SomeUnknownObject:
         x: int
 
@@ -186,7 +105,7 @@ def test_weaveflow_unknown_type_op_param_declared(eager_mode):
     assert op_with_unknown_param(SomeUnknownObject(x=10)) == 12
 
 
-def test_weaveflow_unknown_type_op_param_closure(eager_mode):
+def test_weaveflow_unknown_type_op_param_closure():
     class SomeUnknownObject:
         x: int
 

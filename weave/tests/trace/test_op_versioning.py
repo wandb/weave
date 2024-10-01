@@ -1,46 +1,10 @@
-import shutil
 import typing
 
 import numpy as np
 import pytest
 
 import weave
-from weave.legacy.weave import artifact_fs, derive_op
 from weave.trace_server.trace_server_interface import FileContentReadReq, ObjReadReq
-
-
-@pytest.mark.skip(
-    "weave.versions no longer supported, but there are other ways to do this now..."
-)
-def test_op_versioning_saveload(client):
-    @weave.op()
-    def versioned_op(a: int, b: int) -> int:
-        return a + b
-
-    assert versioned_op(1, 2) == 3
-
-    @weave.op()
-    def versioned_op(a: int, b: int) -> int:
-        return a - b
-
-    # Because it is a new version with different code, this
-    # should not hit memoized cache.
-    assert versioned_op(1, 2) == -1
-
-    v0_ref = weave.versions(versioned_op)[0]
-    v0 = v0_ref.get()
-    assert v0(1, 2) == 3
-
-    # This should refer to v1, even though we just loaded v0
-    v_latest = weave.ref("local-artifact:///op-versioned_op:latest/obj").get()
-    assert v_latest(4, 20) == -16
-
-    v1_ref = weave.versions(versioned_op)[1]
-    v1 = v1_ref.get()
-    assert v1(1, 2) == -1
-
-    v0_again = weave.ref(f"local-artifact:///op-versioned_op:{v0.version}/obj").get()
-    assert v0_again(5, 6) == 11
 
 
 def get_saved_code(client, ref):
@@ -134,15 +98,6 @@ def test_op_versioning_lotsofstuff(strict_op_saving):
         j = [x + 1 for x in range(a)]
         k = map(lambda y: y - 3, j)
         return np.array(k).mean()
-
-
-@pytest.mark.skip("Derived op not fully serializable due to non-json stuff in closure")
-def test_op_versioning_higherlevel_function(strict_op_saving):
-    @weave.op()
-    def versioned_op_lowerlevel(a: int) -> float:
-        return a + 1
-
-    derive_op.MappedDeriveOpHandler.make_derived_op(versioned_op_lowerlevel)
 
 
 def test_op_versioning_inline_import(strict_op_saving, client):
@@ -269,7 +224,7 @@ def pony(v: int):
 
 
 @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
-def test_op_versioning_closure_dict_ops(strict_op_saving, eager_mode, client):
+def test_op_versioning_closure_dict_ops(strict_op_saving, client):
     @weave.op()
     def cat(v: int):
         print("hello from cat()")
@@ -324,7 +279,7 @@ def pony(v: int):
 
 
 @pytest.mark.skip("custom objs not working with new weave_client")
-def test_op_versioning_mixed(strict_op_saving, eager_mode, client):
+def test_op_versioning_mixed(strict_op_saving, client):
     @weave.op()
     def cat(v: int):
         print("hello from cat()")
@@ -386,25 +341,6 @@ def test_op_versioning_2ops(strict_op_saving, client):
     ref = weave.obj_ref(cat)
 
     saved_code = get_saved_code(client, ref)
-
-
-@pytest.mark.skip("not working yet")
-def test_op_return_weave_obj(strict_op_saving, client):
-    @weave.type()
-    class SomeObj:
-        val: int
-
-    @weave.op()
-    def some_obj(v: int):
-        return SomeObj(v)
-
-    ref = weave.obj_ref(some_obj)
-    assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
-
-    with ref.artifact.open("obj.py") as f:
-        saved_code = f.read()
-    print("SAVED_CODE")
-    print(saved_code)
 
 
 EXPECTED_TYPEDICT_ANNO_CODE = """import weave

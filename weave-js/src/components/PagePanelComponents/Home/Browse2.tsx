@@ -8,7 +8,7 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
-import {LicenseInfo} from '@mui/x-license-pro';
+import {LicenseInfo} from '@mui/x-license';
 import React, {FC} from 'react';
 import {
   BrowserRouter as Router,

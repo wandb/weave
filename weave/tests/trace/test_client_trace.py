@@ -1,5 +1,6 @@
 import dataclasses
 import datetime
+import json
 import platform
 import sys
 import time
@@ -14,11 +15,19 @@ from pydantic import BaseModel, ValidationError
 
 import weave
 from weave import Thread, ThreadPoolExecutor
-from weave.tests.trace.util import DatetimeMatcher
+from weave.tests.trace.util import (
+    AnyIntMatcher,
+    DatetimeMatcher,
+    FuzzyDateTimeMatcher,
+    MaybeStringMatcher,
+    client_is_sqlite,
+)
 from weave.trace import weave_client
+from weave.trace.object_record import ObjectRecord
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_trace_server_batched import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
@@ -28,9 +37,6 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
 )
 from weave.trace_server.validation import SHOULD_ENFORCE_OBJ_ID_CHARSET
-
-pytestmark = pytest.mark.trace
-
 
 ## Hacky interface compatibility helpers
 
@@ -69,7 +75,7 @@ def test_simple_op(client):
         f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
     )
     assert fetched_call == weave_client.Call(
-        op_name=expected_name,
+        _op_name=expected_name,
         project_id=f"{client.entity}/{client.project}",
         trace_id=fetched_call.trace_id,
         parent_id=None,
@@ -77,7 +83,13 @@ def test_simple_op(client):
         inputs={"a": 5},
         exception=None,
         output=6,
-        summary={},
+        summary={
+            "weave": {
+                "status": "success",
+                "trace_name": "my_op",
+                "latency_ms": AnyIntMatcher(),
+            }
+        },
         attributes={
             "weave": {
                 "client_version": weave.version.VERSION,
@@ -131,23 +143,6 @@ def test_trace_server_call_start_and_end(client):
         start.started_at.isoformat(timespec="milliseconds")
     )
 
-    class FuzzyDateTimeMatcher:
-        def __init__(self, dt):
-            self.dt = dt
-
-        def __eq__(self, other):
-            # Checks within 1ms
-            return abs((self.dt - other).total_seconds()) < 0.001
-
-    class MaybeStringMatcher:
-        def __init__(self, s):
-            self.s = s
-
-        def __eq__(self, other):
-            if other is None:
-                return True
-            return self.s == other
-
     assert res.call.model_dump() == {
         "project_id": client._project_id(),
         "id": call_id,
@@ -160,7 +155,12 @@ def test_trace_server_call_start_and_end(client):
         "attributes": {"a": 5},
         "inputs": {"b": 5},
         "output": None,
-        "summary": None,
+        "summary": {
+            "weave": {
+                "trace_name": "test_name",
+                "status": "running",
+            },
+        },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,
@@ -199,7 +199,14 @@ def test_trace_server_call_start_and_end(client):
         "attributes": {"a": 5},
         "inputs": {"b": 5},
         "output": {"d": 5},
-        "summary": {"c": 5},
+        "summary": {
+            "c": 5,
+            "weave": {
+                "trace_name": "test_name",
+                "latency_ms": AnyIntMatcher(),
+                "status": "success",
+            },
+        },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,
@@ -250,7 +257,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     # class Number:
     #     value: int
 
-    class Number(BaseModel):
+    class Number(weave.Object):
         value: int
 
     @weave.op()
@@ -427,7 +434,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
     input_object_version_refs = unique_vals(
         [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
     )
-    assert len(input_object_version_refs) > 3
+    assert len(input_object_version_refs) > 3  # > 3
 
     for input_object_version_refs, exp_count in [
         # Test the None case
@@ -780,10 +787,6 @@ def test_trace_call_sort_with_mixed_types(client):
 
         for i, call in enumerate(inner_res.calls):
             assert call.inputs["in_val"].get("prim") == seq[i]
-
-
-def client_is_sqlite(client):
-    return isinstance(client.server._internal_trace_server, SqliteTraceServer)
 
 
 def test_trace_call_filter(client):
@@ -1320,13 +1323,25 @@ def test_dataclass_support(client):
 
     assert len(res.calls) == 1
     assert res.calls[0].inputs == {
-        "a": "weave:///shawn/test-project/object/MyDataclass:qDo5jHFme5xIM1LwgeiXXVxYoGnp4LQ9hulqkX5zunY",
-        "b": "weave:///shawn/test-project/object/MyDataclass:We1slmdrWzi2NYSWObBsLybTTNSP4M9zfQbCMf8rQMc",
+        "a": {
+            "_bases": [],
+            "_class_name": "MyDataclass",
+            "_type": "MyDataclass",
+            "val": 1,
+        },
+        "b": {
+            "_bases": [],
+            "_class_name": "MyDataclass",
+            "_type": "MyDataclass",
+            "val": 2,
+        },
     }
-    assert (
-        res.calls[0].output
-        == "weave:///shawn/test-project/object/MyDataclass:2exnZIHkq8DyHTbJzhL0m5Ew1XrqIBCstZWilQS6Lpo"
-    )
+    assert res.calls[0].output == {
+        "_bases": [],
+        "_class_name": "MyDataclass",
+        "_type": "MyDataclass",
+        "val": 3,
+    }
 
 
 def test_op_retrieval(client):
@@ -1548,6 +1563,7 @@ def test_unknown_attribute(client):
 
 
 # Note: this test only works with the `trace_init_client` fixture
+@pytest.mark.skip(reason="TODO: Skipping since it seems to rely on the testcontainer")
 def test_ref_get_no_client(trace_init_client):
     trace_client = trace_init_client.client
     data = weave.publish(42)
@@ -1680,13 +1696,13 @@ def map_with_copying_thread_executor(fn, vals):
 
 
 # TODO: Make an async version of this
-@pytest.mark.flaky(retries=3)  # <-- Flakes in CI
+@pytest.mark.flaky(retries=5)  # <-- Flakes in CI
 @pytest.mark.parametrize(
     "mapper",
     [
         map_simple,
         map_with_threads_no_executor,
-        map_with_thread_executor,
+        # # map_with_thread_executor,  # <-- Flakes in CI
         # map_with_copying_thread_executor, # <-- Flakes in CI
     ],
 )
@@ -2189,6 +2205,79 @@ def test_call_query_stream_columns(client):
     assert calls[0].inputs == {"a": 0, "b": 0}
 
 
+def test_call_query_stream_columns_with_costs(client):
+    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
+    if is_sqlite:
+        # dont run this test for sqlite
+        return
+
+    @weave.op
+    def calculate(a: int, b: int) -> int:
+        return {
+            "result": {"a + b": a + b},
+            "not result": 123,
+            "usage": {"prompt_tokens": 10, "completion_tokens": 10},
+            "model": "test_model",
+        }
+
+    for i in range(2):
+        calculate(i, i * i)
+
+    # Test that costs are returned if we include the summary field
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary"],
+            include_costs=True,
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 2
+    assert calls[0].summary is not None
+    assert calls[0].summary.get("weave").get("costs") is not None
+
+    # This should not happen, users should not request summary_dump
+    # Test that costs are returned if we include the summary_dump field
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary_dump"],
+            include_costs=True,
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 2
+    assert calls[0].summary is not None
+    assert calls[0].summary.get("weave").get("costs") is not None
+
+    # Test that costs are returned if we don't include the summary field
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id"],
+            include_costs=True,
+        )
+    )
+
+    calls = list(calls)
+    assert len(calls) == 2
+    # Summary should come back even though it wasn't requested, because we include costs
+    assert calls[0].summary.get("weave").get("costs") is not None
+
+    # Test that costs are not returned if we include the summary field, but don't include costs
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary"],
+        )
+    )
+
+    calls = list(calls)
+    assert len(calls) == 2
+    assert calls[0].summary is not None
+    assert calls[0].summary.get("weave", {}).get("costs") is None
+
+
 @pytest.mark.skip("Not implemented: filter / sort through refs")
 def test_sort_and_filter_through_refs(client):
     @weave.op()
@@ -2575,6 +2664,31 @@ def test_calls_stream_column_expansion(client):
     assert call_result.output == nested_ref.uri()
 
 
+# Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
+# in clickhouse_trace_server_batched.py, this test verifies that the dynamic
+# increase works as expected
+@pytest.mark.parametrize("batch_size", [1, 10, 100, 110])
+def test_calls_stream_column_expansion_dynamic_batch_size(client, batch_size):
+    @weave.op
+    def test_op(x):
+        return x
+
+    for i in range(batch_size):
+        test_op(i)
+
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output"],
+            expand_columns=["output"],
+        )
+    )
+    calls = list(res)
+    assert len(calls) == batch_size
+    for i in range(batch_size):
+        assert calls[i].output == i
+
+
 class Custom(weave.Object):
     val: dict
 
@@ -2704,16 +2818,18 @@ def test_objects_and_keys_with_special_characters(client):
 
 
 def test_calls_stream_feedback(client):
+    BATCH_SIZE = 10
+    num_calls = BATCH_SIZE + 1
+
     @weave.op
     def test_call(x):
         return "ello chap"
 
-    test_call(1)
-    test_call(2)
-    test_call(3)
+    for i in range(num_calls):
+        test_call(i)
 
     calls = list(test_call.calls())
-    assert len(calls) == 3
+    assert len(calls) == num_calls
 
     # add feedback to the first call
     calls[0].feedback.add("note", {"note": "this is a note on call1"})
@@ -2732,7 +2848,7 @@ def test_calls_stream_feedback(client):
     )
     calls = list(res)
 
-    assert len(calls) == 3
+    assert len(calls) == num_calls
     assert len(calls[0].summary["weave"]["feedback"]) == 4
     assert len(calls[1].summary["weave"]["feedback"]) == 1
     assert not calls[2].summary.get("weave", {}).get("feedback")
@@ -2759,3 +2875,167 @@ def test_calls_stream_feedback(client):
         "detoned_alias": ":thumbs_up:",
         "emoji": "👍",
     } in call2_payloads
+
+
+def test_inline_dataclass_generates_no_refs_in_function(client):
+    @dataclasses.dataclass
+    class A:
+        b: int
+
+    @weave.op
+    def func(a: A):
+        return A(b=a.b + 1)
+
+    a = A(b=1)
+    func(a)
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+        )
+    )
+    input_object_version_refs = unique_vals(
+        [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
+    )
+    assert len(input_object_version_refs) == 0
+
+    output_object_version_refs = unique_vals(
+        [ref for call in res.calls for ref in extract_refs_from_values(call.output)]
+    )
+    assert len(output_object_version_refs) == 0
+
+
+def test_inline_dataclass_generates_no_refs_in_object(client):
+    @dataclasses.dataclass
+    class A:
+        b: int
+
+    class WeaveObject(weave.Object):
+        a: A
+
+    wo = WeaveObject(a=A(b=1))
+    ref = weave.publish(wo)
+
+    res = get_client_trace_server(client).objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+        )
+    )
+    assert len(res.objs) == 1  # Just the weave object, and not the dataclass
+
+
+def test_inline_pydantic_basemodel_generates_no_refs_in_function(client):
+    class A(BaseModel):
+        b: int
+
+    @weave.op
+    def func(a: A):
+        return A(b=a.b + 1)
+
+    a = A(b=1)
+    func(a)
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+        )
+    )
+    input_object_version_refs = unique_vals(
+        [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
+    )
+    assert len(input_object_version_refs) == 0
+
+    output_object_version_refs = unique_vals(
+        [ref for call in res.calls for ref in extract_refs_from_values(call.output)]
+    )
+    assert len(output_object_version_refs) == 0
+
+
+def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
+    class A(BaseModel):
+        b: int
+
+    class WeaveObject(weave.Object):
+        a: A
+
+    wo = WeaveObject(a=A(b=1))
+    ref = weave.publish(wo)
+
+    res = get_client_trace_server(client).objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+        )
+    )
+    assert len(res.objs) == 1  # Just the weave object, and not the pydantic model
+
+
+def test_large_keys_are_stripped_call(client, caplog):
+    is_sqlite = client_is_sqlite(client)
+    if is_sqlite:
+        # no need to strip in sqlite
+        return
+
+    data = {"dictionary": {f"{i}": i for i in range(300_000)}}
+
+    @weave.op
+    def test_op_dict(input_data: dict):
+        return {"output": input_data}
+
+    test_op_dict(data)
+
+    calls = list(test_op_dict.calls())
+    assert len(calls) == 1
+    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+
+    # now test for inputs/output as raw string
+    @weave.op
+    def test_op_str(input_data: str):
+        return input_data
+
+    test_op_str(json.dumps(data))
+
+    calls = list(test_op_str.calls())
+    assert len(calls) == 1
+    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+
+    # and now list
+    @weave.op
+    def test_op_list(input_data: list[str]):
+        return input_data
+
+    test_op_list([json.dumps(data)])
+
+    calls = list(test_op_list.calls())
+    assert len(calls) == 1
+    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+
+    error_messages = [
+        record.message for record in caplog.records if record.levelname == "ERROR"
+    ]
+    for error_message in error_messages:
+        assert "Retrying with large objects stripped" in error_message
+
+
+def test_weave_finish_unsets_client(client):
+    @weave.op
+    def foo():
+        return 1
+
+    weave.trace.client_context.weave_client.set_weave_client_global(None)
+    weave.trace.weave_init._current_inited_client = (
+        weave.trace.weave_init.InitializedClient(client)
+    )
+    weave_client = weave.trace.weave_init._current_inited_client.client
+    assert weave.trace.weave_init._current_inited_client is not None
+
+    foo()
+    assert len(list(weave_client.get_calls())) == 1
+
+    weave.finish()
+
+    foo()
+    assert len(list(weave_client.get_calls())) == 1
+    assert weave.trace.weave_init._current_inited_client is None

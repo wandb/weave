@@ -1,6 +1,7 @@
 import dataclasses
 import urllib
-from typing import Any, Union
+from concurrent.futures import Future
+from typing import Any, Optional, Union, cast
 
 from ..trace_server import refs_internal
 
@@ -15,12 +16,54 @@ class Ref:
     def uri(self) -> str:
         raise NotImplementedError
 
+    def as_param_dict(self) -> dict:
+        return dataclasses.asdict(self)
+
 
 @dataclasses.dataclass(frozen=True)
 class TableRef(Ref):
     entity: str
     project: str
-    digest: str
+    _digest: Union[str, Future[str]]
+    _row_digests: Optional[Union[list[str], Future[list[str]]]] = None
+
+    def as_param_dict(self) -> dict:
+        return {
+            "entity": self.entity,
+            "project": self.project,
+            "_digest": self._digest,
+            "_row_digests": self._row_digests,
+        }
+
+    @property
+    def digest(self) -> str:
+        if isinstance(self._digest, Future):
+            # Block until the Future resolves and store the result
+            self.__dict__["_digest"] = self._digest.result()
+
+        if not isinstance(self._digest, str):
+            raise Exception(f"TableRef digest is not a string: {self._digest}")
+
+        refs_internal.validate_no_slashes(self._digest, "digest")
+        refs_internal.validate_no_colons(self._digest, "digest")
+
+        return self._digest
+
+    @property
+    def row_digests(self) -> list[str]:
+        if isinstance(self._row_digests, Future):
+            # Block until the Future resolves and store the result
+            self.__dict__["_row_digests"] = self._row_digests.result()
+
+        if not isinstance(self._row_digests, list):
+            raise Exception(f"TableRef row_digests is not a list: {self._row_digests}")
+
+        return self._row_digests
+
+    def __post_init__(self) -> None:
+        if isinstance(self._digest, str):
+            refs_internal.validate_no_slashes(self._digest, "digest")
+            refs_internal.validate_no_colons(self._digest, "digest")
 
     def uri(self) -> str:
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
@@ -28,9 +71,9 @@ class TableRef(Ref):
 
 @dataclasses.dataclass(frozen=True)
 class RefWithExtra(Ref):
-    def with_extra(self, extra: tuple[str, ...]) -> "RefWithExtra":
-        params = dataclasses.asdict(self)
-        params["extra"] = self.extra + tuple(extra)  # type: ignore
+    def with_extra(self, extra: tuple[Union[str, Future[str]], ...]) -> "RefWithExtra":
+        params = self.as_param_dict()
+        params["_extra"] = self._extra + tuple(extra)  # type: ignore
         return self.__class__(**params)
 
     def with_key(self, key: str) -> "RefWithExtra":
@@ -42,8 +85,8 @@ class RefWithExtra(Ref):
     def with_index(self, index: int) -> "RefWithExtra":
         return self.with_extra((LIST_INDEX_EDGE_NAME, str(index)))
 
-    def with_item(self, item_digest: str) -> "RefWithExtra":
-        return self.with_extra((TABLE_ROW_ID_EDGE_NAME, f"{item_digest}"))
+    def with_item(self, item_digest: Union[str, Future[str]]) -> "RefWithExtra":
+        return self.with_extra((TABLE_ROW_ID_EDGE_NAME, item_digest))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -51,13 +94,47 @@ class ObjectRef(RefWithExtra):
     entity: str
     project: str
     name: str
-    digest: str
-    extra: tuple[str, ...] = ()
+    _digest: Union[str, Future[str]]
+    _extra: tuple[Union[str, Future[str]], ...] = ()
+
+    def as_param_dict(self) -> dict:
+        return {
+            "entity": self.entity,
+            "project": self.project,
+            "name": self.name,
+            "_digest": self._digest,
+            "_extra": self._extra,
+        }
+
+    @property
+    def extra(self) -> tuple[str, ...]:
+        if any(isinstance(e, Future) for e in self._extra):
+            self.__dict__["_extra"] = tuple(
+                e if isinstance(e, str) else e.result() for e in self._extra
+            )
+            refs_internal.validate_extra(list(self.extra))
+
+        return cast(tuple[str, ...], self._extra)
+
+    @property
+    def digest(self) -> str:
+        if isinstance(self._digest, Future):
+            # Block until the Future resolves and store the result
+            self.__dict__["_digest"] = self._digest.result()
+
+        if not isinstance(self._digest, str):
+            raise Exception(f"ObjectRef digest is not a string: {self._digest}")
+
+        refs_internal.validate_no_slashes(self._digest, "digest")
+        refs_internal.validate_no_colons(self._digest, "digest")
+
+        return self._digest
 
     def __post_init__(self) -> None:
-        refs_internal.validate_no_slashes(self.digest, "digest")
-        refs_internal.validate_no_colons(self.digest, "digest")
-        refs_internal.validate_extra(list(self.extra))
+        if isinstance(self._digest, str):
+            refs_internal.validate_no_slashes(self._digest, "digest")
+            refs_internal.validate_no_colons(self._digest, "digest")
+
         refs_internal.validate_no_slashes(self.name, "name")
         refs_internal.validate_no_colons(self.name, "name")
 
@@ -123,16 +200,28 @@ class CallRef(RefWithExtra):
     entity: str
     project: str
     id: str
-    extra: tuple[str, ...] = ()
+    _extra: tuple[Union[str, Future[str]], ...] = ()
+
+    def as_param_dict(self) -> dict:
+        return {
+            "entity": self.entity,
+            "project": self.project,
+            "id": self.id,
+            "_extra": self._extra,
+        }
+
+    @property
+    def extra(self) -> tuple[str, ...]:
+        return tuple(e if isinstance(e, str) else e.result() for e in self._extra)
 
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/call/{self.id}"
-        if self.extra:
+        if self._extra:
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
 
-AnyRef = Union[ObjectRef, TableRef, CallRef]
+AnyRef = Union[ObjectRef, TableRef, CallRef, OpRef]
 
 
 def parse_uri(uri: str) -> AnyRef:
@@ -145,19 +234,25 @@ def parse_uri(uri: str) -> AnyRef:
     entity, project, kind = parts[:3]
     remaining = tuple(parts[3:])
     if kind == "table":
-        return TableRef(entity=entity, project=project, digest=remaining[0])
+        return TableRef(entity=entity, project=project, _digest=remaining[0])
     extra = tuple(urllib.parse.unquote(r) for r in remaining[1:])
     if kind == "call":
-        return CallRef(entity=entity, project=project, id=remaining[0], extra=extra)
+        return CallRef(entity=entity, project=project, id=remaining[0], _extra=extra)
     elif kind == "object":
         name, version = remaining[0].split(":")
         return ObjectRef(
-            entity=entity, project=project, name=name, digest=version, extra=extra
+            entity=entity, project=project, name=name, _digest=version, _extra=extra
         )
     elif kind == "op":
         name, version = remaining[0].split(":")
         return OpRef(
-            entity=entity, project=project, name=name, digest=version, extra=extra
+            entity=entity, project=project, name=name, _digest=version, _extra=extra
         )
     else:
         raise ValueError(f"Unknown ref kind: {kind}")
+
+
+def parse_op_uri(uri: str) -> OpRef:
+    if not isinstance(parsed := parse_uri(uri), OpRef):
+        raise ValueError(f"URI is not for an Op: {uri}")
+    return parsed

@@ -68,10 +68,16 @@ export const EmojiDetails = ({
           // TODO (Tim): After https://github.com/wandb/core/pull/22947 is deployed,
           // change the fallback from `r.wb_user_id` to `null`-like (this means no access)
           const names = aliasReactions.map(
-            r => r.creator ?? userMap[r.wb_user_id]?.username ?? r.wb_user_id
+            r =>
+              r.creator ??
+              userMap[r.wb_user_id]?.username ??
+              userMap[r.wb_user_id]?.name ??
+              r.wb_user_id
           );
           const currentViewerName = currentViewerId
-            ? userMap[currentViewerId]?.username ?? currentViewerId
+            ? userMap[currentViewerId]?.username ??
+              userMap[currentViewerId]?.name ??
+              currentViewerId
             : null;
           moveToFront(names, currentViewerName);
           if (names.length > maxNames) {

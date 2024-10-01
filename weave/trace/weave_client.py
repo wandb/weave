@@ -4,16 +4,17 @@ import platform
 import re
 import sys
 import typing
+from concurrent.futures import Future
 from functools import lru_cache
-from typing import Any, Dict, Iterator, Optional, Sequence, Union
+from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Union
 
 import pydantic
 from requests import HTTPError
 
 from weave import version
-from weave.legacy.weave import ref_base, urls
-from weave.trace import call_context, trace_sentry
+from weave.trace import call_context, trace_sentry, urls
 from weave.trace.client_context import weave_client as weave_client_context
+from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.object_record import (
@@ -21,11 +22,12 @@ from weave.trace.object_record import (
     dataclass_object_record,
     pydantic_object_record,
 )
-from weave.trace.op import Op, maybe_unbind_method
+from weave.trace.op import Op, is_op, maybe_unbind_method
 from weave.trace.op import op as op_deco
-from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef
+from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_op_uri
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
+from weave.trace.settings import client_parallelism
 from weave.trace.table import Table
 from weave.trace.util import deprecated
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
@@ -38,8 +40,17 @@ from weave.trace_server.trace_server_interface import (
     CallsQueryReq,
     CallStartReq,
     CallUpdateReq,
+    CostCreateInput,
+    CostCreateReq,
+    CostCreateRes,
+    CostPurgeReq,
+    CostQueryOutput,
+    CostQueryReq,
     EndedCallSchemaForInsert,
+    FileCreateReq,
+    FileCreateRes,
     ObjCreateReq,
+    ObjCreateRes,
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
@@ -49,9 +60,11 @@ from weave.trace_server.trace_server_interface import (
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
     TableCreateReq,
+    TableCreateRes,
     TableSchemaForInsert,
     TraceServerInterface,
 )
+from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -89,6 +102,25 @@ def remove_ref(obj: Any) -> None:
             obj.__dict__["ref"] = None
         else:
             obj.ref = None
+
+
+def set_ref(obj: Any, ref: Optional[Ref]) -> None:
+    """Try to set the ref on "any" object.
+
+    We use increasingly complex methods to try to set the ref
+    to support different kinds of objects. This will still
+    fail for python primitives, but those can't be traced anyway.
+    """
+    try:
+        obj.ref = ref
+    except:
+        try:
+            setattr(obj, "ref", ref)
+        except:
+            try:
+                obj.__dict__["ref"] = ref
+            except:
+                raise ValueError(f"Failed to set ref on object of type {type(obj)}")
 
 
 def _get_direct_ref(obj: Any) -> Optional[Ref]:
@@ -135,7 +167,9 @@ def map_to_refs(obj: Any) -> Any:
 
 @dataclasses.dataclass
 class Call:
-    op_name: str
+    """A Call represents a single operation that was executed as part of a trace."""
+
+    _op_name: Union[str, Future[str]]
     trace_id: str
     project_id: str
     parent_id: Optional[str]
@@ -144,7 +178,7 @@ class Call:
     output: Any = None
     exception: Optional[str] = None
     summary: Optional[dict] = None
-    display_name: Optional[str] = None
+    display_name: Optional[Union[str, Callable[["Call"], str]]] = None
     attributes: Optional[dict] = None
     started_at: Optional[datetime.datetime] = None
     ended_at: Optional[datetime.datetime] = None
@@ -153,6 +187,29 @@ class Call:
     _children: list["Call"] = dataclasses.field(default_factory=list)
 
     _feedback: Optional[RefFeedbackQuery] = None
+
+    @property
+    def op_name(self) -> str:
+        if isinstance(self._op_name, Future):
+            self.__dict__["_op_name"] = self._op_name.result()
+
+        if not isinstance(self._op_name, str):
+            raise Exception(f"Call op_name is not a string: {self._op_name}")
+
+        return self._op_name
+
+    @property
+    def func_name(self) -> str:
+        """
+        The decorated function's name that produced this call.
+
+        This is different from `op_name` which is usually the ref of the op.
+        """
+        if self.op_name.startswith("weave:///"):
+            ref = parse_op_uri(self.op_name)
+            return ref.name
+
+        return self.op_name
 
     @property
     def feedback(self) -> RefFeedbackQuery:
@@ -189,10 +246,24 @@ class Call:
         )
 
     def delete(self) -> bool:
+        """Delete the call."""
         client = weave_client_context.require_weave_client()
         return client.delete_call(call=self)
 
     def set_display_name(self, name: Optional[str]) -> None:
+        """
+        Set the display name for the call.
+
+        Args:
+            name: The display name to set for the call.
+
+        Example:
+
+        ```python
+        result, call = my_function.call("World")
+        call.set_display_name("My Custom Display Name")
+        ```
+        """
         if name == "":
             raise ValueError(
                 "Display name cannot be empty. To remove the display_name, set name=None or use remove_display_name."
@@ -288,7 +359,7 @@ def make_client_call(
 ) -> WeaveObject:
     output = server_call.output
     call = Call(
-        op_name=server_call.op_name,
+        _op_name=server_call.op_name,
         project_id=server_call.project_id,
         trace_id=server_call.trace_id,
         parent_id=server_call.parent_id,
@@ -315,7 +386,7 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
         for k, v in d.items():
             if isinstance(v, dict):
                 result[k] = sum_dict_leaves([result.get(k, {}), v])
-            else:
+            elif v is not None:
                 result[k] = result.get(k, 0) + v
     return result
 
@@ -364,6 +435,7 @@ class AttributesDict(dict):
 
 class WeaveClient:
     server: TraceServerInterface
+    future_executor: FutureExecutor
 
     """
     A client for interacting with the Weave trace server.
@@ -386,6 +458,7 @@ class WeaveClient:
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
+        self.future_executor = FutureExecutor(max_workers=client_parallelism())
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
@@ -393,10 +466,36 @@ class WeaveClient:
             # Set Client project name with updated project name
             self.project = resp.project_name
 
+        self._server_is_flushable = False
+        if isinstance(self.server, RemoteHTTPTraceServer):
+            self._server_is_flushable = self.server.should_batch
+
     ################ High Level Convenience Methods ################
 
     @trace_sentry.global_trace_sentry.watch()
     def save(self, val: Any, name: str, branch: str = "latest") -> Any:
+        """Do not call directly, use weave.publish() instead.
+
+        Args:
+            val: The object to save.
+            name: The name to save the object under.
+            branch: The branch to save the object under. Defaults to "latest".
+
+        Returns:
+            A deserialized version of the saved object.
+        """
+        # Adding a second comment line for developers that is not a docstring:
+        # Save an object to the weave server and return a deserialized version of it.
+
+        # Note: This is sort of a weird method becuase:
+        # 1. It returns a deserialized version of the object (which will often not pass type-checks)
+        # 2. It is slow (because it re-downloads the object from the weave server)
+        # 3. It explicitly filters out non ObjectRefs, which seems like a useless constraint.
+        #
+        # Because of these reasons, `weave.publish()` directly calls `_save_object()`
+        # and then returns the raw ObjectRef. I (Tim) think we should consider refactoring
+        # `save()`. I am not sure when as an end user you would ever want to use this method.
+
         ref = self._save_object(val, name, branch)
         if not isinstance(ref, ObjectRef):
             raise ValueError(f"Expected ObjectRef, got {ref}")
@@ -425,7 +524,7 @@ class WeaveClient:
         #
         # However, we always want to resolve the ref to the digest. So
         # here, we just directly assign the digest.
-        ref = dataclasses.replace(ref, digest=read_res.obj.digest)
+        ref = dataclasses.replace(ref, _digest=read_res.obj.digest)
 
         data = read_res.obj.val
 
@@ -489,7 +588,7 @@ class WeaveClient:
         return make_client_call(self.entity, self.project, response_call, self.server)
 
     @deprecated(new_name="get_call")
-    def cll(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
+    def call(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
         return self.get_call(call_id=call_id, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -499,7 +598,7 @@ class WeaveClient:
         inputs: dict,
         parent: Optional[Call] = None,
         attributes: Optional[dict] = None,
-        display_name: Optional[str] = None,
+        display_name: Optional[Union[str, Callable[[Call], str]]] = None,
         *,
         use_stack: bool = True,
     ) -> Call:
@@ -520,17 +619,18 @@ class WeaveClient:
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
             op = self._anonymous_ops[op]
-        if isinstance(op, Op):
-            unbound_op = maybe_unbind_method(op)
-            op_def_ref = self._save_op(unbound_op)
-            op_str = op_def_ref.uri()
-        else:
-            op_str = op
+
+        unbound_op = maybe_unbind_method(op)
+        op_def_ref = self._save_op(unbound_op)
 
         inputs_redacted = redact_sensitive_keys(inputs)
+        if op.postprocess_inputs:
+            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
+        else:
+            inputs_postprocessed = inputs_redacted
 
-        self._save_nested_objects(inputs_redacted)
-        inputs_with_refs = map_to_refs(inputs_redacted)
+        self._save_nested_objects(inputs_postprocessed)
+        inputs_with_refs = map_to_refs(inputs_postprocessed)
         call_id = generate_id()
 
         if parent is None and use_stack:
@@ -554,34 +654,51 @@ class WeaveClient:
         attributes._set_weave_item("os_release", platform.release())
         attributes._set_weave_item("sys_version", sys.version)
 
+        op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
+
         call = Call(
-            op_name=op_str,
+            _op_name=op_name_future,
             project_id=self._project_id(),
             trace_id=trace_id,
             parent_id=parent_id,
             id=call_id,
             inputs=inputs_with_refs,
-            display_name=display_name,
             attributes=attributes,
         )
+        # feels like this should be in post init, but keping here
+        # because the func needs to be resolved for schema insert below
+        if callable(name_func := display_name):
+            display_name = name_func(call)
+        call.display_name = display_name
         if parent is not None:
             parent._children.append(call)
 
         current_wb_run_id = safe_current_wb_run_id()
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
-        start = StartedCallSchemaForInsert(
-            project_id=self._project_id(),
-            id=call_id,
-            op_name=op_str,
-            display_name=display_name,
-            trace_id=trace_id,
-            started_at=datetime.datetime.now(tz=datetime.timezone.utc),
-            parent_id=parent_id,
-            inputs=to_json(inputs_with_refs, self._project_id(), self.server),
-            attributes=attributes,
-            wb_run_id=current_wb_run_id,
-        )
-        self.server.call_start(CallStartReq(start=start))
+
+        started_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        project_id = self._project_id()
+
+        def send_start_call() -> None:
+            inputs_json = to_json(inputs_with_refs, project_id, self)
+            self.server.call_start(
+                CallStartReq(
+                    start=StartedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call_id,
+                        op_name=op_def_ref.uri(),
+                        display_name=display_name,
+                        trace_id=trace_id,
+                        started_at=started_at,
+                        parent_id=parent_id,
+                        inputs=inputs_json,
+                        attributes=attributes,
+                        wb_run_id=current_wb_run_id,
+                    )
+                )
+            )
+
+        self.future_executor.defer(send_start_call)
 
         if use_stack:
             call_context.push_call(call)
@@ -590,11 +707,22 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def finish_call(
-        self, call: Call, output: Any = None, exception: Optional[BaseException] = None
+        self,
+        call: Call,
+        output: Any = None,
+        exception: Optional[BaseException] = None,
+        *,
+        postprocess_output: Optional[Callable[..., Any]] = None,
     ) -> None:
-        self._save_nested_objects(output)
         original_output = output
-        output = map_to_refs(original_output)
+
+        if postprocess_output:
+            postprocessed_output = postprocess_output(original_output)
+        else:
+            postprocessed_output = original_output
+        self._save_nested_objects(postprocessed_output)
+
+        output = map_to_refs(postprocessed_output)
         call.output = output
 
         # Summary handling
@@ -628,18 +756,25 @@ class WeaveClient:
             exception_str = exception_to_json_str(exception)
             call.exception = exception_str
 
-        self.server.call_end(
-            CallEndReq(
-                end=EndedCallSchemaForInsert(
-                    project_id=self._project_id(),
-                    id=call.id,  # type: ignore
-                    ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
-                    output=to_json(output, self._project_id(), self.server),
-                    summary=summary,
-                    exception=exception_str,
+        project_id = self._project_id()
+        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
+
+        def send_end_call() -> None:
+            output_json = to_json(output, project_id, self)
+            self.server.call_end(
+                CallEndReq(
+                    end=EndedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call.id,
+                        ended_at=ended_at,
+                        output=output_json,
+                        summary=summary,
+                        exception=exception_str,
+                    )
                 )
             )
-        )
+
+        self.future_executor.defer(send_end_call)
 
         # Descendent error tracking disabled til we fix UI
         # Add this call's summary after logging the call, so that only
@@ -752,101 +887,274 @@ class WeaveClient:
             query=query, reaction=reaction, offset=offset, limit=limit
         )
 
-    ################ Internal Helpers ################
+    def add_cost(
+        self,
+        llm_id: str,
+        prompt_token_cost: float,
+        completion_token_cost: float,
+        effective_date: typing.Optional[datetime.datetime] = datetime.datetime.now(
+            datetime.timezone.utc
+        ),
+        prompt_token_cost_unit: typing.Optional[str] = "USD",
+        completion_token_cost_unit: typing.Optional[str] = "USD",
+        provider_id: typing.Optional[str] = "default",
+    ) -> CostCreateRes:
+        """Add a cost to the current project.
 
-    def _ref_is_own(self, ref: Ref) -> bool:
-        return isinstance(ref, Ref)
+        Examples:
 
-    def _project_id(self) -> str:
-        return f"{self.entity}/{self.project}"
+            ```python
+            client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=1, completion_token_cost=2)
+            client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=500, completion_token_cost=1000, effective_date=datetime(1998, 10, 3))
+            ```
 
-    # This is used by tests and op_execute still, but the save() interface
-    # is nicer for clients I think?
-    @trace_sentry.global_trace_sentry.watch()
-    def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
-        self._save_nested_objects(val, name=name)
+        Args:
+            llm_id: The ID of the LLM. eg "gpt-4o-mini-2024-07-18"
+            prompt_token_cost: The cost per prompt token. eg .0005
+            completion_token_cost: The cost per completion token. eg .0015
+            effective_date: Defaults to the current date. A datetime.datetime object.
+            provider_id: The provider of the LLM. Defaults to "default". eg "openai"
+            prompt_token_cost_unit: The unit of the cost for the prompt tokens. Defaults to "USD". (Currently unused, will be used in the future to specify the currency type for the cost eg "tokens" or "time")
+            completion_token_cost_unit: The unit of the cost for the completion tokens. Defaults to "USD". (Currently unused, will be used in the future to specify the currency type for the cost eg "tokens" or "time")
 
-        # typically, this condition would belong inside of the
-        # `_save_nested_objects` switch. However, we don't want to recursively
-        # publish all custom objects. Instead we only want to do this at the
-        # top-most level if requested
-        if get_serializer_for_obj(val) is not None:
-            self._save_and_attach_ref(val)
+        Returns:
+            A CostCreateRes object.
+            Which has one field called a list of tuples called ids.
+            Each tuple contains the llm_id and the id of the created cost object.
+        """
+        cost = CostCreateInput(
+            prompt_token_cost=prompt_token_cost,
+            completion_token_cost=completion_token_cost,
+            effective_date=effective_date,
+            prompt_token_cost_unit=prompt_token_cost_unit,
+            completion_token_cost_unit=completion_token_cost_unit,
+            provider_id=provider_id,
+        )
+        return self.server.cost_create(
+            CostCreateReq(project_id=self._project_id(), costs={llm_id: cost})
+        )
 
-        return self._save_object_basic(val, name, branch)
+    def purge_costs(self, ids: Union[list[str], str]) -> None:
+        """Purge costs from the current project.
 
-    def _save_object_basic(
-        self, val: Any, name: Optional[str] = None, branch: str = "latest"
-    ) -> ObjectRef:
-        # The WeaveTable case is special because object saving happens inside
-        # _save_object_nested and it has a special table_ref -- skip it here.
-        if getattr(val, "_is_dirty", False) and not isinstance(val, WeaveTable):
-            val.ref = None
+        Examples:
 
-        is_opdef = isinstance(val, Op)
-        val = map_to_refs(val)
-        if isinstance(val, ObjectRef):
-            return val
-        json_val = to_json(val, self._project_id(), self.server)
+            ```python
+            client.purge_costs([ids])
+            client.purge_costs(ids)
+            ```
 
-        if name is None:
-            if json_val.get("_type") == "CustomWeaveType":
-                custom_name = json_val.get("weave_type", {}).get("type")
-                name = custom_name
+        Args:
+            ids: The cost IDs to purge. Can be a single ID or a list of IDs.
+        """
+        if isinstance(ids, str):
+            ids = [ids]
+        expr = {
+            "$in": [
+                {"$getField": "id"},
+                [{"$literal": id} for id in ids],
+            ]
+        }
+        self.server.cost_purge(
+            CostPurgeReq(project_id=self._project_id(), query=Query(**{"$expr": expr}))
+        )
 
-        if name is None:
-            raise ValueError("Name must be provided for object saving")
+    def query_costs(
+        self,
+        query: Optional[Union[Query, str]] = None,
+        llm_ids: Optional[list[str]] = None,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> list[CostQueryOutput]:
+        """Query project for costs.
 
-        name = sanitize_object_name(name)
+        Examples:
 
-        response = self.server.obj_create(
-            ObjCreateReq(
-                obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project,
-                    object_id=name,
-                    val=json_val,
-                )
+            ```python
+            # Fetch a specific cost object.
+            # Note that this still returns a collection, which is expected
+            # to contain zero or one item(s).
+            client.query_costs("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
+
+            # Find all cost objects with a specific reaction.
+            client.query_costs(llm_ids=["gpt-4o-mini-2024-07-18"], limit=10)
+            ```
+
+        Args:
+            query: A mongo-style query expression. For convenience, also accepts a cost UUID string.
+            llm_ids: For convenience, filter for a set of llm_ids.
+            offset: The offset to start fetching cost objects from.
+            limit: The maximum number of cost objects to fetch.
+
+        Returns:
+            A CostQuery object.
+        """
+        expr: dict[str, Any] = {
+            "$eq": [
+                {"$literal": "1"},
+                {"$literal": "1"},
+            ],
+        }
+        if isinstance(query, str):
+            expr = {
+                "$eq": [
+                    {"$getField": "id"},
+                    {"$literal": query},
+                ],
+            }
+        elif isinstance(query, Query):
+            expr = query.expr_
+
+        if llm_ids:
+            expr = {
+                "$and": [
+                    expr,
+                    {
+                        "$in": [
+                            {"$getField": "llm_id"},
+                            [{"$literal": llm_id} for llm_id in llm_ids],
+                        ],
+                    },
+                ]
+            }
+        rewritten_query = Query(**{"$expr": expr})
+
+        res = self.server.cost_query(
+            CostQueryReq(
+                project_id=self._project_id(),
+                query=rewritten_query,
+                offset=offset,
+                limit=limit,
             )
         )
-        ref: Ref
-        if is_opdef:
-            ref = OpRef(self.entity, self.project, name, response.digest)
-        else:
-            ref = ObjectRef(self.entity, self.project, name, response.digest)
-        # TODO: Try to put a ref onto val? Or should user code use a style like
-        # save instead?
-        return ref
+        return res.results
 
+    ################# Object Saving ##################
+    # `_save_object` is the top level entry point for saving data to the weave server.
+    # `_save_nested_objects` is a recursive method to dispatch saving of nested objects.
+    #  it is called by `_save_object` above, as well as `create_call` and `finish_call`
+    #  since we don't save the entire dictionary, but rather want to save any nested objects
+    # `_save_object_basic` is the lowest level object saving logic which:
+    #  - serializes the object to json
+    #  - calls the server to save the object
+    #  - creates an ObjectRef and attaches it to the object
+    # `_save_op` and `_save_table` are the sister functions to `_save_object_basic`
+    #  but for Ops and Tables respectively.
+
+    @trace_sentry.global_trace_sentry.watch()
+    def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
+        """Save an object to the weave server and return it's Ref. This is the top
+        level entry point for saving any data to the weave server. Importantly, it
+        will also save all children objects that are "Refable".
+
+        Args:
+            val: The object to save.
+            name: The name to save the object under.
+            branch: The branch to save the object under. Defaults to "latest".
+
+        Returns:
+            An ObjectRef to the saved object.
+        """
+        if isinstance(val, WeaveTable):
+            # TODO: Probably should error here
+            pass
+
+        # If it's an Op, use the Op saving logic
+        if is_op(val):
+            # TODO: Probably should call _save_op directly here (or error)
+            pass
+
+        # Step 1: Recursively save all nested objects
+        self._save_nested_objects(val, name=name)
+
+        # Step 2: Save the object itself
+        return self._save_object_basic(val, name, branch)
+
+    @trace_sentry.global_trace_sentry.watch()
     def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
+        """Recursively visits all values, ensuring that any "Refable" objects are
+        saved and reffed.
+        As of this writing, the only "Refable" objects are instances of:
+        - weave.flow.obj.Object
+        - weave.trace.op.Op
+        - weave.trace.Table
+        - weave.trace.vals.WeaveTable
+        This procedure is a bit complicated, so it is worth making the details explicit:
+        1. If the `obj` value already has a `ref`:
+            - If the ref is to the current project, do nothing.
+            - If the ref is to a different project, remove it. (to avoid cross-project references)
+        2. If the `obj` value can be "reffed" (according to one of the above cases), invoke
+            the appropriate "save" function for that type of object, and attach the ref result to `obj`.
+            - `_save_object_basic` (for `weave.flow.obj.Object` instances)
+            - `_save_op` (for `weave.trace.op.Op` instances)
+            - `_save_table` (for `weave.trace.Table` and `weave.trace.vals.WeaveTable` instances)
+        3. Otherwise, traverse all values within `obj` recursively, applying the above logic to each value.
+        Important notes to developers: This method does not return anything - it _mutates_ the
+        values that it traverses (specifically, it attaches `ref` values to them)
+
+        Important: This method calls low level save methods directly - causing network events. Until
+        these are backgrounded, they should not be invoked from inside a critical path.
+        """
+        # Base case: if the object is already refed
+        #  - if the ref is to a different project, remove it
+        #  - if the ref is to the current project, do nothing
         if (ref := get_ref(obj)) is not None:
             if ALLOW_MIXED_PROJECT_REFS:
                 return
-
             # Check if existing ref is to current project, if not,
             # remove the ref and recreate it in the current project
             if ref.project == self.project:
                 return
             remove_ref(obj)
+        # Must defer import here to avoid circular import
+        from weave.flow.obj import Object
 
-        if isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+        # Case 1: Object:
+        # Here we recurse into each of the properties of the object
+        # and save them, and then save the object itself.
+        if isinstance(obj, Object):
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
             ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
-            obj.__dict__["ref"] = ref
+            # Personally, i think we should be passing `obj` into _save_object_basic,
+            # and letting `to_json` handle converting the pydantic object into a jsonable object
+            # but that might have unintended consequences. As a result, we break the
+            # typical pattern and explicitly set the ref here.
+            set_ref(obj, ref)
+
+        # Case 2: Op:
+        # Here we save the op itself.
+        elif is_op(obj):
+            # Ref is attached in here
+            self._save_op(obj)
+
+        # Case 3: Table
+        elif isinstance(obj, Table):
+            self._save_table(obj)
+
+        # Case 4: WeaveTable
+        elif isinstance(obj, WeaveTable):
+            self._save_table(obj)
+
+        # Special case: Custom recursive handling for WeaveObject with rows
+        # TODO: Kinda hacky way to dispatching Dataset with rows: Table
+        elif isinstance(obj, WeaveObject) and hasattr(obj, "rows"):
+            self._save_nested_objects(obj.rows)
+
+        # Recursive traversal of other pydantic objects
+        elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+            obj_rec = pydantic_object_record(obj)
+            for v in obj_rec.__dict__.values():
+                self._save_nested_objects(v)
+
+        # Recursive traversal of other dataclasses
         elif dataclasses.is_dataclass(obj) and not isinstance(obj, Ref):
             obj_rec = dataclass_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
-            ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
-            obj.__dict__["ref"] = ref
-        elif isinstance(obj, Table):
-            table_ref = self._save_table(obj)
-            obj.ref = table_ref
-        elif isinstance(obj, WeaveTable):
-            table_ref = self._save_table(obj)
-            obj.ref = table_ref
-            obj.table_ref = table_ref
+
+        # Recursive traversal of python structures
         elif isinstance_namedtuple(obj):
             for v in obj._asdict().values():
                 self._save_nested_objects(v)
@@ -856,23 +1164,130 @@ class WeaveClient:
         elif isinstance(obj, dict):
             for v in obj.values():
                 self._save_nested_objects(v)
-        elif isinstance(obj, Op):
-            self._save_op(obj)
-        # TODO: Kinda hacky way to dispatching Dataset with rows: Table
-        elif isinstance(obj, WeaveObject) and hasattr(obj, "rows"):
-            self._save_nested_objects(obj.rows)
+
+    @trace_sentry.global_trace_sentry.watch()
+    def _save_object_basic(
+        self, val: Any, name: Optional[str] = None, branch: str = "latest"
+    ) -> ObjectRef:
+        """Directly saves an object to the weave server and attach
+        the ref to the object. This is the lowest level object saving logic.
+        """
+        # The WeaveTable case is special because object saving happens inside
+        # _save_object_nested and it has a special table_ref -- skip it here.
+        if getattr(val, "_is_dirty", False) and not isinstance(val, WeaveTable):
+            val.ref = None
+
+        is_opdef = is_op(val)
+        orig_val = val
+        val = map_to_refs(val)
+        if isinstance(val, ObjectRef):
+            if ALLOW_MIXED_PROJECT_REFS:
+                return val
+            # Check if existing ref is to current project, if not,
+            # remove the ref and recreate it in the current project
+            if val.project == self.project:
+                return val
+            val = orig_val
+
+        # `to_json` is mostly fast, except for CustomWeaveTypes
+        # which incur network costs to serialize the payload
+
+        if name is None:
+            serializer = get_serializer_for_obj(val)
+            if serializer:
+                name = serializer.id()
+
+        if name is None:
+            raise ValueError("Name must be provided for object saving")
+
+        name = sanitize_object_name(name)
+
+        def send_obj_create() -> ObjCreateRes:
+            json_val = to_json(val, self._project_id(), self)
+            req = ObjCreateReq(
+                obj=ObjSchemaForInsert(
+                    project_id=self.entity + "/" + self.project,
+                    object_id=name,
+                    val=json_val,
+                )
+            )
+            return self.server.obj_create(req)
+
+        res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
+
+        digest_future: Future[str] = self.future_executor.then(
+            [res_future], lambda res: res[0].digest
+        )
+
+        ref: Ref
+        if is_opdef:
+            ref = OpRef(self.entity, self.project, name, digest_future)
+        else:
+            ref = ObjectRef(self.entity, self.project, name, digest_future)
+
+        # Attach the ref to the object
+        try:
+            set_ref(orig_val, ref)
+        except:
+            # Don't worry if we can't set the ref.
+            # This can happen for primitive types that don't have __dict__
+            pass
+
+        return ref
+
+    @trace_sentry.global_trace_sentry.watch()
+    def _save_op(self, op: Op, name: Optional[str] = None) -> ObjectRef:
+        """
+        Saves an Op to the weave server and returns the Ref. This is the sister
+        function to _save_object_basic, but for Ops
+        """
+        if name is None:
+            name = op.name
+
+        return self._save_object_basic(op, name)
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:
-        rows = to_json(table.rows, self._project_id(), self.server)
-        response = self.server.table_create(
-            TableCreateReq(
+        """Saves a Table to the weave server and returns the TableRef.
+        This is the sister function to _save_object_basic but for Tables.
+        """
+
+        def send_table_create() -> TableCreateRes:
+            rows = to_json(table.rows, self._project_id(), self)
+            req = TableCreateReq(
                 table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
             )
+            return self.server.table_create(req)
+
+        res_future: Future[TableCreateRes] = self.future_executor.defer(
+            send_table_create
         )
-        return TableRef(
-            entity=self.entity, project=self.project, digest=response.digest
+
+        digest_future: Future[str] = self.future_executor.then(
+            [res_future], lambda res: res[0].digest
         )
+        row_digests_future: Future[list[str]] = self.future_executor.then(
+            [res_future], lambda res: res[0].row_digests
+        )
+
+        table_ref = TableRef(
+            self.entity, self.project, digest_future, row_digests_future
+        )
+
+        table.ref = table_ref
+
+        if isinstance(table, WeaveTable):
+            table.table_ref = table_ref
+
+        return table_ref
+
+    ################ Internal Helpers ################
+
+    def _ref_is_own(self, ref: Ref) -> bool:
+        return isinstance(ref, Ref)
+
+    def _project_id(self) -> str:
+        return f"{self.entity}/{self.project}"
 
     @trace_sentry.global_trace_sentry.watch()
     def _op_calls(self, op: Op) -> CallsIter:
@@ -898,27 +1313,6 @@ class WeaveClient:
         )
         return response.objs
 
-    def _save_op(self, op: Op, name: Optional[str] = None) -> Ref:
-        if op.ref is not None:
-            return op.ref
-
-        if name is None:
-            name = op.name
-
-        return self._save_and_attach_ref(op, name)
-
-    def _save_and_attach_ref(self, op: Any, name: Optional[str] = None) -> Ref:
-        if (ref := getattr(op, "ref", None)) is not None:
-            return ref
-
-        op_def_ref = self._save_object_basic(op, name)
-
-        # setattr(op, "ref", op_def_ref) fails here
-        # op.ref = op_def_ref fails here
-        # Seems to be the only way to set the ref on the op
-        op.__dict__["ref"] = op_def_ref
-        return op_def_ref
-
     @trace_sentry.global_trace_sentry.watch()
     def _set_call_display_name(
         self, call: Call, display_name: Optional[str] = None
@@ -937,12 +1331,6 @@ class WeaveClient:
     def _remove_call_display_name(self, call: Call) -> None:
         self._set_call_display_name(call, None)
 
-    def _ref_input_to(self, ref: ref_base.Ref) -> Sequence[Call]:
-        raise NotImplementedError()
-
-    def _ref_value_input_to(self, ref: ref_base.Ref) -> list[Call]:
-        raise NotImplementedError()
-
     def _ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
         raise NotImplementedError()
 
@@ -951,6 +1339,21 @@ class WeaveClient:
 
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
+
+    def _flush(self) -> None:
+        # Used to wait until all currently enqueued jobs are processed
+        if not self.future_executor._in_thread_context.get():
+            self.future_executor.flush()
+        if self._server_is_flushable:
+            # We don't want to do an instance check here because it could
+            # be susceptible to shutdown race conditions. So we save a boolean
+            # _server_is_flushable and only call this if we know the server is
+            # flushable. The # type: ignore is safe because we check the type
+            # first.
+            self.server.call_processor.wait_until_all_processed()  # type: ignore
+
+    def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+        return self.future_executor.defer(self.server.file_create, req)
 
 
 def safe_current_wb_run_id() -> Optional[str]:

@@ -22,3 +22,48 @@ Functions decorated with `@weave.op()` will behave normally (without code versio
 :::
 
 Ops can be [served](/guides/tools/serve) or [deployed](/guides/tools/deploy) using the Weave toolbelt.
+
+## Customize display names
+
+You can customize the op's display name by setting the `name` parameter in the `@weave.op` decorator:
+
+```python
+@weave.op(name="custom_name")
+def func():
+    ...
+```
+
+## Customize logged inputs and outputs
+
+If you want to change the data that is logged to weave without modifying the original function (e.g. to hide sensitive data), you can pass `postprocess_inputs` and `postprocess_output` to the op decorator.
+
+`postprocess_inputs` takes in a dict where the keys are the argument names and the values are the argument values, and returns a dict with the transformed inputs.
+
+`postprocess_output` takes in any value which would normally be returned by the function and returns the transformed output.
+
+```py
+from dataclasses import dataclass
+from typing import Any
+import weave
+
+@dataclass
+class CustomObject:
+    x: int
+    secret_password: str
+
+def postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+    return {k:v for k,v in inputs.items() if k != "hide_me"}
+
+def postprocess_output(output: CustomObject) -> CustomObject:
+    return CustomObject(x=output.x, secret_password="REDACTED")
+
+@weave.op(
+    postprocess_inputs=postprocess_inputs,
+    postprocess_output=postprocess_output,
+)
+def func(a: int, hide_me: str) -> CustomObject:
+    return CustomObject(x=a, secret_password=hide_me)
+
+weave.init('hide-data-example') # 🐝
+func(a=1, hide_me="password123")
+```

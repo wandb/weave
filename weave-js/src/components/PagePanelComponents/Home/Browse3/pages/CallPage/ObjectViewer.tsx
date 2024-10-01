@@ -41,7 +41,7 @@ import {
 import {mapObject, ObjectPath, traverse, TraverseContext} from './traverse';
 import {ValueView} from './ValueView';
 
-type Data = Record<string, any>;
+type Data = Record<string, any> | any[];
 
 type ObjectViewerProps = {
   apiRef: React.MutableRefObject<GridApiPro>;
@@ -63,6 +63,8 @@ const getRefs = (data: Data): string[] => {
 };
 
 type RefValues = Record<string, any>; // ref URI to value
+
+const RESOVLED_REF_KEY = '_ref';
 
 // This is a general purpose object viewer that can be used to view any object.
 export const ObjectViewer = ({
@@ -89,6 +91,27 @@ export const ObjectViewer = ({
   const addExpandedRef = useCallback((path: string, ref: string) => {
     setExpandedRefs(eRefs => ({...eRefs, [path]: ref}));
   }, []);
+
+  // This effect will ensure that all "expandedIds" whose value is a ref
+  // have the ref added to the `expandedRefs` state.
+  useEffect(() => {
+    const expandRefsToAdd: {[path: string]: string} = {};
+    const mapper = (context: TraverseContext) => {
+      const contextPath = context.path.toString();
+      if (
+        expandedIds.includes(contextPath) &&
+        isWeaveRef(context.value) &&
+        expandedRefs[contextPath] == null
+      ) {
+        expandRefsToAdd[contextPath] = context.value;
+      }
+      return context.value;
+    };
+    mapObject(resolvedData, mapper);
+    if (Object.keys(expandRefsToAdd).length > 0) {
+      setExpandedRefs(eRefs => ({...eRefs, ...expandRefsToAdd}));
+    }
+  }, [resolvedData, expandedIds, expandedRefs, setExpandedRefs]);
 
   // `refs` is the union of `dataRefs` and the refs in `expandedRefs`.
   const refs = useMemo(() => {
@@ -123,13 +146,13 @@ export const ObjectViewer = ({
         if (typeof val === 'object' && val !== null) {
           val = {
             ...v,
-            _ref: r,
+            [RESOVLED_REF_KEY]: r,
           };
         } else {
           // This makes it so that runs pointing to primitives can still be expanded in the table.
           val = {
             '': v,
-            _ref: r,
+            [RESOVLED_REF_KEY]: r,
           };
         }
       }
@@ -137,19 +160,15 @@ export const ObjectViewer = ({
     }
     let resolved = data;
     let dirty = true;
-    const resolvedRefPaths = new Set<string>();
     const mapper = (context: TraverseContext) => {
       if (
         isWeaveRef(context.value) &&
         refValues[context.value] != null &&
-        // If this is a ref and the parent has been visited, we already resolved
-        // this ref. Example: `a._ref` where `a` is already in resolvedRefPaths
-        !resolvedRefPaths.has(context.value + context.parent?.toString() ?? '')
+        // Don't expand _ref keys
+        context.path.tail() !== RESOVLED_REF_KEY
       ) {
         dirty = true;
-        const res = refValues[context.value];
-        resolvedRefPaths.add(context.value + context.path.toString());
-        return res;
+        return refValues[context.value];
       }
       return _.clone(context.value);
     };
@@ -275,6 +294,7 @@ export const ObjectViewer = ({
         field: 'value',
         headerName: 'Value',
         flex: 1,
+        display: 'flex',
         sortable: false,
         renderCell: ({row}) => {
           if (row.isCode) {
@@ -408,6 +428,7 @@ export const ObjectViewer = ({
         isGroupExpandedByDefault={node => {
           return expandedIds.includes(node.id);
         }}
+        autoHeight
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
           const isNonRefString =

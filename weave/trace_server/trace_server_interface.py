@@ -1,4 +1,5 @@
 import datetime
+from enum import Enum
 from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
@@ -29,10 +30,10 @@ class LLMUsageSchema(TypedDict, total=False):
 
 
 class LLMCostSchema(LLMUsageSchema):
-    prompt_tokens_cost: Optional[float]
-    completion_tokens_cost: Optional[float]
-    cost_per_prompt_token: Optional[float]
-    cost_per_completion_token: Optional[float]
+    prompt_tokens_total_cost: Optional[float]
+    completion_tokens_total_cost: Optional[float]
+    prompt_token_cost: Optional[float]
+    completion_token_cost: Optional[float]
     prompt_token_cost_unit: Optional[str]
     completion_token_cost_unit: Optional[str]
     effective_date: Optional[str]
@@ -53,10 +54,17 @@ class FeedbackDict(TypedDict, total=False):
     wb_user_id: Optional[str]
 
 
+class TraceStatus(str, Enum):
+    SUCCESS = "success"
+    ERROR = "error"
+    RUNNING = "running"
+
+
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
-    status: Optional[Literal["success", "error", "running"]]
-    nice_trace_name: Optional[str]
-    latency: Optional[int]
+    status: Optional[TraceStatus]
+    trace_name: Optional[str]
+    # latency in milliseconds
+    latency_ms: Optional[int]
     costs: Optional[Dict[str, LLMCostSchema]]
     feedback: Optional[List[FeedbackDict]]
 
@@ -360,15 +368,57 @@ class ObjReadRes(BaseModel):
 
 
 class ObjectVersionFilter(BaseModel):
-    base_object_classes: Optional[List[str]] = None
-    object_ids: Optional[List[str]] = None
-    is_op: Optional[bool] = None
-    latest_only: Optional[bool] = None
+    base_object_classes: Optional[List[str]] = Field(
+        default=None,
+        description="Filter objects by their base classes",
+        examples=[["Model"], ["Dataset"]],
+    )
+    object_ids: Optional[List[str]] = Field(
+        default=None,
+        description="Filter objects by their IDs",
+        examples=["my_favorite_model", "my_favorite_dataset"],
+    )
+    is_op: Optional[bool] = Field(
+        default=None,
+        description="Filter objects based on whether they are weave.ops or not. `True` will only return ops, `False` will return non-ops, and `None` will return all objects",
+        examples=[True, False, None],
+    )
+    latest_only: Optional[bool] = Field(
+        default=None,
+        description="If True, return only the latest version of each object. `False` and `None` will return all versions",
+        examples=[True, False],
+    )
 
 
 class ObjQueryReq(BaseModel):
-    project_id: str
-    filter: Optional[ObjectVersionFilter] = None
+    project_id: str = Field(
+        description="The ID of the project to query", examples=["user/project"]
+    )
+    filter: Optional[ObjectVersionFilter] = Field(
+        default=None,
+        description="Filter criteria for the query. See `ObjectVersionFilter`",
+        examples=[
+            ObjectVersionFilter(object_ids=["my_favorite_model"], latest_only=True)
+        ],
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of results to return", examples=[100]
+    )
+    offset: Optional[int] = Field(
+        default=None,
+        description="Number of results to skip before returning",
+        examples=[0],
+    )
+    sort_by: Optional[List[SortBy]] = Field(
+        default=None,
+        description="Sorting criteria for the query results. Currently only supports 'object_id' and 'created_at'.",
+        examples=[[SortBy(field="created_at", direction="desc")]],
+    )
+    metadata_only: Optional[bool] = Field(
+        default=False,
+        description="If true, the `val` column is not read from the database and is empty."
+        "All other fields are returned.",
+    )
 
 
 class ObjQueryRes(BaseModel):
@@ -466,6 +516,18 @@ class TableUpdateReq(BaseModel):
 
 class TableUpdateRes(BaseModel):
     digest: str
+    # A note to developers:
+    # This default factory is needed because we share the
+    # same interface for the python client and the server.
+    # As a result, we might have servers in the wild that
+    # do not support this field. Therefore, we want to ensure
+    # that clients expecting this field will not break when
+    # they are targetting an older server. We should remove
+    # this default factory once we are sure that all servers
+    # have been updated to support this field.
+    updated_row_digests: list[str] = Field(
+        default_factory=list, description="The digests of the rows that were updated"
+    )
 
 
 class TableRowSchema(BaseModel):
@@ -475,22 +537,84 @@ class TableRowSchema(BaseModel):
 
 class TableCreateRes(BaseModel):
     digest: str
+    # A note to developers:
+    # This default factory is needed because we share the
+    # same interface for the python client and the server.
+    # As a result, we might have servers in the wild that
+    # do not support this field. Therefore, we want to ensure
+    # that clients expecting this field will not break when
+    # they are targetting an older server. We should remove
+    # this default factory once we are sure that all servers
+    # have been updated to support this field.
+    row_digests: list[str] = Field(
+        default_factory=list, description="The digests of the rows that were created"
+    )
 
 
 class TableRowFilter(BaseModel):
-    row_digests: Optional[List[str]] = None
+    row_digests: Optional[List[str]] = Field(
+        default=None,
+        description="List of row digests to filter by",
+        examples=[
+            [
+                "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+                "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+            ]
+        ],
+    )
 
 
 class TableQueryReq(BaseModel):
-    project_id: str
-    digest: str
-    filter: Optional[TableRowFilter] = None
-    limit: Optional[int] = None
-    offset: Optional[int] = None
+    project_id: str = Field(
+        description="The ID of the project", examples=["my_entity/my_project"]
+    )
+    digest: str = Field(
+        description="The digest of the table to query",
+        examples=["aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"],
+    )
+    filter: Optional[TableRowFilter] = Field(
+        default=None,
+        description="Optional filter to apply to the query. See `TableRowFilter` for more details.",
+        examples=[
+            {
+                "row_digests": [
+                    "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+                    "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+                ]
+            }
+        ],
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of rows to return", examples=[100]
+    )
+    offset: Optional[int] = Field(
+        default=None,
+        description="Number of rows to skip before starting to return rows",
+        examples=[10],
+    )
+    sort_by: Optional[List[SortBy]] = Field(
+        default=None,
+        description="List of fields to sort by. Fields can be dot-separated to access dictionary values. No sorting uses the default table order (insertion order).",
+        examples=[[{"field": "col_a.prop_b", "order": "desc"}]],
+    )
 
 
 class TableQueryRes(BaseModel):
     rows: List[TableRowSchema]
+
+
+class TableQueryStatsReq(BaseModel):
+    project_id: str = Field(
+        description="The ID of the project", examples=["my_entity/my_project"]
+    )
+    digest: str = Field(
+        description="The digest of the table to query",
+        examples=["aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"],
+    )
+
+
+class TableQueryStatsRes(BaseModel):
+    count: int
 
 
 class RefsReadBatchReq(BaseModel):
@@ -590,6 +714,88 @@ class EnsureProjectExistsRes(BaseModel):
     project_name: str
 
 
+class CostCreateInput(BaseModel):
+    prompt_token_cost: float
+    completion_token_cost: float
+    prompt_token_cost_unit: Optional[str] = Field(
+        "USD", description="The unit of the cost for the prompt tokens"
+    )
+    completion_token_cost_unit: Optional[str] = Field(
+        "USD", description="The unit of the cost for the completion tokens"
+    )
+    effective_date: Optional[datetime.datetime] = Field(
+        None,
+        description="The date after which the cost is effective for, will default to the current date if not provided",
+    )
+    provider_id: Optional[str] = Field(
+        None,
+        description="The provider of the LLM, e.g. 'openai' or 'mistral'. If not provided, the provider_id will be set to 'default'",
+    )
+
+
+class CostCreateReq(BaseModel):
+    project_id: str = Field(examples=["entity/project"])
+    costs: Dict[str, CostCreateInput]
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+# Returns a list of tuples of (llm_id, cost_id)
+class CostCreateRes(BaseModel):
+    ids: list[tuple[str, str]]
+
+
+class CostQueryReq(BaseModel):
+    project_id: str = Field(examples=["entity/project"])
+    fields: Optional[list[str]] = Field(
+        default=None,
+        examples=[
+            [
+                "id",
+                "llm_id",
+                "prompt_token_cost",
+                "completion_token_cost",
+                "prompt_token_cost_unit",
+                "completion_token_cost_unit",
+                "effective_date",
+                "provider_id",
+            ]
+        ],
+    )
+    query: Optional[Query] = None
+    # TODO: From FeedbackQueryReq,
+    # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
+    # TODO: Might be nice to have shortcut for single field and implied ASC direction
+    sort_by: Optional[List[SortBy]] = None
+    limit: Optional[int] = Field(default=None, examples=[10])
+    offset: Optional[int] = Field(default=None, examples=[0])
+
+
+class CostQueryOutput(BaseModel):
+    id: Optional[str] = Field(default=None, examples=["2341-asdf-asdf"])
+    llm_id: Optional[str] = Field(default=None, examples=["gpt4"])
+    prompt_token_cost: Optional[float] = Field(default=None, examples=[1.0])
+    completion_token_cost: Optional[float] = Field(default=None, examples=[1.0])
+    prompt_token_cost_unit: Optional[str] = Field(default=None, examples=["USD"])
+    completion_token_cost_unit: Optional[str] = Field(default=None, examples=["USD"])
+    effective_date: Optional[datetime.datetime] = Field(
+        default=None, examples=["2024-01-01T00:00:00Z"]
+    )
+    provider_id: Optional[str] = Field(default=None, examples=["openai"])
+
+
+class CostQueryRes(BaseModel):
+    results: list[CostQueryOutput]
+
+
+class CostPurgeReq(BaseModel):
+    project_id: str = Field(examples=["entity/project"])
+    query: Query
+
+
+class CostPurgeRes(BaseModel):
+    pass
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -611,6 +817,11 @@ class TraceServerInterface(Protocol):
     def op_read(self, req: OpReadReq) -> OpReadRes: ...
     def ops_query(self, req: OpQueryReq) -> OpQueryRes: ...
 
+    # Cost API
+    def cost_create(self, req: CostCreateReq) -> CostCreateRes: ...
+    def cost_query(self, req: CostQueryReq) -> CostQueryRes: ...
+    def cost_purge(self, req: CostPurgeReq) -> CostPurgeRes: ...
+
     # Obj API
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
     def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
@@ -618,22 +829,10 @@ class TraceServerInterface(Protocol):
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...
     def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
+    def table_query_stats(self, req: TableQueryStatsReq) -> TableQueryStatsRes: ...
     def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes: ...
     def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes: ...
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
-
-
-# These symbols are used in the WB Trace Server and it is not safe
-# to remove them, else it will break the server. Once the server
-# is updated to use the new symbols, these can be removed.
-
-# Legacy Names (i think these might be used in a few growth examples, so keeping
-# around until we clean those up of them)
-_CallsFilter = CallsFilter
-_SortBy = SortBy
-_OpVersionFilter = OpVersionFilter
-_ObjectVersionFilter = ObjectVersionFilter
-_TableRowFilter = TableRowFilter

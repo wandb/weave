@@ -12,6 +12,7 @@ import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
+import {TEAL_600} from '../../../../../../common/css/color.styles';
 import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
@@ -42,7 +43,7 @@ import {
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
 
-const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage'];
+const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.weave'];
 
 export const useCallsTableColumns = (
   entity: string,
@@ -184,8 +185,9 @@ function buildCallsTableColumns(
       minWidth: 100,
       width: 250,
       hideable: false,
-      valueGetter: rowParams => {
-        const op_name = rowParams.row.op_name;
+      display: 'flex',
+      valueGetter: (unused: any, row: any) => {
+        const op_name = row.op_name;
         if (!isWeaveRef(op_name)) {
           return op_name;
         }
@@ -204,6 +206,7 @@ function buildCallsTableColumns(
             callId={rowParams.row.id}
             fullWidth={true}
             preservePath={preservePath}
+            color={TEAL_600}
           />
         );
       },
@@ -237,7 +240,7 @@ function buildCallsTableColumns(
           {
             field: 'derived.op_version',
             headerName: 'Op Version',
-            type: 'number',
+            type: 'number' as const,
             align: 'right' as const,
             disableColumnMenu: true,
             sortable: false,
@@ -262,15 +265,16 @@ function buildCallsTableColumns(
     //   },
     // },
     {
-      field: 'summary.weave.status',
+      field: 'status',
       headerName: 'Status',
       headerAlign: 'center',
       sortable: false,
       // disableColumnMenu: true,
       resizable: false,
       width: 59,
-      valueGetter: cellParams => {
-        return traceCallStatusCode(cellParams.row);
+      display: 'flex',
+      valueGetter: (unused: any, row: any) => {
+        return traceCallStatusCode(row);
       },
       renderCell: cellParams => {
         return (
@@ -309,6 +313,7 @@ function buildCallsTableColumns(
     align: 'center',
     sortable: false,
     resizable: false,
+    display: 'flex',
     renderCell: cellParams => {
       const userId = cellParams.row.wb_user_id;
       if (userId == null) {
@@ -355,7 +360,7 @@ function buildCallsTableColumns(
   cols.push(startedAtCol);
 
   cols.push({
-    field: 'summary.weave.tokens',
+    field: 'tokens',
     headerName: 'Tokens',
     width: 100,
     minWidth: 100,
@@ -363,8 +368,8 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
-    valueGetter: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
+    valueGetter: (unused: any, row: any) => {
+      const usage = getUsageFromCellParams(row);
       const {tokensNum} = getTokensAndCostFromUsage(usage);
       return tokensNum;
     },
@@ -376,7 +381,7 @@ function buildCallsTableColumns(
   });
 
   cols.push({
-    field: 'summary.weave.cost',
+    field: 'cost',
     headerName: 'Cost',
     width: 100,
     minWidth: 100,
@@ -384,8 +389,8 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
-    valueGetter: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
+    valueGetter: (unused: any, row: any) => {
+      const usage = getUsageFromCellParams(row);
       const {costNum} = getTokensAndCostFromUsage(usage);
       return costNum;
     },
@@ -397,7 +402,7 @@ function buildCallsTableColumns(
   });
 
   cols.push({
-    field: 'summary.weave.latency',
+    field: 'latency',
     headerName: 'Latency',
     width: 100,
     minWidth: 100,
@@ -405,13 +410,13 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
-    valueGetter: cellParams => {
-      if (traceCallStatusCode(cellParams.row) === 'UNSET') {
+    valueGetter: (unused: any, row: any) => {
+      if (traceCallStatusCode(row) === 'UNSET') {
         // Call is still in progress, latency will be 0.
         // Displaying nothing seems preferable to being misleading.
         return null;
       }
-      return traceCallLatencyS(cellParams.row);
+      return traceCallLatencyS(row);
     },
     renderCell: cellParams => {
       if (traceCallStatusCode(cellParams.row) === 'UNSET') {
