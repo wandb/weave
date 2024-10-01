@@ -6,8 +6,14 @@ name: Notify wandb/core
 on:
   push:
     branches:
-      - "**"
+      - '**'
   workflow_dispatch:
+    inputs:
+      run_core_integration_tests:
+        description: 'Run core integration tests'
+        required: true
+        type: boolean
+        default: true
 
 jobs:
   notify-wandb-core:
@@ -19,4 +25,4 @@ jobs:
           token: ${{ secrets.WANDB_CORE_ACCESS_TOKEN }}
           repository: wandb/core
           event-type: weave-package-updated
-          client-payload: '{"ref_name": "${{ github.ref_name }}", "sha": "${{ github.sha }}"}'
+          client-payload: '{"ref_name": "${{ github.ref_name }}", "sha": "${{ github.sha }}", "run_core_integration_tests": ${{ github.event.inputs.run_core_integration_tests }}}'
