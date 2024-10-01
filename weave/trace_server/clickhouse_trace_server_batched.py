@@ -106,7 +106,7 @@ MAX_FLUSH_AGE = 15
 FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 100
-MAX_CALL_STREAM_BATCH_SIZE = 500
+MAX_CALLS_STREAM_BATCH_SIZE = 500
 
 
 class NotFoundError(Exception):
@@ -350,7 +350,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         yield tsi.CallSchema.model_validate(call)
 
                     # *** Dynamic increase from 10 to 500 ***
-                    batch_size = min(MAX_CALL_STREAM_BATCH_SIZE, batch_size * 10)
+                    batch_size = min(MAX_CALLS_STREAM_BATCH_SIZE, batch_size * 10)
                     batch = []
 
             hydrated_batch = self._hydrate_calls(
