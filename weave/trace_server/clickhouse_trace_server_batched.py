@@ -648,8 +648,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
-        # To ensure no data is deleted, read obj from db first, then
-        # create payload with deleted_at and insert
+        # 1. Read the entire object from the db based on id and digest
+        # 2. Set deleted_at to the current time
+        # 3. Insert this object into object_versions
+        #    - This object should be IDENTICAL to the original, including
+        #      the created_at time, this will become the only copy of the
+        #      object when the db deduplicates on primary key
         db_obj = self.obj_read(
             tsi.ObjReadReq(
                 project_id=req.project_id,
@@ -1012,7 +1016,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 parameters[version_param_key] = ref.version
 
             if len(conds) > 0:
-                conds += ["deleted_at IS NULL"]
                 conditions = [combine_conditions(conds, "OR")]
                 object_id_conditions = [combine_conditions(object_id_conds, "OR")]
                 objs = self._select_objs_query(
@@ -1485,10 +1488,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not object_id_conditions:
             object_id_conditions = ["1 = 1"]
 
-        deleted_at_condition = "deleted_at IS NULL" if not include_deleted else "1 = 1"
-
         conditions_part = combine_conditions(conditions, "AND")
         object_id_conditions_part = combine_conditions(object_id_conditions, "AND")
+        deleted_at_condition_part = (
+            "deleted_at IS NULL" if not include_deleted else "1 = 1"
+        )
 
         limit_part = ""
         offset_part = ""
@@ -1546,7 +1550,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     is_op,
                     deleted_at,
                     row_number() OVER (
-                        PARTITION BY project_id, kind, object_id
+                        PARTITION BY project_id,
+                        kind,
+                        object_id
                         ORDER BY created_at ASC
                     ) - 1 AS version_index,
                     count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
@@ -1575,7 +1581,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
                 WHERE rn = 1
             )
-            WHERE {deleted_at_condition} AND
+            WHERE {deleted_at_condition_part} AND
             {conditions_part}
             {sort_part}
             {limit_part}
