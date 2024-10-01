@@ -1,14 +1,17 @@
 from typing import Dict, Optional, Union
-import warnings
 
 from notdiamond.toolkit.custom_router import CustomRouter
 import pandas as pd
 
 import weave
+from weave.flow.eval import EvaluationResults
 
-
-def train_on_evaluations(
-    model_evals: dict[Union[weave.Model, str], weave.EvaluationResults],
+@weave.op(
+    description="Train a custom router on evaluation results.",
+    name="notdiamond.custom_router.train_evaluations",
+)
+def train_evaluations(
+    model_evals: dict[Union[weave.Model, str], EvaluationResults],
     prompt_column: str,
     response_column: str,
     preference_id: Optional[str] = None,
@@ -20,6 +23,28 @@ def train_on_evaluations(
     Currently only supports EvaluationResults with a single score column.
     """
     router_dataset: Dict[str, pd.DataFrame] = {}
+
+    def _get_score_column(scores: dict, score_col_name: str = None) -> float:
+        """
+        Extract a single score from the nested `scores` column.
+          - raise for multiple scores
+          - build score column name if not provided
+        """
+        if len(scores) > 1:
+            raise ValueError(
+                f"Multiple eval scores for {model}. Please specify a single score column."
+            )
+
+        score_column, score_val = next(iter(scores.items()))
+        _nd_score_column = f"{score_column}_score"
+        if score_col_name is not None and _nd_score_column != score_col_name:
+            raise ValueError(
+                f"Multiple eval scores for {model}: {score_col_name} and {_nd_score_column}. "
+                "Please specify a single score column."
+            )
+
+        return _nd_score_column, score_val
+
     for model, eval_results in model_evals.items():
         if isinstance(model, weave.Model):
             model = model.name or f"model-{_placeholder_model_name()}"
@@ -30,22 +55,11 @@ def train_on_evaluations(
             _df_row = dict()
             for col, val in row.items():
                 if col == 'scores':
-                    # get the first score; raise if there are multiple
-                    if len(val) > 1:
-                        raise ValueError(f"Multiple eval scores for {model}. Please specify a single score column.")
-
-                    score_column, score_val = next(iter(val.items()))
-                    _nd_score_column = f"{score_column}_score"
-                    _df_row[_nd_score_column] = score_val
-
-                    if score_col_name is not None and _nd_score_column != score_col_name:
-                        raise ValueError(
-                            f"Multiple eval scores for {model}: {score_col_name} and {_nd_score_column}. Please specify a single score column."
-                        )
-                    score_col_name = _nd_score_column
-                else:
-                    _df_row[col] = val
+                    col, val = _get_score_column(val, score_col_name=score_col_name)
+                    score_col_name = score_col_name or col
+                _df_row[col] = val
             df_rows.append(_df_row)
+
         eval_df = pd.DataFrame(df_rows)
         router_dataset[model] = eval_df
 
@@ -58,19 +72,6 @@ def train_on_evaluations(
         score_column=score_col_name,
         preference_id=preference_id,
     )
-
-def train_on_dataset(
-    dataset: weave.Dataset,
-    prompt_column: str,
-    response_column: str,
-    score_column: str,
-    preference_id: Optional[str] = None,
-    **kwargs,
-) -> CustomRouter:
-    """
-    """
-    # todo
-    pass
 
 def _placeholder_model_name() -> str:
     import random

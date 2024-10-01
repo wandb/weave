@@ -1,6 +1,5 @@
 import os
 import pytest
-import time
 
 from weave.trace.weave_client import WeaveClient
 from weave.integrations.integration_utilities import (
