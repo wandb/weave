@@ -41,7 +41,7 @@ class UserSettings(BaseModel):
 
     disabled: bool = False
     """Toggles Weave tracing.
-
+    
     If True, all weave ops will behave like regular functions.
     Can be overrided with the environment variable `WEAVE_DISABLED`"""
 
