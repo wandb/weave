@@ -910,8 +910,8 @@ class WeaveClient:
 
         Args:
             llm_id: The ID of the LLM. eg "gpt-4o-mini-2024-07-18"
-            prompt_token_cost: The cost of the prompt tokens. eg .0005
-            completion_token_cost: The cost of the completion tokens. eg .0015
+            prompt_token_cost: The cost per prompt token. eg .0005
+            completion_token_cost: The cost per completion token. eg .0015
             effective_date: Defaults to the current date. A datetime.datetime object.
             provider_id: The provider of the LLM. Defaults to "default". eg "openai"
             prompt_token_cost_unit: The unit of the cost for the prompt tokens. Defaults to "USD". (Currently unused, will be used in the future to specify the currency type for the cost eg "tokens" or "time")

@@ -1,7 +1,7 @@
 import io
 import json
 import logging
-import typing as t
+from typing import Any, Iterator, List, Optional, Tuple, Type, Union, cast
 
 import tenacity
 from pydantic import BaseModel, ValidationError
@@ -26,7 +26,7 @@ class EndBatchItem(BaseModel):
 
 
 class Batch(BaseModel):
-    batch: t.List[t.Union[StartBatchItem, EndBatchItem]]
+    batch: list[Union[StartBatchItem, EndBatchItem]]
 
 
 class ServerInfoRes(BaseModel):
@@ -57,7 +57,7 @@ def _is_retryable_exception(e: Exception) -> bool:
         # Unknown server error
         # TODO(np): We need to fix the server to return proper status codes
         # for downstream 401, 403, 404, etc... Those should propagate back to
-        # the client.
+        # the clien
         if e.response.status_code == 500:
             return False
 
@@ -76,7 +76,7 @@ def _log_retry(retry_state: tenacity.RetryCallState) -> None:
     )
 
 
-def _log_failure(retry_state: tenacity.RetryCallState) -> t.Any:
+def _log_failure(retry_state: tenacity.RetryCallState) -> Any:
     logger.info(
         "retry_failed",
         extra={
@@ -104,7 +104,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self.should_batch = should_batch
         if self.should_batch:
             self.call_processor = AsyncBatchProcessor(self._flush_calls)
-        self._auth: t.Optional[t.Tuple[str, str]] = None
+        self._auth: Optional[Tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
     def ensure_project_exists(
@@ -120,7 +120,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
         return cls(weave_trace_server_url(), should_batch)
 
-    def set_auth(self, auth: t.Tuple[str, str]) -> None:
+    def set_auth(self, auth: Tuple[str, str]) -> None:
         self._auth = auth
 
     @tenacity.retry(
@@ -135,7 +135,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     )
     def _flush_calls(
         self,
-        batch: t.List,
+        batch: List,
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
@@ -216,8 +216,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self,
         url: str,
         req: BaseModel,
-        req_model: t.Type[BaseModel],
-        res_model: t.Type[BaseModel],
+        req_model: Type[BaseModel],
+        res_model: Type[BaseModel],
     ) -> BaseModel:
         if isinstance(req, dict):
             req = req_model.model_validate(req)
@@ -228,9 +228,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self,
         url: str,
         req: BaseModel,
-        req_model: t.Type[BaseModel],
-        res_model: t.Type[BaseModel],
-    ) -> t.Iterator[BaseModel]:
+        req_model: Type[BaseModel],
+        res_model: Type[BaseModel],
+    ) -> Iterator[BaseModel]:
         if isinstance(req, dict):
             req = req_model.model_validate(req)
         r = self._generic_request_executor(url, req, stream=True)
@@ -255,7 +255,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     # Call API
     def call_start(
-        self, req: t.Union[tsi.CallStartReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.CallStartReq, dict[str, Any]]
     ) -> tsi.CallStartRes:
         if self.should_batch:
             req_as_obj: tsi.CallStartReq
@@ -263,21 +263,19 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 req_as_obj = tsi.CallStartReq.model_validate(req)
             else:
                 req_as_obj = req
-            if req_as_obj.start.id == None or req_as_obj.start.trace_id == None:
+            if req_as_obj.starid == None or req_as_obj.startrace_id == None:
                 raise ValueError(
                     "CallStartReq must have id and trace_id when batching."
                 )
             self.call_processor.enqueue([StartBatchItem(req=req_as_obj)])
             return tsi.CallStartRes(
-                id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id
+                id=req_as_obj.starid, trace_id=req_as_obj.startrace_id
             )
         return self._generic_request(
             "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
         )
 
-    def call_end(
-        self, req: t.Union[tsi.CallEndReq, t.Dict[str, t.Any]]
-    ) -> tsi.CallEndRes:
+    def call_end(self, req: Union[tsi.CallEndReq, dict[str, Any]]) -> tsi.CallEndRes:
         if self.should_batch:
             req_as_obj: tsi.CallEndReq
             if isinstance(req, dict):
@@ -288,41 +286,39 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             return tsi.CallEndRes()
         return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
 
-    def call_read(
-        self, req: t.Union[tsi.CallReadReq, t.Dict[str, t.Any]]
-    ) -> tsi.CallReadRes:
+    def call_read(self, req: Union[tsi.CallReadReq, dict[str, Any]]) -> tsi.CallReadRes:
         return self._generic_request(
             "/call/read", req, tsi.CallReadReq, tsi.CallReadRes
         )
 
     def calls_query(
-        self, req: t.Union[tsi.CallsQueryReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.CallsQueryReq, dict[str, Any]]
     ) -> tsi.CallsQueryRes:
         return self._generic_request(
             "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
         )
 
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> t.Iterator[tsi.CallSchema]:
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         return self._generic_stream_request(
             "/calls/stream_query", req, tsi.CallsQueryReq, tsi.CallSchema
         )
 
     def calls_query_stats(
-        self, req: t.Union[tsi.CallsQueryStatsReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.CallsQueryStatsReq, dict[str, Any]]
     ) -> tsi.CallsQueryStatsRes:
         return self._generic_request(
             "/calls/query_stats", req, tsi.CallsQueryStatsReq, tsi.CallsQueryStatsRes
         )
 
     def calls_delete(
-        self, req: t.Union[tsi.CallsDeleteReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.CallsDeleteReq, dict[str, Any]]
     ) -> tsi.CallsDeleteRes:
         return self._generic_request(
             "/calls/delete", req, tsi.CallsDeleteReq, tsi.CallsDeleteRes
         )
 
     def call_update(
-        self, req: t.Union[tsi.CallUpdateReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.CallUpdateReq, dict[str, Any]]
     ) -> tsi.CallUpdateRes:
         return self._generic_request(
             "/call/update", req, tsi.CallUpdateReq, tsi.CallUpdateRes
@@ -330,54 +326,48 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     # Op API
 
-    def op_create(
-        self, req: t.Union[tsi.OpCreateReq, t.Dict[str, t.Any]]
-    ) -> tsi.OpCreateRes:
+    def op_create(self, req: Union[tsi.OpCreateReq, dict[str, Any]]) -> tsi.OpCreateRes:
         return self._generic_request(
             "/op/create", req, tsi.OpCreateReq, tsi.OpCreateRes
         )
 
-    def op_read(self, req: t.Union[tsi.OpReadReq, t.Dict[str, t.Any]]) -> tsi.OpReadRes:
+    def op_read(self, req: Union[tsi.OpReadReq, dict[str, Any]]) -> tsi.OpReadRes:
         return self._generic_request("/op/read", req, tsi.OpReadReq, tsi.OpReadRes)
 
-    def ops_query(
-        self, req: t.Union[tsi.OpQueryReq, t.Dict[str, t.Any]]
-    ) -> tsi.OpQueryRes:
+    def ops_query(self, req: Union[tsi.OpQueryReq, dict[str, Any]]) -> tsi.OpQueryRes:
         return self._generic_request("/ops/query", req, tsi.OpQueryReq, tsi.OpQueryRes)
 
     # Obj API
 
     def obj_create(
-        self, req: t.Union[tsi.ObjCreateReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.ObjCreateReq, dict[str, Any]]
     ) -> tsi.ObjCreateRes:
         return self._generic_request(
             "/obj/create", req, tsi.ObjCreateReq, tsi.ObjCreateRes
         )
 
-    def obj_read(
-        self, req: t.Union[tsi.ObjReadReq, t.Dict[str, t.Any]]
-    ) -> tsi.ObjReadRes:
+    def obj_read(self, req: Union[tsi.ObjReadReq, dict[str, Any]]) -> tsi.ObjReadRes:
         return self._generic_request("/obj/read", req, tsi.ObjReadReq, tsi.ObjReadRes)
 
     def objs_query(
-        self, req: t.Union[tsi.ObjQueryReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.ObjQueryReq, dict[str, Any]]
     ) -> tsi.ObjQueryRes:
         return self._generic_request(
             "/objs/query", req, tsi.ObjQueryReq, tsi.ObjQueryRes
         )
 
     def table_create(
-        self, req: t.Union[tsi.TableCreateReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.TableCreateReq, dict[str, Any]]
     ) -> tsi.TableCreateRes:
         """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
         due to the property that table creation can be decomposed into a series of
         updates. This is useful when the table creation size is too big to be sent in
-        a single request. We can create an empty table first, then update the table
+        a single reques We can create an empty table first, then update the table
         with the rows.
         """
         if isinstance(req, dict):
             req = tsi.TableCreateReq.model_validate(req)
-        req = t.cast(tsi.TableCreateReq, req)
+        req = cast(tsi.TableCreateReq, req)
 
         estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
         if estimated_bytes > self.remote_request_bytes_limit:
@@ -414,7 +404,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         """
         if isinstance(req, dict):
             req = tsi.TableUpdateReq.model_validate(req)
-        req = t.cast(tsi.TableUpdateReq, req)
+        req = cast(tsi.TableUpdateReq, req)
 
         estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
         if estimated_bytes > self.remote_request_bytes_limit and len(req.updates) > 1:
@@ -443,14 +433,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             )
 
     def table_query(
-        self, req: t.Union[tsi.TableQueryReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.TableQueryReq, dict[str, Any]]
     ) -> tsi.TableQueryRes:
         return self._generic_request(
             "/table/query", req, tsi.TableQueryReq, tsi.TableQueryRes
         )
 
     def refs_read_batch(
-        self, req: t.Union[tsi.RefsReadBatchReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.RefsReadBatchReq, dict[str, Any]]
     ) -> tsi.RefsReadBatchRes:
         return self._generic_request(
             "/refs/read_batch", req, tsi.RefsReadBatchReq, tsi.RefsReadBatchRes
@@ -500,21 +490,21 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return tsi.FileContentReadRes(content=bytes.read())
 
     def feedback_create(
-        self, req: t.Union[tsi.FeedbackCreateReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.FeedbackCreateReq, dict[str, Any]]
     ) -> tsi.FeedbackCreateRes:
         return self._generic_request(
             "/feedback/create", req, tsi.FeedbackCreateReq, tsi.FeedbackCreateRes
         )
 
     def feedback_query(
-        self, req: t.Union[tsi.FeedbackQueryReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.FeedbackQueryReq, dict[str, Any]]
     ) -> tsi.FeedbackQueryRes:
         return self._generic_request(
             "/feedback/query", req, tsi.FeedbackQueryReq, tsi.FeedbackQueryRes
         )
 
     def feedback_purge(
-        self, req: t.Union[tsi.FeedbackPurgeReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.FeedbackPurgeReq, dict[str, Any]]
     ) -> tsi.FeedbackPurgeRes:
         return self._generic_request(
             "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
@@ -522,21 +512,21 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     # Cost API
     def cost_query(
-        self, req: t.Union[tsi.CostQueryReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.CostQueryReq, dict[str, Any]]
     ) -> tsi.CostQueryRes:
         return self._generic_request(
             "/cost/query", req, tsi.CostQueryReq, tsi.CostQueryRes
         )
 
     def cost_create(
-        self, req: t.Union[tsi.CostCreateReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.CostCreateReq, dict[str, Any]]
     ) -> tsi.CostCreateRes:
         return self._generic_request(
             "/cost/create", req, tsi.CostCreateReq, tsi.CostCreateRes
         )
 
     def cost_purge(
-        self, req: t.Union[tsi.CostPurgeReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.CostPurgeReq, dict[str, Any]]
     ) -> tsi.CostPurgeRes:
         return self._generic_request(
             "/cost/purge", req, tsi.CostPurgeReq, tsi.CostPurgeRes
