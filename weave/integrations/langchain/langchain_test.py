@@ -304,13 +304,29 @@ def assert_correct_calls_for_rag_chain(calls: list[Call]) -> None:
         ("langchain.Chain.RunnableSequence", 2),
         ("langchain.Retriever.VectorStoreRetriever", 3),
         ("langchain.Chain.format_docs", 3),
-        ("langchain.Chain.RunnablePassthrough", 2),
+        ("langchain.Chain.RunnablePassthrough", 2),  # Could be here
         ("langchain.Prompt.ChatPromptTemplate", 1),
         ("langchain.Llm.ChatOpenAI", 1),
         ("openai.chat.completions.create", 2),
         ("langchain.Parser.StrOutputParser", 1),
     ]
-    assert got == exp
+    # exp_2 is the same as exp, but with the order of the ops changed
+    # specifically, `RunnableParallel_context_question` runs in parallel,
+    # so the children can be in any order. Practically, this means that
+    # `RunnablePassthrough` could be in 2 places.
+    exp_2 = [
+        ("langchain.Chain.RunnableSequence", 0),
+        ("langchain.Chain.RunnableParallel_context_question", 1),
+        ("langchain.Chain.RunnablePassthrough", 2),  # Could be here
+        ("langchain.Chain.RunnableSequence", 2),
+        ("langchain.Retriever.VectorStoreRetriever", 3),
+        ("langchain.Chain.format_docs", 3),
+        ("langchain.Prompt.ChatPromptTemplate", 1),
+        ("langchain.Llm.ChatOpenAI", 1),
+        ("openai.chat.completions.create", 2),
+        ("langchain.Parser.StrOutputParser", 1),
+    ]
+    assert (got == exp) or (got == exp_2)
 
 
 @pytest.fixture
