@@ -23,30 +23,34 @@ def make_natural_sort_table_query(
     """
     project_id_name = pb.add_param(project_id)
     digest_name = pb.add_param(digest)
-    sql_safe_dir = "ASC" if natural_direction == "ASC" else "DESC"
 
-    sql_safe_limit = (
-        f"LIMIT {{{pb.add_param(limit)}: Int64}}" if limit is not None else ""
-    )
-    sql_safe_offset = (
-        f"OFFSET {{{pb.add_param(offset)}: Int64}}" if offset is not None else ""
-    )
+    row_digests_selection = "row_digests"
+    if natural_direction.lower() == "desc":
+        row_digests_selection = f"reverse({row_digests_selection})"
+    if limit is not None and offset is None:
+        offset = 0
+    if offset is not None:
+        if limit is None:
+            row_digests_selection = f"arraySlice({row_digests_selection}, 1 + {{{pb.add_param(offset)}: Int64}})"
+        else:
+            row_digests_selection = f"arraySlice({row_digests_selection}, 1 + {{{pb.add_param(offset)}: Int64}}, {{{pb.add_param(limit)}: Int64}})"
+    
 
     query = f"""
     SELECT DISTINCT tr.digest, tr.val_dump, t.row_order
     FROM table_rows tr
-    RIGHT JOIN (
+    INNER JOIN (
         SELECT row_digest, row_number() OVER () AS row_order
-        FROM tables
+        FROM (
+            SELECT {row_digests_selection} as row_digests
+            FROM tables
+            WHERE project_id = {{{project_id_name}: String}}
+            AND digest = {{{digest_name}: String}}
+        )
         ARRAY JOIN row_digests AS row_digest
-        WHERE project_id = {{{project_id_name}: String}}
-        AND digest = {{{digest_name}: String}}
-        ORDER BY row_order {sql_safe_dir}
-        {sql_safe_limit}
-        {sql_safe_offset}
     ) AS t ON tr.digest = t.row_digest
     WHERE tr.project_id = {{{project_id_name}: String}}
-    ORDER BY row_order {sql_safe_dir}
+    ORDER BY row_order ASC
     """
 
     return query
@@ -88,12 +92,15 @@ def make_standard_table_query(
     (
         SELECT DISTINCT tr.digest, tr.val_dump, t.row_order
         FROM table_rows tr
-        RIGHT JOIN (
+        INNER JOIN (
             SELECT row_digest, row_number() OVER () AS row_order
-            FROM tables
+            FROM (
+                SELECT row_digests
+                FROM tables
+                WHERE project_id = {{{project_id_name}: String}}
+                AND digest = {{{digest_name}: String}}
+            )
             ARRAY JOIN row_digests AS row_digest
-            WHERE project_id = {{{project_id_name}: String}}
-            AND digest = {{{digest_name}: String}}
         ) AS t ON tr.digest = t.row_digest
         WHERE tr.project_id = {{{project_id_name}: String}}
         {sql_safe_filter_clause}
