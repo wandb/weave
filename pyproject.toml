@@ -53,10 +53,6 @@ version = { attr = "weave.version.VERSION" }
 dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.dynamic.optional-dependencies]
-examples = { file = ["requirements.legacy.ecosystem.txt"] }
-engine = { file = ["requirements.legacy.engine.txt"] }
-ecosystem = { file = ["requirements.legacy.ecosystem.txt"] }
-datadog = { file = ["requirements.legacy.datadog.txt"] }
 modal = { file = ["requirements.modal.txt"] }
 
 [tool.pytest.ini_options]
@@ -142,7 +138,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.11-dev0"
+current_version = "0.51.13-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
