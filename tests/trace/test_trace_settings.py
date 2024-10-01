@@ -1,8 +1,6 @@
-import inspect
 import io
 import os
 import sys
-import textwrap
 import time
 import timeit
 

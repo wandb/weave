@@ -163,8 +163,7 @@ exclude = [
 known-third-party = ["wandb", "weave_query"]
 
 [tool.ruff.lint.per-file-ignores]
-"weave/tests/*" = ["F401"]
-"weave/weave_server.py" = ["F401"]
+"tests/*" = ["F401"]
 
 
 [tool.ruff]
@@ -180,18 +179,8 @@ exclude = [
 
 [tool.mypy]
 warn_unused_configs = true
-exclude = [
-  ".*pyi$",
-  "weave_query",
-  "weave/tests",
-  "weave/trace_server/tests",
-  "weave/conftest.py",
-  "weave/trace/tests",
-  "integration_test",
-  "weave/trace_server/tests",
-  "examples",
-  "weave/docker",
-]
+# Note: You have to update .pre-commit-config.yaml too!
+exclude = [".*pyi$", "weave_query", "tests", "examples", "weave/docker"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

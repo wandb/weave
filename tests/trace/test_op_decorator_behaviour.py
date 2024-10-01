@@ -1,12 +1,11 @@
 import inspect
-import sys
 from typing import Any
 
 import pytest
 
 import weave
 from weave.trace import errors
-from weave.trace.op import Op, is_op, op
+from weave.trace.op import is_op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import Call
