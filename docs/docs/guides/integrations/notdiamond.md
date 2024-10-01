@@ -4,6 +4,11 @@ When building complex LLM workflows users may need to prompt different models ac
 cost, or call latency. Users can use [Not Diamond][nd] to route prompts in these workflows to the
 right model for their needs, helping maximize accuracy while saving on model costs.
 
+## Getting started
+Make sure you have [created an account][account] and [generated an API key][keys], then insert your API key below.
+
+![[Create an API key](imgs/notdiamond/api-keys.png)]
+
 ## Tracing
 
 Weave integrates with [Not Diamond's Python library][python] to [automatically log API calls][ops].
@@ -53,6 +58,9 @@ preference_id = train_evaluations(
 Then use the custom router by submitting the preference ID alongside any `model_select` request:
 
 ```python
+from notdiamond import NotDiamond
+client = NotDiamond()
+
 session_id, provider = client.chat.completions.model_select(
     messages=[
         {"role": "system", "content": "You are a helpful assistant."},
@@ -67,8 +75,13 @@ session_id, provider = client.chat.completions.model_select(
 
 Visit the [docs] for Not Diamond or [send a message][support] us for further support.
 
+You can also [chat with Not Diamond][chat] to learn about prompt routing.
+
+[account]: https://app.notdiamond.ai
+[chat]: https://chat.notdiamond.ai
 [docs]: https://docs.notdiamond.ai
 [evals]: ../../guides/core-types/evaluations.md
+[keys]: https://app.notdiamond.ai/keys
 [nd]: https://www.notdiamond.ai/
 [ops]: ../../guides/tracking/ops.md
 [python]: https://github.com/Not-Diamond/notdiamond-python

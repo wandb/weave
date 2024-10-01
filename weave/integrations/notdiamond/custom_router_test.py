@@ -12,7 +12,10 @@ from weave.integrations.notdiamond.custom_router import train_evaluations
 
 @pytest.fixture
 def model_evals():
-    df = pd.read_csv("integrations/notdiamond/test_data/humaneval.csv")
+    return get_model_evals()
+
+def get_model_evals(file_path: str="integrations/notdiamond/test_data/humaneval.csv"):
+    df = pd.read_csv(file_path)
     models = [
         "anthropic/claude-3-5-sonnet-20240620",
         "openai/gpt-4o-2024-05-13",

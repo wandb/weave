@@ -56,7 +56,5 @@ patched_toolkit_functions = [
 all_patched_functions = (
     patched_client_functions + patched_toolkit_functions + patched_llmconfig_functions
 )
-print(all_patched_functions)
 
 notdiamond_patcher = MultiPatcher(all_patched_functions)
-print(notdiamond_patcher)
