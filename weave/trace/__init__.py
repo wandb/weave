@@ -9,16 +9,18 @@ from typing import Any, Iterator, Optional, Union
 # TODO: type_serializers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_serializers  # noqa: F401
-from weave.trace import urls, util
+from weave.trace import context, urls, util, weave_client, weave_init
 from weave.trace.call_context import get_current_call, require_current_call
 from weave.trace.client_context import weave_client as weave_client_context
-
-from . import context, weave_client, weave_init
-from .constants import TRACE_OBJECT_EMOJI
-from .op import as_op, op
-from .refs import ObjectRef, parse_uri
-from .settings import UserSettings, parse_and_apply_settings, should_disable_weave
-from .table import Table
+from weave.trace.constants import TRACE_OBJECT_EMOJI
+from weave.trace.op import as_op, op
+from weave.trace.refs import ObjectRef, parse_uri
+from weave.trace.settings import (
+    UserSettings,
+    parse_and_apply_settings,
+    should_disable_weave,
+)
+from weave.trace.table import Table
 
 
 def init(
