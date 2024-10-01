@@ -440,7 +440,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     def table_query_stats(
-        self, req: t.Union[tsi.TableQueryStatsReq, t.Dict[str, t.Any]]
+        self, req: Union[tsi.TableQueryStatsReq, dict[str, Any]]
     ) -> tsi.TableQueryStatsRes:
         return self._generic_request(
             "/table/query_stats", req, tsi.TableQueryStatsReq, tsi.TableQueryStatsRes
