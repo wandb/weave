@@ -1510,6 +1510,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     sort_clauses.append(f"{sort.field} {sort.direction.upper()}")
             if sort_clauses:
                 sort_part = f"ORDER BY {', '.join(sort_clauses)}"
+        else:
+            sort_part = "ORDER BY created_at ASC"
 
         if parameters is None:
             parameters = {}
