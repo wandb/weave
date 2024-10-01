@@ -57,7 +57,7 @@ def _is_retryable_exception(e: Exception) -> bool:
         # Unknown server error
         # TODO(np): We need to fix the server to return proper status codes
         # for downstream 401, 403, 404, etc... Those should propagate back to
-        # the clien
+        # the client.
         if e.response.status_code == 500:
             return False
 
@@ -263,13 +263,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 req_as_obj = tsi.CallStartReq.model_validate(req)
             else:
                 req_as_obj = req
-            if req_as_obj.starid == None or req_as_obj.startrace_id == None:
+            if req_as_obj.start.id == None or req_as_obj.start.trace_id == None:
                 raise ValueError(
                     "CallStartReq must have id and trace_id when batching."
                 )
             self.call_processor.enqueue([StartBatchItem(req=req_as_obj)])
             return tsi.CallStartRes(
-                id=req_as_obj.starid, trace_id=req_as_obj.startrace_id
+                id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id
             )
         return self._generic_request(
             "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
@@ -367,7 +367,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
         due to the property that table creation can be decomposed into a series of
         updates. This is useful when the table creation size is too big to be sent in
-        a single reques We can create an empty table first, then update the table
+        a single request. We can create an empty table first, then update the table
         with the rows.
         """
         if isinstance(req, dict):
