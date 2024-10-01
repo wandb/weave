@@ -3,9 +3,8 @@ import typing
 
 import click
 
-from weave import __version__
+from weave import __version__, trace
 from weave.deploy import gcp as google
-from weave.trace import api
 from weave.trace.refs import ObjectRef, parse_uri
 
 # from .model_server import app
@@ -48,10 +47,10 @@ def serve(
     else:
         project = ref_project
 
-    api.init(project)
+    trace.init(project)
     # TODO: provide more control over attributes
-    with api.attributes({"env": env}):
-        api.serve(
+    with trace.attributes({"env": env}):
+        trace.serve(
             parsed_ref, method_name=method or None, auth_entity=auth_entity, port=port
         )
 
