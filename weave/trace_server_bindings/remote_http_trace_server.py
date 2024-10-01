@@ -439,6 +439,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/table/query", req, tsi.TableQueryReq, tsi.TableQueryRes
         )
 
+    def table_query_stats(
+        self, req: Union[tsi.TableQueryStatsReq, dict[str, Any]]
+    ) -> tsi.TableQueryStatsRes:
+        return self._generic_request(
+            "/table/query_stats", req, tsi.TableQueryStatsReq, tsi.TableQueryStatsRes
+        )
+
     def refs_read_batch(
         self, req: Union[tsi.RefsReadBatchReq, dict[str, Any]]
     ) -> tsi.RefsReadBatchRes:
