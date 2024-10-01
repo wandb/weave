@@ -1092,7 +1092,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     ) -> list[tsi.ObjSchema]:
         conn, cursor = get_conn_cursor(self.db_path)
         pred = " AND ".join(conditions or ["1 = 1"])
-        val_dump_part = "'' as val_dump" if metadata_only else "val_dump"
+        val_dump_part = "'{}' as val_dump" if metadata_only else "val_dump"
         query = f"""
             SELECT
                 project_id,
@@ -1144,7 +1144,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     created_at=row[2],
                     kind=row[3],
                     base_object_class=row[4],
-                    val=json.loads(row[5]) if not metadata_only else None,
+                    val=json.loads(row[5]),
                     digest=row[6],
                     version_index=row[7],
                     is_latest=row[8],

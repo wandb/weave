@@ -984,8 +984,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     parameters=parameters,
                 )
                 for obj in objs:
-                    val_dump = json.loads(obj.val_dump) if obj.val_dump else None
-                    root_val_cache[make_obj_cache_key(obj)] = val_dump
+                    root_val_cache[make_obj_cache_key(obj)] = json.loads(obj.val_dump)
 
             return [
                 root_val_cache.get(make_root_ref_cache_key(ref), None) for ref in refs
@@ -1551,8 +1550,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 "version_index",
                                 "version_count",
                                 "is_latest",
+                                "val_dump",
                             ],
-                            row,
+                            list(row) + ["{}"],
                         )
                     )
                 )
@@ -1582,12 +1582,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Map (object_id, digest) to val_dump
         object_values: Dict[tuple[str, str], Any] = {}
         for row in query_result:
-            object_id, digest, val_dump = row[0], row[1], row[2]  # type: ignore
+            (object_id, digest, val_dump) = row
             object_values[(object_id, digest)] = val_dump
 
         # update the val_dump for each object
         for obj in result:
-            obj.val_dump = object_values.get((obj.object_id, obj.digest))
+            obj.val_dump = object_values.get((obj.object_id, obj.digest), "{}")
         return result
 
     def _run_migrations(self) -> None:
@@ -1600,7 +1600,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query: str,
         parameters: Dict[str, Any],
         column_formats: Optional[Dict[str, Any]] = None,
-    ) -> Iterator[QueryResult]:
+    ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
         summary = None
         parameters = _process_parameters(parameters)
@@ -1866,7 +1866,7 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         digest=ch_obj.digest,
         kind=ch_obj.kind,
         base_object_class=ch_obj.base_object_class,
-        val=json.loads(ch_obj.val_dump) if ch_obj.val_dump else None,
+        val=json.loads(ch_obj.val_dump),
     )
 
 

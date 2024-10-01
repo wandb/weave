@@ -145,7 +145,7 @@ class SelectableCHObjSchema(BaseModel):
     object_id: str
     created_at: datetime.datetime
     refs: typing.List[str]
-    val_dump: typing.Optional[str] = None
+    val_dump: str
     kind: str
     base_object_class: typing.Optional[str]
     digest: str
