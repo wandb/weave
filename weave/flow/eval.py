@@ -49,7 +49,7 @@ def async_call(
     return asyncio.to_thread(func, *args, **kwargs)
 
 
-class EvaluationResults(weave.Object):
+class EvaluationResults(Object):
     rows: weave.Table
 
 
