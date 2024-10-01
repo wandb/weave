@@ -16,6 +16,8 @@ on:
         default: true
 
 jobs:
+  check-which-tests-to-run:
+    uses: ./.github/workflows/check-which-tests-to-run.yaml
   notify-wandb-core:
     needs: check-which-tests-to-run
     runs-on: ubuntu-latest
