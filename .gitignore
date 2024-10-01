@@ -10,7 +10,7 @@ artifacts
 local-artifacts
 weave_internal.egg-info
 weave.egg-info/
-weave/frontend/assets
+weave_query/weave_query/frontend/assets
 build/
 MNIST
 food-101
@@ -27,3 +27,8 @@ weave/tests/zlib.txt
 weave/tests/execute.json
 weave-js/src/generated
 .integration-deps
+.tox
+.ruff_cache
+.pytest_cache
+*.log
+weave/file::memory:?cache=shared

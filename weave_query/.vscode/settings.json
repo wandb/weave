@@ -4,7 +4,7 @@
   "python.testing.cwd": "./weave",
   "python.formatting.provider": "black",
   "search.exclude": {
-    "weave/frontend": true
+    "weave_query/weave_query/frontend": true
   },
   "files.insertFinalNewline": true,
   "black-formatter.importStrategy": "fromEnvironment",

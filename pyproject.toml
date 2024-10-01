@@ -53,15 +53,22 @@ version = { attr = "weave.version.VERSION" }
 dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.dynamic.optional-dependencies]
-examples = { file = ["requirements.legacy.ecosystem.txt"] }
-engine = { file = ["requirements.legacy.engine.txt"] }
-ecosystem = { file = ["requirements.legacy.ecosystem.txt"] }
-datadog = { file = ["requirements.legacy.datadog.txt"] }
 modal = { file = ["requirements.modal.txt"] }
 
 [tool.pytest.ini_options]
-testpaths = ["weave"]
-filterwarnings = ["error"]
+filterwarnings = [
+  # treat warnings as errors
+  # "error",
+  # ignore deprecation warnings from installed packages, they're printed at the
+  # bottom of test output, making it hard to find the actual errors.
+  "ignore::DeprecationWarning",
+]
+addopts = "-v"
+markers = [
+  "skip_clickhouse_client: marks tests as requiring clickhouse client to be skipped",
+  "weave_client: alias for `client` fixture used for CI dispatching. Do not use directly in code.",
+  "disable_logging_error_check: means that the test expects logging errors (and the default assertion for no logging errors will fail)",
+]
 
 [tool.ruff.lint]
 preview = true
@@ -142,7 +149,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.11-dev0"
+current_version = "0.51.13-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
