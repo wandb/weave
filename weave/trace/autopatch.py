@@ -16,6 +16,7 @@ def autopatch() -> None:
     from ..integrations.litellm.litellm import litellm_patcher
     from ..integrations.llamaindex.llamaindex import llamaindex_patcher
     from ..integrations.mistral import mistral_patcher
+    from ..integrations.notdiamond.tracing import notdiamond_patcher
     from ..integrations.openai.openai_sdk import openai_patcher
 
     openai_patcher.attempt_patch()
@@ -29,6 +30,7 @@ def autopatch() -> None:
     dspy_patcher.attempt_patch()
     cerebras_patcher.attempt_patch()
     cohere_patcher.attempt_patch()
+    notdiamond_patcher.attempt_patch()
 
 
 def reset_autopatch() -> None:
@@ -42,6 +44,7 @@ def reset_autopatch() -> None:
     from ..integrations.litellm.litellm import litellm_patcher
     from ..integrations.llamaindex.llamaindex import llamaindex_patcher
     from ..integrations.mistral import mistral_patcher
+    from ..integrations.notdiamond.tracing import notdiamond_patcher
     from ..integrations.openai.openai_sdk import openai_patcher
 
     openai_patcher.undo_patch()
@@ -55,3 +58,4 @@ def reset_autopatch() -> None:
     dspy_patcher.undo_patch()
     cerebras_patcher.undo_patch()
     cohere_patcher.undo_patch()
+    notdiamond_patcher.undo_patch()
