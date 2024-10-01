@@ -4,7 +4,6 @@ from weave import version
 
 from weave.trace.api import *
 from weave.flow import *
-
 from weave.trace.util import ThreadPoolExecutor, Thread
 
 __version__ = version.VERSION
