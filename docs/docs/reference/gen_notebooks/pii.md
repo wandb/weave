@@ -84,8 +84,9 @@ Let's install the required packages and set up our API keys. Your Weights & Bias
 %%capture
 # @title Make sure to set up set up your API keys correctly
 # See: https://pypi.org/project/set-env-colab-kaggle-dotenv/ for usage instructions.
+
 from set_env import set_env
-import os
+
 _ = set_env("ANTHROPIC_API_KEY")
 _ = set_env("WANDB_API_KEY")
 ```
@@ -109,8 +110,7 @@ url = "https://raw.githubusercontent.com/wandb/weave/master/docs/notebooks/10_pi
 response = requests.get(url)
 pii_data = response.json()
 
-print("PII data first sample: \""+ pii_data[0]['text']+"\"")
-
+print('PII data first sample: "' + pii_data[0]["text"] + '"')
 ```
 
 # Redaction Methods Implementation
@@ -122,6 +122,7 @@ Our initial method is to use [regular expressions (regex)](https://docs.python.o
 
 ```python
 import re
+
 
 # Define a function to clean PII data using regex
 def redact_with_regex(text):
@@ -168,7 +169,6 @@ def redact_with_regex(text):
     text = re.sub(r"\b[A-Z][a-z]+ [A-Z][a-z]+\b", "<NAME>", text)
 
     return text
-
 ```
 
 Let's test the function with a sample text:
@@ -180,7 +180,6 @@ test_text = "My name is John Doe, my email is john.doe@example.com, my phone is 
 cleaned_text = redact_with_regex(test_text)
 print(f"Raw text:\n\t{test_text}")
 print(f"Redacted text:\n\t{cleaned_text}")
-
 ```
 
 ## Method 2: Microsoft Presidio Redaction
@@ -203,6 +202,7 @@ analyzer = AnalyzerEngine()
 
 # Set up the Anonymizer, which will use the analyzer results to anonymize the text.
 anonymizer = AnonymizerEngine()
+
 
 # Encapsulate the Presidio redaction process into a function
 def redact_with_presidio(text):
@@ -250,12 +250,15 @@ from presidio_anonymizer.entities import OperatorConfig
 
 fake = Faker()
 
+
 # Create faker functions (note that it has to receive a value)
 def fake_name(x):
     return fake.name()
 
+
 def fake_number(x):
     return fake.phone_number()
+
 
 # Create custom operator for the PERSON and PHONE_NUMBER" entities
 operators = {
@@ -290,6 +293,7 @@ Let's consolidate our code into a single class and expand the list of entities t
 from faker import Faker
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
+
 
 # A custom class for generating fake data that extends Faker
 class my_faker(Faker):
@@ -336,12 +340,13 @@ Let's test the function with a sample text:
 
 ```python
 faker = my_faker()
-text_to_anonymize = "My name is Raphael and I like to fish. My phone number is 212-555-5555"
+text_to_anonymize = (
+    "My name is Raphael and I like to fish. My phone number is 212-555-5555"
+)
 anonymized_text = faker.redact_and_anonymize_with_faker(text_to_anonymize)
 
 print(f"Raw text:\n\t{text_to_anonymize}")
 print(f"Anonymized text:\n\t{anonymized_text}")
-
 ```
 
 # Applying the Methods to Weave Calls
@@ -363,13 +368,16 @@ In the simplest case, we can use regex to identify and redact PII data in the or
 import json
 from typing import Any
 
-import weave
 import anthropic
+
+import weave
+
 
 # Define an input postprocessing function that applies our regex redaction for the model prediction Weave Op
 def postprocess_inputs_regex(inputs: dict[str, Any]) -> dict:
     inputs["text_block"] = redact_with_regex(inputs["text_block"])
     return inputs
+
 
 # Weave model / predict function
 class sentiment_analysis_regex_pii_model(weave.Model):
@@ -411,7 +419,6 @@ print("Model: ", model)
 # for every block of text, anonymized first and then predict
 for entry in pii_data:
     await model.predict(entry["text"])
-
 ```
 
 ## Presidio Redaction Method
@@ -425,13 +432,16 @@ Here we will use Presidio to identify and redact PII data in the original text.
 import json
 from typing import Any
 
-import weave
 import anthropic
+
+import weave
+
 
 # Define an input postprocessing function that applies our Presidio redaction for the model prediction Weave Op
 def postprocess_inputs_presidio(inputs: dict[str, Any]) -> dict:
     inputs["text_block"] = redact_with_presidio(inputs["text_block"])
     return inputs
+
 
 # Weave model / predict function
 class sentiment_analysis_presidio_pii_model(weave.Model):
@@ -473,7 +483,6 @@ print("Model: ", model)
 # for every block of text, anonymized first and then predict
 for entry in pii_data:
     await model.predict(entry["text"])
-
 ```
 
 ## Faker + Presidio Replacement Method
@@ -488,14 +497,18 @@ Here we will have Faker generate anonymized replacement PII data and use Presidi
 import json
 from typing import Any
 
-import weave
 import anthropic
+
+import weave
 
 # Define an input postprocessing function that applies our Faker anonymization and Presidio redaction for the model prediction Weave Op
 faker = my_faker()
+
+
 def postprocess_inputs_faker(inputs: dict[str, Any]) -> dict:
     inputs["text_block"] = faker.redact_and_anonymize_with_faker(inputs["text_block"])
     return inputs
+
 
 # Weave model / predict function
 class sentiment_analysis_faker_pii_model(weave.Model):
@@ -537,7 +550,6 @@ print("Model: ", model)
 # for every block of text, anonymized first and then predict
 for entry in pii_data:
     await model.predict(entry["text"])
-
 ```
 
 ## Checklist for Safely Using Weave with PII Data
