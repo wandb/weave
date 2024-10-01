@@ -61,6 +61,18 @@ class UserSettings(BaseModel):
     may lead to unexpected behaviour.  Make sure this is only set once at the start!
     """
 
+    client_parallelism: Optional[int] = None
+    """
+    Sets the number of workers to use for background operations.
+    If not set, automatically adjusts based on the number of cores.
+
+    Setting this to 0 will effectively execute all background operations
+    immediately in the main thread. This will not be great for performance,
+    but can be useful for debugging.
+
+    This cannot be changed after the client has been initialized.
+    """
+
     convert_paths_to_images: bool = True
     """Toggles conversion of image file paths to PathImage objects.
 
@@ -107,6 +119,10 @@ def should_capture_code() -> bool:
     return _should("capture_code")
 
 
+def client_parallelism() -> Optional[int]:
+    return _optional_int("client_parallelism")
+
+
 def should_convert_paths_to_images() -> bool:
     return _should("convert_paths_to_images")
 
@@ -137,6 +153,12 @@ def _str2bool_truthy(v: str) -> bool:
 def _should(name: str) -> bool:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return _str2bool_truthy(env)
+    return _context_vars[name].get()
+
+
+def _optional_int(name: str) -> Optional[int]:
+    if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
+        return int(env)
     return _context_vars[name].get()
 
 

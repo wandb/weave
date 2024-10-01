@@ -43,7 +43,7 @@ if len(bad_dirs) > 0:
     )
 
 if os.getenv("WEAVE_SKIP_BUILD") == None:
-    subprocess.run(["bash", "weave/frontend/build.sh"], check=True)
+    subprocess.run(["bash", "weave_query/weave_query/frontend/build.sh"], check=True)
 else:
     print("!!! Skipping frontend build !!!")
 

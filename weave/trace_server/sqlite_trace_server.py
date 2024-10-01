@@ -21,6 +21,7 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.orm import Row, quote_json_path
 from weave.trace_server.trace_server_common import (
+    digest_is_version_like,
     empty_str_to_none,
     get_nested_key,
     hydrate_calls_with_feedback,
@@ -666,7 +667,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
-            conds.append(f"digest = '{req.digest}'")
+            (is_version, version_index) = digest_is_version_like(req.digest)
+            if is_version:
+                conds.append(f"version_index = '{version_index}'")
+            else:
+                conds.append(f"digest = '{req.digest}'")
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
@@ -885,6 +890,27 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 for r in query_result
             ]
         )
+
+    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+        parameters: list[Any] = [req.project_id, req.digest]
+
+        query = """
+        SELECT json_array_length(row_digests)
+        FROM
+            tables
+        WHERE
+            tables.project_id = ? AND
+            tables.digest = ?
+        """
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(query, parameters)
+        row = cursor.fetchone()
+        count = 0
+        if row is not None:
+            count = row[0]
+
+        return tsi.TableQueryStatsRes(count=count)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches

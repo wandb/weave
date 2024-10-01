@@ -11,12 +11,11 @@ import requests
 import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation
-from weave.legacy.weave import op_def
+from weave.tests.trace.testutil import ObjectRefStrMatcher
 from weave.tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
     RegexStringMatcher,
-    client_is_sqlite,
 )
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
@@ -28,8 +27,13 @@ from weave.trace.refs import (
     TABLE_ROW_ID_EDGE_NAME,
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
-from weave.trace.tests.testutil import ObjectRefStrMatcher
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
+from weave.trace_server.sqlite_trace_server import (
+    NotFoundError as sqliteNotFoundError,
+)
+from weave.trace_server.sqlite_trace_server import (
+    SqliteTraceServer,
+)
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -254,7 +258,7 @@ def test_call_create(client):
     client.finish_call(call, "hello")
     result = client.get_call(call.id)
     expected = weave_client.Call(
-        op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
+        _op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=None,
@@ -294,7 +298,7 @@ def test_calls_query(client):
     result = list(client.get_calls(weave_client.CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
     assert result[0] == weave_client.Call(
-        op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
+        _op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=None,
@@ -320,7 +324,7 @@ def test_calls_query(client):
         ended_at=None,
     )
     assert result[1] == weave_client.Call(
-        op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
+        _op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=call0.id,
@@ -564,25 +568,6 @@ def test_opdef(client):
     assert isinstance(weave_client.get_ref(add2), refs.OpRef)
     assert res == 4
     assert len(list(client.get_calls())) == 1
-
-
-@pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
-def test_saveload_op(client):
-    @weave.op()
-    def add2(x, y):
-        return x + y
-
-    @weave.op()
-    def add3(x, y, z):
-        return x + y + z
-
-    obj = {"a": add2, "b": add3}
-    ref = client._save_object(obj, "my-ops")
-    obj2 = client.get(ref)
-    assert isinstance(obj2["a"], op_def.OpDef)
-    assert obj2["a"].name == "op-add2"
-    assert isinstance(obj2["b"], op_def.OpDef)
-    assert obj2["b"].name == "op-add3"
 
 
 def test_object_mismatch_project_ref(client):
@@ -1121,6 +1106,7 @@ def test_summary_descendents(client):
     ]
 
 
+@pytest.mark.skip("skipping since it depends on query service deps atm")
 def test_weave_server(client):
     class MyModel(weave.Model):
         prompt: str
@@ -1410,9 +1396,6 @@ def test_calls_stream_table_ref_expansion(client):
 
 
 def test_object_version_read(client):
-    if client_is_sqlite(client):
-        return
-
     refs = []
     for i in range(10):
         refs.append(weave.publish({"a": i}))
@@ -1459,7 +1442,31 @@ def test_object_version_read(client):
     assert obj_res.obj.val == {"a": 9}
     assert obj_res.obj.version_index == 9
 
-    # now grab version 5
+    # now grab each by their digests
+    for i, digest in enumerate([obj.digest for obj in objs]):
+        obj_res = client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client._project_id(),
+                object_id=refs[0].name,
+                digest=digest,
+            )
+        )
+        assert obj_res.obj.val == {"a": i}
+        assert obj_res.obj.version_index == i
+
+    # publish another, check that latest is updated
+    client._save_object({"a": 10}, refs[0].name)
+    obj_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=refs[0].name,
+            digest="latest",
+        )
+    )
+    assert obj_res.obj.val == {"a": 10}
+    assert obj_res.obj.version_index == 10
+
+    # check that v5 is still correct
     obj_res = client.server.obj_read(
         tsi.ObjReadReq(
             project_id=client._project_id(),
@@ -1469,3 +1476,26 @@ def test_object_version_read(client):
     )
     assert obj_res.obj.val == {"a": 5}
     assert obj_res.obj.version_index == 5
+
+    # check badly formatted digests
+    digests = ["v1111", "1", ""]
+    for digest in digests:
+        with pytest.raises((NotFoundError, sqliteNotFoundError)):
+            # grab non-existant version
+            obj_res = client.server.obj_read(
+                tsi.ObjReadReq(
+                    project_id=client._project_id(),
+                    object_id=refs[0].name,
+                    digest=digest,
+                )
+            )
+
+    # check non-existant object_id
+    with pytest.raises((NotFoundError, sqliteNotFoundError)):
+        obj_res = client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client._project_id(),
+                object_id="refs[0].name",
+                digest="v1",
+            )
+        )

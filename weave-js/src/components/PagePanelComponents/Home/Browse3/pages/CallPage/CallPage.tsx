@@ -114,7 +114,11 @@ const useCallTabs = (call: CallSchema) => {
     },
     {
       label: 'Use',
-      content: <TabUseCall call={call} />,
+      content: (
+        <Tailwind>
+          <TabUseCall call={call} />
+        </Tailwind>
+      ),
     },
   ];
 };
@@ -204,17 +208,21 @@ const CallPageInnerVertical: FC<{
       isSidebarOpen={showTraceTree}
       headerContent={<CallOverview call={currentCall} />}
       leftSidebar={
-        loading ? (
-          <Loading centered />
-        ) : (
-          <CallTraceView
-            call={call}
-            selectedCall={currentCall}
-            rows={rows}
-            forcedExpandKeys={expandKeys}
-            path={path}
-          />
-        )
+        <Tailwind style={{display: 'contents'}}>
+          <div className="h-full bg-moon-50">
+            {loading ? (
+              <Loading centered />
+            ) : (
+              <CallTraceView
+                call={call}
+                selectedCall={currentCall}
+                rows={rows}
+                forcedExpandKeys={expandKeys}
+                path={path}
+              />
+            )}
+          </div>
+        </Tailwind>
       }
       tabs={callTabs}
     />

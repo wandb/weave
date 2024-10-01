@@ -1,6 +1,8 @@
 import os
 
 import pytest
+from mistralai.async_client import MistralAsyncClient
+from mistralai.client import MistralClient
 
 import weave
 
@@ -10,8 +12,6 @@ import weave
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> None:
-    from mistralai.client import MistralClient
-
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
@@ -68,8 +68,6 @@ def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> Non
 async def test_mistral_quickstart_async(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from mistralai.async_client import MistralAsyncClient
-
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
@@ -121,8 +119,6 @@ Ultimately, the best French cheese is a matter of personal taste. I would recomm
 def test_mistral_quickstart_with_stream(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from mistralai.client import MistralClient
-
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
@@ -182,8 +178,6 @@ def test_mistral_quickstart_with_stream(
 async def test_mistral_quickstart_with_stream_async(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from mistralai.async_client import MistralAsyncClient
-
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
