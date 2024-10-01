@@ -98,6 +98,8 @@ export const useCallsTableColumns = (
     effectiveFilter
   );
 
+  console.log("allDynamicColumnNames", allDynamicColumnNames)
+
   // Determine what sort of view we are looking at based on the filter
   const isSingleOpVersion = useMemo(
     () => effectiveFilter.opVersionRefs?.length === 1,
@@ -309,24 +311,24 @@ function buildCallsTableColumns(
   );
   cols.push(...newCols);
 
-  const {cols: newFeedbackCols, groupingModel: feedbackGroupingModel} = buildDynamicColumns<TraceCallSchema>(
-    filteredDynamicColumnNames,
-    row => {
-      const [rowEntity, rowProject] = row.project_id.split('/');
-      return {entity: rowEntity, project: rowProject};
-    },
-    (row, key) => (row as any)[key],
-    key => expandedRefCols.has(key),
-    key => columnsWithRefs.has(key),
-    onCollapse,
-    onExpand,
-    // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
-    key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
-    (key, operator, value) => {
-      onAddFilter?.(key, operator, value);
-    }
-  );
-  cols.push(...newFeedbackCols);
+  // const {cols: newFeedbackCols, groupingModel: feedbackGroupingModel} = buildDynamicColumns<TraceCallSchema>(
+  //   filteredDynamicColumnNames,
+  //   row => {
+  //     const [rowEntity, rowProject] = row.project_id.split('/');
+  //     return {entity: rowEntity, project: rowProject};
+  //   },
+  //   (row, key) => (row as any)[key],
+  //   key => expandedRefCols.has(key),
+  //   key => columnsWithRefs.has(key),
+  //   onCollapse,
+  //   onExpand,
+  //   // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
+  //   key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
+  //   (key, operator, value) => {
+  //     onAddFilter?.(key, operator, value);
+  //   }
+  // );
+  // cols.push(...newFeedbackCols);
 
   cols.push({
     field: 'wb_user_id',
@@ -458,7 +460,8 @@ function buildCallsTableColumns(
     }
   });
 
-  const groupingModel = [...inputOutputGroupingModel, ...feedbackGroupingModel];
+  // const groupingModel = [...inputOutputGroupingModel, ...feedbackGroupingModel];
+  const groupingModel = inputOutputGroupingModel;
   
 
   return {cols, colGroupingModel: groupingModel};

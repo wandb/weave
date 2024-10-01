@@ -954,12 +954,13 @@ const aggregateTraceCallFeedback = (
     scoreFeedback.forEach(f => {
       const name = f.payload.name;
       if (aggregatedScoreFeedback[name] == null) {
-        aggregatedScoreFeedback[name] = {
-          result: f.payload.score.result,
-          scoreFeedbacks: []
-        }
+        // aggregatedScoreFeedback[name] = {
+        //   result: f.payload.score.result,
+        //   scoreFeedbacks: []
+        // }
+        aggregatedScoreFeedback[name] = f.payload.score.result
       }
-      aggregatedScoreFeedback[name].scoreFeedbacks.push(f);
+      // aggregatedScoreFeedback[name].scoreFeedbacks.push(f);
       // TODO: Aggregate scores
 
     })
@@ -972,15 +973,29 @@ const aggregateTraceCallFeedback = (
   const aggregatedScoreFeedback = scoreFeedbackAggregation(startingFeedback);
   // Add the aggregated score feedback to the trace call
   // without mutating the original trace call
+  // const returnedTraceCall = {
+  //   ...traceCall,
+  //   summary: {
+  //     ...traceCall.summary,
+  //     scores: aggregatedScoreFeedback,
+  //     // weave: {
+  //     //   ...traceCall.summary.weave,
+  //     //   aggregatedScoreFeedback
+  //     // }
+  //   }
+  // };
+
   const returnedTraceCall = {
     ...traceCall,
-    summary: {
-      ...traceCall.summary,
-      weave: {
-        ...traceCall.summary.weave,
-        aggregatedScoreFeedback
-      }
-    }
+    scores: aggregatedScoreFeedback,
+    // summary: {
+    //   ...traceCall.summary,
+    //   scores: aggregatedScoreFeedback,
+    //   // weave: {
+    //   //   ...traceCall.summary.weave,
+    //   //   aggregatedScoreFeedback
+    //   // }
+    // }
   };
 
   return returnedTraceCall;

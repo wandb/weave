@@ -282,21 +282,19 @@ class Call:
         # This needs to be moved to the client and backgrounded.
         client = weave_client_context.require_weave_client()
         payload = {
-                "name": score_name,
-                "score": score,
-            }
+            "name": score_name,
+            "score": score,
+        }
         payload = map_to_refs(payload)
         payload_json = to_json(payload, client._project_id(), client.server)
         freq = FeedbackCreateReq(
             project_id=client._project_id(),
             weave_ref=get_ref(self).uri(),
-            feedback_type="score", # should this be score_name?
+            feedback_type="score",  # should this be score_name?
             payload=payload_json,
         )
         response = client.server.feedback_create(freq)
         return response.id
-
-
 
 
 class CallsIter:
@@ -396,6 +394,8 @@ def make_client_call(
     )
     if call.id is None:
         raise ValueError("Call ID is None")
+    # Total hack..
+    set_ref(call, CallRef(entity, project, call.id))
     return WeaveObject(call, CallRef(entity, project, call.id), server, None)
 
 
@@ -686,11 +686,14 @@ class WeaveClient:
             inputs=inputs_with_refs,
             attributes=attributes,
         )
-        set_ref(call, CallRef(
-            entity=self.entity,
-            project=self.project,
-            id=call_id,
-        ))
+        set_ref(
+            call,
+            CallRef(
+                entity=self.entity,
+                project=self.project,
+                id=call_id,
+            ),
+        )
         # feels like this should be in post init, but keping here
         # because the func needs to be resolved for schema insert below
         if callable(name_func := display_name):

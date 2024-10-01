@@ -3,7 +3,7 @@ import inspect
 import textwrap
 import time
 import traceback
-from typing import Any, Callable, Coroutine, Optional, Union, cast
+from typing import Any, Callable, Coroutine, Optional, Union, cast, Coroutine
 
 from rich import print
 from rich.console import Console
@@ -46,9 +46,7 @@ def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutin
     return asyncio.to_thread(func, *args, **kwargs)
 
 
-def async_call_op(
-    func: Op, *args: Any, **kwargs: Any
-) -> typing.Coroutine:
+def async_call_op(func: Op, *args: Any, **kwargs: Any) -> Coroutine:
     func = as_op(func)
     is_async = inspect.iscoroutinefunction(func.resolve_fn)
     if is_async:
@@ -180,7 +178,9 @@ class Evaluation(Object):
             model_args_with_self = {**model_predict_args}
             if self_arg is not None:
                 model_args_with_self["self"] = self_arg
-            (model_output, model_output_call) = await async_call_op(model_predict, **model_args_with_self)
+            (model_output, model_output_call) = await async_call_op(
+                model_predict, **model_args_with_self
+            )
         except OpCallError as e:
             dataset_column_names = list(example.keys())
             dataset_column_names_str = ", ".join(dataset_column_names[:3])
@@ -235,7 +235,9 @@ class Evaluation(Object):
                         f"{score_fn} expects arguments: {score_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
                     )
             score_args["model_output"] = model_output
-            non_output_args = {k: v for k, v in score_args.items() if k != "model_output"}
+            non_output_args = {
+                k: v for k, v in score_args.items() if k != "model_output"
+            }
 
             try:
                 # TODO: Test different error cases
@@ -263,14 +265,17 @@ class Evaluation(Object):
                 )
                 raise OpCallError(message)
             scores[scorer_name] = result
-            model_output_call.add_score(scorer_name, {
-                "call": result_call,
-                # Denormalizing for performance
-                "op": score_fn,
-                # Denormalizing for performance
-                "score_args": non_output_args,
-                "result": result,
-            })
+            model_output_call.add_score(
+                scorer_name,
+                {
+                    "call": result_call,
+                    # Denormalizing for performance
+                    "op": score_fn,
+                    # Denormalizing for performance
+                    "score_args": non_output_args,
+                    "result": result,
+                },
+            )
 
         return {
             "model_output": model_output,
@@ -388,12 +393,12 @@ def is_valid_model(model: Any) -> bool:
         )
     )
 
+
 # Notes:
 # * Add score without a call
 
 # * Group by:
-# * 
-
+# *
 
 
 # Benefits of this approach:
