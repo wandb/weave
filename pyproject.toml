@@ -42,8 +42,8 @@ dependencies = [
   "tenacity>=8.3.0,!=8.4.0", # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
   "emoji>=2.12.1",           # For emoji shortcode support in Feedback
   "uuid-utils>=0.9.0",       # Used for ID generation - remove once python's built-in uuid supports UUIDv7
-  "numpy>1.21.0",
-  "rich",
+  "numpy>1.21.0",            # Used in box.py (should be made optional)
+  "rich",                    # Used for special formatting of tables (should be made optional)
 
   # dependencies for remaining legacy code.  Remove when possible
   "httpx",
