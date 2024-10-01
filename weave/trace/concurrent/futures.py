@@ -30,7 +30,6 @@ to manage asynchronous tasks:
 import atexit
 import concurrent.futures
 import logging
-import traceback
 from concurrent.futures import Future, wait
 from contextvars import ContextVar
 from threading import Lock
@@ -250,14 +249,15 @@ class FutureExecutor:
 
 def _format_exception(e: BaseException) -> str:
     exception_str = f"{type(e).__name__}: {e}"
-    try:
-        if hasattr(e, "__traceback__"):
-            traceback_str = "".join(traceback.format_tb(e.__traceback__))
-        if traceback_str:
-            exception_str += f"\nTraceback:\n{traceback_str}"
-        return exception_str
-    except:
-        return exception_str
+    return exception_str
+    # try:
+    #     if hasattr(e, "__traceback__"):
+    #         traceback_str = "".join(traceback.format_tb(e.__traceback__))
+    #     if traceback_str:
+    #         exception_str += f"\nTraceback:\n{traceback_str}"
+    #     return exception_str
+    # except:
+    #     return exception_str
 
 
 __all__ = ["FutureExecutor"]
