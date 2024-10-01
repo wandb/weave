@@ -2663,6 +2663,31 @@ def test_calls_stream_column_expansion(client):
     assert call_result.output == nested_ref.uri()
 
 
+# Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
+# in clickhouse_trace_server_batched.py, this test verifies that the dynamic
+# increase works as expected
+@pytest.mark.parametrize("batch_size", [1, 10, 100, 110])
+def test_calls_stream_column_expansion_dynamic_batch_size(client, batch_size):
+    @weave.op
+    def test_op(x):
+        return x
+
+    for i in range(batch_size):
+        test_op(i)
+
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output"],
+            expand_columns=["output"],
+        )
+    )
+    calls = list(res)
+    assert len(calls) == batch_size
+    for i in range(batch_size):
+        assert calls[i].output == i
+
+
 class Custom(weave.Object):
     val: dict
 
@@ -2792,16 +2817,18 @@ def test_objects_and_keys_with_special_characters(client):
 
 
 def test_calls_stream_feedback(client):
+    BATCH_SIZE = 10
+    num_calls = BATCH_SIZE + 1
+
     @weave.op
     def test_call(x):
         return "ello chap"
 
-    test_call(1)
-    test_call(2)
-    test_call(3)
+    for i in range(num_calls):
+        test_call(i)
 
     calls = list(test_call.calls())
-    assert len(calls) == 3
+    assert len(calls) == num_calls
 
     # add feedback to the first call
     calls[0].feedback.add("note", {"note": "this is a note on call1"})
@@ -2820,7 +2847,7 @@ def test_calls_stream_feedback(client):
     )
     calls = list(res)
 
-    assert len(calls) == 3
+    assert len(calls) == num_calls
     assert len(calls[0].summary["weave"]["feedback"]) == 4
     assert len(calls[1].summary["weave"]["feedback"]) == 1
     assert not calls[2].summary.get("weave", {}).get("feedback")
