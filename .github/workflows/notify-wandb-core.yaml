@@ -18,8 +18,6 @@ on:
 jobs:
   check-which-tests-to-run:
     uses: ./.github/workflows/check-which-tests-to-run.yaml
-    with:
-      job: check
   notify-wandb-core:
     needs: check-which-tests-to-run
     runs-on: ubuntu-latest
@@ -27,11 +25,11 @@ jobs:
       - name: Print payload
         run: |
           echo "Sending payload:"
-          echo '{"ref_name": "${{ github.ref_name }}", "sha": "${{ github.sha }}", "run_core_integration_tests": ${{ needs.check-which-tests-to-run.outputs.core_integration_tests }}}'
+          echo '{"ref_name": "${{ github.ref_name }}", "sha": "${{ github.sha }}", "run_core_integration_tests": ${{ needs.check-which-tests-to-run.outputs.check.core_integration_tests }}}'
       - name: Repository dispatch
         uses: peter-evans/repository-dispatch@v2
         with:
           token: ${{ secrets.WANDB_CORE_ACCESS_TOKEN }}
           repository: wandb/core
           event-type: weave-package-updated
-          client-payload: '{"ref_name": "${{ github.ref_name }}", "sha": "${{ github.sha }}", "run_core_integration_tests": ${{ needs.check-which-tests-to-run.outputs.core_integration_tests }}}'
+          client-payload: '{"ref_name": "${{ github.ref_name }}", "sha": "${{ github.sha }}", "run_core_integration_tests": ${{ needs.check-which-tests-to-run.outputs.check.core_integration_tests }}}'

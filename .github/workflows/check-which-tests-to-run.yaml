@@ -1,5 +1,8 @@
 name: Check which tests to run
 
+on:
+  workflow_call:
+
 env:
   WEAVE_QUERY_PATHS: 'weave_query/'
   CORE_INTEGRATION_PATHS: 'weave-js/ weave_query/'
