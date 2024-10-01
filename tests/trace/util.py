@@ -53,3 +53,7 @@ class FuzzyDateTimeMatcher:
 class DatetimeMatcher:
     def __eq__(self, other):
         return isinstance(other, datetime.datetime)
+
+
+class DummyTestException(Exception):
+    pass

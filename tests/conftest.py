@@ -8,7 +8,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import weave
-from weave.trace import weave_init
+from tests.trace.util import DummyTestException
+from weave.trace import autopatch, weave_init
 from weave.trace.client_context import context_state
 from weave.trace_server import (
     clickhouse_trace_server_batched,
@@ -17,9 +18,8 @@ from weave.trace_server import (
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
 
-from .tests.trace.trace_server_clickhouse_conftest import *
-from .tests.wandb_system_tests_conftest import *
-from .trace import autopatch
+from .trace.trace_server_clickhouse_conftest import *
+from .wandb_system_tests_conftest import *
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
@@ -313,10 +313,6 @@ def network_proxy_client(client):
         yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
-
-
-class DummyTestException(Exception):
-    pass
 
 
 class ThrowingServer(tsi.TraceServerInterface):

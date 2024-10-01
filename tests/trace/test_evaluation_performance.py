@@ -1,4 +1,3 @@
-import sys
 from collections import Counter
 from contextlib import contextmanager
 from threading import Lock
@@ -8,7 +7,7 @@ import PIL
 import pytest
 
 import weave
-from weave.conftest import DummyTestException
+from tests.trace.util import DummyTestException
 from weave.trace.context import raise_on_captured_errors
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
