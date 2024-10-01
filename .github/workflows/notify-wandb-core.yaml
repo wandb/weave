@@ -19,6 +19,11 @@ jobs:
   notify-wandb-core:
     runs-on: ubuntu-latest
     steps:
+      - name: Print payload
+        run: |
+          echo "Sending payload:"
+          echo '{"ref_name": "${{ github.ref_name }}", "sha": "${{ github.sha }}", "run_core_integration_tests": ${{ github.event.inputs.run_core_integration_tests || false }}}'
+
       - name: Repository dispatch
         uses: peter-evans/repository-dispatch@v2
         with:
