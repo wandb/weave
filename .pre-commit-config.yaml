@@ -21,11 +21,3 @@ repos:
         # exclude: (.*pyi$)|(weave/legacy)|(weave/tests)
         args: ['--config-file=pyproject.toml']
         exclude: (.*pyi$)|(weave_query)|(weave/tests)|(weave/trace_server/tests)|(weave/conftest.py)|(weave/trace/tests)|(integration_test)|(weave/tests/trace)|(weave/conftest.py)|(weave/trace_server/tests)|(examples)|(weave/integrations)|(weave/docker)
-  # This is legacy Weave when we were building a notebook product - should be removed
-  - repo: local
-    hooks:
-      - id: jupyter-nb-clear-output
-        name: jupyter-nb-clear-output
-        files: ^examples/.*\.ipynb$
-        language: system
-        entry: jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace
