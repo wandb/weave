@@ -183,7 +183,7 @@ def ensure_secret(
         [
             "secrets",
             "list",
-            f"--filter=name~^.*\/{name}$",
+            rf"--filter=name~^.*\/{name}$",
             f"--project={project}",
             "--format=json",
         ]
