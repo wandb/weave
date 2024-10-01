@@ -147,6 +147,7 @@ def ref(location: str) -> weave_client.ObjectRef:
         location = str(client._ref_uri(name, version, "obj"))
 
     uri = parse_uri(location)
+    print(f"{isinstance=}")
     if not isinstance(uri, weave_client.ObjectRef):
         raise ValueError("Expected an object ref")
     return uri

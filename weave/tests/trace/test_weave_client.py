@@ -18,7 +18,7 @@ from weave.tests.trace.util import (
     client_is_sqlite,
 )
 from weave.trace import refs, weave_client
-from weave.trace.isinstance import weave_isinstance
+from weave.trace.isinstance_checks import weave_isinstance
 from weave.trace.op import Op, is_op
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
