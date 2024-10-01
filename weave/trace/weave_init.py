@@ -76,7 +76,7 @@ def init_weave(
         else:
             _current_inited_client.reset()
 
-    from weave.legacy.weave import wandb_api
+    from weave.wandb_interface import wandb_api  # type: ignore
 
     # Must init to read ensure we've read auth from the environment, in
     # case we're on a new thread.

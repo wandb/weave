@@ -60,6 +60,7 @@ export type TraceCallsQueryReq = {
   query?: Query;
   columns?: string[];
   expand_columns?: string[];
+  include_feedback?: boolean;
 };
 
 export type TraceCallsQueryRes = {

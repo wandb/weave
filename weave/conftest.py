@@ -1,10 +1,8 @@
 import logging
 import os
-import random
-import shutil
-import tempfile
+from contextlib import _GeneratorContextManager
+from typing import Callable, Iterator
 
-import numpy as np
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -19,7 +17,6 @@ from weave.trace_server import (
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
 
-from .tests import fixture_fakewandb
 from .tests.trace.trace_server_clickhouse_conftest import *
 from .tests.wandb_system_tests_conftest import *
 from .trace import autopatch
@@ -28,60 +25,16 @@ from .trace import autopatch
 os.environ["WANDB_ERROR_REPORTING"] = "false"
 
 
-class FakeTracer:
-    def trace(*args, **kwargs):
-        pass
-
-
-def make_fake_tracer():
-    return FakeTracer()
-
-
-### End disable datadog engine tracing
-### disable internet access
-
-
-def guard(*args, **kwargs):
-    raise Exception("I told you not to use the Internet!")
-
-
-### End disable internet access
-
-# Uncomment these two lines to disable internet access entirely.
-# engine_trace.tracer = make_fake_tracer
-# socket.socket = guard
-
-
-@pytest.fixture()
-def test_artifact_dir():
-    return "/tmp/weave/pytest/%s" % os.environ.get("PYTEST_CURRENT_TEST")
-
-
 def pytest_sessionfinish(session, exitstatus):
     if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED:
-        print("No tests were selected. Exiting gracefully.")
         session.exitstatus = 0
 
 
 def pytest_collection_modifyitems(config, items):
     # Add the weave_client marker to all tests that have a client fixture
     for item in items:
-        if "client" in item.fixturenames:
+        if "client" in item.fixturenames or "client_creator" in item.fixturenames:
             item.add_marker(pytest.mark.weave_client)
-
-    # Get the job number from environment variable (0 for even tests, 1 for odd tests)
-    job_num = config.getoption("--job-num", default=None)
-    if job_num is None:
-        return
-
-    job_num = int(job_num)
-
-    selected_items = []
-    for index, item in enumerate(items):
-        if index % 2 == job_num:
-            selected_items.append(item)
-
-    items[:] = selected_items
 
 
 PYTEST_CURRENT_TEST_ENV_VAR = "PYTEST_CURRENT_TEST"
@@ -149,73 +102,6 @@ def logging_error_check(request, log_collector):
         )
 
 
-@pytest.fixture(autouse=True)
-def throw_on_error():
-    os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"] = "true"
-    yield
-    del os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"]
-
-
-@pytest.fixture()
-def cache_mode_minimal():
-    os.environ["WEAVE_NO_CACHE"] = "true"
-    yield
-    del os.environ["WEAVE_NO_CACHE"]
-
-
-@pytest.fixture()
-def cereal_csv():
-    with tempfile.TemporaryDirectory() as d:
-        cereal_path = os.path.join(d, "cereal.csv")
-        shutil.copy("testdata/cereal.csv", cereal_path)
-        yield cereal_path
-
-
-@pytest.fixture()
-def fake_wandb():
-    setup_response = fixture_fakewandb.setup()
-    yield setup_response
-    fixture_fakewandb.teardown(setup_response)
-
-
-@pytest.fixture()
-def fixed_random_seed():
-    random.seed(8675309)
-    np.random.seed(8675309)
-    yield
-    random.seed(None)
-    np.random.seed(None)
-
-
-@pytest.fixture()
-def app():
-    from . import weave_server
-
-    app = weave_server.make_app()
-    app.config.update(
-        {
-            "TESTING": True,
-        }
-    )
-
-    yield app
-
-
-@pytest.fixture()
-def enable_touch_on_read():
-    os.environ["WEAVE_ENABLE_TOUCH_ON_READ"] = "1"
-    yield
-    del os.environ["WEAVE_ENABLE_TOUCH_ON_READ"]
-
-
-@pytest.fixture()
-def consistent_table_col_ids():
-    from weave.legacy.weave.panels import table_state
-
-    with table_state.use_consistent_col_ids():
-        yield
-
-
 @pytest.fixture()
 def strict_op_saving():
     with context_state.strict_op_saving(True):
@@ -244,15 +130,19 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
     read operation(s) are performed.
     """
 
+    def set_autoflush(self, value: bool):
+        self._autoflush = value
+
     def __getattribute__(self, name):
         self_super = super()
         attr = self_super.__getattribute__(name)
 
-        if callable(attr) and not name.startswith("_") and name != "flush":
+        if callable(attr) and name != "flush":
 
             def wrapper(*args, **kwargs):
                 res = attr(*args, **kwargs)
-                self_super._flush()
+                if self.__dict__.get("_autoflush", True):
+                    self_super._flush()
                 return res
 
             return wrapper
@@ -301,8 +191,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     return ServerRecorder(server)
 
 
-@pytest.fixture()
-def client(request) -> Generator[weave_client.WeaveClient, None, None]:
+def create_client(request) -> weave_init.InitializedClient:
     inited_client = None
     weave_server_flag = request.config.getoption("--weave-server")
     server: tsi.TraceServerInterface
@@ -339,10 +228,38 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         )
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
+
+    return inited_client
+
+
+@pytest.fixture()
+def client(request) -> Generator[weave_client.WeaveClient, None, None]:
+    """This is the standard fixture used everywhere in tests to test end to end
+    client functionality"""
+    inited_client = create_client(request)
     try:
         yield inited_client.client
     finally:
         inited_client.reset()
+
+
+@pytest.fixture()
+def client_creator(
+    request,
+) -> Generator[
+    Callable[[], _GeneratorContextManager[weave_client.WeaveClient]], None, None
+]:
+    """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
+
+    @contextlib.contextmanager
+    def client():
+        inited_client = create_client(request)
+        try:
+            yield inited_client.client
+        finally:
+            inited_client.reset()
+
+    yield client
 
 
 @pytest.fixture
@@ -396,3 +313,101 @@ def network_proxy_client(client):
         yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
+
+
+class DummyTestException(Exception):
+    pass
+
+
+class ThrowingServer(tsi.TraceServerInterface):
+    # Call API
+    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        raise DummyTestException("FAILURE - call_start, req:", req)
+
+    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+        raise DummyTestException("FAILURE - call_end, req:", req)
+
+    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
+        raise DummyTestException("FAILURE - call_read, req:", req)
+
+    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+        raise DummyTestException("FAILURE - calls_query, req:", req)
+
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+        raise DummyTestException("FAILURE - calls_query_stream, req:", req)
+
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        raise DummyTestException("FAILURE - calls_delete, req:", req)
+
+    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+        raise DummyTestException("FAILURE - calls_query_stats, req:", req)
+
+    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+        raise DummyTestException("FAILURE - call_update, req:", req)
+
+    # Op API
+    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
+        raise DummyTestException("FAILURE - op_create, req:", req)
+
+    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
+        raise DummyTestException("FAILURE - op_read, req:", req)
+
+    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
+        raise DummyTestException("FAILURE - ops_query, req:", req)
+
+    # Cost API
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        raise DummyTestException("FAILURE - cost_create, req:", req)
+
+    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+        raise DummyTestException("FAILURE - cost_query, req:", req)
+
+    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+        raise DummyTestException("FAILURE - cost_purge, req:", req)
+
+    # Obj API
+    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        raise DummyTestException("FAILURE - obj_create, req:", req)
+
+    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        raise DummyTestException("FAILURE - obj_read, req:", req)
+
+    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
+        raise DummyTestException("FAILURE - objs_query, req:", req)
+
+    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        raise DummyTestException("FAILURE - table_create, req:", req)
+
+    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        raise DummyTestException("FAILURE - table_update, req:", req)
+
+    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+        raise DummyTestException("FAILURE - table_query, req:", req)
+
+    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
+        raise DummyTestException("FAILURE - refs_read_batch, req:", req)
+
+    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        raise DummyTestException("FAILURE - file_create, req:", req)
+
+    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        raise DummyTestException("FAILURE - file_content_read, req:", req)
+
+    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        raise DummyTestException("FAILURE - feedback_create, req:", req)
+
+    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+        raise DummyTestException("FAILURE - feedback_query, req:", req)
+
+    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+        raise DummyTestException("FAILURE - feedback_purge, req:", req)
+
+
+@pytest.fixture()
+def client_with_throwing_server(client: weave_client.WeaveClient):
+    curr_server = client.server
+    client.server = ThrowingServer()
+    try:
+        yield client
+    finally:
+        client.server = curr_server

@@ -36,7 +36,7 @@ jobs:
       - name: Prune docker cache
         run: docker system prune -f
       - name: Build legacy (query sevice) unit test image
-        run: python3 weave/docker/docker_build.py build_deps weave-test-python-query-service builder . weave/legacy/Dockerfile.ci.test
+        run: python3 weave/docker/docker_build.py build_deps weave-test-python-query-service builder . weave_query/Dockerfile.ci.test
 
   test-query-service:
     name: Legacy (Query Service) Python unit tests
@@ -82,15 +82,13 @@ jobs:
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
           source /root/venv/bin/activate && \
-          pip install 'dspy-ai==2.4.13' && \
-          pip install pydantic -U && \
-          cd weave && \
+          cd weave_query && \
           pytest \
           --job-num=${{ matrix.job_num }} \
           --timeout=90 \
           --ddtrace \
           --durations=5 \
-          ./legacy
+          .
 
   test-query-service-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
@@ -143,12 +141,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install tox
-      - name: Run tox
-        run: tox -e lint
+          pip install nox uv
+      - name: Run nox
+        run: nox -e lint
 
   trace-tests:
-    name: Trace tox tests
+    name: Trace nox tests
     timeout-minutes: 10
     runs-on: ubuntu-latest
     strategy:
@@ -161,7 +159,7 @@ jobs:
             '12',
             #
           ]
-        tox-shard:
+        nox-shard:
           [
             'trace',
             'trace_server',
@@ -208,8 +206,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install tox
-      - name: Run tox (Clickhouse Only)
+          pip install nox uv
+      - name: Run nox (Clickhouse Only)
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -217,10 +215,10 @@ jobs:
           WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
-          tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }} -- \
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "weave_client and not skip_clickhouse_client" \
             --weave-server=clickhouse
-      - name: Run tox
+      - name: Run nox
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -228,7 +226,7 @@ jobs:
           WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
-          tox -e ${{ matrix.tox-shard }}-py${{ matrix.python-version-major }}${{ matrix.python-version-minor }}
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 

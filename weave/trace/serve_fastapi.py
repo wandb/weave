@@ -5,8 +5,8 @@ from typing import Annotated, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from weave_query import cache, op_args, pyfunc_type_util, weave_pydantic  # type: ignore
 
-from weave.legacy.weave import cache, op_args, pyfunc_type_util, weave_pydantic
 from weave.trace import errors
 from weave.trace.op import Op, is_op
 from weave.trace.refs import ObjectRef

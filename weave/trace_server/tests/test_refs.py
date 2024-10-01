@@ -11,14 +11,14 @@ quote = refs_internal.extra_value_quoter
 
 def test_isdescended_from():
     a = refs.ObjectRef(
-        entity="e", project="p", name="n", digest="v", extra=["attr", "x2"]
+        entity="e", project="p", name="n", _digest="v", _extra=["attr", "x2"]
     )
     b = refs.ObjectRef(
         entity="e",
         project="p",
         name="n",
-        digest="v",
-        extra=["attr", "x2", "attr", "x4"],
+        _digest="v",
+        _extra=["attr", "x2", "attr", "x4"],
     )
     assert a.is_descended_from(b) == False
     assert b.is_descended_from(a) == True
@@ -36,8 +36,8 @@ def test_ref_parsing_external_invalid():
             entity="entity",
             project="project",
             name=string_with_every_char(),
-            digest="1234567890",
-            extra=("key", string_with_every_char()),
+            _digest="1234567890",
+            _extra=("key", string_with_every_char()),
         )
 
 
@@ -46,8 +46,8 @@ def test_ref_parsing_external_sanitized():
         entity="entity",
         project="project",
         name=sanitize_object_name(string_with_every_char()),
-        digest="1234567890",
-        extra=("key", string_with_every_char()),
+        _digest="1234567890",
+        _extra=("key", string_with_every_char()),
     )
 
     ref_str = ref_start.uri()

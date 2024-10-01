@@ -185,6 +185,7 @@ def test_table_query_combined(client: WeaveClient):
             sort_by=[tsi.SortBy(field="id", direction="desc")],
         )
     )
+
     result_vals = [r.val for r in res.rows]
     result_digests = [r.digest for r in res.rows]
 
@@ -215,3 +216,146 @@ def test_table_query_multiple_sort_criteria(client: WeaveClient):
     assert [r.val["id"] for r in res.rows] != [
         d["id"] for d in data
     ]  # Ensure order is different from original  (assertion on the test itself)
+
+
+def test_table_query_stats(client: WeaveClient):
+    digest, row_digests, data = generate_table_data(client, 10, 10)
+
+    stats_res = client.server.table_query_stats(
+        tsi.TableQueryStatsReq(
+            project_id=client._project_id(),
+            digest=digest,
+        )
+    )
+
+    assert stats_res.count == len(data)
+
+
+def test_table_query_stats_empty(client: WeaveClient):
+    digest, row_digests, data = generate_table_data(client, 0, 0)
+
+    stats_res = client.server.table_query_stats(
+        tsi.TableQueryStatsReq(
+            project_id=client._project_id(),
+            digest=digest,
+        )
+    )
+
+    assert stats_res.count == len(data)
+
+
+def test_table_query_stats_missing(client: WeaveClient):
+    digest, row_digests, data = generate_table_data(client, 10, 10)
+
+    stats_res = client.server.table_query_stats(
+        tsi.TableQueryStatsReq(
+            project_id=client._project_id(),
+            digest="missing",
+        )
+    )
+
+    assert stats_res.count == 0
+
+
+def generate_duplication_simple_table_data(
+    client: WeaveClient, n_rows: int, copy_count: int
+):
+    # Create a list of IDs and shuffle them to ensure random order
+    data = [{"val": i} for i in range(n_rows) for _ in range(copy_count)]
+
+    res = client.server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                rows=data,
+                project_id=client._project_id(),
+            ),
+        )
+    )
+    digest = res.digest
+    row_digests = res.row_digests
+
+    return {"digest": digest, "row_digests": row_digests, "data": data}
+
+
+def test_table_query_with_duplicate_row_digests(client: WeaveClient):
+    res1 = generate_duplication_simple_table_data(client, 10, 1)
+    res2 = generate_duplication_simple_table_data(client, 10, 2)
+    res3 = generate_duplication_simple_table_data(client, 10, 3)
+
+    res = client.server.table_query(
+        tsi.TableQueryReq(
+            project_id=client._project_id(),
+            digest=res1["digest"],
+        )
+    )
+
+    stats_res = client.server.table_query_stats(
+        tsi.TableQueryStatsReq(
+            project_id=client._project_id(),
+            digest=res1["digest"],
+        )
+    )
+
+    assert len(res.rows) == stats_res.count == 10
+
+    res = client.server.table_query(
+        tsi.TableQueryReq(
+            project_id=client._project_id(),
+            digest=res1["digest"],
+            filter=tsi.TableRowFilter(row_digests=[res1["row_digests"][0]]),
+        )
+    )
+
+    assert len(res.rows) == 1
+
+    res = client.server.table_query(
+        tsi.TableQueryReq(
+            project_id=client._project_id(),
+            digest=res2["digest"],
+        )
+    )
+
+    stats_res = client.server.table_query_stats(
+        tsi.TableQueryStatsReq(
+            project_id=client._project_id(),
+            digest=res2["digest"],
+        )
+    )
+
+    assert len(res.rows) == stats_res.count == 20
+
+    res = client.server.table_query(
+        tsi.TableQueryReq(
+            project_id=client._project_id(),
+            digest=res2["digest"],
+            filter=tsi.TableRowFilter(row_digests=[res2["row_digests"][0]]),
+        )
+    )
+
+    assert len(res.rows) == 2
+
+    res = client.server.table_query(
+        tsi.TableQueryReq(
+            project_id=client._project_id(),
+            digest=res3["digest"],
+        )
+    )
+
+    stats_res = client.server.table_query_stats(
+        tsi.TableQueryStatsReq(
+            project_id=client._project_id(),
+            digest=res3["digest"],
+        )
+    )
+
+    assert len(res.rows) == stats_res.count == 30
+
+    res = client.server.table_query(
+        tsi.TableQueryReq(
+            project_id=client._project_id(),
+            digest=res3["digest"],
+            filter=tsi.TableRowFilter(row_digests=[res3["row_digests"][0]]),
+        )
+    )
+
+    assert len(res.rows) == 3

@@ -5,8 +5,9 @@ import time
 import typing
 from pathlib import Path
 
-from weave.legacy.weave import artifact_wandb as artifact_wandb
-from weave.legacy.weave import environment
+from weave_query import artifact_wandb as artifact_wandb  # type: ignore
+from weave_query import environment  # type: ignore
+
 from weave.trace.refs import ObjectRef, parse_uri
 
 try:
