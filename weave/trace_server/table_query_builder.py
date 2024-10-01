@@ -34,7 +34,6 @@ def make_natural_sort_table_query(
             row_digests_selection = f"arraySlice({row_digests_selection}, 1 + {{{pb.add_param(offset)}: Int64}})"
         else:
             row_digests_selection = f"arraySlice({row_digests_selection}, 1 + {{{pb.add_param(offset)}: Int64}}, {{{pb.add_param(limit)}: Int64}})"
-    
 
     query = f"""
     SELECT DISTINCT tr.digest, tr.val_dump, t.row_order
