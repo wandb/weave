@@ -3,7 +3,6 @@ import os
 from typing import Dict
 import yaml
 
-import pandas as pd
 import pytest
 
 import weave
@@ -23,7 +22,6 @@ def model_datasets(model_evals: Dict[str, EvaluationResults]):
 
         table_rows = []
         for eval_idx, eval_row in enumerate(eval_results.rows):
-            print(eval_row.keys())
             table_rows.append(
                 {
                     "id": eval_idx,
@@ -39,7 +37,7 @@ def model_datasets(model_evals: Dict[str, EvaluationResults]):
 
 @pytest.fixture
 def preference_id():
-    with open('integrations/notdiamond/cassettes/custom_router_test/test_custom_router_train_evaluations.yaml', 'r') as file:
+    with open('tests/integrations/notdiamond/cassettes/custom_router_test/test_custom_router_train_evaluations.yaml', 'r') as file:
         cassette = yaml.safe_load(file)
 
     response_body = cassette['interactions'][0]['response']['body']
