@@ -49,6 +49,7 @@ jobs:
     steps:
 
   build-container-query-service-matrix-check: # This job does nothing and is only used for the branch protection
+    if: always()
     needs:
       - check-which-tests-to-run
       - ${{ (github.ref == 'refs/heads/master' || needs.check-which-tests-to-run.outputs.weave_query_tests) && 'build-container-query-service' || 'build-container-query-service-dummy' }}
@@ -121,6 +122,7 @@ jobs:
     steps:
 
   test-query-service-matrix-check: # This job does nothing and is only used for the branch protection
+    if: always()
     needs:
       - check-which-tests-to-run
       - ${{ (github.ref == 'refs/heads/master' || needs.check-which-tests-to-run.outputs.weave_query_tests) && 'test-query-service' || 'test-query-service-dummy' }}
@@ -165,7 +167,6 @@ jobs:
 
   weavejs-lint-compile-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
-
     needs:
       - check-which-tests-to-run
       - ${{ (github.ref == 'refs/heads/master' || needs.check-which-tests-to-run.outputs.weave_js_tests) && 'weavejs-lint-compile' || 'weavejs-lint-compile-dummy' }}
