@@ -39,6 +39,8 @@ def test_op_simple():
 
 
 # hmmmmmmmmmm
+
+
 @weave.op()
 def op_inferredtype(a: int, b: int) -> str:
     return str(a) + str(b)
