@@ -15,5 +15,4 @@ const config: CodegenConfig = {
   },
 };
 
-// tes
 export default config;
