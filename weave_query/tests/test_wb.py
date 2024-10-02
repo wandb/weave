@@ -1777,6 +1777,12 @@ def test_is_valid_version_string():
         assert not artifact_wandb.is_valid_version_index(v)
 
 
+def test_artifact_path_escaping_no_path():
+    path = "wandb-client-artifact://12347187287418787843872388177814:latest"
+    result = wb_util.escape_artifact_path(path)
+    assert result == path
+
+
 def test_artifact_path_character_escaping():
     name = 12347187287418787843872388177814
     path = "table #3.table.json"
