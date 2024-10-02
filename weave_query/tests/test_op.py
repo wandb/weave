@@ -11,6 +11,7 @@ from . import test_helpers
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 
+xxxxxxxxxxxxx = 1
 
 @weave.op(
     name="test_op-op_simple",
