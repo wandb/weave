@@ -37,7 +37,8 @@ jobs:
             head_sha=$(git rev-parse HEAD)
             changed_files=$(git diff --name-only $base_sha $head_sha)
           else
-            changed_files=$(git diff --name-only HEAD^)
+            base_sha=$(git merge-base HEAD origin/${{ github.base_ref }})
+            changed_files=$(git diff --name-only $base_sha HEAD)
           fi
           echo "changed_files=$changed_files"
       - id: weave_query
