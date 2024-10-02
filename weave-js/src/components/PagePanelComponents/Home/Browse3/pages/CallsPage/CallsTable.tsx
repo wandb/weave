@@ -311,6 +311,31 @@ export const CallsTable: FC<{
     onAddFilter
   );
 
+  // This contains columns which are suitable for selection and raw data 
+  // entry. Noteably, not children of expanded refs.
+  const filterFriendlyColumnInfo = useMemo(() => {
+    const colIsChildOfExpandedRefCol = (col: GridColDef) => {
+      for (const refCol of expandedRefCols) {
+        if (col.field.startsWith(refCol + '.')) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    const filteredCols = columns.cols.filter(col => !colIsChildOfExpandedRefCol(col))
+    return {
+      cols: filteredCols,
+      colGroupingModel: columns.colGroupingModel,
+    };
+  }, [columns, expandedRefCols]);
+
+  console.log({
+    filterFriendlyColumnInfo,
+    columns,
+    expandedRefCols,
+  })
+
   // Now, there are 4 primary controls:
   // 1. Op Version
   // 2. Input Object Version
@@ -639,7 +664,7 @@ export const CallsTable: FC<{
           {filterModel && setFilterModel && (
             <FilterPanel
               filterModel={filterModel}
-              columnInfo={columns}
+              columnInfo={filterFriendlyColumnInfo}
               setFilterModel={setFilterModel}
               selectedCalls={selectedCalls}
               clearSelectedCalls={clearSelectedCalls}
