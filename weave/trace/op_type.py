@@ -432,7 +432,7 @@ def _get_code_deps(
 
                     from weave.trace.serialize import to_json
 
-                    json_val = to_json(var_value, client._project_id(), client.server)
+                    json_val = to_json(var_value, client._project_id(), client)
                 except Exception as e:
                     warnings.append(
                         f"Serialization error for value of {var_name} needed by {fn}. Encountered:\n    {e}"

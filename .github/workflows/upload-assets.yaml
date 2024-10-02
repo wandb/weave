@@ -27,7 +27,7 @@ jobs:
       - id: 'build'
         run: |
           ./weave_query/weave_query/frontend/build.sh
-          if [[ -z "$(git status weave/frontend/sha1.txt --porcelain)" ]]
+          if [[ -z "$(git status weave_query/weave_query/frontend/sha1.txt --porcelain)" ]]
           then
             echo "Frontend assets has not changed, skipping publishing"
             echo "UPLOAD_ASSETS=false" >> "$GITHUB_OUTPUT"
