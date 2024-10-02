@@ -37,18 +37,35 @@ jobs:
       - name: Get changed files
         id: changed-files
         run: |
-          git fetch origin ${{ inputs.base_ref }}
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base_sha=$(git rev-parse origin/${{ inputs.base_ref }})
-            head_sha=$(git rev-parse HEAD)
-          else
-            base_sha=$(git rev-parse origin/${{ inputs.base_ref }})
-            head_sha=$(git rev-parse HEAD)
-          fi
-          changed_files=$(git diff --name-only $base_sha $head_sha)
-          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
-          echo "$changed_files" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "Current ref: ${{ github.ref }}"
+            echo "Base ref: ${{ inputs.base_ref }}"
+            echo "Event name: ${{ github.event_name }}"
+            
+            git fetch origin ${{ inputs.base_ref }}
+            
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              base_sha=$(git rev-parse origin/${{ inputs.base_ref }})
+              head_sha=${{ github.event.pull_request.head.sha }}
+            else
+              base_sha=$(git rev-parse origin/${{ inputs.base_ref }})
+              head_sha=${{ github.sha }}
+            fi
+            
+            echo "Base SHA: $base_sha"
+            echo "Head SHA: $head_sha"
+            
+            changed_files=$(git diff --name-only $base_sha $head_sha)
+            
+            echo "Changed files:"
+            echo "$changed_files"
+            
+            if [ -z "$changed_files" ]; then
+              echo "No files changed"
+            else
+              echo "CHANGED_FILES<<EOF" >> $GITHUB_ENV
+              echo "$changed_files" >> $GITHUB_ENV
+              echo "EOF" >> $GITHUB_ENV
+            fi
       - name: Echo changed files
         run: |
           echo "Changed files:"
