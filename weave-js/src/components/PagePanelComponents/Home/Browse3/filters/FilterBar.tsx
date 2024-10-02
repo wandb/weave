@@ -8,7 +8,6 @@ import React, {useCallback, useRef} from 'react';
 
 import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
-import {IconFilterAlt} from '../../../../Icon';
 import {Tailwind} from '../../../../Tailwind';
 import {ColumnInfo} from '../types';
 import {
@@ -209,26 +208,27 @@ export const FilterBar = ({
 
   return (
     <>
-      <div
+      <Button
+        variant="outline"
+        size="medium"
+        icon="filter-alt"
         ref={refBar}
-        className="flex cursor-pointer items-center gap-4 rounded px-8 py-4 outline outline-moon-250 hover:outline-2 hover:outline-teal-500/40"
         onClick={onClick}>
-        <div>
-          <IconFilterAlt />
-        </div>
-        <div ref={refLabel} className="select-none">
-          Filter
-        </div>
-        <VariableChildrenDisplay width={availableWidth} gap={8}>
-          {completeItems.map(f => (
-            <FilterTagItem
-              key={f.id}
-              item={f}
-              onRemoveFilter={onRemoveFilter}
-            />
-          ))}
-        </VariableChildrenDisplay>
-      </div>
+        <>
+          <div ref={refLabel} className="select-none">
+            Filter
+          </div>
+          <VariableChildrenDisplay width={availableWidth} gap={8}>
+            {completeItems.map(f => (
+              <FilterTagItem
+                key={f.id}
+                item={f}
+                onRemoveFilter={onRemoveFilter}
+              />
+            ))}
+          </VariableChildrenDisplay>
+        </>
+      </Button>
       <Popover
         id={id}
         open={open}

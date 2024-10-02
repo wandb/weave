@@ -69,6 +69,7 @@ import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
   ExportSelector,
+  PaginationButtons,
   RefreshButton,
 } from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
@@ -82,7 +83,6 @@ import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 
-const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -578,168 +578,183 @@ export const CallsTable: FC<{
       filterListSx={{
         pb: 1,
         display: hideControls ? 'none' : 'flex',
+        justifyContent: 'space-between',
         alignItems: 'center',
       }}
       filterListItems={
         <Tailwind style={{display: 'contents'}}>
-          {!hideOpSelector && (
-            <div className="flex-none">
-              <ListItem sx={{minWidth: 190, width: 320}}>
-                <FormControl fullWidth>
-                  <Autocomplete
-                    PaperComponent={paperProps => (
-                      <StyledPaper {...paperProps} />
-                    )}
-                    size="small"
-                    // Temp disable multiple for simplicity - may want to re-enable
-                    // multiple
-                    limitTags={1}
-                    disabled={Object.keys(frozenFilter ?? {}).includes(
-                      'opVersions'
-                    )}
-                    value={selectedOpVersionOption}
-                    onChange={(event, newValue) => {
-                      if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
-                        setFilter({
-                          ...filter,
-                          opVersionRefs: [],
-                        });
-                      } else {
-                        setFilter({
-                          ...filter,
-                          opVersionRefs: newValue ? [newValue] : [],
-                        });
+          <div className="flex-grow-1 flex gap-8">
+            <RefreshButton onClick={() => calls.refetch()} />
+            {!hideOpSelector && (
+              <div className="flex-none">
+                <ListItem
+                  sx={{minWidth: 190, width: 320, height: 32, padding: 0}}>
+                  <FormControl fullWidth>
+                    <Autocomplete
+                      PaperComponent={paperProps => (
+                        <StyledPaper {...paperProps} />
+                      )}
+                      size="small"
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          height: '32px',
+                        },
+                        '& .MuiOutlinedInput-input': {
+                          height: '32px',
+                          padding: '0 14px',
+                          boxSizing: 'border-box',
+                        },
+                      }}
+                      // Temp disable multiple for simplicity - may want to re-enable
+                      // multiple
+                      limitTags={1}
+                      disabled={Object.keys(frozenFilter ?? {}).includes(
+                        'opVersions'
+                      )}
+                      value={selectedOpVersionOption}
+                      onChange={(event, newValue) => {
+                        if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
+                          setFilter({
+                            ...filter,
+                            opVersionRefs: [],
+                          });
+                        } else {
+                          setFilter({
+                            ...filter,
+                            opVersionRefs: newValue ? [newValue] : [],
+                          });
+                        }
+                      }}
+                      renderInput={renderParams => (
+                        <StyledTextField
+                          {...renderParams}
+                          sx={{maxWidth: '350px'}}
+                        />
+                      )}
+                      getOptionLabel={option => {
+                        return opVersionOptions[option]?.title ?? 'loading...';
+                      }}
+                      disableClearable={
+                        selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
                       }
-                    }}
-                    renderInput={renderParams => (
-                      <StyledTextField
-                        {...renderParams}
-                        label={OP_FILTER_GROUP_HEADER}
-                        sx={{maxWidth: '350px'}}
-                      />
-                    )}
-                    getOptionLabel={option => {
-                      return opVersionOptions[option]?.title ?? 'loading...';
-                    }}
-                    disableClearable={
-                      selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
-                    }
-                    groupBy={option => opVersionOptions[option]?.group}
-                    options={Object.keys(opVersionOptions)}
+                      groupBy={option => opVersionOptions[option]?.group}
+                      options={Object.keys(opVersionOptions)}
+                    />
+                  </FormControl>
+                </ListItem>
+              </div>
+            )}
+            {filterModel && setFilterModel && (
+              <FilterPanel
+                isEvaluateTable={isEvaluateTable}
+                filterModel={filterModel}
+                columnInfo={columns}
+                setFilterModel={setFilterModel}
+                selectedCalls={selectedCalls}
+                clearSelectedCalls={clearSelectedCalls}
+              />
+            )}
+            {columnVisibilityModel && setColumnVisibilityModel && (
+              <>
+                <div className="flex-none">
+                  <ManageColumnsButton
+                    columnInfo={columns}
+                    columnVisibilityModel={columnVisibilityModel}
+                    setColumnVisibilityModel={setColumnVisibilityModel}
                   />
-                </FormControl>
-              </ListItem>
-            </div>
-          )}
-          {filterModel && setFilterModel && (
-            <FilterPanel
-              filterModel={filterModel}
-              columnInfo={columns}
-              setFilterModel={setFilterModel}
-              selectedCalls={selectedCalls}
-              clearSelectedCalls={clearSelectedCalls}
-            />
-          )}
-          {selectedInputObjectVersion && (
-            <Chip
-              label={`Input: ${objectVersionNiceString(
-                selectedInputObjectVersion
-              )}`}
-              onDelete={() => {
-                setFilter({
-                  ...filter,
-                  inputObjectVersionRefs: undefined,
-                });
-              }}
-            />
-          )}
-          {selectedOutputObjectVersion && (
-            <Chip
-              label={`Output: ${objectVersionNiceString(
-                selectedOutputObjectVersion
-              )}`}
-              onDelete={() => {
-                setFilter({
-                  ...filter,
-                  outputObjectVersionRefs: undefined,
-                });
-              }}
-            />
-          )}
-          {selectedParentId && (
-            <Chip
-              label={`Parent: ${selectedParentId}`}
-              onDelete={() => {
-                setFilter({
-                  ...filter,
-                  parentId: undefined,
-                });
-              }}
-            />
-          )}
-          {isEvaluateTable && (
-            <CompareEvaluationsTableButton
-              onClick={() => {
-                history.push(
-                  router.compareEvaluationsUri(entity, project, selectedCalls)
-                );
-              }}
-              disabled={selectedCalls.length === 0}
-            />
-          )}
-          {!isReadonly && (
-            <div className="flex-none">
-              <BulkDeleteButton
-                onClick={() => setDeleteConfirmModalOpen(true)}
+                </div>
+              </>
+            )}
+            {selectedInputObjectVersion && (
+              <Chip
+                label={`Input: ${objectVersionNiceString(
+                  selectedInputObjectVersion
+                )}`}
+                onDelete={() => {
+                  setFilter({
+                    ...filter,
+                    inputObjectVersionRefs: undefined,
+                  });
+                }}
+              />
+            )}
+            {selectedOutputObjectVersion && (
+              <Chip
+                label={`Output: ${objectVersionNiceString(
+                  selectedOutputObjectVersion
+                )}`}
+                onDelete={() => {
+                  setFilter({
+                    ...filter,
+                    outputObjectVersionRefs: undefined,
+                  });
+                }}
+              />
+            )}
+            {selectedParentId && (
+              <Chip
+                label={`Parent: ${selectedParentId}`}
+                onDelete={() => {
+                  setFilter({
+                    ...filter,
+                    parentId: undefined,
+                  });
+                }}
+              />
+            )}
+          </div>
+
+          <div className="flex flex-grow-0 items-center gap-8 px-8">
+            {isEvaluateTable && (
+              <CompareEvaluationsTableButton
+                onClick={() => {
+                  history.push(
+                    router.compareEvaluationsUri(entity, project, selectedCalls)
+                  );
+                }}
                 disabled={selectedCalls.length === 0}
               />
-              <ConfirmDeleteModal
-                calls={tableData
-                  .filter(row => selectedCalls.includes(row.id))
-                  .map(traceCallToUICallSchema)}
-                confirmDelete={deleteConfirmModalOpen}
-                setConfirmDelete={setDeleteConfirmModalOpen}
-                onDeleteCallback={() => {
-                  setSelectedCalls([]);
+            )}
+            {!isReadonly && selectedCalls.length !== 0 && (
+              <>
+                <BulkDeleteButton
+                  onClick={() => setDeleteConfirmModalOpen(true)}
+                  disabled={selectedCalls.length === 0}
+                />
+                <ConfirmDeleteModal
+                  calls={tableData
+                    .filter(row => selectedCalls.includes(row.id))
+                    .map(traceCallToUICallSchema)}
+                  confirmDelete={deleteConfirmModalOpen}
+                  setConfirmDelete={setDeleteConfirmModalOpen}
+                  onDeleteCallback={() => {
+                    setSelectedCalls([]);
+                  }}
+                />
+                <ButtonDivider />
+              </>
+            )}
+
+            <div className="flex-none">
+              <ExportSelector
+                selectedCalls={selectedCalls}
+                numTotalCalls={callsTotal}
+                disabled={callsTotal === 0}
+                visibleColumns={visibleColumns}
+                // Remove cols from expandedRefs if it's not in visibleColumns (probably just inputs.example)
+                refColumnsToExpand={Array.from(expandedRefCols).filter(col =>
+                  visibleColumns.includes(col)
+                )}
+                callQueryParams={{
+                  entity,
+                  project,
+                  filter: effectiveFilter,
+                  gridFilter: filterModel ?? DEFAULT_FILTER_CALLS,
+                  gridSort: sortModel,
                 }}
               />
             </div>
-          )}
-          <ButtonDivider />
-
-          <div className="flex-none">
-            <ExportSelector
-              selectedCalls={selectedCalls}
-              numTotalCalls={callsTotal}
-              disabled={callsTotal === 0}
-              visibleColumns={visibleColumns}
-              // Remove cols from expandedRefs if it's not in visibleColumns (probably just inputs.example)
-              refColumnsToExpand={Array.from(expandedRefCols).filter(col =>
-                visibleColumns.includes(col)
-              )}
-              callQueryParams={{
-                entity,
-                project,
-                filter: effectiveFilter,
-                gridFilter: filterModel ?? DEFAULT_FILTER_CALLS,
-                gridSort: sortModel,
-              }}
-            />
           </div>
-          {columnVisibilityModel && setColumnVisibilityModel && (
-            <>
-              <ButtonDivider />
-              <div className="flex-none">
-                <ManageColumnsButton
-                  columnInfo={columns}
-                  columnVisibilityModel={columnVisibilityModel}
-                  setColumnVisibilityModel={setColumnVisibilityModel}
-                />
-              </div>
-            </>
-          )}
-          <ButtonDivider />
-          <RefreshButton onClick={() => calls.refetch()} />
         </Tailwind>
       }>
       <StyledDataGrid
@@ -802,6 +817,10 @@ export const CallsTable: FC<{
         onPinnedColumnsChange={onPinnedColumnsChange}
         sx={{
           borderRadius: 0,
+          // This moves the pagination controls to the left
+          '& .MuiDataGrid-footerContainer': {
+            justifyContent: 'flex-start',
+          },
         }}
         slots={{
           noRowsOverlay: () => {
@@ -855,6 +874,7 @@ export const CallsTable: FC<{
             );
           },
           columnMenu: CallsCustomColumnMenu,
+          pagination: PaginationButtons,
         }}
       />
     </FilterLayoutTemplate>
