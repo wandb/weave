@@ -15,4 +15,5 @@ const config: CodegenConfig = {
   },
 };
 
+// test
 export default config;
