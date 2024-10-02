@@ -54,7 +54,7 @@ export const useCallsTableColumns = (
   onCollapse: (col: string) => void,
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
-  shownCols?: string[],
+  allowedColumnPatterns?: string[],
   onAddFilter?: OnAddFilter
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
@@ -130,7 +130,7 @@ export const useCallsTableColumns = (
         onExpand,
         columnIsRefExpanded,
         userDefinedColumnWidths,
-        shownCols,
+        allowedColumnPatterns,
         onAddFilter
       ),
     [
@@ -146,7 +146,7 @@ export const useCallsTableColumns = (
       onExpand,
       columnIsRefExpanded,
       userDefinedColumnWidths,
-      shownCols,
+      allowedColumnPatterns,
       onAddFilter,
     ]
   );
@@ -171,7 +171,7 @@ function buildCallsTableColumns(
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
   userDefinedColumnWidths: Record<string, number>,
-  shownCols?: string[],
+  allowedColumnPatterns?: string[],
   onAddFilter?: OnAddFilter
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
@@ -457,8 +457,8 @@ function buildCallsTableColumns(
   // TODO: It would be better to build up the cols rather than throwing away
   //       some at the end, but making simpler change for now.
   let orderedCols = cols;
-  if (shownCols !== undefined) {
-    orderedCols = shownCols.flatMap(shownCol => {
+  if (allowedColumnPatterns !== undefined) {
+    orderedCols = allowedColumnPatterns.flatMap(shownCol => {
       if (shownCol.includes('*')) {
         const regex = new RegExp('^' + shownCol.replace('*', '.*') + '$');
         return cols.filter(col => regex.test(col.field));
