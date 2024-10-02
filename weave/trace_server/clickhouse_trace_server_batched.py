@@ -584,36 +584,75 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         return tsi.ObjCreateRes(digest=digest)
 
-    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+    @staticmethod
+    def _make_conds_from_digest(
+        digest: str,
+    ) -> tuple[list[str], Dict[str, Union[str, int]]]:
+        (is_version, version_index) = digest_is_version_like(digest)
         conds: list[str] = []
-        object_id_conditions = ["object_id = {object_id: String}"]
-        parameters: Dict[str, Union[str, int]] = {"object_id": req.object_id}
-        if req.digest == "latest":
+        parameters: Dict[str, Union[str, int]] = {}
+        if digest == "latest":
             conds.append("is_latest = 1")
         else:
-            (is_version, version_index) = digest_is_version_like(req.digest)
+            (is_version, version_index) = digest_is_version_like(digest)
             if is_version:
                 conds.append("version_index = {version_index: UInt64}")
                 parameters["version_index"] = version_index
             else:
                 conds.append("digest = {version_digest: String}")
-                parameters["version_digest"] = req.digest
+                parameters["version_digest"] = digest
+        return conds, parameters
+
+    def _obj_read(
+        self,
+        project_id: str,
+        object_id: str,
+        digest: str,
+        include_deleted: bool = False,
+        metadata_only: bool = False,
+    ) -> SelectableCHObjSchema:
+        (is_version, version_index) = digest_is_version_like(digest)
+        conds: list[str] = []
+        parameters: Dict[str, Union[str, int]] = {"object_id": object_id}
+        if digest == "latest":
+            conds.append("is_latest = 1")
+        else:
+            (is_version, version_index) = digest_is_version_like(digest)
+            if is_version:
+                conds.append("version_index = {version_index: UInt64}")
+                parameters["version_index"] = version_index
+            else:
+                conds.append("digest = {version_digest: String}")
+                parameters["version_digest"] = digest
+
+        object_id_conditions = ["object_id = {object_id: String}"]
         objs = self._select_objs_query(
-            req.project_id,
+            project_id,
             conditions=conds,
             object_id_conditions=object_id_conditions,
             parameters=parameters,
-            include_deleted=True,
+            include_deleted=include_deleted,
+            metadata_only=metadata_only,
         )
         if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
+            raise NotFoundError(f"Obj {object_id}:{digest} not found")
 
         if objs[0].deleted_at is not None:
             raise ObjectDeletedError(
-                f"Obj {req.object_id}:{req.digest} was deleted at {objs[0].deleted_at}"
+                f"Obj {object_id}:{digest} was deleted at {objs[0].deleted_at}"
             )
 
-        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
+        return objs[0]
+
+    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        ch_obj = self._obj_read(
+            req.project_id,
+            req.object_id,
+            req.digest,
+            include_deleted=True,
+            metadata_only=False,
+        )
+        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(ch_obj))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conds: list[str] = []
@@ -656,24 +695,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         #    - This object should be IDENTICAL to the original, including
         #      the created_at time, this will become the only copy of the
         #      object when the db deduplicates on primary key
-        db_obj = self.obj_read(
-            tsi.ObjReadReq(
-                project_id=req.project_id,
-                object_id=req.object_id,
-                digest=req.digest,
-            )
-        ).obj
-
-        deleted_at = datetime.datetime.now()
+        #    - If purge_value is True, set val_dump to "<DELETED>"
+        db_obj = self._obj_read(
+            req.project_id,
+            req.object_id,
+            req.digest,
+            # If purging, don't read the value from the db
+            metadata_only=bool(req.purge_value),
+        )
+        val = "<DELETED>" if req.purge_value else db_obj.val_dump
         ch_obj = ObjDeleteCHInsertable(
             project_id=req.project_id,
             object_id=req.object_id,
             digest=req.digest,
-            kind=get_kind(db_obj.val),
-            val_dump=json.dumps(db_obj.val),
-            refs=extract_refs_from_values(db_obj.val),
-            base_object_class=get_base_object_class(db_obj.val),
-            deleted_at=deleted_at,
+            kind=db_obj.kind,
+            val_dump=val,
+            refs=db_obj.refs,
+            base_object_class=db_obj.base_object_class,
+            deleted_at=datetime.datetime.now(),
             created_at=db_obj.created_at,
         )
         self._insert(
