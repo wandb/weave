@@ -9,7 +9,7 @@
 name: test
 
 on:
-  push:
+  # push:
   pull_request:
 
 jobs:
