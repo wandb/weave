@@ -9,7 +9,8 @@
 name: test
 
 on:
-  pull_request:
+  push:
+
 jobs:
   check-which-tests-to-run:
     uses: ./.github/workflows/check-which-tests-to-run.yaml
