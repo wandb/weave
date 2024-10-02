@@ -197,6 +197,17 @@ export type TraceTableQueryReq = {
     row_digests?: string[];
   };
   limit?: number;
+  offset?: number;
+  sort_by?: SortBy[];
+};
+
+export type TraceTableQueryStatsReq = {
+  project_id: string;
+  digest: string;
+};
+
+export type TraceTableQueryStatsRes = {
+  count: number;
 };
 
 export type TraceTableQueryRes = {
