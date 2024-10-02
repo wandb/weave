@@ -22,7 +22,7 @@ jobs:
     outputs:
       weave_query_tests: ${{ steps.weave_query.outputs.run_tests }}
       weave_js_tests: ${{ steps.weave_js.outputs.run_tests }}
-      trace_server_tests: ${{ steps.core_integration.outputs.run_tests }}
+      trace_server_tests: ${{ steps.trace_server.outputs.run_tests }}
     steps:
       - uses: actions/checkout@v3
         with:
