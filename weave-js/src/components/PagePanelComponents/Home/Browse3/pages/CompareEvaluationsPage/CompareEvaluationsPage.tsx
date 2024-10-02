@@ -95,7 +95,9 @@ export const CompareEvaluationsPageContent: React.FC<
   );
 
   React.useEffect(() => {
-    if (props.evaluationCallIds.length > 0) {
+    // Only update the baseline if we are switching evaluations, if there
+    // is more than 1, we are in the compare view and baseline is auto set
+    if (props.evaluationCallIds.length === 1) {
       setBaselineEvaluationCallId(props.evaluationCallIds[0]);
     }
   }, [props.evaluationCallIds]);
@@ -108,7 +110,7 @@ export const CompareEvaluationsPageContent: React.FC<
     <CompareEvaluationsProvider
       entity={props.entity}
       project={props.project}
-      evaluationCallIds={props.evaluationCallIds}
+      initialEvaluationCallIds={props.evaluationCallIds}
       baselineEvaluationCallId={baselineEvaluationCallId ?? undefined}
       comparisonDimensions={comparisonDimensions ?? undefined}
       setBaselineEvaluationCallId={setBaselineEvaluationCallId}

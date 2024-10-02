@@ -1,5 +1,5 @@
 import {Box} from '@material-ui/core';
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 
 import {WeaveLoader} from '../../../../../../common/components/WeaveLoader';
 import {LinearProgress} from '../../../../../LinearProgress';
@@ -16,6 +16,8 @@ const CompareEvaluationsContext = React.createContext<{
     React.SetStateAction<ComparisonDimensionsType | null>
   >;
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
+  addEvaluationCall: (newCallId: string) => void;
+  removeEvaluationCall: (callId: string) => void;
 } | null>(null);
 
 export const useCompareEvaluationsState = () => {
@@ -29,7 +31,7 @@ export const useCompareEvaluationsState = () => {
 export const CompareEvaluationsProvider: React.FC<{
   entity: string;
   project: string;
-  evaluationCallIds: string[];
+  initialEvaluationCallIds: string[];
   setBaselineEvaluationCallId: React.Dispatch<
     React.SetStateAction<string | null>
   >;
@@ -43,7 +45,7 @@ export const CompareEvaluationsProvider: React.FC<{
 }> = ({
   entity,
   project,
-  evaluationCallIds,
+  initialEvaluationCallIds,
   setBaselineEvaluationCallId,
   setComparisonDimensions,
 
@@ -54,6 +56,9 @@ export const CompareEvaluationsProvider: React.FC<{
   selectedInputDigest,
   children,
 }) => {
+  const [evaluationCallIds, setEvaluationCallIds] = useState(
+    initialEvaluationCallIds
+  );
   const initialState = useEvaluationComparisonState(
     entity,
     project,
@@ -72,10 +77,17 @@ export const CompareEvaluationsProvider: React.FC<{
       setBaselineEvaluationCallId,
       setComparisonDimensions,
       setSelectedInputDigest,
+      addEvaluationCall: (newCallId: string) => {
+        setEvaluationCallIds(prev => [...prev, newCallId]);
+      },
+      removeEvaluationCall: (callId: string) => {
+        setEvaluationCallIds(prev => prev.filter(id => id !== callId));
+      },
     };
   }, [
     initialState.loading,
     initialState.result,
+    setEvaluationCallIds,
     setBaselineEvaluationCallId,
     setComparisonDimensions,
     setSelectedInputDigest,
