@@ -7,8 +7,8 @@ import pytest
 from PIL import Image
 
 import weave
+from tests.trace.util import AnyIntMatcher
 from weave import Evaluation, Model
-from weave.tests.trace.util import AnyIntMatcher
 from weave.trace_server import trace_server_interface as tsi
 
 

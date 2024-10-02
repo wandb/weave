@@ -1,5 +1,3 @@
-import pytest
-
 from weave.trace_server.trace_server_common import (
     LRUCache,
     get_nested_key,

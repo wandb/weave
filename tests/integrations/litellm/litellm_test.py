@@ -7,8 +7,7 @@ import pytest
 from packaging.version import parse as version_parse
 
 import weave
-
-from .litellm import litellm_patcher
+from weave.integrations.litellm.litellm import litellm_patcher
 
 # This PR:
 # https://github.com/BerriAI/litellm/commit/fe2aa706e8ff4edbcd109897e5da6b83ef6ad693

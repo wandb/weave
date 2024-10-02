@@ -1,7 +1,5 @@
 import pytest
 
-import weave.trace_server.trace_server_interface as tsi
-
 
 def test_client_feedback(client) -> None:
     feedbacks = client.get_feedback()

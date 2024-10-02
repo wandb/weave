@@ -1,13 +1,13 @@
 import pytest
 
-from weave.integrations.integration_utilities import truncate_op_name
+from weave.integrations.integration_utilities import (
+    _make_string_of_length,
+    _truncated_str,
+    truncate_op_name,
+)
 
 MAX_RUN_NAME_LENGTH = 128
 NON_HASH_LIMIT = 5
-
-
-def _make_string_of_length(n: int) -> str:
-    return "a" * n
 
 
 def test_truncate_op_name_less_than_limit() -> None:
@@ -20,15 +20,6 @@ def test_truncate_op_name_at_limit() -> None:
     name = _make_string_of_length(MAX_RUN_NAME_LENGTH)
     trunc = truncate_op_name(name)
     assert trunc == name
-
-
-def _truncated_str(tail_len: int, total_len: int) -> tuple:
-    name = (
-        _make_string_of_length(total_len - tail_len - 1)
-        + "."
-        + _make_string_of_length(tail_len)
-    )
-    return name, truncate_op_name(name)
 
 
 def test_truncate_op_name_too_short_for_hash() -> None:

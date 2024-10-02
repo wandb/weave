@@ -1,5 +1,4 @@
 import weave
-from weave import weaveflow
 
 # This is just an experiment script, it is not a real test for now because we dont
 # have a unit test harness set up that supports what this needs to run successfully.

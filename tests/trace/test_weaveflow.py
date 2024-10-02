@@ -1,5 +1,3 @@
-import typing
-
 import numpy as np
 import pytest
 from pydantic import Field

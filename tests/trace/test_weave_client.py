@@ -10,16 +10,16 @@ import requests
 
 import weave
 import weave.trace_server.trace_server_interface as tsi
-from weave import Evaluation
-from weave.tests.trace.testutil import ObjectRefStrMatcher
-from weave.tests.trace.util import (
+from tests.trace.testutil import ObjectRefStrMatcher
+from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
     RegexStringMatcher,
 )
+from weave import Evaluation
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.op import Op, is_op
+from weave.trace.op import is_op
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
