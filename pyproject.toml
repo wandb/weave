@@ -72,6 +72,7 @@ litellm = ["litellm>=1.36.1"]
 llamaindex = ["llama-index>=0.10.35"]
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
+notdiamond = ["notdiamond"]
 openai = ["openai>=1.0.0"]
 modal = ["modal", "python-dotenv"]
 test = [

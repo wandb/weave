@@ -28,7 +28,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Mon, 30 Sep 2024 22:17:06 GMT
+      - Tue, 01 Oct 2024 01:04:10 GMT
       Transfer-Encoding:
       - chunked
       Vary:
@@ -74,7 +74,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Mon, 30 Sep 2024 22:17:06 GMT
+      - Tue, 01 Oct 2024 01:04:10 GMT
       Transfer-Encoding:
       - chunked
       Vary:
@@ -90,7 +90,7 @@ interactions:
     status:
       code: 200
       message: OK
-- request:
+-- request:
     body: '{"query": "query DefaultEntity {\n  viewer {\n    username\n    defaultEntity
       {\n      name\n    }\n  }\n}"}'
     headers:
@@ -119,7 +119,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Mon, 30 Sep 2024 22:17:06 GMT
+      - Tue, 01 Oct 2024 01:04:11 GMT
       Transfer-Encoding:
       - chunked
       Vary:
@@ -159,13 +159,13 @@ interactions:
       content-type:
       - application/json
       date:
-      - Mon, 30 Sep 2024 22:17:06 GMT
+      - Tue, 01 Oct 2024 01:04:11 GMT
       server:
       - Google Frontend
       via:
       - 1.1 google
       x-cloud-trace-context:
-      - 89ddd8ab7df3b512576dc6ac6240e6ce;o=1
+      - 54ac529564a2e9df97fd8a12cd44cfe3
     status:
       code: 200
       message: OK
@@ -520,7 +520,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Mon, 30 Sep 2024 22:17:06 GMT
+      - Tue, 01 Oct 2024 01:04:11 GMT
       ETag:
       - '"9qZK2gs5SZhkGLAHnKrNZA"'
       Permissions-Policy:
@@ -534,7 +534,7 @@ interactions:
       X-Cache:
       - HIT, HIT
       X-Cache-Hits:
-      - 17, 1
+      - 17, 0
       X-Content-Type-Options:
       - nosniff
       X-Frame-Options:
@@ -544,9 +544,9 @@ interactions:
       X-PyPI-Last-Serial:
       - '25226875'
       X-Served-By:
-      - cache-iad-kjyo7100097-IAD, cache-ewr-kewr1740063-EWR
+      - cache-iad-kjyo7100097-IAD, cache-ewr-kewr1740040-EWR
       X-Timer:
-      - S1727734627.775331,VS0,VE1
+      - S1727744651.145522,VS0,VE2
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -583,7 +583,7 @@ interactions:
         Stats](https://img.shields.io/pypi/dm/weave)](https://pypistats.org/packages/weave)\\n[![Github
         Checks](https://img.shields.io/github/check-runs/wandb/weave/master\\n)](https://github.com/wandb/weave)\\n\\nWeave
         is a toolkit for developing Generative AI applications, built by [Weights
-        & Biases](https://wandb.ai/).\\n\\n---\\n\\nYou can use Weave to:\\n\\n- Log
+        & Biases](https://wandb.ai/)!\\n\\n---\\n\\nYou can use Weave to:\\n\\n- Log
         and debug language model inputs, outputs, and traces\\n- Build rigorous, apples-to-apples
         evaluations for language model use cases\\n- Organize all the information
         generated across the LLM workflow, from experimentation to evaluations to
@@ -624,43 +624,15 @@ interactions:
         is mostly in: `weave/trace` and `weave/trace_server`.\\n\\nThe Weave Evaluations
         code is mostly in `weave/flow`.\\n\",\"description_content_type\":\"text/markdown\",\"docs_url\":null,\"download_url\":null,\"downloads\":{\"last_day\":-1,\"last_month\":-1,\"last_week\":-1},\"dynamic\":null,\"home_page\":null,\"keywords\":null,\"license\":\"Apache-2.0\",\"maintainer\":null,\"maintainer_email\":\"W&B
         <support@wandb.com>\",\"name\":\"weave\",\"package_url\":\"https://pypi.org/project/weave/\",\"platform\":null,\"project_url\":\"https://pypi.org/project/weave/\",\"project_urls\":{\"Changes\":\"https://github.com/wandb/weave/releases\",\"Company\":\"https://wandb.com\",\"Documentation\":\"https://docs.wandb.com/\",\"Issue
-        Tracker\":\"https://github.com/wandb/weave/issues/\",\"Source Code\":\"https://github.com/wandb/weave\",\"Twitter\":\"https://twitter.com/weights_biases\"},\"provides_extra\":[\"datadog\",\"ecosystem\",\"engine\",\"examples\",\"modal\"],\"release_url\":\"https://pypi.org/project/weave/0.51.10/\",\"requires_dist\":[\"typing-extensions>=4.0.0\",\"pyarrow<17.0.0,>=14.0.1\",\"openai>=1.0.0\",\"tiktoken>=0.4.0\",\"pydantic>=2.0.0\",\"rich>=13.7.0\",\"aiohttp>=3.8.3\",\"aiofiles>=22.1.0\",\"aioprocessing>=2.0.1\",\"Werkzeug>=3.0.3\",\"janus>=1.0.0\",\"python-json-logger>=2.0.4\",\"numpy>=1.21\",\"wandb>=0.16.4\",\"graphql-core>3\",\"gql[requests]>=3.4.1\",\"numpy<2.0.0\",\"analytics-python>=1.2.9\",\"python-dateutil>=2.8.2\",\"packaging>=21.0\",\"tenacity!=8.4.0,>=8.3.0\",\"emoji>=2.12.1\",\"uuid-utils>=0.9.0\",\"wandb>=0.17.1\",\"datadog==0.44.0;
-        extra == \\\"datadog\\\"\",\"ddtrace==1.7.5; extra == \\\"datadog\\\"\",\"h5py>=3.8.0;
-        extra == \\\"ecosystem\\\"\",\"openai>=1.0.0; extra == \\\"ecosystem\\\"\",\"matplotlib!=3.5,>3;
-        extra == \\\"ecosystem\\\"\",\"shap>=0.41.0; extra == \\\"ecosystem\\\"\",\"xgboost>=1.7.3;
-        extra == \\\"ecosystem\\\"\",\"torch>=1.13.1; extra == \\\"ecosystem\\\"\",\"torchvision>=0.14.1;
-        extra == \\\"ecosystem\\\"\",\"bertviz>=1.4.0; extra == \\\"ecosystem\\\"\",\"datasets>=2.9.0;
-        extra == \\\"ecosystem\\\"\",\"transformers<4.21; extra == \\\"ecosystem\\\"\",\"plotly>=5.13.0;
-        extra == \\\"ecosystem\\\"\",\"sqlalchemy>=2.0.1; extra == \\\"ecosystem\\\"\",\"faiss-cpu>=1.7.4;
-        extra == \\\"ecosystem\\\"\",\"replicate>=0.4.0; extra == \\\"ecosystem\\\"\",\"langchain>=0.0.132;
-        extra == \\\"ecosystem\\\"\",\"tiktoken>=0.4.0; extra == \\\"ecosystem\\\"\",\"hdbscan>=0.8.27;
-        extra == \\\"ecosystem\\\"\",\"pillow>=10.0.1; extra == \\\"ecosystem\\\"\",\"spacy<4.0.0,>=3.0.0;
-        extra == \\\"ecosystem\\\"\",\"sentry-sdk<1.29.0; extra == \\\"engine\\\"\",\"pandas>=1.5.3;
-        extra == \\\"engine\\\"\",\"ipython>=7.34; extra == \\\"engine\\\"\",\"flask>=2.1;
-        extra == \\\"engine\\\"\",\"black>=22.3.0; extra == \\\"engine\\\"\",\"flask-cors>=3.0.10;
-        extra == \\\"engine\\\"\",\"notebook>=6.4.8; extra == \\\"engine\\\"\",\"ipynbname>=2021.3.2;
-        extra == \\\"engine\\\"\",\"pillow>=10.0.1; extra == \\\"engine\\\"\",\"scikit-learn>=1.2.1;
-        extra == \\\"engine\\\"\",\"umap-learn>=0.5.3; extra == \\\"engine\\\"\",\"typeguard>=4.1.3;
-        extra == \\\"engine\\\"\",\"objgraph>=3.6.0; extra == \\\"engine\\\"\",\"tabulate;
-        extra == \\\"engine\\\"\",\"faiss-cpu; extra == \\\"engine\\\"\",\"h5py>=3.8.0;
-        extra == \\\"examples\\\"\",\"openai>=1.0.0; extra == \\\"examples\\\"\",\"matplotlib!=3.5,>3;
-        extra == \\\"examples\\\"\",\"shap>=0.41.0; extra == \\\"examples\\\"\",\"xgboost>=1.7.3;
-        extra == \\\"examples\\\"\",\"torch>=1.13.1; extra == \\\"examples\\\"\",\"torchvision>=0.14.1;
-        extra == \\\"examples\\\"\",\"bertviz>=1.4.0; extra == \\\"examples\\\"\",\"datasets>=2.9.0;
-        extra == \\\"examples\\\"\",\"transformers<4.21; extra == \\\"examples\\\"\",\"plotly>=5.13.0;
-        extra == \\\"examples\\\"\",\"sqlalchemy>=2.0.1; extra == \\\"examples\\\"\",\"faiss-cpu>=1.7.4;
-        extra == \\\"examples\\\"\",\"replicate>=0.4.0; extra == \\\"examples\\\"\",\"langchain>=0.0.132;
-        extra == \\\"examples\\\"\",\"tiktoken>=0.4.0; extra == \\\"examples\\\"\",\"hdbscan>=0.8.27;
-        extra == \\\"examples\\\"\",\"pillow>=10.0.1; extra == \\\"examples\\\"\",\"spacy<4.0.0,>=3.0.0;
-        extra == \\\"examples\\\"\",\"modal; extra == \\\"modal\\\"\",\"python-dotenv;
-        extra == \\\"modal\\\"\"],\"requires_python\":\">=3.9\",\"summary\":\"A toolkit
-        for building composable interactive data driven applications.\",\"version\":\"0.51.10\",\"yanked\":false,\"yanked_reason\":null},\"last_serial\":25210571,\"releases\":{\"0.20.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"096c2bcc92086d41790778bfc6c006c523c6cd8f143cbbafa28ddfe5aa2e7940\",\"md5\":\"f2b06f4bce9383448624753040e6e623\",\"sha256\":\"03d19fa77acdc37dfad3e90bde5cd67a931233bf725936b1801a0cf0bf0d5297\"},\"downloads\":-1,\"filename\":\"weave-0.20.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"f2b06f4bce9383448624753040e6e623\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":24586471,\"upload_time\":\"2023-06-07T18:25:32\",\"upload_time_iso_8601\":\"2023-06-07T18:25:32.617443Z\",\"url\":\"https://files.pythonhosted.org/packages/09/6c/2bcc92086d41790778bfc6c006c523c6cd8f143cbbafa28ddfe5aa2e7940/weave-0.20.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"981f7993016e9896c6a22cb0e3171279575b5fdcf46f0d21e356b4480a0514ff\",\"md5\":\"733fa02842354e601036f7bdc29228b4\",\"sha256\":\"ee8fd1c98f412d00722ba5f5aeea63cb7f5ff51a6358556f61cca633f5112b7b\"},\"downloads\":-1,\"filename\":\"weave-0.20.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"733fa02842354e601036f7bdc29228b4\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":24081224,\"upload_time\":\"2023-06-07T18:26:29\",\"upload_time_iso_8601\":\"2023-06-07T18:26:29.467158Z\",\"url\":\"https://files.pythonhosted.org/packages/98/1f/7993016e9896c6a22cb0e3171279575b5fdcf46f0d21e356b4480a0514ff/weave-0.20.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.20.0.dev1\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"a335eafc3bac81dd0ed16ade3e976ff01ba1741f43701c58f301cc857e36a5ee\",\"md5\":\"2a7e853ac858b8e204cbfe9dcfe41d9d\",\"sha256\":\"bfd4947fdfb2e0ba419318dd8540e8510dd3785fafd7d90396b3ba081ad3bcc1\"},\"downloads\":-1,\"filename\":\"weave-0.20.0.dev1-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"2a7e853ac858b8e204cbfe9dcfe41d9d\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":24584203,\"upload_time\":\"2023-06-07T02:31:34\",\"upload_time_iso_8601\":\"2023-06-07T02:31:34.132017Z\",\"url\":\"https://files.pythonhosted.org/packages/a3/35/eafc3bac81dd0ed16ade3e976ff01ba1741f43701c58f301cc857e36a5ee/weave-0.20.0.dev1-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"3f7fc5e63027a84c4e011f1783f9e99a41fcf2849083be7f16e72d236baf97ed\",\"md5\":\"f257caa80d6ff1a50d2457453b9bfb48\",\"sha256\":\"adac5406d438da9508725b7dec8435336529b853b164971753836cf2b9740636\"},\"downloads\":-1,\"filename\":\"weave-0.20.0.dev1.tar.gz\",\"has_sig\":false,\"md5_digest\":\"f257caa80d6ff1a50d2457453b9bfb48\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":24078169,\"upload_time\":\"2023-06-07T02:31:39\",\"upload_time_iso_8601\":\"2023-06-07T02:31:39.233424Z\",\"url\":\"https://files.pythonhosted.org/packages/3f/7f/c5e63027a84c4e011f1783f9e99a41fcf2849083be7f16e72d236baf97ed/weave-0.20.0.dev1.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.20.0.dev2\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"555c27d04b9a00f838951f715ea39f0416ec5bf9ce0193a7e103978ee3b64267\",\"md5\":\"d54b575aa6b42cb6c644fba141aafc40\",\"sha256\":\"770bb03a6f6e5ec2ab8ba1c52a6f92c11e384f0434ea4406369b506fb2bb8ef0\"},\"downloads\":-1,\"filename\":\"weave-0.20.0.dev2-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"d54b575aa6b42cb6c644fba141aafc40\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":24586858,\"upload_time\":\"2023-06-07T14:47:59\",\"upload_time_iso_8601\":\"2023-06-07T14:47:59.597205Z\",\"url\":\"https://files.pythonhosted.org/packages/55/5c/27d04b9a00f838951f715ea39f0416ec5bf9ce0193a7e103978ee3b64267/weave-0.20.0.dev2-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"a50e680ef6af8397d91c8019985f538bf62f0cd6a0f54db001b57f7f3a33152d\",\"md5\":\"957c58d314173b529a69b5c662c9827c\",\"sha256\":\"9c9ec755ac6e6c9b410c7d4af99a50959a7ec2057bb5146baab619d150930da9\"},\"downloads\":-1,\"filename\":\"weave-0.20.0.dev2.tar.gz\",\"has_sig\":false,\"md5_digest\":\"957c58d314173b529a69b5c662c9827c\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":24082320,\"upload_time\":\"2023-06-07T14:48:07\",\"upload_time_iso_8601\":\"2023-06-07T14:48:07.164364Z\",\"url\":\"https://files.pythonhosted.org/packages/a5/0e/680ef6af8397d91c8019985f538bf62f0cd6a0f54db001b57f7f3a33152d/weave-0.20.0.dev2.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.21.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"d1e53f8066a9039618b301349966b157f79d3ac7592286bba1e193b6601883ab\",\"md5\":\"d1d43c51832aa55b3f3c32bb238c2410\",\"sha256\":\"ca9af5690a5a65e3ff20956d64a5cfdd2d47c9a01508187cb1d9fac4c797214d\"},\"downloads\":-1,\"filename\":\"weave-0.21.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"d1d43c51832aa55b3f3c32bb238c2410\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":24628225,\"upload_time\":\"2023-06-30T03:04:03\",\"upload_time_iso_8601\":\"2023-06-30T03:04:03.320166Z\",\"url\":\"https://files.pythonhosted.org/packages/d1/e5/3f8066a9039618b301349966b157f79d3ac7592286bba1e193b6601883ab/weave-0.21.0-py3-none-any.whl\",\"yanked\":true,\"yanked_reason\":\"bad
+        Tracker\":\"https://github.com/wandb/weave/issues/\",\"Source Code\":\"https://github.com/wandb/weave\",\"Twitter\":\"https://twitter.com/weights_biases\"},\"provides_extra\":[\"modal\"],\"release_url\":\"https://pypi.org/project/weave/0.51.12/\",\"requires_dist\":[\"typing-extensions>=4.0.0\",\"pyarrow<17.0.0,>=14.0.1\",\"openai>=1.0.0\",\"tiktoken>=0.4.0\",\"pydantic>=2.0.0\",\"rich>=13.7.0\",\"aiohttp>=3.8.3\",\"aiofiles>=22.1.0\",\"aioprocessing>=2.0.1\",\"Werkzeug>=3.0.3\",\"janus>=1.0.0\",\"python-json-logger>=2.0.4\",\"numpy>=1.21\",\"wandb>=0.16.4\",\"graphql-core>3\",\"gql[requests]>=3.4.1\",\"numpy<2.0.0\",\"analytics-python>=1.2.9\",\"python-dateutil>=2.8.2\",\"packaging>=21.0\",\"tenacity!=8.4.0,>=8.3.0\",\"emoji>=2.12.1\",\"uuid-utils>=0.9.0\",\"wandb>=0.17.1\",\"modal;
+        extra == \\\"modal\\\"\",\"python-dotenv; extra == \\\"modal\\\"\"],\"requires_python\":\">=3.9\",\"summary\":\"A
+        toolkit for building composable interactive data driven applications.\",\"version\":\"0.51.12\",\"yanked\":false,\"yanked_reason\":null},\"last_serial\":25265766,\"releases\":{\"0.20.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"096c2bcc92086d41790778bfc6c006c523c6cd8f143cbbafa28ddfe5aa2e7940\",\"md5\":\"f2b06f4bce9383448624753040e6e623\",\"sha256\":\"03d19fa77acdc37dfad3e90bde5cd67a931233bf725936b1801a0cf0bf0d5297\"},\"downloads\":-1,\"filename\":\"weave-0.20.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"f2b06f4bce9383448624753040e6e623\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":24586471,\"upload_time\":\"2023-06-07T18:25:32\",\"upload_time_iso_8601\":\"2023-06-07T18:25:32.617443Z\",\"url\":\"https://files.pythonhosted.org/packages/09/6c/2bcc92086d41790778bfc6c006c523c6cd8f143cbbafa28ddfe5aa2e7940/weave-0.20.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"981f7993016e9896c6a22cb0e3171279575b5fdcf46f0d21e356b4480a0514ff\",\"md5\":\"733fa02842354e601036f7bdc29228b4\",\"sha256\":\"ee8fd1c98f412d00722ba5f5aeea63cb7f5ff51a6358556f61cca633f5112b7b\"},\"downloads\":-1,\"filename\":\"weave-0.20.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"733fa02842354e601036f7bdc29228b4\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":24081224,\"upload_time\":\"2023-06-07T18:26:29\",\"upload_time_iso_8601\":\"2023-06-07T18:26:29.467158Z\",\"url\":\"https://files.pythonhosted.org/packages/98/1f/7993016e9896c6a22cb0e3171279575b5fdcf46f0d21e356b4480a0514ff/weave-0.20.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.20.0.dev1\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"a335eafc3bac81dd0ed16ade3e976ff01ba1741f43701c58f301cc857e36a5ee\",\"md5\":\"2a7e853ac858b8e204cbfe9dcfe41d9d\",\"sha256\":\"bfd4947fdfb2e0ba419318dd8540e8510dd3785fafd7d90396b3ba081ad3bcc1\"},\"downloads\":-1,\"filename\":\"weave-0.20.0.dev1-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"2a7e853ac858b8e204cbfe9dcfe41d9d\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":24584203,\"upload_time\":\"2023-06-07T02:31:34\",\"upload_time_iso_8601\":\"2023-06-07T02:31:34.132017Z\",\"url\":\"https://files.pythonhosted.org/packages/a3/35/eafc3bac81dd0ed16ade3e976ff01ba1741f43701c58f301cc857e36a5ee/weave-0.20.0.dev1-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"3f7fc5e63027a84c4e011f1783f9e99a41fcf2849083be7f16e72d236baf97ed\",\"md5\":\"f257caa80d6ff1a50d2457453b9bfb48\",\"sha256\":\"adac5406d438da9508725b7dec8435336529b853b164971753836cf2b9740636\"},\"downloads\":-1,\"filename\":\"weave-0.20.0.dev1.tar.gz\",\"has_sig\":false,\"md5_digest\":\"f257caa80d6ff1a50d2457453b9bfb48\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":24078169,\"upload_time\":\"2023-06-07T02:31:39\",\"upload_time_iso_8601\":\"2023-06-07T02:31:39.233424Z\",\"url\":\"https://files.pythonhosted.org/packages/3f/7f/c5e63027a84c4e011f1783f9e99a41fcf2849083be7f16e72d236baf97ed/weave-0.20.0.dev1.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.20.0.dev2\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"555c27d04b9a00f838951f715ea39f0416ec5bf9ce0193a7e103978ee3b64267\",\"md5\":\"d54b575aa6b42cb6c644fba141aafc40\",\"sha256\":\"770bb03a6f6e5ec2ab8ba1c52a6f92c11e384f0434ea4406369b506fb2bb8ef0\"},\"downloads\":-1,\"filename\":\"weave-0.20.0.dev2-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"d54b575aa6b42cb6c644fba141aafc40\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":24586858,\"upload_time\":\"2023-06-07T14:47:59\",\"upload_time_iso_8601\":\"2023-06-07T14:47:59.597205Z\",\"url\":\"https://files.pythonhosted.org/packages/55/5c/27d04b9a00f838951f715ea39f0416ec5bf9ce0193a7e103978ee3b64267/weave-0.20.0.dev2-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"a50e680ef6af8397d91c8019985f538bf62f0cd6a0f54db001b57f7f3a33152d\",\"md5\":\"957c58d314173b529a69b5c662c9827c\",\"sha256\":\"9c9ec755ac6e6c9b410c7d4af99a50959a7ec2057bb5146baab619d150930da9\"},\"downloads\":-1,\"filename\":\"weave-0.20.0.dev2.tar.gz\",\"has_sig\":false,\"md5_digest\":\"957c58d314173b529a69b5c662c9827c\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":24082320,\"upload_time\":\"2023-06-07T14:48:07\",\"upload_time_iso_8601\":\"2023-06-07T14:48:07.164364Z\",\"url\":\"https://files.pythonhosted.org/packages/a5/0e/680ef6af8397d91c8019985f538bf62f0cd6a0f54db001b57f7f3a33152d/weave-0.20.0.dev2.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.21.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"d1e53f8066a9039618b301349966b157f79d3ac7592286bba1e193b6601883ab\",\"md5\":\"d1d43c51832aa55b3f3c32bb238c2410\",\"sha256\":\"ca9af5690a5a65e3ff20956d64a5cfdd2d47c9a01508187cb1d9fac4c797214d\"},\"downloads\":-1,\"filename\":\"weave-0.21.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"d1d43c51832aa55b3f3c32bb238c2410\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":24628225,\"upload_time\":\"2023-06-30T03:04:03\",\"upload_time_iso_8601\":\"2023-06-30T03:04:03.320166Z\",\"url\":\"https://files.pythonhosted.org/packages/d1/e5/3f8066a9039618b301349966b157f79d3ac7592286bba1e193b6601883ab/weave-0.21.0-py3-none-any.whl\",\"yanked\":true,\"yanked_reason\":\"bad
         build\"},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"5cff95587e2d2d026ee13f596aef481050d6077f105eb880404094064aa436f7\",\"md5\":\"a82636b9d27374dd14c850f7186f5d8f\",\"sha256\":\"62b48154211212c7007d780e75a87c4d0a677f148019bfe3cb666a437b658fad\"},\"downloads\":-1,\"filename\":\"weave-0.21.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"a82636b9d27374dd14c850f7186f5d8f\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":24124442,\"upload_time\":\"2023-06-30T03:04:16\",\"upload_time_iso_8601\":\"2023-06-30T03:04:16.954625Z\",\"url\":\"https://files.pythonhosted.org/packages/5c/ff/95587e2d2d026ee13f596aef481050d6077f105eb880404094064aa436f7/weave-0.21.0.tar.gz\",\"yanked\":true,\"yanked_reason\":\"bad
         build\"}],\"0.22.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"15bedc8b04c2479ac6bc25da7d3d03eae71d3cce2d40073eda9d4b129be680ee\",\"md5\":\"2be1072a9f903472d881d330169fe2ad\",\"sha256\":\"950704611034e9ee6257b86e7e22004c91aac92c5ee821a00330599291d93bb7\"},\"downloads\":-1,\"filename\":\"weave-0.22.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"2be1072a9f903472d881d330169fe2ad\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":24633888,\"upload_time\":\"2023-06-30T04:35:27\",\"upload_time_iso_8601\":\"2023-06-30T04:35:27.651403Z\",\"url\":\"https://files.pythonhosted.org/packages/15/be/dc8b04c2479ac6bc25da7d3d03eae71d3cce2d40073eda9d4b129be680ee/weave-0.22.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"497ee2f8fdb96ce6e9583a50d7abe6ac2704517bd24963b600588c54099a41f1\",\"md5\":\"4194734cc8b9a2e2694ace413a153eef\",\"sha256\":\"c1a41cb59c577d13fc43d05976f3abe203197cb73398657e460d0db276941d6c\"},\"downloads\":-1,\"filename\":\"weave-0.22.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"4194734cc8b9a2e2694ace413a153eef\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":24128940,\"upload_time\":\"2023-06-30T04:35:41\",\"upload_time_iso_8601\":\"2023-06-30T04:35:41.152759Z\",\"url\":\"https://files.pythonhosted.org/packages/49/7e/e2f8fdb96ce6e9583a50d7abe6ac2704517bd24963b600588c54099a41f1/weave-0.22.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.23.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"d90ede3b368193f290c50fb359f70f5dc852b9e2ddbc8be6722ce57f019d7928\",\"md5\":\"2e1c82430bb9df9c132a67a0156a6d6f\",\"sha256\":\"fb8d66100151cf16fc0168c4b92e4aea593abdd1b1305347d15009d3b4aecb48\"},\"downloads\":-1,\"filename\":\"weave-0.23.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"2e1c82430bb9df9c132a67a0156a6d6f\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":24949529,\"upload_time\":\"2023-07-18T14:43:29\",\"upload_time_iso_8601\":\"2023-07-18T14:43:29.594597Z\",\"url\":\"https://files.pythonhosted.org/packages/d9/0e/de3b368193f290c50fb359f70f5dc852b9e2ddbc8be6722ce57f019d7928/weave-0.23.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"32fb8d8572907d3ed69e0a29efb9e9fc9c2117e1bf0a04132a563ffd169ec9e9\",\"md5\":\"b21b2b19f97821e01b8ad2eca0cfbf8a\",\"sha256\":\"1ec3d2b3201f964d5fda4dabb449bfc9e3600e6abaac322d35ce5315819862a1\"},\"downloads\":-1,\"filename\":\"weave-0.23.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"b21b2b19f97821e01b8ad2eca0cfbf8a\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":24387925,\"upload_time\":\"2023-07-18T14:43:45\",\"upload_time_iso_8601\":\"2023-07-18T14:43:45.159125Z\",\"url\":\"https://files.pythonhosted.org/packages/32/fb/8d8572907d3ed69e0a29efb9e9fc9c2117e1bf0a04132a563ffd169ec9e9/weave-0.23.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.24.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"5a2abcf66a07ef9e2f88b1e26c01e047deb6727c7db6cc89b8c68be3b63c9564\",\"md5\":\"3b0b0f0a4f066ac7dce9e388bf092b98\",\"sha256\":\"61dcb4c58611a4a1b5d2a4fd7d9acafc7bc3ba215c33123fd82d525e1caf16a3\"},\"downloads\":-1,\"filename\":\"weave-0.24.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"3b0b0f0a4f066ac7dce9e388bf092b98\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":25091928,\"upload_time\":\"2023-07-24T22:35:33\",\"upload_time_iso_8601\":\"2023-07-24T22:35:33.139390Z\",\"url\":\"https://files.pythonhosted.org/packages/5a/2a/bcf66a07ef9e2f88b1e26c01e047deb6727c7db6cc89b8c68be3b63c9564/weave-0.24.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"d7a2f208858c15044f89c31c2d16c311a0cac60a7ecc4632ead1afdc584ee941\",\"md5\":\"22cfd4bb7782699e8c07a1350c277446\",\"sha256\":\"472918071857515b7e167de13fa2fd17ca1b7c0b7cfbf2934805461b363e6359\"},\"downloads\":-1,\"filename\":\"weave-0.24.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"22cfd4bb7782699e8c07a1350c277446\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":24530590,\"upload_time\":\"2023-07-24T22:35:43\",\"upload_time_iso_8601\":\"2023-07-24T22:35:43.719476Z\",\"url\":\"https://files.pythonhosted.org/packages/d7/a2/f208858c15044f89c31c2d16c311a0cac60a7ecc4632ead1afdc584ee941/weave-0.24.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.24.1\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"f32c5f2976f819ad8fdf5cd0e30be894cc3b9eea3649b5910224d24b3f341c70\",\"md5\":\"cf9738513dbe790a4f4b28d54f22a42c\",\"sha256\":\"773a4af439b196c007531da72eddc186af3535fd9025181e7098b36dddd494c8\"},\"downloads\":-1,\"filename\":\"weave-0.24.1-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"cf9738513dbe790a4f4b28d54f22a42c\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":25091863,\"upload_time\":\"2023-07-25T03:32:31\",\"upload_time_iso_8601\":\"2023-07-25T03:32:31.717163Z\",\"url\":\"https://files.pythonhosted.org/packages/f3/2c/5f2976f819ad8fdf5cd0e30be894cc3b9eea3649b5910224d24b3f341c70/weave-0.24.1-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"5563f5dd768981591623bd68faabc0daec2773969518af6d0d40238e58619f8a\",\"md5\":\"c8d72a765947c3aa1fa6b231c512a5ba\",\"sha256\":\"8e478bf65c5d3538ef7e55d1cd36f14e1bb4ab5c6216a96d4902eb4bcdaa0b23\"},\"downloads\":-1,\"filename\":\"weave-0.24.1.tar.gz\",\"has_sig\":false,\"md5_digest\":\"c8d72a765947c3aa1fa6b231c512a5ba\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":24528597,\"upload_time\":\"2023-07-25T03:32:42\",\"upload_time_iso_8601\":\"2023-07-25T03:32:42.460503Z\",\"url\":\"https://files.pythonhosted.org/packages/55/63/f5dd768981591623bd68faabc0daec2773969518af6d0d40238e58619f8a/weave-0.24.1.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.25.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"4004a7693ca6dec061a6e64c6af7198b0cedc249086c70b6d2bb9c0cf5465ee1\",\"md5\":\"534f892a2cb51ce246a67bc664365113\",\"sha256\":\"bd49795e51133cc7951d15df55061e607a29cc75ddcc96d9ffdbd0eba4eaaecb\"},\"downloads\":-1,\"filename\":\"weave-0.25.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"534f892a2cb51ce246a67bc664365113\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":25136605,\"upload_time\":\"2023-08-14T22:15:51\",\"upload_time_iso_8601\":\"2023-08-14T22:15:51.445206Z\",\"url\":\"https://files.pythonhosted.org/packages/40/04/a7693ca6dec061a6e64c6af7198b0cedc249086c70b6d2bb9c0cf5465ee1/weave-0.25.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"3a3288c363a85d0d1386c6a03f0cb7cbd9ac7da4b89e4a0687abaaa35992d687\",\"md5\":\"183d46e268c1fb0a9ae090d63545369e\",\"sha256\":\"f88c684c8cda42fadf24a1703ff6a02619e27ebe14a529227c3868f53bd4f781\"},\"downloads\":-1,\"filename\":\"weave-0.25.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"183d46e268c1fb0a9ae090d63545369e\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":24575481,\"upload_time\":\"2023-08-14T22:16:00\",\"upload_time_iso_8601\":\"2023-08-14T22:16:00.552058Z\",\"url\":\"https://files.pythonhosted.org/packages/3a/32/88c363a85d0d1386c6a03f0cb7cbd9ac7da4b89e4a0687abaaa35992d687/weave-0.25.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.26.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"ac2091b70f25bccfcb5d9f61ed9886dde6ef375cb2eedc04043535798e3e889d\",\"md5\":\"1be555b60631a9acefe76ba2a2719c5f\",\"sha256\":\"38e05a675c6ea1ce3f35237636298008083468402740cf3dc03ee2f08945a60a\"},\"downloads\":-1,\"filename\":\"weave-0.26.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"1be555b60631a9acefe76ba2a2719c5f\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":25529851,\"upload_time\":\"2023-08-23T16:35:23\",\"upload_time_iso_8601\":\"2023-08-23T16:35:23.628259Z\",\"url\":\"https://files.pythonhosted.org/packages/ac/20/91b70f25bccfcb5d9f61ed9886dde6ef375cb2eedc04043535798e3e889d/weave-0.26.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"4f71bc22424a1b12fc6f12bb81b5207c39349e37dfb1114756c8c49f29506511\",\"md5\":\"a669bc740861de2353f6f5ca14591153\",\"sha256\":\"9ac79dcccac88e8bab59f1de2bc40e156e8f22a2cb2a250f280352254a8122c1\"},\"downloads\":-1,\"filename\":\"weave-0.26.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"a669bc740861de2353f6f5ca14591153\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":24958729,\"upload_time\":\"2023-08-23T16:35:32\",\"upload_time_iso_8601\":\"2023-08-23T16:35:32.744386Z\",\"url\":\"https://files.pythonhosted.org/packages/4f/71/bc22424a1b12fc6f12bb81b5207c39349e37dfb1114756c8c49f29506511/weave-0.26.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.27.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"dd43e69a32d0d04aceb9363689dc4aa2a86b47befed5a24d36db5af53b5946ca\",\"md5\":\"748a7ef10581b06e7828dcfb9580ca74\",\"sha256\":\"1cba2c416a40dbba4e19fb169cfe69fec87a8747e82a7b427b9a12d739871c6f\"},\"downloads\":-1,\"filename\":\"weave-0.27.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"748a7ef10581b06e7828dcfb9580ca74\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":25642742,\"upload_time\":\"2023-09-06T21:02:57\",\"upload_time_iso_8601\":\"2023-09-06T21:02:57.162168Z\",\"url\":\"https://files.pythonhosted.org/packages/dd/43/e69a32d0d04aceb9363689dc4aa2a86b47befed5a24d36db5af53b5946ca/weave-0.27.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"9c7e0553c31c022291abd0df329a25454b4bdffade3698cba1ea891ffe1d983e\",\"md5\":\"1d0d433efe85002e10f302678244e2cf\",\"sha256\":\"bf1461ba3c84a59a347cf008f02416259c5a7b60da26c21aebef95ad22fe4b32\"},\"downloads\":-1,\"filename\":\"weave-0.27.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"1d0d433efe85002e10f302678244e2cf\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":25059673,\"upload_time\":\"2023-09-06T21:03:01\",\"upload_time_iso_8601\":\"2023-09-06T21:03:01.055348Z\",\"url\":\"https://files.pythonhosted.org/packages/9c/7e/0553c31c022291abd0df329a25454b4bdffade3698cba1ea891ffe1d983e/weave-0.27.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.28.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"a1d56a92ff8dc319e3de649f3a95314568cae77f1d3521a96efe480ed70b539e\",\"md5\":\"6491e90be61cf2f354276aa5994f3a15\",\"sha256\":\"b0596674d62817e58976829d3824b66d86757d3ab42df66b948b682ef67b13be\"},\"downloads\":-1,\"filename\":\"weave-0.28.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"6491e90be61cf2f354276aa5994f3a15\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":26626057,\"upload_time\":\"2023-09-21T20:30:46\",\"upload_time_iso_8601\":\"2023-09-21T20:30:46.063055Z\",\"url\":\"https://files.pythonhosted.org/packages/a1/d5/6a92ff8dc319e3de649f3a95314568cae77f1d3521a96efe480ed70b539e/weave-0.28.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"fd59e4e31b4640c5cb3d7ef63812d6015fa892c5ae27df3370d790e78cd70e36\",\"md5\":\"72939f943d90157f94b67d0d07819fec\",\"sha256\":\"441031f702b628d8bad377c9a856561d58411ce26d8501d3c2d1687d63da0a6a\"},\"downloads\":-1,\"filename\":\"weave-0.28.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"72939f943d90157f94b67d0d07819fec\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":26035602,\"upload_time\":\"2023-09-21T20:30:49\",\"upload_time_iso_8601\":\"2023-09-21T20:30:49.671402Z\",\"url\":\"https://files.pythonhosted.org/packages/fd/59/e4e31b4640c5cb3d7ef63812d6015fa892c5ae27df3370d790e78cd70e36/weave-0.28.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.29.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"fc67d39337feb14b2f84667b38493f6e9b137b6787ce41162d87c3127b24e344\",\"md5\":\"2f52f395883b9f4e34251af843d733f8\",\"sha256\":\"9b134a53a3473244e5667607a3638c87ab12ca58e1090d95ef93b219b146af00\"},\"downloads\":-1,\"filename\":\"weave-0.29.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"2f52f395883b9f4e34251af843d733f8\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":26831232,\"upload_time\":\"2023-10-04T20:44:28\",\"upload_time_iso_8601\":\"2023-10-04T20:44:28.308911Z\",\"url\":\"https://files.pythonhosted.org/packages/fc/67/d39337feb14b2f84667b38493f6e9b137b6787ce41162d87c3127b24e344/weave-0.29.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"484f378fe34f54a0cdb98ee884188b326f017223f20657bd7b0ee5858a08b9ef\",\"md5\":\"203530f54071c688bebe16606540bae9\",\"sha256\":\"cac85db16e6e146d7278a67abfbfd1817c003a25015325808efb583082085e71\"},\"downloads\":-1,\"filename\":\"weave-0.29.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"203530f54071c688bebe16606540bae9\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":26240566,\"upload_time\":\"2023-10-04T20:44:32\",\"upload_time_iso_8601\":\"2023-10-04T20:44:32.726605Z\",\"url\":\"https://files.pythonhosted.org/packages/48/4f/378fe34f54a0cdb98ee884188b326f017223f20657bd7b0ee5858a08b9ef/weave-0.29.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.30.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"9c17221a6f3bfc69c15f46ec2a7f47f38e21613ce8f168767209139b885066d7\",\"md5\":\"dbf0ab46ab4669054a910f130fda8f3d\",\"sha256\":\"d47b7680136a3687878b4953bcc15fa9af2ddb1d031c8ab1fc3dbf81e855dcff\"},\"downloads\":-1,\"filename\":\"weave-0.30.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"dbf0ab46ab4669054a910f130fda8f3d\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":26842968,\"upload_time\":\"2023-10-09T19:00:50\",\"upload_time_iso_8601\":\"2023-10-09T19:00:50.674624Z\",\"url\":\"https://files.pythonhosted.org/packages/9c/17/221a6f3bfc69c15f46ec2a7f47f38e21613ce8f168767209139b885066d7/weave-0.30.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"d95586a294c18de70fc135e97b0e4edc9a6d36b15050f7d7c7a058f062232683\",\"md5\":\"68d8c69e8f43e69244ce04a650230260\",\"sha256\":\"94a6c546161a2b4527ed9a1132e9ce890e6d8c89b7f2f48205b03b9cce2dd28e\"},\"downloads\":-1,\"filename\":\"weave-0.30.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"68d8c69e8f43e69244ce04a650230260\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":26249946,\"upload_time\":\"2023-10-09T19:00:54\",\"upload_time_iso_8601\":\"2023-10-09T19:00:54.171462Z\",\"url\":\"https://files.pythonhosted.org/packages/d9/55/86a294c18de70fc135e97b0e4edc9a6d36b15050f7d7c7a058f062232683/weave-0.30.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.31.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"b1f31266255aded58232cab33bf37b7b71828ade3855f605911e602c5d9d0e26\",\"md5\":\"fadfdf35b8de5bd786d7c7f45d16310e\",\"sha256\":\"150a401092b90ff7f7c3c2a7d656c19a512b2ad82795692eaa3cbf927a63c074\"},\"downloads\":-1,\"filename\":\"weave-0.31.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"fadfdf35b8de5bd786d7c7f45d16310e\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28488805,\"upload_time\":\"2023-12-19T04:10:08\",\"upload_time_iso_8601\":\"2023-12-19T04:10:08.303980Z\",\"url\":\"https://files.pythonhosted.org/packages/b1/f3/1266255aded58232cab33bf37b7b71828ade3855f605911e602c5d9d0e26/weave-0.31.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"e14c0f9d3efe133f33ca9de09b52fb1b8dd164b490396d6179add4926dd2a9af\",\"md5\":\"e5ce0553b55fa7ae002b84bbcf271205\",\"sha256\":\"88218d8f4337f57258ff3b7e1e6f8f68fbb5d81a25003bddc26f8431f58881b1\"},\"downloads\":-1,\"filename\":\"weave-0.31.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"e5ce0553b55fa7ae002b84bbcf271205\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":27867553,\"upload_time\":\"2023-12-19T04:10:13\",\"upload_time_iso_8601\":\"2023-12-19T04:10:13.172968Z\",\"url\":\"https://files.pythonhosted.org/packages/e1/4c/0f9d3efe133f33ca9de09b52fb1b8dd164b490396d6179add4926dd2a9af/weave-0.31.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.32.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"8f29853a6fde00c348e675dbf5258229e457bb0c96001dbcaa6156f67403e60c\",\"md5\":\"a0e2dbdde1ad13a2889c70264b748f37\",\"sha256\":\"10f260511b75c95047277e391ab0c772e507f531ee00179759fae044451bb521\"},\"downloads\":-1,\"filename\":\"weave-0.32.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"a0e2dbdde1ad13a2889c70264b748f37\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28545869,\"upload_time\":\"2024-01-08T22:24:15\",\"upload_time_iso_8601\":\"2024-01-08T22:24:15.381183Z\",\"url\":\"https://files.pythonhosted.org/packages/8f/29/853a6fde00c348e675dbf5258229e457bb0c96001dbcaa6156f67403e60c/weave-0.32.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"143eafe483f7aefe178b2c3d94dab80a5c76c4412deab48e7a5462204d1f8d10\",\"md5\":\"ad71565fd5900a1aad0663ba2f1c7dc3\",\"sha256\":\"bf08946caa22402dac3ff766a6bea46b3bd5d14a6a69b99a89a51d3e19fe4fbb\"},\"downloads\":-1,\"filename\":\"weave-0.32.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"ad71565fd5900a1aad0663ba2f1c7dc3\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":27924744,\"upload_time\":\"2024-01-08T22:24:21\",\"upload_time_iso_8601\":\"2024-01-08T22:24:21.897795Z\",\"url\":\"https://files.pythonhosted.org/packages/14/3e/afe483f7aefe178b2c3d94dab80a5c76c4412deab48e7a5462204d1f8d10/weave-0.32.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.33.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"4a5c32106dc988b4d8104ff7c7c7d17adf5a5fa3f16dd7a43f6c06bf97db928d\",\"md5\":\"c861d3e09b2b06a6a160a0cae3b568e6\",\"sha256\":\"7c5c671a7c54efb0da54fc1c8355294ad71cf9b56cb1c24aeca5de4e6990c673\"},\"downloads\":-1,\"filename\":\"weave-0.33.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"c861d3e09b2b06a6a160a0cae3b568e6\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28545144,\"upload_time\":\"2024-01-11T19:03:28\",\"upload_time_iso_8601\":\"2024-01-11T19:03:28.637344Z\",\"url\":\"https://files.pythonhosted.org/packages/4a/5c/32106dc988b4d8104ff7c7c7d17adf5a5fa3f16dd7a43f6c06bf97db928d/weave-0.33.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"a3a17d87db56215c93dc5467865ef49f04b86bd199312aa136a79f9e82f76bf9\",\"md5\":\"b2a8c4ba1e1158e3a1c27fcadcb8f54c\",\"sha256\":\"c7ba2e98ed8fcaec52475a73ae4e1fbd788707e7211ace7f2373b602525408e4\"},\"downloads\":-1,\"filename\":\"weave-0.33.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"b2a8c4ba1e1158e3a1c27fcadcb8f54c\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":27922109,\"upload_time\":\"2024-01-11T19:03:36\",\"upload_time_iso_8601\":\"2024-01-11T19:03:36.173808Z\",\"url\":\"https://files.pythonhosted.org/packages/a3/a1/7d87db56215c93dc5467865ef49f04b86bd199312aa136a79f9e82f76bf9/weave-0.33.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.34.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"6f56caed5cec5d97777c60193765b4d5c094bf8dcddbef5bd5b6f4fa441d5305\",\"md5\":\"f35c72fcff15462fa559111da32f720e\",\"sha256\":\"3fc79d5a1e03b58ec54ce052e4395bebe98e06ca8e2856f30029aa414421574b\"},\"downloads\":-1,\"filename\":\"weave-0.34.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"f35c72fcff15462fa559111da32f720e\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28574453,\"upload_time\":\"2024-01-23T17:42:40\",\"upload_time_iso_8601\":\"2024-01-23T17:42:40.700772Z\",\"url\":\"https://files.pythonhosted.org/packages/6f/56/caed5cec5d97777c60193765b4d5c094bf8dcddbef5bd5b6f4fa441d5305/weave-0.34.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"5a84e13d5a1e51d3acd7801c944eb3c4f3bed632b6b160c297b1499feddbbc29\",\"md5\":\"75f4d61cb6481a7be61b7609db6478f9\",\"sha256\":\"2674fbaee86b48adc3b21128d9b95e6a67af6cc4dd3701af93710ceb10d04167\"},\"downloads\":-1,\"filename\":\"weave-0.34.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"75f4d61cb6481a7be61b7609db6478f9\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":27951480,\"upload_time\":\"2024-01-23T17:42:46\",\"upload_time_iso_8601\":\"2024-01-23T17:42:46.288761Z\",\"url\":\"https://files.pythonhosted.org/packages/5a/84/e13d5a1e51d3acd7801c944eb3c4f3bed632b6b160c297b1499feddbbc29/weave-0.34.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.35.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"26ba3d2f7304148c05779a47dd6de66306740599c140c0d1972599cd46885fcb\",\"md5\":\"817661bb2c960d4f5252190b4ef795df\",\"sha256\":\"6b4c390fff49538287ae6182fd39b1fd5c55695a75627e3a793f0dbeb3fdcd97\"},\"downloads\":-1,\"filename\":\"weave-0.35.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"817661bb2c960d4f5252190b4ef795df\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28622866,\"upload_time\":\"2024-02-01T04:43:06\",\"upload_time_iso_8601\":\"2024-02-01T04:43:06.209466Z\",\"url\":\"https://files.pythonhosted.org/packages/26/ba/3d2f7304148c05779a47dd6de66306740599c140c0d1972599cd46885fcb/weave-0.35.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"794eefb8c786b0c12425b603edd822a7a1dc1a9e798c27085a8c9f61412babcf\",\"md5\":\"446c611943c746e916e7f1cfa9a789bb\",\"sha256\":\"30e955cc5bb58cf8192cecd37296ca741e72475d2b5cc9debd6b91dfbcef1b07\"},\"downloads\":-1,\"filename\":\"weave-0.35.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"446c611943c746e916e7f1cfa9a789bb\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":27997012,\"upload_time\":\"2024-02-01T04:43:09\",\"upload_time_iso_8601\":\"2024-02-01T04:43:09.317089Z\",\"url\":\"https://files.pythonhosted.org/packages/79/4e/efb8c786b0c12425b603edd822a7a1dc1a9e798c27085a8c9f61412babcf/weave-0.35.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.36.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"df06a7886741ad824f2abf754b9dbe60380c628e2720c932bb2d3c7193373ebf\",\"md5\":\"8fa82875eddc1abf95897902dcfcda66\",\"sha256\":\"924124c3bb73a1c972c52284efc36884f598334e835bf5f3602ef49ab83c7d81\"},\"downloads\":-1,\"filename\":\"weave-0.36.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"8fa82875eddc1abf95897902dcfcda66\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28644437,\"upload_time\":\"2024-02-06T18:01:38\",\"upload_time_iso_8601\":\"2024-02-06T18:01:38.775489Z\",\"url\":\"https://files.pythonhosted.org/packages/df/06/a7886741ad824f2abf754b9dbe60380c628e2720c932bb2d3c7193373ebf/weave-0.36.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"21f3ae454482f2c704c781c05d2e4f570de19e0e3598a5ceccadf5e950b97962\",\"md5\":\"49ef092e70a8e4612814f0cede7df766\",\"sha256\":\"e9b54be9a71552728316a9316d74746aa3bf1fb038ab99e5e7ef7e04eaf847b8\"},\"downloads\":-1,\"filename\":\"weave-0.36.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"49ef092e70a8e4612814f0cede7df766\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28019640,\"upload_time\":\"2024-02-06T18:01:44\",\"upload_time_iso_8601\":\"2024-02-06T18:01:44.005981Z\",\"url\":\"https://files.pythonhosted.org/packages/21/f3/ae454482f2c704c781c05d2e4f570de19e0e3598a5ceccadf5e950b97962/weave-0.36.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.37.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"ac58adcdd7258029c00c373e990f430b2e93ea7a491ae73f056552035a70da67\",\"md5\":\"2704eeacc379052d490b298c0cf93a86\",\"sha256\":\"2f69c800abf81f6208401f9c2d6e333c9e6a104c8a9b6b02a956190523f58114\"},\"downloads\":-1,\"filename\":\"weave-0.37.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"2704eeacc379052d490b298c0cf93a86\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28643747,\"upload_time\":\"2024-02-07T18:45:31\",\"upload_time_iso_8601\":\"2024-02-07T18:45:31.101587Z\",\"url\":\"https://files.pythonhosted.org/packages/ac/58/adcdd7258029c00c373e990f430b2e93ea7a491ae73f056552035a70da67/weave-0.37.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"3b70099413d5775285010f38e0ddf22fbd48e921287d38688cfccf427d2cec4b\",\"md5\":\"b89cdd2d0dc1a87117907695c666254b\",\"sha256\":\"4b8a8810ba4d54a18170c6a6b56aebf2be7688f8e3f0aef0b0080a30cd3b9c3a\"},\"downloads\":-1,\"filename\":\"weave-0.37.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"b89cdd2d0dc1a87117907695c666254b\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28019029,\"upload_time\":\"2024-02-07T18:45:34\",\"upload_time_iso_8601\":\"2024-02-07T18:45:34.854673Z\",\"url\":\"https://files.pythonhosted.org/packages/3b/70/099413d5775285010f38e0ddf22fbd48e921287d38688cfccf427d2cec4b/weave-0.37.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.38.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"dfb8a29f1d240556bb15ebaa649f72ba700b2452347dc2c96b668536e89162c4\",\"md5\":\"1449acb1acbdfd6ab1db4bf4bafc4af9\",\"sha256\":\"237a55deec988678771e76ecef01f930123002190c7389244c6e948bb0c67f5c\"},\"downloads\":-1,\"filename\":\"weave-0.38.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"1449acb1acbdfd6ab1db4bf4bafc4af9\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28630921,\"upload_time\":\"2024-02-13T03:00:03\",\"upload_time_iso_8601\":\"2024-02-13T03:00:03.300669Z\",\"url\":\"https://files.pythonhosted.org/packages/df/b8/a29f1d240556bb15ebaa649f72ba700b2452347dc2c96b668536e89162c4/weave-0.38.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"1773450a89457bd863851713ce4867ca582c6ae70f2a9d0cc9d0c82793935861\",\"md5\":\"9345e8bd6020046e2b14964bac301ba9\",\"sha256\":\"a16a0db40d4e8bff3ae0d4bd6e1fe4b8c9e32401ffe38f6772b88d91a9aed290\"},\"downloads\":-1,\"filename\":\"weave-0.38.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"9345e8bd6020046e2b14964bac301ba9\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28004173,\"upload_time\":\"2024-02-13T03:00:08\",\"upload_time_iso_8601\":\"2024-02-13T03:00:08.699243Z\",\"url\":\"https://files.pythonhosted.org/packages/17/73/450a89457bd863851713ce4867ca582c6ae70f2a9d0cc9d0c82793935861/weave-0.38.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.39.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"22b16ced09789efdcac0695a4f06a430b28452bdeda297570059a3f84d2fc7e2\",\"md5\":\"0bcee6e40515fe1eeabdf6b32a03669a\",\"sha256\":\"fd13e49a066d31e53a90a8d343043c7698ddd7e444915e401ca0481e37aec43a\"},\"downloads\":-1,\"filename\":\"weave-0.39.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"0bcee6e40515fe1eeabdf6b32a03669a\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28642436,\"upload_time\":\"2024-02-20T20:32:40\",\"upload_time_iso_8601\":\"2024-02-20T20:32:40.309489Z\",\"url\":\"https://files.pythonhosted.org/packages/22/b1/6ced09789efdcac0695a4f06a430b28452bdeda297570059a3f84d2fc7e2/weave-0.39.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"a629cdcf684191ecf516f98e0975b2765207a97c969ce6d7dd97bfef95648af2\",\"md5\":\"448b6fa19572da2b5fd3953723df16b3\",\"sha256\":\"8fa5afd7952bcfedc7116ca38e05a3cff0f8515e78aa147b821cdae68462000b\"},\"downloads\":-1,\"filename\":\"weave-0.39.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"448b6fa19572da2b5fd3953723df16b3\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28018029,\"upload_time\":\"2024-02-20T20:32:44\",\"upload_time_iso_8601\":\"2024-02-20T20:32:44.075698Z\",\"url\":\"https://files.pythonhosted.org/packages/a6/29/cdcf684191ecf516f98e0975b2765207a97c969ce6d7dd97bfef95648af2/weave-0.39.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.40.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"f869e4c600483c26bd3e691c841755f4379f5215e6a854bf26ec448f66786075\",\"md5\":\"63bdce06485085da557dc95a710f993b\",\"sha256\":\"a0a37a577eebf7fc18068e5986e833e5c0d06c579cce40860e03a637f96fa480\"},\"downloads\":-1,\"filename\":\"weave-0.40.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"63bdce06485085da557dc95a710f993b\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28698555,\"upload_time\":\"2024-02-29T23:04:51\",\"upload_time_iso_8601\":\"2024-02-29T23:04:51.256416Z\",\"url\":\"https://files.pythonhosted.org/packages/f8/69/e4c600483c26bd3e691c841755f4379f5215e6a854bf26ec448f66786075/weave-0.40.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"26e7719bd9f66c520e94f80fbddf7583db5b19c368c4c2cb338899cbddb2af80\",\"md5\":\"a142a4a98886f1a4930e4ea5037b369b\",\"sha256\":\"9a2f14a5219263cc91f4f9d82182f104266ae752dd6c2d60bf2977782a4bd8dd\"},\"downloads\":-1,\"filename\":\"weave-0.40.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"a142a4a98886f1a4930e4ea5037b369b\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28067916,\"upload_time\":\"2024-02-29T23:04:57\",\"upload_time_iso_8601\":\"2024-02-29T23:04:57.902976Z\",\"url\":\"https://files.pythonhosted.org/packages/26/e7/719bd9f66c520e94f80fbddf7583db5b19c368c4c2cb338899cbddb2af80/weave-0.40.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.41.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"72fd4804e3cd9234a5b0b059cceaabc0c507aa4efa5dfd5763d75e5d7150ef09\",\"md5\":\"37383a024284567acdbad7b46b3b1e74\",\"sha256\":\"1489e96b9038d2a57bf591c34de3622e8182190a3e3641472753f84b59110110\"},\"downloads\":-1,\"filename\":\"weave-0.41.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"37383a024284567acdbad7b46b3b1e74\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28687649,\"upload_time\":\"2024-03-07T20:37:54\",\"upload_time_iso_8601\":\"2024-03-07T20:37:54.316943Z\",\"url\":\"https://files.pythonhosted.org/packages/72/fd/4804e3cd9234a5b0b059cceaabc0c507aa4efa5dfd5763d75e5d7150ef09/weave-0.41.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"a2df9dc2200412d7f6701e211db377943ff16f89b49920f90ccd3a7eb9297c94\",\"md5\":\"c52af25892071a287cdcd550d18d540c\",\"sha256\":\"6b81eb7d09126a84eb814fc3f073202ad57606abb0d96793c3f0f32eb4546220\"},\"downloads\":-1,\"filename\":\"weave-0.41.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"c52af25892071a287cdcd550d18d540c\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28052322,\"upload_time\":\"2024-03-07T20:37:58\",\"upload_time_iso_8601\":\"2024-03-07T20:37:58.160508Z\",\"url\":\"https://files.pythonhosted.org/packages/a2/df/9dc2200412d7f6701e211db377943ff16f89b49920f90ccd3a7eb9297c94/weave-0.41.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.42.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"4e9828cc61001c6582929f3322b85dcb27bf6525cb14c56c2dfe0e300f7cfb2f\",\"md5\":\"47ee7b8995da9bf67e7af16cd14ab82c\",\"sha256\":\"07c44b7143207f46da308b795dc818ccc0edfd26736f2eb9a87f036b3fa2d606\"},\"downloads\":-1,\"filename\":\"weave-0.42.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"47ee7b8995da9bf67e7af16cd14ab82c\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28701398,\"upload_time\":\"2024-03-12T03:45:30\",\"upload_time_iso_8601\":\"2024-03-12T03:45:30.588522Z\",\"url\":\"https://files.pythonhosted.org/packages/4e/98/28cc61001c6582929f3322b85dcb27bf6525cb14c56c2dfe0e300f7cfb2f/weave-0.42.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"4baee80949e5020370b85d43f389253d2578fb587947256103318958d244df46\",\"md5\":\"662e00bdb0a2b398acab9cb5e97eee40\",\"sha256\":\"bfb5cfa90fc91de0c26e3181487dbd8452dd195e8f15e148b8df523b29b89b9d\"},\"downloads\":-1,\"filename\":\"weave-0.42.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"662e00bdb0a2b398acab9cb5e97eee40\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28069111,\"upload_time\":\"2024-03-12T03:45:34\",\"upload_time_iso_8601\":\"2024-03-12T03:45:34.546070Z\",\"url\":\"https://files.pythonhosted.org/packages/4b/ae/e80949e5020370b85d43f389253d2578fb587947256103318958d244df46/weave-0.42.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.43.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"6af6bfb61ceb85c9d0d7274db8ae8ee4bac9f16bcff8389cb81b70ce2811bb58\",\"md5\":\"f2abee10ac75f3efd5b6b8058307aa82\",\"sha256\":\"455214cbddd5ab786ed6776f9292a3e41ba460c79f607c6215e0c0a97d13af4c\"},\"downloads\":-1,\"filename\":\"weave-0.43.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"f2abee10ac75f3efd5b6b8058307aa82\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28732070,\"upload_time\":\"2024-03-23T00:56:43\",\"upload_time_iso_8601\":\"2024-03-23T00:56:43.989521Z\",\"url\":\"https://files.pythonhosted.org/packages/6a/f6/bfb61ceb85c9d0d7274db8ae8ee4bac9f16bcff8389cb81b70ce2811bb58/weave-0.43.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"bed3778e831039b3ab42924d76f1a9ba995cd9537b551ec67c010140eb0a57f5\",\"md5\":\"9bbe40a80722035fc2600a4023a1f3a4\",\"sha256\":\"bd6dd5b799aa64d21e53d65961fe1f8941acf95f93d288a503a27f3fecce885a\"},\"downloads\":-1,\"filename\":\"weave-0.43.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"9bbe40a80722035fc2600a4023a1f3a4\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28098705,\"upload_time\":\"2024-03-23T00:56:48\",\"upload_time_iso_8601\":\"2024-03-23T00:56:48.419316Z\",\"url\":\"https://files.pythonhosted.org/packages/be/d3/778e831039b3ab42924d76f1a9ba995cd9537b551ec67c010140eb0a57f5/weave-0.43.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.44.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"e58d3af64a7a420b98e2db7f43de47f2db9a07dc19d635a0f68659082747cc68\",\"md5\":\"e074613cbf9043e2089ea97b4d60e9af\",\"sha256\":\"bbf603c3d4faae9679d84366d47490f0f219692f39d476d4e0a6bee9159b681a\"},\"downloads\":-1,\"filename\":\"weave-0.44.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"e074613cbf9043e2089ea97b4d60e9af\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28746660,\"upload_time\":\"2024-03-26T23:29:08\",\"upload_time_iso_8601\":\"2024-03-26T23:29:08.476433Z\",\"url\":\"https://files.pythonhosted.org/packages/e5/8d/3af64a7a420b98e2db7f43de47f2db9a07dc19d635a0f68659082747cc68/weave-0.44.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"e1b72cfc7e1a3b19ef3d0b1110b7ec2f76d2ed2fc1ec3b4b2d19075754226c28\",\"md5\":\"4464bee9db38fea705a89224f6950135\",\"sha256\":\"015059aa238fcb9ebfebd86ba1b02acc2bf3710d96508698aeb3af8c8418d7bb\"},\"downloads\":-1,\"filename\":\"weave-0.44.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"4464bee9db38fea705a89224f6950135\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28115987,\"upload_time\":\"2024-03-26T23:29:11\",\"upload_time_iso_8601\":\"2024-03-26T23:29:11.572022Z\",\"url\":\"https://files.pythonhosted.org/packages/e1/b7/2cfc7e1a3b19ef3d0b1110b7ec2f76d2ed2fc1ec3b4b2d19075754226c28/weave-0.44.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.45.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"68491a4f0fd5469b08619bd1920a291a8e26de2cf95b9238aefb015f63b320b1\",\"md5\":\"dc21cc7f8d9fd7d979febb7b68ba5464\",\"sha256\":\"847a0894ada9453bb33ae291e46b2050b92e66950061f41201ecf49593cff741\"},\"downloads\":-1,\"filename\":\"weave-0.45.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"dc21cc7f8d9fd7d979febb7b68ba5464\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28738559,\"upload_time\":\"2024-03-28T17:59:36\",\"upload_time_iso_8601\":\"2024-03-28T17:59:36.734309Z\",\"url\":\"https://files.pythonhosted.org/packages/68/49/1a4f0fd5469b08619bd1920a291a8e26de2cf95b9238aefb015f63b320b1/weave-0.45.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"72075b0abf2b38846ce9e86932fc747a0020c2d945d958db72e31656e902164d\",\"md5\":\"528cc0d33231866f04d5e57df345144e\",\"sha256\":\"91c38a16b00141925f9c076daf3c2c40882150ac1f6b81a52d9018d59344cb25\"},\"downloads\":-1,\"filename\":\"weave-0.45.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"528cc0d33231866f04d5e57df345144e\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28104578,\"upload_time\":\"2024-03-28T17:59:41\",\"upload_time_iso_8601\":\"2024-03-28T17:59:41.190031Z\",\"url\":\"https://files.pythonhosted.org/packages/72/07/5b0abf2b38846ce9e86932fc747a0020c2d945d958db72e31656e902164d/weave-0.45.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.46.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"f689ead99d8a4c0277480b7fbd622bed09f1206f758943c61aed3086e9306b32\",\"md5\":\"fa5e23bb1e732b129774764e6d984edd\",\"sha256\":\"ac5b5d3033975be0a7262a2b58ffe248bda1bcf9ac04e6e6e229b734e876b615\"},\"downloads\":-1,\"filename\":\"weave-0.46.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"fa5e23bb1e732b129774764e6d984edd\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28756674,\"upload_time\":\"2024-03-29T22:23:36\",\"upload_time_iso_8601\":\"2024-03-29T22:23:36.632320Z\",\"url\":\"https://files.pythonhosted.org/packages/f6/89/ead99d8a4c0277480b7fbd622bed09f1206f758943c61aed3086e9306b32/weave-0.46.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"cbb460bc61da24907aef5f2a368a1fbb9f77c57b2c4781c194481c12ef8a5b32\",\"md5\":\"cb2f4205329c80cff16649ebdbc56fe1\",\"sha256\":\"61c55aa91aa67ebc83232a84c8dbc75ba85b91ee1d6f1a2e976dd93d9723f03f\"},\"downloads\":-1,\"filename\":\"weave-0.46.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"cb2f4205329c80cff16649ebdbc56fe1\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28123551,\"upload_time\":\"2024-03-29T22:23:40\",\"upload_time_iso_8601\":\"2024-03-29T22:23:40.417778Z\",\"url\":\"https://files.pythonhosted.org/packages/cb/b4/60bc61da24907aef5f2a368a1fbb9f77c57b2c4781c194481c12ef8a5b32/weave-0.46.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.47.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"9de8c972d458c0bc466f4f8d2f6384d06632b46ca4a1b34c80e5f24f42c4d6d1\",\"md5\":\"1f80491be0d77905ca8b6a819d5e7f23\",\"sha256\":\"4c402184daaa1feea4555f5491a3522ede84c86f114acf69cda8a06a5acc1990\"},\"downloads\":-1,\"filename\":\"weave-0.47.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"1f80491be0d77905ca8b6a819d5e7f23\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28771548,\"upload_time\":\"2024-04-02T01:31:55\",\"upload_time_iso_8601\":\"2024-04-02T01:31:55.969243Z\",\"url\":\"https://files.pythonhosted.org/packages/9d/e8/c972d458c0bc466f4f8d2f6384d06632b46ca4a1b34c80e5f24f42c4d6d1/weave-0.47.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"d32163736dfa8680f8a535719432da476e05462eef9bb4497d82986277ce4cbf\",\"md5\":\"0291e72ac4ad2faebf141aa733202d60\",\"sha256\":\"fdf25631dd7cf6a6af9f6daf40c1dde881284814d0acbd88f661c5d8b8575b6d\"},\"downloads\":-1,\"filename\":\"weave-0.47.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"0291e72ac4ad2faebf141aa733202d60\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28135766,\"upload_time\":\"2024-04-02T01:32:00\",\"upload_time_iso_8601\":\"2024-04-02T01:32:00.799908Z\",\"url\":\"https://files.pythonhosted.org/packages/d3/21/63736dfa8680f8a535719432da476e05462eef9bb4497d82986277ce4cbf/weave-0.47.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.48.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"239ebbcd474aca85d1d153762e2d9c3f5d974df922f60123102555929b715dd5\",\"md5\":\"7a3c576847249a3bf1096eed2f9483fd\",\"sha256\":\"8a54874ccd74d560cc80d0999462ff036166561dd6a797695bf859c1c44e2f6d\"},\"downloads\":-1,\"filename\":\"weave-0.48.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"7a3c576847249a3bf1096eed2f9483fd\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28776476,\"upload_time\":\"2024-04-03T02:41:18\",\"upload_time_iso_8601\":\"2024-04-03T02:41:18.095274Z\",\"url\":\"https://files.pythonhosted.org/packages/23/9e/bbcd474aca85d1d153762e2d9c3f5d974df922f60123102555929b715dd5/weave-0.48.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"23e08d0d3bc7e769dd8189f463d37a3b043ec02ab2153471c3edbf0fa29e123b\",\"md5\":\"c8bc769b42f8bce10f76731ddd092f8e\",\"sha256\":\"90b3609f5556f9b23b0a6858c7cf3201506717b4ff02dacfa03bdb9d22ed390b\"},\"downloads\":-1,\"filename\":\"weave-0.48.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"c8bc769b42f8bce10f76731ddd092f8e\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28138779,\"upload_time\":\"2024-04-03T02:41:21\",\"upload_time_iso_8601\":\"2024-04-03T02:41:21.533710Z\",\"url\":\"https://files.pythonhosted.org/packages/23/e0/8d0d3bc7e769dd8189f463d37a3b043ec02ab2153471c3edbf0fa29e123b/weave-0.48.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.49.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"313dd6655759305816c5cd7d53690bea77b96a2c2df93fe49cc318f7da34c9b1\",\"md5\":\"c6c5a65a6a379900826b7ab0276f40d3\",\"sha256\":\"fde7dcd1c38622f1dd36314fd2b44575ea5eb10d33b21e148d34415f808e6ee9\"},\"downloads\":-1,\"filename\":\"weave-0.49.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"c6c5a65a6a379900826b7ab0276f40d3\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28778600,\"upload_time\":\"2024-04-03T21:46:50\",\"upload_time_iso_8601\":\"2024-04-03T21:46:50.299241Z\",\"url\":\"https://files.pythonhosted.org/packages/31/3d/d6655759305816c5cd7d53690bea77b96a2c2df93fe49cc318f7da34c9b1/weave-0.49.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"b19009785c722aa25c9a10eb859d24252d50db7ab9de6c51c360bd17a19ccec1\",\"md5\":\"2e8b3426b0628724a88f02a631f56acc\",\"sha256\":\"e7acaa55eb5bca9e5eb447b5f41a3dcd9d1193f0cefa2431563ab028cde3d0d9\"},\"downloads\":-1,\"filename\":\"weave-0.49.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"2e8b3426b0628724a88f02a631f56acc\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28140679,\"upload_time\":\"2024-04-03T21:46:54\",\"upload_time_iso_8601\":\"2024-04-03T21:46:54.428466Z\",\"url\":\"https://files.pythonhosted.org/packages/b1/90/09785c722aa25c9a10eb859d24252d50db7ab9de6c51c360bd17a19ccec1/weave-0.49.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.50.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"4b32bd04dc30a86ce216f26a0bb5e8cbf93e01a1c65099a17ab07425910343ec\",\"md5\":\"145493b78fc7a126151009d2ef753e5b\",\"sha256\":\"c847a4089ff27489f1e354d02790be4ef756177ea418fd720a0770c6b93736aa\"},\"downloads\":-1,\"filename\":\"weave-0.50.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"145493b78fc7a126151009d2ef753e5b\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28779004,\"upload_time\":\"2024-04-04T18:04:04\",\"upload_time_iso_8601\":\"2024-04-04T18:04:04.956417Z\",\"url\":\"https://files.pythonhosted.org/packages/4b/32/bd04dc30a86ce216f26a0bb5e8cbf93e01a1c65099a17ab07425910343ec/weave-0.50.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"0d55467ccc0a3ae08521551c486f8044c103ce94b8ba30b89246306499050f4b\",\"md5\":\"aa86eb40402bddb9adf91253ce313555\",\"sha256\":\"13c984a1d2c74217f4bf43c07d3d2a47b8129d3284e9459ffe5cf5fd3ec026c7\"},\"downloads\":-1,\"filename\":\"weave-0.50.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"aa86eb40402bddb9adf91253ce313555\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28141282,\"upload_time\":\"2024-04-04T18:04:08\",\"upload_time_iso_8601\":\"2024-04-04T18:04:08.634156Z\",\"url\":\"https://files.pythonhosted.org/packages/0d/55/467ccc0a3ae08521551c486f8044c103ce94b8ba30b89246306499050f4b/weave-0.50.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.50.1\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"55f02e7d81f47440e8a839d8c2e737702c5f4c5f8c8050fec40e2ef83c3c83e7\",\"md5\":\"894ddc23028a159b9982b1769d62825b\",\"sha256\":\"007457746357efe48839bb51cd3ab75d4098016c7e0db69d66d57cf636156c6a\"},\"downloads\":-1,\"filename\":\"weave-0.50.1-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"894ddc23028a159b9982b1769d62825b\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28772216,\"upload_time\":\"2024-04-12T00:26:47\",\"upload_time_iso_8601\":\"2024-04-12T00:26:47.585694Z\",\"url\":\"https://files.pythonhosted.org/packages/55/f0/2e7d81f47440e8a839d8c2e737702c5f4c5f8c8050fec40e2ef83c3c83e7/weave-0.50.1-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"a79ced04eac29e9948ca31a969bbbf6087aa785817fd9dc98404ba6c2fe1b66e\",\"md5\":\"b7149abd859b9400feaf9f9d3c8e6e0f\",\"sha256\":\"3a57c8e5c6c95c68cb282df39fcadde8f8f7fc2bb73741c31c72e261a4ad8322\"},\"downloads\":-1,\"filename\":\"weave-0.50.1.tar.gz\",\"has_sig\":false,\"md5_digest\":\"b7149abd859b9400feaf9f9d3c8e6e0f\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28134829,\"upload_time\":\"2024-04-12T00:26:56\",\"upload_time_iso_8601\":\"2024-04-12T00:26:56.562179Z\",\"url\":\"https://files.pythonhosted.org/packages/a7/9c/ed04eac29e9948ca31a969bbbf6087aa785817fd9dc98404ba6c2fe1b66e/weave-0.50.1.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.50.10\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"c96fba2a7357f5d9801966537c8b0d1b3ed8973c35c1f026eac1afc96d5cffda\",\"md5\":\"c1958e1d30f12b6e55901d01fdd54bd8\",\"sha256\":\"cbefd090fd7e74a8d1e4570feba22a13b5726a28236268c9fe8f8c6c35590ce0\"},\"downloads\":-1,\"filename\":\"weave-0.50.10-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"c1958e1d30f12b6e55901d01fdd54bd8\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":29869056,\"upload_time\":\"2024-07-16T21:20:43\",\"upload_time_iso_8601\":\"2024-07-16T21:20:43.662748Z\",\"url\":\"https://files.pythonhosted.org/packages/c9/6f/ba2a7357f5d9801966537c8b0d1b3ed8973c35c1f026eac1afc96d5cffda/weave-0.50.10-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"c771118791aac6b42e2f4f3e5ef3041125999ad91e50eb3e53609551f9f49c8c\",\"md5\":\"ef960b7dff6c330b9795fc86c8333ae2\",\"sha256\":\"2428af6dd9cc1ef2412dc1dff2cb7f479c936cf381ef4b7b5ef301cc747b9994\"},\"downloads\":-1,\"filename\":\"weave-0.50.10.tar.gz\",\"has_sig\":false,\"md5_digest\":\"ef960b7dff6c330b9795fc86c8333ae2\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":29241279,\"upload_time\":\"2024-07-16T21:20:48\",\"upload_time_iso_8601\":\"2024-07-16T21:20:48.129434Z\",\"url\":\"https://files.pythonhosted.org/packages/c7/71/118791aac6b42e2f4f3e5ef3041125999ad91e50eb3e53609551f9f49c8c/weave-0.50.10.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.50.11\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"4eb830d05d222cfa6e61548699fd792e764f65eb3a3d4d9543e22ac9cf7d25e8\",\"md5\":\"766f72372cf6eb673d094958992cad4b\",\"sha256\":\"99d64c7677b1ba7ab70bb01d192d5825418cd2be51b8fc56607877bb98197269\"},\"downloads\":-1,\"filename\":\"weave-0.50.11-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"766f72372cf6eb673d094958992cad4b\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":30136073,\"upload_time\":\"2024-07-19T23:01:31\",\"upload_time_iso_8601\":\"2024-07-19T23:01:31.961704Z\",\"url\":\"https://files.pythonhosted.org/packages/4e/b8/30d05d222cfa6e61548699fd792e764f65eb3a3d4d9543e22ac9cf7d25e8/weave-0.50.11-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"58f666878927b5509bb6a1a9fa4034394db489e8a3f0a735a3875f657ca56b07\",\"md5\":\"8696361acbd2de9c5d6c7a24c092a1c5\",\"sha256\":\"d5fa0b75e7f95798125c8d9b60a1b1e3700ca0820d61616aa81a763fc0ca7b7c\"},\"downloads\":-1,\"filename\":\"weave-0.50.11.tar.gz\",\"has_sig\":false,\"md5_digest\":\"8696361acbd2de9c5d6c7a24c092a1c5\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":29496419,\"upload_time\":\"2024-07-19T23:01:35\",\"upload_time_iso_8601\":\"2024-07-19T23:01:35.634437Z\",\"url\":\"https://files.pythonhosted.org/packages/58/f6/66878927b5509bb6a1a9fa4034394db489e8a3f0a735a3875f657ca56b07/weave-0.50.11.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.50.12\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"dc26d8977975c9fa95fb940bfaec3acf781f1ec52d34d43f5a91e35de2c6c30a\",\"md5\":\"ba802f3b6571432e07f85dde9a995beb\",\"sha256\":\"53226b3461847ac11dee4019f037bebec55f5c7795d5b64fc28b0adac06b5433\"},\"downloads\":-1,\"filename\":\"weave-0.50.12-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"ba802f3b6571432e07f85dde9a995beb\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":30142299,\"upload_time\":\"2024-07-25T23:21:05\",\"upload_time_iso_8601\":\"2024-07-25T23:21:05.991122Z\",\"url\":\"https://files.pythonhosted.org/packages/dc/26/d8977975c9fa95fb940bfaec3acf781f1ec52d34d43f5a91e35de2c6c30a/weave-0.50.12-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"ee9c45055e95a0e5cf0c354bc19342d5fd7505fa65274400ff00e9f281a2cdf7\",\"md5\":\"601ea0d66eeb7dc9dfe71cae1a9fc777\",\"sha256\":\"c6ba75dd59749f0fbf820bf30378fbc7dd25e7bbd9eb47ed0eccecd8a7a5bd19\"},\"downloads\":-1,\"filename\":\"weave-0.50.12.tar.gz\",\"has_sig\":false,\"md5_digest\":\"601ea0d66eeb7dc9dfe71cae1a9fc777\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":29503330,\"upload_time\":\"2024-07-25T23:21:11\",\"upload_time_iso_8601\":\"2024-07-25T23:21:11.426673Z\",\"url\":\"https://files.pythonhosted.org/packages/ee/9c/45055e95a0e5cf0c354bc19342d5fd7505fa65274400ff00e9f281a2cdf7/weave-0.50.12.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.50.13\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"7e0c1c09c09707632a03ff7179f76b44d2e4963de433ac256965b77ccd2a18f1\",\"md5\":\"1387122353bbdbd6c2f3c9a10104b8e4\",\"sha256\":\"956e9a9b70178dfb4da4496e191a8be400c53a5e74ea2509dadf63ec870f9e51\"},\"downloads\":-1,\"filename\":\"weave-0.50.13-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"1387122353bbdbd6c2f3c9a10104b8e4\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":30164691,\"upload_time\":\"2024-08-02T20:15:38\",\"upload_time_iso_8601\":\"2024-08-02T20:15:38.555985Z\",\"url\":\"https://files.pythonhosted.org/packages/7e/0c/1c09c09707632a03ff7179f76b44d2e4963de433ac256965b77ccd2a18f1/weave-0.50.13-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"8815ea416594f916780da90ee824c60e837d7c1464b2bd66b2ad7fc296ae7c44\",\"md5\":\"38b86ed4a52a24c26a4a66e68bf62d27\",\"sha256\":\"fe59f55ab02c675c22692dd761e21b0009439ef24706d27355f720909ab0187a\"},\"downloads\":-1,\"filename\":\"weave-0.50.13.tar.gz\",\"has_sig\":false,\"md5_digest\":\"38b86ed4a52a24c26a4a66e68bf62d27\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":29520678,\"upload_time\":\"2024-08-02T20:15:41\",\"upload_time_iso_8601\":\"2024-08-02T20:15:41.970383Z\",\"url\":\"https://files.pythonhosted.org/packages/88/15/ea416594f916780da90ee824c60e837d7c1464b2bd66b2ad7fc296ae7c44/weave-0.50.13.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.50.14\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"473082035f64eb71864eb061f7ef7f2c4782d6d08ec14cf17abf8efb66a4f101\",\"md5\":\"cd334233ff3386a8a51a130573d8be2e\",\"sha256\":\"3400ad6bd5acb8b55003914c176cef6f8d180821c9a6a3da0afdfcb0b1b5ec0c\"},\"downloads\":-1,\"filename\":\"weave-0.50.14-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"cd334233ff3386a8a51a130573d8be2e\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":30218176,\"upload_time\":\"2024-08-13T00:19:18\",\"upload_time_iso_8601\":\"2024-08-13T00:19:18.710194Z\",\"url\":\"https://files.pythonhosted.org/packages/47/30/82035f64eb71864eb061f7ef7f2c4782d6d08ec14cf17abf8efb66a4f101/weave-0.50.14-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"a0c05268075c3a2978975c7d4ed208ba158dd9e10a59dba8839894fc104568cd\",\"md5\":\"454cf73d0ebef4f4866156d5f48f9087\",\"sha256\":\"19c1d6e5aacf45e2e52865451b460666d1fba7332dd59d29a46c6beb1fb9ee45\"},\"downloads\":-1,\"filename\":\"weave-0.50.14.tar.gz\",\"has_sig\":false,\"md5_digest\":\"454cf73d0ebef4f4866156d5f48f9087\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":29574556,\"upload_time\":\"2024-08-13T00:19:21\",\"upload_time_iso_8601\":\"2024-08-13T00:19:21.898938Z\",\"url\":\"https://files.pythonhosted.org/packages/a0/c0/5268075c3a2978975c7d4ed208ba158dd9e10a59dba8839894fc104568cd/weave-0.50.14.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.50.15\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"ebc9a82e75d3003a4146c05527b8fd537745bc7cef5a95125509433aec8aa648\",\"md5\":\"b1a733edbee5e91aa9ae92bcc8254e7f\",\"sha256\":\"e671060b2524063a878d30ab34de9fad5e530b3723db82eb4540842452f5311e\"},\"downloads\":-1,\"filename\":\"weave-0.50.15-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"b1a733edbee5e91aa9ae92bcc8254e7f\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":30485365,\"upload_time\":\"2024-08-27T17:30:29\",\"upload_time_iso_8601\":\"2024-08-27T17:30:29.911916Z\",\"url\":\"https://files.pythonhosted.org/packages/eb/c9/a82e75d3003a4146c05527b8fd537745bc7cef5a95125509433aec8aa648/weave-0.50.15-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"e7681a90a7f2dbcd2c508b6220d3924d441249da6cf7113ba3c8cc324d87250c\",\"md5\":\"3e79dd0eb913285e71d8f709617f743b\",\"sha256\":\"9bd79bd7d9432fa1af5fa8a098aa1649e69084b2de0c210feacf48e7a73ea143\"},\"downloads\":-1,\"filename\":\"weave-0.50.15.tar.gz\",\"has_sig\":false,\"md5_digest\":\"3e79dd0eb913285e71d8f709617f743b\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":29831178,\"upload_time\":\"2024-08-27T17:30:35\",\"upload_time_iso_8601\":\"2024-08-27T17:30:35.632935Z\",\"url\":\"https://files.pythonhosted.org/packages/e7/68/1a90a7f2dbcd2c508b6220d3924d441249da6cf7113ba3c8cc324d87250c/weave-0.50.15.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.50.2\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"51899b87ccc011376c8a5aa05082f6ac86e3b9d62e0dc7d671d9c6432b6f2f89\",\"md5\":\"75aab69780dc8f959a7e7332e68e515b\",\"sha256\":\"b21e91f41466b45bf53867710d3508243692e01fd673a1a6eaad57a022c51804\"},\"downloads\":-1,\"filename\":\"weave-0.50.2-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"75aab69780dc8f959a7e7332e68e515b\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":28827855,\"upload_time\":\"2024-05-02T23:08:42\",\"upload_time_iso_8601\":\"2024-05-02T23:08:42.432626Z\",\"url\":\"https://files.pythonhosted.org/packages/51/89/9b87ccc011376c8a5aa05082f6ac86e3b9d62e0dc7d671d9c6432b6f2f89/weave-0.50.2-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"412fd24fba0b7cfacf69905e699257e95eca631fa9e47130b822cf586222db0b\",\"md5\":\"8cb27baffc5823f1eb615da89968c32b\",\"sha256\":\"fc2b4d05fb2395e2bf76de81f2acc3a83b587e64920bc692f5243e9546f15d3d\"},\"downloads\":-1,\"filename\":\"weave-0.50.2.tar.gz\",\"has_sig\":false,\"md5_digest\":\"8cb27baffc5823f1eb615da89968c32b\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28253796,\"upload_time\":\"2024-05-02T23:08:46\",\"upload_time_iso_8601\":\"2024-05-02T23:08:46.419895Z\",\"url\":\"https://files.pythonhosted.org/packages/41/2f/d24fba0b7cfacf69905e699257e95eca631fa9e47130b822cf586222db0b/weave-0.50.2.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.50.3\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"8deb6803ac26dd47f8e35b61f22fe272686f19658bc390a70adeb54847baad64\",\"md5\":\"7ff571808417c8ebc3f7fa9a6cbd9096\",\"sha256\":\"9b51b94f4e6de3a42b00ecf4fe52d8fb86b832235de6a7db0b7341a80b8f6c33\"},\"downloads\":-1,\"filename\":\"weave-0.50.3-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"7ff571808417c8ebc3f7fa9a6cbd9096\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":29234607,\"upload_time\":\"2024-05-21T18:57:28\",\"upload_time_iso_8601\":\"2024-05-21T18:57:28.438184Z\",\"url\":\"https://files.pythonhosted.org/packages/8d/eb/6803ac26dd47f8e35b61f22fe272686f19658bc390a70adeb54847baad64/weave-0.50.3-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"8f6441ace4183082bdb37f5ca7447ed3dd5cd0e1ca8cf6c6b55779fdd5e8197e\",\"md5\":\"c4a6b73da1c3626df314c5297ab39986\",\"sha256\":\"c04a6d987d5eb575e7a7f8ccf8792eb5416c8173f702134494c8aa26621c1c85\"},\"downloads\":-1,\"filename\":\"weave-0.50.3.tar.gz\",\"has_sig\":false,\"md5_digest\":\"c4a6b73da1c3626df314c5297ab39986\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28650860,\"upload_time\":\"2024-05-21T18:57:31\",\"upload_time_iso_8601\":\"2024-05-21T18:57:31.747589Z\",\"url\":\"https://files.pythonhosted.org/packages/8f/64/41ace4183082bdb37f5ca7447ed3dd5cd0e1ca8cf6c6b55779fdd5e8197e/weave-0.50.3.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.50.4\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"6e7d8c6945bb741b2e1d74bd666f7fe13ef5372003aeb4c19ee17c698e7417da\",\"md5\":\"c99a3b2f179011b68a0bb8db48f904dc\",\"sha256\":\"7440ea16547c81d0cfbf28bf35890d62fccb27d81573b74b42f6eb981c8d0256\"},\"downloads\":-1,\"filename\":\"weave-0.50.4-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"c99a3b2f179011b68a0bb8db48f904dc\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":29298231,\"upload_time\":\"2024-06-17T18:46:12\",\"upload_time_iso_8601\":\"2024-06-17T18:46:12.066507Z\",\"url\":\"https://files.pythonhosted.org/packages/6e/7d/8c6945bb741b2e1d74bd666f7fe13ef5372003aeb4c19ee17c698e7417da/weave-0.50.4-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"ef8a842cd7537a893ab0ebf1d170a72169e5b9d10cf0c5ed7d7e24d01c2db737\",\"md5\":\"a8e679760107cc77dc43a66665f4754f\",\"sha256\":\"c48fbefcaaca0cd2403b4bb8e81b4add7ae057a5435df12bab707f00d991b8ce\"},\"downloads\":-1,\"filename\":\"weave-0.50.4.tar.gz\",\"has_sig\":false,\"md5_digest\":\"a8e679760107cc77dc43a66665f4754f\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28706507,\"upload_time\":\"2024-06-17T18:46:21\",\"upload_time_iso_8601\":\"2024-06-17T18:46:21.499245Z\",\"url\":\"https://files.pythonhosted.org/packages/ef/8a/842cd7537a893ab0ebf1d170a72169e5b9d10cf0c5ed7d7e24d01c2db737/weave-0.50.4.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.50.5\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"177f6ebd176a177c58b7ebb4c3067c0d52e939c4acddbadc9a32833a107394ac\",\"md5\":\"3a2e079b9772cb8e6522d3c68c08d005\",\"sha256\":\"bb38df0b3444c69e0dd878d4a315dc083c2736284364c6edc0abce95ff63ffb1\"},\"downloads\":-1,\"filename\":\"weave-0.50.5-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"3a2e079b9772cb8e6522d3c68c08d005\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":29298093,\"upload_time\":\"2024-06-17T21:13:40\",\"upload_time_iso_8601\":\"2024-06-17T21:13:40.636635Z\",\"url\":\"https://files.pythonhosted.org/packages/17/7f/6ebd176a177c58b7ebb4c3067c0d52e939c4acddbadc9a32833a107394ac/weave-0.50.5-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"70b98d5b3dd1295b202f2a4d01fbf3aa0fd1412d38128ad4d4f2ea67cf999b5a\",\"md5\":\"6fd888fed5f77e0d106e14096224ed14\",\"sha256\":\"9124986260faf711639279f5ad186b3f6cf2b6f430f4108579ddf54c6e507371\"},\"downloads\":-1,\"filename\":\"weave-0.50.5.tar.gz\",\"has_sig\":false,\"md5_digest\":\"6fd888fed5f77e0d106e14096224ed14\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28703744,\"upload_time\":\"2024-06-17T21:13:47\",\"upload_time_iso_8601\":\"2024-06-17T21:13:47.455751Z\",\"url\":\"https://files.pythonhosted.org/packages/70/b9/8d5b3dd1295b202f2a4d01fbf3aa0fd1412d38128ad4d4f2ea67cf999b5a/weave-0.50.5.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.50.6\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"a03de8dbbd61d93425f01553445b05e3adb6b9d074c17241e5f90e18175ce939\",\"md5\":\"4a48bdcffdde06b49547afbf8738ddc2\",\"sha256\":\"1a78799f7f1d33d217062103bddd9048115d2bd92c6ce90f2a57e8320c247c6c\"},\"downloads\":-1,\"filename\":\"weave-0.50.6-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"4a48bdcffdde06b49547afbf8738ddc2\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":29510780,\"upload_time\":\"2024-06-26T19:17:17\",\"upload_time_iso_8601\":\"2024-06-26T19:17:17.819710Z\",\"url\":\"https://files.pythonhosted.org/packages/a0/3d/e8dbbd61d93425f01553445b05e3adb6b9d074c17241e5f90e18175ce939/weave-0.50.6-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"ec5cc1544bdaede9d8f9275a84d7bb55e633eda680469419dffdbd7f15aab763\",\"md5\":\"a358de0208aff36664832e2f22b978e7\",\"sha256\":\"14d36289f44234ae6989a9ec3c421e00cea1136facfd7dedbf9c202ea9f9fbe5\"},\"downloads\":-1,\"filename\":\"weave-0.50.6.tar.gz\",\"has_sig\":false,\"md5_digest\":\"a358de0208aff36664832e2f22b978e7\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28901576,\"upload_time\":\"2024-06-26T19:17:21\",\"upload_time_iso_8601\":\"2024-06-26T19:17:21.594380Z\",\"url\":\"https://files.pythonhosted.org/packages/ec/5c/c1544bdaede9d8f9275a84d7bb55e633eda680469419dffdbd7f15aab763/weave-0.50.6.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.50.7\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"eee637f3f64109f92d9f0f91538713554618cbe4040935fd30dcdc90e5398394\",\"md5\":\"bee8a0b88cadd9c2b6093dd14351356d\",\"sha256\":\"9726ab8067dfbc92336087acbe95cf75a8b3e64a6e264db926addb4b5fcf879f\"},\"downloads\":-1,\"filename\":\"weave-0.50.7-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"bee8a0b88cadd9c2b6093dd14351356d\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":29520260,\"upload_time\":\"2024-07-01T19:08:08\",\"upload_time_iso_8601\":\"2024-07-01T19:08:08.130964Z\",\"url\":\"https://files.pythonhosted.org/packages/ee/e6/37f3f64109f92d9f0f91538713554618cbe4040935fd30dcdc90e5398394/weave-0.50.7-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"1168a0c0ca481f23ec73b7ca980e8626c79f35bc921e7e1773e28834791fd373\",\"md5\":\"c9d86dd8869d02e7db32f3555028cd15\",\"sha256\":\"632264d25bede8956dd1fcd92da7b91cd6f48b6a02ac4afa50b19a5214108b5b\"},\"downloads\":-1,\"filename\":\"weave-0.50.7.tar.gz\",\"has_sig\":false,\"md5_digest\":\"c9d86dd8869d02e7db32f3555028cd15\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":28912883,\"upload_time\":\"2024-07-01T19:08:11\",\"upload_time_iso_8601\":\"2024-07-01T19:08:11.608858Z\",\"url\":\"https://files.pythonhosted.org/packages/11/68/a0c0ca481f23ec73b7ca980e8626c79f35bc921e7e1773e28834791fd373/weave-0.50.7.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.50.8\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"c618477850bc23e5e77efe4f705b8539b3933ed173a3875ca41200a6edf27512\",\"md5\":\"6b37ac8ec542c547138e8b6a22af17ce\",\"sha256\":\"1839771b35e19b84ed8d6da3ba2d8ac9518ac488316f84cfe1eb55a775b0fd85\"},\"downloads\":-1,\"filename\":\"weave-0.50.8-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"6b37ac8ec542c547138e8b6a22af17ce\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":29828676,\"upload_time\":\"2024-07-10T23:57:06\",\"upload_time_iso_8601\":\"2024-07-10T23:57:06.168925Z\",\"url\":\"https://files.pythonhosted.org/packages/c6/18/477850bc23e5e77efe4f705b8539b3933ed173a3875ca41200a6edf27512/weave-0.50.8-py3-none-any.whl\",\"yanked\":true,\"yanked_reason\":\"regression
         in eval\"},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"f55ad6319874c6ab1faf769a632682dfaaa4dc5644a2943d3024d6981e2f2fe0\",\"md5\":\"98c8cf70587d3320e52cf9897d134e1c\",\"sha256\":\"df008665fbd824e867948befc2e2957115a1983848d3a687527bdb5ca9d74f53\"},\"downloads\":-1,\"filename\":\"weave-0.50.8.tar.gz\",\"has_sig\":false,\"md5_digest\":\"98c8cf70587d3320e52cf9897d134e1c\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":29208658,\"upload_time\":\"2024-07-10T23:57:10\",\"upload_time_iso_8601\":\"2024-07-10T23:57:10.778345Z\",\"url\":\"https://files.pythonhosted.org/packages/f5/5a/d6319874c6ab1faf769a632682dfaaa4dc5644a2943d3024d6981e2f2fe0/weave-0.50.8.tar.gz\",\"yanked\":true,\"yanked_reason\":\"regression
-        in eval\"}],\"0.50.9\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"a889acc7594612ae4e527825ee96867ac720047fc7bdbd1e952f20c07b36692d\",\"md5\":\"0fa4de7610a689d39fb8b077bf9067e6\",\"sha256\":\"f429571c4bc3a992dd0eb0fb43f48644de9a586d03c0dcadfa79d97842b2e68e\"},\"downloads\":-1,\"filename\":\"weave-0.50.9-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"0fa4de7610a689d39fb8b077bf9067e6\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":29829029,\"upload_time\":\"2024-07-11T16:02:48\",\"upload_time_iso_8601\":\"2024-07-11T16:02:48.383674Z\",\"url\":\"https://files.pythonhosted.org/packages/a8/89/acc7594612ae4e527825ee96867ac720047fc7bdbd1e952f20c07b36692d/weave-0.50.9-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"d6e6ba9e73349369c6014a54aca653b9a819ccbd045f68a4d90a54247fde8281\",\"md5\":\"6bef845389f84bda34480771b278659c\",\"sha256\":\"31635aed22d387e329e416003640335b5fd582ba020a27dedd0983b2eb02cc77\"},\"downloads\":-1,\"filename\":\"weave-0.50.9.tar.gz\",\"has_sig\":false,\"md5_digest\":\"6bef845389f84bda34480771b278659c\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":29209539,\"upload_time\":\"2024-07-11T16:02:52\",\"upload_time_iso_8601\":\"2024-07-11T16:02:52.305429Z\",\"url\":\"https://files.pythonhosted.org/packages/d6/e6/ba9e73349369c6014a54aca653b9a819ccbd045f68a4d90a54247fde8281/weave-0.50.9.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"11afbbf4365668fe19a8875f5192d6d25357654365606d68043e2e493751bac0\",\"md5\":\"5c05f52662bcf984d41c0a429175339d\",\"sha256\":\"bbb4320a645b59d06a0d9c8bbcaab8a06c41e9500444b48e49bcc3c6295a9dbc\"},\"downloads\":-1,\"filename\":\"weave-0.51.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"5c05f52662bcf984d41c0a429175339d\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31402433,\"upload_time\":\"2024-08-29T02:32:19\",\"upload_time_iso_8601\":\"2024-08-29T02:32:19.574642Z\",\"url\":\"https://files.pythonhosted.org/packages/11/af/bbf4365668fe19a8875f5192d6d25357654365606d68043e2e493751bac0/weave-0.51.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"56c2ca827eb9423893ddf4e44482d2171d457c36218a56a2b13fbcd73efd8a04\",\"md5\":\"621c7ee981158d7f1a9c0557c733ff1f\",\"sha256\":\"197da66bffbc0ce8db69c1b4751e1151e21832ee4fca7ce40513730fa63c8fc0\"},\"downloads\":-1,\"filename\":\"weave-0.51.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"621c7ee981158d7f1a9c0557c733ff1f\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30653450,\"upload_time\":\"2024-08-29T02:32:22\",\"upload_time_iso_8601\":\"2024-08-29T02:32:22.820189Z\",\"url\":\"https://files.pythonhosted.org/packages/56/c2/ca827eb9423893ddf4e44482d2171d457c36218a56a2b13fbcd73efd8a04/weave-0.51.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.1\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"60b78c25fd9c9254ed1e39f1bf08a0b6101cc0be49a8ede0f6705adb59cd1351\",\"md5\":\"2778f1a961ea0056f8b02d1317b344df\",\"sha256\":\"f37a2e2baf4c6f3e46fe234a058420f6ef3c44cb4c3af128304259e1542d138c\"},\"downloads\":-1,\"filename\":\"weave-0.51.1-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"2778f1a961ea0056f8b02d1317b344df\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31402485,\"upload_time\":\"2024-08-29T15:59:11\",\"upload_time_iso_8601\":\"2024-08-29T15:59:11.205639Z\",\"url\":\"https://files.pythonhosted.org/packages/60/b7/8c25fd9c9254ed1e39f1bf08a0b6101cc0be49a8ede0f6705adb59cd1351/weave-0.51.1-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"66b5151aec6110e1aa93f5514fdee8e673a7ef8e3f96792e3805a2d0262518ec\",\"md5\":\"50f6773a009cb5dfca7eec33c7cc635a\",\"sha256\":\"3e9f70753383274e81cbbc08a2b3599e7ab1d42cb0c9429293d06d3430091611\"},\"downloads\":-1,\"filename\":\"weave-0.51.1.tar.gz\",\"has_sig\":false,\"md5_digest\":\"50f6773a009cb5dfca7eec33c7cc635a\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30653550,\"upload_time\":\"2024-08-29T15:59:16\",\"upload_time_iso_8601\":\"2024-08-29T15:59:16.608748Z\",\"url\":\"https://files.pythonhosted.org/packages/66/b5/151aec6110e1aa93f5514fdee8e673a7ef8e3f96792e3805a2d0262518ec/weave-0.51.1.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.10\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"5b9b1c49a4082ec9b34b0334633d6b944d03085a7cb90302015793fbda175f6c\",\"md5\":\"95ba5594ecb618ae6505123c9ed4ccb0\",\"sha256\":\"b35642a1e4eb73f03c7d369164a9c7393b6a3f3fad8f5d7dea5827bcb632be21\"},\"downloads\":-1,\"filename\":\"weave-0.51.10-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"95ba5594ecb618ae6505123c9ed4ccb0\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31547950,\"upload_time\":\"2024-09-26T20:00:04\",\"upload_time_iso_8601\":\"2024-09-26T20:00:04.502952Z\",\"url\":\"https://files.pythonhosted.org/packages/5b/9b/1c49a4082ec9b34b0334633d6b944d03085a7cb90302015793fbda175f6c/weave-0.51.10-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"132adb3317ef06adccb4addadd0688240da1bbc6785a857c299fe484111617e1\",\"md5\":\"7eb2d94649bcc73528dc6b043c18077f\",\"sha256\":\"406379b2a578ec0bc22dd2a464cbef9ac5ad8c59a48cea6b2de3ebb03e43a078\"},\"downloads\":-1,\"filename\":\"weave-0.51.10.tar.gz\",\"has_sig\":false,\"md5_digest\":\"7eb2d94649bcc73528dc6b043c18077f\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30777036,\"upload_time\":\"2024-09-26T20:00:07\",\"upload_time_iso_8601\":\"2024-09-26T20:00:07.855168Z\",\"url\":\"https://files.pythonhosted.org/packages/13/2a/db3317ef06adccb4addadd0688240da1bbc6785a857c299fe484111617e1/weave-0.51.10.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.2\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"68f496fbec796a4cf01ae28d2b3899a5c61a76feeed03a179d83278640d1cd9c\",\"md5\":\"6cd087b35d7bcde81cf87b5fe13138ae\",\"sha256\":\"3aff932ccf77fdc1925893ed3115064f36436517c14f01328441883f71ef7aff\"},\"downloads\":-1,\"filename\":\"weave-0.51.2-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"6cd087b35d7bcde81cf87b5fe13138ae\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31409244,\"upload_time\":\"2024-09-04T16:36:14\",\"upload_time_iso_8601\":\"2024-09-04T16:36:14.832121Z\",\"url\":\"https://files.pythonhosted.org/packages/68/f4/96fbec796a4cf01ae28d2b3899a5c61a76feeed03a179d83278640d1cd9c/weave-0.51.2-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"81c7587d0c7ae0cfaa1dd3c5cdfa4c2b738c0e2d52caee919d0779083f2ad136\",\"md5\":\"ef9ebdde7967412b87cd880d0aa20334\",\"sha256\":\"a38997131f965c387323ccc10f9be71ba8a9fd21e4e8061a676a5b17055e6e1f\"},\"downloads\":-1,\"filename\":\"weave-0.51.2.tar.gz\",\"has_sig\":false,\"md5_digest\":\"ef9ebdde7967412b87cd880d0aa20334\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30656419,\"upload_time\":\"2024-09-04T16:36:19\",\"upload_time_iso_8601\":\"2024-09-04T16:36:19.071842Z\",\"url\":\"https://files.pythonhosted.org/packages/81/c7/587d0c7ae0cfaa1dd3c5cdfa4c2b738c0e2d52caee919d0779083f2ad136/weave-0.51.2.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.5\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"3123d1fad30204911b89333bd87b8e411435f37e0eae9ca99b99f2137abde08e\",\"md5\":\"c5a1b5ba39ca825fce816f9304e3da6d\",\"sha256\":\"1f82bb0bfa1d6af7c773a4d7939cef6c533f794e8589aabc86ec23c0e49add4f\"},\"downloads\":-1,\"filename\":\"weave-0.51.5-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"c5a1b5ba39ca825fce816f9304e3da6d\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31434199,\"upload_time\":\"2024-09-11T19:56:43\",\"upload_time_iso_8601\":\"2024-09-11T19:56:43.806290Z\",\"url\":\"https://files.pythonhosted.org/packages/31/23/d1fad30204911b89333bd87b8e411435f37e0eae9ca99b99f2137abde08e/weave-0.51.5-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"5633d521f72844b5f852eb3d7fb624a3063c305ef1b49857e9b1f1ff0d861889\",\"md5\":\"3fb4be929206e7c347069879debbf2fe\",\"sha256\":\"e5e4087bab834b8fcaecd19365a78b95b5a5175f58975df7f24648b395cf9c9e\"},\"downloads\":-1,\"filename\":\"weave-0.51.5.tar.gz\",\"has_sig\":false,\"md5_digest\":\"3fb4be929206e7c347069879debbf2fe\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30677801,\"upload_time\":\"2024-09-11T19:56:47\",\"upload_time_iso_8601\":\"2024-09-11T19:56:47.446641Z\",\"url\":\"https://files.pythonhosted.org/packages/56/33/d521f72844b5f852eb3d7fb624a3063c305ef1b49857e9b1f1ff0d861889/weave-0.51.5.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.6\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"8038a65cb9fab8f05bc5b8860b43e54954856ea9b919dcc5b46dccc14b319125\",\"md5\":\"40d3fac8f1f5017b469479db45890474\",\"sha256\":\"d6c28022e65fc63ea8efaf589a1ebe2d6e1ed3aad381c66dd4f02327611b8d93\"},\"downloads\":-1,\"filename\":\"weave-0.51.6-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"40d3fac8f1f5017b469479db45890474\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31452404,\"upload_time\":\"2024-09-12T18:33:26\",\"upload_time_iso_8601\":\"2024-09-12T18:33:26.867985Z\",\"url\":\"https://files.pythonhosted.org/packages/80/38/a65cb9fab8f05bc5b8860b43e54954856ea9b919dcc5b46dccc14b319125/weave-0.51.6-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"d66ab0891bcf4fec6b3abb3d9cf8c9dc737662cce2029d11803dd3173ed41764\",\"md5\":\"673cfec72f2b10a89c03ebee2b81906d\",\"sha256\":\"7f6593c41d0a7d171326e168a465d804ee321246c3d1fc95ed47b447db2ed2e7\"},\"downloads\":-1,\"filename\":\"weave-0.51.6.tar.gz\",\"has_sig\":false,\"md5_digest\":\"673cfec72f2b10a89c03ebee2b81906d\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30692050,\"upload_time\":\"2024-09-12T18:33:35\",\"upload_time_iso_8601\":\"2024-09-12T18:33:35.934480Z\",\"url\":\"https://files.pythonhosted.org/packages/d6/6a/b0891bcf4fec6b3abb3d9cf8c9dc737662cce2029d11803dd3173ed41764/weave-0.51.6.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.7\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"264314f86445daeda89d2069b890ef7e4b3fe663b779490c4cc8956ac32ae854\",\"md5\":\"071516a49cb6b56382b8e43b8b991bfe\",\"sha256\":\"ecf02a068b6ad3c559b4992e0a3938181a3ab9336cde7b12299bce208828e1ef\"},\"downloads\":-1,\"filename\":\"weave-0.51.7-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"071516a49cb6b56382b8e43b8b991bfe\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31461209,\"upload_time\":\"2024-09-16T22:55:03\",\"upload_time_iso_8601\":\"2024-09-16T22:55:03.514338Z\",\"url\":\"https://files.pythonhosted.org/packages/26/43/14f86445daeda89d2069b890ef7e4b3fe663b779490c4cc8956ac32ae854/weave-0.51.7-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"68ed09e78488dc22acd37e5d395cb62be5ba53c683859f91b3925f6a6ab17641\",\"md5\":\"daf1e688a3eeadfa45927bb0585e4afe\",\"sha256\":\"d81d92978aacc5e508bf21cc53b417a35eaec8810141b48c8cf2d258594622bb\"},\"downloads\":-1,\"filename\":\"weave-0.51.7.tar.gz\",\"has_sig\":false,\"md5_digest\":\"daf1e688a3eeadfa45927bb0585e4afe\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30698021,\"upload_time\":\"2024-09-16T22:55:06\",\"upload_time_iso_8601\":\"2024-09-16T22:55:06.773032Z\",\"url\":\"https://files.pythonhosted.org/packages/68/ed/09e78488dc22acd37e5d395cb62be5ba53c683859f91b3925f6a6ab17641/weave-0.51.7.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.8\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"8a4584172335fdf65ad8a5c22cfe8615384d2449908b2398598d0fd50b989c05\",\"md5\":\"8a5a0d8140b824d6c24be9985d382281\",\"sha256\":\"fcc72470d94f897e8af4769275d563ecf2e956b1a29812736cb74f328c8bcd07\"},\"downloads\":-1,\"filename\":\"weave-0.51.8-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"8a5a0d8140b824d6c24be9985d382281\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31481288,\"upload_time\":\"2024-09-20T16:01:49\",\"upload_time_iso_8601\":\"2024-09-20T16:01:49.378030Z\",\"url\":\"https://files.pythonhosted.org/packages/8a/45/84172335fdf65ad8a5c22cfe8615384d2449908b2398598d0fd50b989c05/weave-0.51.8-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"558833d520801edfc59aee3371b8f809399aa209e21fc35f6b5ec14656c46f88\",\"md5\":\"587f74dde69efee407df1222247c27ea\",\"sha256\":\"ff96bf3329690ac3d9a683367ea39bfa75456b876aeb35504a9440a9fb8f7894\"},\"downloads\":-1,\"filename\":\"weave-0.51.8.tar.gz\",\"has_sig\":false,\"md5_digest\":\"587f74dde69efee407df1222247c27ea\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30717211,\"upload_time\":\"2024-09-20T16:01:53\",\"upload_time_iso_8601\":\"2024-09-20T16:01:53.044014Z\",\"url\":\"https://files.pythonhosted.org/packages/55/88/33d520801edfc59aee3371b8f809399aa209e21fc35f6b5ec14656c46f88/weave-0.51.8.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.9\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"6eaaec01e7ddaf75493b3b6c07a003fec7d9319bf90522a78348fffe0436e98d\",\"md5\":\"25f7168c5951718ddc82cdb7d4c2bf1e\",\"sha256\":\"72ef515c4754e38ba238d330c2776758497921e85d81f59a987925a91e3cb4ff\"},\"downloads\":-1,\"filename\":\"weave-0.51.9-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"25f7168c5951718ddc82cdb7d4c2bf1e\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31524455,\"upload_time\":\"2024-09-25T17:31:07\",\"upload_time_iso_8601\":\"2024-09-25T17:31:07.083107Z\",\"url\":\"https://files.pythonhosted.org/packages/6e/aa/ec01e7ddaf75493b3b6c07a003fec7d9319bf90522a78348fffe0436e98d/weave-0.51.9-py3-none-any.whl\",\"yanked\":true,\"yanked_reason\":\"bug
+        in eval\"}],\"0.50.9\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"a889acc7594612ae4e527825ee96867ac720047fc7bdbd1e952f20c07b36692d\",\"md5\":\"0fa4de7610a689d39fb8b077bf9067e6\",\"sha256\":\"f429571c4bc3a992dd0eb0fb43f48644de9a586d03c0dcadfa79d97842b2e68e\"},\"downloads\":-1,\"filename\":\"weave-0.50.9-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"0fa4de7610a689d39fb8b077bf9067e6\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":29829029,\"upload_time\":\"2024-07-11T16:02:48\",\"upload_time_iso_8601\":\"2024-07-11T16:02:48.383674Z\",\"url\":\"https://files.pythonhosted.org/packages/a8/89/acc7594612ae4e527825ee96867ac720047fc7bdbd1e952f20c07b36692d/weave-0.50.9-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"d6e6ba9e73349369c6014a54aca653b9a819ccbd045f68a4d90a54247fde8281\",\"md5\":\"6bef845389f84bda34480771b278659c\",\"sha256\":\"31635aed22d387e329e416003640335b5fd582ba020a27dedd0983b2eb02cc77\"},\"downloads\":-1,\"filename\":\"weave-0.50.9.tar.gz\",\"has_sig\":false,\"md5_digest\":\"6bef845389f84bda34480771b278659c\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":29209539,\"upload_time\":\"2024-07-11T16:02:52\",\"upload_time_iso_8601\":\"2024-07-11T16:02:52.305429Z\",\"url\":\"https://files.pythonhosted.org/packages/d6/e6/ba9e73349369c6014a54aca653b9a819ccbd045f68a4d90a54247fde8281/weave-0.50.9.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.0\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"11afbbf4365668fe19a8875f5192d6d25357654365606d68043e2e493751bac0\",\"md5\":\"5c05f52662bcf984d41c0a429175339d\",\"sha256\":\"bbb4320a645b59d06a0d9c8bbcaab8a06c41e9500444b48e49bcc3c6295a9dbc\"},\"downloads\":-1,\"filename\":\"weave-0.51.0-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"5c05f52662bcf984d41c0a429175339d\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31402433,\"upload_time\":\"2024-08-29T02:32:19\",\"upload_time_iso_8601\":\"2024-08-29T02:32:19.574642Z\",\"url\":\"https://files.pythonhosted.org/packages/11/af/bbf4365668fe19a8875f5192d6d25357654365606d68043e2e493751bac0/weave-0.51.0-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"56c2ca827eb9423893ddf4e44482d2171d457c36218a56a2b13fbcd73efd8a04\",\"md5\":\"621c7ee981158d7f1a9c0557c733ff1f\",\"sha256\":\"197da66bffbc0ce8db69c1b4751e1151e21832ee4fca7ce40513730fa63c8fc0\"},\"downloads\":-1,\"filename\":\"weave-0.51.0.tar.gz\",\"has_sig\":false,\"md5_digest\":\"621c7ee981158d7f1a9c0557c733ff1f\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30653450,\"upload_time\":\"2024-08-29T02:32:22\",\"upload_time_iso_8601\":\"2024-08-29T02:32:22.820189Z\",\"url\":\"https://files.pythonhosted.org/packages/56/c2/ca827eb9423893ddf4e44482d2171d457c36218a56a2b13fbcd73efd8a04/weave-0.51.0.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.1\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"60b78c25fd9c9254ed1e39f1bf08a0b6101cc0be49a8ede0f6705adb59cd1351\",\"md5\":\"2778f1a961ea0056f8b02d1317b344df\",\"sha256\":\"f37a2e2baf4c6f3e46fe234a058420f6ef3c44cb4c3af128304259e1542d138c\"},\"downloads\":-1,\"filename\":\"weave-0.51.1-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"2778f1a961ea0056f8b02d1317b344df\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31402485,\"upload_time\":\"2024-08-29T15:59:11\",\"upload_time_iso_8601\":\"2024-08-29T15:59:11.205639Z\",\"url\":\"https://files.pythonhosted.org/packages/60/b7/8c25fd9c9254ed1e39f1bf08a0b6101cc0be49a8ede0f6705adb59cd1351/weave-0.51.1-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"66b5151aec6110e1aa93f5514fdee8e673a7ef8e3f96792e3805a2d0262518ec\",\"md5\":\"50f6773a009cb5dfca7eec33c7cc635a\",\"sha256\":\"3e9f70753383274e81cbbc08a2b3599e7ab1d42cb0c9429293d06d3430091611\"},\"downloads\":-1,\"filename\":\"weave-0.51.1.tar.gz\",\"has_sig\":false,\"md5_digest\":\"50f6773a009cb5dfca7eec33c7cc635a\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30653550,\"upload_time\":\"2024-08-29T15:59:16\",\"upload_time_iso_8601\":\"2024-08-29T15:59:16.608748Z\",\"url\":\"https://files.pythonhosted.org/packages/66/b5/151aec6110e1aa93f5514fdee8e673a7ef8e3f96792e3805a2d0262518ec/weave-0.51.1.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.10\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"5b9b1c49a4082ec9b34b0334633d6b944d03085a7cb90302015793fbda175f6c\",\"md5\":\"95ba5594ecb618ae6505123c9ed4ccb0\",\"sha256\":\"b35642a1e4eb73f03c7d369164a9c7393b6a3f3fad8f5d7dea5827bcb632be21\"},\"downloads\":-1,\"filename\":\"weave-0.51.10-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"95ba5594ecb618ae6505123c9ed4ccb0\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31547950,\"upload_time\":\"2024-09-26T20:00:04\",\"upload_time_iso_8601\":\"2024-09-26T20:00:04.502952Z\",\"url\":\"https://files.pythonhosted.org/packages/5b/9b/1c49a4082ec9b34b0334633d6b944d03085a7cb90302015793fbda175f6c/weave-0.51.10-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"132adb3317ef06adccb4addadd0688240da1bbc6785a857c299fe484111617e1\",\"md5\":\"7eb2d94649bcc73528dc6b043c18077f\",\"sha256\":\"406379b2a578ec0bc22dd2a464cbef9ac5ad8c59a48cea6b2de3ebb03e43a078\"},\"downloads\":-1,\"filename\":\"weave-0.51.10.tar.gz\",\"has_sig\":false,\"md5_digest\":\"7eb2d94649bcc73528dc6b043c18077f\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30777036,\"upload_time\":\"2024-09-26T20:00:07\",\"upload_time_iso_8601\":\"2024-09-26T20:00:07.855168Z\",\"url\":\"https://files.pythonhosted.org/packages/13/2a/db3317ef06adccb4addadd0688240da1bbc6785a857c299fe484111617e1/weave-0.51.10.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.12\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"3eeacacdbc795cd310aa9dffd7b5483b97321e35664bf3b4533258e6bd0ca7e7\",\"md5\":\"53d97ae22617ce26a079529a0d8f6689\",\"sha256\":\"d508359419496064d80fe3161016504fc787c36807735245c0708f2cd1fa44a6\"},\"downloads\":-1,\"filename\":\"weave-0.51.12-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"53d97ae22617ce26a079529a0d8f6689\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":982281,\"upload_time\":\"2024-09-30T23:21:22\",\"upload_time_iso_8601\":\"2024-09-30T23:21:22.519959Z\",\"url\":\"https://files.pythonhosted.org/packages/3e/ea/cacdbc795cd310aa9dffd7b5483b97321e35664bf3b4533258e6bd0ca7e7/weave-0.51.12-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"b226731eb697a0033aac04b9aff91c0ceb3bc13cb354cd15e86fe3c0305c0585\",\"md5\":\"d71d1fb9c4dbf8bc665cd5b63c88cb2f\",\"sha256\":\"aef8068889cd88c0a3928ca06059077cf1ba1a05bfb40b21e907d2a2b9b1ac67\"},\"downloads\":-1,\"filename\":\"weave-0.51.12.tar.gz\",\"has_sig\":false,\"md5_digest\":\"d71d1fb9c4dbf8bc665cd5b63c88cb2f\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":29494789,\"upload_time\":\"2024-09-30T23:21:25\",\"upload_time_iso_8601\":\"2024-09-30T23:21:25.678079Z\",\"url\":\"https://files.pythonhosted.org/packages/b2/26/731eb697a0033aac04b9aff91c0ceb3bc13cb354cd15e86fe3c0305c0585/weave-0.51.12.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.2\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"68f496fbec796a4cf01ae28d2b3899a5c61a76feeed03a179d83278640d1cd9c\",\"md5\":\"6cd087b35d7bcde81cf87b5fe13138ae\",\"sha256\":\"3aff932ccf77fdc1925893ed3115064f36436517c14f01328441883f71ef7aff\"},\"downloads\":-1,\"filename\":\"weave-0.51.2-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"6cd087b35d7bcde81cf87b5fe13138ae\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31409244,\"upload_time\":\"2024-09-04T16:36:14\",\"upload_time_iso_8601\":\"2024-09-04T16:36:14.832121Z\",\"url\":\"https://files.pythonhosted.org/packages/68/f4/96fbec796a4cf01ae28d2b3899a5c61a76feeed03a179d83278640d1cd9c/weave-0.51.2-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"81c7587d0c7ae0cfaa1dd3c5cdfa4c2b738c0e2d52caee919d0779083f2ad136\",\"md5\":\"ef9ebdde7967412b87cd880d0aa20334\",\"sha256\":\"a38997131f965c387323ccc10f9be71ba8a9fd21e4e8061a676a5b17055e6e1f\"},\"downloads\":-1,\"filename\":\"weave-0.51.2.tar.gz\",\"has_sig\":false,\"md5_digest\":\"ef9ebdde7967412b87cd880d0aa20334\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30656419,\"upload_time\":\"2024-09-04T16:36:19\",\"upload_time_iso_8601\":\"2024-09-04T16:36:19.071842Z\",\"url\":\"https://files.pythonhosted.org/packages/81/c7/587d0c7ae0cfaa1dd3c5cdfa4c2b738c0e2d52caee919d0779083f2ad136/weave-0.51.2.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.5\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"3123d1fad30204911b89333bd87b8e411435f37e0eae9ca99b99f2137abde08e\",\"md5\":\"c5a1b5ba39ca825fce816f9304e3da6d\",\"sha256\":\"1f82bb0bfa1d6af7c773a4d7939cef6c533f794e8589aabc86ec23c0e49add4f\"},\"downloads\":-1,\"filename\":\"weave-0.51.5-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"c5a1b5ba39ca825fce816f9304e3da6d\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31434199,\"upload_time\":\"2024-09-11T19:56:43\",\"upload_time_iso_8601\":\"2024-09-11T19:56:43.806290Z\",\"url\":\"https://files.pythonhosted.org/packages/31/23/d1fad30204911b89333bd87b8e411435f37e0eae9ca99b99f2137abde08e/weave-0.51.5-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"5633d521f72844b5f852eb3d7fb624a3063c305ef1b49857e9b1f1ff0d861889\",\"md5\":\"3fb4be929206e7c347069879debbf2fe\",\"sha256\":\"e5e4087bab834b8fcaecd19365a78b95b5a5175f58975df7f24648b395cf9c9e\"},\"downloads\":-1,\"filename\":\"weave-0.51.5.tar.gz\",\"has_sig\":false,\"md5_digest\":\"3fb4be929206e7c347069879debbf2fe\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30677801,\"upload_time\":\"2024-09-11T19:56:47\",\"upload_time_iso_8601\":\"2024-09-11T19:56:47.446641Z\",\"url\":\"https://files.pythonhosted.org/packages/56/33/d521f72844b5f852eb3d7fb624a3063c305ef1b49857e9b1f1ff0d861889/weave-0.51.5.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.6\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"8038a65cb9fab8f05bc5b8860b43e54954856ea9b919dcc5b46dccc14b319125\",\"md5\":\"40d3fac8f1f5017b469479db45890474\",\"sha256\":\"d6c28022e65fc63ea8efaf589a1ebe2d6e1ed3aad381c66dd4f02327611b8d93\"},\"downloads\":-1,\"filename\":\"weave-0.51.6-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"40d3fac8f1f5017b469479db45890474\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31452404,\"upload_time\":\"2024-09-12T18:33:26\",\"upload_time_iso_8601\":\"2024-09-12T18:33:26.867985Z\",\"url\":\"https://files.pythonhosted.org/packages/80/38/a65cb9fab8f05bc5b8860b43e54954856ea9b919dcc5b46dccc14b319125/weave-0.51.6-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"d66ab0891bcf4fec6b3abb3d9cf8c9dc737662cce2029d11803dd3173ed41764\",\"md5\":\"673cfec72f2b10a89c03ebee2b81906d\",\"sha256\":\"7f6593c41d0a7d171326e168a465d804ee321246c3d1fc95ed47b447db2ed2e7\"},\"downloads\":-1,\"filename\":\"weave-0.51.6.tar.gz\",\"has_sig\":false,\"md5_digest\":\"673cfec72f2b10a89c03ebee2b81906d\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30692050,\"upload_time\":\"2024-09-12T18:33:35\",\"upload_time_iso_8601\":\"2024-09-12T18:33:35.934480Z\",\"url\":\"https://files.pythonhosted.org/packages/d6/6a/b0891bcf4fec6b3abb3d9cf8c9dc737662cce2029d11803dd3173ed41764/weave-0.51.6.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.7\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"264314f86445daeda89d2069b890ef7e4b3fe663b779490c4cc8956ac32ae854\",\"md5\":\"071516a49cb6b56382b8e43b8b991bfe\",\"sha256\":\"ecf02a068b6ad3c559b4992e0a3938181a3ab9336cde7b12299bce208828e1ef\"},\"downloads\":-1,\"filename\":\"weave-0.51.7-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"071516a49cb6b56382b8e43b8b991bfe\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31461209,\"upload_time\":\"2024-09-16T22:55:03\",\"upload_time_iso_8601\":\"2024-09-16T22:55:03.514338Z\",\"url\":\"https://files.pythonhosted.org/packages/26/43/14f86445daeda89d2069b890ef7e4b3fe663b779490c4cc8956ac32ae854/weave-0.51.7-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"68ed09e78488dc22acd37e5d395cb62be5ba53c683859f91b3925f6a6ab17641\",\"md5\":\"daf1e688a3eeadfa45927bb0585e4afe\",\"sha256\":\"d81d92978aacc5e508bf21cc53b417a35eaec8810141b48c8cf2d258594622bb\"},\"downloads\":-1,\"filename\":\"weave-0.51.7.tar.gz\",\"has_sig\":false,\"md5_digest\":\"daf1e688a3eeadfa45927bb0585e4afe\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30698021,\"upload_time\":\"2024-09-16T22:55:06\",\"upload_time_iso_8601\":\"2024-09-16T22:55:06.773032Z\",\"url\":\"https://files.pythonhosted.org/packages/68/ed/09e78488dc22acd37e5d395cb62be5ba53c683859f91b3925f6a6ab17641/weave-0.51.7.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.8\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"8a4584172335fdf65ad8a5c22cfe8615384d2449908b2398598d0fd50b989c05\",\"md5\":\"8a5a0d8140b824d6c24be9985d382281\",\"sha256\":\"fcc72470d94f897e8af4769275d563ecf2e956b1a29812736cb74f328c8bcd07\"},\"downloads\":-1,\"filename\":\"weave-0.51.8-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"8a5a0d8140b824d6c24be9985d382281\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31481288,\"upload_time\":\"2024-09-20T16:01:49\",\"upload_time_iso_8601\":\"2024-09-20T16:01:49.378030Z\",\"url\":\"https://files.pythonhosted.org/packages/8a/45/84172335fdf65ad8a5c22cfe8615384d2449908b2398598d0fd50b989c05/weave-0.51.8-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"558833d520801edfc59aee3371b8f809399aa209e21fc35f6b5ec14656c46f88\",\"md5\":\"587f74dde69efee407df1222247c27ea\",\"sha256\":\"ff96bf3329690ac3d9a683367ea39bfa75456b876aeb35504a9440a9fb8f7894\"},\"downloads\":-1,\"filename\":\"weave-0.51.8.tar.gz\",\"has_sig\":false,\"md5_digest\":\"587f74dde69efee407df1222247c27ea\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30717211,\"upload_time\":\"2024-09-20T16:01:53\",\"upload_time_iso_8601\":\"2024-09-20T16:01:53.044014Z\",\"url\":\"https://files.pythonhosted.org/packages/55/88/33d520801edfc59aee3371b8f809399aa209e21fc35f6b5ec14656c46f88/weave-0.51.8.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"0.51.9\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"6eaaec01e7ddaf75493b3b6c07a003fec7d9319bf90522a78348fffe0436e98d\",\"md5\":\"25f7168c5951718ddc82cdb7d4c2bf1e\",\"sha256\":\"72ef515c4754e38ba238d330c2776758497921e85d81f59a987925a91e3cb4ff\"},\"downloads\":-1,\"filename\":\"weave-0.51.9-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"25f7168c5951718ddc82cdb7d4c2bf1e\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31524455,\"upload_time\":\"2024-09-25T17:31:07\",\"upload_time_iso_8601\":\"2024-09-25T17:31:07.083107Z\",\"url\":\"https://files.pythonhosted.org/packages/6e/aa/ec01e7ddaf75493b3b6c07a003fec7d9319bf90522a78348fffe0436e98d/weave-0.51.9-py3-none-any.whl\",\"yanked\":true,\"yanked_reason\":\"bug
         with non-async openai calls\"},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"611782dfa09aee57365ff0937d3a4dbc5cd4abf5fe044d0074ad60b990f97360\",\"md5\":\"8288a8c2eeaca8b8220705f6c3f29fd1\",\"sha256\":\"b44fe9f07cb4da072dbe617749709ea8177e1789f762c0d7d08563992655a097\"},\"downloads\":-1,\"filename\":\"weave-0.51.9.tar.gz\",\"has_sig\":false,\"md5_digest\":\"8288a8c2eeaca8b8220705f6c3f29fd1\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30754786,\"upload_time\":\"2024-09-25T17:31:11\",\"upload_time_iso_8601\":\"2024-09-25T17:31:11.188779Z\",\"url\":\"https://files.pythonhosted.org/packages/61/17/82dfa09aee57365ff0937d3a4dbc5cd4abf5fe044d0074ad60b990f97360/weave-0.51.9.tar.gz\",\"yanked\":true,\"yanked_reason\":\"bug
-        with non-async openai calls\"}]},\"urls\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"5b9b1c49a4082ec9b34b0334633d6b944d03085a7cb90302015793fbda175f6c\",\"md5\":\"95ba5594ecb618ae6505123c9ed4ccb0\",\"sha256\":\"b35642a1e4eb73f03c7d369164a9c7393b6a3f3fad8f5d7dea5827bcb632be21\"},\"downloads\":-1,\"filename\":\"weave-0.51.10-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"95ba5594ecb618ae6505123c9ed4ccb0\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":31547950,\"upload_time\":\"2024-09-26T20:00:04\",\"upload_time_iso_8601\":\"2024-09-26T20:00:04.502952Z\",\"url\":\"https://files.pythonhosted.org/packages/5b/9b/1c49a4082ec9b34b0334633d6b944d03085a7cb90302015793fbda175f6c/weave-0.51.10-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"132adb3317ef06adccb4addadd0688240da1bbc6785a857c299fe484111617e1\",\"md5\":\"7eb2d94649bcc73528dc6b043c18077f\",\"sha256\":\"406379b2a578ec0bc22dd2a464cbef9ac5ad8c59a48cea6b2de3ebb03e43a078\"},\"downloads\":-1,\"filename\":\"weave-0.51.10.tar.gz\",\"has_sig\":false,\"md5_digest\":\"7eb2d94649bcc73528dc6b043c18077f\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":30777036,\"upload_time\":\"2024-09-26T20:00:07\",\"upload_time_iso_8601\":\"2024-09-26T20:00:07.855168Z\",\"url\":\"https://files.pythonhosted.org/packages/13/2a/db3317ef06adccb4addadd0688240da1bbc6785a857c299fe484111617e1/weave-0.51.10.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"vulnerabilities\":[]}\n"
+        with non-async openai calls\"}]},\"urls\":[{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"3eeacacdbc795cd310aa9dffd7b5483b97321e35664bf3b4533258e6bd0ca7e7\",\"md5\":\"53d97ae22617ce26a079529a0d8f6689\",\"sha256\":\"d508359419496064d80fe3161016504fc787c36807735245c0708f2cd1fa44a6\"},\"downloads\":-1,\"filename\":\"weave-0.51.12-py3-none-any.whl\",\"has_sig\":false,\"md5_digest\":\"53d97ae22617ce26a079529a0d8f6689\",\"packagetype\":\"bdist_wheel\",\"python_version\":\"py3\",\"requires_python\":\">=3.9\",\"size\":982281,\"upload_time\":\"2024-09-30T23:21:22\",\"upload_time_iso_8601\":\"2024-09-30T23:21:22.519959Z\",\"url\":\"https://files.pythonhosted.org/packages/3e/ea/cacdbc795cd310aa9dffd7b5483b97321e35664bf3b4533258e6bd0ca7e7/weave-0.51.12-py3-none-any.whl\",\"yanked\":false,\"yanked_reason\":null},{\"comment_text\":\"\",\"digests\":{\"blake2b_256\":\"b226731eb697a0033aac04b9aff91c0ceb3bc13cb354cd15e86fe3c0305c0585\",\"md5\":\"d71d1fb9c4dbf8bc665cd5b63c88cb2f\",\"sha256\":\"aef8068889cd88c0a3928ca06059077cf1ba1a05bfb40b21e907d2a2b9b1ac67\"},\"downloads\":-1,\"filename\":\"weave-0.51.12.tar.gz\",\"has_sig\":false,\"md5_digest\":\"d71d1fb9c4dbf8bc665cd5b63c88cb2f\",\"packagetype\":\"sdist\",\"python_version\":\"source\",\"requires_python\":\">=3.9\",\"size\":29494789,\"upload_time\":\"2024-09-30T23:21:25\",\"upload_time_iso_8601\":\"2024-09-30T23:21:25.678079Z\",\"url\":\"https://files.pythonhosted.org/packages/b2/26/731eb697a0033aac04b9aff91c0ceb3bc13cb354cd15e86fe3c0305c0585/weave-0.51.12.tar.gz\",\"yanked\":false,\"yanked_reason\":null}],\"vulnerabilities\":[]}\n"
     headers:
       Accept-Ranges:
       - bytes
@@ -681,7 +653,7 @@ interactions:
       Content-Encoding:
       - gzip
       Content-Length:
-      - '21396'
+      - '21186'
       Content-Security-Policy:
       - base-uri 'self'; connect-src 'self' https://api.github.com/repos/ https://api.github.com/search/issues
         https://gitlab.com/api/ https://*.google-analytics.com https://*.analytics.google.com
@@ -702,9 +674,9 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Mon, 30 Sep 2024 22:17:06 GMT
+      - Tue, 01 Oct 2024 01:04:11 GMT
       ETag:
-      - '"5r8dqpgdJJ0JdKc6678KfA"'
+      - '"vzH/gPRnhWtO5UtcjYzHhA"'
       Permissions-Policy:
       - publickey-credentials-create=(self),publickey-credentials-get=(self),accelerometer=(),ambient-light-sensor=(),autoplay=(),battery=(),camera=(),display-capture=(),document-domain=(),encrypted-media=(),execution-while-not-rendered=(),execution-while-out-of-viewport=(),fullscreen=(),gamepad=(),geolocation=(),gyroscope=(),hid=(),identity-credentials-get=(),idle-detection=(),local-fonts=(),magnetometer=(),microphone=(),midi=(),otp-credentials=(),payment=(),picture-in-picture=(),screen-wake-lock=(),serial=(),speaker-selection=(),storage-access=(),usb=(),web-share=(),xr-spatial-tracking=()
       Referrer-Policy:
@@ -716,7 +688,7 @@ interactions:
       X-Cache:
       - HIT, HIT
       X-Cache-Hits:
-      - 161, 0
+      - 16, 0
       X-Content-Type-Options:
       - nosniff
       X-Frame-Options:
@@ -724,18 +696,604 @@ interactions:
       X-Permitted-Cross-Domain-Policies:
       - none
       X-PyPI-Last-Serial:
-      - '25210571'
+      - '25265766'
       X-Served-By:
-      - cache-iad-kiad7000161-IAD, cache-ewr-kewr1740044-EWR
+      - cache-iad-kiad7000161-IAD, cache-ewr-kewr1740070-EWR
       X-Timer:
-      - S1727734627.831422,VS0,VE1
+      - S1727744651.222134,VS0,VE1
       X-XSS-Protection:
       - 1; mode=block
     status:
       code: 200
       message: OK
 - request:
-    body: '{"project_id":"notdiamond/dev_testing","filter":{"op_names":null,"input_refs":null,"output_refs":null,"parent_ids":null,"trace_ids":null,"call_ids":null,"trace_roots_only":null,"wb_user_ids":null,"wb_run_ids":null},"limit":1000,"offset":0,"sort_by":null,"query":null,"include_costs":false,"include_feedback":false,"columns":null,"expand_columns":null}'
+    body: "--1b37ece5766f21ce78b4d8624f1a587f\r\nContent-Disposition: form-data; name=\"project_id\"\r\n\r\nnotdiamond/dev_testing\r\n--1b37ece5766f21ce78b4d8624f1a587f\r\nContent-Disposition:
+      form-data; name=\"file\"; filename=\"obj.py\"\r\n\r\nimport weave\n\n\n@weave.op()\n@classmethod\ndef
+      from_string(cls, llm_provider: str):\n    \"\"\"\n    We allow our users to
+      specify LLM providers for NotDiamond in the string format 'provider_name/model_name',\n
+      \   as example 'openai/gpt-3.5-turbo'. Underlying our workflows we want to ensure
+      we use LLMConfig as\n    the base type, so this class method converts a string
+      specification of an LLM provider into an\n    LLMConfig object.\n\n    Args:\n
+      \       llm_provider (str): this is the string definition of the LLM provider\n\n
+      \   Returns:\n        LLMConfig: initialized object with correct provider and
+      model\n    \"\"\"\n    split_items = llm_provider.split(\"/\")\n    if len(split_items)
+      not in [2, 3]:\n        raise ValueError(\n            f\"Expected string of
+      format 'provider/model' or 'prefix/provider/model' but got {llm_provider}\"\n
+      \       )\n    elif len(split_items) == 3:\n        _, provider, model = split_items\n
+      \   else:\n        provider = split_items[0]\n        model = split_items[1]\n
+      \   return cls(provider=provider, model=model)\n\r\n--1b37ece5766f21ce78b4d8624f1a587f--\r\n"
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1280'
+      Content-Type:
+      - multipart/form-data; boundary=1b37ece5766f21ce78b4d8624f1a587f
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/files/create
+  response:
+    body:
+      string: '{"digest":"55PAbrMO3jgJFRqPKuenyYB7YXJI5OrvE8WEYURzJG4"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '56'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:11 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - ef2c05b6df0a558bdbc9ac931e69337a
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"obj":{"project_id":"notdiamond/dev_testing","object_id":"from_string","val":{"_type":"CustomWeaveType","weave_type":{"type":"Op"},"files":{"obj.py":"55PAbrMO3jgJFRqPKuenyYB7YXJI5OrvE8WEYURzJG4"}}}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '199'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/obj/create
+  response:
+    body:
+      string: '{"digest":"wpogeb0sneHz1sX1Yu2dvq3oeNzLkyiFj2UuzGleGY8"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '56'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:11 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - b35884092d8c9ff7c7b2b2979e707ee7;o=1
+    status:
+      code: 200
+      message: OK
+- request:
+    body: "--e09197d25d61d5424ce704f3efcdeae1\r\nContent-Disposition: form-data; name=\"project_id\"\r\n\r\nnotdiamond/dev_testing\r\n--e09197d25d61d5424ce704f3efcdeae1\r\nContent-Disposition:
+      form-data; name=\"file\"; filename=\"obj.py\"\r\n\r\nimport weave\nfrom typing
+      import Optional\nfrom notdiamond.exceptions import UnsupportedLLMProvider\nimport
+      notdiamond.settings as settings\n\nPOSSIBLE_PROVIDERS = [\n    \"openai\",\n
+      \   \"anthropic\",\n    \"google\",\n    \"cohere\",\n    \"mistral\",\n    \"togetherai\",\n
+      \   \"perplexity\",\n    \"replicate\"\n]\n\nPOSSIBLE_MODELS = [\n    \"gpt-3.5-turbo\",\n
+      \   \"gpt-3.5-turbo-0125\",\n    \"gpt-4\",\n    \"gpt-4-0613\",\n    \"gpt-4-turbo\",\n
+      \   \"gpt-4-turbo-2024-04-09\",\n    \"gpt-4o\",\n    \"gpt-4o-2024-05-13\",\n
+      \   \"gpt-4o-2024-08-06\",\n    \"gpt-4o-mini\",\n    \"gpt-4o-mini-2024-07-18\",\n
+      \   \"gpt-4-turbo-preview\",\n    \"gpt-4-0125-preview\",\n    \"gpt-4-1106-preview\",\n
+      \   \"o1-preview\",\n    \"o1-preview-2024-09-12\",\n    \"o1-mini\",\n    \"o1-mini-2024-09-12\",\n
+      \   \"gpt-3.5-turbo\",\n    \"gpt-3.5-turbo-0125\",\n    \"gpt-4\",\n    \"gpt-4-0613\",\n
+      \   \"gpt-4-turbo\",\n    \"gpt-4-turbo-2024-04-09\",\n    \"gpt-4o\",\n    \"gpt-4o-2024-05-13\",\n
+      \   \"gpt-4o-2024-08-06\",\n    \"gpt-4o-mini\",\n    \"gpt-4o-mini-2024-07-18\",\n
+      \   \"gpt-4-turbo-preview\",\n    \"gpt-4-0125-preview\",\n    \"gpt-4-1106-preview\",\n
+      \   \"o1-preview\",\n    \"o1-preview-2024-09-12\",\n    \"o1-mini\",\n    \"o1-mini-2024-09-12\",\n
+      \   \"gpt-3.5-turbo\",\n    \"gpt-3.5-turbo-0125\",\n    \"gpt-4\",\n    \"gpt-4-0613\",\n
+      \   \"gpt-4-turbo\",\n    \"gpt-4-turbo-2024-04-09\",\n    \"gpt-4o\",\n    \"gpt-4o-2024-05-13\",\n
+      \   \"gpt-4o-2024-08-06\",\n    \"gpt-4o-mini\",\n    \"gpt-4o-mini-2024-07-18\",\n
+      \   \"gpt-4-turbo-preview\",\n    \"gpt-4-0125-preview\",\n    \"gpt-4-1106-preview\",\n
+      \   \"o1-preview\",\n    \"o1-preview-2024-09-12\",\n    \"o1-mini\",\n    \"o1-mini-2024-09-12\",\n
+      \   \"claude-2.1\",\n    \"claude-3-opus-20240229\",\n    \"claude-3-sonnet-20240229\",\n
+      \   \"claude-3-haiku-20240307\",\n    \"claude-3-5-sonnet-20240620\",\n    \"claude-3-opus-20240229\",\n
+      \   \"claude-3-sonnet-20240229\",\n    \"claude-3-haiku-20240307\",\n    \"claude-3-5-sonnet-20240620\",\n
+      \   \"claude-2.1\",\n    \"claude-3-opus-20240229\",\n    \"gemini-pro\",\n
+      \   \"gemini-1.0-pro-latest\",\n    \"gemini-1.5-pro-latest\",\n    \"gemini-1.5-pro-exp-0801\",\n
+      \   \"gemini-1.5-flash-latest\",\n    \"gemini-pro\",\n    \"gemini-1.0-pro-latest\",\n
+      \   \"gemini-1.5-pro-latest\",\n    \"gemini-1.5-pro-exp-0801\",\n    \"gemini-1.5-flash-latest\",\n
+      \   \"gemini-pro\",\n    \"gemini-1.0-pro-latest\",\n    \"gemini-1.5-pro-latest\",\n
+      \   \"gemini-1.5-pro-exp-0801\",\n    \"gemini-1.5-flash-latest\",\n    \"command-r\",\n
+      \   \"command-r-plus\",\n    \"command-r\",\n    \"command-r-plus\",\n    \"command-r\",\n
+      \   \"command-r-plus\",\n    \"mistral-large-latest\",\n    \"mistral-large-2402\",\n
+      \   \"mistral-large-2407\",\n    \"mistral-medium-latest\",\n    \"mistral-small-latest\",\n
+      \   \"open-mistral-7b\",\n    \"open-mixtral-8x7b\",\n    \"open-mixtral-8x22b\",\n
+      \   \"codestral-latest\",\n    \"mistral-large-latest\",\n    \"mistral-large-2402\",\n
+      \   \"mistral-large-2407\",\n    \"mistral-small-latest\",\n    \"open-mixtral-8x22b\",\n
+      \   \"mistral-large-latest\",\n    \"mistral-large-2402\",\n    \"mistral-large-2407\",\n
+      \   \"mistral-medium-latest\",\n    \"mistral-small-latest\",\n    \"open-mistral-7b\",\n
+      \   \"open-mixtral-8x7b\",\n    \"open-mixtral-8x22b\",\n    \"codestral-latest\",\n
+      \   \"Mistral-7B-Instruct-v0.2\",\n    \"Mixtral-8x7B-Instruct-v0.1\",\n    \"Mixtral-8x22B-Instruct-v0.1\",\n
+      \   \"Llama-3-70b-chat-hf\",\n    \"Llama-3-8b-chat-hf\",\n    \"Qwen2-72B-Instruct\",\n
+      \   \"Meta-Llama-3.1-8B-Instruct-Turbo\",\n    \"Meta-Llama-3.1-70B-Instruct-Turbo\",\n
+      \   \"Meta-Llama-3.1-405B-Instruct-Turbo\",\n    \"llama-3.1-sonar-large-128k-online\",\n
+      \   \"mistral-7b-instruct-v0.2\",\n    \"mixtral-8x7b-instruct-v0.1\",\n    \"meta-llama-3-70b-instruct\",\n
+      \   \"meta-llama-3-8b-instruct\",\n    \"meta-llama-3.1-405b-instruct\"\n]\n\n@weave.op()\ndef
+      __init__(\n    self,\n    provider: str,\n    model: str,\n    is_custom: bool
+      = False,\n    system_prompt: Optional[str] = None,\n    context_length: Optional[int]
+      = None,\n    input_price: Optional[float] = None,\n    output_price: Optional[float]
+      = None,\n    latency: Optional[float] = None,\n    api_key: Optional[str] =
+      None,\n    **kwargs,\n):\n    \"\"\"_summary_\n\n    Args:\n        provider
+      (str): The name of the LLM provider (e.g., \"openai\", \"anthropic\").\n        model
+      (str): The name of the LLM model to use (e.g., \"gpt-3.5-turbo\").\n        is_custom
+      (bool): Whether this is a custom model. Defaults to False.\n        system_prompt
+      (Optional[str], optional): The system prompt to use for the provider. Defaults
+      to None.\n        context_length (Optional[int], optional): Custom context window
+      length for the provider/model.\n        input_price (Optional[float], optional):
+      Custom input price (USD) per million tokens for provider/model.\n        output_price
+      (Optional[float], optional): Custom output price (USD) per million tokens for
+      provider/model.\n        latency (Optional[float], optional): Custom latency
+      (time to first token) for provider/model.\n        api_key (Optional[str], optional):
+      The API key for accessing the LLM provider's services.\n                                            Defaults
+      to None.\n        **kwargs: Additional keyword arguments that might be necessary
+      for specific providers or models.\n\n    Raises:\n        UnsupportedLLMProvider:
+      If the `provider` or `model` specified is not supported.\n    \"\"\"\n    if
+      is_custom:\n        self._openrouter_model = None\n        self.api_key = api_key\n
+      \   else:\n        if provider not in POSSIBLE_PROVIDERS:\n            raise
+      UnsupportedLLMProvider(\n                f\"Given LLM provider {provider} is
+      not in the list of supported providers.\"\n            )\n        if model not
+      in POSSIBLE_MODELS:\n            raise UnsupportedLLMProvider(\n                f\"Given
+      LLM model {model} is not in the list of supported models.\"\n            )\n
+      \       self._openrouter_model = settings.PROVIDERS[provider][\n            \"openrouter_identifier\"\n
+      \       ].get(model, None)\n\n        self.api_key = (\n            api_key\n
+      \           if api_key is not None\n            else settings.PROVIDERS[provider][\"api_key\"]\n
+      \       )\n\n    self.provider = provider\n    self.model = model\n    self.system_prompt
+      = system_prompt\n\n    self.is_custom = is_custom\n    self.context_length =
+      context_length\n    self.input_price = input_price\n    self.output_price =
+      output_price\n    self.latency = latency\n\n    self.kwargs = kwargs\n\r\n--e09197d25d61d5424ce704f3efcdeae1--\r\n"
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '6331'
+      Content-Type:
+      - multipart/form-data; boundary=e09197d25d61d5424ce704f3efcdeae1
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/files/create
+  response:
+    body:
+      string: '{"digest":"uTnpKLuAcrShifswwldYqXm6tyNtGlnpYYADLNcKBlc"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '56'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:12 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - f9eb423aa96c0527fe0746440f258102
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"batch":[{"mode":"start","req":{"start":{"project_id":"notdiamond/dev_testing","id":"0192459b-32b5-71e1-aad4-d955613c5160","op_name":"weave:///notdiamond/dev_testing/op/from_string:wpogeb0sneHz1sX1Yu2dvq3oeNzLkyiFj2UuzGleGY8","display_name":"","trace_id":"0192459b-32b7-7c80-86a0-c6a348511bdc","parent_id":null,"started_at":"2024-10-01T01:04:11.959236Z","attributes":{"weave":{"client_version":"0.51.11-dev0","source":"python-sdk","os_name":"Darwin","os_version":"Darwin
+      Kernel Version 23.6.0: Fri Jul  5 17:55:37 PDT 2024; root:xnu-10063.141.1~2/RELEASE_ARM64_T6030","os_release":"23.6.0","sys_version":"3.11.10
+      (main, Sep 24 2024, 22:22:44) [Clang 16.0.0 (clang-1600.0.26.3)]"}},"inputs":{"llm_provider":"openai/gpt-4o-mini"},"wb_user_id":null,"wb_run_id":null}}}]}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '768'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/call/upsert_batch
+  response:
+    body:
+      string: '{"res":[{"id":"0192459b-32b5-71e1-aad4-d955613c5160","trace_id":"0192459b-32b7-7c80-86a0-c6a348511bdc"}]}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '105'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:12 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - 4a45b671361aad3c52af1ec72486e90c
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"obj":{"project_id":"notdiamond/dev_testing","object_id":"LLMConfig-init","val":{"_type":"CustomWeaveType","weave_type":{"type":"Op"},"files":{"obj.py":"uTnpKLuAcrShifswwldYqXm6tyNtGlnpYYADLNcKBlc"}}}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '202'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/obj/create
+  response:
+    body:
+      string: '{"digest":"U2YL4ujAD3X7itZyCb5Dub4Zbyia6RWuvqATGDjL1oM"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '56'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:12 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - c9c20ea099062463aea9a42cd6594a10
+    status:
+      code: 200
+      message: OK
+- request:
+    body: "--b6275783faf693c4bc9a9a9f78d60742\r\nContent-Disposition: form-data; name=\"project_id\"\r\n\r\nnotdiamond/dev_testing\r\n--b6275783faf693c4bc9a9a9f78d60742\r\nContent-Disposition:
+      form-data; name=\"file\"; filename=\"obj.py\"\r\n\r\nimport weave\nfrom typing
+      import List\nfrom typing import Dict\nfrom typing import Optional\nfrom typing
+      import Any\nfrom notdiamond.llms.config import LLMConfig\nfrom typing import
+      Union\nfrom notdiamond.metrics.metric import Metric\n\nLOGGER = \"<_FixedFindCallerLogger
+      notdiamond.llms.client (INFO)>\"\n\n@weave.op()\ndef model_select(\n    self,\n
+      \   messages: List[Dict[str, str]],\n    input: Optional[Dict[str, Any]] = None,\n
+      \   model: Optional[List[LLMConfig]] = None,\n    default: Optional[Union[LLMConfig,
+      int, str]] = None,\n    max_model_depth: Optional[int] = None,\n    latency_tracking:
+      Optional[bool] = None,\n    hash_content: Optional[bool] = None,\n    tradeoff:
+      Optional[str] = None,\n    preference_id: Optional[str] = None,\n    metric:
+      Metric = Metric(\"accuracy\"),\n    previous_session: Optional[str] = None,\n
+      \   timeout: int = 5,\n    **kwargs,\n) -> tuple[str, Optional[LLMConfig]]:\n
+      \   \"\"\"\n    This function calls the NotDiamond backend to fetch the most
+      suitable model for the given prompt,\n    and leaves the execution of the LLM
+      call to the developer.\n\n    Parameters:\n        messages (List[Dict[str,
+      str]]): List of messages OpenAI style.\n        input (Optional[Dict[str, Any]],
+      optional): If the prompt_template contains variables, use input to specify\n
+      \                                                   the values for those variables.
+      Defaults to None, assuming no\n                                                    variables.\n
+      \       model (Optional[List[LLMConfig]]): List of models to choose from.\n
+      \       default (Optional[Union[LLMConfig, int, str]]): Default LLM.\n        max_model_depth
+      (Optional[int]): If your top recommended model is down, specify up to which
+      depth\n                                            of routing you're willing
+      to go.\n        latency_tracking (Optional[bool]): Latency tracking flag.\n
+      \       hash_content (Optional[bool]): Flag for hashing content before sending
+      to NotDiamond API.\n        tradeoff (Optional[str], optional): Define the \"cost\"
+      or \"latency\" tradeoff\n                                            for the
+      router to determine the best LLM for a given query.\n        preference_id (Optional[str]):
+      The ID of the router preference that was configured via the Dashboard.\n                                        Defaults
+      to None.\n        metric (Metric, optional): Metric used by NotDiamond router
+      to choose the best LLM.\n                                        Defaults to
+      Metric(\"accuracy\").\n        previous_session (Optional[str], optional): The
+      session ID of a previous session, allow you to link requests.\n        timeout
+      (int): The number of seconds to wait before terminating the API call to Not
+      Diamond backend.\n                        Default to 5 seconds.\n        **kwargs:
+      Any other arguments that are supported by Langchain's invoke method, will be
+      passed through.\n\n    Returns:\n        tuple[str, Optional[LLMConfig]]: returns
+      the session_id and the chosen LLM\n    \"\"\"\n    if input is None:\n        input
+      = {}\n\n    if model is not None:\n        llm_configs = self._parse_llm_configs_data(model)\n
+      \       self.llm_configs = llm_configs\n\n    self.validate_params(\n        default=default,\n
+      \       max_model_depth=max_model_depth,\n        latency_tracking=latency_tracking,\n
+      \       hash_content=hash_content,\n        tradeoff=tradeoff,\n        preference_id=preference_id,\n
+      \   )\n\n    best_llm, session_id = model_select(\n        messages=messages,\n
+      \       llm_configs=self.llm_configs,\n        metric=metric,\n        notdiamond_api_key=self.api_key,\n
+      \       max_model_depth=self.max_model_depth,\n        hash_content=self.hash_content,\n
+      \       tradeoff=self.tradeoff,\n        preference_id=self.preference_id,\n
+      \       tools=self.tools,\n        previous_session=previous_session,\n        timeout=timeout,\n
+      \       nd_api_url=self.nd_api_url,\n        _user_agent=self.user_agent,\n
+      \   )\n\n    if not best_llm:\n        LOGGER.warning(\n            f\"ND API
+      error. Falling back to default provider={self.default_llm.provider}/{self.default_llm.model}.\"\n
+      \       )\n        best_llm = self.default_llm\n    self.call_callbacks(\"on_model_select\",
+      best_llm, best_llm.model)\n\n    return session_id, best_llm\n\r\n--b6275783faf693c4bc9a9a9f78d60742--\r\n"
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '4412'
+      Content-Type:
+      - multipart/form-data; boundary=b6275783faf693c4bc9a9a9f78d60742
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/files/create
+  response:
+    body:
+      string: '{"digest":"3HRtmdzQpLXIimOlJmkSmmcTIGCXCkXQSL19saYnMOk"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '56'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:12 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - 2a0ce311c76795f7b9b46325d0351ee6;o=1
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"obj":{"project_id":"notdiamond/dev_testing","object_id":"NDRouterClient.model_select","val":{"_type":"CustomWeaveType","weave_type":{"type":"Op"},"files":{"obj.py":"3HRtmdzQpLXIimOlJmkSmmcTIGCXCkXQSL19saYnMOk"}}}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '215'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/obj/create
+  response:
+    body:
+      string: '{"digest":"I1Kxj2M8QuSxFFVY2sEzFs3dDRdHNln9x7NtvLX8xKs"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '56'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:13 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - baca317629810fc7bef9ec7133212162
+    status:
+      code: 200
+      message: OK
+- request:
+    body: "--e5e3b36e771f8c4f03afc2dba158585d\r\nContent-Disposition: form-data; name=\"project_id\"\r\n\r\nnotdiamond/dev_testing\r\n--e5e3b36e771f8c4f03afc2dba158585d\r\nContent-Disposition:
+      form-data; name=\"file\"; filename=\"obj.py\"\r\n\r\nimport weave\nfrom typing
+      import List\nfrom typing import Dict\nfrom typing import Optional\nfrom typing
+      import Any\nfrom notdiamond.llms.config import LLMConfig\nfrom typing import
+      Union\nfrom notdiamond.metrics.metric import Metric\n\nLOGGER = \"<_FixedFindCallerLogger
+      notdiamond.llms.client (INFO)>\"\n\n@weave.op()\nasync def amodel_select(\n
+      \   self,\n    messages: List[Dict[str, str]],\n    input: Optional[Dict[str,
+      Any]] = None,\n    model: Optional[List[LLMConfig]] = None,\n    default: Optional[Union[LLMConfig,
+      int, str]] = None,\n    max_model_depth: Optional[int] = None,\n    latency_tracking:
+      Optional[bool] = None,\n    hash_content: Optional[bool] = None,\n    tradeoff:
+      Optional[str] = None,\n    preference_id: Optional[str] = None,\n    metric:
+      Metric = Metric(\"accuracy\"),\n    previous_session: Optional[str] = None,\n
+      \   timeout: int = 5,\n    **kwargs,\n) -> tuple[str, Optional[LLMConfig]]:\n
+      \   \"\"\"\n    This function calls the NotDiamond backend to fetch the most
+      suitable model for the given prompt,\n    and leaves the execution of the LLM
+      call to the developer.\n    The function is async, so it's suitable for async
+      codebases.\n\n    Parameters:\n        messages (List[Dict[str, str]]): List
+      of messages, OpenAI style.\n        input (Optional[Dict[str, Any]], optional):
+      If the prompt_template contains variables, use input to specify\n                                                    the
+      values for those variables. Defaults to None, assuming no\n                                                    variables.\n
+      \       model (Optional[List[LLMConfig]]): List of models to choose from.\n
+      \       default (Optional[Union[LLMConfig, int, str]]): Default LLM.\n        max_model_depth
+      (Optional[int]): If your top recommended model is down, specify up to which
+      depth\n                                            of routing you're willing
+      to go.\n        latency_tracking (Optional[bool]): Latency tracking flag.\n
+      \       hash_content (Optional[bool]): Flag for hashing content before sending
+      to NotDiamond API.\n        tradeoff (Optional[str], optional): Define the \"cost\"
+      or \"latency\" tradeoff\n                                            for the
+      router to determine the best LLM for a given query.\n        preference_id (Optional[str]):
+      The ID of the router preference that was configured via the Dashboard.\n                                        Defaults
+      to None.\n        metric (Metric, optional): Metric used by NotDiamond router
+      to choose the best LLM.\n                                        Defaults to
+      Metric(\"accuracy\").\n        previous_session (Optional[str], optional): The
+      session ID of a previous session, allow you to link requests.\n        timeout
+      (int): The number of seconds to wait before terminating the API call to Not
+      Diamond backend.\n                        Default to 5 seconds.\n        nd_api_url
+      (Optional[str]): The URL of the NotDiamond API. Defaults to settings.NOTDIAMOND_API_URL.\n
+      \       **kwargs: Any other arguments that are supported by Langchain's invoke
+      method, will be passed through.\n    Returns:\n        tuple[str, Optional[LLMConfig]]:
+      returns the session_id and the chosen LLM\n    \"\"\"\n    if input is None:\n
+      \       input = {}\n\n    if model is not None:\n        llm_configs = self._parse_llm_configs_data(model)\n
+      \       self.llm_configs = llm_configs\n\n    self.validate_params(\n        default=default,\n
+      \       max_model_depth=max_model_depth,\n        latency_tracking=latency_tracking,\n
+      \       hash_content=hash_content,\n        tradeoff=tradeoff,\n        preference_id=preference_id,\n
+      \   )\n\n    best_llm, session_id = await amodel_select(\n        messages=messages,\n
+      \       llm_configs=self.llm_configs,\n        metric=metric,\n        notdiamond_api_key=self.api_key,\n
+      \       max_model_depth=self.max_model_depth,\n        hash_content=self.hash_content,\n
+      \       tradeoff=self.tradeoff,\n        preference_id=self.preference_id,\n
+      \       tools=self.tools,\n        previous_session=previous_session,\n        timeout=timeout,\n
+      \       nd_api_url=self.nd_api_url,\n        _user_agent=self.user_agent,\n
+      \   )\n\n    if not best_llm:\n        LOGGER.warning(\n            f\"ND API
+      error. Falling back to default provider={self.default_llm.provider}/{self.default_llm.model}.\"\n
+      \       )\n        best_llm = self.default_llm\n    self.call_callbacks(\"on_model_select\",
+      best_llm, best_llm.model)\n\n    return session_id, best_llm\n\r\n--e5e3b36e771f8c4f03afc2dba158585d--\r\n"
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '4599'
+      Content-Type:
+      - multipart/form-data; boundary=e5e3b36e771f8c4f03afc2dba158585d
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/files/create
+  response:
+    body:
+      string: '{"digest":"SUN41AR44ueZ2xDPxdYoZi1m1yAARAkWudFv3XWcd9w"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '56'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:13 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - 72d32d7e903417405a20b72dabe9317e
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"batch":[{"mode":"start","req":{"start":{"project_id":"notdiamond/dev_testing","id":"0192459b-355b-7121-b2ef-42fdc590ea42","op_name":"weave:///notdiamond/dev_testing/op/LLMConfig-init:U2YL4ujAD3X7itZyCb5Dub4Zbyia6RWuvqATGDjL1oM","display_name":"","trace_id":"0192459b-32b7-7c80-86a0-c6a348511bdc","parent_id":"0192459b-32b5-71e1-aad4-d955613c5160","started_at":"2024-10-01T01:04:12.635461Z","attributes":{"weave":{"client_version":"0.51.11-dev0","source":"python-sdk","os_name":"Darwin","os_version":"Darwin
+      Kernel Version 23.6.0: Fri Jul  5 17:55:37 PDT 2024; root:xnu-10063.141.1~2/RELEASE_ARM64_T6030","os_release":"23.6.0","sys_version":"3.11.10
+      (main, Sep 24 2024, 22:22:44) [Clang 16.0.0 (clang-1600.0.26.3)]"}},"inputs":{"self":"LLMConfig(openai/gpt-4o-mini)","provider":"openai","model":"gpt-4o-mini","is_custom":false,"kwargs":{}},"wb_user_id":null,"wb_run_id":null}}},{"mode":"end","req":{"end":{"project_id":"notdiamond/dev_testing","id":"0192459b-355b-7121-b2ef-42fdc590ea42","ended_at":"2024-10-01T01:04:12.635810Z","exception":null,"output":null,"summary":{}}}},{"mode":"end","req":{"end":{"project_id":"notdiamond/dev_testing","id":"0192459b-32b5-71e1-aad4-d955613c5160","ended_at":"2024-10-01T01:04:12.636809Z","exception":null,"output":"LLMConfig(openai/gpt-4o-mini)","summary":{}}}},{"mode":"start","req":{"start":{"project_id":"notdiamond/dev_testing","id":"0192459b-355e-7cf0-bd75-0a965b1bf659","op_name":"weave:///notdiamond/dev_testing/op/from_string:wpogeb0sneHz1sX1Yu2dvq3oeNzLkyiFj2UuzGleGY8","display_name":"","trace_id":"0192459b-355e-7cf0-bd75-0aa49577c601","parent_id":null,"started_at":"2024-10-01T01:04:12.638596Z","attributes":{"weave":{"client_version":"0.51.11-dev0","source":"python-sdk","os_name":"Darwin","os_version":"Darwin
+      Kernel Version 23.6.0: Fri Jul  5 17:55:37 PDT 2024; root:xnu-10063.141.1~2/RELEASE_ARM64_T6030","os_release":"23.6.0","sys_version":"3.11.10
+      (main, Sep 24 2024, 22:22:44) [Clang 16.0.0 (clang-1600.0.26.3)]"}},"inputs":{"llm_provider":"openai/gpt-4o"},"wb_user_id":null,"wb_run_id":null}}},{"mode":"start","req":{"start":{"project_id":"notdiamond/dev_testing","id":"0192459b-355f-7481-bd06-e3c9bd967b20","op_name":"weave:///notdiamond/dev_testing/op/LLMConfig-init:U2YL4ujAD3X7itZyCb5Dub4Zbyia6RWuvqATGDjL1oM","display_name":"","trace_id":"0192459b-355e-7cf0-bd75-0aa49577c601","parent_id":"0192459b-355e-7cf0-bd75-0a965b1bf659","started_at":"2024-10-01T01:04:12.639186Z","attributes":{"weave":{"client_version":"0.51.11-dev0","source":"python-sdk","os_name":"Darwin","os_version":"Darwin
+      Kernel Version 23.6.0: Fri Jul  5 17:55:37 PDT 2024; root:xnu-10063.141.1~2/RELEASE_ARM64_T6030","os_release":"23.6.0","sys_version":"3.11.10
+      (main, Sep 24 2024, 22:22:44) [Clang 16.0.0 (clang-1600.0.26.3)]"}},"inputs":{"self":"LLMConfig(openai/gpt-4o)","provider":"openai","model":"gpt-4o","is_custom":false,"kwargs":{}},"wb_user_id":null,"wb_run_id":null}}},{"mode":"end","req":{"end":{"project_id":"notdiamond/dev_testing","id":"0192459b-355f-7481-bd06-e3c9bd967b20","ended_at":"2024-10-01T01:04:12.639307Z","exception":null,"output":null,"summary":{}}}},{"mode":"end","req":{"end":{"project_id":"notdiamond/dev_testing","id":"0192459b-355e-7cf0-bd75-0a965b1bf659","ended_at":"2024-10-01T01:04:12.640006Z","exception":null,"output":"LLMConfig(openai/gpt-4o)","summary":{}}}}]}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '3332'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/call/upsert_batch
+  response:
+    body:
+      string: '{"res":[{"id":"0192459b-355b-7121-b2ef-42fdc590ea42","trace_id":"0192459b-32b7-7c80-86a0-c6a348511bdc"},{},{},{"id":"0192459b-355e-7cf0-bd75-0a965b1bf659","trace_id":"0192459b-355e-7cf0-bd75-0aa49577c601"},{"id":"0192459b-355f-7481-bd06-e3c9bd967b20","trace_id":"0192459b-355e-7cf0-bd75-0aa49577c601"},{},{}]}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '309'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:13 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - 19cce013dfb47bf565eda456ee564ca9
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "Hello, world!"}], "llm_providers":
+      [{"provider": "openai", "model": "gpt-4o-mini", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "openai", "model": "gpt-4o", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}], "metric": "accuracy", "max_model_depth":
+      2, "hash_content": false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '445'
+      User-Agent:
+      - Python-SDK/0.3.18
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-mini"}],"session_id":"65b07a0c-dc0c-4468-a83f-ff367140ff11"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cb88995c9c941e7-EWR
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 01 Oct 2024 01:04:14 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - 983a00ff-c591-4a02
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"project_id":"notdiamond/dev_testing","filter":{"op_names":null,"input_refs":null,"output_refs":null,"parent_ids":null,"trace_ids":null,"call_ids":null,"trace_roots_only":true,"wb_user_ids":null,"wb_run_ids":null},"limit":1000,"offset":0,"sort_by":null,"query":null,"include_costs":false,"include_feedback":false,"columns":null,"expand_columns":null}'
     headers:
       Accept:
       - '*/*'
@@ -751,6 +1309,94 @@ interactions:
     uri: https://trace.wandb.ai/calls/query
   response:
     body:
+      string: '{"calls":[{"id":"01924598-e90d-7420-bab2-8b392906750e","project_id":"notdiamond/dev_testing","op_name":"weave:///notdiamond/dev_testing/op/from_string:wpogeb0sneHz1sX1Yu2dvq3oeNzLkyiFj2UuzGleGY8","display_name":null,"trace_id":"01924598-e90d-7420-bab2-8b4078ccbb43","parent_id":null,"started_at":"2024-10-01T01:01:42.029000Z","attributes":{"weave":{"client_version":"0.51.11-dev0","source":"python-sdk","os_name":"Darwin","os_version":"Darwin
+        Kernel Version 23.6.0: Fri Jul  5 17:55:37 PDT 2024; root:xnu-10063.141.1~2/RELEASE_ARM64_T6030","os_release":"23.6.0","sys_version":"3.11.10
+        (main, Sep 24 2024, 22:22:44) [Clang 16.0.0 (clang-1600.0.26.3)]"}},"inputs":{"llm_provider":"openai/gpt-4o-mini"},"ended_at":"2024-10-01T01:01:42.601000Z","exception":null,"output":"LLMConfig(openai/gpt-4o-mini)","summary":{"weave":{"status":"success","trace_name":"from_string","latency_ms":572}},"wb_user_id":"VXNlcjoxODM1MzY2","wb_run_id":null,"deleted_at":null},{"id":"01924598-eb4a-7721-bb9e-e44aacac1324","project_id":"notdiamond/dev_testing","op_name":"weave:///notdiamond/dev_testing/op/from_string:wpogeb0sneHz1sX1Yu2dvq3oeNzLkyiFj2UuzGleGY8","display_name":null,"trace_id":"01924598-eb4a-7721-bb9e-e458e2622f6e","parent_id":null,"started_at":"2024-10-01T01:01:42.602000Z","attributes":{"weave":{"client_version":"0.51.11-dev0","source":"python-sdk","os_name":"Darwin","os_version":"Darwin
+        Kernel Version 23.6.0: Fri Jul  5 17:55:37 PDT 2024; root:xnu-10063.141.1~2/RELEASE_ARM64_T6030","os_release":"23.6.0","sys_version":"3.11.10
+        (main, Sep 24 2024, 22:22:44) [Clang 16.0.0 (clang-1600.0.26.3)]"}},"inputs":{"llm_provider":"openai/gpt-4o"},"ended_at":"2024-10-01T01:01:42.603000Z","exception":null,"output":"LLMConfig(openai/gpt-4o)","summary":{"weave":{"status":"success","trace_name":"from_string","latency_ms":1}},"wb_user_id":"VXNlcjoxODM1MzY2","wb_run_id":null,"deleted_at":null},{"id":"01924598-eec5-7710-981a-a454f02cab25","project_id":"notdiamond/dev_testing","op_name":"weave:///notdiamond/dev_testing/op/NDRouterClient.model_select:I1Kxj2M8QuSxFFVY2sEzFs3dDRdHNln9x7NtvLX8xKs","display_name":null,"trace_id":"01924598-eec5-7710-981a-a46aceeb19c1","parent_id":null,"started_at":"2024-10-01T01:01:43.493000Z","attributes":{"weave":{"client_version":"0.51.11-dev0","source":"python-sdk","os_name":"Darwin","os_version":"Darwin
+        Kernel Version 23.6.0: Fri Jul  5 17:55:37 PDT 2024; root:xnu-10063.141.1~2/RELEASE_ARM64_T6030","os_release":"23.6.0","sys_version":"3.11.10
+        (main, Sep 24 2024, 22:22:44) [Clang 16.0.0 (clang-1600.0.26.3)]"}},"inputs":{"self":{"_type":"NotDiamond","api_key":"sk-bd462bc8aa60929cf36d5933c1c2b41e903820644c9985a6","llm_configs":null,"default":0,"max_model_depth":null,"latency_tracking":true,"hash_content":false,"tradeoff":null,"preference_id":null,"tools":null,"callbacks":null,"nd_api_url":"https://api.notdiamond.ai","user_agent":"Python-SDK/0.3.18","amodel_select":"weave:///notdiamond/dev_testing/op/NDRouterClient.amodel_select:Rhn8AzYF9LCU1ked72mv6teWuY85YIhq1WvLT3FnyM4","model_select":"weave:///notdiamond/dev_testing/op/NDRouterClient.model_select:I1Kxj2M8QuSxFFVY2sEzFs3dDRdHNln9x7NtvLX8xKs","_class_name":"NotDiamond","_bases":["_NDRouterClient","BaseModel","Representation"]},"messages":[{"role":"user","content":"Hello,
+        world!"}],"model":["LLMConfig(openai/gpt-4o-mini)","LLMConfig(openai/gpt-4o)"],"metric":"<notdiamond.metrics.metric.Metric
+        object at 0x312498cd0>","timeout":5,"kwargs":{}},"ended_at":"2024-10-01T01:01:44.189000Z","exception":null,"output":["a2b584be-c554-455b-86f5-94fccbb18401","LLMConfig(openai/gpt-4o-mini)"],"summary":{"weave":{"status":"success","trace_name":"NDRouterClient.model_select","latency_ms":696}},"wb_user_id":"VXNlcjoxODM1MzY2","wb_run_id":null,"deleted_at":null},{"id":"0192459b-32b5-71e1-aad4-d955613c5160","project_id":"notdiamond/dev_testing","op_name":"weave:///notdiamond/dev_testing/op/from_string:wpogeb0sneHz1sX1Yu2dvq3oeNzLkyiFj2UuzGleGY8","display_name":null,"trace_id":"0192459b-32b7-7c80-86a0-c6a348511bdc","parent_id":null,"started_at":"2024-10-01T01:04:11.959000Z","attributes":{"weave":{"client_version":"0.51.11-dev0","source":"python-sdk","os_name":"Darwin","os_version":"Darwin
+        Kernel Version 23.6.0: Fri Jul  5 17:55:37 PDT 2024; root:xnu-10063.141.1~2/RELEASE_ARM64_T6030","os_release":"23.6.0","sys_version":"3.11.10
+        (main, Sep 24 2024, 22:22:44) [Clang 16.0.0 (clang-1600.0.26.3)]"}},"inputs":{"llm_provider":"openai/gpt-4o-mini"},"ended_at":"2024-10-01T01:04:12.636000Z","exception":null,"output":"LLMConfig(openai/gpt-4o-mini)","summary":{"weave":{"status":"success","trace_name":"from_string","latency_ms":677}},"wb_user_id":"VXNlcjoxODM1MzY2","wb_run_id":null,"deleted_at":null},{"id":"0192459b-355e-7cf0-bd75-0a965b1bf659","project_id":"notdiamond/dev_testing","op_name":"weave:///notdiamond/dev_testing/op/from_string:wpogeb0sneHz1sX1Yu2dvq3oeNzLkyiFj2UuzGleGY8","display_name":null,"trace_id":"0192459b-355e-7cf0-bd75-0aa49577c601","parent_id":null,"started_at":"2024-10-01T01:04:12.638000Z","attributes":{"weave":{"client_version":"0.51.11-dev0","source":"python-sdk","os_name":"Darwin","os_version":"Darwin
+        Kernel Version 23.6.0: Fri Jul  5 17:55:37 PDT 2024; root:xnu-10063.141.1~2/RELEASE_ARM64_T6030","os_release":"23.6.0","sys_version":"3.11.10
+        (main, Sep 24 2024, 22:22:44) [Clang 16.0.0 (clang-1600.0.26.3)]"}},"inputs":{"llm_provider":"openai/gpt-4o"},"ended_at":"2024-10-01T01:04:12.640000Z","exception":null,"output":"LLMConfig(openai/gpt-4o)","summary":{"weave":{"status":"success","trace_name":"from_string","latency_ms":2}},"wb_user_id":"VXNlcjoxODM1MzY2","wb_run_id":null,"deleted_at":null}]}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '5619'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:14 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - a32aa25dc2a7ba18744616d3a7161ff8
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"batch":[{"mode":"start","req":{"start":{"project_id":"notdiamond/dev_testing","id":"0192459b-3959-7521-b4f5-6c95dfae29ea","op_name":"weave:///notdiamond/dev_testing/op/NDRouterClient.model_select:I1Kxj2M8QuSxFFVY2sEzFs3dDRdHNln9x7NtvLX8xKs","display_name":"","trace_id":"0192459b-3959-7521-b4f5-6ca0ba1ecf63","parent_id":null,"started_at":"2024-10-01T01:04:13.657892Z","attributes":{"weave":{"client_version":"0.51.11-dev0","source":"python-sdk","os_name":"Darwin","os_version":"Darwin
+      Kernel Version 23.6.0: Fri Jul  5 17:55:37 PDT 2024; root:xnu-10063.141.1~2/RELEASE_ARM64_T6030","os_release":"23.6.0","sys_version":"3.11.10
+      (main, Sep 24 2024, 22:22:44) [Clang 16.0.0 (clang-1600.0.26.3)]"}},"inputs":{"self":{"_type":"NotDiamond","api_key":"sk-bd462bc8aa60929cf36d5933c1c2b41e903820644c9985a6","llm_configs":null,"default":0,"max_model_depth":null,"latency_tracking":true,"hash_content":false,"tradeoff":null,"preference_id":null,"tools":null,"callbacks":null,"nd_api_url":"https://api.notdiamond.ai","user_agent":"Python-SDK/0.3.18","amodel_select":"weave:///notdiamond/dev_testing/op/NDRouterClient.amodel_select:Rhn8AzYF9LCU1ked72mv6teWuY85YIhq1WvLT3FnyM4","model_select":"weave:///notdiamond/dev_testing/op/NDRouterClient.model_select:I1Kxj2M8QuSxFFVY2sEzFs3dDRdHNln9x7NtvLX8xKs","_class_name":"NotDiamond","_bases":["_NDRouterClient","BaseModel","Representation"]},"messages":[{"role":"user","content":"Hello,
+      world!"}],"model":["LLMConfig(openai/gpt-4o-mini)","LLMConfig(openai/gpt-4o)"],"metric":"<notdiamond.metrics.metric.Metric
+      object at 0x17f73b290>","timeout":5,"kwargs":{}},"wb_user_id":null,"wb_run_id":null}}},{"mode":"end","req":{"end":{"project_id":"notdiamond/dev_testing","id":"0192459b-3959-7521-b4f5-6c95dfae29ea","ended_at":"2024-10-01T01:04:14.413053Z","exception":null,"output":["65b07a0c-dc0c-4468-a83f-ff367140ff11","LLMConfig(openai/gpt-4o-mini)"],"summary":{}}}}]}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1899'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/call/upsert_batch
+  response:
+    body:
+      string: '{"res":[{"id":"0192459b-3959-7521-b4f5-6c95dfae29ea","trace_id":"0192459b-3959-7521-b4f5-6ca0ba1ecf63"},{}]}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '108'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:15 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - e806f49fa013e027ea9828d6fbc3dfb2
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"project_id":"notdiamond/dev_testing","filter":{"op_names":null,"input_refs":null,"output_refs":null,"parent_ids":["01924598-eb49-7710-b22e-d5e077181177"],"trace_ids":null,"call_ids":null,"trace_roots_only":null,"wb_user_ids":null,"wb_run_ids":null},"limit":1000,"offset":0,"sort_by":null,"query":null,"include_costs":false,"include_feedback":false,"columns":null,"expand_columns":null}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '387'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/calls/query
+  response:
+    body:
       string: '{"calls":[]}'
     headers:
       Alt-Svc:
@@ -760,13 +1406,271 @@ interactions:
       content-type:
       - application/json
       date:
-      - Mon, 30 Sep 2024 22:17:07 GMT
+      - Tue, 01 Oct 2024 01:04:15 GMT
       server:
       - Google Frontend
       via:
       - 1.1 google
       x-cloud-trace-context:
-      - 70760fa86694a0374fff8f2b75a3ccc1
+      - f1c4e36dc2bd66cc2161cedf6a5ed052
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"project_id":"notdiamond/dev_testing","filter":{"op_names":null,"input_refs":null,"output_refs":null,"parent_ids":["01924598-eb4a-7721-bb9e-e44aacac1324"],"trace_ids":null,"call_ids":null,"trace_roots_only":null,"wb_user_ids":null,"wb_run_ids":null},"limit":1000,"offset":0,"sort_by":null,"query":null,"include_costs":false,"include_feedback":false,"columns":null,"expand_columns":null}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '387'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/calls/query
+  response:
+    body:
+      string: '{"calls":[{"id":"01924598-eb4a-7721-bb9e-e466b1284c20","project_id":"notdiamond/dev_testing","op_name":"weave:///notdiamond/dev_testing/op/LLMConfig-init:U2YL4ujAD3X7itZyCb5Dub4Zbyia6RWuvqATGDjL1oM","display_name":null,"trace_id":"01924598-eb4a-7721-bb9e-e458e2622f6e","parent_id":"01924598-eb4a-7721-bb9e-e44aacac1324","started_at":"2024-10-01T01:01:42.602000Z","attributes":{"weave":{"client_version":"0.51.11-dev0","source":"python-sdk","os_name":"Darwin","os_version":"Darwin
+        Kernel Version 23.6.0: Fri Jul  5 17:55:37 PDT 2024; root:xnu-10063.141.1~2/RELEASE_ARM64_T6030","os_release":"23.6.0","sys_version":"3.11.10
+        (main, Sep 24 2024, 22:22:44) [Clang 16.0.0 (clang-1600.0.26.3)]"}},"inputs":{"self":"LLMConfig(openai/gpt-4o)","provider":"openai","model":"gpt-4o","is_custom":false,"kwargs":{}},"ended_at":"2024-10-01T01:01:42.603000Z","exception":null,"output":null,"summary":{"weave":{"status":"success","trace_name":"LLMConfig-init","latency_ms":1}},"wb_user_id":"VXNlcjoxODM1MzY2","wb_run_id":null,"deleted_at":null}]}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '1029'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:15 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - 589b13cea0c38a4a396410e606dd2989
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"project_id":"notdiamond/dev_testing","filter":{"op_names":null,"input_refs":null,"output_refs":null,"parent_ids":["01924598-eb4a-7721-bb9e-e466b1284c20"],"trace_ids":null,"call_ids":null,"trace_roots_only":null,"wb_user_ids":null,"wb_run_ids":null},"limit":1000,"offset":0,"sort_by":null,"query":null,"include_costs":false,"include_feedback":false,"columns":null,"expand_columns":null}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '387'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/calls/query
+  response:
+    body:
+      string: '{"calls":[]}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '12'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:16 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - 2faecc5deea00b31c24b154fca710e25;o=1
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"project_id":"notdiamond/dev_testing","filter":{"op_names":null,"input_refs":null,"output_refs":null,"parent_ids":["01924598-eec5-7710-981a-a454f02cab25"],"trace_ids":null,"call_ids":null,"trace_roots_only":null,"wb_user_ids":null,"wb_run_ids":null},"limit":1000,"offset":0,"sort_by":null,"query":null,"include_costs":false,"include_feedback":false,"columns":null,"expand_columns":null}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '387'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/calls/query
+  response:
+    body:
+      string: '{"calls":[]}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '12'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:16 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - 7e591f9a09a907f8a4885c2f5b97b8c7
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"project_id":"notdiamond/dev_testing","filter":{"op_names":null,"input_refs":null,"output_refs":null,"parent_ids":["0192459b-32b5-71e1-aad4-d955613c5160"],"trace_ids":null,"call_ids":null,"trace_roots_only":null,"wb_user_ids":null,"wb_run_ids":null},"limit":1000,"offset":0,"sort_by":null,"query":null,"include_costs":false,"include_feedback":false,"columns":null,"expand_columns":null}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '387'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/calls/query
+  response:
+    body:
+      string: '{"calls":[{"id":"0192459b-355b-7121-b2ef-42fdc590ea42","project_id":"notdiamond/dev_testing","op_name":"weave:///notdiamond/dev_testing/op/LLMConfig-init:U2YL4ujAD3X7itZyCb5Dub4Zbyia6RWuvqATGDjL1oM","display_name":null,"trace_id":"0192459b-32b7-7c80-86a0-c6a348511bdc","parent_id":"0192459b-32b5-71e1-aad4-d955613c5160","started_at":"2024-10-01T01:04:12.635000Z","attributes":{"weave":{"client_version":"0.51.11-dev0","source":"python-sdk","os_name":"Darwin","os_version":"Darwin
+        Kernel Version 23.6.0: Fri Jul  5 17:55:37 PDT 2024; root:xnu-10063.141.1~2/RELEASE_ARM64_T6030","os_release":"23.6.0","sys_version":"3.11.10
+        (main, Sep 24 2024, 22:22:44) [Clang 16.0.0 (clang-1600.0.26.3)]"}},"inputs":{"self":"LLMConfig(openai/gpt-4o-mini)","provider":"openai","model":"gpt-4o-mini","is_custom":false,"kwargs":{}},"ended_at":"2024-10-01T01:04:12.635000Z","exception":null,"output":null,"summary":{"weave":{"status":"success","trace_name":"LLMConfig-init","latency_ms":0}},"wb_user_id":"VXNlcjoxODM1MzY2","wb_run_id":null,"deleted_at":null}]}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '1039'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:16 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - 647a1e6d0769bd0c27bebb0c810d9c3e
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"project_id":"notdiamond/dev_testing","filter":{"op_names":null,"input_refs":null,"output_refs":null,"parent_ids":["0192459b-355b-7121-b2ef-42fdc590ea42"],"trace_ids":null,"call_ids":null,"trace_roots_only":null,"wb_user_ids":null,"wb_run_ids":null},"limit":1000,"offset":0,"sort_by":null,"query":null,"include_costs":false,"include_feedback":false,"columns":null,"expand_columns":null}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '387'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/calls/query
+  response:
+    body:
+      string: '{"calls":[]}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '12'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:16 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - 65c60162467080cc6d72b29b666247bf
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"project_id":"notdiamond/dev_testing","filter":{"op_names":null,"input_refs":null,"output_refs":null,"parent_ids":["0192459b-355e-7cf0-bd75-0a965b1bf659"],"trace_ids":null,"call_ids":null,"trace_roots_only":null,"wb_user_ids":null,"wb_run_ids":null},"limit":1000,"offset":0,"sort_by":null,"query":null,"include_costs":false,"include_feedback":false,"columns":null,"expand_columns":null}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '387'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/calls/query
+  response:
+    body:
+      string: '{"calls":[{"id":"0192459b-355f-7481-bd06-e3c9bd967b20","project_id":"notdiamond/dev_testing","op_name":"weave:///notdiamond/dev_testing/op/LLMConfig-init:U2YL4ujAD3X7itZyCb5Dub4Zbyia6RWuvqATGDjL1oM","display_name":null,"trace_id":"0192459b-355e-7cf0-bd75-0aa49577c601","parent_id":"0192459b-355e-7cf0-bd75-0a965b1bf659","started_at":"2024-10-01T01:04:12.639000Z","attributes":{"weave":{"client_version":"0.51.11-dev0","source":"python-sdk","os_name":"Darwin","os_version":"Darwin
+        Kernel Version 23.6.0: Fri Jul  5 17:55:37 PDT 2024; root:xnu-10063.141.1~2/RELEASE_ARM64_T6030","os_release":"23.6.0","sys_version":"3.11.10
+        (main, Sep 24 2024, 22:22:44) [Clang 16.0.0 (clang-1600.0.26.3)]"}},"inputs":{"self":"LLMConfig(openai/gpt-4o)","provider":"openai","model":"gpt-4o","is_custom":false,"kwargs":{}},"ended_at":"2024-10-01T01:04:12.639000Z","exception":null,"output":null,"summary":{"weave":{"status":"success","trace_name":"LLMConfig-init","latency_ms":0}},"wb_user_id":"VXNlcjoxODM1MzY2","wb_run_id":null,"deleted_at":null}]}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '1029'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:17 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - 46f6ef9afe09235510c41bc7457ff678
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"project_id":"notdiamond/dev_testing","filter":{"op_names":null,"input_refs":null,"output_refs":null,"parent_ids":["0192459b-355f-7481-bd06-e3c9bd967b20"],"trace_ids":null,"call_ids":null,"trace_roots_only":null,"wb_user_ids":null,"wb_run_ids":null},"limit":1000,"offset":0,"sort_by":null,"query":null,"include_costs":false,"include_feedback":false,"columns":null,"expand_columns":null}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '387'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/calls/query
+  response:
+    body:
+      string: '{"calls":[]}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '12'
+      content-type:
+      - application/json
+      date:
+      - Tue, 01 Oct 2024 01:04:17 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - 207f6dec62428217bd4fdf74e46f71ab
     status:
       code: 200
       message: OK
