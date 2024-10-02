@@ -62,7 +62,7 @@ jobs:
             if [ -z "$changed_files" ]; then
               echo "No files changed"
             else
-              echo "CHANGED_FILES<<EOF" >> $GITHUB_ENV
+              echo "changed_files<<EOF" >> $GITHUB_ENV
               echo "$changed_files" >> $GITHUB_ENV
               echo "EOF" >> $GITHUB_ENV
             fi
