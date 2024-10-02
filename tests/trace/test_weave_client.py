@@ -27,7 +27,13 @@ from weave.trace.refs import (
     TABLE_ROW_ID_EDGE_NAME,
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
+from weave.trace_server.sqlite_trace_server import (
+    NotFoundError as sqliteNotFoundError,
+)
+from weave.trace_server.sqlite_trace_server import (
+    SqliteTraceServer,
+)
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -1436,7 +1442,31 @@ def test_object_version_read(client):
     assert obj_res.obj.val == {"a": 9}
     assert obj_res.obj.version_index == 9
 
-    # now grab version 5
+    # now grab each by their digests
+    for i, digest in enumerate([obj.digest for obj in objs]):
+        obj_res = client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client._project_id(),
+                object_id=refs[0].name,
+                digest=digest,
+            )
+        )
+        assert obj_res.obj.val == {"a": i}
+        assert obj_res.obj.version_index == i
+
+    # publish another, check that latest is updated
+    client._save_object({"a": 10}, refs[0].name)
+    obj_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=refs[0].name,
+            digest="latest",
+        )
+    )
+    assert obj_res.obj.val == {"a": 10}
+    assert obj_res.obj.version_index == 10
+
+    # check that v5 is still correct
     obj_res = client.server.obj_read(
         tsi.ObjReadReq(
             project_id=client._project_id(),
@@ -1446,3 +1476,26 @@ def test_object_version_read(client):
     )
     assert obj_res.obj.val == {"a": 5}
     assert obj_res.obj.version_index == 5
+
+    # check badly formatted digests
+    digests = ["v1111", "1", ""]
+    for digest in digests:
+        with pytest.raises((NotFoundError, sqliteNotFoundError)):
+            # grab non-existant version
+            obj_res = client.server.obj_read(
+                tsi.ObjReadReq(
+                    project_id=client._project_id(),
+                    object_id=refs[0].name,
+                    digest=digest,
+                )
+            )
+
+    # check non-existant object_id
+    with pytest.raises((NotFoundError, sqliteNotFoundError)):
+        obj_res = client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client._project_id(),
+                object_id="refs[0].name",
+                digest="v1",
+            )
+        )
