@@ -968,7 +968,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.TableQueryStatsRes(count=count)
 
     def _table_delete(self, project_id: str, digest: str) -> None:
-        # get the row_digests for the table
+        """
+        Internal function to delete a table and all of its rows.
+
+        1. Get the row_digests for the table
+        2. Delete the rows by row_digest
+        3. Delete the table by digest
+        """
+        # 1. get the row_digests for the table
         query = """
         SELECT row_digests
         FROM tables
@@ -981,7 +988,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query_result = self.ch_client.query(query, parameters=parameters)
         row_digests = query_result.result_rows[0][0] if query_result.result_rows else []
 
-        # delete the rows
+        # 2. delete the rows by row_digest
         delete_query = """
         DELETE FROM table_rows
         WHERE project_id = {project_id:String} AND digest IN {row_digests:Array(String)}
@@ -991,6 +998,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             "row_digests": row_digests,
         }
         self.ch_client.query(delete_query, parameters=parameters)
+
+        # 3. delete the table by digest
+        delete_table_query = """
+        DELETE FROM tables
+        WHERE project_id = {project_id:String} AND digest = {digest:String}
+        """
+        parameters = {
+            "project_id": project_id,
+            "digest": digest,
+        }
+        self.ch_client.query(delete_table_query, parameters=parameters)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches
