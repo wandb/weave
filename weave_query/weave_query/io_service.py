@@ -40,6 +40,7 @@ from weave_query import (
 tracer = engine_trace.tracer()  # type: ignore
 statsd = engine_trace.statsd()  # type: ignore
 
+# hmmm
 
 QueueItemType = TypeVar("QueueItemType")
 
