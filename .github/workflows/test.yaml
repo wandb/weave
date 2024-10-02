@@ -69,8 +69,7 @@ jobs:
       fail-fast: false
       matrix:
         job_num: [0, 1]
-    # runs-on: ubuntu-latest
-    container: ${{ needs.build-container-query-service.outputs.build_needed == 'true' && 'us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-query-service:${{ github.sha }}' || 'ubuntu:latest' }}
+    container: ${{ needs.build-container-query-service.outputs.build_needed == 'true' && 'us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-query-service:${{ github.sha }}' || 'ubuntu-latest' }}
     services:
       wandbservice:
         image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
