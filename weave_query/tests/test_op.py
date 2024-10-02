@@ -38,6 +38,7 @@ def test_op_simple():
     assert weave.use(x) == "34"
 
 
+# hmmmmmmmmmm
 @weave.op()
 def op_inferredtype(a: int, b: int) -> str:
     return str(a) + str(b)
