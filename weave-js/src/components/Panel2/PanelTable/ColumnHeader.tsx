@@ -499,7 +499,11 @@ export const ColumnHeader: React.FC<{
   return (
     <S.ColumnHeader
       data-test="column-header"
-      style={{textAlign: columnFormat?.textAlign ?? 'center'}}>
+      style={{
+        textAlign: columnFormat?.textAlign ?? 'center',
+        flexDirection:
+          columnFormat?.textAlign === 'right' ? 'row-reverse' : 'row',
+      }}>
       {simpleTable ? (
         workingColumnName !== '' ? (
           <S.ColumnNameText>{workingColumnName}</S.ColumnNameText>
@@ -540,7 +544,10 @@ export const ColumnHeader: React.FC<{
           trigger={
             <S.ColumnName
               style={{
-                marginRight: `-${colControlsWidth}px`,
+                marginRight:
+                  columnFormat?.textAlign === 'center'
+                    ? `-${colControlsWidth}px`
+                    : 'inherit',
               }}
               onClick={() => setColumnSettingsOpen(!columnSettingsOpen)}>
               {propsColumnName !== '' ? (
@@ -648,36 +655,47 @@ export const ColumnHeader: React.FC<{
       {!simpleTable && (
         <WBPopupMenuTrigger options={columnMenuItems}>
           {({anchorRef, setOpen, open}) => (
-            <S.ColumnAction className="column-controls">
-              {isPinned && (
-                <PinnedIndicator unpin={() => setColumnPinState(false)} />
-              )}
-              {isGroupCol && (
-                <S.ControlIcon
-                  name="group-runs"
-                  onClick={e => {
-                    recordEvent('REMOVE_COLUMN_GROUPING');
-                    doUngroup();
-                  }}
+            <S.ColumnActionContainer
+              className="column-controls"
+              style={{
+                flexDirection:
+                  columnFormat?.textAlign === 'right' ? 'row-reverse' : 'row',
+              }}>
+              <S.ColumnAction>
+                {isPinned && (
+                  <PinnedIndicator unpin={() => setColumnPinState(false)} />
+                )}
+                {isGroupCol && (
+                  <S.ControlIcon
+                    name="group-runs"
+                    onClick={e => {
+                      recordEvent('REMOVE_COLUMN_GROUPING');
+                      doUngroup();
+                    }}
+                  />
+                )}
+              </S.ColumnAction>
+              <S.ColumnAction>
+                {colIsSorted && (
+                  <SortStateToggle
+                    {...{
+                      tableState,
+                      colId,
+                      updateTableState,
+                    }}
+                  />
+                )}
+              </S.ColumnAction>
+              <S.ColumnAction>
+                <S.EllipsisIcon
+                  ref={anchorRef}
+                  data-test="column-options"
+                  name="overflow"
+                  className="column-actions-trigger"
+                  onClick={() => setOpen(o => !o)}
                 />
-              )}
-              {colIsSorted && (
-                <SortStateToggle
-                  {...{
-                    tableState,
-                    colId,
-                    updateTableState,
-                  }}
-                />
-              )}
-              <S.EllipsisIcon
-                ref={anchorRef}
-                data-test="column-options"
-                name="overflow"
-                className="column-actions-trigger"
-                onClick={() => setOpen(o => !o)}
-              />
-            </S.ColumnAction>
+              </S.ColumnAction>
+            </S.ColumnActionContainer>
           )}
         </WBPopupMenuTrigger>
       )}
