@@ -12,6 +12,8 @@ on:
 jobs:
   check-which-tests-to-run:
     uses: ./.github/workflows/check-which-tests-to-run.yaml
+    with:
+      base_ref: ${{ github.base_ref }}
   notify-wandb-core:
     needs: check-which-tests-to-run
     runs-on: ubuntu-latest
