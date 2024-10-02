@@ -20,6 +20,8 @@ from .refs import ObjectRef, parse_uri
 from .settings import UserSettings, parse_and_apply_settings, should_disable_weave
 from .table import Table
 
+a = 1
+
 
 def init(
     project_name: str,
