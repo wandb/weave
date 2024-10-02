@@ -32,14 +32,16 @@ jobs:
           ref: ${{ github.head_ref }}
       - name: Git setup
         run: |
-          git fetch origin ${{ github.base_ref }}
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base_sha=$(git rev-parse origin/${{ github.base_ref }})
-            head_sha=$(git rev-parse HEAD)
-            changed_files=$(git diff --name-only $base_sha $head_sha)
-          else
-            changed_files=$(git diff --name-only HEAD^)
-          fi
+          git fetch --all
+      - run: |
+          git checkout ${{ github.head_ref || github.ref_name}}
+      - run: |
+          changed_files=$(git diff --name-only $(git merge-base --fork-point origin/master HEAD) HEAD)
+          echo "Changed files:"
+          echo "$changed_files"
+          echo "changed_files<<EOF" >> $GITHUB_ENV
+          echo "$changed_files" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
       - id: weave_query
         name: Weave Query Checks
         run: |
