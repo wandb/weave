@@ -42,17 +42,20 @@ If you want to change the data that is logged to weave without modifying the ori
 `postprocess_output` takes in any value which would normally be returned by the function and returns the transformed output.
 
 ```py
-def postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
-    return {k:v for k,v in inputs.items() if k != "hide_me"}
-
-def postprocess_output(output: CustomObject) -> CustomObject:
-    return CustomObject(x=output.x, secret_password="REDACTED")
-
+from dataclasses import dataclass
+from typing import Any
+import weave
 
 @dataclass
 class CustomObject:
     x: int
     secret_password: str
+
+def postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+    return {k:v for k,v in inputs.items() if k != "hide_me"}
+
+def postprocess_output(output: CustomObject) -> CustomObject:
+    return CustomObject(x=output.x, secret_password="REDACTED")
 
 @weave.op(
     postprocess_inputs=postprocess_inputs,
@@ -60,4 +63,7 @@ class CustomObject:
 )
 def func(a: int, hide_me: str) -> CustomObject:
     return CustomObject(x=a, secret_password=hide_me)
+
+weave.init('hide-data-example') # 🐝
+func(a=1, hide_me="password123")
 ```

@@ -3,7 +3,7 @@ import inspect
 import textwrap
 import time
 import traceback
-from typing import Any, Callable, Coroutine, Optional, Union, cast, Coroutine
+from typing import Any, Callable, Coroutine, Optional, Union, cast
 
 from rich import print
 from rich.console import Console
@@ -54,7 +54,7 @@ def async_call_op(func: Op, *args: Any, **kwargs: Any) -> Coroutine:
     return asyncio.to_thread(func.call, *args, **kwargs)
 
 
-class EvaluationResults(weave.Object):
+class EvaluationResults(Object):
     rows: weave.Table
 
 
