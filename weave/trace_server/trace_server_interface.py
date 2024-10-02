@@ -430,7 +430,7 @@ class ObjDeleteReq(BaseModel):
     object_id: str
     digest: str
 
-    purge_value: Optional[bool] = Field(
+    permanently_delete: Optional[bool] = Field(
         default=False,
         description="If true, the object value will be permanently deleted "
         "from the database. This action is irreversible.",

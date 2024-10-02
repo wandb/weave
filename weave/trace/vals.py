@@ -125,7 +125,7 @@ class Traceable:
         raise NotImplementedError("Traceable.save not implemented")
         # return self.server.mutate(self.ref, mutations)
 
-    def delete(self) -> None:
+    def delete(self, permanently_delete: bool = False) -> None:
         if self.ref is None:
             raise ValueError("Cannot delete object that is not saved")
         if not isinstance(self.ref, (ObjectRef, OpRef)):
@@ -136,6 +136,7 @@ class Traceable:
                 project_id=f"{ref.entity}/{ref.project}",
                 object_id=ref.name,
                 digest=ref.digest,
+                permanently_delete=permanently_delete,
             )
         )
 

@@ -808,22 +808,26 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def delete_object(self, object: ObjectRef) -> None:
+    def delete_object(
+        self, object: ObjectRef, permenantly_delete: bool = False
+    ) -> None:
         self.server.obj_delete(
             ObjDeleteReq(
                 project_id=self._project_id(),
                 object_id=object.name,
                 digest=object.digest,
+                permenantly_delete=permenantly_delete,
             )
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def delete_op(self, op: OpRef) -> None:
+    def delete_op(self, op: OpRef, permenantly_delete: bool = False) -> None:
         self.server.obj_delete(
             ObjDeleteReq(
                 project_id=self._project_id(),
                 object_id=op.name,
                 digest=op.digest,
+                permenantly_delete=permenantly_delete,
             )
         )
 

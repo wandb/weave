@@ -121,6 +121,8 @@ FILE_CHUNK_SIZE = 100000
 MAX_DELETE_CALLS_COUNT = 100
 MAX_CALLS_STREAM_BATCH_SIZE = 500
 
+DELETED_SENTINEL = "<DELETED>"
+
 
 CallCHInsertable = Union[
     CallStartCHInsertable,
@@ -701,9 +703,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             req.object_id,
             req.digest,
             # If purging, don't read the value from the db
-            metadata_only=bool(req.purge_value),
+            metadata_only=bool(req.permanently_delete),
         )
-        val = "<DELETED>" if req.purge_value else db_obj.val_dump
+
+        # Check if any of the object refs are tables, and delete them if
+        # permenantly_delete is set
+        if db_obj.refs:
+            for raw_ref in db_obj.refs:
+                ref = ri.parse_internal_uri(raw_ref)
+                if isinstance(ref, ri.InternalTableRef):
+                    if not req.permanently_delete:
+                        raise ValueError(
+                            "Deleting datasets is irreversible, permenantly_delete must be set to true"
+                        )
+                    self._table_delete(project_id=ref.project_id, digest=ref.digest)
+
+        val = DELETED_SENTINEL if req.permanently_delete else db_obj.val_dump
         ch_obj = ObjDeleteCHInsertable(
             project_id=req.project_id,
             object_id=req.object_id,
@@ -951,6 +966,31 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         count = query_result.result_rows[0][0] if query_result.result_rows else 0
 
         return tsi.TableQueryStatsRes(count=count)
+
+    def _table_delete(self, project_id: str, digest: str) -> None:
+        # get the row_digests for the table
+        query = """
+        SELECT row_digests
+        FROM tables
+        WHERE project_id = {project_id:String} AND digest = {digest:String}
+        """
+        parameters = {
+            "project_id": project_id,
+            "digest": digest,
+        }
+        query_result = self.ch_client.query(query, parameters=parameters)
+        row_digests = query_result.result_rows[0][0] if query_result.result_rows else []
+
+        # delete the rows
+        delete_query = """
+        DELETE FROM table_rows
+        WHERE project_id = {project_id:String} AND digest IN {row_digests:Array(String)}
+        """
+        parameters = {
+            "project_id": project_id,
+            "row_digests": row_digests,
+        }
+        self.ch_client.query(delete_query, parameters=parameters)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches
