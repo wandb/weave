@@ -41,7 +41,7 @@ jobs:
           fi
           echo "Base branch is $BASE_BRANCH"
 
-          changed_files=$(git diff --name-only $(git merge-base --fork-point $BASE_BRANCH HEAD) HEAD)
+          changed_files=$(git diff --name-only $(git merge-base --fork-point origin/$BASE_BRANCH HEAD) HEAD)
           echo "Changed files:"
           echo "$changed_files"
           echo "changed_files<<EOF" >> $GITHUB_ENV
