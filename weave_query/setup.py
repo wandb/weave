@@ -18,6 +18,7 @@ IS_BUILT = (ROOT / "weave_query" / "frontend" / "assets").is_dir() or SKIP_BUILD
 FORCE_BUILD = os.environ.get("WEAVE_FORCE_BUILD", False)
 
 
+# test
 def check_build_deps() -> bool:
     have_yarn = False
     try:
