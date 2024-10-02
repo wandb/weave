@@ -46,7 +46,10 @@ jobs:
   build-container-query-service-dummy:
     name: "SKIPPED: Build Legacy (Query Service) test container"
     if: github.ref != 'refs/heads/master' && !needs.check-which-tests-to-run.outputs.weave_query_tests
+    runs-on: ubuntu-latest
     steps:
+      - run: |
+          echo "Skipping build-container-query-service-dummy"
 
   build-container-query-service-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
@@ -119,7 +122,10 @@ jobs:
   test-query-service-dummy:
     name: "SKIPPED: Legacy (Query Service) Python unit tests"
     if: github.ref != 'refs/heads/master' && !needs.check-which-tests-to-run.outputs.weave_query_tests
+    runs-on: ubuntu-latest
     steps:
+      - run: |
+          echo "Skipping build-container-query-service-dummy"
 
   test-query-service-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
@@ -163,7 +169,10 @@ jobs:
   weavejs-lint-compile-dummy:
     name: "SKIPPED: WeaveJS Lint and Compile"
     if: github.ref != 'refs/heads/master' && !needs.check-which-tests-to-run.outputs.weave_js_tests
+    runs-on: ubuntu-latest
     steps:
+      - run: |
+          echo "Skipping build-container-query-service-dummy"
 
   weavejs-lint-compile-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
