@@ -1,5 +1,9 @@
 """Defines the custom Image weave type."""
 
+from functools import cached_property
+
+from pydantic import BaseModel
+
 from weave.trace import serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
 
@@ -11,6 +15,14 @@ try:
     dependencies_met = True
 except ImportError:
     pass
+
+
+class PathImage(BaseModel):
+    path: str
+
+    @cached_property
+    def img(self) -> Image.Image:
+        return Image.open(self.path)
 
 
 def save(obj: "Image.Image", artifact: MemTraceFilesArtifact, name: str) -> None:

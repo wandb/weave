@@ -53,10 +53,10 @@ class UserSettings(BaseModel):
 
     capture_code: bool = True
     """Toggles code capture for ops.
-    
+
     If True, saves code for ops so they can be reloaded for later use.
     Can be overrided with the environment variable `WEAVE_CAPTURE_CODE`
-    
+
     WARNING: Switching between `save_code=True` and `save_code=False` mid-script
     may lead to unexpected behaviour.  Make sure this is only set once at the start!
     """
@@ -71,6 +71,22 @@ class UserSettings(BaseModel):
     but can be useful for debugging.
 
     This cannot be changed after the client has been initialized.
+    """
+
+    convert_paths_to_images: bool = True
+    """Toggles conversion of image file paths to PathImage objects.
+
+    If True, image file paths will be converted to PathImage objects.
+    Can be overrided with the environment variable `WEAVE_CONVERT_PATHS_TO_IMAGES`
+
+    Example:
+        @weave.op
+        def generate_image(prompt: str):
+            text, url = generate_text_and_image(prompt)
+            return {"text": text, "image": url}
+
+        If WEAVE_CONVERT_PATHS_TO_IMAGES=false, `image` will be remain as a string.
+        Otherwise, it will automatically be converted to a PathImage object.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -105,6 +121,10 @@ def should_capture_code() -> bool:
 
 def client_parallelism() -> Optional[int]:
     return _optional_int("client_parallelism")
+
+
+def should_convert_paths_to_images() -> bool:
+    return _should("convert_paths_to_images")
 
 
 def parse_and_apply_settings(
