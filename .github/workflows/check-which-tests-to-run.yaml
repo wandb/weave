@@ -39,7 +39,6 @@ jobs:
         run: |
           echo "Changed files:"
           echo "${{ steps.changed-files.outputs.all_changed_files }}"
-
       - name: Set changed files output
         run: echo "changed_files=$(echo '${{ steps.changed-files.outputs.all_changed_files }}')" >> $GITHUB_ENV
       - id: weave_query
