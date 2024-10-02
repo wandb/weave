@@ -24,6 +24,8 @@ from weave_query.language_features.tagging.tag_store import (
     isolated_tagging_context,
 )
 
+# test
+
 logs.configure_logger()
 
 # Lazy mode was the default for a long time. Eager is now the default for the user API.
