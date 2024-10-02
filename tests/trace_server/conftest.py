@@ -4,13 +4,10 @@ import subprocess
 import time
 import typing
 import urllib
-import uuid
 
 import pytest
 import requests
 
-from weave.trace import weave_client
-from weave.trace.weave_init import InitializedClient
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     external_to_internal_trace_server_adapter,

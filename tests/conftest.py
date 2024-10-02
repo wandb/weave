@@ -11,14 +11,9 @@ import weave
 from tests.trace.util import DummyTestException
 from weave.trace import autopatch, weave_init
 from weave.trace.client_context import context_state
-from weave.trace_server import (
-    clickhouse_trace_server_batched,
-    sqlite_trace_server,
-)
+from weave.trace_server import clickhouse_trace_server_batched, sqlite_trace_server
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
-
-from .trace.trace_server_clickhouse_conftest import *
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
