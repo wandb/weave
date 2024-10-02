@@ -330,6 +330,8 @@ export const CallsTable: FC<{
   const onAddFilter: OnAddFilter | undefined =
     filterModel && setFilterModel
       ? (field: string, operator: string | null, value: any, rowId: string) => {
+          // This condition is used to filter by the parent ref itself, not the child cell.
+          // Should be removed once we can filter by reffed values on the backend.
           if (columnIsRefExpanded(field)) {
             const expandedRef = getFieldAndValueForRefExpandedFilter(
               field,
