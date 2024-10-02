@@ -13,12 +13,12 @@ export const useProjectSidebar = (
   hasModelsAccess: boolean = true
 ): FancyPageSidebarItem[] => {
   // Should show models sidebar items if we have models data or if we don't have a trace backend
-  var showModelsSidebarItems = hasModelsData || !hasTraceBackend;
+  let showModelsSidebarItems = hasModelsData || !hasTraceBackend;
   // Should show weave sidebar items if we have weave data and we have a trace backend
-  var showWeaveSidebarItems = hasWeaveData && hasTraceBackend;
+  let showWeaveSidebarItems = hasWeaveData && hasTraceBackend;
 
-  var isModelsOnly = showModelsSidebarItems && !showWeaveSidebarItems;
-  var isWeaveOnly = !showModelsSidebarItems && showWeaveSidebarItems;
+  let isModelsOnly = showModelsSidebarItems && !showWeaveSidebarItems;
+  let isWeaveOnly = !showModelsSidebarItems && showWeaveSidebarItems;
 
   if (!hasModelsAccess) {
     showModelsSidebarItems = false;
