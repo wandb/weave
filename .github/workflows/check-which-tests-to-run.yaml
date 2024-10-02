@@ -29,13 +29,19 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
           ref: ${{ github.head_ref }}
-      - name: Git setup
+      - name: Get changed files
         run: |
-          git fetch origin ${{ github.base_ref }}
-          base_sha=$(git rev-parse origin/${{ github.base_ref }})
-          head_sha=$(git rev-parse HEAD)
-          changed_files=$(git diff --name-only $base_sha $head_sha)
-          echo "changed_files=$changed_files"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin ${{ github.base_ref }}
+            base_sha=$(git rev-parse origin/${{ github.base_ref }})
+            head_sha=$(git rev-parse HEAD)
+            changed_files=$(git diff --name-only $base_sha $head_sha)
+          else
+            changed_files=$(git diff --name-only HEAD^ HEAD)
+          fi
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$changed_files" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - id: weave_query
         name: Weave Query Checks
         run: |
