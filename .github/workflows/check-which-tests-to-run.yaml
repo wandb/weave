@@ -33,7 +33,7 @@ jobs:
         id: changed-files
         run: |
           # Get the base branch (the branch we're merging into)
-          BASE_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          BASE_BRANCH=${{ github.base_ref }}
 
           # Get the current HEAD commit
           CURRENT_HEAD=$(git rev-parse HEAD)
