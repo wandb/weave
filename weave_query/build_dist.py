@@ -26,11 +26,11 @@ known_dirs = set()
 with open("MANIFEST.in") as f:
     for line in f.readlines():
         if line.startswith("graft"):
-            known_dirs.add(line.split(" ")[1].strip().replace("weave/", ""))
+            known_dirs.add(line.split(" ")[1].strip().replace("weave_query/", ""))
 
 bad_dirs = set()
-for name in os.listdir("./weave"):
-    if os.path.isfile(os.path.join("./weave", name)):
+for name in os.listdir("./weave_query"):
+    if os.path.isfile(os.path.join("./weave_query", name)):
         continue
     if name in ignored_dirs:
         continue
@@ -43,7 +43,7 @@ if len(bad_dirs) > 0:
     )
 
 if os.getenv("WEAVE_SKIP_BUILD") == None:
-    subprocess.run(["bash", "weave_query/weave_query/frontend/build.sh"], check=True)
+    subprocess.run(["bash", "weave_query/frontend/build.sh"], check=True)
 else:
     print("!!! Skipping frontend build !!!")
 
