@@ -10,6 +10,7 @@ on:
       trace_server_tests:
         value: ${{ jobs.check.outputs.trace_server_tests }}
 
+      
 env:
   WEAVE_QUERY_PATHS: 'weave_query/'
   WEAVE_JS_PATHS: 'weave-js/'
