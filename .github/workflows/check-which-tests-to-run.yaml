@@ -37,29 +37,20 @@ jobs:
       - name: Get changed files
         id: changed-files
         run: |
-          # Get the base branch (the branch we're merging into)
-          BASE_BRANCH=${{ inputs.base_ref }}
-
-          # Get the current HEAD commit
-          CURRENT_HEAD=$(git rev-parse HEAD)
-
-          # Get the merge base (common ancestor) of the current HEAD and the base branch
-          MERGE_BASE=$(git merge-base $BASE_BRANCH $CURRENT_HEAD)
-
-          # Get all changed files between the merge base and the current HEAD
-          CHANGED_FILES=$(git diff --name-only $MERGE_BASE $CURRENT_HEAD)
-
-          # Set the output
-          echo "all_changed_files<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
+          git fetch origin ${{ github.base_ref }}
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_sha=$(git rev-parse origin/${{ github.base_ref }})
+            head_sha=$(git rev-parse HEAD)
+            changed_files=$(git diff --name-only $base_sha $head_sha)
+          else
+            changed_files=$(git diff --name-only HEAD^)
+          fi
       - name: Echo changed files to terminal
         run: |
           echo "Changed files:"
-          echo "${{ steps.changed-files.outputs.all_changed_files }}"
+          echo "${{ steps.changed-files.outputs.changed_files }}"
       - name: Set changed files output
-        run: echo "changed_files=$(echo '${{ steps.changed-files.outputs.all_changed_files }}')" >> $GITHUB_ENV
+        run: echo "changed_files=$(echo '${{ steps.changed-files.outputs.changed_files }}')" >> $GITHUB_ENV
       - id: weave_query
         name: Weave Query Checks
         run: |
