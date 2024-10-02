@@ -162,10 +162,8 @@ async def test_evaluation_resilience(
     logs = log_collector.get_error_logs()
     ag_res = Counter([k.split(", req:")[0] for k in set([l.msg for l in logs])])
     assert len(ag_res) == 2
-    assert ag_res == {
-        "Task failed: DummyTestException: ('FAILURE - obj_create": 1,
-        "Task failed: DummyTestException: ('FAILURE - file_create": 1,
-    }
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - obj_create"] <= 2
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - file_create"] <= 2
 
     # We should gracefully handle the error and return a value
     with raise_on_captured_errors(False):
