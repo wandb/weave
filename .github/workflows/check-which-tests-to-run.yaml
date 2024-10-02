@@ -29,19 +29,28 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
           ref: ${{ github.head_ref }}
-      - name: Git setup
+      - name: Get changed files
         run: |
-          # Determine the base branch
-          if [[ -n "${{ github.base_ref }}" ]]; then
-            # For pull requests, use the base branch
+          # Fetch all branches
+          git fetch --all
+
+          # Determine the base branch and current commit
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # For pull requests
             BASE_BRANCH="${{ github.base_ref }}"
+            CURRENT_COMMIT="${{ github.event.pull_request.head.sha }}"
           else
-            # For pushes, use the default branch (usually main or master)
+            # For pushes
             BASE_BRANCH=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')
+            CURRENT_COMMIT="${{ github.sha }}"
           fi
           echo "Base branch is $BASE_BRANCH"
 
-          changed_files=$(git diff --name-only $(git merge-base --fork-point origin/$BASE_BRANCH HEAD) HEAD)
+          # Find the common ancestor
+          MERGE_BASE=$(git merge-base origin/$BASE_BRANCH $CURRENT_COMMIT)
+
+          # Get changed files
+          changed_files=$(git diff --name-only $MERGE_BASE $CURRENT_COMMIT)
           echo "Changed files:"
           echo "$changed_files"
           echo "changed_files<<EOF" >> $GITHUB_ENV
