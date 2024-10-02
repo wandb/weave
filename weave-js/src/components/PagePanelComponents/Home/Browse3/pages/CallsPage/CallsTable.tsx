@@ -285,16 +285,16 @@ export const CallsTable: FC<{
       if (columnIsRefExpanded(field)) {
         // In this case, we actually just want to filter by the parent ref itself.
         // This means we need to:
-        // 1. Determine the column of the highest level anscestor column with a ref
+        // 1. Determine the column of the highest level ancestor column with a ref
         // 2. Get the value of that corresponding cell (ref column @ row)
         // 3. Add a filter for that ref on that column.
-        // The aknoweldged drawback of this approach is that we are not filtering by that
+        // The acknowledge drawback of this approach is that we are not filtering by that
         // cell's value, but rather the entire object itself. This still might confuse users,
         // but is better than returning nothing.
         const fieldParts = field.split('.');
         let ancestorField: string | null = null;
         let targetRef: string | null = null;
-        for (let i = 0; i <= fieldParts.length; i++) {
+        for (let i = 1; i <= fieldParts.length; i++) {
           const ancestorFieldCandidate = fieldParts.slice(0, i).join('.');
           if (expandedRefCols.has(ancestorFieldCandidate)) {
             const candidateRow = callsResult.find(
@@ -332,14 +332,11 @@ export const CallsTable: FC<{
       ? (field: string, operator: string | null, value: any, rowId: string) => {
           // This condition is used to filter by the parent ref itself, not the child cell.
           // Should be removed once we can filter by reffed values on the backend.
-          if (columnIsRefExpanded(field)) {
-            const expandedRef = getFieldAndValueForRefExpandedFilter(
-              field,
-              rowId
-            );
-            if (expandedRef == null) {
-              return;
-            }
+          const expandedRef = getFieldAndValueForRefExpandedFilter(
+            field,
+            rowId
+          );
+          if (expandedRef != null) {
             value = expandedRef.value;
             field = expandedRef.field;
           }
@@ -374,7 +371,7 @@ export const CallsTable: FC<{
   );
 
   // This contains columns which are suitable for selection and raw data
-  // entry. Noteably, not children of expanded refs.
+  // entry. Notably, not children of expanded refs.
   const filterFriendlyColumnInfo = useMemo(() => {
     const filteredCols = columns.cols.filter(
       col => !columnIsRefExpanded(col.field)
