@@ -39,6 +39,7 @@ import {useHistory} from 'react-router-dom';
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {Tailwind} from '../../../../../Tailwind';
+import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
@@ -63,6 +64,7 @@ import {
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
+import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
@@ -274,18 +276,6 @@ export const CallsTable: FC<{
     [callsResult]
   );
 
-  const colIsChildOfExpandedRefCol = useCallback(
-    (col: string) => {
-      for (const refCol of expandedRefCols) {
-        if (col.startsWith(refCol + '.')) {
-          return true;
-        }
-      }
-      return false;
-    },
-    [expandedRefCols]
-  );
-
   const onAddFilter: OnAddFilter | undefined = useMemo(() => {
     if (!filterModel || !setFilterModel) {
       return;
@@ -296,7 +286,7 @@ export const CallsTable: FC<{
       value: any,
       rowId: string
     ) => {
-      if (colIsChildOfExpandedRefCol(field)) {
+      if (columnIsRefExpanded(field)) {
         // In this case, we actually just want to filter by the parent ref itself.
         // This means we need to:
         // 1. Determine the column of the highest level anscestor column with a ref
@@ -307,24 +297,30 @@ export const CallsTable: FC<{
         // but is better than returning nothing.
         const fieldParts = field.split('.');
         let ancestorField: string | null = null;
-        for (let i = 0; i < fieldParts.length; i++) {
+        let targetRef: string | null = null;
+        for (let i = 0; i <= fieldParts.length; i++) {
           const ancestorFieldCandidate = fieldParts.slice(0, i).join('.');
           if (expandedRefCols.has(ancestorFieldCandidate)) {
-            ancestorField = ancestorFieldCandidate;
-            break;
+            const candidateRow = callsResult.find(
+              row => row.traceCall?.id === rowId
+            )?.traceCall;
+            if (candidateRow != null) {
+              const flattenedCandidateRow =
+                flattenObjectPreservingWeaveTypes(candidateRow);
+              const targetRefCandidate =
+                flattenedCandidateRow[
+                  ancestorFieldCandidate + '.' + EXPANDED_REF_REF_KEY
+                ];
+              if (targetRefCandidate != null) {
+                ancestorField = ancestorFieldCandidate;
+                targetRef = targetRefCandidate;
+                break;
+              }
+            }
           }
         }
         if (ancestorField == null) {
           console.warn('Could not find ancestor ref column for', field);
-          return;
-        }
-
-        const targetRef = tableData.find(row => row.id === rowId)?.[
-          ancestorField
-        ];
-
-        if (targetRef == null) {
-          console.warn('Could not find target ref for', ancestorField, rowId);
           return;
         }
 
@@ -347,11 +343,11 @@ export const CallsTable: FC<{
       setFilterModel(newModel);
     };
   }, [
-    colIsChildOfExpandedRefCol,
+    callsResult,
+    columnIsRefExpanded,
     expandedRefCols,
     filterModel,
     setFilterModel,
-    tableData,
   ]);
 
   // Column Management: Build the columns needed for the table
@@ -371,13 +367,13 @@ export const CallsTable: FC<{
   // entry. Noteably, not children of expanded refs.
   const filterFriendlyColumnInfo = useMemo(() => {
     const filteredCols = columns.cols.filter(
-      col => !colIsChildOfExpandedRefCol(col.field)
+      col => !columnIsRefExpanded(col.field)
     );
     return {
       cols: filteredCols,
       colGroupingModel: columns.colGroupingModel,
     };
-  }, [colIsChildOfExpandedRefCol, columns.colGroupingModel, columns.cols]);
+  }, [columnIsRefExpanded, columns.colGroupingModel, columns.cols]);
 
   // Now, there are 4 primary controls:
   // 1. Op Version
