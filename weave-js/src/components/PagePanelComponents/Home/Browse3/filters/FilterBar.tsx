@@ -31,7 +31,6 @@ type FilterBarProps = {
   clearSelectedCalls: () => void;
 
   width: number;
-  height: number;
 };
 
 const isFilterIncomplete = (filter: GridFilterItem): boolean => {

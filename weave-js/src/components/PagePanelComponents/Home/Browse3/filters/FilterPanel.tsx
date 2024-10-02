@@ -31,7 +31,7 @@ export const FilterPanel = (props: FilterPanelProps) => {
   return (
     <div className="min-w-90 flex-auto self-stretch">
       <LocalizationProvider dateAdapter={AdapterMoment}>
-        <FilterBar {...props} width={maxFilterBarWidth} height={28} />
+        <FilterBar {...props} width={maxFilterBarWidth} />
       </LocalizationProvider>
     </div>
   );
