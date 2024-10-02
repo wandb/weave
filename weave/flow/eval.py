@@ -278,7 +278,7 @@ class Evaluation(Object):
         return summary
 
     @weave.op()
-    async def get_eval_results(self, model: Union[Callable, Model]) -> EvaluationResults:
+    async def evaluate(self, model: Union[Callable, Model]) -> dict:
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
         eval_rows = []
@@ -330,13 +330,11 @@ class Evaluation(Object):
         # also bad. In the near-term, this will at least solve the problem of
         # breaking summarization with big datasets, but this is not the correct
         # long-term solution.
-        return EvaluationResults(rows=weave.Table(eval_rows))
-
-    @weave.op()
-    async def evaluate(self, model: Union[Callable, Model]) -> dict:
-        eval_results = await self.get_eval_results(model)
+        eval_results = EvaluationResults(rows=weave.Table(eval_rows))
         summary = await self.summarize(eval_results)
+
         print("Evaluation summary", summary)
+
         return summary
 
 
