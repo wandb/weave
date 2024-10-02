@@ -178,6 +178,12 @@ class Evaluation(Object):
             model_args_with_self = {**model_predict_args}
             if self_arg is not None:
                 model_args_with_self["self"] = self_arg
+            if not is_op(model_predict):
+                raise ValueError(
+                    f"Evaluation.predict_and_score expects a model that is an Op, got {model_predict}"
+                )
+            else:
+                model_predict = as_op(model_predict)
             (model_output, model_output_call) = await async_call_op(
                 model_predict, **model_args_with_self
             )
@@ -241,6 +247,12 @@ class Evaluation(Object):
 
             try:
                 # TODO: Test different error cases
+                if not is_op(score_fn):
+                    raise ValueError(
+                        f"Evaluation.predict_and_score expects a model that is an Op, got {score_fn}"
+                    )
+                else:
+                    score_fn = as_op(score_fn)
                 (result, result_call) = await async_call_op(score_fn, **score_args)
             except OpCallError as e:
                 dataset_column_names = list(example.keys())

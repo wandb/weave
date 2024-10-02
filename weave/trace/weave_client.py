@@ -278,7 +278,7 @@ class Call:
     def remove_display_name(self) -> None:
         self.set_display_name(None)
 
-    def add_score(self, score_name: str, score: dict):
+    def add_score(self, score_name: str, score: dict) -> str:
         # This needs to be moved to the client and backgrounded.
         client = weave_client_context.require_weave_client()
         payload = {
@@ -286,10 +286,13 @@ class Call:
             "score": score,
         }
         payload = map_to_refs(payload)
-        payload_json = to_json(payload, client._project_id(), client.server)
+        payload_json = to_json(payload, client._project_id(), client)
+        ref = get_ref(self)
+        if ref is None:
+            raise ValueError("Can't add score to call without ref")
         freq = FeedbackCreateReq(
             project_id=client._project_id(),
-            weave_ref=get_ref(self).uri(),
+            weave_ref=ref.uri(),
             feedback_type="score",  # should this be score_name?
             payload=payload_json,
         )
