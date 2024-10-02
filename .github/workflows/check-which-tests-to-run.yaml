@@ -31,9 +31,28 @@ jobs:
           ref: ${{ github.head_ref }}
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@v39
-      - run: |
-          echo '${{ steps.changed-files.outputs.all_changed_files }}'
+        run: |
+          # Get the base branch (the branch we're merging into)
+          BASE_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+          # Get the current HEAD commit
+          CURRENT_HEAD=$(git rev-parse HEAD)
+
+          # Get the merge base (common ancestor) of the current HEAD and the base branch
+          MERGE_BASE=$(git merge-base $BASE_BRANCH $CURRENT_HEAD)
+
+          # Get all changed files between the merge base and the current HEAD
+          CHANGED_FILES=$(git diff --name-only $MERGE_BASE $CURRENT_HEAD)
+
+          # Set the output
+          echo "all_changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Echo changed files to terminal
+        run: |
+          echo "Changed files:"
+          echo "${{ steps.changed-files.outputs.all_changed_files }}"
       - name: Set changed files output
         run: echo "changed_files=$(echo '${{ steps.changed-files.outputs.all_changed_files }}')" >> $GITHUB_ENV
       - id: weave_query
