@@ -6,7 +6,6 @@
  *    * (BackendExpansion) Move Expansion to Backend, and support filter/sort
  */
 
-
 // Two objectives:
 // 1. If a user cmd-clicks a cell that is an expanded ref value, make the filter respect the ref
 // 2. If any column is expanded, then it is not a candidate for filtering.
@@ -45,6 +44,7 @@ import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {Tailwind} from '../../../../../Tailwind';
 import {useWeaveflowCurrentRouteContext} from '../../context';
+import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
@@ -273,30 +273,90 @@ export const CallsTable: FC<{
   }, [calls, effectiveFilter]);
 
   // Construct Flattened Table Data
-  const tableData: TraceCallSchema[] = useMemo(
+  const tableData: FlattenedCallData[] = useMemo(
     () => prepareFlattenedCallDataForTable(callsResult),
     [callsResult]
   );
 
-  const onAddFilter =
-    filterModel && setFilterModel
-      ? (field: string, operator: string | null, value: any) => {
-          const op = operator ? operator : getDefaultOperatorForValue(value);
-          const newModel = {
-            ...filterModel,
-            items: [
-              ...filterModel.items,
-              {
-                id: filterModel.items.length,
-                field,
-                operator: op,
-                value,
-              },
-            ],
-          };
-          setFilterModel(newModel);
+  const colIsChildOfExpandedRefCol = useCallback(
+    (col: string) => {
+      for (const refCol of expandedRefCols) {
+        if (col.startsWith(refCol + '.')) {
+          return true;
         }
-      : undefined;
+      }
+      return false;
+    },
+    [expandedRefCols]
+  );
+
+  const onAddFilter: OnAddFilter | undefined = useMemo(() => {
+    if (!filterModel || !setFilterModel) {
+      return;
+    }
+    return (
+      field: string,
+      operator: string | null,
+      value: any,
+      rowId: string
+    ) => {
+      if (colIsChildOfExpandedRefCol(field)) {
+        // In this case, we actually just want to filter by the parent ref itself.
+        // This means we need to:
+        // 1. Determine the column of the highest level anscestor column with a ref
+        // 2. Get the value of that corresponding cell (ref column @ row)
+        // 3. Add a filter for that ref on that column.
+        // The aknoweldged drawback of this approach is that we are not filtering by that
+        // cell's value, but rather the entire object itself. This still might confuse users,
+        // but is better than returning nothing.
+        const fieldParts = field.split('.');
+        let ancestorField: string | null = null;
+        for (let i = 0; i < fieldParts.length; i++) {
+          const ancestorFieldCandidate = fieldParts.slice(0, i).join('.');
+          if (expandedRefCols.has(ancestorFieldCandidate)) {
+            ancestorField = ancestorFieldCandidate;
+            break;
+          }
+        }
+        if (ancestorField == null) {
+          console.warn('Could not find ancestor ref column for', field);
+          return;
+        }
+
+        const targetRef = tableData.find(row => row.id === rowId)?.[
+          ancestorField
+        ];
+
+        if (targetRef == null) {
+          console.warn('Could not find target ref for', ancestorField, rowId);
+          return;
+        }
+
+        value = targetRef;
+        field = ancestorField;
+      }
+      const op = operator ? operator : getDefaultOperatorForValue(value);
+      const newModel = {
+        ...filterModel,
+        items: [
+          ...filterModel.items,
+          {
+            id: filterModel.items.length,
+            field,
+            operator: op,
+            value,
+          },
+        ],
+      };
+      setFilterModel(newModel);
+    };
+  }, [
+    colIsChildOfExpandedRefCol,
+    expandedRefCols,
+    filterModel,
+    setFilterModel,
+    tableData,
+  ]);
 
   // Column Management: Build the columns needed for the table
   const {columns, setUserDefinedColumnWidths} = useCallsTableColumns(
@@ -311,30 +371,17 @@ export const CallsTable: FC<{
     onAddFilter
   );
 
-  // This contains columns which are suitable for selection and raw data 
+  // This contains columns which are suitable for selection and raw data
   // entry. Noteably, not children of expanded refs.
   const filterFriendlyColumnInfo = useMemo(() => {
-    const colIsChildOfExpandedRefCol = (col: GridColDef) => {
-      for (const refCol of expandedRefCols) {
-        if (col.field.startsWith(refCol + '.')) {
-          return true;
-        }
-      }
-      return false;
-    };
-
-    const filteredCols = columns.cols.filter(col => !colIsChildOfExpandedRefCol(col))
+    const filteredCols = columns.cols.filter(
+      col => !colIsChildOfExpandedRefCol(col.field)
+    );
     return {
       cols: filteredCols,
       colGroupingModel: columns.colGroupingModel,
     };
-  }, [columns, expandedRefCols]);
-
-  console.log({
-    filterFriendlyColumnInfo,
-    columns,
-    expandedRefCols,
-  })
+  }, [colIsChildOfExpandedRefCol, columns.colGroupingModel, columns.cols]);
 
   // Now, there are 4 primary controls:
   // 1. Op Version
@@ -933,8 +980,10 @@ const getPeekId = (peekPath: string | null): string | null => {
   return pathname.split('/').pop() ?? null;
 };
 
+export type FlattenedCallData = TraceCallSchema & {[key: string]: string};
+
 function prepareFlattenedCallDataForTable(
   callsResult: CallSchema[]
-): Array<TraceCallSchema & {[key: string]: string}> {
+): FlattenedCallData[] {
   return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
 }
