@@ -276,16 +276,12 @@ export const CallsTable: FC<{
     [callsResult]
   );
 
-  const onAddFilter: OnAddFilter | undefined = useMemo(() => {
-    if (!filterModel || !setFilterModel) {
-      return;
-    }
-    return (
-      field: string,
-      operator: string | null,
-      value: any,
-      rowId: string
-    ) => {
+  // This is a specific helper that is used when the user attempts to option-click
+  // a cell that is a child cell of an expanded ref. In this case, we want to
+  // add a filter on the parent ref itself, not the child cell. Once we can properly
+  // filter by reffed values on the backend, this can be removed.
+  const getFieldAndValueForRefExpandedFilter = useCallback(
+    (field: string, rowId: string) => {
       if (columnIsRefExpanded(field)) {
         // In this case, we actually just want to filter by the parent ref itself.
         // This means we need to:
@@ -321,34 +317,46 @@ export const CallsTable: FC<{
         }
         if (ancestorField == null) {
           console.warn('Could not find ancestor ref column for', field);
-          return;
+          return null;
         }
 
-        value = targetRef;
-        field = ancestorField;
+        return {value: targetRef, field: ancestorField};
       }
-      const op = operator ? operator : getDefaultOperatorForValue(value);
-      const newModel = {
-        ...filterModel,
-        items: [
-          ...filterModel.items,
-          {
-            id: filterModel.items.length,
-            field,
-            operator: op,
-            value,
-          },
-        ],
-      };
-      setFilterModel(newModel);
-    };
-  }, [
-    callsResult,
-    columnIsRefExpanded,
-    expandedRefCols,
-    filterModel,
-    setFilterModel,
-  ]);
+      return null;
+    },
+    [callsResult, columnIsRefExpanded, expandedRefCols]
+  );
+
+  const onAddFilter: OnAddFilter | undefined =
+    filterModel && setFilterModel
+      ? (field: string, operator: string | null, value: any, rowId: string) => {
+          if (columnIsRefExpanded(field)) {
+            const expandedRef = getFieldAndValueForRefExpandedFilter(
+              field,
+              rowId
+            );
+            if (expandedRef == null) {
+              return;
+            }
+            value = expandedRef.value;
+            field = expandedRef.field;
+          }
+          const op = operator ? operator : getDefaultOperatorForValue(value);
+          const newModel = {
+            ...filterModel,
+            items: [
+              ...filterModel.items,
+              {
+                id: filterModel.items.length,
+                field,
+                operator: op,
+                value,
+              },
+            ],
+          };
+          setFilterModel(newModel);
+        }
+      : undefined;
 
   // Column Management: Build the columns needed for the table
   const {columns, setUserDefinedColumnWidths} = useCallsTableColumns(
