@@ -32,6 +32,8 @@ jobs:
       - name: Get changed files
         id: changed-files
         uses: tj-actions/changed-files@v39
+      - run: |
+          echo '${{ steps.changed-files.outputs.all_changed_files }}'
       - name: Set changed files output
         run: echo "changed_files=$(echo '${{ steps.changed-files.outputs.all_changed_files }}')" >> $GITHUB_ENV
       - id: weave_query
