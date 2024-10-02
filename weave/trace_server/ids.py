@@ -4,6 +4,8 @@
 # so we can just use the library.
 import uuid_utils as uuid
 
+# example3
+
 
 def generate_id() -> str:
     """Should be used to generate IDs for trace calls.
