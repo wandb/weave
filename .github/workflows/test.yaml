@@ -20,7 +20,8 @@ jobs:
     name: Build Legacy (Query Service) test container
     timeout-minutes: 30
     runs-on: [self-hosted, builder]
-    # runs-on: ubuntu-latest
+    outputs:
+      build_needed: ${{ steps.build_check.outputs.build_needed }}
     env:
       REGISTRY: us-east4-docker.pkg.dev/weave-support-367421/weave-images
     needs: check-which-tests-to-run
@@ -70,7 +71,7 @@ jobs:
       matrix:
         job_num: [0, 1]
     # runs-on: ubuntu-latest
-    container: ${{ needs.build-container-query-service.outputs.build_needed == 'true' && 'us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-query-service:${{ github.sha }}' || 'ubuntu:latest' }}
+    container: ${{ needs.build-container-query-service.outputs.build_needed == 'true' && format('us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-query-service:{0}', github.sha) || null }}
     services:
       wandbservice:
         image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
