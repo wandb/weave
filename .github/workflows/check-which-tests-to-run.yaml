@@ -30,18 +30,10 @@ jobs:
           fetch-tags: true
           ref: ${{ github.head_ref }}
       - name: Get changed files
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git fetch origin ${{ github.base_ref }}
-            base_sha=$(git rev-parse origin/${{ github.base_ref }})
-            head_sha=$(git rev-parse HEAD)
-            changed_files=$(git diff --name-only $base_sha $head_sha)
-          else
-            changed_files=$(git diff --name-only HEAD^ HEAD)
-          fi
-          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
-          echo "$changed_files" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+        id: changed-files
+        uses: tj-actions/changed-files@v39
+      - name: Set changed files output
+        run: echo "changed_files=$(echo '${{ steps.changed-files.outputs.all_changed_files }}')" >> $GITHUB_ENV
       - id: weave_query
         name: Weave Query Checks
         run: |
