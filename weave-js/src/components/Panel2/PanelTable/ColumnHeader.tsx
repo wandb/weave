@@ -496,6 +496,19 @@ export const ColumnHeader: React.FC<{
     };
   }, [cellFrame, weave, propsSelectFunction, inputArrayNode]);
 
+  const columnNameStyle =
+    columnFormat?.textAlign === 'right'
+      ? {marginLeft: `-${colControlsWidth}px`}
+      : {marginRight: `-${colControlsWidth}px`};
+
+  // When there is a right justified column, reverse the order of the indicators
+  // and set z-index to 1 otherwise click events on the Ellipses icon is blocked
+  // by the click event on the column name due to DOM ordering and negative margins.
+  const columnActionContainerStyle =
+    columnFormat?.textAlign === 'right'
+      ? {zIndex: 1, flexDirection: 'row-reverse'}
+      : {flexDirection: 'row'};
+
   return (
     <S.ColumnHeader
       data-test="column-header"
@@ -543,12 +556,7 @@ export const ColumnHeader: React.FC<{
           }}
           trigger={
             <S.ColumnName
-              style={{
-                marginRight:
-                  columnFormat?.textAlign === 'center'
-                    ? `-${colControlsWidth}px`
-                    : 'inherit',
-              }}
+              style={columnNameStyle}
               onClick={() => setColumnSettingsOpen(!columnSettingsOpen)}>
               {propsColumnName !== '' ? (
                 <S.ColumnNameText>{propsColumnName}</S.ColumnNameText>
@@ -657,10 +665,7 @@ export const ColumnHeader: React.FC<{
           {({anchorRef, setOpen, open}) => (
             <S.ColumnActionContainer
               className="column-controls"
-              style={{
-                flexDirection:
-                  columnFormat?.textAlign === 'right' ? 'row-reverse' : 'row',
-              }}>
+              style={columnActionContainerStyle}>
               <S.ColumnAction>
                 {isPinned && (
                   <PinnedIndicator unpin={() => setColumnPinState(false)} />
