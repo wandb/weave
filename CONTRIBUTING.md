@@ -9,8 +9,6 @@
     - [Linting](#linting)
     - [Building the `weave` package](#building-the-weave-package)
     - [Testing](#testing)
-    - [Adding settings](#adding-settings)
-    - [Adding URLs](#adding-urls)
     - [Deprecating features](#deprecating-features)
 
 ## Issues and PRs
@@ -82,12 +80,6 @@ Examples can be found in the section below.
 
 ## Setting up your environment
 
-We use [uv](https://astral.sh/blog/uv) for package and env management. Follow the [uv guide to bootstrap an environment](https://docs.astral.sh/uv/getting-started/installation/), run:
-
-```sh
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
 We use:
 
 1. [`uv`](<(https://astral.sh/blog/uv)>) for package and env management -- follow the [uv guide to bootstrap an environment](https://docs.astral.sh/uv/getting-started/installation/)
@@ -152,23 +144,8 @@ nox -e "$TARGET_ENV"  # e.g. nox -e "tests-3.12(shard='trace')"
 Tests are split up into shards, which include:
 
 1. `trace` -- all of the trace SDK tests
-2. `trace_server` -- tests for the clickhouse trace server backend
+2. `trace_server` -- tests for trace server backend
 3. various integrations, like `openai`, `instructor`, etc -- these envs are isolated to simplify testing
-
-### Adding settings
-
-Settings are currently handled on the `UserSettings` object in `weave.trace.settings` and via env vars.
-
-To add a new setting:
-
-1. Add a new field to the `UserSettings` class and provide a short description; and
-2. Add a `should_{new_setting_name}` func to the `settings` module so users can check if that setting is enabled
-
-By default, the env var will be `WEAVE_{setting_name_in_all_caps}`, e.g. `WEAVE_PRINT_CALL_LINK`.
-
-### Adding URLs
-
-To keep URLs consistent, make sure to add and access URLs from `weave.trace.urls`. We currently use functions to return URLs.
 
 ### Deprecating features
 
