@@ -19,7 +19,6 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
 
 from .trace.trace_server_clickhouse_conftest import *
-from .wandb_system_tests_conftest import *
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"

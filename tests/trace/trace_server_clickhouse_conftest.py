@@ -39,31 +39,6 @@ def clickhouse_trace_server(clickhouse_server):
     yield clickhouse_trace_server
 
 
-@pytest.fixture()
-def trace_init_client(clickhouse_trace_server, user_by_api_key_in_env):
-    # Generate a random project name to avoid conflicts between tests
-    # using the same shared backend server
-    random_project_name = str(uuid.uuid4())
-    server = TestOnlyUserInjectingExternalTraceServer(
-        clickhouse_trace_server, DummyIdConverter(), user_by_api_key_in_env.username
-    )
-    graph_client = weave_client.WeaveClient(
-        user_by_api_key_in_env.username, random_project_name, server
-    )
-
-    inited_client = InitializedClient(graph_client)
-
-    try:
-        yield inited_client
-    finally:
-        inited_client.reset()
-
-
-@pytest.fixture()
-def trace_client(trace_init_client):
-    return trace_init_client.client
-
-
 def _check_server_health(
     base_url: str, endpoint: str, num_retries: int = 1, sleep_time: int = 1
 ) -> bool:
