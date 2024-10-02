@@ -31,16 +31,6 @@ jobs:
           ref: ${{ github.head_ref }}
       - name: Git setup
         run: |
-        run: |
-          git fetch --all
-      - run: |
-          git checkout ${{ github.head_ref || github.ref_name}}
-      - run: |
-      run: |
-          git fetch --all
-      - run: |
-          git checkout ${{ github.head_ref || github.ref_name}}
-      - run: |
           changed_files=$(git diff --name-only $(git merge-base --fork-point origin/master HEAD) HEAD)
           echo "Changed files:"
           echo "$changed_files"
