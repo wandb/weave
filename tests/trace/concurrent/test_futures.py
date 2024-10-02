@@ -4,7 +4,6 @@ from typing import Any, List
 
 import pytest
 
-from weave.conftest import InMemoryWeaveLogCollector
 from weave.trace.concurrent.futures import FutureExecutor
 
 
@@ -19,7 +18,7 @@ def test_defer_simple() -> None:
 
 
 @pytest.mark.disable_logging_error_check
-def test_defer_with_exception(log_collector: InMemoryWeaveLogCollector) -> None:
+def test_defer_with_exception(log_collector) -> None:
     executor: FutureExecutor = FutureExecutor()
 
     def failing_task() -> None:
@@ -69,9 +68,7 @@ def test_then_multiple_futures() -> None:
 
 
 @pytest.mark.disable_logging_error_check
-def test_then_with_exception_in_future(
-    log_collector: InMemoryWeaveLogCollector,
-) -> None:
+def test_then_with_exception_in_future(log_collector) -> None:
     executor: FutureExecutor = FutureExecutor()
 
     def failing_task() -> None:
@@ -92,9 +89,7 @@ def test_then_with_exception_in_future(
 
 
 @pytest.mark.disable_logging_error_check
-def test_then_with_exception_in_callback(
-    log_collector: InMemoryWeaveLogCollector,
-) -> None:
+def test_then_with_exception_in_callback(log_collector) -> None:
     executor: FutureExecutor = FutureExecutor()
 
     def fetch_data() -> List[int]:
