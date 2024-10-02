@@ -25,7 +25,9 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
+import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
+import {Icon} from '@wandb/weave/components/Icon';
 import React, {
   FC,
   useCallback,
@@ -589,7 +591,7 @@ export const CallsTable: FC<{
               <div className="flex-none">
                 <ListItem
                   sx={{minWidth: 190, width: 320, height: 32, padding: 0}}>
-                  <FormControl fullWidth>
+                  <FormControl fullWidth sx={{borderColor: MOON_200}}>
                     <Autocomplete
                       PaperComponent={paperProps => (
                         <StyledPaper {...paperProps} />
@@ -598,6 +600,12 @@ export const CallsTable: FC<{
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           height: '32px',
+                          '& fieldset': {
+                            borderColor: MOON_200,
+                          },
+                          '&:hover fieldset': {
+                            borderColor: `rgba(${TEAL_300}, 0.48)`,
+                          },
                         },
                         '& .MuiOutlinedInput-input': {
                           height: '32px',
@@ -639,6 +647,8 @@ export const CallsTable: FC<{
                       }
                       groupBy={option => opVersionOptions[option]?.group}
                       options={Object.keys(opVersionOptions)}
+                      popupIcon={<Icon name="chevron-down" />}
+                      clearIcon={<Icon name="close" />}
                     />
                   </FormControl>
                 </ListItem>

@@ -88,7 +88,6 @@ export const ManageColumnsButton = ({
       <span ref={ref}>
         <Button
           variant="outline"
-          size="medium"
           icon="miller-columns"
           tooltip="Manage columns"
           onClick={onClick}>

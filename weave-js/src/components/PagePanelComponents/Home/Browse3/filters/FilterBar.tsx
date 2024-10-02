@@ -210,7 +210,6 @@ export const FilterBar = ({
     <>
       <Button
         variant="outline"
-        size="medium"
         icon="filter-alt"
         ref={refBar}
         onClick={onClick}>
