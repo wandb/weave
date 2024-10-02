@@ -31,6 +31,27 @@ from weave.trace_server_bindings import remote_http_trace_server
 os.environ["WANDB_ERROR_REPORTING"] = "false"
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--weave-server",
+        action="store",
+        default="sqlite",
+        help="Specify the client object to use: sqlite or clickhouse",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    # Add the weave_client marker to all tests that have a client fixture
+    for item in items:
+        if "client" in item.fixturenames or "client_creator" in item.fixturenames:
+            item.add_marker(pytest.mark.weave_client)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED:
+        session.exitstatus = 0
+
+
 class ThrowingServer(tsi.TraceServerInterface):
     # Call API
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
@@ -116,7 +137,7 @@ class ThrowingServer(tsi.TraceServerInterface):
 
 
 @pytest.fixture()
-def client_with_throwing_server(client: weave_client.WeaveClient):
+def client_with_throwing_server(client):
     curr_server = client.server
     client.server = ThrowingServer()
     try:
@@ -306,27 +327,6 @@ class TestOnlyUserInjectingExternalTraceServer(
         return super().cost_create(req)
 
 
-def pytest_sessionfinish(session, exitstatus):
-    if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED:
-        session.exitstatus = 0
-
-
-def pytest_collection_modifyitems(config, items):
-    # Add the weave_client marker to all tests that have a client fixture
-    for item in items:
-        if "client" in item.fixturenames or "client_creator" in item.fixturenames:
-            item.add_marker(pytest.mark.weave_client)
-
-
-def pytest_addoption(parser):
-    parser.addoption(
-        "--weave-server",
-        action="store",
-        default="sqlite",
-        help="Specify the client object to use: sqlite or clickhouse",
-    )
-
-
 PYTEST_CURRENT_TEST_ENV_VAR = "PYTEST_CURRENT_TEST"
 
 
@@ -390,12 +390,6 @@ def logging_error_check(request, log_collector):
         pytest.fail(
             f"Expected no errors, but found {len(error_logs)} error(s): {error_logs}"
         )
-
-
-@pytest.fixture()
-def strict_op_saving():
-    with context_state.strict_op_saving(True):
-        yield
 
 
 class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
