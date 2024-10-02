@@ -84,6 +84,30 @@ def dataclass_object_record(obj: Any) -> ObjectRecord:
     return ObjectRecord(attrs)
 
 
+def safe_is_protobuf_instance(obj: Any) -> bool:
+    try:
+        import google.protobuf.message
+
+        return isinstance(obj, google.protobuf.message.Message)
+    except ImportError:
+        return False
+
+
+def protobuf_asdict_one_level(obj: Any) -> dict[str, Any]:
+    if not safe_is_protobuf_instance(obj):
+        raise ValueError(f"{obj} is not a protobuf instance")
+    return {field.name: getattr(obj, field.name) for field in obj.DESCRIPTOR.fields}
+
+
+def protobuf_object_record(obj: Any) -> ObjectRecord:
+    if not safe_is_protobuf_instance(obj):
+        raise ValueError(f"{obj} is not a protobuf instance")
+    attrs = protobuf_asdict_one_level(obj)
+    attrs["_class_name"] = obj.__class__.__name__
+    attrs["_bases"] = class_all_bases_names(obj.__class__)
+    return ObjectRecord(attrs)
+
+
 # This is an exact copy of the getmembers function from the inspect module
 # with the addition of handling exceptions when calling getattr, with an on_error handler
 def getmembers(
