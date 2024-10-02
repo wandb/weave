@@ -10,14 +10,14 @@ Note 2: There is a subtle distinction between the concept of an Evaluation and a
 ## Current Data Model
 
 The current logical data model consists of:
-    * `Evaluation` - a Weave Evaluation that defines an Evaluation. It contains:
-        * `Dataset` - a Weave Dataset that contains the data for the Eval (currently columns are completely user defined)
-        * `Scorer`s - a list of Weave Scorer Objects (or Weave Ops) that are used to score the model against the data
-            * Note: The user can define a custom scorer if they want to define custom aggregation logic, else an op is fine.
-            * Note 2: The scorer function parameters must be (model_output, **some_subset_of_dataset_columns)
-    * `EvaluationRun` - a Weave Call of the `Evaluation.evaluate` method op. It is paramterized by:
-        * `Model` - a Weave Model (or Weave Op) that is used to make predictions. The parameters of the op must be a subset of the columns of the dataset.
-        * `Trials` - the number of trails to run per-row of the dataset - this is critical in LLM evaluation due to inherent randomness - analysis must be able to aggregate across multiple trials.
+  * `Evaluation` - a Weave Evaluation that defines an Evaluation. It contains:
+    * `Dataset` - a Weave Dataset that contains the data for the Eval (currently columns are completely user defined)
+    * `Scorer`s - a list of Weave Scorer Objects (or Weave Ops) that are used to score the model against the data
+        * Note: The user can define a custom scorer if they want to define custom aggregation logic, else an op is fine.
+        * Note 2: The scorer function parameters must be (model_output, **some_subset_of_dataset_columns)
+  * `EvaluationRun` - a Weave Call of the `Evaluation.evaluate` method op. It is paramterized by:
+    * `Model` - a Weave Model (or Weave Op) that is used to make predictions. The parameters of the op must be a subset of the columns of the dataset.
+    * `Trials` - the number of trails to run per-row of the dataset - this is critical in LLM evaluation due to inherent randomness - analysis must be able to aggregate across multiple trials.
 
 Under the hood, the EvaluationRun is modeled as a Weave Call, and is stored as a Weave Trace. The canonical shape of the trace is:
 * EvaluationRun
