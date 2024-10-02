@@ -17,10 +17,9 @@ repos:
       - id: mypy
         additional_dependencies:
           [types-pkg-resources==0.1.3, types-all, wandb>=0.15.5]
-        # You have to exclude in 3 places. 1) here. 2) mypi.ini exclude, 3) follow_imports = skip for each module in mypy.ini
-        # exclude: (.*pyi$)|(weave/legacy)|(weave/tests)
+        # Note: You have to update pyproject.toml[tool.mypy] too!
         args: ['--config-file=pyproject.toml']
-        exclude: (.*pyi$)|(weave_query)|(weave/tests)|(weave/trace_server/tests)|(weave/conftest.py)|(weave/trace/tests)|(integration_test)|(weave/tests/trace)|(weave/conftest.py)|(weave/trace_server/tests)|(examples)|(weave/integrations)|(weave/docker)
+        exclude: (.*pyi$)|(weave_query)|(tests)|(examples)|(weave/docker)
   # This is legacy Weave when we were building a notebook product - should be removed
   - repo: local
     hooks:

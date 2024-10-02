@@ -12,6 +12,9 @@ on:
   push:
 
 jobs:
+  check-which-tests-to-run:
+    uses: ./.github/workflows/check-which-tests-to-run.yaml
+
   # ==== Query Service Jobs ====
   build-container-query-service:
     name: Build Legacy (Query Service) test container
@@ -20,37 +23,54 @@ jobs:
     # runs-on: ubuntu-latest
     env:
       REGISTRY: us-east4-docker.pkg.dev/weave-support-367421/weave-images
+    needs: check-which-tests-to-run
+
+    # if: github.ref == 'refs/heads/master' || needs.check-which-tests-to-run.outputs.weave_query_tests
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 2
 
+      - name: Check if build is needed
+        id: build_check
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/master" || "${{ needs.check-which-tests-to-run.outputs.weave_query_tests }}" == "true" ]]; then
+            echo "Build is needed"
+            echo "build_needed=true" >> $GITHUB_OUTPUT
+          else
+            echo "Build is not needed"
+            echo "build_needed=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Login to Docker Hub
+        if: steps.build_check.outputs.build_needed == 'true'
         uses: docker/login-action@v2
         with:
           registry: us-east4-docker.pkg.dev
           username: _json_key
           password: ${{ secrets.gcp_sa_key }}
 
-      # this script is hardcoded to build for linux/amd64
       - name: Prune docker cache
+        if: steps.build_check.outputs.build_needed == 'true'
         run: docker system prune -f
-      - name: Build legacy (query sevice) unit test image
+
+      - name: Build legacy (query service) unit test image
+        if: steps.build_check.outputs.build_needed == 'true'
         run: python3 weave/docker/docker_build.py build_deps weave-test-python-query-service builder . weave_query/Dockerfile.ci.test
 
   test-query-service:
     name: Legacy (Query Service) Python unit tests
     timeout-minutes: 15 # do not raise! running longer than this indicates an issue with the tests. fix there.
     needs:
+      - check-which-tests-to-run
       - build-container-query-service
-    # runs-on: [self-hosted, gke-runner]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         job_num: [0, 1]
     # runs-on: ubuntu-latest
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-query-service:${{ github.sha }}
+    container: ${{ needs.build-container-query-service.outputs.build_needed == 'true' && 'us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-query-service:${{ github.sha }}' || 'ubuntu:latest' }}
     services:
       wandbservice:
         image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
@@ -65,14 +85,25 @@ jobs:
           - '8083:8083'
           - '9015:9015'
         options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
+    outputs:
+      tests_should_run: ${{ steps.test_check.outputs.tests_should_run }}
     steps:
-      # - uses: datadog/agent-github-action@v1.3
-      #   with:
-      #     api_key: ${{ secrets.DD_API_KEY }}
       - uses: actions/checkout@v2
+      - name: Check if tests should run
+        id: test_check
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/master" || "${{ needs.check-which-tests-to-run.outputs.weave_query_tests }}" == "true" ]]; then
+            echo "Tests should run"
+            echo "tests_should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "Tests should not run"
+            echo "tests_should_run=false" >> $GITHUB_OUTPUT
+          fi
       - name: Verify wandb server is running
+        if: steps.test_check.outputs.tests_should_run == 'true'
         run: curl -s http://wandbservice:8080/healthz
       - name: Run Legacy (Query Service) Python Unit Tests
+        if: steps.test_check.outputs.tests_should_run == 'true'
         env:
           DD_SERVICE: weave-python
           DD_ENV: ci
@@ -108,16 +139,30 @@ jobs:
   weavejs-lint-compile:
     name: WeaveJS Lint and Compile
     runs-on: ubuntu-latest
-    # runs-on: [self-hosted, gke-runner]
+    needs:
+      - check-which-tests-to-run
     steps:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check if lint and compile should run
+        id: check_run
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/master" || "${{ needs.check-which-tests-to-run.outputs.weave_js_tests }}" == "true" ]]; then
+            echo "Lint and compile should run"
+            echo "should_lint_and_compile=true" >> $GITHUB_OUTPUT
+          else
+            echo "Lint and compile should not run"
+            echo "should_lint_and_compile=false" >> $GITHUB_OUTPUT
+          fi
       - uses: actions/setup-node@v1
+        if: steps.check_run.outputs.should_lint_and_compile == 'true'
         with:
           node-version: '18.x'
-      - run: |
+      - name: Run WeaveJS Lint and Compile
+        if: steps.check_run.outputs.should_lint_and_compile == 'true'
+        run: |
           set -e
           cd weave-js
           yarn install --frozen-lockfile
