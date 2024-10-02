@@ -31,6 +31,16 @@ jobs:
           ref: ${{ github.head_ref }}
       - name: Git setup
         run: |
+          # Determine the base branch
+          if [[ -n "${{ github.base_ref }}" ]]; then
+            # For pull requests, use the base branch
+            BASE_BRANCH="${{ github.base_ref }}"
+          else
+            # For pushes, use the default branch (usually main or master)
+            BASE_BRANCH=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')
+          fi
+          echo "Base branch is $BASE_BRANCH"
+
           changed_files=$(git diff --name-only $(git merge-base --fork-point origin/master HEAD) HEAD)
           echo "Changed files:"
           echo "$changed_files"
