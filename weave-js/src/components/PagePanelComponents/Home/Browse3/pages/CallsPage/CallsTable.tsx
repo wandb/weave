@@ -69,6 +69,7 @@ import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
   ExportSelector,
+  PaginationButtons,
   RefreshButton,
 } from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
@@ -802,6 +803,10 @@ export const CallsTable: FC<{
         onPinnedColumnsChange={onPinnedColumnsChange}
         sx={{
           borderRadius: 0,
+          // This moves the pagination controls to the left
+          '& .MuiDataGrid-footerContainer': {
+            justifyContent: 'flex-start',
+          },
         }}
         slots={{
           noRowsOverlay: () => {
@@ -855,6 +860,7 @@ export const CallsTable: FC<{
             );
           },
           columnMenu: CallsCustomColumnMenu,
+          pagination: PaginationButtons,
         }}
       />
     </FilterLayoutTemplate>
