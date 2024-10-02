@@ -364,7 +364,7 @@ class WeaveTable(Traceable):
 
     def _remote_iter(self) -> Generator[dict, None, None]:
         page_index = 0
-        page_size = 1000
+        page_size = 100
         while True:
             if self.table_ref is None:
                 break

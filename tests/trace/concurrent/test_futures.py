@@ -17,7 +17,8 @@ def test_defer_simple() -> None:
     assert future.result() == 42
 
 
-def test_defer_with_exception() -> None:
+@pytest.mark.disable_logging_error_check
+def test_defer_with_exception(log_collector) -> None:
     executor: FutureExecutor = FutureExecutor()
 
     def failing_task() -> None:
@@ -26,6 +27,10 @@ def test_defer_with_exception() -> None:
     future: Future[None] = executor.defer(failing_task)
     with pytest.raises(ValueError, match="Test exception"):
         future.result()
+
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert "ValueError: Test exception" in logs[0].msg
 
 
 def test_then_single_future() -> None:
@@ -62,7 +67,8 @@ def test_then_multiple_futures() -> None:
     assert future_result.result() == 15
 
 
-def test_then_with_exception_in_future() -> None:
+@pytest.mark.disable_logging_error_check
+def test_then_with_exception_in_future(log_collector) -> None:
     executor: FutureExecutor = FutureExecutor()
 
     def failing_task() -> None:
@@ -77,8 +83,13 @@ def test_then_with_exception_in_future() -> None:
     with pytest.raises(ValueError, match="Future exception"):
         future_result.result()
 
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert "ValueError: Future exception" in logs[0].msg
 
-def test_then_with_exception_in_callback() -> None:
+
+@pytest.mark.disable_logging_error_check
+def test_then_with_exception_in_callback(log_collector) -> None:
     executor: FutureExecutor = FutureExecutor()
 
     def fetch_data() -> List[int]:
@@ -92,6 +103,10 @@ def test_then_with_exception_in_callback() -> None:
 
     with pytest.raises(ValueError, match="Callback exception"):
         future_result.result()
+
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert "ValueError: Callback exception" in logs[0].msg
 
 
 def test_concurrent_execution() -> None:

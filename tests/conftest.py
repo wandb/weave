@@ -72,7 +72,7 @@ class InMemoryWeaveLogCollector(logging.Handler):
             # is causing it and need to ship this PR, so I am just going to filter it out
             # for now.
             and not record.msg.startswith(
-                "Job failed with exception: 400 Client Error: Bad Request for url: https://trace.wandb.ai/"
+                "Task failed: HTTPError: 400 Client Error: Bad Request for url: https://trace.wandb.ai/"
             )
             # Exclude legacy
             and not record.name.startswith("weave.weave_server")
