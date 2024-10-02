@@ -72,6 +72,7 @@ jobs:
       matrix:
         job_num: [0, 1]
     container: ${{ needs.build-container-query-service.outputs.build_needed == 'true' && format('us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-query-service:{0}', github.sha) || null }}
+
     services:
       wandbservice:
         image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
