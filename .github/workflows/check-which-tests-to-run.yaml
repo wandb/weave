@@ -10,7 +10,6 @@ on:
       trace_server_tests:
         value: ${{ jobs.check.outputs.trace_server_tests }}
 
-      
 env:
   WEAVE_QUERY_PATHS: 'weave_query/'
   WEAVE_JS_PATHS: 'weave-js/'
@@ -32,6 +31,12 @@ jobs:
           ref: ${{ github.head_ref }}
       - name: Git setup
         run: |
+        run: |
+          git fetch --all
+      - run: |
+          git checkout ${{ github.head_ref || github.ref_name}}
+      - run: |
+      run: |
           git fetch --all
       - run: |
           git checkout ${{ github.head_ref || github.ref_name}}
