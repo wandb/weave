@@ -39,6 +39,7 @@ jobs:
           else
             changed_files=$(git diff --name-only HEAD^)
           fi
+          echo "changed_files=$changed_files"
       - id: weave_query
         name: Weave Query Checks
         run: |
