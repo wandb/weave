@@ -6,8 +6,7 @@ import subprocess
 import time
 import typing
 import urllib
-from contextlib import _GeneratorContextManager
-from typing import Callable, Generator, Iterator
+from typing import Iterator
 
 import pytest
 import requests
@@ -17,7 +16,6 @@ from fastapi.testclient import TestClient
 import weave
 from tests.trace.util import DummyTestException
 from weave.trace import autopatch, weave_client, weave_init
-from weave.trace.client_context import context_state
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     external_to_internal_trace_server_adapter,
@@ -517,7 +515,7 @@ def create_client(request) -> weave_init.InitializedClient:
 
 
 @pytest.fixture()
-def client(request) -> Generator[weave_client.WeaveClient, None, None]:
+def client(request):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality"""
     inited_client = create_client(request)
@@ -528,11 +526,7 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
 
 
 @pytest.fixture()
-def client_creator(
-    request,
-) -> Generator[
-    Callable[[], _GeneratorContextManager[weave_client.WeaveClient]], None, None
-]:
+def client_creator(request):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
 
     @contextlib.contextmanager
