@@ -37,20 +37,22 @@ jobs:
       - name: Get changed files
         id: changed-files
         run: |
-          git fetch origin ${{ github.base_ref }}
+          git fetch origin ${{ inputs.base_ref }}
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base_sha=$(git rev-parse origin/${{ github.base_ref }})
+            base_sha=$(git rev-parse origin/${{ inputs.base_ref }})
             head_sha=$(git rev-parse HEAD)
-            changed_files=$(git diff --name-only $base_sha $head_sha)
           else
-            changed_files=$(git diff --name-only HEAD^)
+            base_sha=$(git rev-parse origin/${{ inputs.base_ref }})
+            head_sha=$(git rev-parse HEAD)
           fi
-      - name: Echo changed files to terminal
+          changed_files=$(git diff --name-only $base_sha $head_sha)
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$changed_files" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Echo changed files
         run: |
           echo "Changed files:"
           echo "${{ steps.changed-files.outputs.changed_files }}"
-      - name: Set changed files output
-        run: echo "changed_files=$(echo '${{ steps.changed-files.outputs.changed_files }}')" >> $GITHUB_ENV
       - id: weave_query
         name: Weave Query Checks
         run: |
