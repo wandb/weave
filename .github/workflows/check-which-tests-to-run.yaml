@@ -70,7 +70,7 @@ jobs:
       - id: trace_server
         name: Weave Trace Server Checks
         run: |
-          for path in ${{ env.CORE_INTEGRATION_PATHS }}; do
+          for path in ${{ env.TRACE_SERVER_PATHS }}; do
             if echo "$changed_files" | grep -q "$path"; then
               echo "run_tests=true" >> $GITHUB_OUTPUT
               exit 0
