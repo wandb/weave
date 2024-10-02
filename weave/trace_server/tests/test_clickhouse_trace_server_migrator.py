@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, patch
+
 from clickhouse_connect.driver.client import Client as CHClient
 
 # Import the ClickHouseTraceServerMigrator from its module

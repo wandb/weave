@@ -1,19 +1,21 @@
-import os
 import json
-import pytest
-from unittest.mock import MagicMock, patch
+import os
 from datetime import datetime
 from decimal import Decimal
+from typing import Any, Iterator
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Import the functions from your script
 from weave.trace_server.costs.create_new_migration import (
-    get_updated_costs,
-    load_costs_from_json,
+    CostDetails,
+    create_new_migration,
     filter_out_current_costs,
     get_migrations,
-    create_new_migration,
+    get_updated_costs,
+    load_costs_from_json,
     update_costs_in_json,
-    CostDetails,
 )
 
 # Constants for testing
@@ -22,7 +24,7 @@ TEST_MIGRATIONS_DIR = "test_migrations"
 
 
 # Helper function to clean up test files/directories
-def cleanup_test_environment():
+def cleanup_test_environment() -> None:
     if os.path.exists(TEST_COSTS_JSON):
         os.remove(TEST_COSTS_JSON)
     if os.path.exists(TEST_MIGRATIONS_DIR):
@@ -32,7 +34,7 @@ def cleanup_test_environment():
 
 
 @pytest.fixture(autouse=True)
-def run_around_tests():
+def run_around_tests() -> Iterator[None]:
     # Code that will run before each test
     cleanup_test_environment()
     yield
@@ -40,7 +42,7 @@ def run_around_tests():
     cleanup_test_environment()
 
 
-def test_get_updated_costs():
+def test_get_updated_costs() -> None:
     # Mock the requests.get call
     sample_response = {
         "model1": {
@@ -55,7 +57,7 @@ def test_get_updated_costs():
         },
     }
 
-    def mock_get(*args, **kwargs):
+    def mock_get(*args: Any, **kwargs: Any) -> MagicMock:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = sample_response
@@ -78,7 +80,9 @@ def test_get_updated_costs():
         }
 
 
-def test_load_costs_from_json():
+def test_load_costs_from_json() -> None:
+    costs_file = os.path.join(os.getcwd(), TEST_COSTS_JSON)
+
     # Create a sample costs.json file
     sample_costs = {
         "model1": {
@@ -87,15 +91,15 @@ def test_load_costs_from_json():
             "output": 0.002,
         }
     }
-    with open(TEST_COSTS_JSON, "w") as f:
+    with open(costs_file, "w") as f:
         json.dump(sample_costs, f)
 
     # Call the function with the test file
-    costs = load_costs_from_json(TEST_COSTS_JSON)
+    costs = load_costs_from_json(costs_file)
     assert costs == sample_costs
 
 
-def test_filter_out_current_costs():
+def test_filter_out_current_costs() -> None:
     current_costs = {
         "model1": CostDetails(provider="provider1", input=0.001, output=0.002),
         "model2": CostDetails(provider="provider2", input=0.003, output=0.004),
@@ -119,8 +123,8 @@ def test_filter_out_current_costs():
     assert "model1" not in filtered_costs
 
 
-def test_get_migrations():
-    TEST_MIGRATIONS_DIR = os.path.join(os.getcwd(), "test_migrations")
+def test_get_migrations() -> None:
+    migrations_dir = os.path.join(os.getcwd(), TEST_MIGRATIONS_DIR)
     migration_files = [
         "001_init.up.sql",
         "001_init.down.sql",
@@ -129,13 +133,13 @@ def test_get_migrations():
     ]
 
     # Create a test migrations directory with sample files
-    os.makedirs(TEST_MIGRATIONS_DIR, exist_ok=True)
+    os.makedirs(migrations_dir, exist_ok=True)
 
     for file in migration_files:
-        open(os.path.join(TEST_MIGRATIONS_DIR, file), "a").close()
+        open(os.path.join(migrations_dir, file), "a").close()
 
     # Call get_migrations with the test migrations directory
-    migrations = get_migrations(migrations_dir=TEST_MIGRATIONS_DIR)
+    migrations = get_migrations(migrations_dir=migrations_dir)
     assert len(migrations) == 2
     assert migrations[1]["up"] == "001_init.up.sql"
     assert migrations[1]["down"] == "001_init.down.sql"
@@ -143,7 +147,7 @@ def test_get_migrations():
     assert migrations[2]["down"] == "002_add_table.down.sql"
 
 
-def test_create_new_migration():
+def test_create_new_migration() -> None:
     # Prepare test data
     migration_number = "003"
     new_costs = {
@@ -200,20 +204,20 @@ def test_create_new_migration():
             assert f"created_at = '{current_time_str}'" in content
 
 
-def test_update_costs_in_json():
+def test_update_costs_in_json() -> None:
+    costs_file = os.path.join(os.getcwd(), TEST_COSTS_JSON)
+
+    # Create a sample costs.json file
     new_costs = {
         "model1": CostDetails(provider="provider1", input=0.001, output=0.002),
         "model2": CostDetails(provider="provider2", input=0.003, output=0.004),
     }
 
     # Mock COST_FILE to point to the test file
-    with patch(
-        "weave.trace_server.costs.create_new_migration.COST_FILE", TEST_COSTS_JSON
-    ):
-        update_costs_in_json(new_costs)
+    update_costs_in_json(new_costs, costs_file)
 
-        # Verify that the file is created and contains the correct data
-        assert os.path.exists(TEST_COSTS_JSON)
-        with open(TEST_COSTS_JSON, "r") as f:
-            data = json.load(f)
-            assert data == new_costs
+    # Verify that the file is created and contains the correct data
+    assert os.path.exists(costs_file)
+    with open(costs_file, "r") as f:
+        data = json.load(f)
+        assert data == new_costs

@@ -1,8 +1,10 @@
 # This script creates a new migration for the llm_token_prices table
-# It pulls existing costs from costs.json and updates them with the latest costs from the litellm model_prices_and_context_window.json file
+# It pulls existing costs from costs.json and compares them with the latest costs from the litellm model_prices_and_context_window.json file
+# Then creates a new migration file with the delta of the changes
 # It then updates costs.json with the new costs
 # costs.json is a file that contains the most updated costs in the db from the migrations
 import json
+import logging
 import math
 import os
 from datetime import datetime
@@ -12,6 +14,9 @@ from typing import Dict, Optional, TypedDict
 import requests
 
 COST_FILE = "costs.json"
+
+
+logger = logging.getLogger(__name__)
 
 
 class CostDetails(TypedDict):
@@ -26,7 +31,7 @@ def get_updated_costs() -> Dict[str, CostDetails]:
     req = requests.get(url)
 
     if req.status_code != requests.codes.ok:
-        print("Token cost file was not found.")
+        logger.info("Token cost file was not found.")
         exit()
 
     # We expect the fetched json to be a dict with the following structure:
@@ -159,8 +164,6 @@ VALUES"""
         output_token_cost = details.get("output", 0)
         up_migration_command += f"""{comma}
     (generateUUIDv4(), 'default', 'default', '{provider_id}', '{llm_id}', '{str(current_time)}', {input_token_cost}, 'USD', {output_token_cost}, 'USD', 'system', '{current_time}')"""
-
-    # create the migration file
     migration_file = os.path.join(
         os.path.dirname(__file__),
         migrations_dir,
@@ -174,8 +177,6 @@ VALUES"""
 ALTER TABLE llm_token_prices DELETE WHERE
     created_at = '{current_time}';
     """
-
-    # create the migration file
     migration_file = os.path.join(
         os.path.dirname(__file__),
         migrations_dir,
@@ -201,30 +202,30 @@ def main() -> None:
     try:
         new_costs = get_updated_costs()
     except Exception as e:
-        print("Failed to get updated costs, ", e)
+        logger.error("Failed to get updated costs, ", e)
         return
-    print(len(new_costs), "costs fetched")
+    logger.info(len(new_costs), "costs fetched")
 
     try:
         migrations = get_migrations()
     except Exception as e:
-        print("Failed to get migrations, ", e)
+        logger.error("Failed to get migrations, ", e)
         return
-    print(len(migrations), "migrations found")
+    logger.info(len(migrations), "migrations found")
 
     try:
         current_costs = load_costs_from_json()
     except Exception as e:
-        print("Failed to load costs from json, ", e)
+        logger.error("Failed to load costs from json, ", e)
         return
-    print("Loaded", len(current_costs), "costs from json")
+    logger.info("Loaded", len(current_costs), "costs from json")
 
     try:
         filtered_costs = filter_out_current_costs(current_costs, new_costs)
     except Exception as e:
-        print("Failed to filter out current costs, ", e)
+        logger.error("Failed to filter out current costs, ", e)
         return
-    print(
+    logger.info(
         "There are",
         len(filtered_costs),
         "costs to insert, after filtering out existing costs",
@@ -238,16 +239,16 @@ def main() -> None:
         migration_number = str(len(migrations) + 1).zfill(3)
         create_new_migration(migration_number, filtered_costs)
     except Exception as e:
-        print("Failed to create a new migration, ", e)
+        logger.error("Failed to create a new migration, ", e)
         return
-    print("Created a new migration", migration_number)
+    logger.info("Created a new migration", migration_number)
 
     try:
         update_costs_in_json(new_costs)
     except Exception as e:
-        print("Failed to update costs in json, ", e)
+        logger.error("Failed to update costs in json, ", e)
         return
-    print(len(new_costs), "costs written to", COST_FILE)
+    logger.info(len(new_costs), "costs written to", COST_FILE)
 
 
 if __name__ == "__main__":
