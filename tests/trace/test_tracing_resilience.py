@@ -68,8 +68,9 @@ def test_resilience_to_server_errors(client_with_throwing_server, log_collector)
     # Tim: This is very specific and intentiaion, please don't change
     # this unless you are sure that is the expected behavior
     assert ag_res == {
-        "Job failed during flush: ('FAILURE - call_end": 1,
-        "Job failed during flush: ('FAILURE - obj_create": 1,
+        "Task failed: DummyTestException: ('FAILURE - call_end": 1,
+        "Task failed: DummyTestException: ('FAILURE - file_create": 1,
+        "Task failed: DummyTestException: ('FAILURE - obj_create": 1,
     }
 
 
