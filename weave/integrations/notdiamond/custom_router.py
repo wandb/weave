@@ -4,7 +4,7 @@ from notdiamond.toolkit.custom_router import CustomRouter
 import pandas as pd
 
 import weave
-from weave.flow.dataset import Dataset
+from weave import Dataset, Model
 from weave.flow.eval import EvaluationResults
 
 @weave.op(
@@ -60,13 +60,15 @@ def evaluate_router(
         router_dataset[model] = model_df[[prompt_column, response_column, score_column]]
 
     custom_router = CustomRouter(api_key=api_key)
-    return custom_router.eval(
+    eval_results, eval_stats = custom_router.eval(
         router_dataset,
         prompt_column=prompt_column,
         response_column=response_column,
         score_column=score_column,
         preference_id=preference_id,
     )
+
+    return eval_results, eval_stats
 
 def _get_score_column(model: str, scores: dict, score_col_name: str = None) -> Tuple[str, float]:
     """
