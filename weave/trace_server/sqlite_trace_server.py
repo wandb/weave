@@ -13,7 +13,11 @@ import emoji
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server.emoji_util import detone_emojis
-from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.errors import (
+    InvalidRequest,
+    NotFoundError,
+    ObjectDeletedError,
+)
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
@@ -46,10 +50,6 @@ from .trace_server_interface_util import (
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
-
-
-class NotFoundError(Exception):
-    pass
 
 
 _conn_cursor: contextvars.ContextVar[
@@ -675,10 +675,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
+            include_deleted=True,
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
-
+        if objs[0].deleted_at is not None:
+            raise ObjectDeletedError(
+                f"Obj {req.object_id}:{req.digest} was deleted at {objs[0].deleted_at}"
+            )
         return tsi.ObjReadRes(obj=objs[0])
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
@@ -712,6 +716,22 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
 
         return tsi.ObjQueryRes(objs=objs)
+
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            cursor.execute("BEGIN TRANSACTION")
+            cursor.execute(
+                """
+                UPDATE objects SET deleted_at = CURRENT_TIMESTAMP
+                WHERE project_id = ? AND
+                    object_id = ? AND
+                    digest = ?
+                """,
+                (req.project_id, req.object_id, req.digest),
+            )
+            conn.commit()
+        return tsi.ObjDeleteRes()
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1108,11 +1128,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         parameters: Optional[Dict[str, Any]] = None,
         metadata_only: Optional[bool] = False,
         limit: Optional[int] = None,
+        include_deleted: bool = False,
         offset: Optional[int] = None,
         sort_by: Optional[list[tsi.SortBy]] = None,
     ) -> list[tsi.ObjSchema]:
         conn, cursor = get_conn_cursor(self.db_path)
-        pred = " AND ".join(conditions or ["1 = 1"])
+        conditions = conditions or ["1 = 1"]
+        if not include_deleted:
+            conditions.append("deleted_at IS NULL")
+        pred = " AND ".join(conditions)
         val_dump_part = "'{}' as val_dump" if metadata_only else "val_dump"
         query = f"""
             SELECT
@@ -1124,10 +1148,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 {val_dump_part},
                 digest,
                 version_index,
-                is_latest
+                is_latest,
+                deleted_at
             FROM objects
-            WHERE deleted_at IS NULL AND
-                project_id = ? AND {pred}
+            WHERE project_id = ? AND {pred}
         """
 
         if sort_by:
@@ -1169,6 +1193,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     digest=row[6],
                     version_index=row[7],
                     is_latest=row[8],
+                    deleted_at=row[9],
                 )
             )
         return result

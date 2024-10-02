@@ -425,6 +425,22 @@ class ObjQueryRes(BaseModel):
     objs: List[ObjSchema]
 
 
+class ObjDeleteReq(BaseModel):
+    project_id: str
+    object_id: str
+    digest: str
+
+    permanently_delete: Optional[bool] = Field(
+        default=False,
+        description="If true, the object value will be permanently deleted "
+        "from the database. This action is irreversible.",
+    )
+
+
+class ObjDeleteRes(BaseModel):
+    pass
+
+
 class TableCreateReq(BaseModel):
     table: TableSchemaForInsert
 
@@ -825,6 +841,7 @@ class TraceServerInterface(Protocol):
     # Obj API
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
     def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
+    def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes: ...
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...
