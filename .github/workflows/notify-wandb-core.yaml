@@ -22,4 +22,4 @@ jobs:
           token: ${{ secrets.WANDB_CORE_ACCESS_TOKEN }}
           repository: wandb/core
           event-type: weave-package-updated
-          client-payload: '{"ref_name": "${{ github.ref_name }}", "sha": "${{ github.sha }}", "run_core_integration_tests": ${{ needs.check-which-tests-to-run.outputs.core_integration_tests }}}'
+          client-payload: '{"ref_name": "${{ github.ref_name }}", "sha": "${{ github.sha }}", "run_weave_query_tests": ${{ needs.check-which-tests-to-run.outputs.weave_query_tests }}}, "run_weave_js_tests": ${{ needs.check-which-tests-to-run.outputs.weave_js_tests }}}, "run_trace_server_tests": ${{ needs.check-which-tests-to-run.outputs.trace_server_tests }}}'
