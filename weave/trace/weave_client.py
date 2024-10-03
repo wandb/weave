@@ -641,9 +641,8 @@ class WeaveClient:
         Returns:
             The created Call object.
         """
-
         inputs_redacted = redact_sensitive_keys(inputs)
-        
+
         # YUK! Clean this up
         resolved_op = None
         op_def_ref = None
@@ -665,7 +664,6 @@ class WeaveClient:
 
             if resolved_op.postprocess_inputs:
                 inputs_postprocessed = resolved_op.postprocess_inputs(inputs_redacted)
-            
 
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
@@ -759,7 +757,7 @@ class WeaveClient:
         exception: Optional[BaseException] = None,
         *,
         llm_token_usage: Optional[dict[str, LLMUsageSchema]] = None,
-        summmary: Optional[dict] = None, # TODO: Should these be exposed?
+        summmary: Optional[dict] = None,  # TODO: Should these be exposed?
         postprocess_output: Optional[Callable[..., Any]] = None,
     ) -> None:
         original_output = output

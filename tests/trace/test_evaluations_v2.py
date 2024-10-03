@@ -1,6 +1,5 @@
-
-
 # Supervised Section (Datsets with possible labels)
+
 
 def test_batch_eval():
     """
@@ -11,6 +10,7 @@ def test_batch_eval():
     APIs used: Evaluation.evalute (or perhaps v2)
     """
     raise NotImplementedError()
+
 
 def test_batch_eval_backfill():
     """
@@ -30,7 +30,9 @@ def test_batch_eval_backfill():
     """
     raise NotImplementedError()
 
+
 # Realtime Section (Gaurdrails on ops)
+
 
 def test_realtime_op_level_scorers():
     """
@@ -43,6 +45,7 @@ def test_realtime_op_level_scorers():
     """
     raise NotImplementedError()
 
+
 def test_realtime_call_time_scorers():
     """
     This test demonstrates the ability to include scorers at the moment of
@@ -52,7 +55,9 @@ def test_realtime_call_time_scorers():
     """
     raise NotImplementedError()
 
+
 # Retroactive Section
+
 
 def test_retroactive_add_score():
     """
@@ -62,6 +67,7 @@ def test_retroactive_add_score():
     APIs used: call.add_score(...)
     """
     raise NotImplementedError()
+
 
 def test_retroactive_apply_scorer():
     """
@@ -86,7 +92,9 @@ def test_retroactive_batch_apply_score():
     """
     raise NotImplementedError()
 
+
 # Query Layer (still working out the details)
+
 
 def test_calls_query_by_score():
     """
@@ -105,9 +113,10 @@ def test_calls_query_by_score():
     """
     raise NotImplementedError()
 
+
 def test_grouped_calls_query():
     """
-    This one is the hard one, but also the most powerful. We essentially want to be able to query 
+    This one is the hard one, but also the most powerful. We essentially want to be able to query
     the calls table, grouping by an input key, specify the score-level aggergation, specify the trial-level aggegation,
     then possibly sort or filter those final results! Very powerful.
 
@@ -117,17 +126,20 @@ def test_grouped_calls_query():
     """
     raise NotImplementedError()
 
+
 def test_call_query_stats():
     """
     This demonstrates the ability to get column stats over a set of calls. Think: the queries
     used to create filter plots.
 
     Maybe we still do this in memory.
-    
+
     """
     raise NotImplementedError()
 
+
 # Lower-level integration utilities tests
+
 
 def test_direct_create_generation():
     """
@@ -138,6 +150,7 @@ def test_direct_create_generation():
     API: client.log_generation(model_id, model_params, input, output, ...)
     """
     raise NotImplementedError()
+
 
 """
 It might be worth thinking specifically aobut the views we want to create 
@@ -151,4 +164,3 @@ and instead focusing on ensureing they can be represented. For example:
 Thinking more about this, a score can be thought of as "latest" or a specific scorer version and multiple scores of the same version are meaningless (they should not be variable).
 
 """
-
