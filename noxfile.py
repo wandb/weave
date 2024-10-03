@@ -33,7 +33,7 @@ def lint(session):
 )
 def tests(session, shard):
     session.install("-e", f".[{shard},test]")
-    session.chdir("weave")
+    session.chdir("tests")
 
     env = {
         k: session.env.get(k)
@@ -48,7 +48,7 @@ def tests(session, shard):
 
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
-        "trace": ["tests/trace/", "trace/"],
+        "trace": ["trace/"],
         "trace_server": ["trace_server/"],
         "mistral0": ["integrations/mistral/v0/"],
         "mistral1": ["integrations/mistral/v1/"],
