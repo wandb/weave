@@ -333,6 +333,10 @@ def calls(op: Op) -> "CallsIter":
 
 # Modern decos
 @overload
+def op() -> Op: ...
+
+
+@overload
 def op(func: Any) -> Op: ...
 
 
