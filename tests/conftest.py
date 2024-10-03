@@ -21,7 +21,7 @@ from weave.trace_server import (
     external_to_internal_trace_server_adapter,
     sqlite_trace_server,
 )
-from weave.trace_server import environment as wf_env
+from weave.trace_server import environment as ts_env
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
 
@@ -147,7 +147,7 @@ def client_with_throwing_server(client):
 @pytest.fixture(scope="session")
 def clickhouse_server():
     server_up = _check_server_up(
-        wf_env.wf_clickhouse_host(), wf_env.wf_clickhouse_port()
+        ts_env.wf_clickhouse_host(), ts_env.wf_clickhouse_port()
     )
     if not server_up:
         pytest.fail("clickhouse server is not running")
@@ -325,11 +325,9 @@ class TestOnlyUserInjectingExternalTraceServer(
         return super().cost_create(req)
 
 
-PYTEST_CURRENT_TEST_ENV_VAR = "PYTEST_CURRENT_TEST"
-
-
+# https://docs.pytest.org/en/7.1.x/example/simple.html#pytest-current-test-environment-variable
 def get_test_name():
-    return os.environ.get(PYTEST_CURRENT_TEST_ENV_VAR).split(" ")[0]
+    return os.environ.get("PYTEST_CURRENT_TEST", " ").split(" ")[0]
 
 
 class InMemoryWeaveLogCollector(logging.Handler):
