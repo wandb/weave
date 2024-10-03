@@ -739,7 +739,7 @@ export const CallsTable: FC<{
               <FilterPanel
                 isEvaluateTable={isEvaluateTable}
                 filterModel={filterModel}
-                columnInfo={columns}
+                columnInfo={filterFriendlyColumnInfo}
                 setFilterModel={setFilterModel}
                 selectedCalls={selectedCalls}
                 clearSelectedCalls={clearSelectedCalls}
