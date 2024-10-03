@@ -1,5 +1,15 @@
 import {Box, Popover} from '@mui/material';
-import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
+import {
+  GridFilterModel,
+  gridPageCountSelector,
+  gridPageSelector,
+  gridPageSizeSelector,
+  gridRowCountSelector,
+  GridSortModel,
+  useGridApiContext,
+  useGridSelector,
+} from '@mui/x-data-grid-pro';
+import {MOON_500} from '@wandb/weave/common/css/color.styles';
 import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Radio} from '@wandb/weave/components';
@@ -611,3 +621,55 @@ curl '${baseUrl}/calls/stream_query' \\
 
   return baseCurl;
 }
+
+export const PaginationButtons = () => {
+  const apiRef = useGridApiContext();
+  const page = useGridSelector(apiRef, gridPageSelector);
+  const pageCount = useGridSelector(apiRef, gridPageCountSelector);
+  const pageSize = useGridSelector(apiRef, gridPageSizeSelector);
+  const rowCount = useGridSelector(apiRef, gridRowCountSelector);
+
+  const handlePrevPage = () => {
+    apiRef.current.setPage(page - 1);
+  };
+
+  const handleNextPage = () => {
+    apiRef.current.setPage(page + 1);
+  };
+
+  // Calculate the item range being displayed
+  const start = rowCount > 0 ? page * pageSize + 1 : 0;
+  const end = Math.min(rowCount, (page + 1) * pageSize);
+
+  return (
+    <Box display="flex" alignItems="center" justifyContent="center" padding={1}>
+      <Button
+        variant="quiet"
+        size="medium"
+        onClick={handlePrevPage}
+        disabled={page === 0}
+        icon="chevron-back"
+      />
+      <Box
+        mx={1}
+        sx={{
+          fontSize: '14px',
+          fontWeight: '400',
+          color: MOON_500,
+          // This is so that when we go from 1-100 -> 101-200, the buttons dont jump
+          minWidth: '90px',
+          display: 'flex',
+          justifyContent: 'center',
+        }}>
+        {start}-{end} of {rowCount}
+      </Box>
+      <Button
+        variant="quiet"
+        size="medium"
+        onClick={handleNextPage}
+        disabled={page >= pageCount - 1}
+        icon="chevron-next"
+      />
+    </Box>
+  );
+};

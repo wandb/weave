@@ -6,18 +6,18 @@ check if libraries are installed and imported and patch in the case that they ar
 
 
 def autopatch() -> None:
-    from ..integrations.anthropic.anthropic_sdk import anthropic_patcher
-    from ..integrations.cerebras.cerebras_sdk import cerebras_patcher
-    from ..integrations.cohere.cohere_sdk import cohere_patcher
-    from ..integrations.dspy.dspy_sdk import dspy_patcher
-    from ..integrations.groq.groq_sdk import groq_patcher
-    from ..integrations.instructor.instructor_sdk import instructor_patcher
-    from ..integrations.langchain.langchain import langchain_patcher
-    from ..integrations.litellm.litellm import litellm_patcher
-    from ..integrations.llamaindex.llamaindex import llamaindex_patcher
-    from ..integrations.mistral import mistral_patcher
-    from ..integrations.notdiamond.tracing import notdiamond_patcher
-    from ..integrations.openai.openai_sdk import openai_patcher
+    from weave.integrations.anthropic.anthropic_sdk import anthropic_patcher
+    from weave.integrations.cerebras.cerebras_sdk import cerebras_patcher
+    from weave.integrations.cohere.cohere_sdk import cohere_patcher
+    from weave.integrations.dspy.dspy_sdk import dspy_patcher
+    from weave.integrations.groq.groq_sdk import groq_patcher
+    from weave.integrations.instructor.instructor_sdk import instructor_patcher
+    from weave.integrations.langchain.langchain import langchain_patcher
+    from weave.integrations.litellm.litellm import litellm_patcher
+    from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
+    from weave.integrations.mistral import mistral_patcher
+    from weave.integrations.notdiamond.tracing import notdiamond_patcher
+    from weave.integrations.openai.openai_sdk import openai_patcher
 
     openai_patcher.attempt_patch()
     mistral_patcher.attempt_patch()
@@ -34,18 +34,18 @@ def autopatch() -> None:
 
 
 def reset_autopatch() -> None:
-    from ..integrations.anthropic.anthropic_sdk import anthropic_patcher
-    from ..integrations.cerebras.cerebras_sdk import cerebras_patcher
-    from ..integrations.cohere.cohere_sdk import cohere_patcher
-    from ..integrations.dspy.dspy_sdk import dspy_patcher
-    from ..integrations.groq.groq_sdk import groq_patcher
-    from ..integrations.instructor.instructor_sdk import instructor_patcher
-    from ..integrations.langchain.langchain import langchain_patcher
-    from ..integrations.litellm.litellm import litellm_patcher
-    from ..integrations.llamaindex.llamaindex import llamaindex_patcher
-    from ..integrations.mistral import mistral_patcher
-    from ..integrations.notdiamond.tracing import notdiamond_patcher
-    from ..integrations.openai.openai_sdk import openai_patcher
+    from weave.integrations.anthropic.anthropic_sdk import anthropic_patcher
+    from weave.integrations.cerebras.cerebras_sdk import cerebras_patcher
+    from weave.integrations.cohere.cohere_sdk import cohere_patcher
+    from weave.integrations.dspy.dspy_sdk import dspy_patcher
+    from weave.integrations.groq.groq_sdk import groq_patcher
+    from weave.integrations.instructor.instructor_sdk import instructor_patcher
+    from weave.integrations.langchain.langchain import langchain_patcher
+    from weave.integrations.litellm.litellm import litellm_patcher
+    from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
+    from weave.integrations.mistral import mistral_patcher
+    from weave.integrations.notdiamond.tracing import notdiamond_patcher
+    from weave.integrations.openai.openai_sdk import openai_patcher
 
     openai_patcher.undo_patch()
     mistral_patcher.undo_patch()

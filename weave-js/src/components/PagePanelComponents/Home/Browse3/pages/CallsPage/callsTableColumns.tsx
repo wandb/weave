@@ -54,6 +54,7 @@ export const useCallsTableColumns = (
   onCollapse: (col: string) => void,
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
+  allowedColumnPatterns?: string[],
   onAddFilter?: OnAddFilter
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
@@ -129,6 +130,7 @@ export const useCallsTableColumns = (
         onExpand,
         columnIsRefExpanded,
         userDefinedColumnWidths,
+        allowedColumnPatterns,
         onAddFilter
       ),
     [
@@ -144,6 +146,7 @@ export const useCallsTableColumns = (
       onExpand,
       columnIsRefExpanded,
       userDefinedColumnWidths,
+      allowedColumnPatterns,
       onAddFilter,
     ]
   );
@@ -168,15 +171,29 @@ function buildCallsTableColumns(
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
   userDefinedColumnWidths: Record<string, number>,
+  allowedColumnPatterns?: string[],
   onAddFilter?: OnAddFilter
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
 } {
   // Filters summary.usage. because we add a derived column for tokens and cost
-  const filteredDynamicColumnNames = allDynamicColumnNames.filter(
-    c => !HIDDEN_DYNAMIC_COLUMN_PREFIXES.some(p => c.startsWith(p + '.'))
-  );
+  // Sort attributes after inputs and outputs.
+  const filteredDynamicColumnNames = allDynamicColumnNames
+    .filter(
+      c => !HIDDEN_DYNAMIC_COLUMN_PREFIXES.some(p => c.startsWith(p + '.'))
+    )
+    .sort((a, b) => {
+      const prefixes = ['inputs.', 'output.', 'attributes.'];
+      const aPrefix =
+        a === 'output' ? 'output.' : prefixes.find(p => a.startsWith(p)) ?? '';
+      const bPrefix =
+        b === 'output' ? 'output.' : prefixes.find(p => b.startsWith(p)) ?? '';
+      if (aPrefix !== bPrefix) {
+        return prefixes.indexOf(aPrefix) - prefixes.indexOf(bPrefix);
+      }
+      return a.localeCompare(b);
+    });
 
   const cols: Array<GridColDef<TraceCallSchema>> = [
     {
@@ -437,7 +454,21 @@ function buildCallsTableColumns(
     }
   });
 
-  return {cols, colGroupingModel: groupingModel};
+  // TODO: It would be better to build up the cols rather than throwing away
+  //       some at the end, but making simpler change for now.
+  let orderedCols = cols;
+  if (allowedColumnPatterns !== undefined) {
+    orderedCols = allowedColumnPatterns.flatMap(shownCol => {
+      if (shownCol.includes('*')) {
+        const regex = new RegExp('^' + shownCol.replace('*', '.*') + '$');
+        return cols.filter(col => regex.test(col.field));
+      } else {
+        return cols.filter(col => col.field === shownCol);
+      }
+    });
+  }
+
+  return {cols: orderedCols, colGroupingModel: groupingModel};
 }
 /**
  * This function maintains an ever-growing list of dynamic column names. It is used to

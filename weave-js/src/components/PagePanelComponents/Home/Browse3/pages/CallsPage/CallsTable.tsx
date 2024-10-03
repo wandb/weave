@@ -72,6 +72,7 @@ import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
   ExportSelector,
+  PaginationButtons,
   RefreshButton,
 } from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
@@ -143,6 +144,9 @@ export const CallsTable: FC<{
 
   paginationModel?: GridPaginationModel;
   setPaginationModel?: (newModel: GridPaginationModel) => void;
+
+  // Can include glob for prefix match, e.g. "inputs.*"
+  allowedColumnPatterns?: string[];
 }> = ({
   entity,
   project,
@@ -161,6 +165,7 @@ export const CallsTable: FC<{
   setSortModel,
   paginationModel,
   setPaginationModel,
+  allowedColumnPatterns,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
 
@@ -367,6 +372,7 @@ export const CallsTable: FC<{
     onCollapse,
     onExpand,
     columnIsRefExpanded,
+    allowedColumnPatterns,
     onAddFilter
   );
 
@@ -878,6 +884,10 @@ export const CallsTable: FC<{
         onPinnedColumnsChange={onPinnedColumnsChange}
         sx={{
           borderRadius: 0,
+          // This moves the pagination controls to the left
+          '& .MuiDataGrid-footerContainer': {
+            justifyContent: 'flex-start',
+          },
         }}
         slots={{
           noRowsOverlay: () => {
@@ -931,6 +941,7 @@ export const CallsTable: FC<{
             );
           },
           columnMenu: CallsCustomColumnMenu,
+          pagination: PaginationButtons,
         }}
       />
     </FilterLayoutTemplate>

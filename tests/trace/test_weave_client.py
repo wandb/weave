@@ -632,7 +632,7 @@ def test_object_mismatch_project_ref_nested(client):
     assert obj.project_id == "shawn/test-project2"
 
 
-def test_saveload_customtype(client, strict_op_saving):
+def test_saveload_customtype(client):
     class MyCustomObj:
         a: int
         b: str
