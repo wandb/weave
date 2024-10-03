@@ -142,6 +142,7 @@ select = [
   "W291",   # https://docs.astral.sh/ruff/rules/trailing-whitespace/
   "W391",   # https://docs.astral.sh/ruff/rules/too-many-newlines-at-end-of-file/
   "F401",   # https://docs.astral.sh/ruff/rules/unused-import/
+  "TID252", # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
 ]
 ignore = [
   # we use Google style
