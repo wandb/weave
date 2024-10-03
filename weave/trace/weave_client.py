@@ -279,15 +279,25 @@ class Call:
     def remove_display_name(self) -> None:
         self.set_display_name(None)
 
-    def add_score(self, score_name: str, score: dict) -> str:
-        # This needs to be moved to the client and backgrounded.
+    def log_score(
+        self,
+        name: str,
+        results: dict,
+        call_ref: Optional[str] = None,
+        op_ref: Optional[str] = None,
+        additional_args: Optional[dict] = None,
+    ) -> str:
         client = weave_client_context.require_weave_client()
+        results = map_to_refs(results)
+        results_json = to_json(results, client._project_id(), client)
+        # Need to really decide on this shape and formalize it.
         payload = {
-            "name": score_name,
-            "score": score,
+            "name": name,
+            "op_ref": op_ref,
+            "call_ref": call_ref,
+            "additional_args": additional_args,
+            "results": results_json,
         }
-        payload = map_to_refs(payload)
-        payload_json = to_json(payload, client._project_id(), client)
         ref = get_ref(self)
         if ref is None:
             raise ValueError("Can't add score to call without ref")
@@ -295,10 +305,31 @@ class Call:
             project_id=client._project_id(),
             weave_ref=ref.uri(),
             feedback_type="score",  # should this be score_name?
-            payload=payload_json,
+            payload=payload,
         )
         response = client.server.feedback_create(freq)
         return response.id
+
+    # def add_score(self, score_name: str, score: dict) -> str:
+    #     # This needs to be moved to the client and backgrounded.
+    #     client = weave_client_context.require_weave_client()
+    #     payload = {
+    #         "name": score_name,
+    #         "score": score,
+    #     }
+    #     payload = map_to_refs(payload)
+    #     payload_json = to_json(payload, client._project_id(), client)
+    #     ref = get_ref(self)
+    #     if ref is None:
+    #         raise ValueError("Can't add score to call without ref")
+    #     freq = FeedbackCreateReq(
+    #         project_id=client._project_id(),
+    #         weave_ref=ref.uri(),
+    #         feedback_type="score",  # should this be score_name?
+    #         payload=payload_json,
+    #     )
+    #     response = client.server.feedback_create(freq)
+    #     return response.id
 
 
 class CallsIter:

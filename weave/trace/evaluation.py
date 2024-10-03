@@ -16,6 +16,8 @@ class AnonymousModel(weave.Model):
 
 
 def log_generation(
+    inputs: Optional[dict] = None,
+    output: Optional[Any] = None,
     *,
     # Basic Config
     generator_id: str = "generator",
@@ -25,19 +27,33 @@ def log_generation(
     # Pre-Start info
     attributes: Optional[dict] = None,  # TODO: Should these be exposed?
     # Start Info
-    inputs: Optional[dict] = None,
     started_at: Optional[datetime] = None,
     # End Info
     latency_ms: Optional[float] = None,
     ended_at: Optional[datetime] = None,
-    output: Optional[Any] = None,
     llm_token_usage: Optional[dict[str, LLMUsageSchema]] = None,
     exception: Optional[Union[BaseException, str]] = None,
     # Post-End Info
     summmary: Optional[dict] = None,  # TODO: Should these be exposed?
-    # Scoring Info
-    # TODO: Add me
 ) -> Call:
+    """
+    This is an alternatve mechanism of logging "Calls", which is optmized for the
+    specific case of logging "generations" (my new word for predict), which can be used
+    completely outside the weave tracing lifecyle. This is useful if you have predictions
+    that are generated in some way outside of what can be traced but still want to add that
+    data to Weave.
+
+    Base-bones example:
+
+    ```python
+    call = log_generation(
+        {
+            "prompt": "Hello, what is your name?"
+        },
+        "I am a bot named GPT!"
+    )
+    ```
+    """
     wc = require_weave_client()
 
     # First we build the inputs:
