@@ -5,11 +5,12 @@ from typing import Any, Iterable, Iterator, Optional
 
 from rich.table import Table
 
-from weave.trace import rich_pydantic_util, util
+from weave.trace import util
 from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.refs import parse_uri
-from weave.trace.rich_container import AbstractRichContainer
-from weave.trace.rich_refs import Refs
+from weave.trace.rich import pydantic_util
+from weave.trace.rich.container import AbstractRichContainer
+from weave.trace.rich.refs import Refs
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.query import Query
 
@@ -155,10 +156,10 @@ class FeedbackQuery:
             self.execute()
             assert self.feedbacks is not None
             if len(self.feedbacks) == 1:
-                p.text(rich_pydantic_util.model_to_str(self.feedbacks[0]))
+                p.text(pydantic_util.model_to_str(self.feedbacks[0]))
             else:
                 table = self.feedbacks.as_rich_table()
-                p.text(rich_pydantic_util.table_to_str(table))
+                p.text(pydantic_util.table_to_str(table))
 
 
 class RefFeedbackQuery(FeedbackQuery):
