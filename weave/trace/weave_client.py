@@ -283,10 +283,13 @@ class Call:
         self,
         name: str,
         results: dict,
+        *,
         call_ref: Optional[str] = None,
         op_ref: Optional[str] = None,
         additional_args: Optional[dict] = None,
     ) -> str:
+        # This needs to be moved to the client and backgrounded.
+        # TODO: Validate refs
         client = weave_client_context.require_weave_client()
         results = map_to_refs(results)
         results_json = to_json(results, client._project_id(), client)
