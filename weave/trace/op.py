@@ -53,13 +53,9 @@ except ImportError:
 
 try:
     # https://github.com/search?q=repo:mistralai/client-python%20Final&type=code
-    from mistralai.types.basemodel import UNSET  # type: ignore
-
-    MISTRAL_NOT_GIVEN = UNSET  # type: ignore
+    from mistralai.types.basemodel import UNSET as MISTRAL_NOT_GIVEN
 except ImportError:
     MISTRAL_NOT_GIVEN = None
-
-MISTRAL_NOT_GIVEN = None
 
 
 try:
