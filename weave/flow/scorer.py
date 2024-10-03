@@ -1,14 +1,16 @@
+import importlib.util
 from collections import defaultdict
-from numbers import Number
 from typing import Any, Callable, Optional, Sequence, Tuple, Union
 
-import numpy as np
 from pydantic import BaseModel
 
 import weave
 from weave.flow.obj import Object
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, as_op, is_op
+
+if NUMPY_ENABLED := importlib.util.find_spec("numpy") is not None:
+    import numpy as np
 
 
 class Scorer(Object):
@@ -22,8 +24,14 @@ class Scorer(Object):
 
 def stderr(data: Sequence[Union[int, float]]) -> float:
     if len(data) > 1:
-        sample_variance = np.var(data, ddof=1)
-        return float(np.sqrt(sample_variance / len(data)))
+        if NUMPY_ENABLED:
+            sample_variance = np.var(data, ddof=1)
+            return float(np.sqrt(sample_variance / len(data)))
+        else:
+            mean = sum(data) / len(data)
+            sse = sum((x - mean) ** 2 for x in data)
+            svar = sse / (len(data) - 1)
+            return (svar / len(data)) ** 0.5
     else:
         return 0
 
@@ -55,8 +63,11 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
             "true_count": (true_count := sum(1 for x in data if x)),
             "true_fraction": true_count / len(data),
         }
-    elif isinstance(val, Number):
-        return {"mean": np.mean(data).item()}
+    elif isinstance(val, (float, int)):
+        if NUMPY_ENABLED:
+            return {"mean": np.mean(data).item()}
+        else:
+            return {"mean": sum(data) / len(data)}
     elif isinstance(val, dict):
         result = {}
         all_keys = set().union(*[x.keys() for x in data if isinstance(x, dict)])

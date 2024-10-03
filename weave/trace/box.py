@@ -6,11 +6,14 @@ does not box None and bool which simplify checks for trace users."""
 from __future__ import annotations
 
 import datetime
+import importlib
 from typing import Any, TypeVar
 
-import numpy as np
-
 from weave.trace.refs import Ref
+
+if NUMPY_ENABLED := importlib.util.find_spec("numpy") is not None:
+    import numpy as np
+
 
 T = TypeVar("T")
 
@@ -50,23 +53,32 @@ class BoxedTimedelta(datetime.timedelta):
         )
 
 
-# See https://numpy.org/doc/stable/user/basics.subclassing.html
-class BoxedNDArray(np.ndarray):
-    ref: Ref | None = None
+if NUMPY_ENABLED:
+    # See https://numpy.org/doc/stable/user/basics.subclassing.html
+    class BoxedNDArray(np.ndarray):
+        ref: Ref | None = None
 
-    def __new__(cls, input_array: Any) -> BoxedNDArray:
-        obj = np.asarray(input_array).view(cls)
-        return obj
+        def __new__(cls, input_array: Any) -> BoxedNDArray:
+            obj = np.asarray(input_array).view(cls)
+            return obj
 
-    def __array_finalize__(self, obj: Any) -> None:
-        if obj is None:
-            return
+        def __array_finalize__(self, obj: Any) -> None:
+            if obj is None:
+                return
+else:
+    BoxedNDArray = None  # type: ignore
 
 
 def box(
     obj: T,
 ) -> (
-    T | BoxedInt | BoxedFloat | BoxedStr | BoxedNDArray | BoxedDatetime | BoxedTimedelta
+    T
+    | BoxedInt
+    | BoxedFloat
+    | BoxedStr
+    | "BoxedNDArray"
+    | BoxedDatetime
+    | BoxedTimedelta
 ):
     if type(obj) == int:
         return BoxedInt(obj)
@@ -85,7 +97,7 @@ def box(
 
 def unbox(
     obj: T,
-) -> T | int | float | str | np.ndarray | datetime.datetime | datetime.timedelta:
+) -> T | int | float | str | "np.ndarray" | datetime.datetime | datetime.timedelta:
     if type(obj) == BoxedInt:
         return int(obj)
     elif type(obj) == BoxedFloat:
