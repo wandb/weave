@@ -1,3 +1,4 @@
+import {CSSProperties} from '@material-ui/core/styles/withStyles';
 import {WBMenuOption, WBPopupMenuTrigger} from '@wandb/ui';
 import EditableField from '@wandb/weave/common/components/EditableField';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
@@ -504,7 +505,7 @@ export const ColumnHeader: React.FC<{
   // When there is a right justified column, reverse the order of the indicators
   // and set z-index to 1 otherwise click events on the Ellipses icon is blocked
   // by the click event on the column name due to DOM ordering and negative margins.
-  const columnActionContainerStyle =
+  const columnActionContainerStyle: CSSProperties =
     columnFormat?.textAlign === 'right'
       ? {zIndex: 1, flexDirection: 'row-reverse'}
       : {flexDirection: 'row'};
