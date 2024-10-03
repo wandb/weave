@@ -1,6 +1,10 @@
 # Supervised Section (Datsets with possible labels)
 
 
+import weave
+from weave.trace import evaluation
+
+
 def test_batch_eval():
     """
     This test deomonstrates the ability to run a batch evaluation in the traditional v1 sense)
@@ -164,3 +168,76 @@ and instead focusing on ensureing they can be represented. For example:
 Thinking more about this, a score can be thought of as "latest" or a specific scorer version and multiple scores of the same version are meaningless (they should not be variable).
 
 """
+
+
+def test_direct_log_generation_and_direct_log_score(client):
+    """TODO: test all the new variants of different params"""
+    generation = evaluation.log_generation(
+        {"prompt": "Hello, what is your name?"}, "I'm sorry, I am an AI."
+    )
+    generation.log_score("contains_appology", True)
+
+    calls = list(client.get_calls(include_feedback=True))
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.inputs["prompt"] == "Hello, what is your name?"
+    assert call.output == "I'm sorry, I am an AI."
+    # I would prefer to use the Calls.feedback edge, but it
+    # is too complicated for me to just get the feedback out.
+    call_feedback = call.summary["weave"]["feedback"]
+    assert len(call_feedback) == 1
+    feedback_item = call_feedback[0]
+    assert feedback_item["feedback_type"] == "score"
+    assert feedback_item["weave_ref"] == call.ref.uri()
+    assert feedback_item["payload"] == {
+        "name": "contains_appology",
+        "op_ref": None,
+        "call_ref": None,
+        "supervision": None,
+        "results": True,
+    }
+    assert feedback_item["creator"] is None
+    assert feedback_item["created_at"] is not None
+    assert feedback_item["wb_user_id"] is not None
+
+
+def test_direct_log_generation_and_direct_apply_score(client):
+    """TODO: test all the new variants of different params"""
+    generation = evaluation.log_generation(
+        {"prompt": "Hello, what is your name?"}, "I'm sorry, I am an AI."
+    )
+
+    @weave.op
+    def contains_appology(inputs, output, supervision):
+        return "sorry" in output
+
+    generation.apply_scorer(contains_appology)
+
+    calls = list(client.get_calls(include_feedback=True))
+    assert len(calls) == 2
+    call = calls[0]
+    assert call.inputs["prompt"] == "Hello, what is your name?"
+    assert call.output == "I'm sorry, I am an AI."
+
+    score_call = calls[1]
+    assert score_call.inputs["inputs"] == call.inputs
+    assert score_call.inputs["output"] == call.output
+    assert score_call.inputs["supervision"] == None
+    assert score_call.output == True
+    # I would prefer to use the Calls.feedback edge, but it
+    # is too complicated for me to just get the feedback out.
+    call_feedback = call.summary["weave"]["feedback"]
+    assert len(call_feedback) == 1
+    feedback_item = call_feedback[0]
+    assert feedback_item["feedback_type"] == "score"
+    assert feedback_item["weave_ref"] == call.ref.uri()
+    assert feedback_item["payload"] == {
+        "name": "contains_appology",
+        "op_ref": score_call.op_name,
+        "call_ref": score_call.ref.uri(),
+        "supervision": None,
+        "results": True,
+    }
+    assert feedback_item["creator"] is None
+    assert feedback_item["created_at"] is not None
+    assert feedback_item["wb_user_id"] is not None

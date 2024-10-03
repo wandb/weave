@@ -190,6 +190,9 @@ class Call:
 
     _feedback: Optional[RefFeedbackQuery] = None
 
+    # _start_future: Optional[Future] = None
+    # _finish_future: Optional[Future] = None
+
     @property
     def op_name(self) -> str:
         if isinstance(self._op_name, Future):
@@ -286,7 +289,7 @@ class Call:
         *,
         call_ref: Optional[str] = None,
         op_ref: Optional[str] = None,
-        additional_args: Optional[dict] = None,
+        supervision: Optional[dict] = None,
     ) -> str:
         # This needs to be moved to the client and backgrounded.
         # TODO: Validate refs
@@ -298,7 +301,7 @@ class Call:
             "name": name,
             "op_ref": op_ref,
             "call_ref": call_ref,
-            "additional_args": additional_args,
+            "supervision": supervision,
             "results": results_json,
         }
         ref = get_ref(self)
@@ -312,6 +315,40 @@ class Call:
         )
         response = client.server.feedback_create(freq)
         return response.id
+
+    def apply_scorer(self, scorer_op: Op, supervision: Optional[dict] = None) -> str:
+        # if self._finish_future:
+        #     # Block until this finishes
+        #     self._finish_future.result()
+        # if self._start_future:
+        #     # Block until this finishes
+        #     self._start_future.result()
+
+        if self.ended_at is None:
+            raise Exception("Must be finished to run scorer")
+
+        inputs = self.inputs
+        output = self.output
+
+        kwargs = {
+            "inputs": self.inputs,
+            "output": output,  # "generation output?"
+            # Thse would be labels and such. Not sure how we want to do this yet
+            "supervision": supervision,
+        }
+
+        (scorer_res, scorer_call) = scorer_op.call(**kwargs)
+        score_name = scorer_op.name  # should this always be the name?
+        scorer_ref = scorer_op.ref
+        if scorer_ref is None:
+            raise ValueError("Tim is a bad programmer")
+        return self.log_score(
+            name=score_name,
+            results=scorer_res,
+            call_ref=scorer_call.ref.uri(),
+            op_ref=scorer_ref.uri(),
+            supervision=supervision,
+        )
 
     # def add_score(self, score_name: str, score: dict) -> str:
     #     # This needs to be moved to the client and backgrounded.
@@ -339,6 +376,7 @@ class CallsIter:
     server: TraceServerInterface
     filter: CallsFilter
     include_costs: bool
+    include_feedback: bool
 
     def __init__(
         self,
@@ -346,12 +384,14 @@ class CallsIter:
         project_id: str,
         filter: CallsFilter,
         include_costs: bool = False,
+        include_feedback: bool = False,
     ) -> None:
         self.server = server
         self.project_id = project_id
         self.filter = filter
         self._page_size = 1000
         self.include_costs = include_costs
+        self.include_feedback = include_feedback
 
     # seems like this caching should be on the server, but it's here for now...
     @lru_cache
@@ -365,6 +405,7 @@ class CallsIter:
                 offset=index * self._page_size,
                 limit=self._page_size,
                 include_costs=self.include_costs,
+                include_feedback=self.include_feedback,
             )
         )
         return response.calls
@@ -614,12 +655,17 @@ class WeaveClient:
         self,
         filter: Optional[CallsFilter] = None,
         include_costs: Optional[bool] = False,
+        include_feedback: Optional[bool] = False,
     ) -> CallsIter:
         if filter is None:
             filter = CallsFilter()
 
         return CallsIter(
-            self.server, self._project_id(), filter, include_costs or False
+            self.server,
+            self._project_id(),
+            filter,
+            include_costs or False,
+            include_feedback or False,
         )
 
     @deprecated(new_name="get_calls")
@@ -659,7 +705,7 @@ class WeaveClient:
         attributes: Optional[dict] = None,
         display_name: Optional[Union[str, Callable[[Call], str]]] = None,
         *,
-        started_at: Optional[datetime.datetime],
+        started_at: Optional[datetime.datetime] = None,
         use_stack: bool = True,
     ) -> Call:
         """Create, log, and push a call onto the runtime stack.
@@ -772,7 +818,8 @@ class WeaveClient:
                 )
             )
 
-        self.future_executor.defer(send_start_call)
+        start_future = self.future_executor.defer(send_start_call)
+        # call._start_future = start_future
 
         if use_stack:
             call_context.push_call(call)
@@ -853,7 +900,9 @@ class WeaveClient:
                 )
             )
 
-        self.future_executor.defer(send_end_call)
+        finish_future = self.future_executor.defer(send_end_call)
+        # call._finish_future = finish_future
+        call.ended_at = ended_at
 
         # Descendent error tracking disabled til we fix UI
         # Add this call's summary after logging the call, so that only

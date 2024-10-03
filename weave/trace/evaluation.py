@@ -2,10 +2,9 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, TypedDict, Union
 
-from responses import Call
-
 import weave
 from weave.trace.client_context.weave_client import require_weave_client
+from weave.trace.weave_client import Call
 from weave.trace_server.trace_server_interface import LLMUsageSchema
 
 logger = logging.Logger(__name__)
@@ -16,7 +15,7 @@ class AnonymousModel(weave.Model):
 
 
 def log_generation(
-    inputs: Optional[dict] = None,
+    inputs: Optional[dict] = None,  # I wish we could allow an "any" here...
     output: Optional[Any] = None,
     *,
     # Basic Config
@@ -35,6 +34,7 @@ def log_generation(
     exception: Optional[Union[BaseException, str]] = None,
     # Post-End Info
     summmary: Optional[dict] = None,  # TODO: Should these be exposed?
+    # TODO: Consider adding a project here so we can create a temo client - similar to "get" in refs.py
 ) -> Call:
     """
     This is an alternatve mechanism of logging "Calls", which is optmized for the
