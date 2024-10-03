@@ -48,7 +48,7 @@ export const FilterBar = ({
   clearSelectedCalls,
   width,
 }: FilterBarProps) => {
-  const refBar = useRef<HTMLDivElement>(null);
+  const refBar = useRef<HTMLButtonElement>(null);
   const refLabel = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
