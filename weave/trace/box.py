@@ -86,7 +86,7 @@ def box(
         return BoxedFloat(obj)
     elif type(obj) == str:
         return BoxedStr(obj)
-    elif type(obj) == np.ndarray:
+    elif NUMPY_ENABLED and type(obj) == np.ndarray:
         return BoxedNDArray(obj)
     elif type(obj) == datetime.datetime:
         return BoxedDatetime.fromtimestamp(obj.timestamp(), tz=datetime.timezone.utc)
@@ -104,7 +104,7 @@ def unbox(
         return float(obj)
     elif type(obj) == BoxedStr:
         return str(obj)
-    elif type(obj) == BoxedNDArray:
+    elif NUMPY_ENABLED and type(obj) == BoxedNDArray:
         return np.array(obj)
     elif type(obj) == BoxedDatetime:
         return datetime.datetime.fromtimestamp(obj.timestamp())
