@@ -161,6 +161,8 @@ class Op(Protocol):
     # it disables child ops as well.
     _tracing_enabled: bool
 
+    scorers: Optional[list["Op"]] = None
+
 
 def _set_on_output_handler(func: Op, on_output: OnOutputHandlerType) -> None:
     if func._on_output_handler is not None:
@@ -235,6 +237,10 @@ def _execute_call(
         )
         if not call_context.get_current_call():
             print_call_link(call)
+
+        if __op.scorers:
+            for scorer in __op.scorers:
+                call.apply_scorer(scorer)
 
     def on_output(output: Any) -> Any:
         if handler := getattr(__op, "_on_output_handler", None):
@@ -402,6 +408,12 @@ def op(
     ...
 
 
+@overload
+def op(*, scorers: list[Op]) -> Callable[[Any], Op]:  # type: ignore
+    """Add proactive scorers to the execution"""
+    ...
+
+
 def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
     """
     A decorator to weave op-ify a function or method.  Works for both sync and async.
@@ -514,6 +526,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
             wrapper._on_output_handler = None  # type: ignore
 
             wrapper._tracing_enabled = True  # type: ignore
+
+            wrapper.scorers = kwargs.get("scorers")  # type: ignore
 
             if callable(call_name_func := kwargs.get("call_display_name", "")):
                 params = inspect.signature(call_name_func).parameters

@@ -232,3 +232,10 @@ These are things that I would like to do, but are not MVP changes. I believe the
 
 
 
+
+---- Some more thoughts:
+
+Top level: Evaluation Framework
+Proactive Level: Decorator
+Mid Level: apply_score, batch_apply_score
+Low Level: log_generation, log_score
