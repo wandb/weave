@@ -4,12 +4,13 @@ import {twMerge} from 'tailwind-merge';
 import {Icon, IconName} from '../Icon';
 import {getTagColorClass, type TagColorName} from '../Tag';
 import {Tailwind} from '../Tailwind';
+import {CalloutSize} from './types';
 
 export type CalloutProps = {
   className?: string;
   color: TagColorName;
   icon: IconName;
-  size: 'x-small' | 'small' | 'medium' | 'large';
+  size: CalloutSize;
 };
 
 export const Callout = ({className, color, icon, size}: CalloutProps) => {
