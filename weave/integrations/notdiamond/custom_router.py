@@ -86,11 +86,6 @@ def evaluate_router(
     model_results = _get_model_results(best_provider)
     nd_results = _get_model_results("notdiamond")
 
-    @weave.op()
-    def is_correct(score: int, model_output: dict) -> dict:
-        # We hack score, since we already have model responses
-        return {'correct': score}
-
     class _DummyEvalModel(weave.Model):
         model_results: pd.DataFrame
 
@@ -102,12 +97,6 @@ def evaluate_router(
                 .values[0]
             )
             return {'response': response, 'score': score}
-
-        def eval(self, scorer: Op):
-            eval = weave.Evaluation(
-                dataset=self.model_results.to_dict(orient='records'), scorers=[scorer]
-            )
-            asyncio.run(eval.evaluate(self))
 
     class BestRoutedModel(_DummyEvalModel):
         model_name: str
@@ -121,12 +110,9 @@ def evaluate_router(
             return super().predict(prompt)
 
     best_provider_model = BestRoutedModel(model_name=best_provider, model_results=model_results)
-    best_provider_model.eval(is_correct)
-
     nd_model = NotDiamondRoutedModel(model_results=nd_results)
-    nd_model.eval(is_correct)
 
-    return eval_results, eval_stats
+    return best_provider_model, nd_model
 
 def _get_score_column(model: str, scores: dict, score_col_name: str = None) -> Tuple[str, float]:
     """
@@ -172,3 +158,14 @@ def _placeholder_model_name() -> str:
     import string
     alphabet = string.ascii_lowercase + string.digits
     return ''.join(random.choices(alphabet, k=8))
+
+def _in_notebook():
+    try:
+        from IPython import get_ipython
+        if 'IPKernelApp' not in get_ipython().config:  # pragma: no cover
+            return False
+    except ImportError:
+        return False
+    except AttributeError:
+        return False
+    return True
