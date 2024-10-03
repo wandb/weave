@@ -6,10 +6,9 @@ from responses import Call
 
 import weave
 from weave.trace.client_context.weave_client import require_weave_client
-from weave.trace.refs import parse_op_uri
 from weave.trace_server.trace_server_interface import LLMUsageSchema
 
-logger = logging.logger(__name__)
+logger = logging.Logger(__name__)
 
 
 class AnonymousModel(weave.Model):
@@ -89,13 +88,6 @@ def log_generation(
     )
 
     return call
-
-
-def _determine_op_ref(maybe_op_ref):
-    if not maybe_op_ref.startswith("weave:///"):
-        return None
-    else:
-        return parse_op_uri(maybe_op_ref)
 
 
 class _ResolveTimestampsReturnType(TypedDict):

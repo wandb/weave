@@ -642,23 +642,19 @@ class WeaveClient:
             The created Call object.
         """
         inputs_redacted = redact_sensitive_keys(inputs)
+        inputs_postprocessed = inputs_redacted
 
         # YUK! Clean this up
-        resolved_op = None
-        op_def_ref = None
-        if isinstance(op, str):
-            if op.startswith("weave:///"):
-                op_def_ref = parse_op_uri(op)
-                resolved_op = None
-            else:
+        if isinstance(op, str) and op.startswith("weave:///"):
+            op_def_ref = parse_op_uri(op)
+        else:
+            if isinstance(op, str):
                 if op not in self._anonymous_ops:
                     self._anonymous_ops[op] = _build_anonymous_op(op)
                 resolved_op = self._anonymous_ops[op]
-        else:
-            resolved_op = op
+            else:
+                resolved_op = op
 
-        inputs_postprocessed = inputs_redacted
-        if resolved_op:
             unbound_op = maybe_unbind_method(resolved_op)
             op_def_ref = self._save_op(unbound_op)
 

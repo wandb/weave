@@ -153,7 +153,7 @@ def test_direct_create_generation():
 
 
 """
-It might be worth thinking specifically aobut the views we want to create 
+It might be worth thinking specifically aobut the views we want to create
 and instead focusing on ensureing they can be represented. For example:
 
 1. Given an Evaluation definition & a Model, build an interactive call table. Also, show the summary stats.
