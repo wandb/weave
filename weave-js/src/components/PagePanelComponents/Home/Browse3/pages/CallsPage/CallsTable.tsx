@@ -143,6 +143,9 @@ export const CallsTable: FC<{
 
   paginationModel?: GridPaginationModel;
   setPaginationModel?: (newModel: GridPaginationModel) => void;
+
+  // Can include glob for prefix match, e.g. "inputs.*"
+  allowedColumnPatterns?: string[];
 }> = ({
   entity,
   project,
@@ -161,6 +164,7 @@ export const CallsTable: FC<{
   setSortModel,
   paginationModel,
   setPaginationModel,
+  allowedColumnPatterns,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
 
@@ -367,6 +371,7 @@ export const CallsTable: FC<{
     onCollapse,
     onExpand,
     columnIsRefExpanded,
+    allowedColumnPatterns,
     onAddFilter
   );
 
