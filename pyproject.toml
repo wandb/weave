@@ -46,7 +46,6 @@ dependencies = [
   "rich",                    # Used for special formatting of tables (should be made optional)
 
   # dependencies for remaining legacy code.  Remove when possible
-  "httpx",
   "aiohttp",
   "gql",
   "requests_toolbelt",
