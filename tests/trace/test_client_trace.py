@@ -644,33 +644,6 @@ def test_trace_call_query_filter_trace_roots_only(client):
         assert len(inner_res.calls) == exp_count
 
 
-# is this test still valid?
-# @pytest.mark.skip("too slow")
-# def test_trace_call_query_filter_wb_run_ids(client, user_by_api_key_in_env):
-#     call_spec = simple_line_call_bootstrap(init_wandb=True)
-
-#     res = get_all_calls_asserting_finished(client, call_spec)
-
-#     wb_run_ids = list(set([call.wb_run_id for call in res.calls]) - set([None]))
-
-#     for wb_run_ids, exp_count in [
-#         # Test the None case
-#         (None, call_spec.total_calls),
-#         # Test the empty list case
-#         ([], call_spec.total_calls),
-#         # Test List (of 1)
-#         (wb_run_ids, call_spec.run_calls),
-#     ]:
-#         inner_res = get_client_trace_server(client).calls_query(
-#             tsi.CallsQueryReq(
-#                 project_id=get_client_project_id(client),
-#                 filter=tsi.CallsFilter(wb_run_ids=wb_run_ids),
-#             )
-#         )
-
-#         assert len(inner_res.calls) == exp_count
-
-
 def test_trace_call_query_limit(client):
     call_spec = simple_line_call_bootstrap()
 
