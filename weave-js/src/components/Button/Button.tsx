@@ -134,7 +134,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               'bg-red-450': isDestructive && active,
 
               // outline
-              'box-border gap-4 border border-moon-200 bg-white text-moon-650 hover:border-teal-300/[0] hover:bg-teal-300/[0.48] hover:text-teal-600':
+              'box-border gap-4 border border-moon-200 bg-white text-moon-650 hover:border-transparent hover:bg-teal-300/[0.48] hover:text-teal-600':
                 isOutline,
               'dark:border-moon-750 dark:bg-transparent dark:text-moon-200 dark:hover:bg-teal-700/[0.48] dark:hover:text-teal-400':
                 isOutline,
