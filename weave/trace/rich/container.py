@@ -3,7 +3,7 @@ from typing import Any, Generic, Iterable, Iterator, Optional, TypeVar
 
 from rich.table import Table
 
-from weave.trace import rich_pydantic_util
+from weave.trace.rich import pydantic_util
 
 T = TypeVar("T")
 
@@ -51,4 +51,4 @@ class AbstractRichContainer(ABC, Generic[T]):
             p.text(self._cycle_repr())
         else:
             table = self.as_rich_table()
-            p.text(rich_pydantic_util.table_to_str(table))
+            p.text(pydantic_util.table_to_str(table))
