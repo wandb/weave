@@ -18,7 +18,6 @@ from typing import (
     Protocol,
     Union,
     cast,
-    overload,
     runtime_checkable,
 )
 
@@ -331,50 +330,14 @@ def calls(op: Op) -> "CallsIter":
     return client._op_calls(op)
 
 
-# Modern decos
-@overload
-def op() -> Op: ...
-
-
-@overload
-def op(func: Any) -> Op: ...
-
-
-@overload
 def op(
+    func: Optional[Callable] = None,
     *,
-    call_display_name: Union[str, Callable[["Call"], str]],
-) -> Callable[[Any], Op]:
-    """Use call_display_name to set the display name of the traced call.
-
-    When set as a callable, the callable must take in a Call object
-    (which can have attributes like op_name, trace_id, etc.) and return
-    the string to be used as the display name of the traced call."""
-    ...
-
-
-@overload
-def op(*, name: str) -> Callable[[Any], Op]:  # type: ignore
-    """Use name to set the name of the op itself."""
-    ...
-
-
-@overload
-def op(
-    *,
-    postprocess_inputs: Callable[[dict[str, Any]], dict[str, Any]],
-    postprocess_output: Callable[..., Any],
-) -> Any:
-    """
-    Modify the inputs and outputs of an op before sending data to weave.
-
-    This does not modify inputs or outputs at function call time, only when
-    the data is sent to weave.
-    """
-    ...
-
-
-def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
+    name: Optional[str] = None,
+    call_display_name: Optional[Union[str, Callable[["Call"], str]]] = None,
+    postprocess_inputs: Optional[Callable[[dict[str, Any]], dict[str, Any]]] = None,
+    postprocess_output: Optional[Callable[..., Any]] = None,
+) -> Union[Callable[[Any], Op], Op]:
     """
     A decorator to weave op-ify a function or method.  Works for both sync and async.
 
@@ -469,12 +432,12 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
             # this is noisy for us, so we strip it out
             inferred_name = inferred_name.split(".<locals>.")[-1]
 
-            wrapper.name = kwargs.get("name", inferred_name)  # type: ignore
+            wrapper.name = name or inferred_name  # type: ignore
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
 
-            wrapper.postprocess_inputs = kwargs.get("postprocess_inputs")  # type: ignore
-            wrapper.postprocess_output = kwargs.get("postprocess_output")  # type: ignore
+            wrapper.postprocess_inputs = postprocess_inputs  # type: ignore
+            wrapper.postprocess_output = postprocess_output  # type: ignore
 
             wrapper.call = partial(call, wrapper)  # type: ignore
             wrapper.calls = partial(calls, wrapper)  # type: ignore
@@ -487,21 +450,20 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
             wrapper._tracing_enabled = True  # type: ignore
 
-            if callable(call_name_func := kwargs.get("call_display_name", "")):
-                params = inspect.signature(call_name_func).parameters
+            if callable(call_display_name):
+                params = inspect.signature(call_display_name).parameters
                 if len(params) != 1:
                     raise DisplayNameFuncError(
                         "`call_display_name` function must take exactly 1 argument (the Call object)"
                     )
-            wrapper.call_display_name = call_name_func  # type: ignore
+            wrapper.call_display_name = call_display_name  # type: ignore
 
             return cast(Op, wrapper)
 
         return create_wrapper(func)
 
-    if len(args) == 1 and len(kwargs) == 0 and callable(func := args[0]):
+    if func is not None:
         return op_deco(func)
-
     return op_deco
 
 
