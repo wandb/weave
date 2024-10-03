@@ -50,6 +50,7 @@ from weave.trace_server.trace_server_interface import (
     FeedbackCreateReq,
     FileCreateReq,
     FileCreateRes,
+    LLMUsageSchema,
     ObjCreateReq,
     ObjCreateRes,
     ObjectVersionFilter,
@@ -624,6 +625,7 @@ class WeaveClient:
         attributes: Optional[dict] = None,
         display_name: Optional[Union[str, Callable[[Call], str]]] = None,
         *,
+        started_at: Optional[datetime.datetime],
         use_stack: bool = True,
     ) -> Call:
         """Create, log, and push a call onto the runtime stack.
@@ -639,19 +641,31 @@ class WeaveClient:
         Returns:
             The created Call object.
         """
-        if isinstance(op, str):
-            if op not in self._anonymous_ops:
-                self._anonymous_ops[op] = _build_anonymous_op(op)
-            op = self._anonymous_ops[op]
-
-        unbound_op = maybe_unbind_method(op)
-        op_def_ref = self._save_op(unbound_op)
 
         inputs_redacted = redact_sensitive_keys(inputs)
-        if op.postprocess_inputs:
-            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
+        
+        # YUK! Clean this up
+        resolved_op = None
+        op_def_ref = None
+        if isinstance(op, str):
+            if op.startswith("weave:///"):
+                op_def_ref = parse_op_uri(op)
+                resolved_op = None
+            else:
+                if op not in self._anonymous_ops:
+                    self._anonymous_ops[op] = _build_anonymous_op(op)
+                resolved_op = self._anonymous_ops[op]
         else:
-            inputs_postprocessed = inputs_redacted
+            resolved_op = op
+
+        inputs_postprocessed = inputs_redacted
+        if resolved_op:
+            unbound_op = maybe_unbind_method(resolved_op)
+            op_def_ref = self._save_op(unbound_op)
+
+            if resolved_op.postprocess_inputs:
+                inputs_postprocessed = resolved_op.postprocess_inputs(inputs_redacted)
+            
 
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
@@ -708,7 +722,7 @@ class WeaveClient:
         current_wb_run_id = safe_current_wb_run_id()
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
 
-        started_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        started_at = started_at or datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
         def send_start_call() -> None:
@@ -744,6 +758,8 @@ class WeaveClient:
         output: Any = None,
         exception: Optional[BaseException] = None,
         *,
+        llm_token_usage: Optional[dict[str, LLMUsageSchema]] = None,
+        summmary: Optional[dict] = None, # TODO: Should these be exposed?
         postprocess_output: Optional[Callable[..., Any]] = None,
     ) -> None:
         original_output = output
@@ -758,7 +774,10 @@ class WeaveClient:
         call.output = output
 
         # Summary handling
-        summary = {}
+        summary = summmary or {}
+        # IDK if this is the best place to put this, but adding for now
+        if llm_token_usage:
+            summary["usage"] = llm_token_usage
         if call._children:
             summary = sum_dict_leaves([child.summary or {} for child in call._children])
         elif (

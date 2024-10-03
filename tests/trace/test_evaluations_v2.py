@@ -126,3 +126,29 @@ def test_call_query_stats():
     
     """
     raise NotImplementedError()
+
+# Lower-level integration utilities tests
+
+def test_direct_create_generation():
+    """
+    This demonstrates the ability to directly create a "generation record" (name TBD)
+    without using the op decorator. While this is available via the low-level rest API,
+    it is still a bit cumbersome.
+
+    API: client.log_generation(model_id, model_params, input, output, ...)
+    """
+    raise NotImplementedError()
+
+"""
+It might be worth thinking specifically aobut the views we want to create 
+and instead focusing on ensureing they can be represented. For example:
+
+1. Given an Evaluation definition & a Model, build an interactive call table. Also, show the summary stats.
+2. Given an Evaluation definition and Multiple models, build an interactive compare table (rows are dataset rows, columns are pivot on model and metrics)
+3. Given a dataset row and a model, show the results aggregated over trials (for all scorers, or perhaps a specific scorer)
+4. Given a dataset row and multiple models, show the comparison (aggregated over trials)
+
+Thinking more about this, a score can be thought of as "latest" or a specific scorer version and multiple scores of the same version are meaningless (they should not be variable).
+
+"""
+
