@@ -28,7 +28,7 @@ import hashlib
 import json
 import logging
 import threading
-from collections import Counter, defaultdict
+from collections import defaultdict
 from contextlib import contextmanager
 from typing import (
     Any,
@@ -49,6 +49,10 @@ from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 
+from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
+from weave.trace_server import environment as wf_env
+from weave.trace_server import refs_internal as ri
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -57,21 +61,7 @@ from weave.trace_server.calls_query_builder import (
     QueryBuilderField,
     combine_conditions,
 )
-from weave.trace_server.ids import generate_id
-from weave.trace_server.table_query_builder import (
-    ROW_ORDER_COLUMN_NAME,
-    TABLE_ROWS_ALIAS,
-    VAL_DUMP_COLUMN_NAME,
-    make_natural_sort_table_query,
-    make_standard_table_query,
-)
-from weave.trace_server.trace_server_common import make_derived_summary_fields
-
-from . import clickhouse_trace_server_migrator as wf_migrator
-from . import environment as wf_env
-from . import refs_internal as ri
-from . import trace_server_interface as tsi
-from .clickhouse_schema import (
+from weave.trace_server.clickhouse_schema import (
     CallDeleteCHInsertable,
     CallEndCHInsertable,
     CallStartCHInsertable,
@@ -80,25 +70,37 @@ from .clickhouse_schema import (
     SelectableCHCallSchema,
     SelectableCHObjSchema,
 )
-from .emoji_util import detone_emojis
-from .errors import InsertTooLarge, InvalidRequest, RequestTooLarge
-from .feedback import (
+from weave.trace_server.emoji_util import detone_emojis
+from weave.trace_server.errors import InsertTooLarge, InvalidRequest, RequestTooLarge
+from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from .orm import ParamBuilder, Row
-from .token_costs import LLM_TOKEN_PRICES_TABLE, validate_cost_purge_req
-from .trace_server_common import (
+from weave.trace_server.ids import generate_id
+from weave.trace_server.orm import ParamBuilder, Row
+from weave.trace_server.table_query_builder import (
+    ROW_ORDER_COLUMN_NAME,
+    TABLE_ROWS_ALIAS,
+    VAL_DUMP_COLUMN_NAME,
+    make_natural_sort_table_query,
+    make_standard_table_query,
+)
+from weave.trace_server.token_costs import (
+    LLM_TOKEN_PRICES_TABLE,
+    validate_cost_purge_req,
+)
+from weave.trace_server.trace_server_common import (
     LRUCache,
     digest_is_version_like,
     empty_str_to_none,
     get_nested_key,
     hydrate_calls_with_feedback,
+    make_derived_summary_fields,
     make_feedback_query_req,
     set_nested_key,
 )
-from .trace_server_interface_util import (
+from weave.trace_server.trace_server_interface_util import (
     assert_non_null_wb_user_id,
     bytes_digest,
     extract_refs_from_values,
@@ -114,6 +116,7 @@ MAX_FLUSH_AGE = 15
 FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 100
+MAX_CALLS_STREAM_BATCH_SIZE = 500
 
 
 class NotFoundError(Exception):
@@ -356,15 +359,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     for call in hydrated_batch:
                         yield tsi.CallSchema.model_validate(call)
 
-                    # *** Dynamic Batch Size ***
-                    # count the number of columns at each depth
-                    depths = Counter(col.count(".") for col in expand_columns)
-                    # take the max number of columns at any depth
-                    max_count_at_ref_depth = max(depths.values())
-                    # divide max refs that we can resolve 1000 refs at any depth
-                    max_size = 1000 // max_count_at_ref_depth
-                    # double batch size up to what refs_read_batch can handle
-                    batch_size = min(max_size, batch_size * 2)
+                    # *** Dynamic increase from 10 to 500 ***
+                    batch_size = min(MAX_CALLS_STREAM_BATCH_SIZE, batch_size * 10)
                     batch = []
 
             hydrated_batch = self._hydrate_calls(
@@ -1440,9 +1436,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters to be passed to the query. Must include all parameters for both
             conditions and object_id_conditions.
         metadata_only:
-            if metadata_only is True, then we exclude the val_dump field in the select query.
-            generally, "queries" should not include the val_dump, but "reads" should, as
-            the val_dump is the most expensive part of the query.
+            if metadata_only is True, then we return early and dont grab the value.
+            Otherwise, make a second query to grab the val_dump from the db
         """
         if not conditions:
             conditions = ["1 = 1"]
@@ -1475,11 +1470,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if parameters is None:
             parameters = {}
 
-        # When metadata_only is false, dont actually read from the field
-        val_dump_field = "'{}' AS val_dump" if metadata_only else "val_dump"
-
-        # The subquery is for deduplication of object versions by digest
-        select_query = f"""
+        select_without_val_dump_query = f"""
             SELECT
                 project_id,
                 object_id,
@@ -1487,7 +1478,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 kind,
                 base_object_class,
                 refs,
-                val_dump,
                 digest,
                 is_op,
                 version_index,
@@ -1500,7 +1490,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     kind,
                     base_object_class,
                     refs,
-                    val_dump,
                     digest,
                     is_op,
                     row_number() OVER (
@@ -1518,7 +1507,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         kind,
                         base_object_class,
                         refs,
-                        {val_dump_field},
                         digest,
                         if (kind = 'op', 1, 0) AS is_op,
                         row_number() OVER (
@@ -1540,7 +1528,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             {offset_part}
         """
         query_result = self._query_stream(
-            select_query,
+            select_without_val_dump_query,
             {"project_id": project_id, **parameters},
         )
         result: list[SelectableCHObjSchema] = []
@@ -1556,19 +1544,50 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 "kind",
                                 "base_object_class",
                                 "refs",
-                                "val_dump",
                                 "digest",
                                 "is_op",
                                 "version_index",
                                 "version_count",
                                 "is_latest",
+                                "val_dump",
                             ],
-                            row,
+                            # Add an empty val_dump to the end of the row
+                            list(row) + ["{}"],
                         )
                     )
                 )
             )
 
+        # -- Don't make second query for object values if metadata_only --
+        if metadata_only:
+            return result
+
+        # now get the val_dump for each object
+        object_ids = list(set([row.object_id for row in result]))
+        digests = list(set([row.digest for row in result]))
+        query = """
+            SELECT object_id, digest, any(val_dump)
+            FROM object_versions
+            WHERE project_id = {project_id: String} AND
+                object_id IN {object_ids: Array(String)} AND
+                digest IN {digests: Array(String)}
+            GROUP BY object_id, digest
+        """
+        parameters = {
+            "project_id": project_id,
+            "object_ids": object_ids,
+            "digests": digests,
+        }
+        query_result = self._query_stream(query, parameters)
+        # Map (object_id, digest) to val_dump
+        object_values: Dict[tuple[str, str], Any] = {}
+        for row in query_result:
+            (object_id, digest, val_dump) = row
+            object_values[(object_id, digest)] = val_dump
+
+        # update the val_dump for each object
+        for obj in result:
+            obj.val_dump = object_values.get((obj.object_id, obj.digest), "{}")
         return result
 
     def _run_migrations(self) -> None:
@@ -1581,7 +1600,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query: str,
         parameters: Dict[str, Any],
         column_formats: Optional[Dict[str, Any]] = None,
-    ) -> Iterator[QueryResult]:
+    ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
         summary = None
         parameters = _process_parameters(parameters)

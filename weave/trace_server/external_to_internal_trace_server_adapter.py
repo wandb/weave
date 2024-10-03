@@ -2,12 +2,11 @@ import abc
 import typing
 from typing import Callable, Iterator, TypeVar
 
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_converter import (
     universal_ext_to_int_ref_converter,
     universal_int_to_ext_ref_converter,
 )
-
-from . import trace_server_interface as tsi
 
 
 class IdConverter:

@@ -91,11 +91,7 @@ class FutureExecutor:
         Returns:
             Future[T]: A Future object representing the eventual result of the function.
         """
-        future = self._safe_submit(f, *args, **kwargs)
-        with self._active_futures_lock:
-            self._active_futures.append(future)
-        future.add_done_callback(self._future_done_callback)
-        return future
+        return self._safe_submit(f, *args, **kwargs)
 
     def then(self, futures: List[Future[T]], g: Callable[[List[T]], U]) -> Future[U]:
         """
@@ -173,7 +169,6 @@ class FutureExecutor:
             except Exception as e:
                 if get_raise_on_captured_errors():
                     raise
-                logger.error(f"Job failed during flush: {e}")
         return True
 
     def _future_done_callback(self, future: Future) -> None:
@@ -181,6 +176,9 @@ class FutureExecutor:
         with self._active_futures_lock:
             if future in self._active_futures:
                 self._active_futures.remove(future)
+                exception = future.exception()
+                if exception:
+                    logger.error(f"Task failed: {_format_exception(exception)}")
 
     def _shutdown(self) -> None:
         """Shutdown the thread pool executor. Should only be called when the program is exiting."""
@@ -223,11 +221,17 @@ class FutureExecutor:
             return self._execute_directly(wrapped, *args, **kwargs)
 
         try:
-            return self._executor.submit(wrapped, *args, **kwargs)
+            future = self._executor.submit(wrapped, *args, **kwargs)
         except Exception as e:
             if get_raise_on_captured_errors():
                 raise
             return self._execute_directly(wrapped, *args, **kwargs)
+
+        with self._active_futures_lock:
+            self._active_futures.append(future)
+        future.add_done_callback(self._future_done_callback)
+
+        return future
 
     def _execute_directly(
         self, f: Callable[..., T], *args: Any, **kwargs: Any
@@ -238,8 +242,22 @@ class FutureExecutor:
             res = f(*args, **kwargs)
             fut.set_result(res)
         except Exception as e:
+            logger.error(f"Task failed: {_format_exception(e)}")
             fut.set_exception(e)
         return fut
+
+
+def _format_exception(e: BaseException) -> str:
+    exception_str = f"{type(e).__name__}: {e}"
+    return exception_str
+    # try:
+    #     if hasattr(e, "__traceback__"):
+    #         traceback_str = "".join(traceback.format_tb(e.__traceback__))
+    #     if traceback_str:
+    #         exception_str += f"\nTraceback:\n{traceback_str}"
+    #     return exception_str
+    # except:
+    #     return exception_str
 
 
 __all__ = ["FutureExecutor"]
