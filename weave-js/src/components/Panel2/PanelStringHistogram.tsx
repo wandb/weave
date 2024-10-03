@@ -169,7 +169,11 @@ const PanelStringHistogramInner: React.FC<
   const isColorable = colorNode.nodeType !== 'void';
   const nodeValueQuery = CGReact.useNodeValue(props.input);
   const data = useMemo(() => {
-    if (nodeValueQuery.loading || (isColorable && colorNodeValue.loading)) {
+    if (
+      nodeValueQuery.loading ||
+      (isColorable && colorNodeValue.loading) ||
+      nodeValueQuery.result == null
+    ) {
       return [];
     }
     if (!isColorable) {
