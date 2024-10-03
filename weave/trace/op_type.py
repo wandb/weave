@@ -14,7 +14,7 @@ import typing
 from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any, Callable, Optional, Union, get_args, get_origin
 
-from weave.trace import settings
+from weave.trace import serializer, settings
 from weave.trace.client_context.weave_client import get_weave_client
 from weave.trace.ipython import (
     ClassNotFoundError,
@@ -25,8 +25,6 @@ from weave.trace.mem_artifact import MemTraceFilesArtifact
 from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef
 from weave.trace_server.trace_server_interface_util import str_digest
-
-from . import serializer
 
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")

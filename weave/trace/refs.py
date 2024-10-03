@@ -3,7 +3,7 @@ import urllib
 from concurrent.futures import Future
 from typing import Any, Optional, Union, cast
 
-from ..trace_server import refs_internal
+from weave.trace_server import refs_internal
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME

@@ -10,8 +10,7 @@ from pathlib import Path
 from weave import __version__
 from weave.trace import env
 from weave.trace.refs import ObjectRef, parse_uri
-
-from ..util import execute, safe_name
+from weave.trace.util import execute, safe_name
 
 
 def generate_dockerfile(
