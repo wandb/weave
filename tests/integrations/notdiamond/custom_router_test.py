@@ -1,25 +1,26 @@
 import json
 import os
 from typing import Dict
-import yaml
 
 import pytest
+import yaml
 
 import weave
 from weave.flow.eval import EvaluationResults
-from weave.integrations.notdiamond.custom_router import train_router, evaluate_router
+from weave.integrations.notdiamond.custom_router import evaluate_router, train_router
 from weave.integrations.notdiamond.util import get_model_evals
 from weave.trace.weave_client import WeaveClient
+
 
 @pytest.fixture
 def model_evals():
     return get_model_evals()
 
+
 @pytest.fixture
 def model_datasets(model_evals: Dict[str, EvaluationResults]):
     model_datasets = {}
     for model, eval_results in model_evals.items():
-
         table_rows = []
         for eval_idx, eval_row in enumerate(eval_results.rows):
             table_rows.append(
@@ -35,20 +36,27 @@ def model_datasets(model_evals: Dict[str, EvaluationResults]):
 
     return model_datasets
 
+
 @pytest.fixture
 def preference_id():
-    with open('tests/integrations/notdiamond/cassettes/custom_router_test/test_custom_router_train_router.yaml', 'r') as file:
+    with open(
+        "tests/integrations/notdiamond/cassettes/custom_router_test/test_custom_router_train_router.yaml",
+        "r",
+    ) as file:
         cassette = yaml.safe_load(file)
 
-    response_body = cassette['interactions'][0]['response']['body']
-    return json.loads(response_body['string'])['preference_id']
+    response_body = cassette["interactions"][0]["response"]["body"]
+    return json.loads(response_body["string"])["preference_id"]
+
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "api.notdiamond.ai"],
 )
-def test_custom_router_train_router(client: WeaveClient, model_evals: Dict[str, EvaluationResults]):
+def test_custom_router_train_router(
+    client: WeaveClient, model_evals: Dict[str, EvaluationResults]
+):
     api_key = os.getenv("NOTDIAMOND_API_KEY", "DUMMY_API_KEY")
     preference_id = train_router(
         model_evals=model_evals,
@@ -60,7 +68,7 @@ def test_custom_router_train_router(client: WeaveClient, model_evals: Dict[str, 
     )
 
     assert len(list(client.calls())) > 0
-    nd_calls = [call for call in client.calls() if 'train_evaluations' in call.op_name]
+    nd_calls = [call for call in client.calls() if "train_evaluations" in call.op_name]
     assert len(nd_calls) == 1
 
     # confirm router was trained
@@ -72,7 +80,9 @@ def test_custom_router_train_router(client: WeaveClient, model_evals: Dict[str, 
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "api.notdiamond.ai"],
 )
-def test_evaluate_router(client: WeaveClient, model_datasets: Dict[str, weave.Table], preference_id: str):
+def test_evaluate_router(
+    client: WeaveClient, model_datasets: Dict[str, weave.Table], preference_id: str
+):
     api_key = os.getenv("NOTDIAMOND_API_KEY", "DUMMY_API_KEY")
     eval_results, eval_stats = evaluate_router(
         model_datasets=model_datasets,
@@ -83,7 +93,7 @@ def test_evaluate_router(client: WeaveClient, model_datasets: Dict[str, weave.Ta
     )
 
     assert len(list(client.calls())) > 0
-    nd_calls = [call for call in client.calls() if 'evaluate_router' in call.op_name]
+    nd_calls = [call for call in client.calls() if "evaluate_router" in call.op_name]
     assert len(nd_calls) == 1
 
     model_dataset = next(iter(model_datasets.values()))

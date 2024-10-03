@@ -1,7 +1,9 @@
 import importlib
 from typing import Callable, List
+
 import weave
-from weave.trace.patcher import SymbolPatcher, MultiPatcher
+from weave.trace.patcher import MultiPatcher, SymbolPatcher
+
 
 def nd_wrapper(name: str) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
@@ -10,6 +12,7 @@ def nd_wrapper(name: str) -> Callable[[Callable], Callable]:
         return op
 
     return wrapper
+
 
 def _patch_client_op(method_name: str) -> List[SymbolPatcher]:
     return [
@@ -24,6 +27,7 @@ def _patch_client_op(method_name: str) -> List[SymbolPatcher]:
             weave.op(),
         ),
     ]
+
 
 patched_client_functions = _patch_client_op("model_select")
 

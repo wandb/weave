@@ -1,8 +1,10 @@
 from typing import Dict
 
 import pandas as pd
+
 import weave
 from weave.flow.eval import EvaluationResults
+
 
 def get_model_evals(
     file_path: str = "tests/integrations/notdiamond/test_data/humaneval.csv",
@@ -21,18 +23,23 @@ def get_model_evals(
         input_score_col = _get_score_column(model)
         input_response_col = _get_response_column(model)
         columns = ["Input", input_response_col, input_score_col]
-        eval_rows = (
-            df[columns]
-            .rename(columns={"Input": "prompt", input_response_col: "actual", input_score_col: "scores"})
+        eval_rows = df[columns].rename(
+            columns={
+                "Input": "prompt",
+                input_response_col: "actual",
+                input_score_col: "scores",
+            }
         )
-        eval_rows['scores'] = eval_rows['scores'].apply(lambda x: {"correctness": x})
+        eval_rows["scores"] = eval_rows["scores"].apply(lambda x: {"correctness": x})
         eval_rows = eval_rows.to_dict(orient="records")
         model_evals[model] = EvaluationResults(rows=weave.Table(eval_rows))
 
     return model_evals
 
+
 def _get_score_column(model: str) -> str:
     return f"{model}/final_score"
+
 
 def _get_response_column(model: str) -> str:
     return f"{model}/response"
