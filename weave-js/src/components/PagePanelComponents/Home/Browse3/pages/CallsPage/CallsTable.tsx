@@ -245,6 +245,8 @@ export const CallsTable: FC<{
     expandedRefCols
   );
 
+  console.log(calls)
+
   // Here, we only update our local state once the calls have loaded.
   // If we were not to do this, we would see a flicker of an empty table
   // before the calls are loaded. Since the columns are data-driven, this
@@ -979,10 +981,108 @@ const getPeekId = (peekPath: string | null): string | null => {
   return pathname.split('/').pop() ?? null;
 };
 
-export type FlattenedCallData = TraceCallSchema & {[key: string]: string};
+
+type FeedbackType = Array<FeedbackEntry>
+type FeedbackEntry<PayloadType extends any = any> = {
+  created_at: string,     
+  creator?: string,
+  feedback_type: string,
+  payload: PayloadType,
+  wb_user_id: string,
+  weave_ref: string,
+}
+
+type ScoreScorePayload = {
+  call?: string,
+  op?: string,
+  result: any,
+  score_args?: any
+}
+type ScoreFeedbackPayload = {
+  name: string,
+  score: ScoreScorePayload
+}
+
+type AggregatedScoreFeedback = {
+  [name: string]: {
+    result: any,
+    scoreFeedbacks: Array<FeedbackEntry<ScoreFeedbackPayload>>
+  }
+}
+
+const aggregateTraceCallFeedback = (
+  traceCall: TraceCallSchema,
+): TraceCallSchema => {
+  if (traceCall.summary?.weave?.feedback == null) {
+    return traceCall;
+  }
+  
+  const scoreFeedbackAggregation = (
+    feedback: FeedbackType
+  ) : AggregatedScoreFeedback => {
+    // TODO: more type safety
+    const scoreFeedback = feedback.filter(f => 
+      f.feedback_type === 'score' &&
+      f.payload.score != null  &&
+      f.payload.score.result != null 
+    ) as Array<FeedbackEntry<ScoreFeedbackPayload>>
+    // TODO: Permform aggregation
+    const aggregatedScoreFeedback: AggregatedScoreFeedback = {};
+    scoreFeedback.forEach(f => {
+      const name = f.payload.name;
+      if (aggregatedScoreFeedback[name] == null) {
+        // aggregatedScoreFeedback[name] = {
+        //   result: f.payload.score.result,
+        //   scoreFeedbacks: []
+        // }
+        aggregatedScoreFeedback[name] = f.payload.score.result
+      }
+      // aggregatedScoreFeedback[name].scoreFeedbacks.push(f);
+      // TODO: Aggregate scores
+
+    })
+     
+  
+    return aggregatedScoreFeedback;
+  }
+
+  const startingFeedback = traceCall.summary.weave.feedback ?? [];
+  const aggregatedScoreFeedback = scoreFeedbackAggregation(startingFeedback);
+  // Add the aggregated score feedback to the trace call
+  // without mutating the original trace call
+  // const returnedTraceCall = {
+  //   ...traceCall,
+  //   summary: {
+  //     ...traceCall.summary,
+  //     scores: aggregatedScoreFeedback,
+  //     // weave: {
+  //     //   ...traceCall.summary.weave,
+  //     //   aggregatedScoreFeedback
+  //     // }
+  //   }
+  // };
+
+  const returnedTraceCall = {
+    ...traceCall,
+    scores: aggregatedScoreFeedback,
+    // summary: {
+    //   ...traceCall.summary,
+    //   scores: aggregatedScoreFeedback,
+    //   // weave: {
+    //   //   ...traceCall.summary.weave,
+    //   //   aggregatedScoreFeedback
+    //   // }
+    // }
+  };
+
+  return returnedTraceCall;
+}
+
+
 
 function prepareFlattenedCallDataForTable(
   callsResult: CallSchema[]
-): FlattenedCallData[] {
-  return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
-}
+): Array<TraceCallSchema & {[key: string]: string}> {
+  return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall ? aggregateTraceCallFeedback(c.traceCall) : undefined));
+
+export type FlattenedCallData = TraceCallSchema & {[key: string]: string};

@@ -374,6 +374,7 @@ export const useCallFlattenedTraceTree = (
     undefined,
     columns,
     undefined,
+    undefined,
     // Refetch the trace tree on delete or rename
     {refetchOnDelete: true}
   );

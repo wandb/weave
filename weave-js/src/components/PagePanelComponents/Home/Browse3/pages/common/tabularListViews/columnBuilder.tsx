@@ -214,6 +214,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
   let groupingModel: GridColumnGroupingModel = tree.children.filter(
     c => 'groupId' in c
   ) as GridColumnGroup[];
+  console.log(filteredDynamicColumnNames, groupingModel)
 
   const walkGroupingModel = (
     nodes: GridColumnNode[],

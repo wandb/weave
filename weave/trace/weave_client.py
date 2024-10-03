@@ -47,6 +47,7 @@ from weave.trace_server.trace_server_interface import (
     CostQueryOutput,
     CostQueryReq,
     EndedCallSchemaForInsert,
+    FeedbackCreateReq,
     FileCreateReq,
     FileCreateRes,
     ObjCreateReq,
@@ -277,6 +278,27 @@ class Call:
     def remove_display_name(self) -> None:
         self.set_display_name(None)
 
+    def add_score(self, score_name: str, score: dict) -> str:
+        # This needs to be moved to the client and backgrounded.
+        client = weave_client_context.require_weave_client()
+        payload = {
+            "name": score_name,
+            "score": score,
+        }
+        payload = map_to_refs(payload)
+        payload_json = to_json(payload, client._project_id(), client)
+        ref = get_ref(self)
+        if ref is None:
+            raise ValueError("Can't add score to call without ref")
+        freq = FeedbackCreateReq(
+            project_id=client._project_id(),
+            weave_ref=ref.uri(),
+            feedback_type="score",  # should this be score_name?
+            payload=payload_json,
+        )
+        response = client.server.feedback_create(freq)
+        return response.id
+
 
 class CallsIter:
     server: TraceServerInterface
@@ -375,6 +397,8 @@ def make_client_call(
     )
     if call.id is None:
         raise ValueError("Call ID is None")
+    # Total hack..
+    set_ref(call, CallRef(entity, project, call.id))
     return WeaveObject(call, CallRef(entity, project, call.id), server, None)
 
 
@@ -664,6 +688,14 @@ class WeaveClient:
             id=call_id,
             inputs=inputs_with_refs,
             attributes=attributes,
+        )
+        set_ref(
+            call,
+            CallRef(
+                entity=self.entity,
+                project=self.project,
+                id=call_id,
+            ),
         )
         # feels like this should be in post init, but keping here
         # because the func needs to be resolved for schema insert below

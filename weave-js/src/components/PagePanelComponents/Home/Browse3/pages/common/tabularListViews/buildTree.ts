@@ -50,7 +50,7 @@ export function buildTree(strings: string[]): GridColumnGroup {
   return pushLeavesIntoGroupsForGroup(root);
 }
 
-function addToTree(
+function  addToTree(
   node: GridColumnGroup,
   fields: string[],
   fullPath: string,
@@ -107,7 +107,7 @@ function pushLeavesIntoGroupsForGroup(group: GridColumnGroup): GridColumnGroup {
   Object.keys(childrenLeaves).forEach(childKey => {
     let found = false;
     Object.keys(childrenGroups).forEach(groupKey => {
-      if (!found && childKey.startsWith(groupKey)) {
+      if (!found && (childKey === groupKey || childKey.startsWith(groupKey + "."))) {
         childrenGroups[groupKey].children.push(childrenLeaves[childKey]);
         found = true;
       }

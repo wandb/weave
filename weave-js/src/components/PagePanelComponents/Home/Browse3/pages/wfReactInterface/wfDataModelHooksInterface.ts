@@ -173,6 +173,7 @@ export type WFDataModelHooksInterface = {
     query?: Query,
     columns?: string[],
     expandedRefColumns?: Set<string>,
+    includeFeedback?: boolean,
     opts?: {skip?: boolean; refetchOnDelete?: boolean}
   ) => Loadable<CallSchema[]> & Refetchable;
   useCallsStats: (

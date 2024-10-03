@@ -20,7 +20,7 @@ export function isDynamicCallColumn(path: Path): boolean {
   }
   return (
     path.length > 1 &&
-    ['attributes', 'inputs', 'output', 'summary'].includes(path[0])
+    ['attributes', 'inputs', 'output', 'summary', 'scores'].includes(path[0])
   );
 }
 

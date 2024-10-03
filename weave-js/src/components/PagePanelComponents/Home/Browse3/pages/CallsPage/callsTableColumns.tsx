@@ -90,11 +90,15 @@ export const useCallsTableColumns = (
     [columnsWithRefs]
   );
 
+  console.log("tableData", tableData)
+
   const allDynamicColumnNames = useAllDynamicColumnNames(
     tableData,
     shouldIgnoreColumn,
     effectiveFilter
   );
+
+  console.log("allDynamicColumnNames", allDynamicColumnNames)
 
   // Determine what sort of view we are looking at based on the filter
   const isSingleOpVersion = useMemo(
@@ -129,6 +133,7 @@ export const useCallsTableColumns = (
         onExpand,
         columnIsRefExpanded,
         userDefinedColumnWidths,
+        [],
         onAddFilter
       ),
     [
@@ -168,7 +173,8 @@ function buildCallsTableColumns(
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
   userDefinedColumnWidths: Record<string, number>,
-  onAddFilter?: OnAddFilter
+  onAddFilter?: OnAddFilter,
+  allFeedbackScoreColumnNames: string[],
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -286,7 +292,7 @@ function buildCallsTableColumns(
     },
   ];
 
-  const {cols: newCols, groupingModel} = buildDynamicColumns<TraceCallSchema>(
+  const {cols: newCols, groupingModel: inputOutputGroupingModel} = buildDynamicColumns<TraceCallSchema>(
     filteredDynamicColumnNames,
     row => {
       const [rowEntity, rowProject] = row.project_id.split('/');
@@ -304,6 +310,25 @@ function buildCallsTableColumns(
     }
   );
   cols.push(...newCols);
+
+  // const {cols: newFeedbackCols, groupingModel: feedbackGroupingModel} = buildDynamicColumns<TraceCallSchema>(
+  //   filteredDynamicColumnNames,
+  //   row => {
+  //     const [rowEntity, rowProject] = row.project_id.split('/');
+  //     return {entity: rowEntity, project: rowProject};
+  //   },
+  //   (row, key) => (row as any)[key],
+  //   key => expandedRefCols.has(key),
+  //   key => columnsWithRefs.has(key),
+  //   onCollapse,
+  //   onExpand,
+  //   // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
+  //   key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
+  //   (key, operator, value) => {
+  //     onAddFilter?.(key, operator, value);
+  //   }
+  // );
+  // cols.push(...newFeedbackCols);
 
   cols.push({
     field: 'wb_user_id',
@@ -436,6 +461,10 @@ function buildCallsTableColumns(
       col.flex = 0;
     }
   });
+
+  // const groupingModel = [...inputOutputGroupingModel, ...feedbackGroupingModel];
+  const groupingModel = inputOutputGroupingModel;
+  
 
   return {cols, colGroupingModel: groupingModel};
 }
