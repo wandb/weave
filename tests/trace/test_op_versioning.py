@@ -34,7 +34,7 @@ def solo_versioned_op(a: int) -> float:
 """
 
 
-def test_solo_op_versioning(strict_op_saving, client):
+def test_solo_op_versioning(client):
     from tests.trace import op_versioning_solo
 
     ref = weave.publish(op_versioning_solo.solo_versioned_op)
@@ -57,7 +57,7 @@ def versioned_op(self, a: int) -> float:
 """
 
 
-def test_object_op_versioning(strict_op_saving, client):
+def test_object_op_versioning(client):
     from tests.trace import op_versioning_obj
 
     obj = op_versioning_obj.MyTestObjWithOp(val=5)
@@ -81,7 +81,7 @@ def versioned_op_importfrom(a: int) -> float:
 """
 
 
-def test_op_versioning_importfrom(strict_op_saving, client):
+def test_op_versioning_importfrom(client):
     from tests.trace import op_versioning_importfrom
 
     ref = weave.publish(op_versioning_importfrom.versioned_op_importfrom)
@@ -92,7 +92,7 @@ def test_op_versioning_importfrom(strict_op_saving, client):
     assert saved_code == EXPECTED_IMPORTFROM_OP_CODE
 
 
-def test_op_versioning_lotsofstuff(strict_op_saving):
+def test_op_versioning_lotsofstuff():
     @weave.op()
     def versioned_op_lotsofstuff(a: int) -> float:
         j = [x + 1 for x in range(a)]
@@ -100,11 +100,11 @@ def test_op_versioning_lotsofstuff(strict_op_saving):
         return np.array(k).mean()
 
 
-def test_op_versioning_inline_import(strict_op_saving, client):
+def test_op_versioning_inline_import(client):
     pass
 
 
-def test_op_versioning_inline_func_decl(strict_op_saving):
+def test_op_versioning_inline_func_decl():
     @weave.op()
     def versioned_op_inline_func_decl(a: int) -> float:
         def inner_func(x):
@@ -126,7 +126,7 @@ def versioned_op_closure_constant(a: int) -> float:
 """
 
 
-def test_op_versioning_closure_constant(strict_op_saving, client):
+def test_op_versioning_closure_constant(client):
     x = 10
 
     @weave.op()
@@ -155,7 +155,7 @@ def versioned_op_closure_constant(a: int) -> float:
 """
 
 
-def test_op_versioning_closure_dict_simple(strict_op_saving, client):
+def test_op_versioning_closure_dict_simple(client):
     x = {"a": 5, "b": 10}
 
     @weave.op()
@@ -186,7 +186,7 @@ def versioned_op_closure_constant(a: int) -> float:
 
 
 @pytest.mark.skip("custom objs not working with new weave_client")
-def test_op_versioning_closure_dict_np(strict_op_saving, client):
+def test_op_versioning_closure_dict_np(client):
     x = {"a": 5, "b": np.array([1, 2, 3])}
 
     @weave.op()
@@ -224,7 +224,7 @@ def pony(v: int):
 
 
 @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
-def test_op_versioning_closure_dict_ops(strict_op_saving, client):
+def test_op_versioning_closure_dict_ops(client):
     @weave.op()
     def cat(v: int):
         print("hello from cat()")
@@ -279,7 +279,7 @@ def pony(v: int):
 
 
 @pytest.mark.skip("custom objs not working with new weave_client")
-def test_op_versioning_mixed(strict_op_saving, client):
+def test_op_versioning_mixed(client):
     @weave.op()
     def cat(v: int):
         print("hello from cat()")
@@ -313,7 +313,7 @@ def test_op_versioning_mixed(strict_op_saving, client):
     assert op2(1) == 102.0
 
 
-def test_op_versioning_exception(strict_op_saving):
+def test_op_versioning_exception():
     # Just ensure this doesn't raise by running it.
     @weave.op()
     def versioned_op_exception(a: int) -> float:
@@ -325,7 +325,7 @@ def test_op_versioning_exception(strict_op_saving):
         return x
 
 
-def test_op_versioning_2ops(strict_op_saving, client):
+def test_op_versioning_2ops(client):
     @weave.op()
     def dog():
         print("hello from dog()")
@@ -355,7 +355,9 @@ def some_d(v: int) -> SomeDict:
 """
 
 
-def test_op_return_typeddict_annotation(client, strict_op_saving):
+def test_op_return_typeddict_annotation(
+    client,
+):
     class SomeDict(typing.TypedDict):
         val: int
 
@@ -392,7 +394,9 @@ def some_d(v: int):
 """
 
 
-def test_op_return_return_custom_class(client, strict_op_saving):
+def test_op_return_return_custom_class(
+    client,
+):
     class MyCoolClass:
         val: int
 
@@ -426,7 +430,9 @@ def some_d(v: int):
 """
 
 
-def test_op_nested_function(client, strict_op_saving):
+def test_op_nested_function(
+    client,
+):
     @weave.op()
     def some_d(v: int):
         def internal_fn(x):
