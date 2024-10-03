@@ -348,8 +348,30 @@ def op(
     not decorated.
 
 
-    Example usage:
+    Args:
+        func (Optional[Callable]): The function to be decorated. If None, the decorator
+            is being called with parameters.
+        name (Optional[str]): Custom name for the op. If None, the function's name is used.
+        call_display_name (Optional[Union[str, Callable[["Call"], str]]]): Custom display name
+            for the call in the Weave UI. Can be a string or a function that takes a Call
+            object and returns a string.  When a function is passed, it can use any attributes
+            of the Call object (e.g. `op_name`, `trace_id`, etc.) to generate a custom display name.
+        postprocess_inputs (Optional[Callable[[dict[str, Any]], dict[str, Any]]]): A function
+            to process the inputs after they've been captured but before they're logged.  This
+            does not affect the actual inputs passed to the function, only the displayed inputs.
+        postprocess_output (Optional[Callable[..., Any]]): A function to process the output
+            after it's been returned from the function but before it's logged.  This does not
+            affect the actual output of the function, only the displayed output.
 
+    Returns:
+        Union[Callable[[Any], Op], Op]: If called without arguments, returns a decorator.
+        If called with a function, returns the decorated function as an Op.
+
+    Raises:
+        ValueError: If the decorated object is not a function or method.
+
+
+    Example usage:
     ```python
     import weave
     weave.init("my-project")
