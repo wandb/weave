@@ -12,7 +12,7 @@ from weave.trace.op import Op
     description="Train a custom router on evaluation results.",
     name="notdiamond.custom_router.train_evaluations",
 )
-def train_evaluations(
+def train_router(
     model_evals: dict[Union[weave.Model, str], EvaluationResults],
     prompt_column: str,
     response_column: str,

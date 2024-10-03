@@ -7,7 +7,7 @@ import pytest
 
 import weave
 from weave.flow.eval import EvaluationResults
-from weave.integrations.notdiamond.custom_router import train_evaluations, evaluate_router
+from weave.integrations.notdiamond.custom_router import train_router, evaluate_router
 from weave.integrations.notdiamond.util import get_model_evals
 from weave.trace.weave_client import WeaveClient
 
@@ -37,7 +37,7 @@ def model_datasets(model_evals: Dict[str, EvaluationResults]):
 
 @pytest.fixture
 def preference_id():
-    with open('tests/integrations/notdiamond/cassettes/custom_router_test/test_custom_router_train_evaluations.yaml', 'r') as file:
+    with open('tests/integrations/notdiamond/cassettes/custom_router_test/test_custom_router_train_router.yaml', 'r') as file:
         cassette = yaml.safe_load(file)
 
     response_body = cassette['interactions'][0]['response']['body']
@@ -48,9 +48,9 @@ def preference_id():
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "api.notdiamond.ai"],
 )
-def test_custom_router_train_evaluations(client: WeaveClient, model_evals: Dict[str, EvaluationResults]):
+def test_custom_router_train_router(client: WeaveClient, model_evals: Dict[str, EvaluationResults]):
     api_key = os.getenv("NOTDIAMOND_API_KEY", "DUMMY_API_KEY")
-    preference_id = train_evaluations(
+    preference_id = train_router(
         model_evals=model_evals,
         prompt_column="prompt",
         response_column="actual",
