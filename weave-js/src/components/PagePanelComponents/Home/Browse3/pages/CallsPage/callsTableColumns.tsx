@@ -18,7 +18,7 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {Reactions} from '../../feedback/Reactions';
-import {CellFilterWrapper} from '../../filters/CellFilterWrapper';
+import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../filters/common';
 import {
   getTokensAndCostFromUsage,
@@ -54,7 +54,7 @@ export const useCallsTableColumns = (
   onCollapse: (col: string) => void,
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
-  onAddFilter?: (field: string, operator: string | null, value: any) => void
+  onAddFilter?: OnAddFilter
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -173,8 +173,8 @@ function buildCallsTableColumns(
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
   userDefinedColumnWidths: Record<string, number>,
+  onAddFilter?: OnAddFilter,
   allFeedbackScoreColumnNames: string[],
-  onAddFilter?: (field: string, operator: string | null, value: any) => void,
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -305,8 +305,8 @@ function buildCallsTableColumns(
     onExpand,
     // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
     key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
-    (key, operator, value) => {
-      onAddFilter?.(key, operator, value);
+    (key, operator, value, rowId) => {
+      onAddFilter?.(key, operator, value, rowId);
     }
   );
   cols.push(...newCols);
@@ -348,6 +348,7 @@ function buildCallsTableColumns(
         <CellFilterWrapper
           onAddFilter={onAddFilter}
           field="wb_user_id"
+          rowId={cellParams.id.toString()}
           operation="(string): equals"
           value={userId}>
           <UserLink userId={userId} />
@@ -375,6 +376,7 @@ function buildCallsTableColumns(
         <CellFilterWrapper
           onAddFilter={onAddFilter}
           field="started_at"
+          rowId={cellParams.id.toString()}
           operation="(date): after"
           value={filterValue}>
           <Timestamp value={value} format="relative" />
