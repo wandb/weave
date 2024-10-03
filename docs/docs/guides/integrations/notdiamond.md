@@ -5,6 +5,7 @@ cost, or call latency. Users can use [Not Diamond][nd] to route prompts in these
 right model for their needs, helping maximize accuracy while saving on model costs.
 
 ## Getting started
+
 Make sure you have [created an account][account] and [generated an API key][keys], then insert your API key below.
 
 ![[Create an API key](imgs/notdiamond/api-keys.png)]
