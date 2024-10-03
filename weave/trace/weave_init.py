@@ -4,6 +4,7 @@ from weave.trace import autopatch, errors, init_message, trace_sentry, weave_cli
 from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace_server import sqlite_trace_server
 from weave.trace_server_bindings import remote_http_trace_server
+from weave.wandb_interface import wandb_api
 
 _current_inited_client = None
 
@@ -18,8 +19,6 @@ class InitializedClient:
 
 
 def get_username() -> typing.Optional[str]:
-    from weave.wandb_interface import wandb_api
-
     api = wandb_api.get_wandb_api_sync()
     try:
         return api.username()
@@ -28,8 +27,6 @@ def get_username() -> typing.Optional[str]:
 
 
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
-    from weave.wandb_interface import wandb_api
-
     fields = project_name.split("/")
     if len(fields) == 1:
         api = wandb_api.get_wandb_api_sync()
@@ -75,8 +72,6 @@ def init_weave(
             return _current_inited_client
         else:
             _current_inited_client.reset()
-
-    from weave.wandb_interface import wandb_api  # type: ignore
 
     # Must init to read ensure we've read auth from the environment, in
     # case we're on a new thread.
