@@ -37,18 +37,13 @@ dependencies = [
   "pydantic>=2.0.0",
   "wandb>=0.17.1",
   "analytics-python>=1.2.9", # Segment logging
-  "python-dateutil>=2.8.2",  # For ISO date parsing
   "packaging>=21.0",         # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0", # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
   "emoji>=2.12.1",           # For emoji shortcode support in Feedback
   "uuid-utils>=0.9.0",       # Used for ID generation - remove once python's built-in uuid supports UUIDv7
-  "numpy>1.21.0",            # Used in box.py (should be made optional)
+  "numpy>1.21.0",            # Used in box.py and scorer.py (should be made optional)
   "rich",                    # Used for special formatting of tables (should be made optional)
-
-  # dependencies for remaining legacy code.  Remove when possible
-  "aiohttp",
-  "gql",
-  "requests_toolbelt",
+  "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
 ]
 
 [project.optional-dependencies]
@@ -84,8 +79,8 @@ test = [
   "sqlparse==0.5.0",
 
   # Integration Tests
-  "pytest-recording==0.13.1",
-  "vcrpy==6.0.1",
+  "pytest-recording>=0.13.2",
+  "vcrpy>=6.0.1",
 
   # serving tests
   "flask",
