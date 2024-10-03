@@ -39,7 +39,9 @@ import {useHistory} from 'react-router-dom';
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {Tailwind} from '../../../../../Tailwind';
+import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {useWeaveflowCurrentRouteContext} from '../../context';
+import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
@@ -62,6 +64,7 @@ import {
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
+import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
@@ -268,14 +271,75 @@ export const CallsTable: FC<{
   }, [calls, effectiveFilter]);
 
   // Construct Flattened Table Data
-  const tableData: TraceCallSchema[] = useMemo(
+  const tableData: FlattenedCallData[] = useMemo(
     () => prepareFlattenedCallDataForTable(callsResult),
     [callsResult]
   );
 
-  const onAddFilter =
+  // This is a specific helper that is used when the user attempts to option-click
+  // a cell that is a child cell of an expanded ref. In this case, we want to
+  // add a filter on the parent ref itself, not the child cell. Once we can properly
+  // filter by reffed values on the backend, this can be removed.
+  const getFieldAndValueForRefExpandedFilter = useCallback(
+    (field: string, rowId: string) => {
+      if (columnIsRefExpanded(field)) {
+        // In this case, we actually just want to filter by the parent ref itself.
+        // This means we need to:
+        // 1. Determine the column of the highest level ancestor column with a ref
+        // 2. Get the value of that corresponding cell (ref column @ row)
+        // 3. Add a filter for that ref on that column.
+        // The acknowledge drawback of this approach is that we are not filtering by that
+        // cell's value, but rather the entire object itself. This still might confuse users,
+        // but is better than returning nothing.
+        const fieldParts = field.split('.');
+        let ancestorField: string | null = null;
+        let targetRef: string | null = null;
+        for (let i = 1; i <= fieldParts.length; i++) {
+          const ancestorFieldCandidate = fieldParts.slice(0, i).join('.');
+          if (expandedRefCols.has(ancestorFieldCandidate)) {
+            const candidateRow = callsResult.find(
+              row => row.traceCall?.id === rowId
+            )?.traceCall;
+            if (candidateRow != null) {
+              const flattenedCandidateRow =
+                flattenObjectPreservingWeaveTypes(candidateRow);
+              const targetRefCandidate =
+                flattenedCandidateRow[
+                  ancestorFieldCandidate + '.' + EXPANDED_REF_REF_KEY
+                ];
+              if (targetRefCandidate != null) {
+                ancestorField = ancestorFieldCandidate;
+                targetRef = targetRefCandidate;
+                break;
+              }
+            }
+          }
+        }
+        if (ancestorField == null) {
+          console.warn('Could not find ancestor ref column for', field);
+          return null;
+        }
+
+        return {value: targetRef, field: ancestorField};
+      }
+      return null;
+    },
+    [callsResult, columnIsRefExpanded, expandedRefCols]
+  );
+
+  const onAddFilter: OnAddFilter | undefined =
     filterModel && setFilterModel
-      ? (field: string, operator: string | null, value: any) => {
+      ? (field: string, operator: string | null, value: any, rowId: string) => {
+          // This condition is used to filter by the parent ref itself, not the child cell.
+          // Should be removed once we can filter by reffed values on the backend.
+          const expandedRef = getFieldAndValueForRefExpandedFilter(
+            field,
+            rowId
+          );
+          if (expandedRef != null) {
+            value = expandedRef.value;
+            field = expandedRef.field;
+          }
           const op = operator ? operator : getDefaultOperatorForValue(value);
           const newModel = {
             ...filterModel,
@@ -305,6 +369,18 @@ export const CallsTable: FC<{
     columnIsRefExpanded,
     onAddFilter
   );
+
+  // This contains columns which are suitable for selection and raw data
+  // entry. Notably, not children of expanded refs.
+  const filterFriendlyColumnInfo = useMemo(() => {
+    const filteredCols = columns.cols.filter(
+      col => !columnIsRefExpanded(col.field)
+    );
+    return {
+      cols: filteredCols,
+      colGroupingModel: columns.colGroupingModel,
+    };
+  }, [columnIsRefExpanded, columns.colGroupingModel, columns.cols]);
 
   // Now, there are 4 primary controls:
   // 1. Op Version
@@ -634,7 +710,7 @@ export const CallsTable: FC<{
           {filterModel && setFilterModel && (
             <FilterPanel
               filterModel={filterModel}
-              columnInfo={columns}
+              columnInfo={filterFriendlyColumnInfo}
               setFilterModel={setFilterModel}
               selectedCalls={selectedCalls}
               clearSelectedCalls={clearSelectedCalls}
@@ -903,8 +979,10 @@ const getPeekId = (peekPath: string | null): string | null => {
   return pathname.split('/').pop() ?? null;
 };
 
+export type FlattenedCallData = TraceCallSchema & {[key: string]: string};
+
 function prepareFlattenedCallDataForTable(
   callsResult: CallSchema[]
-): Array<TraceCallSchema & {[key: string]: string}> {
+): FlattenedCallData[] {
   return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
 }
