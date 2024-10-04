@@ -298,37 +298,6 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
 
     assert len(res.rows) == stats_res.count == 10
 
-    # with limit
-    res_limit = client.server.table_query(
-        tsi.TableQueryReq(
-            project_id=client._project_id(),
-            digest=res3["digest"],
-            limit=100,
-            offset=0,
-            sort_by=[],
-        )
-    )
-
-    res_limit2 = client.server.table_query(
-        tsi.TableQueryReq(
-            project_id=client._project_id(),
-            digest=res3["digest"],
-            limit=10,
-            offset=0,
-            sort_by=[],
-        )
-    )
-
-    stats_res = client.server.table_query_stats(
-        tsi.TableQueryStatsReq(
-            project_id=client._project_id(),
-            digest=res3["digest"],
-        )
-    )
-
-    assert len(res_limit.rows) == len(res_limit2.rows) == stats_res.count == 10
-
-    # with filter
     res = client.server.table_query(
         tsi.TableQueryReq(
             project_id=client._project_id(),
@@ -390,3 +359,33 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     )
 
     assert len(res.rows) == 3
+
+    # with limit
+    res_limit = client.server.table_query(
+        tsi.TableQueryReq(
+            project_id=client._project_id(),
+            digest=res3["digest"],
+            limit=100,
+            offset=0,
+            sort_by=[],
+        )
+    )
+
+    res_limit2 = client.server.table_query(
+        tsi.TableQueryReq(
+            project_id=client._project_id(),
+            digest=res3["digest"],
+            limit=30,
+            offset=0,
+            sort_by=[],
+        )
+    )
+
+    stats_res = client.server.table_query_stats(
+        tsi.TableQueryStatsReq(
+            project_id=client._project_id(),
+            digest=res3["digest"],
+        )
+    )
+
+    assert len(res_limit.rows) == len(res_limit2.rows) == stats_res.count == 30
