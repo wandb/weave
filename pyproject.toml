@@ -1,6 +1,5 @@
 [project]
 name = "weave"
-description = "A toolkit for building composable interactive data driven applications."
 readme = "README.md"
 license = { file = "LICENSE" }
 maintainers = [{ name = "W&B", email = "support@wandb.com" }]
@@ -32,7 +31,7 @@ classifiers = [
   "Topic :: Software Development :: Widget Sets",
 ]
 requires-python = ">=3.9"
-dynamic = ["version"]
+dynamic = ["version", "description"]
 dependencies = [
   "pydantic>=2.0.0",
   "wandb>=0.17.1",
@@ -101,25 +100,11 @@ Changes = "https://github.com/wandb/weave/releases"
 Twitter = "https://twitter.com/weights_biases"
 
 [build-system]
-requires = ["setuptools>=75", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
 
-[tool.setuptools]
-include-package-data = true
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["weave*"]
-namespaces = true
-
-[tool.setuptools.package-data]
-"weave" = ["**/*.py", "**/*.pyi", "py.typed"]
-
-[tool.setuptools.exclude-package-data]
-"*" = ["*.pyc", "*__pycache__*"]
-
-[tool.setuptools.dynamic]
-version = { attr = "weave.version.VERSION" }
+[tool.flit.module]
+name = "weave"
 
 [tool.pytest.ini_options]
 filterwarnings = [
