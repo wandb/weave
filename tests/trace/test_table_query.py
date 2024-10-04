@@ -302,7 +302,7 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     res_limit = client.server.table_query(
         tsi.TableQueryReq(
             project_id=client._project_id(),
-            digest=res1["digest"],
+            digest=res3["digest"],
             limit=100,
             offset=0,
             sort_by=[],
@@ -312,7 +312,7 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     res_limit2 = client.server.table_query(
         tsi.TableQueryReq(
             project_id=client._project_id(),
-            digest=res1["digest"],
+            digest=res3["digest"],
             limit=10,
             offset=0,
             sort_by=[],
@@ -322,7 +322,7 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     stats_res = client.server.table_query_stats(
         tsi.TableQueryStatsReq(
             project_id=client._project_id(),
-            digest=res1["digest"],
+            digest=res3["digest"],
         )
     )
 
