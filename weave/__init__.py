@@ -1,4 +1,4 @@
-"""A toolkit for building composable interactive data driven applications."""
+"""The top-level functions and classes for working with Weave."""
 
 from weave import version
 from weave.trace.api import *
