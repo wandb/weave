@@ -299,7 +299,7 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     assert len(res.rows) == stats_res.count == 10
 
     # with limit
-    res1 = client.server.table_query(
+    res_limit = client.server.table_query(
         tsi.TableQueryReq(
             project_id=client._project_id(),
             digest=res1["digest"],
@@ -309,7 +309,7 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
         )
     )
 
-    res2 = client.server.table_query(
+    res_limit2 = client.server.table_query(
         tsi.TableQueryReq(
             project_id=client._project_id(),
             digest=res1["digest"],
@@ -326,7 +326,7 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
         )
     )
 
-    assert len(res1.rows) == len(res2.rows) == stats_res.count == 10
+    assert len(res_limit.rows) == len(res_limit2.rows) == stats_res.count == 10
 
     # with filter
     res = client.server.table_query(
