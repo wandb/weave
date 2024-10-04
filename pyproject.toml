@@ -108,7 +108,15 @@ path = "weave/version.py"
 
 [tool.hatch.build]
 include = ["weave"]
-exclude = ["weave_query", "weave-js", "examples", "tests", "docs", "dev_docs"]
+exclude = [
+  "weave_query",
+  "weave-js",
+  "examples",
+  "tests",
+  "docs",
+  "dev_docs",
+  "clear_cache.py",
+]
 
 
 [tool.pytest.ini_options]
