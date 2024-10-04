@@ -484,9 +484,9 @@ def op(
 
         return create_wrapper(func)
 
-    if func is not None:
-        return op_deco(func)
-    return op_deco
+    if func is None:
+        return op_deco
+    return op_deco(func)
 
 
 def maybe_bind_method(func: Callable, self: Any = None) -> Union[Callable, MethodType]:
