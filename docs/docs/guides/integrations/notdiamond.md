@@ -6,7 +6,8 @@ right model for their needs, helping maximize accuracy while saving on model cos
 
 ## Getting started
 
-Make sure you have [created an account][account] and [generated an API key][keys], then insert your API key below.
+Make sure you have [created an account][account] and [generated an API key][keys], then add your API
+key to your env as `NOTDIAMOND_API_KEY`.
 
 ![[Create an API key](imgs/notdiamond/api-keys.png)]
 
