@@ -312,6 +312,8 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
         )
     )
 
+    assert len(res.rows) == stats_res.count == 10
+
     # with filter
     res = client.server.table_query(
         tsi.TableQueryReq(
