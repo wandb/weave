@@ -40,7 +40,7 @@ def model_datasets(model_evals: Dict[str, EvaluationResults]):
 @pytest.fixture
 def preference_id():
     with open(
-        "tests/integrations/notdiamond/cassettes/custom_router_test/test_custom_router_train_router.yaml",
+        "integrations/notdiamond/cassettes/custom_router_test/test_custom_router_train_router.yaml",
         "r",
     ) as file:
         cassette = yaml.safe_load(file)
@@ -68,7 +68,7 @@ def test_custom_router_train_router(
     )
 
     assert len(list(client.calls())) > 0
-    nd_calls = [call for call in client.calls() if "train_evaluations" in call.op_name]
+    nd_calls = [call for call in client.calls() if "train_router" in call.op_name]
     assert len(nd_calls) == 1
 
     # confirm router was trained
@@ -84,7 +84,7 @@ def test_evaluate_router(
     client: WeaveClient, model_datasets: Dict[str, weave.Table], preference_id: str
 ):
     api_key = os.getenv("NOTDIAMOND_API_KEY", "DUMMY_API_KEY")
-    eval_results, eval_stats = evaluate_router(
+    best_routed_model, nd_model = evaluate_router(
         model_datasets=model_datasets,
         preference_id=preference_id,
         prompt_column="prompt",
@@ -95,6 +95,3 @@ def test_evaluate_router(
     assert len(list(client.calls())) > 0
     nd_calls = [call for call in client.calls() if "evaluate_router" in call.op_name]
     assert len(nd_calls) == 1
-
-    model_dataset = next(iter(model_datasets.values()))
-    assert len(eval_results) == len(model_dataset.rows)

@@ -7,7 +7,7 @@ from weave.flow.eval import EvaluationResults
 
 
 def get_model_evals(
-    file_path: str = "tests/integrations/notdiamond/test_data/humaneval.csv",
+    file_path: str = "integrations/notdiamond/test_data/humaneval.csv",
 ) -> Dict[str, EvaluationResults]:
     df = pd.read_csv(file_path)
     models = [

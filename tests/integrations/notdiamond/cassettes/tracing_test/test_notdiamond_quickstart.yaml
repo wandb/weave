@@ -90,7 +90,7 @@ interactions:
     status:
       code: 200
       message: OK
--- request:
+- request:
     body: '{"query": "query DefaultEntity {\n  viewer {\n    username\n    defaultEntity
       {\n      name\n    }\n  }\n}"}'
     headers:
