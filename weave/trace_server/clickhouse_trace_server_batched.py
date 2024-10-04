@@ -28,7 +28,7 @@ import hashlib
 import json
 import logging
 import threading
-from collections import defaultdict
+from collections import Counter, defaultdict
 from contextlib import contextmanager
 from typing import (
     Any,
@@ -49,19 +49,21 @@ from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 
-from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
-from weave.trace_server import environment as wf_env
-from weave.trace_server import refs_internal as ri
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
     OrderField,
     QueryBuilderDynamicField,
-    QueryBuilderField,
     combine_conditions,
 )
-from weave.trace_server.clickhouse_schema import (
+from weave.trace_server.ids import generate_id
+from weave.trace_server.trace_server_common import make_derived_summary_fields
+
+from . import clickhouse_trace_server_migrator as wf_migrator
+from . import environment as wf_env
+from . import refs_internal as ri
+from . import trace_server_interface as tsi
+from .clickhouse_schema import (
     CallDeleteCHInsertable,
     CallEndCHInsertable,
     CallStartCHInsertable,
@@ -70,37 +72,24 @@ from weave.trace_server.clickhouse_schema import (
     SelectableCHCallSchema,
     SelectableCHObjSchema,
 )
-from weave.trace_server.emoji_util import detone_emojis
-from weave.trace_server.errors import InsertTooLarge, InvalidRequest, RequestTooLarge
-from weave.trace_server.feedback import (
+from .emoji_util import detone_emojis
+from .errors import InsertTooLarge, InvalidRequest, RequestTooLarge
+from .feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from weave.trace_server.ids import generate_id
-from weave.trace_server.orm import ParamBuilder, Row
-from weave.trace_server.table_query_builder import (
-    ROW_ORDER_COLUMN_NAME,
-    TABLE_ROWS_ALIAS,
-    VAL_DUMP_COLUMN_NAME,
-    make_natural_sort_table_query,
-    make_standard_table_query,
-)
-from weave.trace_server.token_costs import (
-    LLM_TOKEN_PRICES_TABLE,
-    validate_cost_purge_req,
-)
-from weave.trace_server.trace_server_common import (
+from .orm import ParamBuilder, Row
+from .token_costs import LLM_TOKEN_PRICES_TABLE, validate_cost_purge_req
+from .trace_server_common import (
     LRUCache,
-    digest_is_version_like,
     empty_str_to_none,
     get_nested_key,
     hydrate_calls_with_feedback,
-    make_derived_summary_fields,
     make_feedback_query_req,
     set_nested_key,
 )
-from weave.trace_server.trace_server_interface_util import (
+from .trace_server_interface_util import (
     assert_non_null_wb_user_id,
     bytes_digest,
     extract_refs_from_values,
@@ -116,7 +105,6 @@ MAX_FLUSH_AGE = 15
 FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 100
-MAX_CALLS_STREAM_BATCH_SIZE = 500
 
 
 class NotFoundError(Exception):
@@ -359,8 +347,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     for call in hydrated_batch:
                         yield tsi.CallSchema.model_validate(call)
 
-                    # *** Dynamic increase from 10 to 500 ***
-                    batch_size = min(MAX_CALLS_STREAM_BATCH_SIZE, batch_size * 10)
+                    # *** Dynamic Batch Size ***
+                    # count the number of columns at each depth
+                    depths = Counter(col.count(".") for col in expand_columns)
+                    # take the max number of columns at any depth
+                    max_count_at_ref_depth = max(depths.values())
+                    # divide max refs that we can resolve 1000 refs at any depth
+                    max_size = 1000 // max_count_at_ref_depth
+                    # double batch size up to what refs_read_batch can handle
+                    batch_size = min(max_size, batch_size * 2)
                     batch = []
 
             hydrated_batch = self._hydrate_calls(
@@ -592,7 +587,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
-            (is_version, version_index) = digest_is_version_like(req.digest)
+            (is_version, version_index) = _digest_is_version_like(req.digest)
             if is_version:
                 conds.append("version_index = {version_index: UInt64}")
                 parameters["version_index"] = version_index
@@ -771,33 +766,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
-        pb = ParamBuilder()
+        parameters: Dict[str, Any] = {}
         if req.filter:
             if req.filter.row_digests:
-                conds.append(
-                    f"tr.digest IN {{{pb.add_param(req.filter.row_digests)}: Array(String)}}"
-                )
+                conds.append("tr.digest IN {row_digests: Array(String)}")
+                parameters["row_digests"] = req.filter.row_digests
+        else:
+            conds.append("1 = 1")
 
-        sort_fields = []
+        sort_clause = ""
+        pb = ParamBuilder()
         if req.sort_by:
-            for sort in req.sort_by:
+            sort_fields = []
+            for i, sort in enumerate(req.sort_by):
                 # TODO: better splitting of escaped dots (.) in field names
                 extra_path = sort.field.split(".")
                 field = OrderField(
                     field=QueryBuilderDynamicField(
-                        field=VAL_DUMP_COLUMN_NAME, extra_path=extra_path
+                        field="val_dump", extra_path=extra_path
                     ),
                     direction="ASC" if sort.direction.lower() == "asc" else "DESC",
                 )
-                sort_fields.append(field)
+                sort_fields.append(field.as_sql(pb, "tr"))
+            sort_clause = f"ORDER BY {', '.join(sort_fields)}"
+        sort_params = pb.get_params()
+        parameters.update(sort_params)
         rows = self._table_query(
             req.project_id,
             req.digest,
-            pb,
-            sql_safe_conditions=conds,
-            sort_fields=sort_fields,
+            conditions=conds,
             limit=req.limit,
             offset=req.offset,
+            parameters=parameters,
+            sort_clause=sort_clause,
         )
         return tsi.TableQueryRes(rows=rows)
 
@@ -805,74 +806,77 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         digest: str,
-        pb: ParamBuilder,
-        *,
-        # using the `sql_safe_*` prefix is a way to signal to the caller
-        # that these strings should have been santized by the caller.
-        sql_safe_conditions: Optional[list[str]] = None,
-        sort_fields: Optional[list[OrderField]] = None,
+        conditions: Optional[list[str]] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
+        parameters: Optional[Dict[str, Any]] = None,
+        sort_clause: Optional[str] = None,
     ) -> list[tsi.TableRowSchema]:
-        if not sort_fields:
-            sort_fields = [
-                OrderField(
-                    field=QueryBuilderField(field=ROW_ORDER_COLUMN_NAME),
-                    direction="ASC",
-                )
-            ]
+        if sort_clause is None:
+            sort_clause = ""
+        conds = ["project_id = {project_id: String}"]
+        if conditions:
+            conds.extend(conditions)
 
-        if (
-            len(sort_fields) == 1
-            and sort_fields[0].field.field == ROW_ORDER_COLUMN_NAME
-            and not sql_safe_conditions
-        ):
-            query = make_natural_sort_table_query(
-                project_id,
-                digest,
-                pb,
-                limit=limit,
-                offset=offset,
-                natural_direction=sort_fields[0].direction,
-            )
-        else:
-            order_by_components = ", ".join(
-                [sort_field.as_sql(pb, TABLE_ROWS_ALIAS) for sort_field in sort_fields]
-            )
-            sql_safe_sort_clause = f"ORDER BY {order_by_components}"
-            query = make_standard_table_query(
-                project_id,
-                digest,
-                pb,
-                sql_safe_conditions=sql_safe_conditions,
-                sql_safe_sort_clause=sql_safe_sort_clause,
-                limit=limit,
-                offset=offset,
-            )
+        predicate = combine_conditions(conds, "AND")
+        # The subqueries are for deduplication of table rows and tables by digest.
+        # It might be more efficient to do deduplication of table rows
+        # in the outer query instead of the right side of the JOIN clause here,
+        # that hasn't been tested yet.
+        query = f"""
+                SELECT tr.digest, tr.val_dump
+                FROM (
+                    SELECT project_id, row_digest
+                    FROM (
+                        SELECT *
+                        FROM (
+                                SELECT *,
+                                    row_number() OVER (PARTITION BY project_id, digest) AS rn
+                                FROM tables
+                                WHERE project_id = {{project_id:String}} AND digest = {{digest:String}}
+                            )
+                        WHERE rn = 1
+                        ORDER BY project_id, digest
+                    )
+                    ARRAY JOIN row_digests AS row_digest
+                    WHERE digest = {{digest:String}}
+                ) AS t
+                JOIN (
+                    SELECT project_id, digest, val_dump
+                    FROM (
+                            SELECT *,
+                                row_number() OVER (PARTITION BY project_id, digest) AS rn
+                            FROM table_rows
+                            WHERE project_id = {{project_id:String}}
+                        )
+                    WHERE rn = 1
+                    ORDER BY project_id, digest
+                ) tr ON t.project_id = tr.project_id AND t.row_digest = tr.digest
+                WHERE {predicate}
+                {sort_clause}
+            """
+        if parameters is None:
+            parameters = {}
+        if limit:
+            query += " LIMIT {limit: UInt64}"
+            parameters["limit"] = limit
+        if offset:
+            query += " OFFSET {offset: UInt64}"
+            parameters["offset"] = offset
 
-        query_result = self.ch_client.query(query, parameters=pb.get_params())
+        query_result = self.ch_client.query(
+            query,
+            parameters={
+                "project_id": project_id,
+                "digest": digest,
+                **parameters,
+            },
+        )
 
         return [
             tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
             for r in query_result.result_rows
         ]
-
-    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
-        parameters: Dict[str, Any] = {
-            "project_id": req.project_id,
-            "digest": req.digest,
-        }
-
-        query = """
-        SELECT length(row_digests)
-        FROM tables
-        WHERE project_id = {project_id:String} AND digest = {digest:String}
-        """
-
-        query_result = self.ch_client.query(query, parameters=parameters)
-        count = query_result.result_rows[0][0] if query_result.result_rows else 0
-
-        return tsi.TableQueryStatsRes(count=count)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches
@@ -1122,15 +1126,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     # handles this check. However, out of caution, we add this check here.
                     # Hitting this would be a programming error, not a user error.
                     raise ValueError("Will not resolve cross-project refs.")
-                pb = ParamBuilder()
-                row_digests_name = pb.add_param(row_digests)
                 rows = self._table_query(
                     project_id=project_id_scope,
                     digest=digest,
-                    pb=pb,
-                    sql_safe_conditions=[
-                        f"digest IN {{{row_digests_name}: Array(String)}}"
-                    ],
+                    conditions=["digest IN {digests: Array(String)}"],
+                    parameters={"digests": row_digests},
                 )
                 # Unpack the results into the target rows
                 row_digest_vals = {r.digest: r.val for r in rows}
@@ -1436,8 +1436,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters to be passed to the query. Must include all parameters for both
             conditions and object_id_conditions.
         metadata_only:
-            if metadata_only is True, then we return early and dont grab the value.
-            Otherwise, make a second query to grab the val_dump from the db
+            if metadata_only is True, then we exclude the val_dump field in the select query.
+            generally, "queries" should not include the val_dump, but "reads" should, as
+            the val_dump is the most expensive part of the query.
         """
         if not conditions:
             conditions = ["1 = 1"]
@@ -1470,7 +1471,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if parameters is None:
             parameters = {}
 
-        select_without_val_dump_query = f"""
+        # When metadata_only is false, dont actually read from the field
+        val_dump_field = "'{}' AS val_dump" if metadata_only else "val_dump"
+
+        # The subquery is for deduplication of object versions by digest
+        select_query = f"""
             SELECT
                 project_id,
                 object_id,
@@ -1478,6 +1483,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 kind,
                 base_object_class,
                 refs,
+                val_dump,
                 digest,
                 is_op,
                 version_index,
@@ -1490,6 +1496,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     kind,
                     base_object_class,
                     refs,
+                    val_dump,
                     digest,
                     is_op,
                     row_number() OVER (
@@ -1507,6 +1514,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         kind,
                         base_object_class,
                         refs,
+                        {val_dump_field},
                         digest,
                         if (kind = 'op', 1, 0) AS is_op,
                         row_number() OVER (
@@ -1528,7 +1536,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             {offset_part}
         """
         query_result = self._query_stream(
-            select_without_val_dump_query,
+            select_query,
             {"project_id": project_id, **parameters},
         )
         result: list[SelectableCHObjSchema] = []
@@ -1544,50 +1552,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 "kind",
                                 "base_object_class",
                                 "refs",
+                                "val_dump",
                                 "digest",
                                 "is_op",
                                 "version_index",
                                 "version_count",
                                 "is_latest",
-                                "val_dump",
                             ],
-                            # Add an empty val_dump to the end of the row
-                            list(row) + ["{}"],
+                            row,
                         )
                     )
                 )
             )
 
-        # -- Don't make second query for object values if metadata_only --
-        if metadata_only:
-            return result
-
-        # now get the val_dump for each object
-        object_ids = list(set([row.object_id for row in result]))
-        digests = list(set([row.digest for row in result]))
-        query = """
-            SELECT object_id, digest, any(val_dump)
-            FROM object_versions
-            WHERE project_id = {project_id: String} AND
-                object_id IN {object_ids: Array(String)} AND
-                digest IN {digests: Array(String)}
-            GROUP BY object_id, digest
-        """
-        parameters = {
-            "project_id": project_id,
-            "object_ids": object_ids,
-            "digests": digests,
-        }
-        query_result = self._query_stream(query, parameters)
-        # Map (object_id, digest) to val_dump
-        object_values: Dict[tuple[str, str], Any] = {}
-        for row in query_result:
-            (object_id, digest, val_dump) = row
-            object_values[(object_id, digest)] = val_dump
-
-        # update the val_dump for each object
-        for obj in result:
-            obj.val_dump = object_values.get((obj.object_id, obj.digest), "{}")
         return result
 
     def _run_migrations(self) -> None:
@@ -1600,7 +1577,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query: str,
         parameters: Dict[str, Any],
         column_formats: Optional[Dict[str, Any]] = None,
-    ) -> Iterator[tuple]:
+    ) -> Iterator[QueryResult]:
         """Streams the results of a query from the database."""
         summary = None
         parameters = _process_parameters(parameters)
@@ -1971,6 +1948,15 @@ def get_base_object_class(val: Any) -> Optional[str]:
                             elif "_class_name" in val:
                                 return val["_class_name"]
     return None
+
+
+def _digest_is_version_like(digest: str) -> Tuple[bool, int]:
+    if not digest.startswith("v"):
+        return (False, -1)
+    try:
+        return (True, int(digest[1:]))
+    except ValueError:
+        return (False, -1)
 
 
 def find_call_descendants(
