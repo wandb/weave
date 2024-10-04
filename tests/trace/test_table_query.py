@@ -361,7 +361,7 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     assert len(res.rows) == 3
 
 
-def test_duplicate_table_with_updates(client: WeaveClient):
+def test_duplicate_table_with_identical_rows(client: WeaveClient):
     data = [{"val": i} for i in range(10)]
 
     res1 = client.server.table_create(
