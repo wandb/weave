@@ -2,11 +2,17 @@ import base64
 import re
 from datetime import datetime
 
-from . import trace_server_interface as tsi
-from .clickhouse_schema import SelectableCHCallSchema
-from .errors import InvalidRequest
-from .orm import Column, ColumnType, ParamBuilder, PreparedSelect, Table
-from .validation import (
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_schema import SelectableCHCallSchema
+from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.orm import (
+    Column,
+    ColumnType,
+    ParamBuilder,
+    PreparedSelect,
+    Table,
+)
+from weave.trace_server.validation import (
     validate_purge_req_multiple,
     validate_purge_req_one,
 )

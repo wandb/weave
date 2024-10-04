@@ -2,7 +2,7 @@ import typing
 
 from pydantic import BaseModel
 
-from . import refs_internal as ri
+from weave.trace_server import refs_internal as ri
 
 A = typing.TypeVar("A")
 B = typing.TypeVar("B")

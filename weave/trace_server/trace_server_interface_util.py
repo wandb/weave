@@ -2,7 +2,7 @@ import base64
 import hashlib
 import typing
 
-from . import refs_internal
+from weave.trace_server import refs_internal
 
 TRACE_REF_SCHEME = "weave"
 ARTIFACT_REF_SCHEME = "wandb-artifact"
