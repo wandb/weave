@@ -100,11 +100,16 @@ Changes = "https://github.com/wandb/weave/releases"
 Twitter = "https://twitter.com/weights_biases"
 
 [build-system]
-requires = ["flit_core >=3.2,<4"]
-build-backend = "flit_core.buildapi"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.flit.module]
-name = "weave"
+[tool.hatch.version]
+path = "weave/version.py"
+
+[tool.hatch.build]
+include = ["weave"]
+exclude = ["weave_query", "weave-js", "examples", "tests", "docs", "dev_docs"]
+
 
 [tool.pytest.ini_options]
 filterwarnings = [
