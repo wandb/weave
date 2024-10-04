@@ -160,8 +160,19 @@ def backfill_scores(
         stats["calls_found"] += 1
         call = make_client_call(wc.entity, wc.project, raw_call, wc.server)
         for scorer, scorer_op_ref in saved_scorers:
-            # TODO Refeactor to by more dry since apply_scorer is called twice
-            if rerun_all:
+            existing_call_ref = None
+            if not rerun_all:
+                # TODO: Remove magic strings & type this
+                # TODO: might need to sort here to ensure we get the latest one.
+                for feedback in call.summary["weave"]["feedback"]:
+                    if (
+                        feedback["feedback_type"] == "score"
+                        and feedback.get("payload", {}).get("op_ref") == scorer_op_ref
+                    ):
+                        existing_call_ref = feedback.get("payload", {}).get("call_ref")
+                        break
+            
+            if existing_call_ref is None:
                 existing_call_ref = call.apply_scorer(scorer)
                 stats["score_records"].append(
                     {
@@ -171,27 +182,7 @@ def backfill_scores(
                     }
                 )
             else:
-                existing_call_ref = None
-                # TODO: Remove magic strings & type this
-                # TODO: might need to sort here to ensure we get the latest one.
-                for feedback in call.summary["weave"]["feedback"]:
-                    if (
-                        feedback["feedback_type"] == "score"
-                        and feedback.get("payload").get("op_ref") == scorer_op_ref
-                    ):
-                        existing_call_ref = feedback.get("payload").get("call_ref")
-                        break
-                if existing_call_ref is None:
-                    existing_call_ref = call.apply_scorer(scorer)
-                    stats["score_records"].append(
-                        {
-                            "call_ref": call.ref.uri(),
-                            "scorer_ref": scorer_op_ref.uri(),
-                            "feedback_id": existing_call_ref,
-                        }
-                    )
-                else:
-                    stats["cache_hits"] += 1
+                stats["cache_hits"] += 1
 
     return stats
 
