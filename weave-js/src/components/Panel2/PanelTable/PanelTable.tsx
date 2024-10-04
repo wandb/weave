@@ -434,7 +434,7 @@ const PanelTableInner: React.FC<
           {
             ...config.activeRowForGrouping,
             [compositeGroupKey]: row,
-          } ?? {};
+          };
         // if row is less than 0, delete the active row
         if (row < 0) {
           delete activeRowForGrouping[compositeGroupKey];
