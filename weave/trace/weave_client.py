@@ -327,12 +327,9 @@ class Call:
         if self.ended_at is None:
             raise Exception("Must be finished to run scorer")
 
-        inputs = self.inputs
-        output = self.output
-
         kwargs = {
             "inputs": self.inputs,
-            "output": output,  # "generation output?"
+            "output": self.output,  # "generation output?"
             # Thse would be labels and such. Not sure how we want to do this yet
             "supervision": supervision,
         }
@@ -342,13 +339,16 @@ class Call:
         scorer_ref = scorer_op.ref
         if scorer_ref is None:
             raise ValueError("Tim is a bad programmer")
-        return self.log_score(
+        
+        feedback_id = self.log_score(
             name=score_name,
             results=scorer_res,
             call_ref=scorer_call.ref.uri(),
             op_ref=scorer_ref.uri(),
             supervision=supervision,
         )
+         # Feels like this wants to be the call and the feedback id?
+        return scorer_call.ref.uri()
 
     # def add_score(self, score_name: str, score: dict) -> str:
     #     # This needs to be moved to the client and backgrounded.
