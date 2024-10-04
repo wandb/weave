@@ -1,6 +1,7 @@
 """A toolkit for building composable interactive data driven applications."""
 
 from weave import version
+from weave.trace.api import *
 
 __version__ = version.VERSION
 
@@ -11,7 +12,6 @@ from weave.flow.dataset import Dataset
 from weave.flow.eval import Evaluation, Scorer
 from weave.flow.model import Model
 from weave.flow.obj import Object
-from weave.trace.api import *
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
 
