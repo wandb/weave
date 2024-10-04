@@ -581,6 +581,7 @@ export const typeToDataGridColumnSpec = (
             maxWidth,
             minWidth,
             flex: 1,
+            display: 'flex',
             type: colType,
             editable: editable && !disableEdits,
             field: innerKey,
