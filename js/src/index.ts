@@ -1,5 +1,5 @@
 // src/index.ts
-export { init } from "./clientApi";
+export { init, requireCurrentChildSummary } from "./clientApi";
 export { weaveImage } from "./media";
 export { op, boundOp } from "./op";
 export { wrapOpenAI } from "./integrations";

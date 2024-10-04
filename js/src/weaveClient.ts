@@ -43,6 +43,10 @@ class CallStack {
     this.stack = stack;
   }
 
+  peek(): CallStackEntry | null {
+    return this.stack[this.stack.length - 1] ?? null;
+  }
+
   pushNewCall(): {
     currentCall: CallStackEntry;
     parentCall: CallStackEntry | undefined;
@@ -354,7 +358,7 @@ export class WeaveClient {
     this.scheduleBatchProcessing();
   }
 
-  private getCallStack(): CallStack {
+  public getCallStack(): CallStack {
     return this.stackContext.getStore() || new CallStack();
   }
 
@@ -489,9 +493,16 @@ export class WeaveClient {
   public async finishCallWithException(
     error: any,
     currentCall: CallStackEntry,
+    parentCall: CallStackEntry | undefined,
     endTime: Date,
     startCallPromise: Promise<void>
   ) {
+    const mergedSummary = processSummary(
+      null,
+      undefined,
+      currentCall,
+      parentCall
+    );
     // ensure end is logged after start is logged
     await startCallPromise;
     await this.saveCallEnd({
@@ -499,7 +510,7 @@ export class WeaveClient {
       id: currentCall.callId,
       ended_at: endTime.toISOString(),
       output: null,
-      summary: {},
+      summary: mergedSummary,
       exception: error instanceof Error ? error.message : String(error),
     });
   }
@@ -549,7 +560,7 @@ function processSummary(
   currentCall: CallStackEntry,
   parentCall: CallStackEntry | undefined
 ) {
-  let ownSummary = summarize ? summarize(result) : {};
+  let ownSummary = summarize && result != null ? summarize(result) : {};
 
   if (ownSummary.usage) {
     for (const model in ownSummary.usage) {
