@@ -1,12 +1,17 @@
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Generator, Optional, TypedDict, Union
+from typing import Any, Optional, TypedDict, Union
 
 import weave
 from weave.trace.client_context.weave_client import require_weave_client
 from weave.trace.op import Op, maybe_unbind_method
-from weave.trace.weave_client import Call, get_ref, make_client_call
-from weave.trace_server.trace_server_interface import CallsFilter, CallsQueryReq, LLMUsageSchema, SortBy
+from weave.trace.weave_client import Call, make_client_call
+from weave.trace_server.trace_server_interface import (
+    CallsFilter,
+    CallsQueryReq,
+    LLMUsageSchema,
+    SortBy,
+)
 
 logger = logging.Logger(__name__)
 
@@ -106,7 +111,9 @@ def log_generation(
 
     return call
 
+
 # class BackfillCallsQuery
+
 
 # Maybe this should be a convenience off of the CallIter?
 def backfill_scores(
@@ -123,20 +130,21 @@ def backfill_scores(
 ):
     wc = require_weave_client()
 
-    saved_scorers = [(scorer, wc._save_op(maybe_unbind_method(scorer))) for scorer in scorers]
+    saved_scorers = [
+        (scorer, wc._save_op(maybe_unbind_method(scorer))) for scorer in scorers
+    ]
 
     if filter is None:
         filter = CallsFilter()
-    
+
     op_ref = wc._save_op(maybe_unbind_method(for_op))
 
-    
-    filter.op_names = [op_ref.uri()] # what if they specified something here?
+    filter.op_names = [op_ref.uri()]  # what if they specified something here?
 
     stats = {
-        'calls_found': 0,
-        'cache_hits': 0,
-        'score_records': [],
+        "calls_found": 0,
+        "cache_hits": 0,
+        "score_records": [],
     }
     for raw_call in wc.server.calls_query_stream(
         CallsQueryReq(
@@ -149,39 +157,43 @@ def backfill_scores(
             include_feedback=True,
         )
     ):
-        stats['calls_found'] += 1
+        stats["calls_found"] += 1
         call = make_client_call(wc.entity, wc.project, raw_call, wc.server)
         for scorer, scorer_op_ref in saved_scorers:
             # TODO Refeactor to by more dry since apply_scorer is called twice
             if rerun_all:
                 existing_call_ref = call.apply_scorer(scorer)
-                stats['score_records'].append({
-                    'call_ref': call.ref.uri(),
-                    'scorer_ref': scorer_op_ref.uri(),
-                    'feedback_id': existing_call_ref,
-                })
+                stats["score_records"].append(
+                    {
+                        "call_ref": call.ref.uri(),
+                        "scorer_ref": scorer_op_ref.uri(),
+                        "feedback_id": existing_call_ref,
+                    }
+                )
             else:
                 existing_call_ref = None
                 # TODO: Remove magic strings & type this
                 # TODO: might need to sort here to ensure we get the latest one.
-                for feedback in call.summary['weave']['feedback']:
-                    if feedback['feedback_type'] == 'score' and feedback.get('payload').get("op_ref") == scorer_op_ref:
-                        existing_call_ref = feedback.get('payload').get("call_ref")
-                        break;
+                for feedback in call.summary["weave"]["feedback"]:
+                    if (
+                        feedback["feedback_type"] == "score"
+                        and feedback.get("payload").get("op_ref") == scorer_op_ref
+                    ):
+                        existing_call_ref = feedback.get("payload").get("call_ref")
+                        break
                 if existing_call_ref is None:
                     existing_call_ref = call.apply_scorer(scorer)
-                    stats['score_records'].append({
-                        'call_ref': call.ref.uri(),
-                        'scorer_ref': scorer_op_ref.uri(),
-                        'feedback_id': existing_call_ref,
-                    })
+                    stats["score_records"].append(
+                        {
+                            "call_ref": call.ref.uri(),
+                            "scorer_ref": scorer_op_ref.uri(),
+                            "feedback_id": existing_call_ref,
+                        }
+                    )
                 else:
-                    stats['cache_hits'] += 1
-    
-    return stats
-        
-        
+                    stats["cache_hits"] += 1
 
+    return stats
 
 
 class _ResolveTimestampsReturnType(TypedDict):
@@ -236,4 +248,3 @@ def _resolve_timestamps(
         return {"started_at": started_at, "ended_at": ended_at}
 
     raise Exception("Programming error - all cases not considered")
-

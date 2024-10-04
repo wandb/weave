@@ -339,7 +339,7 @@ class Call:
         scorer_ref = scorer_op.ref
         if scorer_ref is None:
             raise ValueError("Tim is a bad programmer")
-        
+
         feedback_id = self.log_score(
             name=score_name,
             results=scorer_res,
@@ -347,7 +347,7 @@ class Call:
             op_ref=scorer_ref.uri(),
             supervision=supervision,
         )
-         # Feels like this wants to be the call and the feedback id?
+        # Feels like this wants to be the call and the feedback id?
         return scorer_call.ref.uri()
 
     # def add_score(self, score_name: str, score: dict) -> str:

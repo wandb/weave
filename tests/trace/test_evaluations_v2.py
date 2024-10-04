@@ -297,11 +297,13 @@ def test_smart_backfill(client):
 
     make_generation("Hello, what is your name?")
 
-    stats = evaluation.backfill_scores(for_op=make_generation, scorers=[contains_appology])
+    stats = evaluation.backfill_scores(
+        for_op=make_generation, scorers=[contains_appology]
+    )
 
-    assert stats['calls_found'] == 1
-    assert stats['cache_hits'] == 0
-    assert len(stats['score_records']) == 1
+    assert stats["calls_found"] == 1
+    assert stats["cache_hits"] == 0
+    assert len(stats["score_records"]) == 1
 
     calls = list(client.get_calls(include_feedback=True))
     assert len(calls) == 2
@@ -331,11 +333,12 @@ def test_smart_backfill(client):
     assert feedback_item["creator"] is None
     assert feedback_item["created_at"] is not None
     assert feedback_item["wb_user_id"] is not None
-    
-    stats = evaluation.backfill_scores(for_op=make_generation, scorers=[contains_appology])
+
+    stats = evaluation.backfill_scores(
+        for_op=make_generation, scorers=[contains_appology]
+    )
 
     # TODO: This is not getting a cache hit :/
     # assert stats['calls_found'] == 1
     # assert stats['cache_hits'] == 1
     # assert len(stats['score_records']) == 0
-
