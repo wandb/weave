@@ -127,7 +127,7 @@ def backfill_scores(
     limit: Optional[int] = 1000,
     offset: Optional[int] = None,
     sort_by: Optional[list[SortBy]] = None,
-):
+) -> dict:
     wc = require_weave_client()
 
     saved_scorers = [
