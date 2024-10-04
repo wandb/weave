@@ -107,9 +107,8 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = ["weave"]
 
-[tool.setuptools.package.find]
-where = ["."]
-include = ["weave", "weave.*"]
+[tool.setuptools.package-data]
+weave = ["**/*.py"]
 
 [tool.setuptools.dynamic]
 version = { attr = "weave.version.VERSION" }
