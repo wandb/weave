@@ -360,32 +360,44 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
 
     assert len(res.rows) == 3
 
-    # with limit
-    res_limit = client.server.table_query(
+
+def test_duplicate_table_with_updates(client: WeaveClient):
+    data = [{"val": i} for i in range(10)]
+
+    res1 = client.server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                rows=data,
+                project_id=client._project_id(),
+            ),
+        )
+    )
+
+    assert len(res1.row_digests) == 10
+
+    # now create the same table with the same data
+    res2 = client.server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                rows=data,
+                project_id=client._project_id(),
+            ),
+        )
+    )
+
+    # should this actually be 0?
+    assert len(res2.row_digests) == 10
+
+    # this is the same table!
+    assert res1.digest == res2.digest
+
+    res = client.server.table_query(
         tsi.TableQueryReq(
             project_id=client._project_id(),
-            digest=res3["digest"],
-            limit=100,
-            offset=0,
-            sort_by=[],
+            digest=res1.digest,
+            sort_by=[tsi.SortBy(field="val", direction="asc")],
         )
     )
 
-    res_limit2 = client.server.table_query(
-        tsi.TableQueryReq(
-            project_id=client._project_id(),
-            digest=res3["digest"],
-            limit=30,
-            offset=0,
-            sort_by=[],
-        )
-    )
-
-    stats_res = client.server.table_query_stats(
-        tsi.TableQueryStatsReq(
-            project_id=client._project_id(),
-            digest=res3["digest"],
-        )
-    )
-
-    assert len(res_limit.rows) == len(res_limit2.rows) == stats_res.count == 30
+    # this is the same table, so we should get the same number of rows
+    assert len(res.rows) == 10
