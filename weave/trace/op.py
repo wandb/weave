@@ -18,6 +18,7 @@ from typing import (
     Protocol,
     Union,
     cast,
+    overload,
     runtime_checkable,
 )
 
@@ -330,13 +331,39 @@ def calls(op: Op) -> "CallsIter":
     return client._op_calls(op)
 
 
+CallDisplayNameFunc = Callable[["Call"], str]
+PostprocessInputsFunc = Callable[[dict[str, Any]], dict[str, Any]]
+PostprocessOutputFunc = Callable[..., Any]
+
+
+@overload
+def op(
+    func: Callable,
+    *,
+    name: Optional[str] = None,
+    call_display_name: Optional[Union[str, CallDisplayNameFunc]] = None,
+    postprocess_inputs: Optional[PostprocessInputsFunc] = None,
+    postprocess_output: Optional[PostprocessOutputFunc] = None,
+) -> Op: ...
+
+
+@overload
+def op(
+    *,
+    name: Optional[str] = None,
+    call_display_name: Optional[Union[str, CallDisplayNameFunc]] = None,
+    postprocess_inputs: Optional[PostprocessInputsFunc] = None,
+    postprocess_output: Optional[PostprocessOutputFunc] = None,
+) -> Callable[[Callable], Op]: ...
+
+
 def op(
     func: Optional[Callable] = None,
     *,
     name: Optional[str] = None,
-    call_display_name: Optional[Union[str, Callable[["Call"], str]]] = None,
-    postprocess_inputs: Optional[Callable[[dict[str, Any]], dict[str, Any]]] = None,
-    postprocess_output: Optional[Callable[..., Any]] = None,
+    call_display_name: Optional[Union[str, CallDisplayNameFunc]] = None,
+    postprocess_inputs: Optional[PostprocessInputsFunc] = None,
+    postprocess_output: Optional[PostprocessOutputFunc] = None,
 ) -> Union[Callable[[Any], Op], Op]:
     """
     A decorator to weave op-ify a function or method.  Works for both sync and async.
