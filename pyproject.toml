@@ -101,14 +101,23 @@ Changes = "https://github.com/wandb/weave/releases"
 Twitter = "https://twitter.com/weights_biases"
 
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=75", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["weave"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["weave*"]
+namespaces = true
 
 [tool.setuptools.package-data]
-weave = ["**/*.py"]
+"weave" = ["**/*.py", "**/*.pyi", "py.typed"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["*.pyc", "*__pycache__*"]
 
 [tool.setuptools.dynamic]
 version = { attr = "weave.version.VERSION" }
