@@ -16,7 +16,7 @@ To create a `Model` in Weave, you need the following:
 
 - a class that inherits from `weave.Model`
 - type definitions on all class attributes
-- a typed `invoke` function with the `@weave.op()` decorator
+- a typed `invoke` function with the `@weave.op` decorator
 
 When you change the class attributes or the code that defines your model, **these changes will be logged and the version will be updated**. This ensures that you can compare the generations across different versions of your app.
 
@@ -28,7 +28,7 @@ from openai import OpenAI
 
 import weave
 
-@weave.op()
+@weave.op
 def extract_dinos(wmodel: weave.Model, sentence: str) -> dict:
     response = wmodel.client.chat.completions.create(
         model=wmodel.model_name,
@@ -57,7 +57,7 @@ class ExtractDinos(weave.Model):
 
     # Ensure your function is called `invoke` or `predict`
     # highlight-next-line
-    @weave.op()
+    @weave.op
     # highlight-next-line
     def invoke(self, sentence: str) -> dict:
         dino_data  = extract_dinos(self, sentence)
@@ -71,7 +71,7 @@ weave.init('jurassic-park')
 client = OpenAI()
 
 system_prompt = """Extract any dinosaur `name`, their `common_name`, \
-names and whether its `diet` is a herbivore or carnivore, in JSON format."""
+and whether its `diet` is a herbivore or carnivore, in JSON format."""
 
 # highlight-next-line
 dinos = ExtractDinos(
@@ -90,13 +90,13 @@ result = dinos.invoke(sentence)
 print(result)
 ```
 
-Now after calling `.invoke` you can see the trace in Weave **now tracks the model attributes as well as the code** for the model functions that have been decorated with `weave.op()`. You can see the model is also versioned, "v21" in this case, and if you click on the model **you can see all of the calls** that have used that version of the model
+Now after calling `.invoke` you can see the trace in Weave **now tracks the model attributes as well as the code** for the model functions that have been decorated with `weave.op`. You can see the model is also versioned, "v21" in this case, and if you click on the model **you can see all of the calls** that have used that version of the model
 
 ![Re-using a weave model](../static/img/tutorial-model_invoke3.png)
 
 **A note on using `weave.Model`:**
 - You can use `predict` instead of `invoke` for the name of the function in your Weave `Model` if you prefer.
-- If you want other class methods to be tracked by weave they need to be wrapped in `weave.op()`
+- If you want other class methods to be tracked by weave they need to be wrapped in `weave.op`
 - Attributes starting with an underscore are ignored by weave and won't be logged
 
 ## Exporting and re-using a logged `weave.Model`
