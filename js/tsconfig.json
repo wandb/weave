@@ -14,19 +14,17 @@
     "strict": true,
     "esModuleInterop": true,
     "outDir": "./dist",
+    "importHelpers": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
-  "exclude": [
-    "src",
-    "examples",
-    "dist",
-    "node_modules"
-  ],
+  "exclude": ["src", "examples", "dist", "node_modules"],
   "references": [
     {
-      "path": "./src/tsconfig.src.json",
+      "path": "./src/tsconfig.src.json"
     },
     {
-      "path": "./examples/tsconfig.examples.json",
+      "path": "./examples/tsconfig.examples.json"
     }
   ]
 }
