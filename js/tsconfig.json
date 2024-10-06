@@ -1,10 +1,4 @@
 {
-  // "include": [
-  //   "src/**/*.ts"
-  // ],
-  // "exclude": [
-  //   "node_modules"
-  // ],
   "compilerOptions": {
     "composite": true,
     "target": "es2018",
@@ -16,9 +10,13 @@
     "outDir": "./dist",
     "importHelpers": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "baseUrl": ".",
+    "paths": {
+      "*": ["src/*", "examples/*"]
+    }
   },
-  "exclude": ["src", "examples", "dist", "node_modules"],
+  "exclude": ["dist", "node_modules"],
   "references": [
     {
       "path": "./src/tsconfig.src.json"
