@@ -1,18 +1,18 @@
 {
-    "extends": "../tsconfig.json",
-    "exclude": [],
-    "compilerOptions": {
-        "rootDir": ".",
-        "outDir": "../dist/examples",
-        "paths": {
-            "weave": [
-                "../dist/src"
-            ]
-        }
-    },
-    "references": [
-        {
-            "path": "../src/tsconfig.src.json"
-        }
-    ]
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../dist/examples",
+    "composite": true,
+    "paths": {
+      "weave": ["../src"]
+    }
+  },
+  "include": ["./**/*"],
+  "exclude": [],
+  "references": [
+    {
+      "path": "../src/tsconfig.src.json"
+    }
+  ]
 }

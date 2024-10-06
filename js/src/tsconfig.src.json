@@ -1,8 +1,10 @@
 {
-    "extends": "../tsconfig.json",
-    "exclude": [],
-    "compilerOptions": {
-        "rootDir": ".",
-        "outDir": "../dist/src"
-    }
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../dist/src",
+    "composite": true
+  },
+  "include": ["./**/*"],
+  "exclude": []
 }

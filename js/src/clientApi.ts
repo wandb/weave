@@ -1,10 +1,10 @@
-import {CallStackEntry, WeaveClient} from './weaveClient';
-import {getApiKey} from './settings';
-import {WandbServerApi} from './wandbServerApi';
-import {Api as TraceServerApi} from './traceServerApi';
-import {InMemoryTraceServer} from './inMemoryTraceServer';
 import {ConcurrencyLimiter} from './concurrencyLimit';
+import {InMemoryTraceServer} from './inMemoryTraceServer';
 import {createFetchWithRetry} from './retry';
+import {getApiKey} from './settings';
+import {Api as TraceServerApi} from './traceServerApi';
+import {WandbServerApi} from './wandbServerApi';
+import {CallStackEntry, createSettings, WeaveClient} from './weaveClient';
 
 // Global client instance
 export let globalClient: WeaveClient | null = null;
@@ -65,7 +65,7 @@ export function initWithCustomTraceServer(
     customTraceServer as unknown as TraceServerApi<any>,
     {} as WandbServerApi, // Placeholder, as we don't use WandbServerApi in this case
     projectName,
-    true
+    createSettings({quiet: true})
   );
 }
 

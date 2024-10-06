@@ -77,6 +77,22 @@ class CallStack {
 type CallStartParams = StartedCallSchemaForInsert;
 type CallEndParams = EndedCallSchemaForInsert;
 
+type Settings = {
+  disabled: boolean;
+  quiet: boolean;
+};
+
+export function createSettings(opts: Partial<Settings> = {}): Settings {
+  const defaults: Settings = {
+    disabled: false,
+    quiet: false,
+  };
+  return {
+    ...defaults,
+    ...opts,
+  };
+}
+
 export class WeaveClient {
   private stackContext = new AsyncLocalStorage<CallStack>();
   private callQueue: Array<{mode: 'start' | 'end'; data: any}> = [];
@@ -88,7 +104,7 @@ export class WeaveClient {
     public traceServerApi: TraceServerApi<any>,
     private wandbServerApi: WandbServerApi,
     public projectId: string,
-    public quiet: boolean = false
+    public settings: Settings = createSettings()
   ) {}
 
   private scheduleBatchProcessing() {

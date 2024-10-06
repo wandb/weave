@@ -6,9 +6,9 @@
   "main": "dist/src/index.js",
   "type": "commonjs",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --build",
     "test": "jest",
-    "watch": "nodemon --watch 'src/**/*.ts' --watch 'testing/**/*.ts' --watch 'testing/**/*.mjs' --exec 'ts-node' testing/test.ts",
+    "watch": "nodemon --watch 'src/**/*.ts' --watch 'testing/**/*.ts' --watch 'testing/**/*.mjs' --exec 'ts-node' testing/predict.ts",
     "format": "prettier --write \"src/**/*.ts\""
   },
   "repository": {

@@ -1,5 +1,5 @@
 import {globalClient} from './clientApi';
-import {OpOptions, Op} from './opType';
+import {Op, OpOptions} from './opType';
 
 export function op<T extends (...args: any[]) => any>(
   fn: T,
@@ -25,7 +25,7 @@ export function op<T extends (...args: any[]) => any>(
 
     const {newStack, currentCall, parentCall} = globalClient.pushNewCall();
     const startTime = new Date();
-    if (!globalClient.quiet && parentCall == null) {
+    if (!globalClient.settings.quiet && parentCall == null) {
       console.log(
         `🍩 https://wandb.ai/${globalClient.projectId}/r/call/${currentCall.callId}`
       );
