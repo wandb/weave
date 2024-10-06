@@ -13,7 +13,7 @@ export class ConcurrencyLimiter {
   }
 
   private tryExecuteNext() {
-    if (this.queue.length > 0 && this.activeCount < this.limit) {
+    if (this.pending && this.active < this.limit) {
       const nextTask = this.queue.shift();
       this.activeCount++;
       nextTask!();
@@ -37,7 +37,7 @@ export class ConcurrencyLimiter {
           }
         };
 
-        if (this.activeCount < this.limit) {
+        if (this.active < this.limit) {
           this.activeCount++;
           task();
         } else {
