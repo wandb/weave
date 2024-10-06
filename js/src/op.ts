@@ -5,6 +5,7 @@ export function op<T extends (...args: any[]) => any>(
   fn: T,
   options?: OpOptions<T>
 ): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>> {
+  // Step 1: Determine the operation name
   const fnName = options?.originalFunction?.name || fn.name || 'anonymous';
   let actualOpName = fnName;
   const thisArg = options?.bindThis;
@@ -16,23 +17,20 @@ export function op<T extends (...args: any[]) => any>(
     actualOpName = options.name;
   }
 
-  const opWrapper = async function (
-    ...params: Parameters<T>
-  ): Promise<ReturnType<T>> {
+  // Step 2: Define the wrapper function
+  const opWrapper = async function (...params: Parameters<T>): Promise<ReturnType<T>> {
+    // Step 2.1: Check if globalClient exists
     if (!globalClient) {
       return await fn(...params);
     }
 
+    // Step 2.2: Set up call context
     const {newStack, currentCall, parentCall} = globalClient.pushNewCall();
     const startTime = new Date();
     if (!globalClient.settings.quiet && parentCall == null) {
-      console.log(
-        `🍩 https://wandb.ai/${globalClient.projectId}/r/call/${currentCall.callId}`
-      );
+      console.log(`🍩 https://wandb.ai/${globalClient.projectId}/r/call/${currentCall.callId}`);
     }
-    const displayName = options?.callDisplayName
-      ? options.callDisplayName(...params)
-      : undefined;
+    const displayName = options?.callDisplayName ? options.callDisplayName(...params) : undefined;
     const startCallPromise = globalClient.startCall(
       opWrapper,
       params,
@@ -45,10 +43,12 @@ export function op<T extends (...args: any[]) => any>(
     );
 
     try {
+      // Step 2.3: Execute the wrapped function
       let result = await globalClient.runWithCallStack(newStack, async () => {
         return await fn(...params);
       });
 
+      // Step 2.4: Handle stream reducer if applicable
       if (options?.streamReducer && Symbol.asyncIterator in result) {
         const {initialState, reduceFn} = options.streamReducer;
         let state = initialState;
@@ -79,33 +79,22 @@ export function op<T extends (...args: any[]) => any>(
 
         return wrappedIterator as unknown as ReturnType<T>;
       } else {
+        // Step 2.5: Finish the call and return the result
         const endTime = new Date();
-        globalClient.finishCall(
-          result,
-          currentCall,
-          parentCall,
-          options?.summarize,
-          endTime,
-          startCallPromise
-        );
+        globalClient.finishCall(result, currentCall, parentCall, options?.summarize, endTime, startCallPromise);
         return result;
       }
     } catch (error) {
-      // console.error(`Op ${actualOpName} failed:`, error);
+      // Step 2.6: Handle errors
       const endTime = new Date();
-      globalClient.finishCallWithException(
-        error,
-        currentCall,
-        parentCall,
-        endTime,
-        startCallPromise
-      );
+      globalClient.finishCallWithException(error, currentCall, parentCall, endTime, startCallPromise);
       throw error;
     } finally {
       // No need to do anything here.
     }
   };
 
+  // Step 3: Set metadata on the wrapper function
   opWrapper.__name = actualOpName;
   opWrapper.__isOp = true as true;
   if (options?.originalFunction) {
@@ -118,6 +107,7 @@ export function op<T extends (...args: any[]) => any>(
     opWrapper.__boundThis = options.bindThis;
   }
 
+  // Step 4: Return the wrapped function
   return opWrapper as Op<T>;
 }
 
@@ -128,11 +118,7 @@ export function isOp(fn: any): fn is Op<any> {
   return fn.__isOp === true;
 }
 
-export function boundOp<T extends (...args: any[]) => any>(
-  bindThis: any,
-  fn: T,
-  options?: OpOptions<T>
-) {
+export function boundOp<T extends (...args: any[]) => any>(bindThis: any, fn: T, options?: OpOptions<T>) {
   const boundFn = fn.bind(bindThis) as T;
   return op(boundFn, {originalFunction: fn, bindThis, ...options});
 }
