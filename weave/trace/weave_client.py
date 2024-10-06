@@ -285,7 +285,7 @@ class Call:
     def log_score(
         self,
         name: str,
-        results: dict,
+        results: Any,
         *,
         call_ref: Optional[str] = None,
         op_ref: Optional[str] = None,
@@ -323,6 +323,8 @@ class Call:
         # if self._start_future:
         #     # Block until this finishes
         #     self._start_future.result()
+
+        # TODO: handle aysnc Ops!
 
         if self.ended_at is None:
             raise Exception("Must be finished to run scorer")

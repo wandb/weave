@@ -241,8 +241,10 @@ class Evaluation(Object):
                         f"{score_fn} expects arguments: {score_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
                     )
             score_args["model_output"] = model_output
-            non_output_args = {
-                k: v for k, v in score_args.items() if k != "model_output"
+            supervision = {
+                k: v
+                for k, v in score_args.items()
+                if k != "model_output" and k not in model_predict_arg_names
             }
 
             try:
@@ -277,16 +279,23 @@ class Evaluation(Object):
                 )
                 raise OpCallError(message)
             scores[scorer_name] = result
-            model_output_call.add_score(
-                scorer_name,
-                {
-                    "call": result_call,
-                    # Denormalizing for performance
-                    "op": score_fn,
-                    # Denormalizing for performance
-                    "score_args": non_output_args,
-                    "result": result,
-                },
+
+            call_ref = result_call.ref
+            if call_ref is None:
+                raise Exception("TODO")
+            call_ref_uri = call_ref.uri()
+
+            scorer_ref = score_fn.ref
+            if scorer_ref is None:
+                raise Exception("TODO")
+            scorer_ref_uri = scorer_ref.uri()
+
+            model_output_call.log_score(
+                name=scorer_name,
+                results=result,
+                call_ref=call_ref_uri,
+                op_ref=scorer_ref_uri,
+                supervision=supervision,
             )
 
         return {
