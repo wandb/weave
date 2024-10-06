@@ -334,11 +334,16 @@ def test_smart_backfill(client):
     assert feedback_item["created_at"] is not None
     assert feedback_item["wb_user_id"] is not None
 
+    @weave.op
+    def contains_period(inputs, output, supervision):
+        return "." in output
+
+    make_generation("Please tell me!")
+
     stats = evaluation.backfill_scores(
-        for_op=make_generation, scorers=[contains_appology]
+        for_op=make_generation, scorers=[contains_appology, contains_period]
     )
 
-    # TODO: This is not getting a cache hit :/
-    # assert stats['calls_found'] == 1
-    # assert stats['cache_hits'] == 1
-    # assert len(stats['score_records']) == 0
+    assert stats["calls_found"] == 2
+    assert stats["cache_hits"] == 1  # 1 prior score / op combo
+    assert len(stats["score_records"]) == 3  # 3 new "cells" to fill

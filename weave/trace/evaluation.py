@@ -112,7 +112,16 @@ def log_generation(
     return call
 
 
-# class BackfillCallsQuery
+class ScoreRecord(TypedDict):
+    call_ref: str
+    scorer_ref: str
+    feedback_id: str
+
+
+class StatsDict(TypedDict):
+    calls_found: int
+    cache_hits: int
+    score_records: list[ScoreRecord]
 
 
 # Maybe this should be a convenience off of the CallIter?
@@ -127,7 +136,7 @@ def backfill_scores(
     limit: Optional[int] = 1000,
     offset: Optional[int] = None,
     sort_by: Optional[list[SortBy]] = None,
-) -> dict:
+) -> StatsDict:
     wc = require_weave_client()
 
     saved_scorers = [
@@ -141,7 +150,7 @@ def backfill_scores(
 
     filter.op_names = [op_ref.uri()]  # what if they specified something here?
 
-    stats = {
+    stats: StatsDict = {
         "calls_found": 0,
         "cache_hits": 0,
         "score_records": [],
@@ -159,6 +168,10 @@ def backfill_scores(
     ):
         stats["calls_found"] += 1
         call = make_client_call(wc.entity, wc.project, raw_call, wc.server)
+        call_ref = call.ref
+        if call_ref is None:
+            raise Exception("This is really odd")
+        call_ref_uri = call_ref.uri()
         for scorer, scorer_op_ref in saved_scorers:
             existing_call_ref = None
             if not rerun_all:
@@ -167,20 +180,21 @@ def backfill_scores(
                 for feedback in call.summary["weave"]["feedback"]:
                     if (
                         feedback["feedback_type"] == "score"
-                        and feedback.get("payload", {}).get("op_ref") == scorer_op_ref
+                        and feedback.get("payload", {}).get("op_ref")
+                        == scorer_op_ref.uri()
                     ):
                         existing_call_ref = feedback.get("payload", {}).get("call_ref")
                         break
-            
+
             if existing_call_ref is None:
                 existing_call_ref = call.apply_scorer(scorer)
-                stats["score_records"].append(
-                    {
-                        "call_ref": call.ref.uri(),
-                        "scorer_ref": scorer_op_ref.uri(),
-                        "feedback_id": existing_call_ref,
-                    }
-                )
+
+                score_record: ScoreRecord = {
+                    "call_ref": call_ref_uri,
+                    "scorer_ref": scorer_op_ref.uri(),
+                    "feedback_id": existing_call_ref,
+                }
+                stats["score_records"].append(score_record)
             else:
                 stats["cache_hits"] += 1
 
