@@ -2,40 +2,45 @@ import crypto from 'crypto';
 import { Buffer } from 'buffer';
 
 export function computeDigest(data: Buffer): string {
-    // Must match python server algorithm in clickhouse_trace_server_batched.py
-    const hasher = crypto.createHash('sha256');
-    hasher.update(data);
-    const hashBytes = hasher.digest();
-    const base64EncodedHash = hashBytes.toString('base64url');
-    return base64EncodedHash.replace(/-/g, 'X').replace(/_/g, 'Y').replace(/=/g, '');
+  // Must match python server algorithm in clickhouse_trace_server_batched.py
+  const hasher = crypto.createHash('sha256');
+  hasher.update(data);
+  const hashBytes = hasher.digest();
+  const base64EncodedHash = hashBytes.toString('base64url');
+  return base64EncodedHash
+    .replace(/-/g, 'X')
+    .replace(/_/g, 'Y')
+    .replace(/=/g, '');
 }
 
 export function stringDigest(data: string): string {
-    return computeDigest(Buffer.from(data));
+  return computeDigest(Buffer.from(data));
 }
 
 export function encodeNumber(num: number): string {
-    return String(num);
+  return String(num);
 }
 
 export function stringifyPythonDumps(obj: any): string {
-    if (obj === null) return 'null';
-    if (typeof obj === 'string') return JSON.stringify(obj);
-    if (typeof obj === 'number' || typeof obj === 'boolean') {
-        return String(obj);
-    }
-    if (Array.isArray(obj)) {
-        return '[' + obj.map(stringifyPythonDumps).join(', ') + ']';
-    }
-    if (typeof obj === 'object') {
-        const pairs = Object.keys(obj).sort().map(key =>
-            JSON.stringify(key) + ': ' + stringifyPythonDumps(obj[key])
-        );
-        return '{' + pairs.join(', ') + '}';
-    }
-    throw new Error('Unsupported type');
+  if (obj === null) return 'null';
+  if (typeof obj === 'string') return JSON.stringify(obj);
+  if (typeof obj === 'number' || typeof obj === 'boolean') {
+    return String(obj);
+  }
+  if (Array.isArray(obj)) {
+    return '[' + obj.map(stringifyPythonDumps).join(', ') + ']';
+  }
+  if (typeof obj === 'object') {
+    const pairs = Object.keys(obj)
+      .sort()
+      .map(
+        (key) => JSON.stringify(key) + ': ' + stringifyPythonDumps(obj[key]),
+      );
+    return '{' + pairs.join(', ') + '}';
+  }
+  throw new Error('Unsupported type');
 }
 
 export function valDigest(data: any): string {
-    return stringDigest(stringifyPythonDumps(data));
+  return stringDigest(stringifyPythonDumps(data));
 }

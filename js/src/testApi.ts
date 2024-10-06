@@ -1,10 +1,10 @@
-import { init } from "./clientApi";
-import { op } from "./op";
-import { OpenAI } from "openai";
-import { wrapOpenAI } from "./integrations/openai";
+import { init } from './clientApi';
+import { op } from './op';
+import { OpenAI } from 'openai';
+import { wrapOpenAI } from './integrations/openai';
 
 // Initialize the API
-init("shawn/weavejs-test1");
+init('shawn/weavejs-test1');
 
 // Create OpenAI client
 const openai = wrapOpenAI(new OpenAI());
@@ -29,10 +29,10 @@ const wrappedDelayedMultiply = op(delayedMultiply);
 // Function to call OpenAI
 async function callOpenAI(prompt: string): Promise<string> {
   const completion = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
-    messages: [{ role: "user", content: prompt }],
+    model: 'gpt-3.5-turbo',
+    messages: [{ role: 'user', content: prompt }],
   });
-  return completion.choices[0].message.content || "";
+  return completion.choices[0].message.content || '';
 }
 
 // Wrap the OpenAI function
@@ -42,7 +42,7 @@ const wrappedCallOpenAI = op(callOpenAI);
 async function complexOperationWithAI(
   a: number,
   b: number,
-  c: number
+  c: number,
 ): Promise<string> {
   const sum = await wrappedAdd(a, b);
   const product = await wrappedDelayedMultiply(sum, c);
@@ -56,25 +56,25 @@ const wrappedComplexOperationWithAI = op(complexOperationWithAI);
 
 // Main async function to run our tests
 async function runTests() {
-  console.log("Starting tests...");
+  console.log('Starting tests...');
 
   // Test the wrapped add function
-  console.log("\nTesting wrapped add function:");
-  console.log("2 + 3 =", await wrappedAdd(2, 3));
+  console.log('\nTesting wrapped add function:');
+  console.log('2 + 3 =', await wrappedAdd(2, 3));
 
   // Test the wrapped async multiply function
-  console.log("\nTesting wrapped delayed multiply function:");
-  console.log("3 * 4 =", await wrappedDelayedMultiply(3, 4));
+  console.log('\nTesting wrapped delayed multiply function:');
+  console.log('3 * 4 =', await wrappedDelayedMultiply(3, 4));
 
   // Test the complex operation with nested calls including OpenAI
   console.log(
-    "\nTesting complex operation with nested calls including OpenAI:"
+    '\nTesting complex operation with nested calls including OpenAI:',
   );
   const result = await wrappedComplexOperationWithAI(2, 3, 4);
   console.log(result);
 
-  console.log("\nTests completed.");
+  console.log('\nTests completed.');
 }
 
 // Run the tests
-runTests().catch((error) => console.error("An error occurred:", error));
+runTests().catch((error) => console.error('An error occurred:', error));

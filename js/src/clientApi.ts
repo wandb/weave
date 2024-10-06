@@ -1,21 +1,21 @@
-import { CallStackEntry, WeaveClient } from "./weaveClient";
-import { getApiKey } from "./settings";
-import { WandbServerApi } from "./wandbServerApi";
-import { Api as TraceServerApi } from "./traceServerApi";
-import { InMemoryTraceServer } from "./inMemoryTraceServer";
-import { ConcurrencyLimiter } from "./concurrencyLimit";
-import { createFetchWithRetry } from "./retry";
+import { CallStackEntry, WeaveClient } from './weaveClient';
+import { getApiKey } from './settings';
+import { WandbServerApi } from './wandbServerApi';
+import { Api as TraceServerApi } from './traceServerApi';
+import { InMemoryTraceServer } from './inMemoryTraceServer';
+import { ConcurrencyLimiter } from './concurrencyLimit';
+import { createFetchWithRetry } from './retry';
 
 // Global client instance
 export let globalClient: WeaveClient | null = null;
 
 export async function init(projectName: string): Promise<WeaveClient> {
-  const host = "https://api.wandb.ai";
+  const host = 'https://api.wandb.ai';
   const apiKey = getApiKey();
 
   const headers: Record<string, string> = {
-    "User-Agent": `W&B Internal JS Client ${process.env.VERSION || "unknown"}`,
-    Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString("base64")}`,
+    'User-Agent': `W&B Internal JS Client ${process.env.VERSION || 'unknown'}`,
+    Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
   };
 
   try {
@@ -37,11 +37,11 @@ export async function init(projectName: string): Promise<WeaveClient> {
         // Useful for debugging
         // console.log(`Active: ${concurrencyLimiter.active} Pending: ${concurrencyLimiter.pending}`);
         return result;
-      }
+      },
     );
 
     const traceServerApi = new TraceServerApi({
-      baseUrl: "https://trace.wandb.ai",
+      baseUrl: 'https://trace.wandb.ai',
       baseApiParams: {
         headers: headers,
       },
@@ -52,30 +52,30 @@ export async function init(projectName: string): Promise<WeaveClient> {
     console.log(`Initializing project: ${projectId}`);
     return globalClient;
   } catch (error) {
-    console.error("Error during initialization:", error);
+    console.error('Error during initialization:', error);
     throw error;
   }
 }
 
 export function initWithCustomTraceServer(
   projectName: string,
-  customTraceServer: InMemoryTraceServer
+  customTraceServer: InMemoryTraceServer,
 ) {
   globalClient = new WeaveClient(
     customTraceServer as unknown as TraceServerApi<any>,
     {} as WandbServerApi, // Placeholder, as we don't use WandbServerApi in this case
     projectName,
-    true
+    true,
   );
 }
 
 export function requireCurrentCallStackEntry(): CallStackEntry {
   if (!globalClient) {
-    throw new Error("Weave client not initialized");
+    throw new Error('Weave client not initialized');
   }
   const callStackEntry = globalClient.getCallStack().peek();
   if (!callStackEntry) {
-    throw new Error("No current call stack entry");
+    throw new Error('No current call stack entry');
   }
   return callStackEntry;
 }

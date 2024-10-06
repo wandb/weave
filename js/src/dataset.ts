@@ -1,5 +1,5 @@
-import { WeaveObject, WeaveObjectParameters, ObjectRef } from "./weaveObject";
-import { Table } from "./table";
+import { WeaveObject, WeaveObjectParameters, ObjectRef } from './weaveObject';
+import { Table } from './table';
 
 interface DatasetParameters<R extends DatasetRow>
   extends WeaveObjectParameters {
@@ -11,7 +11,7 @@ export class DatasetRowRef {
     public projectId: string,
     public objId: string,
     public digest: string,
-    public rowDigest: string
+    public rowDigest: string,
   ) {}
 
   public uri() {
@@ -37,7 +37,7 @@ export class Dataset<R extends DatasetRow> extends WeaveObject {
 
   async save(): Promise<ObjectRef> {
     // Need require because of circular dependency
-    const client = require("./clientApi").globalClient;
+    const client = require('./clientApi').globalClient;
     return client.saveObject(this);
   }
 
@@ -63,7 +63,7 @@ export class Dataset<R extends DatasetRow> extends WeaveObject {
           ref.projectId,
           ref.objectId,
           ref.digest,
-          tableRowRef.rowDigest
+          tableRowRef.rowDigest,
         );
       });
     }

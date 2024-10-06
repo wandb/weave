@@ -1,18 +1,18 @@
-import { Evaluation } from "../evaluation";
-import { Dataset } from "../dataset";
+import { Evaluation } from '../evaluation';
+import { Dataset } from '../dataset';
 // import { Op } from "../opType";
-import { op } from "../op";
+import { op } from '../op';
 
-describe("Evaluation", () => {
-  test("summarizeResults with failed predictions and scorers", async () => {
+describe('Evaluation', () => {
+  test('summarizeResults with failed predictions and scorers', async () => {
     // Mock dataset
     const mockDataset = new Dataset({
       rows: [
-        { id: 0, text: "Example 0" },
-        { id: 1, text: "Example 1" },
-        { id: 2, text: "Example 2" },
-        { id: 3, text: "Example 3" },
-        { id: 4, text: "Example 4" },
+        { id: 0, text: 'Example 0' },
+        { id: 1, text: 'Example 1' },
+        { id: 2, text: 'Example 2' },
+        { id: 3, text: 'Example 3' },
+        { id: 4, text: 'Example 4' },
       ],
     });
 
@@ -25,7 +25,7 @@ describe("Evaluation", () => {
         text: string;
       };
     }) {
-      if (datasetRow.id === 0) throw new Error("Model failed");
+      if (datasetRow.id === 0) throw new Error('Model failed');
       return `Prediction for ${datasetRow.text}`;
     });
 
@@ -38,9 +38,9 @@ describe("Evaluation", () => {
         datasetRow: { id: number; text: string };
         modelOutput: string;
       }) {
-        if (datasetRow.id === 3) throw new Error("Scorer 1 failed");
+        if (datasetRow.id === 3) throw new Error('Scorer 1 failed');
         return {
-          explanation: "length is " + modelOutput.length,
+          explanation: 'length is ' + modelOutput.length,
           length: modelOutput.length,
         };
       }),

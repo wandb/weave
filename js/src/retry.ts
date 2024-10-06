@@ -38,7 +38,7 @@ export function createFetchWithRetry(options: RetryOptions = {}) {
         // Exponential backoff delay
         const delay = Math.min(baseDelay * 2 ** attempt, maxDelay);
         console.log(
-          `Return code: ${response.status}. Retrying fetch after ${delay}ms`
+          `Return code: ${response.status}. Retrying fetch after ${delay}ms`,
         );
         await new Promise((resolve) => setTimeout(resolve, delay));
         attempt++;

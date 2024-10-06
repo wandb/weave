@@ -1,10 +1,10 @@
-import { WeaveObject, WeaveObjectParameters } from "./weaveObject";
-import { Op, getOpName } from "./opType";
-import { boundOp } from "./op";
-import { Dataset } from "./dataset";
-import { isMedia } from "./media";
-import { DatasetRow } from "./dataset";
-import cliProgress from "cli-progress";
+import { WeaveObject, WeaveObjectParameters } from './weaveObject';
+import { Op, getOpName } from './opType';
+import { boundOp } from './op';
+import { Dataset } from './dataset';
+import { isMedia } from './media';
+import { DatasetRow } from './dataset';
+import cliProgress from 'cli-progress';
 
 const PROGRESS_BAR = false;
 
@@ -28,16 +28,16 @@ function callWeaveCallable<T extends (...args: any[]) => any>(
   callable: WeaveCallable<T>,
   ...args: Parameters<T>
 ) {
-  if (typeof callable === "function") {
+  if (typeof callable === 'function') {
     return callable(...args);
   }
   return callable.invoke(...args);
 }
 
 function weaveCallableName<T extends (...args: any[]) => any>(
-  callable: WeaveCallable<T>
+  callable: WeaveCallable<T>,
 ) {
-  if (typeof callable === "function") {
+  if (typeof callable === 'function') {
     return getOpName(callable);
   }
   return callable.id;
@@ -45,7 +45,7 @@ function weaveCallableName<T extends (...args: any[]) => any>(
 
 async function* repeatAsyncIterator<T>(
   asyncIterator: AsyncIterable<T>,
-  repeatCount: number
+  repeatCount: number,
 ): AsyncGenerator<T, void, unknown> {
   for (let i = 0; i < repeatCount; i++) {
     for await (const item of asyncIterator) {
@@ -58,7 +58,7 @@ async function* asyncParallelMap<T, U>(
   asyncIterator: AsyncIterable<T>,
   fn: (item: T, ...args: any[]) => Promise<U>,
   fnParams: (item: T) => any[],
-  maxConcurrency: number
+  maxConcurrency: number,
 ) {
   const itemPromiseMap: Map<
     T,
@@ -107,12 +107,12 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
     this.dataset = parameters.dataset;
     this.scorers = parameters.scorers;
     this.evaluate = boundOp(this, this.evaluate, {
-      parameterNames: "useParam0Object",
+      parameterNames: 'useParam0Object',
       callDisplayName: (inputs) =>
         `${this.id}_${weaveCallableName(inputs.model)}`,
     });
     this.predict_and_score = boundOp(this, this.predict_and_score, {
-      parameterNames: "useParam0Object",
+      parameterNames: 'useParam0Object',
     });
   }
 
@@ -134,9 +134,9 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
 
     const progressBar = new cliProgress.SingleBar({
       format:
-        "Evaluating |{bar}| {percentage}% | ETA: {eta}s | {modelErrors} errors | {value}/{total} examples | {running} running",
-      barCompleteChar: "\u2588",
-      barIncompleteChar: "\u2591",
+        'Evaluating |{bar}| {percentage}% | ETA: {eta}s | {modelErrors} errors | {value}/{total} examples | {running} running',
+      barCompleteChar: '\u2588',
+      barIncompleteChar: '\u2591',
       hideCursor: true,
     });
 
@@ -159,7 +159,7 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
       datasetExamples,
       this.predict_and_score,
       (item) => [{ model, example: item }],
-      maxConcurrency
+      maxConcurrency,
     )) {
       const { scores } = result;
       results.push({
@@ -175,7 +175,7 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
         console.log(
           `Evaluating ${nDone}/${
             this.dataset.length * nTrials
-          } examples (${nRunning} running, ${modelErrors} errors)`
+          } examples (${nRunning} running, ${modelErrors} errors)`,
         );
       }
     }
@@ -236,10 +236,10 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
       model_success: boolean;
       model_latency: number;
       [key: string]: any;
-    }>
+    }>,
   ) {
     const summarizeNestedObject = (
-      results: Array<any>
+      results: Array<any>,
     ): Record<string, any> => {
       const nestedSummary: Record<string, any> = {};
 
@@ -248,15 +248,15 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
 
       for (const key of allKeys) {
         const values = results.map((result) =>
-          result == null ? null : result[key]
+          result == null ? null : result[key],
         );
         if (
           values.some(
             (v) =>
-              typeof v === "object" &&
+              typeof v === 'object' &&
               v !== null &&
               !Array.isArray(v) &&
-              !isMedia(v)
+              !isMedia(v),
           )
         ) {
           const result = summarizeNestedObject(values);
@@ -283,13 +283,13 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
       return {}; // Return an empty object if there are no valid values
     }
 
-    if (nonNilValues.every((v) => typeof v === "boolean")) {
+    if (nonNilValues.every((v) => typeof v === 'boolean')) {
       const trueCount = nonNilValues.filter((v) => v).length;
       return {
         true_count: trueCount,
         true_fraction: values.length > 0 ? trueCount / values.length : 0,
       };
-    } else if (nonNilValues.every((v) => typeof v === "number")) {
+    } else if (nonNilValues.every((v) => typeof v === 'number')) {
       const sum = nonNilValues.reduce((acc, v) => acc + v, 0);
       return {
         mean: values.length > 0 ? sum / values.length : 0,
