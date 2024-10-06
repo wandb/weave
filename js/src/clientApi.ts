@@ -1,10 +1,10 @@
-import { CallStackEntry, WeaveClient } from './weaveClient';
-import { getApiKey } from './settings';
-import { WandbServerApi } from './wandbServerApi';
-import { Api as TraceServerApi } from './traceServerApi';
-import { InMemoryTraceServer } from './inMemoryTraceServer';
-import { ConcurrencyLimiter } from './concurrencyLimit';
-import { createFetchWithRetry } from './retry';
+import {CallStackEntry, WeaveClient} from './weaveClient';
+import {getApiKey} from './settings';
+import {WandbServerApi} from './wandbServerApi';
+import {Api as TraceServerApi} from './traceServerApi';
+import {InMemoryTraceServer} from './inMemoryTraceServer';
+import {ConcurrencyLimiter} from './concurrencyLimit';
+import {createFetchWithRetry} from './retry';
 
 // Global client instance
 export let globalClient: WeaveClient | null = null;
@@ -37,7 +37,7 @@ export async function init(projectName: string): Promise<WeaveClient> {
         // Useful for debugging
         // console.log(`Active: ${concurrencyLimiter.active} Pending: ${concurrencyLimiter.pending}`);
         return result;
-      },
+      }
     );
 
     const traceServerApi = new TraceServerApi({
@@ -59,13 +59,13 @@ export async function init(projectName: string): Promise<WeaveClient> {
 
 export function initWithCustomTraceServer(
   projectName: string,
-  customTraceServer: InMemoryTraceServer,
+  customTraceServer: InMemoryTraceServer
 ) {
   globalClient = new WeaveClient(
     customTraceServer as unknown as TraceServerApi<any>,
     {} as WandbServerApi, // Placeholder, as we don't use WandbServerApi in this case
     projectName,
-    true,
+    true
   );
 }
 
@@ -80,7 +80,7 @@ export function requireCurrentCallStackEntry(): CallStackEntry {
   return callStackEntry;
 }
 
-export function requireCurrentChildSummary(): { [key: string]: any } {
+export function requireCurrentChildSummary(): {[key: string]: any} {
   const callStackEntry = requireCurrentCallStackEntry();
   return callStackEntry.childSummary;
 }

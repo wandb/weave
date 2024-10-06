@@ -1,4 +1,4 @@
-import { CallStackEntry } from './weaveClient';
+import {CallStackEntry} from './weaveClient';
 
 /**
  * Represents a summary object with string keys and any type of values.
@@ -17,7 +17,7 @@ type Summary = Record<string, any>;
  * - For other types, the left value "wins".
  */
 function mergeSummaries(left: Summary, right: Summary): Summary {
-  const result: Summary = { ...right };
+  const result: Summary = {...right};
   for (const [key, leftValue] of Object.entries(left)) {
     if (key in result) {
       if (typeof leftValue === 'number' && typeof result[key] === 'number') {
@@ -41,7 +41,7 @@ export function processSummary(
   result: any,
   summarize: ((result: any) => Record<string, any>) | undefined,
   currentCall: CallStackEntry,
-  parentCall: CallStackEntry | undefined,
+  parentCall: CallStackEntry | undefined
 ) {
   let ownSummary = summarize ? summarize(result) : {};
 
@@ -61,7 +61,7 @@ export function processSummary(
   if (parentCall) {
     parentCall.childSummary = mergeSummaries(
       mergedSummary,
-      parentCall.childSummary,
+      parentCall.childSummary
     );
   }
 

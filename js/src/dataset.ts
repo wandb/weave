@@ -1,5 +1,5 @@
-import { WeaveObject, WeaveObjectParameters, ObjectRef } from './weaveObject';
-import { Table } from './table';
+import {WeaveObject, WeaveObjectParameters, ObjectRef} from './weaveObject';
+import {Table} from './table';
 
 interface DatasetParameters<R extends DatasetRow>
   extends WeaveObjectParameters {
@@ -11,7 +11,7 @@ export class DatasetRowRef {
     public projectId: string,
     public objId: string,
     public digest: string,
-    public rowDigest: string,
+    public rowDigest: string
   ) {}
 
   public uri() {
@@ -53,7 +53,7 @@ export class Dataset<R extends DatasetRow> extends WeaveObject {
 
   row(index: number): R {
     const tableRow = this.rows.row(index);
-    const datasetRow: R = { ...tableRow, __savedRef: undefined };
+    const datasetRow: R = {...tableRow, __savedRef: undefined};
     if (this.__savedRef && tableRow.__savedRef) {
       datasetRow.__savedRef = Promise.all([
         this.__savedRef,
@@ -63,7 +63,7 @@ export class Dataset<R extends DatasetRow> extends WeaveObject {
           ref.projectId,
           ref.objectId,
           ref.digest,
-          tableRowRef.rowDigest,
+          tableRowRef.rowDigest
         );
       });
     }

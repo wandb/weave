@@ -1,9 +1,9 @@
 // Manual test for checking openai client
 
-import { OpenAI } from 'openai';
-import { wrapOpenAI, init } from '..';
-import { z } from 'zod';
-import { zodResponseFormat } from 'openai/helpers/zod';
+import {OpenAI} from 'openai';
+import {wrapOpenAI, init} from '..';
+import {z} from 'zod';
+import {zodResponseFormat} from 'openai/helpers/zod';
 
 async function betaParseCall(client: OpenAI) {
   return await client.beta.chat.completions.parse({
@@ -15,10 +15,7 @@ async function betaParseCall(client: OpenAI) {
         content: 'What is the capital of the US?',
       },
     ],
-    response_format: zodResponseFormat(
-      z.object({ name: z.string() }),
-      'result',
-    ),
+    response_format: zodResponseFormat(z.object({name: z.string()}), 'result'),
   });
 }
 
@@ -32,10 +29,7 @@ async function standardCall(client: OpenAI) {
         content: 'What is the capital of the US?',
       },
     ],
-    response_format: zodResponseFormat(
-      z.object({ name: z.string() }),
-      'result',
-    ),
+    response_format: zodResponseFormat(z.object({name: z.string()}), 'result'),
   });
 }
 
@@ -50,10 +44,7 @@ async function streamCall(client: OpenAI) {
       },
     ],
     stream: true,
-    response_format: zodResponseFormat(
-      z.object({ name: z.string() }),
-      'result',
-    ),
+    response_format: zodResponseFormat(z.object({name: z.string()}), 'result'),
   });
 }
 
@@ -87,7 +78,7 @@ async function callTests(openai: OpenAI) {
 }
 
 export async function oaiParse<T extends z.ZodTypeAny>() {
-  const openai = new OpenAI({ timeout: 120 * 1000 });
+  const openai = new OpenAI({timeout: 120 * 1000});
   console.log('OPENAI CLIENT TESTS');
   await callTests(openai);
 
@@ -100,4 +91,4 @@ export async function oaiParse<T extends z.ZodTypeAny>() {
   await callTests(client);
 }
 
-oaiParse().then((result) => console.log(result));
+oaiParse().then(result => console.log(result));

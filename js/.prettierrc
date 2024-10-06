@@ -1,7 +1,16 @@
 {
-  "semi": true,
-  "trailingComma": "all",
+  "trailingComma": "es5",
   "singleQuote": true,
-  "printWidth": 80,
-  "tabWidth": 2
+  "bracketSpacing": false,
+  "bracketSameLine": true,
+  "tabWidth": 2,
+  "arrowParens": "avoid",
+  "overrides": [
+    {
+      "files": ["*.ts", "*.tsx"],
+      "options": {
+        "parser": "typescript"
+      }
+    }
+  ]
 }

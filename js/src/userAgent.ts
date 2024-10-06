@@ -1,5 +1,5 @@
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import {readFileSync, existsSync} from 'fs';
+import {join} from 'path';
 
 export let packageVersion: string;
 

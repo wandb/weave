@@ -1,9 +1,9 @@
-import { globalClient } from './clientApi';
-import { OpOptions, Op } from './opType';
+import {globalClient} from './clientApi';
+import {OpOptions, Op} from './opType';
 
 export function op<T extends (...args: any[]) => any>(
   fn: T,
-  options?: OpOptions<T>,
+  options?: OpOptions<T>
 ): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>> {
   const fnName = options?.originalFunction?.name || fn.name || 'anonymous';
   let actualOpName = fnName;
@@ -23,11 +23,11 @@ export function op<T extends (...args: any[]) => any>(
       return await fn(...params);
     }
 
-    const { newStack, currentCall, parentCall } = globalClient.pushNewCall();
+    const {newStack, currentCall, parentCall} = globalClient.pushNewCall();
     const startTime = new Date();
     if (!globalClient.quiet && parentCall == null) {
       console.log(
-        `🍩 https://wandb.ai/${globalClient.projectId}/r/call/${currentCall.callId}`,
+        `🍩 https://wandb.ai/${globalClient.projectId}/r/call/${currentCall.callId}`
       );
     }
     const displayName = options?.callDisplayName
@@ -41,7 +41,7 @@ export function op<T extends (...args: any[]) => any>(
       currentCall,
       parentCall,
       startTime,
-      displayName,
+      displayName
     );
 
     try {
@@ -50,7 +50,7 @@ export function op<T extends (...args: any[]) => any>(
       });
 
       if (options?.streamReducer && Symbol.asyncIterator in result) {
-        const { initialState, reduceFn } = options.streamReducer;
+        const {initialState, reduceFn} = options.streamReducer;
         let state = initialState;
 
         const wrappedIterator = {
@@ -70,7 +70,7 @@ export function op<T extends (...args: any[]) => any>(
                   parentCall,
                   options?.summarize,
                   endTime,
-                  startCallPromise,
+                  startCallPromise
                 );
               }
             }
@@ -86,7 +86,7 @@ export function op<T extends (...args: any[]) => any>(
           parentCall,
           options?.summarize,
           endTime,
-          startCallPromise,
+          startCallPromise
         );
         return result;
       }
@@ -98,7 +98,7 @@ export function op<T extends (...args: any[]) => any>(
         currentCall,
         parentCall,
         endTime,
-        startCallPromise,
+        startCallPromise
       );
       throw error;
     } finally {
@@ -131,8 +131,8 @@ export function isOp(fn: any): fn is Op<any> {
 export function boundOp<T extends (...args: any[]) => any>(
   bindThis: any,
   fn: T,
-  options?: OpOptions<T>,
+  options?: OpOptions<T>
 ) {
   const boundFn = fn.bind(bindThis) as T;
-  return op(boundFn, { originalFunction: fn, bindThis, ...options });
+  return op(boundFn, {originalFunction: fn, bindThis, ...options});
 }

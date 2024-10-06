@@ -1,4 +1,4 @@
-import { isOp } from './op';
+import {isOp} from './op';
 
 export interface WeaveObjectParameters {
   id?: string;
@@ -9,7 +9,7 @@ export class ObjectRef {
   constructor(
     public projectId: string,
     public objectId: string,
-    public digest: string,
+    public digest: string
   ) {}
 
   public uri() {
@@ -31,10 +31,10 @@ export class WeaveObject {
   }
 
   saveAttrs() {
-    const attrs: { [key: string]: any } = {};
+    const attrs: {[key: string]: any} = {};
 
     const nonUnderscoreKeys = Object.keys(this).filter(
-      (key) => !key.startsWith('_'),
+      key => !key.startsWith('_')
     );
 
     // Include values first (non-functions)

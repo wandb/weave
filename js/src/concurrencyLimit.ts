@@ -21,7 +21,7 @@ export class ConcurrencyLimiter {
   }
 
   limitFunction<T extends any[], R>(
-    asyncFn: (...args: T) => Promise<R>,
+    asyncFn: (...args: T) => Promise<R>
   ): (...args: T) => Promise<R> {
     return async (...args: T): Promise<R> => {
       return new Promise<R>((resolve, reject) => {

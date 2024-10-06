@@ -1,5 +1,5 @@
-import { op } from '../op';
-import { weaveImage } from '../media';
+import {op} from '../op';
+import {weaveImage} from '../media';
 
 const openAIStreamReducer = {
   initialState: {
@@ -69,7 +69,7 @@ export function makeOpenAIChatCompletionsOp(originalCreate: any, name: string) {
   return op(
     function (...args: Parameters<typeof originalCreate>) {
       const [originalParams]: any[] = args;
-      const params = { ...originalParams }; // Create a shallow copy of the params
+      const params = {...originalParams}; // Create a shallow copy of the params
 
       if (params.stream) {
         // Always include usage for internal tracking
@@ -89,13 +89,13 @@ export function makeOpenAIChatCompletionsOp(originalCreate: any, name: string) {
     {
       name: name,
       parameterNames: 'useParam0Object',
-      summarize: (result) => ({
+      summarize: result => ({
         usage: {
           [result.model]: result.usage,
         },
       }),
       streamReducer: openAIStreamReducer,
-    },
+    }
   );
 }
 
@@ -110,10 +110,10 @@ export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
           result.data.map(async (item: any) => {
             if (item.b64_json) {
               const buffer = Buffer.from(item.b64_json, 'base64');
-              return weaveImage({ data: buffer, imageType: 'png' });
+              return weaveImage({data: buffer, imageType: 'png'});
             }
             return item;
-          }),
+          })
         );
       }
 
@@ -121,14 +121,14 @@ export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
     },
     {
       name: 'openai.images.generate',
-      summarize: (result) => ({
+      summarize: result => ({
         usage: {
           'dall-e': {
             images_generated: result.data.length,
           },
         },
       }),
-    },
+    }
   );
 }
 
@@ -157,7 +157,7 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
       if (p === 'create') {
         return makeOpenAIChatCompletionsOp(
           targetVal.bind(target),
-          'openai.chat.completions.create',
+          'openai.chat.completions.create'
         );
       }
       return targetVal;
@@ -189,7 +189,7 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
       if (p === 'parse') {
         return makeOpenAIChatCompletionsOp(
           targetVal.bind(target),
-          'openai.beta.chat.completions.parse',
+          'openai.beta.chat.completions.parse'
         );
       }
       return targetVal;

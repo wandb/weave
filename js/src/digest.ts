@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { Buffer } from 'buffer';
+import {Buffer} from 'buffer';
 
 export function computeDigest(data: Buffer): string {
   // Must match python server algorithm in clickhouse_trace_server_batched.py
@@ -33,9 +33,7 @@ export function stringifyPythonDumps(obj: any): string {
   if (typeof obj === 'object') {
     const pairs = Object.keys(obj)
       .sort()
-      .map(
-        (key) => JSON.stringify(key) + ': ' + stringifyPythonDumps(obj[key]),
-      );
+      .map(key => JSON.stringify(key) + ': ' + stringifyPythonDumps(obj[key]));
     return '{' + pairs.join(', ') + '}';
   }
   throw new Error('Unsupported type');

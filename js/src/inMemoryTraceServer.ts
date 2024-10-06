@@ -1,4 +1,4 @@
-import { uuidv7 } from 'uuidv7';
+import {uuidv7} from 'uuidv7';
 
 interface Call {
   project_id: string;
@@ -48,13 +48,13 @@ export class InMemoryTraceServer {
 
   call = {
     callStartBatchCallUpsertBatchPost: async (batchReq: {
-      batch: Array<{ mode: 'start' | 'end'; req: any }>;
+      batch: Array<{mode: 'start' | 'end'; req: any}>;
     }) => {
       for (const item of batchReq.batch) {
         if (item.mode === 'start') {
           this._calls.push(item.req.start);
         } else if (item.mode === 'end') {
-          const call = this._calls.find((c) => c.id === item.req.end.id);
+          const call = this._calls.find(c => c.id === item.req.end.id);
           if (call) {
             Object.assign(call, item.req.end);
           }
@@ -66,14 +66,14 @@ export class InMemoryTraceServer {
   calls = {
     callsStreamQueryPost: async (queryParams: QueryParams) => {
       let filteredCalls = this._calls.filter(
-        (call) => call.project_id === queryParams.project_id,
+        call => call.project_id === queryParams.project_id
       );
 
       // Apply filters if any
       if (queryParams.filters) {
-        filteredCalls = filteredCalls.filter((call) => {
+        filteredCalls = filteredCalls.filter(call => {
           return Object.entries(queryParams.filters || {}).every(
-            ([key, value]) => call[key] === value,
+            ([key, value]) => call[key] === value
           );
         });
       }
@@ -103,7 +103,7 @@ export class InMemoryTraceServer {
 
   obj = {
     objCreateObjCreatePost: async (req: {
-      obj: { project_id: string; object_id: string; val: any };
+      obj: {project_id: string; object_id: string; val: any};
     }) => {
       const now = new Date().toISOString();
       const digest = this.generateDigest(req.obj.val);
@@ -123,13 +123,13 @@ export class InMemoryTraceServer {
 
       // Update version_index and is_latest for existing objects
       const existingObjs = this._objs.filter(
-        (obj) =>
+        obj =>
           obj.project_id === req.obj.project_id &&
-          obj.object_id === req.obj.object_id,
+          obj.object_id === req.obj.object_id
       );
       if (existingObjs.length > 0) {
         newObj.version_index = existingObjs.length;
-        existingObjs.forEach((obj) => (obj.is_latest = 0));
+        existingObjs.forEach(obj => (obj.is_latest = 0));
       }
 
       this._objs.push(newObj);

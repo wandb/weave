@@ -1,4 +1,4 @@
-import { makeMockOpenAIChat } from './openaiMock';
+import {makeMockOpenAIChat} from './openaiMock';
 
 describe('OpenAI Mock', () => {
   const mockResponse = (messages: any[]) => ({
@@ -6,7 +6,7 @@ describe('OpenAI Mock', () => {
     functionCalls: [
       {
         name: 'test_function',
-        arguments: { arg: 'value' },
+        arguments: {arg: 'value'},
       },
     ],
   });
@@ -14,7 +14,7 @@ describe('OpenAI Mock', () => {
   test('non-streaming response', async () => {
     const testOpenAIChat = makeMockOpenAIChat(mockResponse);
     const response = await testOpenAIChat({
-      messages: [{ role: 'user', content: 'Hello, AI!' }],
+      messages: [{role: 'user', content: 'Hello, AI!'}],
     });
 
     expect(response).toEqual({
@@ -50,7 +50,7 @@ describe('OpenAI Mock', () => {
   test('streaming response without include_usage', async () => {
     const testOpenAIChat = makeMockOpenAIChat(mockResponse);
     const stream = (await testOpenAIChat({
-      messages: [{ role: 'user', content: 'Hello, AI!' }],
+      messages: [{role: 'user', content: 'Hello, AI!'}],
       stream: true,
     })) as AsyncIterable<any>;
 
@@ -69,7 +69,7 @@ describe('OpenAI Mock', () => {
       choices: [
         {
           index: 0,
-          delta: { role: 'assistant', content: '', refusal: null },
+          delta: {role: 'assistant', content: '', refusal: null},
           logprobs: null,
           finish_reason: null,
         },
@@ -90,15 +90,15 @@ describe('OpenAI Mock', () => {
         },
       ],
     });
-    expect(chunks.every((chunk) => !('usage' in chunk))).toBe(true);
+    expect(chunks.every(chunk => !('usage' in chunk))).toBe(true);
   });
 
   test('streaming response with include_usage', async () => {
     const testOpenAIChat = makeMockOpenAIChat(mockResponse);
     const stream = (await testOpenAIChat({
-      messages: [{ role: 'user', content: 'Hello, AI!' }],
+      messages: [{role: 'user', content: 'Hello, AI!'}],
       stream: true,
-      stream_options: { include_usage: true },
+      stream_options: {include_usage: true},
     })) as AsyncIterable<any>;
 
     let chunks = [];
@@ -116,7 +116,7 @@ describe('OpenAI Mock', () => {
       choices: [
         {
           index: 0,
-          delta: { role: 'assistant', content: '', refusal: null },
+          delta: {role: 'assistant', content: '', refusal: null},
           logprobs: null,
           finish_reason: null,
         },
@@ -152,8 +152,6 @@ describe('OpenAI Mock', () => {
         total_tokens: 6,
       },
     });
-    expect(chunks.slice(0, -1).every((chunk) => chunk.usage === null)).toBe(
-      true,
-    );
+    expect(chunks.slice(0, -1).every(chunk => chunk.usage === null)).toBe(true);
   });
 });

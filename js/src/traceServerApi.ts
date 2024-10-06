@@ -823,7 +823,7 @@ export interface ApiConfig<SecurityDataType = unknown> {
   baseUrl?: string;
   baseApiParams?: Omit<RequestParams, 'baseUrl' | 'cancelToken' | 'signal'>;
   securityWorker?: (
-    securityData: SecurityDataType | null,
+    securityData: SecurityDataType | null
   ) => Promise<RequestParams | void> | RequestParams | void;
   customFetch?: typeof fetch;
 }
@@ -883,13 +883,13 @@ export class HttpClient<SecurityDataType = unknown> {
   protected toQueryString(rawQuery?: QueryParamsType): string {
     const query = rawQuery || {};
     const keys = Object.keys(query).filter(
-      (key) => 'undefined' !== typeof query[key],
+      key => 'undefined' !== typeof query[key]
     );
     return keys
-      .map((key) =>
+      .map(key =>
         Array.isArray(query[key])
           ? this.addArrayQueryParam(query, key)
-          : this.addQueryParam(query, key),
+          : this.addQueryParam(query, key)
       )
       .join('&');
   }
@@ -917,7 +917,7 @@ export class HttpClient<SecurityDataType = unknown> {
             ? property
             : typeof property === 'object' && property !== null
               ? JSON.stringify(property)
-              : `${property}`,
+              : `${property}`
         );
         return formData;
       }, new FormData()),
@@ -926,7 +926,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
   protected mergeRequestParams(
     params1: RequestParams,
-    params2?: RequestParams,
+    params2?: RequestParams
   ): RequestParams {
     return {
       ...this.baseApiParams,
@@ -941,7 +941,7 @@ export class HttpClient<SecurityDataType = unknown> {
   }
 
   protected createAbortSignal = (
-    cancelToken: CancelToken,
+    cancelToken: CancelToken
   ): AbortSignal | undefined => {
     if (this.abortControllers.has(cancelToken)) {
       const abortController = this.abortControllers.get(cancelToken);
@@ -993,7 +993,7 @@ export class HttpClient<SecurityDataType = unknown> {
         headers: {
           ...(requestParams.headers || {}),
           ...(type && type !== ContentType.FormData
-            ? { 'Content-Type': type }
+            ? {'Content-Type': type}
             : {}),
         },
         signal:
@@ -1004,8 +1004,8 @@ export class HttpClient<SecurityDataType = unknown> {
           typeof body === 'undefined' || body === null
             ? null
             : payloadFormatter(body),
-      },
-    ).then(async (response) => {
+      }
+    ).then(async response => {
       const r = response.clone() as HttpResponse<T, E>;
       r.data = null as unknown as T;
       r.error = null as unknown as E;
@@ -1013,7 +1013,7 @@ export class HttpClient<SecurityDataType = unknown> {
       const data = !responseFormat
         ? r
         : await response[responseFormat]()
-            .then((data) => {
+            .then(data => {
               if (r.ok) {
                 r.data = data;
               } else {
@@ -1021,7 +1021,7 @@ export class HttpClient<SecurityDataType = unknown> {
               }
               return r;
             })
-            .catch((e) => {
+            .catch(e => {
               r.error = e;
               return r;
             });
@@ -1129,7 +1129,7 @@ export class Api<
      */
     callStartBatchCallUpsertBatchPost: (
       data: CallCreateBatchReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<CallCreateBatchRes, HTTPValidationError>({
         path: `/call/upsert_batch`,
@@ -1152,7 +1152,7 @@ export class Api<
      */
     callUpdateCallUpdatePost: (
       data: CallUpdateReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<CallUpdateRes, HTTPValidationError>({
         path: `/call/update`,
@@ -1196,7 +1196,7 @@ export class Api<
      */
     callsDeleteCallsDeletePost: (
       data: CallsDeleteReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<CallsDeleteRes, HTTPValidationError>({
         path: `/calls/delete`,
@@ -1219,7 +1219,7 @@ export class Api<
      */
     callsQueryStatsCallsQueryStatsPost: (
       data: CallsQueryStatsReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<CallsQueryStatsRes, HTTPValidationError>({
         path: `/calls/query_stats`,
@@ -1242,7 +1242,7 @@ export class Api<
      */
     callsQueryStreamCallsStreamQueryPost: (
       data: CallsQueryReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<any, HTTPValidationError>({
         path: `/calls/stream_query`,
@@ -1328,7 +1328,7 @@ export class Api<
      */
     tableCreateTableCreatePost: (
       data: TableCreateReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<TableCreateRes, HTTPValidationError>({
         path: `/table/create`,
@@ -1351,7 +1351,7 @@ export class Api<
      */
     tableUpdateTableUpdatePost: (
       data: TableUpdateReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<TableUpdateRes, HTTPValidationError>({
         path: `/table/update`,
@@ -1374,7 +1374,7 @@ export class Api<
      */
     tableQueryTableQueryPost: (
       data: TableQueryReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<TableQueryRes, HTTPValidationError>({
         path: `/table/query`,
@@ -1398,7 +1398,7 @@ export class Api<
      */
     refsReadBatchRefsReadBatchPost: (
       data: RefsReadBatchReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<RefsReadBatchRes, HTTPValidationError>({
         path: `/refs/read_batch`,
@@ -1422,7 +1422,7 @@ export class Api<
      */
     fileCreateFileCreatePost: (
       data: BodyFileCreateFileCreatePost,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<FileCreateRes, HTTPValidationError>({
         path: `/file/create`,
@@ -1445,7 +1445,7 @@ export class Api<
      */
     fileContentFileContentPost: (
       data: FileContentReadReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<any, HTTPValidationError>({
         path: `/file/content`,
@@ -1469,7 +1469,7 @@ export class Api<
      */
     feedbackCreateFeedbackCreatePost: (
       data: FeedbackCreateReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<FeedbackCreateRes, HTTPValidationError>({
         path: `/feedback/create`,
@@ -1492,7 +1492,7 @@ export class Api<
      */
     feedbackQueryFeedbackQueryPost: (
       data: FeedbackQueryReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<FeedbackQueryRes, HTTPValidationError>({
         path: `/feedback/query`,
@@ -1515,7 +1515,7 @@ export class Api<
      */
     feedbackPurgeFeedbackPurgePost: (
       data: FeedbackPurgeReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<FeedbackPurgeRes, HTTPValidationError>({
         path: `/feedback/purge`,

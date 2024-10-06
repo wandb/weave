@@ -1,18 +1,18 @@
-import { Evaluation } from '../evaluation';
-import { Dataset } from '../dataset';
+import {Evaluation} from '../evaluation';
+import {Dataset} from '../dataset';
 // import { Op } from "../opType";
-import { op } from '../op';
+import {op} from '../op';
 
 describe('Evaluation', () => {
   test('summarizeResults with failed predictions and scorers', async () => {
     // Mock dataset
     const mockDataset = new Dataset({
       rows: [
-        { id: 0, text: 'Example 0' },
-        { id: 1, text: 'Example 1' },
-        { id: 2, text: 'Example 2' },
-        { id: 3, text: 'Example 3' },
-        { id: 4, text: 'Example 4' },
+        {id: 0, text: 'Example 0'},
+        {id: 1, text: 'Example 1'},
+        {id: 2, text: 'Example 2'},
+        {id: 3, text: 'Example 3'},
+        {id: 4, text: 'Example 4'},
       ],
     });
 
@@ -35,7 +35,7 @@ describe('Evaluation', () => {
         datasetRow,
         modelOutput,
       }: {
-        datasetRow: { id: number; text: string };
+        datasetRow: {id: number; text: string};
         modelOutput: string;
       }) {
         if (datasetRow.id === 3) throw new Error('Scorer 1 failed');
@@ -49,7 +49,7 @@ describe('Evaluation', () => {
         datasetRow,
       }: {
         modelOutput: string;
-        datasetRow: { id: number; text: string };
+        datasetRow: {id: number; text: string};
       }) {
         return modelOutput.includes(datasetRow.text);
       }),
@@ -62,11 +62,11 @@ describe('Evaluation', () => {
     });
 
     // Run evaluation
-    const results = await evaluation.evaluate({ model: mockModel });
+    const results = await evaluation.evaluate({model: mockModel});
 
     // Expected summarized results
     const expectedResults = {
-      model_success: { true_count: 4, true_fraction: 0.8 },
+      model_success: {true_count: 4, true_fraction: 0.8},
       inclusionScorer: {
         true_count: 4,
         true_fraction: 0.8,
@@ -76,7 +76,7 @@ describe('Evaluation', () => {
           mean: 14.4,
         },
       },
-      model_latency: { mean: expect.any(Number) },
+      model_latency: {mean: expect.any(Number)},
     };
 
     // Check results

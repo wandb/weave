@@ -1,4 +1,4 @@
-import { stringifyPythonDumps, encodeNumber } from '../digest';
+import {stringifyPythonDumps, encodeNumber} from '../digest';
 
 describe('stringifyPythonDumps', () => {
   test('Basic types', () => {
@@ -58,7 +58,7 @@ describe('stringifyPythonDumps', () => {
     const testData5 = {
       nested: {
         list: [1, [2, [3, [4]]]],
-        dict: { a: { b: { c: { d: 4 } } } },
+        dict: {a: {b: {c: {d: 4}}}},
       },
     };
     const expected5 =
@@ -67,13 +67,13 @@ describe('stringifyPythonDumps', () => {
   });
 
   test('Array of mixed types', () => {
-    const testData6 = [1, 'two', 3, [4, 5], { six: 6 }, null, true, false];
+    const testData6 = [1, 'two', 3, [4, 5], {six: 6}, null, true, false];
     const expected6 = '[1, "two", 3, [4, 5], {"six": 6}, null, true, false]';
     expect(stringifyPythonDumps(testData6)).toBe(expected6);
   });
 
   test('Empty string keys and values', () => {
-    const testData7 = { '': 'empty_key', empty_value: '' };
+    const testData7 = {'': 'empty_key', empty_value: ''};
     const expected7 = '{"": "empty_key", "empty_value": ""}';
     expect(stringifyPythonDumps(testData7)).toBe(expected7);
   });
@@ -81,7 +81,7 @@ describe('stringifyPythonDumps', () => {
   // TODO: This is a generated test that fails. I didn't look into what the behavior should actually
   // be, because we're not using stringifyPythonDumps anywhere yet.
   test.skip('Non-string keys', () => {
-    const testData8 = { 1: 'one', 2.0: 'two', true: 'true' };
+    const testData8 = {1: 'one', 2.0: 'two', true: 'true'};
     const expected8 = '{"1": "true", "2.0": "two"}';
     expect(stringifyPythonDumps(testData8)).toBe(expected8);
   });

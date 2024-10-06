@@ -1,4 +1,4 @@
-import { userAgent } from './userAgent';
+import {userAgent} from './userAgent';
 
 const VIEWER_DEFAULT_ENTITY_QUERY = `
 query DefaultEntity {
@@ -22,7 +22,7 @@ export class WandbServerApi {
 
   private async graphqlRequest(
     query: string,
-    variables: Record<string, any> = {},
+    variables: Record<string, any> = {}
   ) {
     try {
       const response = await fetch(`${this.host}/graphql`, {
@@ -40,7 +40,7 @@ export class WandbServerApi {
 
       if (!response.ok) {
         throw new Error(
-          `HTTP error! status: ${response.status}, statusText: ${response.statusText}`,
+          `HTTP error! status: ${response.status}, statusText: ${response.statusText}`
         );
       }
 

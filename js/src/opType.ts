@@ -1,4 +1,4 @@
-import { WeaveObject } from './weaveObject';
+import {WeaveObject} from './weaveObject';
 
 export type ParameterNamesOption = 'useParam0Object' | string[] | undefined;
 
@@ -30,7 +30,7 @@ export function isOp(value: any): value is Op<any> {
 }
 
 export function getOpWrappedFunction<T extends (...args: any[]) => any>(
-  opValue: Op<T>,
+  opValue: Op<T>
 ): T {
   return opValue.__wrappedFunction;
 }
@@ -47,7 +47,7 @@ export class OpRef {
   constructor(
     public projectId: string,
     public objectId: string,
-    public digest: string,
+    public digest: string
   ) {}
 
   public uri() {
