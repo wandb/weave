@@ -23,7 +23,7 @@ from weave.trace.object_record import (
     dataclass_object_record,
     pydantic_object_record,
 )
-from weave.trace.op import Op, is_op, maybe_unbind_method
+from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
 from weave.trace.op import op as op_deco
 from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_op_uri
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
@@ -1423,6 +1423,7 @@ def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
 
     op_fn.__name__ = name
     op = op_deco(op_fn)
+    op = as_op(op)
     op.name = name
     return op
 

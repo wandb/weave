@@ -5,7 +5,7 @@ from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Union
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
 
-from .interface.query import Query
+from weave.trace_server.interface.query import Query
 
 WB_USER_ID_DESCRIPTION = (
     "Do not set directly. Server will automatically populate this field."

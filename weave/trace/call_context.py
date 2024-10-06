@@ -5,8 +5,7 @@ import logging
 import typing
 
 if typing.TYPE_CHECKING:
-    # from .run import Run
-    from .weave_client import Call
+    from weave.trace.weave_client import Call
 
 
 class NoCurrentCallError(Exception): ...

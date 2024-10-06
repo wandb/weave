@@ -8,8 +8,6 @@ from weave.deploy import gcp as google
 from weave.trace import api
 from weave.trace.refs import ObjectRef, parse_uri
 
-# from .model_server import app
-
 # TODO: does this work?
 os.environ["PYTHONUNBUFFERED"] = "1"
 
