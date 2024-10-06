@@ -8,7 +8,8 @@
   "scripts": {
     "build": "tsc",
     "test": "jest",
-    "watch": "nodemon --watch 'src/**/*.ts' --watch 'testing/**/*.ts' --watch 'testing/**/*.mjs' --exec 'ts-node' testing/test.ts"
+    "watch": "nodemon --watch 'src/**/*.ts' --watch 'testing/**/*.ts' --watch 'testing/**/*.mjs' --exec 'ts-node' testing/test.ts",
+    "format": "prettier --write \"src/**/*.ts\""
   },
   "repository": {
     "type": "git",
