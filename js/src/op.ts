@@ -1,4 +1,5 @@
 import { globalClient } from './clientApi';
+import { TRACE_CALL_EMOJI } from './constants';
 import { Op, OpOptions } from './opType';
 
 export function op<T extends (...args: any[]) => any>(
@@ -24,7 +25,7 @@ export function op<T extends (...args: any[]) => any>(
     const { newStack, currentCall, parentCall } = globalClient.pushNewCall();
     const startTime = new Date();
     if (!globalClient.quiet && parentCall == null) {
-      console.log(`🍩 https://wandb.ai/${globalClient.projectId}/r/call/${currentCall.callId}`);
+      console.log(`${TRACE_CALL_EMOJI} https://wandb.ai/${globalClient.projectId}/r/call/${currentCall.callId}`);
     }
     const displayName = options?.callDisplayName ? options.callDisplayName(...params) : undefined;
     const startCallPromise = globalClient.startCall(
