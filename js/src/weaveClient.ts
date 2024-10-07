@@ -1,15 +1,14 @@
-import * as crypto from 'crypto';
-import { uuidv7 } from 'uuidv7';
 import { AsyncLocalStorage } from 'async_hooks';
+import { uuidv7 } from 'uuidv7';
 
-import { packageVersion } from './userAgent';
-import { Api as TraceServerApi, StartedCallSchemaForInsert, EndedCallSchemaForInsert } from './traceServerApi';
-import { WandbServerApi } from './wandbServerApi';
-import { WeaveObject, ObjectRef, getClassChain } from './weaveObject';
-import { Op, getOpName, getOpWrappedFunction, isOp, OpRef, ParameterNamesOption } from './opType';
-import { isWeaveImage } from './media';
-import { Table, TableRef, TableRowRef } from './table';
 import { computeDigest } from './digest';
+import { isWeaveImage } from './media';
+import { Op, OpRef, ParameterNamesOption, getOpName, getOpWrappedFunction, isOp } from './opType';
+import { Table, TableRef, TableRowRef } from './table';
+import { EndedCallSchemaForInsert, StartedCallSchemaForInsert, Api as TraceServerApi } from './traceServerApi';
+import { packageVersion } from './userAgent';
+import { WandbServerApi } from './wandbServerApi';
+import { ObjectRef, WeaveObject, getClassChain } from './weaveObject';
 
 export type CallStackEntry = {
   callId: string;
@@ -26,11 +25,7 @@ function generateCallId(): string {
 }
 
 class CallStack {
-  private stack: CallStackEntry[] = [];
-
-  constructor(stack: CallStackEntry[] = []) {
-    this.stack = stack;
-  }
+  constructor(private stack: CallStackEntry[] = []) {}
 
   peek(): CallStackEntry | null {
     return this.stack[this.stack.length - 1] ?? null;
@@ -38,29 +33,16 @@ class CallStack {
 
   pushNewCall(): {
     currentCall: CallStackEntry;
-    parentCall: CallStackEntry | undefined;
+    parentCall?: CallStackEntry;
     newStack: CallStack;
   } {
     const parentCall = this.stack[this.stack.length - 1];
 
     const callId = generateCallId();
-    let traceId: string;
-    let parentId: string | null = null;
-    if (!parentCall) {
-      traceId = generateTraceId();
-    } else {
-      traceId = parentCall.traceId;
-      parentId = parentCall.callId;
-    }
-
+    const traceId = parentCall?.traceId ?? generateTraceId();
     const newCall: CallStackEntry = { callId, traceId, childSummary: {} };
-
     const newStack = new CallStack([...this.stack, newCall]);
-    return {
-      currentCall: newCall,
-      parentCall,
-      newStack,
-    };
+    return { currentCall: newCall, parentCall, newStack };
   }
 }
 
