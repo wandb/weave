@@ -258,10 +258,12 @@ def test_model_predict(
     res = claude_translator.predict("There is a bug in my code!", "Spanish")
     assert res is not None
 
-    call = claude_translator.predict.calls()[0]  # type: ignore
-    assert dict(call.summary["usage"]["claude-3-5-sonnet-20240620"]) == {
-        "requests": 1,
-        "prompt_tokens": 28,
-        "completion_tokens": 10,
-        "total_tokens": 38,
-    }
+    call = claude_translator.predict.calls()[0]
+    d = call.summary["usage"]["claude-3-5-sonnet-20240620"]
+    assert d["cache_creation_input_tokens"] == 0
+    assert d["cache_read_input_tokens"] == 0
+    assert d["requests"] == 1
+    assert d["prompt_tokens"] == 28
+    assert d["prompt_tokens_details"]["cached_tokens"] == 0
+    assert d["completion_tokens"] == 10
+    assert d["total_tokens"] == 38
