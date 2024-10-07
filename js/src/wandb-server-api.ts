@@ -12,13 +12,10 @@ query DefaultEntity {
 `;
 
 export class WandbServerApi {
-  private host: string;
-  private apiKey: string;
-
-  constructor(host: string, apiKey: string) {
-    this.host = host;
-    this.apiKey = apiKey;
-  }
+  constructor(
+    private host: string,
+    private apiKey: string
+  ) {}
 
   private async graphqlRequest(query: string, variables: Record<string, any> = {}) {
     try {
