@@ -87,7 +87,8 @@ class SymbolPatcher(Patcher):
         original_value = getattr(target.base_symbol, target.attr)
         try:
             new_val = self._make_new_value(original_value)
-        except Exception:
+        except Exception as e:
+            print(e)
             logger.error(f"Failed to patch {self._attribute_name}")
             return False
         setattr(

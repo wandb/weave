@@ -76,7 +76,7 @@ def _build_result_from_encoded(
 REP_LIMIT = 1000
 
 
-def fallback_encode(obj: Any) -> Any:
+def stringify(obj: Any, limit: int = REP_LIMIT) -> str:
     rep = None
     try:
         rep = repr(obj)
@@ -86,9 +86,64 @@ def fallback_encode(obj: Any) -> Any:
         except Exception:
             rep = f"<{type(obj).__name__}: {id(obj)}>"
     if isinstance(rep, str):
-        if len(rep) > REP_LIMIT:
-            rep = rep[:REP_LIMIT] + "..."
+        if len(rep) > limit:
+            rep = rep[:limit] + "..."
     return rep
+
+
+def dictify(obj: Any, maxdepth: int = 2, depth=1) -> Any:
+    if depth > maxdepth:
+        return stringify(obj)
+
+    if isinstance(obj, (int, float, str, bool)) or obj is None:
+        return obj
+    elif isinstance(obj, (list, tuple)):
+        return [dictify(v, maxdepth, depth + 1) for v in obj]
+    elif isinstance(obj, dict):
+        return {k: dictify(v, maxdepth, depth + 1) for k, v in obj.items()}
+
+    if hasattr(obj, "to_dict"):
+        try:
+            as_dict = obj.to_dict()
+            if isinstance(as_dict, dict):
+                result = {}
+                for k, v in as_dict.items():
+                    if depth < maxdepth:
+                        result[k] = dictify(v, maxdepth, depth + 1)
+                    else:
+                        result[k] = stringify(v)
+                return result
+        except Exception:
+            raise ValueError("to_dict failed")
+
+    result = {}
+    # Not prefixing with _ because we hide those in UI
+    # result["str__"] = stringify(obj)
+    result["__class__"] = {
+        "name": obj.__class__.__name__,
+        "module": obj.__class__.__module__,
+    }
+    for attr in dir(obj):
+        if attr.startswith("_"):
+            continue
+        try:
+            val = getattr(obj, attr)
+            if callable(val):
+                continue
+            if depth < maxdepth:
+                result[attr] = dictify(val, maxdepth, depth + 1)
+            else:
+                result[attr] = stringify(val)
+        except Exception:
+            raise ValueError('fallback dictify failed')
+    return result
+
+
+def fallback_encode(obj: Any) -> Any:
+    try:
+        return dictify(obj, 7)
+    except Exception:
+        return stringify(obj)
 
 
 def isinstance_namedtuple(obj: Any) -> bool:

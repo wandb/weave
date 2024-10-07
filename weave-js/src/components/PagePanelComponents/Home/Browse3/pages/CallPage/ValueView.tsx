@@ -41,6 +41,14 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
         console.error('Expected ref, found', innerRef, typeof innerRef);
       }
     }
+    if (data.valueType === 'object' && '__class__' in data.value) {
+      const cls = data.value.__class__;
+      let clsName = cls.name;
+      if (cls.module) {
+        clsName = cls.module + '.' + clsName;
+      }
+      return <ValueViewPrimitive>{clsName}</ValueViewPrimitive>;
+    }
     if (USE_TABLE_FOR_ARRAYS && data.valueType === 'array') {
       return <DataTableView data={data.value} autoPageSize={true} />;
     }
