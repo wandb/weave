@@ -260,8 +260,11 @@ def test_model_predict(
 
     call = claude_translator.predict.calls()[0]  # type: ignore
     assert dict(call.summary["usage"]["claude-3-5-sonnet-20240620"]) == {
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
         "requests": 1,
         "prompt_tokens": 28,
+        "prompt_token_details": {"cached_tokens": 0},
         "completion_tokens": 10,
         "total_tokens": 38,
     }
