@@ -16,13 +16,18 @@ export class ConcurrencyLimiter {
     if (this.pending && this.active < this.limit) {
       const nextTask = this.queue.shift();
       this.activeCount++;
-      nextTask!();
+      Promise.resolve(nextTask!())
+        .catch(error => {
+          console.error('Failed to execute task:', error);
+        })
+        .finally(() => {
+          this.activeCount--;
+          this.tryExecuteNext();
+        });
     }
   }
 
-  limitFunction<T extends any[], R>(
-    asyncFn: (...args: T) => Promise<R>
-  ): (...args: T) => Promise<R> {
+  limitFunction<T extends any[], R>(asyncFn: (...args: T) => Promise<R>): (...args: T) => Promise<R> {
     return async (...args: T): Promise<R> => {
       return new Promise<R>((resolve, reject) => {
         const task = async () => {
@@ -31,9 +36,6 @@ export class ConcurrencyLimiter {
             resolve(result);
           } catch (error) {
             reject(error);
-          } finally {
-            this.activeCount--;
-            this.tryExecuteNext();
           }
         };
 
