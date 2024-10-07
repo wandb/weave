@@ -94,7 +94,9 @@ export const ObjectVersionPage: React.FC<{
     path: props.filePath,
     refExtra: props.refExtra,
   });
-  if (objectVersion.loading) {
+  if (objectVersion.error) {
+    return <NotFoundPanel title={objectVersion.error.reason as string} />;
+  } else if (objectVersion.loading) {
     return <CenteredAnimatedLoader />;
   } else if (objectVersion.result == null) {
     return <NotFoundPanel title="Object not found" />;

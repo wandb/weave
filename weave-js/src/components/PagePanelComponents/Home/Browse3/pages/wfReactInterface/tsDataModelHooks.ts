@@ -660,6 +660,7 @@ const useOpVersion = (
   const cachedOpVersion = key ? opVersionCache.get(key) : null;
   const [opVersionRes, setOpVersionRes] =
     useState<traceServerTypes.TraceObjReadRes | null>(null);
+  const [error, setError] = useState<any>(null);
   const deepKey = useDeepMemo(key);
   useEffect(() => {
     if (deepKey) {
@@ -677,6 +678,16 @@ const useOpVersion = (
         .then(res => {
           loadingRef.current = false;
           setOpVersionRes(res);
+        })
+        .catch(err => {
+          console.error(err);
+          // try to json parse the error
+          try {
+            const errJson = JSON.parse(err);
+            setError(errJson['reason']);
+          } catch (e) {
+            setError(err);
+          }
         });
     }
   }, [deepKey, getTsClient]);
@@ -805,12 +816,13 @@ const useFileContent = makeTraceServerEndpointHook<
 const useObjectVersion = (
   // Null value skips
   key: ObjectVersionKey | null
-): Loadable<ObjectVersionSchema | null> => {
+): LoadableWithError<ObjectVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const cachedObjectVersion = key ? objectVersionCache.get(key) : null;
   const [objectVersionRes, setObjectVersionRes] =
     useState<traceServerTypes.TraceObjReadRes | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const deepKey = useDeepMemo(key);
   useEffect(() => {
     if (deepKey) {
@@ -826,9 +838,13 @@ const useObjectVersion = (
           digest: deepKey?.versionHash ?? '',
         })
         .then(res => {
+          if (res.obj == null && res.reason != null) {
+            setError(new Error(res.reason));
+          } else {
+            setObjectVersionRes(res);
+          }
           loadingRef.current = false;
-          setObjectVersionRes(res);
-        });
+        })
     }
   }, [deepKey, getTsClient]);
 
@@ -837,18 +853,28 @@ const useObjectVersion = (
       return {
         loading: false,
         result: null,
+        error: null,
       };
     }
     if (cachedObjectVersion != null) {
       return {
         loading: false,
         result: cachedObjectVersion,
+        error: null,
+      };
+    }
+    if (error != null) {
+      return {
+        loading: false,
+        result: null,
+        error,
       };
     }
     if (objectVersionRes == null || loadingRef.current) {
       return {
         loading: true,
         result: null,
+        error: null,
       };
     }
 
@@ -856,6 +882,7 @@ const useObjectVersion = (
       return {
         loading: false,
         result: null,
+        error,
       };
     }
 
@@ -871,6 +898,7 @@ const useObjectVersion = (
       return {
         loading: true,
         result: null,
+        error,
       };
     }
 
@@ -883,8 +911,9 @@ const useObjectVersion = (
     return {
       loading: false,
       result: cacheableResult,
+      error,
     };
-  }, [cachedObjectVersion, key, objectVersionRes]);
+  }, [cachedObjectVersion, key, objectVersionRes, error]);
 };
 
 const convertTraceServerObjectVersionToSchema = (

@@ -641,7 +641,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         if objs[0].deleted_at is not None:
             raise ObjectDeletedError(
-                f"Obj {object_id}:{digest} was deleted at {objs[0].deleted_at}"
+                f"Obj {object_id}:v{objs[0].version_index} was deleted at {objs[0].deleted_at}"
             )
 
         return objs[0]
@@ -714,8 +714,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             val_dump=val,
             refs=db_obj.refs,
             base_object_class=db_obj.base_object_class,
-            deleted_at=datetime.datetime.now(),
-            created_at=db_obj.created_at,
+            deleted_at=datetime.datetime.now(datetime.timezone.utc),
+            created_at=_ensure_datetimes_have_tz(db_obj.created_at),
         )
         self._insert(
             "object_versions",
@@ -1519,6 +1519,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         metadata_only:
             if metadata_only is True, then we return early and dont grab the value.
             Otherwise, make a second query to grab the val_dump from the db
+        include_deleted:
+            if include_deleted is True, then we include deleted objects in the results
+            with the expectation that the caller will filter out deleted objects
         """
         if not conditions:
             conditions = ["1 = 1"]
@@ -1609,7 +1612,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             kind,
                             object_id,
                             digest
-                            ORDER BY created_at ASC
+                            ORDER BY (deleted_at IS NULL) ASC, created_at ASC
                         ) AS rn
                     FROM object_versions
                     WHERE project_id = {{project_id: String}} AND
@@ -1617,8 +1620,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
                 WHERE rn = 1
             )
-            WHERE {deleted_at_condition_part} AND
-            {conditions_part}
+            WHERE {conditions_part} AND
+            {deleted_at_condition_part}
             {sort_part}
             {limit_part}
             {offset_part}

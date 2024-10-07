@@ -41,7 +41,7 @@ type WFDBTableType =
 
 export const objectRefDisplayName = (
   objRef: ObjectRef,
-  versionIndex?: number
+  versionIndex?: number,
 ) => {
   if (isWandbArtifactRef(objRef)) {
     const versionStr =
@@ -126,6 +126,9 @@ export const SmallRef: FC<{
   }
   const objectVersion = useObjectVersion(objVersionKey);
   const opVersion = useOpVersion(opVersionKey);
+
+  const isDeleted = objectVersion.error || opVersion.error;
+
   const versionIndex =
     objectVersion.result?.versionIndex ?? opVersion.result?.versionIndex;
 
@@ -141,7 +144,6 @@ export const SmallRef: FC<{
     rootType = {type: 'OpDef'};
   }
   const {label} = objectRefDisplayName(objRef, versionIndex);
-
   const rootTypeName = getTypeName(rootType);
   let icon: IconName = IconNames.CubeContainer;
   if (rootTypeName === 'Dataset') {
@@ -178,13 +180,14 @@ export const SmallRef: FC<{
             overflow: 'hidden',
             whiteSpace: 'nowrap',
             textOverflow: 'ellipsis',
+            textDecoration: isDeleted ? 'line-through' : 'none',
           }}>
           {label}
         </Box>
       )}
     </Box>
   );
-  if (refTypeQuery.loading) {
+  if (refTypeQuery.loading || isDeleted) {
     return Item;
   }
   if (!isArtifactRef && !isWeaveObjRef) {

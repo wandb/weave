@@ -217,7 +217,7 @@ export type WFDataModelHooksInterface = {
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (
     key: ObjectVersionKey | null
-  ) => Loadable<ObjectVersionSchema | null>;
+  ) => LoadableWithError<ObjectVersionSchema | null>;
   useTableRowsQuery: (
     entity: string,
     project: string,
