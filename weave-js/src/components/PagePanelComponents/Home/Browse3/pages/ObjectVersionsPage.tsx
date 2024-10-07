@@ -18,6 +18,7 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {TEAL_600} from '../../../../../common/css/color.styles';
 import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
@@ -223,6 +224,7 @@ const ObjectVersionsTable: React.FC<{
               version={obj.versionHash}
               versionIndex={obj.versionIndex}
               fullWidth={true}
+              color={TEAL_600}
             />
           );
         },

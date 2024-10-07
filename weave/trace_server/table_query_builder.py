@@ -45,6 +45,7 @@ def make_natural_sort_table_query(
             FROM tables
             WHERE project_id = {{{project_id_name}: String}}
             AND digest = {{{digest_name}: String}}
+            LIMIT 1
         )
         ARRAY JOIN row_digests AS row_digest
     ) AS t ON tr.digest = t.row_digest
@@ -98,6 +99,7 @@ def make_standard_table_query(
                 FROM tables
                 WHERE project_id = {{{project_id_name}: String}}
                 AND digest = {{{digest_name}: String}}
+                LIMIT 1
             )
             ARRAY JOIN row_digests AS row_digest
         ) AS t ON tr.digest = t.row_digest
