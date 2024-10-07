@@ -90,15 +90,8 @@ export function op<T extends (...args: any[]) => any>(
 
   opWrapper.__name = actualOpName;
   opWrapper.__isOp = true as true;
-  if (options?.originalFunction) {
-    opWrapper.__wrappedFunction = options.originalFunction;
-  } else {
-    opWrapper.__wrappedFunction = fn;
-  }
-
-  if (options?.bindThis !== undefined) {
-    opWrapper.__boundThis = options.bindThis;
-  }
+  opWrapper.__wrappedFunction = options?.originalFunction ?? fn;
+  opWrapper.__boundThis = options?.bindThis;
 
   return opWrapper as Op<T>;
 }
