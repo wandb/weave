@@ -1,4 +1,4 @@
-import {CallStackEntry} from './weaveClient';
+import {CallStackEntry} from './weave-client';
 
 /**
  * Represents a summary object with string keys and any type of values.
@@ -22,10 +22,7 @@ function mergeSummaries(left: Summary, right: Summary): Summary {
     if (key in result) {
       if (typeof leftValue === 'number' && typeof result[key] === 'number') {
         result[key] = leftValue + result[key];
-      } else if (
-        typeof leftValue === 'object' &&
-        typeof result[key] === 'object'
-      ) {
+      } else if (typeof leftValue === 'object' && typeof result[key] === 'object') {
         result[key] = mergeSummaries(leftValue, result[key]);
       } else {
         result[key] = leftValue;
@@ -59,10 +56,7 @@ export function processSummary(
   const mergedSummary = mergeSummaries(ownSummary, currentCall.childSummary);
 
   if (parentCall) {
-    parentCall.childSummary = mergeSummaries(
-      mergedSummary,
-      parentCall.childSummary
-    );
+    parentCall.childSummary = mergeSummaries(mergedSummary, parentCall.childSummary);
   }
 
   return mergedSummary;

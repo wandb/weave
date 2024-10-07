@@ -1,8 +1,8 @@
 // src/index.ts
-export {init, requireCurrentChildSummary} from './clientApi';
-export {weaveImage} from './media';
-export {op, boundOp} from './op';
-export {wrapOpenAI} from './integrations';
-export {WeaveObject} from './weaveObject';
+export {init, requireCurrentChildSummary} from './client-api';
 export {Dataset} from './dataset';
 export {Evaluation} from './evaluation';
+export {wrapOpenAI} from './integrations';
+export {weaveImage} from './media';
+export {boundOp, op} from './op';
+export {WeaveObject} from './weave-object';

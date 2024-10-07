@@ -1,6 +1,6 @@
-import {globalClient} from './clientApi';
+import {globalClient} from './client-api';
 import {TRACE_CALL_EMOJI, WANDB_URL} from './constants';
-import {Op, OpOptions} from './opType';
+import {Op, OpOptions} from './op-type';
 
 export function op<T extends (...args: any[]) => any>(
   fn: T,

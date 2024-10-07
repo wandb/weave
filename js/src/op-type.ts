@@ -1,5 +1,5 @@
 import {WANDB_URL} from './constants';
-import {WeaveObject} from './weaveObject';
+import {WeaveObject} from './weave-object';
 
 export type ParameterNamesOption = 'useParam0Object' | string[] | undefined;
 

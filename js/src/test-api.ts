@@ -1,7 +1,7 @@
-import {init} from './clientApi';
-import {op} from './op';
 import {OpenAI} from 'openai';
+import {init} from './client-api';
 import {wrapOpenAI} from './integrations/openai';
+import {op} from './op';
 
 // Initialize the API
 init('shawn/weavejs-test1');
@@ -39,11 +39,7 @@ async function callOpenAI(prompt: string): Promise<string> {
 const wrappedCallOpenAI = op(callOpenAI);
 
 // Function to demonstrate nested calls including OpenAI
-async function complexOperationWithAI(
-  a: number,
-  b: number,
-  c: number
-): Promise<string> {
+async function complexOperationWithAI(a: number, b: number, c: number): Promise<string> {
   const sum = await wrappedAdd(a, b);
   const product = await wrappedDelayedMultiply(sum, c);
   const prompt = `What is an interesting fact about the number ${product}?`;
@@ -67,9 +63,7 @@ async function runTests() {
   console.log('3 * 4 =', await wrappedDelayedMultiply(3, 4));
 
   // Test the complex operation with nested calls including OpenAI
-  console.log(
-    '\nTesting complex operation with nested calls including OpenAI:'
-  );
+  console.log('\nTesting complex operation with nested calls including OpenAI:');
   const result = await wrappedComplexOperationWithAI(2, 3, 4);
   console.log(result);
 

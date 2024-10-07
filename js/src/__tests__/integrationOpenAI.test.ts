@@ -1,7 +1,7 @@
-import {initWithCustomTraceServer} from '../clientApi';
-import {InMemoryTraceServer} from '../inMemoryTraceServer';
+import {initWithCustomTraceServer} from '../client-api';
+import {InMemoryTraceServer} from '../in-memory-trace-server';
+import {wrapOpenAI} from '../integrations/openai';
 import {makeMockOpenAIChat} from './openaiMock';
-import {makeOpenAIChatCompletionsOp, wrapOpenAI} from '../integrations/openai';
 
 // Helper function to get calls
 async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {
@@ -174,9 +174,7 @@ describe('OpenAI Integration', () => {
 
   // Add a new test for streaming with explicit usage request
   test('streaming chat completion with explicit usage request', async () => {
-    const messages = [
-      {role: 'user', content: 'Hello, streaming AI with usage!'},
-    ];
+    const messages = [{role: 'user', content: 'Hello, streaming AI with usage!'}];
 
     // Op-wrapped API call with explicit usage request
     const opStream = await patchedOpenAI.chat.completions.create({

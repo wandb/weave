@@ -1,11 +1,11 @@
-import {ConcurrencyLimiter} from './concurrencyLimit';
+import {ConcurrencyLimiter} from './concurrency-limit';
 import {TRACE_BASE_URL, WANDB_BASE_URL} from './constants';
-import {InMemoryTraceServer} from './inMemoryTraceServer';
+import {InMemoryTraceServer} from './in-memory-trace-server';
 import {createFetchWithRetry} from './retry';
 import {getApiKey} from './settings';
-import {Api as TraceServerApi} from './traceServerApi';
-import {WandbServerApi} from './wandbServerApi';
-import {CallStackEntry, createSettings, WeaveClient} from './weaveClient';
+import {Api as TraceServerApi} from './trace-server-api';
+import {WandbServerApi} from './wandb-server-api';
+import {CallStackEntry, createSettings, WeaveClient} from './weave-client';
 
 // Global client instance
 export let globalClient: WeaveClient | null = null;

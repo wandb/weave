@@ -1,5 +1,5 @@
 import {boundOp} from 'op';
-import {WeaveObject} from 'weaveObject';
+import {WeaveObject} from 'weave-object';
 
 export interface Fn<I, O> {
   id: string;
@@ -30,8 +30,6 @@ export class BaseFn<I, O> extends WeaveObject implements Fn<I, O> {
   }
 }
 
-export type FnInputs<T extends Fn<any, any>> =
-  T extends Fn<infer I, any> ? I : never;
+export type FnInputs<T extends Fn<any, any>> = T extends Fn<infer I, any> ? I : never;
 
-export type FnOutput<T extends Fn<any, any>> =
-  T extends Fn<any, infer O> ? O : never;
+export type FnOutput<T extends Fn<any, any>> = T extends Fn<any, infer O> ? O : never;

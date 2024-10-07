@@ -3,12 +3,12 @@ import {uuidv7} from 'uuidv7';
 
 import {computeDigest} from './digest';
 import {isWeaveImage} from './media';
-import {Op, OpRef, ParameterNamesOption, getOpName, getOpWrappedFunction, isOp} from './opType';
+import {Op, OpRef, ParameterNamesOption, getOpName, getOpWrappedFunction, isOp} from './op-type';
 import {Table, TableRef, TableRowRef} from './table';
-import {EndedCallSchemaForInsert, StartedCallSchemaForInsert, Api as TraceServerApi} from './traceServerApi';
-import {packageVersion} from './userAgent';
-import {WandbServerApi} from './wandbServerApi';
-import {ObjectRef, WeaveObject, getClassChain} from './weaveObject';
+import {EndedCallSchemaForInsert, StartedCallSchemaForInsert, Api as TraceServerApi} from './trace-server-api';
+import {packageVersion} from './user-agent';
+import {WandbServerApi} from './wandb-server-api';
+import {ObjectRef, WeaveObject, getClassChain} from './weave-object';
 
 export type CallStackEntry = {
   callId: string;

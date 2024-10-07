@@ -1,16 +1,11 @@
-import {initWithCustomTraceServer} from '../clientApi';
-import {op} from '../op';
-import {InMemoryTraceServer} from '../inMemoryTraceServer';
-import {makeMockOpenAIChat} from './openaiMock';
+import {initWithCustomTraceServer} from '../client-api';
+import {InMemoryTraceServer} from '../in-memory-trace-server';
 import {makeOpenAIChatCompletionsOp} from '../integrations/openai';
+import {op} from '../op';
+import {makeMockOpenAIChat} from './openaiMock';
 
 // Helper function to get calls
-async function getCalls(
-  traceServer: InMemoryTraceServer,
-  projectId: string,
-  limit?: number,
-  filters?: any
-) {
+async function getCalls(traceServer: InMemoryTraceServer, projectId: string, limit?: number, filters?: any) {
   return traceServer.calls
     .callsStreamQueryPost({
       project_id: projectId,
@@ -72,9 +67,7 @@ describe('Op Flow', () => {
 
     // Check that inner calls have correct parent_id
     innerCalls.forEach(innerCall => {
-      expect(
-        outerCalls.some(outerCall => outerCall.id === innerCall.parent_id)
-      ).toBeTruthy();
+      expect(outerCalls.some(outerCall => outerCall.id === innerCall.parent_id)).toBeTruthy();
     });
 
     // Check that all calls have a trace_id
@@ -124,27 +117,19 @@ describe('Op Flow', () => {
     expect(result1).toBe(20);
     expect(result2).toBe(40);
 
-    const outerCalls = calls.filter(call =>
-      call.op_name.includes('outerAsyncOp')
-    );
-    const innerCalls = calls.filter(call =>
-      call.op_name.includes('innerAsyncOp')
-    );
+    const outerCalls = calls.filter(call => call.op_name.includes('outerAsyncOp'));
+    const innerCalls = calls.filter(call => call.op_name.includes('innerAsyncOp'));
 
     expect(outerCalls).toHaveLength(2);
     expect(innerCalls).toHaveLength(4);
 
     // Check that outer calls have different start times
-    const outerStartTimes = outerCalls.map(call =>
-      new Date(call.started_at).getTime()
-    );
+    const outerStartTimes = outerCalls.map(call => new Date(call.started_at).getTime());
     expect(outerStartTimes[0]).not.toBe(outerStartTimes[1]);
 
     // Check that inner calls have correct parent_id
     innerCalls.forEach(innerCall => {
-      expect(
-        outerCalls.some(outerCall => outerCall.id === innerCall.parent_id)
-      ).toBeTruthy();
+      expect(outerCalls.some(outerCall => outerCall.id === innerCall.parent_id)).toBeTruthy();
     });
 
     // Check that all calls have a trace_id
@@ -154,9 +139,7 @@ describe('Op Flow', () => {
 
     // Check that the duration of async calls is greater than 0
     calls.forEach(call => {
-      const duration =
-        new Date(call.ended_at!).getTime() -
-        new Date(call.started_at).getTime();
+      const duration = new Date(call.ended_at!).getTime() - new Date(call.started_at).getTime();
       expect(duration).toBeGreaterThan(0);
     });
 
@@ -164,9 +147,7 @@ describe('Op Flow', () => {
     outerCalls.forEach(outerCall => {
       const outerStartTime = new Date(outerCall.started_at).getTime();
       const outerEndTime = new Date(outerCall.ended_at!).getTime();
-      const relatedInnerCalls = innerCalls.filter(
-        innerCall => innerCall.parent_id === outerCall.id
-      );
+      const relatedInnerCalls = innerCalls.filter(innerCall => innerCall.parent_id === outerCall.id);
       expect(relatedInnerCalls).toHaveLength(2);
       relatedInnerCalls.forEach(innerCall => {
         const innerStartTime = new Date(innerCall.started_at).getTime();
@@ -202,10 +183,7 @@ describe('Op Flow', () => {
       content: messages[0].content.toUpperCase(),
     }));
 
-    const openaiLikeOp = makeOpenAIChatCompletionsOp(
-      testOpenAIChat,
-      'testOpenAIChat'
-    );
+    const openaiLikeOp = makeOpenAIChatCompletionsOp(testOpenAIChat, 'testOpenAIChat');
 
     await openaiLikeOp({messages: [{role: 'user', content: 'Hello, AI!'}]});
 
@@ -311,12 +289,8 @@ describe('Op Flow', () => {
     const leafCalls = calls.filter(call => call.op_name.includes('leafOp'));
     expect(leafCalls).toHaveLength(3);
 
-    const leafCallsUnderMid = leafCalls.filter(
-      call => call.parent_id === midCall?.id
-    );
-    const leafCallUnderRoot = leafCalls.find(
-      call => call.parent_id === rootCall?.id
-    );
+    const leafCallsUnderMid = leafCalls.filter(call => call.parent_id === midCall?.id);
+    const leafCallUnderRoot = leafCalls.find(call => call.parent_id === rootCall?.id);
 
     expect(leafCallsUnderMid).toEqual(
       expect.arrayContaining([
@@ -326,9 +300,7 @@ describe('Op Flow', () => {
     );
     expect(leafCallsUnderMid).toHaveLength(2);
 
-    expect(leafCallUnderRoot).toEqual(
-      expect.objectContaining({summary: {leaf: {count: 1, sum: 3}}})
-    );
+    expect(leafCallUnderRoot).toEqual(expect.objectContaining({summary: {leaf: {count: 1, sum: 3}}}));
 
     // Ensure we have exactly these three summaries
     expect(leafCalls).toHaveLength(3);
@@ -340,9 +312,7 @@ describe('Op Flow', () => {
 
     // Ensure all leaf calls have either midCall or rootCall as parent
     leafCalls.forEach(call => {
-      expect(
-        call.parent_id === midCall?.id || call.parent_id === rootCall?.id
-      ).toBeTruthy();
+      expect(call.parent_id === midCall?.id || call.parent_id === rootCall?.id).toBeTruthy();
     });
 
     // Check that all calls have the same trace_id

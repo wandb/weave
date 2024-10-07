@@ -1,8 +1,7 @@
-import {WeaveObject, WeaveObjectParameters, ObjectRef} from './weaveObject';
 import {Table} from './table';
+import {ObjectRef, WeaveObject, WeaveObjectParameters} from './weave-object';
 
-interface DatasetParameters<R extends DatasetRow>
-  extends WeaveObjectParameters {
+interface DatasetParameters<R extends DatasetRow> extends WeaveObjectParameters {
   rows: R[];
 }
 
@@ -55,16 +54,8 @@ export class Dataset<R extends DatasetRow> extends WeaveObject {
     const tableRow = this.rows.row(index);
     const datasetRow: R = {...tableRow, __savedRef: undefined};
     if (this.__savedRef && tableRow.__savedRef) {
-      datasetRow.__savedRef = Promise.all([
-        this.__savedRef,
-        tableRow.__savedRef,
-      ]).then(([ref, tableRowRef]) => {
-        return new DatasetRowRef(
-          ref.projectId,
-          ref.objectId,
-          ref.digest,
-          tableRowRef.rowDigest
-        );
+      datasetRow.__savedRef = Promise.all([this.__savedRef, tableRow.__savedRef]).then(([ref, tableRowRef]) => {
+        return new DatasetRowRef(ref.projectId, ref.objectId, ref.digest, tableRowRef.rowDigest);
       });
     }
     return datasetRow;
