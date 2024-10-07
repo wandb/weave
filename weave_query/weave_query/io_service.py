@@ -6,6 +6,8 @@
 # traces in local development.
 # TODO: Fix
 
+print("HELLO FROM TOP OF IO SERVICE")
+
 import asyncio
 import atexit
 import contextlib
@@ -22,6 +24,9 @@ from typing import Any, Callable, Dict, Iterator, TypeVar
 
 import aioprocessing
 
+print("IMPORTED BASIC PYTHON STUFF")
+
+
 from weave_query import (
     weave_http,
     filesystem,
@@ -37,8 +42,12 @@ from weave_query import (
     wandb_file_manager,
 )
 
+print("WE IMPORTED EVERYTHING")
+
 tracer = engine_trace.tracer()  # type: ignore
 statsd = engine_trace.statsd()  # type: ignore
+
+print("SETUP TRACER AND STATSD")
 
 
 QueueItemType = TypeVar("QueueItemType")
@@ -240,7 +249,9 @@ class Server:
     # server_process runs the server's main coroutine
     def _request_handler_fn(self) -> None:
         try:
+            print("_REQUEST_HANDLER_FN: STARTED")
             asyncio.run(self._request_handler_fn_main(), debug=True)
+            print("_REQUEST_HANDLER_FN: FINISHED")
         except Exception as e:
             logging.exception(f"Error in request handler process: {e}")
             raise e
@@ -276,7 +287,9 @@ class Server:
 
     def _response_queue_router_fn(self) -> None:
         try:
+            print("_RESPONSE_QUEUE_ROUTER_FN: STARTED")
             asyncio.run(self._response_queue_router_fn_main(), debug=True)
+            print("_RESPONSE_QUEUE_ROUTER_FN: FINISHED")
         except Exception as e:
             logging.exception(f"Error in response queue router: {e}")
             raise e
@@ -338,6 +351,7 @@ class Server:
         fs = filesystem.FilesystemAsync()
         net = weave_http.HttpAsync(fs)
         loop = asyncio.get_running_loop()
+        print(f"HELLO, {loop=}")
         active_tasks: set[asyncio.Task[typing.Any]] = set()
         async with net:
             self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
@@ -468,7 +482,9 @@ class AsyncConnection:
         self.response_queue: async_queue.ThreadQueue[ServerResponse] = typing.cast(
             async_queue.ThreadQueue[ServerResponse], response_queue
         )
+        print("BEFORE ASYNCIO.CREATE_TASK")
         self.response_task = asyncio.create_task(self.handle_responses())
+        print("AFTER ASYNCIO.CREATE_TASK")
         self.response_task.add_done_callback(self.response_task_ended)
         self.connected = True
 
