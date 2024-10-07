@@ -385,7 +385,6 @@ def test_duplicate_table_with_identical_rows(client: WeaveClient):
         )
     )
 
-    # should this actually be 0?
     assert len(res2.row_digests) == 10
 
     # this is the same table!
