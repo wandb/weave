@@ -71,12 +71,14 @@ from weave.trace_server.clickhouse_schema import (
     SelectableCHCallSchema,
     SelectableCHObjSchema,
 )
+from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import (
+    InsertTooLarge,
+    InvalidRequest,
     NotFoundError,
     ObjectDeletedError,
+    RequestTooLarge,
 )
-from weave.trace_server.emoji_util import detone_emojis
-from weave.trace_server.errors import InsertTooLarge, InvalidRequest, RequestTooLarge
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
