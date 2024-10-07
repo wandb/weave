@@ -19,4 +19,4 @@ gha-creds-*.json
 .pytest_cache
 .nox
 *.log
-weave/file::memory:?cache=shared
+*/file::memory:?cache=shared
