@@ -264,6 +264,6 @@ def test_model_predict(
     assert d["cache_read_input_tokens"] == 0
     assert d["requests"] == 1
     assert d["prompt_tokens"] == 28
-    assert d["prompt_token_details"]["cached_tokens"] == 0
+    assert d["prompt_tokens_details"]["cached_tokens"] == 0
     assert d["completion_tokens"] == 10
     assert d["total_tokens"] == 38
