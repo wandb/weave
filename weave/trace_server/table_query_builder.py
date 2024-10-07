@@ -39,16 +39,17 @@ def make_natural_sort_table_query(
     SELECT DISTINCT tr.digest, tr.val_dump, t.row_order
     FROM table_rows tr
     INNER JOIN (
-        SELECT row_digest, row_number() OVER () AS row_order, rn
+        SELECT row_digest, row_number() OVER () AS row_order
         FROM (
-            SELECT {row_digests_selection} as row_digests, row_number() OVER (PARTITION BY project_id, digest) AS rn
+            SELECT {row_digests_selection} as row_digests
             FROM tables
             WHERE project_id = {{{project_id_name}: String}}
             AND digest = {{{digest_name}: String}}
+            LIMIT 1
         )
         ARRAY JOIN row_digests AS row_digest
     ) AS t ON tr.digest = t.row_digest
-    WHERE tr.project_id = {{{project_id_name}: String}} AND t.rn = 1
+    WHERE tr.project_id = {{{project_id_name}: String}}
     ORDER BY row_order ASC
     """
 
@@ -92,16 +93,17 @@ def make_standard_table_query(
         SELECT DISTINCT tr.digest, tr.val_dump, t.row_order
         FROM table_rows tr
         INNER JOIN (
-            SELECT row_digest, row_number() OVER () AS row_order, rn
+            SELECT row_digest, row_number() OVER () AS row_order
             FROM (
-                SELECT row_digests, row_number() OVER (PARTITION BY project_id, digest) AS rn
+                SELECT row_digests
                 FROM tables
                 WHERE project_id = {{{project_id_name}: String}}
                 AND digest = {{{digest_name}: String}}
+                LIMIT 1
             )
             ARRAY JOIN row_digests AS row_digest
         ) AS t ON tr.digest = t.row_digest
-        WHERE tr.project_id = {{{project_id_name}: String}} AND t.rn = 1
+        WHERE tr.project_id = {{{project_id_name}: String}}
         {sql_safe_filter_clause}
     ) AS tr
     {sql_safe_sort_clause}
