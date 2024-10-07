@@ -17,32 +17,27 @@ export class WandbServerApi {
     private apiKey: string
   ) {}
 
-  private async graphqlRequest(query: string, variables: Record<string, any> = {}) {
+  private async gqlRequest(query: string, variables: Record<string, any> = {}) {
     try {
-      const response = await fetch(`${this.host}/graphql`, {
+      const resp = await fetch(`${this.host}/graphql`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': userAgent(),
           Authorization: `Basic ${Buffer.from(`api:${this.apiKey}`).toString('base64')}`,
         },
-        body: JSON.stringify({
-          query,
-          variables,
-        }),
+        body: JSON.stringify({query, variables}),
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}, statusText: ${response.statusText}`);
+      if (!resp.ok) {
+        throw new Error(`HTTP error! status: ${resp.status}, statusText: ${resp.statusText}`);
       }
 
-      const result = await response.json();
-
-      if (result.errors) {
-        throw new Error(`GraphQL Error: ${JSON.stringify(result.errors)}`);
+      const res = await resp.json();
+      if (res.errors) {
+        throw new Error(`GraphQL Error: ${JSON.stringify(res.errors)}`);
       }
 
-      return result.data;
+      return res.data;
     } catch (error) {
       console.error('Error in graphqlRequest:', error);
       throw error;
@@ -51,7 +46,7 @@ export class WandbServerApi {
 
   async defaultEntityName() {
     try {
-      const result = await this.graphqlRequest(VIEWER_DEFAULT_ENTITY_QUERY);
+      const result = await this.gqlRequest(VIEWER_DEFAULT_ENTITY_QUERY);
       if (!result.viewer || !result.viewer.defaultEntity || !result.viewer.defaultEntity.name) {
         throw new Error('Default entity name not found in the response');
       }
