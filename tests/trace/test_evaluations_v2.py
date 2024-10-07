@@ -481,6 +481,8 @@ Notes to self:
 5. Make a UI that can take any call table and render the pivoted comparison (it need not be limited by a speicfic dataset or score-set. Evaluation summary is the only thing missing)
     5.b: Add the summary to the backend calculation for these dynamic results.
 
+Bug:
+* need to make eval stuff backgrounded!
 
 Probably want to cleanup the names of everyting
 Obviously: a bunch of cleanup and little todos & magic stuff

@@ -149,10 +149,10 @@ async def test_basic_evaluation(client):
     assert is_op_ref_with_name(expected_predict_ref, "MyModel.predict")
 
 
-def test_call_add_feedback(client):
-    call = client.get_call("019244a4-e032-75a0-80d7-0760f9508629")
-    call.add_score("tims score", {"result": {"rank": 5}})
-    call.add_score("tims score 2", {"result": 10})
+# def test_call_add_feedback(client):
+#     call = client.get_call("019244a4-e032-75a0-80d7-0760f9508629")
+#     call.add_score("tims score", {"result": {"rank": 5}})
+#     call.add_score("tims score 2", {"result": 10})
 
 
 @weave.op

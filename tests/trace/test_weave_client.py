@@ -759,6 +759,7 @@ def test_evaluate(client):
     expected_eval_result = {
         "model_output": {"mean": 9.5},
         "score": {"true_count": 1, "true_fraction": 0.5},
+        'model_latency': {'mean': pytest.approx(0, abs=0.001)}
     }
     assert result == expected_eval_result
 
