@@ -6,6 +6,7 @@ import {
 } from '@mui/x-data-grid-pro';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {TEAL_600} from '../../../../../common/css/color.styles';
 import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
@@ -121,6 +122,7 @@ export const FilterableOpVersionsTable: React.FC<{
             version={obj.versionHash}
             versionIndex={obj.versionIndex}
             fullWidth={true}
+            color={TEAL_600}
           />
         );
       },
