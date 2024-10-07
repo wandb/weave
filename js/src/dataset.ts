@@ -25,13 +25,9 @@ export type DatasetRow = Record<string, any> & {
 export class Dataset<R extends DatasetRow> extends WeaveObject {
   public rows: Table<R>;
 
-  constructor(parameters: DatasetParameters<R>) {
-    const baseParameters = {
-      id: parameters.id,
-      description: parameters.description,
-    };
+  constructor({rows, ...baseParameters}: DatasetParameters<R>) {
     super(baseParameters);
-    this.rows = new Table(parameters.rows);
+    this.rows = new Table(rows);
   }
 
   async save(): Promise<ObjectRef> {

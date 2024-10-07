@@ -42,9 +42,7 @@ export async function init(projectName: string): Promise<WeaveClient> {
 
     const traceServerApi = new TraceServerApi({
       baseUrl: TRACE_BASE_URL,
-      baseApiParams: {
-        headers: headers,
-      },
+      baseApiParams: {headers},
       customFetch: concurrencyLimitedFetch,
     });
 
@@ -78,7 +76,7 @@ export function requireCurrentCallStackEntry(): CallStackEntry {
     throw new Error('Weave client not initialized (make sure to call `weave.init()` first)');
   }
   const callStackEntry = globalClient.getCallStack().peek();
-  if (!callStackEntry) {
+  if (callStackEntry == null) {
     throw new Error('No current call stack entry');
   }
   return callStackEntry;
