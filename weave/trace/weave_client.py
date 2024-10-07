@@ -329,11 +329,16 @@ class Call:
         if self.ended_at is None:
             raise Exception("Must be finished to run scorer")
 
+        supervision_args = supervision or {}
         kwargs = {
-            "inputs": self.inputs,
-            "output": self.output,  # "generation output?"
+            # TODO: Determine the non-output args needed and
+            # strip that from  the inputs - similar to the normal
+            # eval process
+            # "inputs": self.inputs,
+            # TODO: suppport plain "output" key
+            "model_output": self.output,  # "generation output?"
             # Thse would be labels and such. Not sure how we want to do this yet
-            "supervision": supervision,
+            **supervision_args,
         }
 
         (scorer_res, scorer_call) = scorer_op.call(**kwargs)

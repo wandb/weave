@@ -209,8 +209,8 @@ def test_direct_log_generation_and_direct_apply_score(client):
     )
 
     @weave.op
-    def contains_appology(inputs, output, supervision):
-        return "sorry" in output
+    def contains_appology(model_output):
+        return "sorry" in model_output
 
     generation.apply_scorer(contains_appology)
 
@@ -221,9 +221,9 @@ def test_direct_log_generation_and_direct_apply_score(client):
     assert call.output == "I'm sorry, I am an AI."
 
     score_call = calls[1]
-    assert score_call.inputs["inputs"] == call.inputs
-    assert score_call.inputs["output"] == call.output
-    assert score_call.inputs["supervision"] == None
+    # assert score_call.inputs["inputs"] == call.inputs
+    assert score_call.inputs["model_output"] == call.output
+    # assert score_call.inputs["supervision"] == None
     assert score_call.output == True
     # I would prefer to use the Calls.feedback edge, but it
     # is too complicated for me to just get the feedback out.
@@ -248,8 +248,8 @@ def test_decorator_proactive(client):
     """TODO: test all the new variants of different params"""
 
     @weave.op
-    def contains_appology(inputs, output, supervision):
-        return "sorry" in output
+    def contains_appology(model_output):
+        return "sorry" in model_output
 
     @weave.op(scorers=[contains_appology])
     def make_generation(prompt: str) -> str:
@@ -264,9 +264,9 @@ def test_decorator_proactive(client):
     assert call.output == "I'm sorry, I am an AI."
 
     score_call = calls[1]
-    assert score_call.inputs["inputs"] == call.inputs
-    assert score_call.inputs["output"] == call.output
-    assert score_call.inputs["supervision"] == None
+    # assert score_call.inputs["inputs"] == call.inputs
+    assert score_call.inputs["model_output"] == call.output
+    # assert score_call.inputs["supervision"] == None
     assert score_call.output == True
     # I would prefer to use the Calls.feedback edge, but it
     # is too complicated for me to just get the feedback out.
@@ -289,8 +289,8 @@ def test_decorator_proactive(client):
 
 def test_smart_backfill(client):
     @weave.op
-    def contains_appology(inputs, output, supervision):
-        return "sorry" in output
+    def contains_appology(model_output):
+        return "sorry" in model_output
 
     @weave.op()
     def make_generation(prompt: str) -> str:
@@ -313,9 +313,9 @@ def test_smart_backfill(client):
     assert call.output == "I'm sorry, I am an AI."
 
     score_call = calls[1]
-    assert score_call.inputs["inputs"] == call.inputs
-    assert score_call.inputs["output"] == call.output
-    assert score_call.inputs["supervision"] == None
+    # assert score_call.inputs["inputs"] == call.inputs
+    assert score_call.inputs["model_output"] == call.output
+    # assert score_call.inputs["supervision"] == None
     assert score_call.output == True
     # I would prefer to use the Calls.feedback edge, but it
     # is too complicated for me to just get the feedback out.
@@ -336,8 +336,8 @@ def test_smart_backfill(client):
     assert feedback_item["wb_user_id"] is not None
 
     @weave.op
-    def contains_period(inputs, output, supervision):
-        return "." in output
+    def contains_period(model_output):
+        return "." in model_output
 
     make_generation("Please tell me!")
 
@@ -352,8 +352,8 @@ def test_smart_backfill(client):
 
 def test_eval_backfill(client):
     @weave.op
-    def contains_appology(inputs, output, supervision):
-        return "sorry" in output
+    def contains_appology(model_output):
+        return "sorry" in model_output
 
     @weave.op(scorers=[contains_appology])
     def make_generation(prompt: str) -> str:
