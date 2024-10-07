@@ -350,6 +350,77 @@ def test_smart_backfill(client):
     assert len(stats["score_records"]) == 3  # 3 new "cells" to fill
 
 
+# TODO: Need input hashing for thie to actually work efficiently.
+# Plan: hash(inputs_with_hash_keys)
+# Might also want to have some otehr identifiers for a call:
+# {
+#   inputs_hash -> good for logs outside the framework (server-side calc)
+#   dataset_row_hash -> good to logs created with eval framework (normally would be same as inputs_hash unless the model inputs vary)
+#   example_id -> user-defined example ID might be useful for comparison across datasets with equal rows.
+# }
+# def test_smart_forward_fill(client):
+#     @weave.op
+#     def contains_appology(model_output):
+#         return "sorry" in model_output
+
+#     @weave.op()
+#     def make_generation(prompt: str) -> str:
+#         return "I'm sorry, I am an AI."
+
+#     stats = evaluation.forwardfill_scores(
+#         for_op=make_generation, scorers=[contains_appology], dataset=[{
+#             "prompt": "Hello, what is your name?"
+#         }]
+#     )
+
+#     assert stats["calls_found"] == 1
+#     assert stats["cache_hits"] == 0
+#     assert len(stats["score_records"]) == 1
+
+#     calls = list(client.get_calls(include_feedback=True))
+#     assert len(calls) == 2
+#     call = calls[0]
+#     assert call.inputs["prompt"] == "Hello, what is your name?"
+#     assert call.output == "I'm sorry, I am an AI."
+
+#     score_call = calls[1]
+#     # assert score_call.inputs["inputs"] == call.inputs
+#     assert score_call.inputs["model_output"] == call.output
+#     # assert score_call.inputs["supervision"] == None
+#     assert score_call.output == True
+#     # I would prefer to use the Calls.feedback edge, but it
+#     # is too complicated for me to just get the feedback out.
+#     call_feedback = call.summary["weave"]["feedback"]
+#     assert len(call_feedback) == 1
+#     feedback_item = call_feedback[0]
+#     assert feedback_item["feedback_type"] == "score"
+#     assert feedback_item["weave_ref"] == call.ref.uri()
+#     assert feedback_item["payload"] == {
+#         "name": "contains_appology",
+#         "op_ref": score_call.op_name,
+#         "call_ref": score_call.ref.uri(),
+#         "supervision": None,
+#         "results": True,
+#     }
+#     assert feedback_item["creator"] is None
+#     assert feedback_item["created_at"] is not None
+#     assert feedback_item["wb_user_id"] is not None
+
+#     @weave.op
+#     def contains_period(model_output):
+#         return "." in model_output
+
+#     make_generation("Please tell me!")
+
+#     stats = evaluation.backfill_scores(
+#         for_op=make_generation, scorers=[contains_appology, contains_period]
+#     )
+
+#     assert stats["calls_found"] == 2
+#     assert stats["cache_hits"] == 1  # 1 prior score / op combo
+#     assert len(stats["score_records"]) == 3  # 3 new "cells" to fill
+
+
 def test_eval_backfill(client):
     @weave.op
     def contains_appology(model_output):
@@ -395,3 +466,22 @@ def test_eval_backfill(client):
     # assert feedback_item["creator"] is None
     # assert feedback_item["created_at"] is not None
     # assert feedback_item["wb_user_id"] is not None
+
+
+"""
+Notes to self:
+2. Make a smart forward-fill (needs to leverage the ID stuff - this might allow us to get rid of some refs?
+    2.a) Explore if we can get rid of refs completely? Perhaps just by having a ref-map in the attributes?!??! - is it that easy?
+3. Rework evaluations to have a cache-based option:
+    1. Use Smart foward-fill to calculate the needed rows
+    2. Use smart backfill to calculate the scores
+    3. Summarize the data and log the evaluation run
+4. Make a UI that can look at an evaluation definition and render the results
+    1. Converting the query layer to this new model for evals marked as "cached" - the query layer should be much faster
+5. Make a UI that can take any call table and render the pivoted comparison (it need not be limited by a speicfic dataset or score-set. Evaluation summary is the only thing missing)
+    5.b: Add the summary to the backend calculation for these dynamic results.
+
+
+Probably want to cleanup the names of everyting
+Obviously: a bunch of cleanup and little todos & magic stuff
+"""
