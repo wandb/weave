@@ -200,7 +200,7 @@ export const VerticalBar: React.FC = () => {
   return (
     <div
       style={{
-        width: '2px',
+        width: '1px',
         height: '100%',
         backgroundColor: MOON_300,
       }}
