@@ -258,18 +258,26 @@ class Server:
 
     # start starts the server thread or process
     def start(self) -> None:
+        print("STARTING REQUEST HANDLER")
         self.request_handler.start()
+        print("STARTING RESPONSE QUEUE ROUTER")
         self.response_queue_router.start()
+        print("WAITING FOR REQUEST HANDLER TO BE READY")
         self._request_handler_ready_event.wait()
+        print("WAITING FOR RESPONSE QUEUE ROUTER TO BE READY")
         self._response_queue_feeder_ready_event.wait()
+        print("REGISTERING SHUTDOWN FUNCTION")
         atexit.register(self.shutdown)
 
     # cleanup performs cleanup actions, such as flushing stats
     def cleanup(self) -> None:
+        print("CLEANING UP")
         statsd.flush()
+        print("CLEANED UP")
 
     # shutdown stops the server and joins the thread/process
     def shutdown(self) -> None:
+        print("SHUTTING DOWN")
         with self._shutdown_lock:
             self._shutting_down.set()
 
@@ -282,7 +290,9 @@ class Server:
             self._request_handler_ready_to_shut_down_event.wait()
 
             self.response_queue_router.join()
+            print("JOINING REQUEST HANDLER")
             self.request_handler.join()
+            print("JOINED REQUEST HANDLER")
             self.cleanup()
 
     def _response_queue_router_fn(self) -> None:
@@ -400,11 +410,13 @@ class Server:
     ) -> None:
         if client.client_id not in self.client_response_queues:
             if isinstance(client, SyncClient):
+                print("REGISTERING SYNC CLIENT")
                 self.client_response_queues[client.client_id] = queue.Queue()
             else:
-                self.client_response_queues[
-                    client.client_id
-                ] = async_queue.ThreadQueue()
+                print("REGISTERING ASYNC CLIENT")
+                self.client_response_queues[client.client_id] = (
+                    async_queue.ThreadQueue()
+                )
 
     def unregister_client(
         self, client: typing.Union["SyncClient", "AsyncClient"]
