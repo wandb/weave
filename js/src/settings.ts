@@ -1,11 +1,12 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import {WANDB_URL} from './constants';
 
 const apiKeyNotFoundMessage = `
 wandb API key not found.
 
-Go to https://wandb.ai/authorize to get your API key.
+Go to ${WANDB_URL}/authorize to get your API key.
 
 You can either:
 

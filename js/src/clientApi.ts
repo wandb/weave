@@ -1,4 +1,5 @@
 import {ConcurrencyLimiter} from './concurrencyLimit';
+import {TRACE_BASE_URL, WANDB_BASE_URL} from './constants';
 import {InMemoryTraceServer} from './inMemoryTraceServer';
 import {createFetchWithRetry} from './retry';
 import {getApiKey} from './settings';
@@ -10,7 +11,7 @@ import {CallStackEntry, createSettings, WeaveClient} from './weaveClient';
 export let globalClient: WeaveClient | null = null;
 
 export async function init(projectName: string): Promise<WeaveClient> {
-  const host = 'https://api.wandb.ai';
+  const host = WANDB_BASE_URL;
   const apiKey = getApiKey();
 
   const headers: Record<string, string> = {
@@ -27,8 +28,7 @@ export async function init(projectName: string): Promise<WeaveClient> {
       baseDelay: 1000,
       maxDelay: 5 * 60 * 1000, // 5 minutes
       maxRetryTime: 12 * 60 * 60 * 1000, // 12 hours
-      retryOnStatus: (status: number) =>
-        status === 429 || (status >= 500 && status < 600),
+      retryOnStatus: (status: number) => status === 429 || (status >= 500 && status < 600),
     });
     const concurrencyLimiter = new ConcurrencyLimiter(20);
     const concurrencyLimitedFetch = concurrencyLimiter.limitFunction(
@@ -41,7 +41,7 @@ export async function init(projectName: string): Promise<WeaveClient> {
     );
 
     const traceServerApi = new TraceServerApi({
-      baseUrl: 'https://trace.wandb.ai',
+      baseUrl: TRACE_BASE_URL,
       baseApiParams: {
         headers: headers,
       },
@@ -57,10 +57,7 @@ export async function init(projectName: string): Promise<WeaveClient> {
   }
 }
 
-export function initWithCustomTraceServer(
-  projectName: string,
-  customTraceServer: InMemoryTraceServer
-) {
+export function initWithCustomTraceServer(projectName: string, customTraceServer: InMemoryTraceServer) {
   globalClient = new WeaveClient(
     customTraceServer as unknown as TraceServerApi<any>,
     {} as WandbServerApi, // Placeholder, as we don't use WandbServerApi in this case
@@ -69,9 +66,16 @@ export function initWithCustomTraceServer(
   );
 }
 
+export function requireClient(): WeaveClient {
+  if (globalClient == null) {
+    throw new Error('Weave client not initialized (make sure to call `weave.init()` first)');
+  }
+  return globalClient;
+}
+
 export function requireCurrentCallStackEntry(): CallStackEntry {
-  if (!globalClient) {
-    throw new Error('Weave client not initialized');
+  if (globalClient == null) {
+    throw new Error('Weave client not initialized (make sure to call `weave.init()` first)');
   }
   const callStackEntry = globalClient.getCallStack().peek();
   if (!callStackEntry) {

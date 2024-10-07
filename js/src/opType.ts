@@ -1,3 +1,4 @@
+import {WANDB_URL} from './constants';
 import {WeaveObject} from './weaveObject';
 
 export type ParameterNamesOption = 'useParam0Object' | string[] | undefined;
@@ -29,9 +30,7 @@ export function isOp(value: any): value is Op<any> {
   return value && value.__isOp === true;
 }
 
-export function getOpWrappedFunction<T extends (...args: any[]) => any>(
-  opValue: Op<T>
-): T {
+export function getOpWrappedFunction<T extends (...args: any[]) => any>(opValue: Op<T>): T {
   return opValue.__wrappedFunction;
 }
 
@@ -55,6 +54,6 @@ export class OpRef {
   }
 
   public ui_url() {
-    return `https://wandb.ai/${this.projectId}/weave/ops/${this.objectId}/versions/${this.digest}`;
+    return `${WANDB_URL}/${this.projectId}/weave/ops/${this.objectId}/versions/${this.digest}`;
   }
 }

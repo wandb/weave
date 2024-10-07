@@ -31,7 +31,7 @@ class CallStack {
     return this.stack[this.stack.length - 1] ?? null;
   }
 
-  pushNewCall(): {
+  push(): {
     currentCall: CallStackEntry;
     parentCall?: CallStackEntry;
     newStack: CallStack;
@@ -321,7 +321,7 @@ export class WeaveClient {
   }
 
   public pushNewCall() {
-    return this.getCallStack().pushNewCall();
+    return this.getCallStack().push();
   }
 
   public runWithCallStack<T>(callStack: CallStack, fn: () => T): T {

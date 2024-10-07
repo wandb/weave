@@ -1,4 +1,5 @@
 import {globalClient} from './clientApi';
+import {TRACE_CALL_EMOJI, WANDB_URL} from './constants';
 import {Op, OpOptions} from './opType';
 
 export function op<T extends (...args: any[]) => any>(
@@ -7,8 +8,9 @@ export function op<T extends (...args: any[]) => any>(
 ): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>> {
   // Step 1: Determine the operation name
   const fnName = options?.originalFunction?.name || fn.name || 'anonymous';
-  let actualOpName = fnName;
   const thisArg = options?.bindThis;
+
+  let actualOpName = fnName;
   if (options?.bindThis) {
     const className = Object.getPrototypeOf(options.bindThis).constructor.name;
     actualOpName = `${className}.${fnName}`;
@@ -28,7 +30,7 @@ export function op<T extends (...args: any[]) => any>(
     const {newStack, currentCall, parentCall} = globalClient.pushNewCall();
     const startTime = new Date();
     if (!globalClient.settings.quiet && parentCall == null) {
-      console.log(`🍩 https://wandb.ai/${globalClient.projectId}/r/call/${currentCall.callId}`);
+      console.log(`${TRACE_CALL_EMOJI} ${WANDB_URL}/${globalClient.projectId}/r/call/${currentCall.callId}`);
     }
     const displayName = options?.callDisplayName ? options.callDisplayName(...params) : undefined;
     const startCallPromise = globalClient.startCall(
@@ -97,15 +99,8 @@ export function op<T extends (...args: any[]) => any>(
   // Step 3: Set metadata on the wrapper function
   opWrapper.__name = actualOpName;
   opWrapper.__isOp = true as true;
-  if (options?.originalFunction) {
-    opWrapper.__wrappedFunction = options.originalFunction;
-  } else {
-    opWrapper.__wrappedFunction = fn;
-  }
-
-  if (options?.bindThis !== undefined) {
-    opWrapper.__boundThis = options.bindThis;
-  }
+  opWrapper.__wrappedFunction = options?.originalFunction ?? fn;
+  opWrapper.__boundThis = options?.bindThis;
 
   // Step 4: Return the wrapped function
   return opWrapper as Op<T>;
