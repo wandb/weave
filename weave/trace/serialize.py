@@ -73,10 +73,11 @@ def _build_result_from_encoded(
     return result
 
 
-REP_LIMIT = 1000
+STR_LENGTH_LIMIT = 1000
 
 
-def fallback_encode(obj: Any) -> Any:
+def stringify(obj: Any, limit: int = STR_LENGTH_LIMIT) -> str:
+    """This is a fallback for objects that we don't have a better way to serialize."""
     rep = None
     try:
         rep = repr(obj)
@@ -86,9 +87,68 @@ def fallback_encode(obj: Any) -> Any:
         except Exception:
             rep = f"<{type(obj).__name__}: {id(obj)}>"
     if isinstance(rep, str):
-        if len(rep) > REP_LIMIT:
-            rep = rep[:REP_LIMIT] + "..."
+        if len(rep) > limit:
+            rep = rep[: limit - 3] + "..."
     return rep
+
+
+def dictify(obj: Any, maxdepth: int = 0, depth=1) -> Any:
+    """Recursively compute a dictionary representation of an object."""
+    if maxdepth > 0 and depth > maxdepth:
+        # TODO: If obj at this point is a simple type,
+        #       maybe we should just return it rather than stringify
+        return stringify(obj)
+
+    if isinstance(obj, (int, float, str, bool)) or obj is None:
+        return obj
+    elif isinstance(obj, (list, tuple)):
+        return [dictify(v, maxdepth, depth + 1) for v in obj]
+    elif isinstance(obj, dict):
+        return {k: dictify(v, maxdepth, depth + 1) for k, v in obj.items()}
+
+    if hasattr(obj, "to_dict"):
+        try:
+            as_dict = obj.to_dict()
+            if isinstance(as_dict, dict):
+                result = {}
+                for k, v in as_dict.items():
+                    if maxdepth == 0 or depth < maxdepth:
+                        result[k] = dictify(v, maxdepth, depth + 1)
+                    else:
+                        result[k] = stringify(v)
+                return result
+        except Exception:
+            raise ValueError("to_dict failed")
+
+    result = {}
+    result["__class__"] = {
+        "module": obj.__class__.__module__,
+        "qualname": obj.__class__.__qualname__,
+        "name": obj.__class__.__name__,
+    }
+    for attr in dir(obj):
+        if attr.startswith("_"):
+            continue
+        try:
+            val = getattr(obj, attr)
+            if callable(val):
+                continue
+            if maxdepth == 0 or depth < maxdepth:
+                result[attr] = dictify(val, maxdepth, depth + 1)
+            else:
+                result[attr] = stringify(val)
+        except Exception:
+            raise ValueError("fallback dictify failed")
+    return result
+
+
+def fallback_encode(obj: Any) -> Any:
+    # TODO: Should we try to compute an object size and skip if too big?
+    try:
+        # Note: Max depth not picked scientifically, just trying to keep things under control.
+        return dictify(obj, maxdepth=10)
+    except Exception:
+        return stringify(obj)
 
 
 def isinstance_namedtuple(obj: Any) -> bool:

@@ -178,6 +178,9 @@ class FutureExecutor:
                 self._active_futures.remove(future)
                 exception = future.exception()
                 if exception:
+                    import traceback
+
+                    print(traceback.format_exc())
                     logger.error(f"Task failed: {_format_exception(exception)}")
 
     def _shutdown(self) -> None:

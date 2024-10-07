@@ -726,10 +726,6 @@ class WeaveClient:
 
         # Summary handling
         summary = {}
-        print('summary handling')
-        print(original_output)
-        print(type(original_output))
-        print(dir(original_output))
         if call._children:
             summary = sum_dict_leaves([child.summary or {} for child in call._children])
         elif (
@@ -776,10 +772,18 @@ class WeaveClient:
         project_id = self._project_id()
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
 
+        # Descendent error tracking disabled til we fix UI
+        # Add this call's summary after logging the call, so that only
+        # descendents are included in what we log
+        # summary.setdefault("descendants", {}).setdefault(
+        #     call.op_name, {"successes": 0, "errors": 0}
+        # )["successes"] += 1
+        call.summary = summary
+
         # The finish handler serves as a last chance for integrations
         # to customize what gets logged for a call.
         if op is not None and op._on_finish_handler:
-            op._on_finish_handler(call, original_output, exception)
+            op._on_finish_handler(call, output, exception)
 
         def send_end_call() -> None:
             output_json = to_json(call.output, project_id, self)
@@ -797,7 +801,6 @@ class WeaveClient:
             )
 
         self.future_executor.defer(send_end_call)
-
         call_context.pop_call(call.id)
 
     @trace_sentry.global_trace_sentry.watch()

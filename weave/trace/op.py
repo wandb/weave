@@ -156,6 +156,8 @@ class Op(Protocol):
     # not sure if this is the best place for this, but kept for compat
     _set_on_output_handler: Callable[[OnOutputHandlerType], None]
     _on_output_handler: Optional[OnOutputHandlerType]
+    _set_on_finish_handler: Callable[[OnFinishHandlerType], None]
+    _on_finish_handler: Optional[OnFinishHandlerType]
 
     _set_on_finish_handler: Callable[[OnFinishHandlerType], None]
     _on_finish_handler: Optional[OnFinishHandlerType]
@@ -177,6 +179,12 @@ def _set_on_output_handler(func: Op, on_output: OnOutputHandlerType) -> None:
     if func._on_output_handler is not None:
         raise ValueError("Cannot set on_output_handler multiple times")
     func._on_output_handler = on_output
+
+
+def _set_on_finish_handler(func: Op, on_finish: FinishCallbackType) -> None:
+    if func._on_finish_handler is not None:
+        raise ValueError("Cannot set on_finish_handler multiple times")
+    func._on_finish_handler = on_finish
 
 
 def _set_on_finish_handler(func: Op, on_finish: OnFinishHandlerType) -> None:
@@ -523,6 +531,8 @@ def op(
 
             wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
             wrapper._on_output_handler = None  # type: ignore
+            wrapper._set_on_finish_handler = partial(_set_on_finish_handler, wrapper)  # type: ignore
+            wrapper._on_finish_handler = None  # type: ignore
 
             wrapper._set_on_finish_handler = partial(_set_on_finish_handler, wrapper)  # type: ignore
             wrapper._on_finish_handler = None  # type: ignore

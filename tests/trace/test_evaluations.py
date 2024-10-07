@@ -725,9 +725,9 @@ async def test_eval_with_complex_types(client):
     # So this assertion is checking current state, but not
     # the correct behavior of the dataset (the should be the
     # MyDataclass, MyModel, and MyObj)
-    assert isinstance(row["dc"], str)  #  MyDataclass
-    assert isinstance(row["model"], str)  #  MyModel
-    assert isinstance(row["obj"], str)  #  MyObj
+    assert isinstance(row["dc"], dict)  #  MyDataclass
+    assert isinstance(row["model"], dict)  #  MyModel
+    assert isinstance(row["obj"], dict)  #  MyObj
     assert isinstance(row["text"], str)
 
     access_log = client.server.attribute_access_log
