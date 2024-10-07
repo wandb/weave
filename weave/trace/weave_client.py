@@ -726,6 +726,10 @@ class WeaveClient:
 
         # Summary handling
         summary = {}
+        print('summary handling')
+        print(original_output)
+        print(type(original_output))
+        print(dir(original_output))
         if call._children:
             summary = sum_dict_leaves([child.summary or {} for child in call._children])
         elif (
