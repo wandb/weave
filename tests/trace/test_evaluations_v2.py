@@ -176,7 +176,7 @@ def test_direct_log_generation_and_direct_log_score(client):
     generation = evaluation.log_generation(
         {"prompt": "Hello, what is your name?"}, "I'm sorry, I am an AI."
     )
-    generation.log_score("contains_appology", True)
+    generation.log_score("contains_apology", True)
 
     calls = list(client.get_calls(include_feedback=True))
     assert len(calls) == 1
@@ -191,7 +191,7 @@ def test_direct_log_generation_and_direct_log_score(client):
     assert feedback_item["feedback_type"] == "score"
     assert feedback_item["weave_ref"] == call.ref.uri()
     assert feedback_item["payload"] == {
-        "name": "contains_appology",
+        "name": "contains_apology",
         "op_ref": None,
         "call_ref": None,
         "supervision": None,
@@ -209,10 +209,10 @@ def test_direct_log_generation_and_direct_apply_score(client):
     )
 
     @weave.op
-    def contains_appology(model_output):
+    def contains_apology(model_output):
         return "sorry" in model_output
 
-    generation.apply_scorer(contains_appology)
+    generation.apply_scorer(contains_apology)
 
     calls = list(client.get_calls(include_feedback=True))
     assert len(calls) == 2
@@ -233,7 +233,7 @@ def test_direct_log_generation_and_direct_apply_score(client):
     assert feedback_item["feedback_type"] == "score"
     assert feedback_item["weave_ref"] == call.ref.uri()
     assert feedback_item["payload"] == {
-        "name": "contains_appology",
+        "name": "contains_apology",
         "op_ref": score_call.op_name,
         "call_ref": score_call.ref.uri(),
         "supervision": None,
@@ -248,10 +248,12 @@ def test_decorator_proactive(client):
     """TODO: test all the new variants of different params"""
 
     @weave.op
-    def contains_appology(model_output):
+    def contains_apology(model_output):
         return "sorry" in model_output
+    
+    # TODO: Should we use a task here to reduce the duplication?
 
-    @weave.op(scorers=[contains_appology])
+    @weave.op(scorers=[contains_apology])
     def make_generation(prompt: str) -> str:
         return "I'm sorry, I am an AI."
 
@@ -276,7 +278,7 @@ def test_decorator_proactive(client):
     assert feedback_item["feedback_type"] == "score"
     assert feedback_item["weave_ref"] == call.ref.uri()
     assert feedback_item["payload"] == {
-        "name": "contains_appology",
+        "name": "contains_apology",
         "op_ref": score_call.op_name,
         "call_ref": score_call.ref.uri(),
         "supervision": None,
@@ -289,7 +291,7 @@ def test_decorator_proactive(client):
 
 def test_smart_backfill(client):
     @weave.op
-    def contains_appology(model_output):
+    def contains_apology(model_output):
         return "sorry" in model_output
 
     @weave.op()
@@ -298,8 +300,10 @@ def test_smart_backfill(client):
 
     make_generation("Hello, what is your name?")
 
+    # TODO: Should we do a plan step?
+    # TODO: can the stats be based on batches so this streams?
     stats = evaluation.backfill_scores(
-        for_op=make_generation, scorers=[contains_appology]
+        for_op=make_generation, scorers=[contains_apology]
     )
 
     assert stats["calls_found"] == 1
@@ -325,7 +329,7 @@ def test_smart_backfill(client):
     assert feedback_item["feedback_type"] == "score"
     assert feedback_item["weave_ref"] == call.ref.uri()
     assert feedback_item["payload"] == {
-        "name": "contains_appology",
+        "name": "contains_apology",
         "op_ref": score_call.op_name,
         "call_ref": score_call.ref.uri(),
         "supervision": None,
@@ -342,7 +346,7 @@ def test_smart_backfill(client):
     make_generation("Please tell me!")
 
     stats = evaluation.backfill_scores(
-        for_op=make_generation, scorers=[contains_appology, contains_period]
+        for_op=make_generation, scorers=[contains_apology, contains_period]
     )
 
     assert stats["calls_found"] == 2
@@ -360,18 +364,19 @@ def test_smart_backfill(client):
 # }
 # def test_smart_forward_fill(client):
 #     @weave.op
-#     def contains_appology(model_output):
+#     def contains_apology(model_output):
 #         return "sorry" in model_output
 
 #     @weave.op()
 #     def make_generation(prompt: str) -> str:
 #         return "I'm sorry, I am an AI."
 
-#     stats = evaluation.forwardfill_scores(
-#         for_op=make_generation, scorers=[contains_appology], dataset=[{
-#             "prompt": "Hello, what is your name?"
-#         }]
-#     )
+    # plan_object -> costs, stream...
+    # stats = evaluation.forwardfill_scores(
+    #     for_op=make_generation, scorers=[contains_apology], dataset=[{
+    #         "prompt": "Hello, what is your name?"
+    #     }]
+    # )
 
 #     assert stats["calls_found"] == 1
 #     assert stats["cache_hits"] == 0
@@ -396,7 +401,7 @@ def test_smart_backfill(client):
 #     assert feedback_item["feedback_type"] == "score"
 #     assert feedback_item["weave_ref"] == call.ref.uri()
 #     assert feedback_item["payload"] == {
-#         "name": "contains_appology",
+#         "name": "contains_apology",
 #         "op_ref": score_call.op_name,
 #         "call_ref": score_call.ref.uri(),
 #         "supervision": None,
@@ -413,7 +418,7 @@ def test_smart_backfill(client):
 #     make_generation("Please tell me!")
 
 #     stats = evaluation.backfill_scores(
-#         for_op=make_generation, scorers=[contains_appology, contains_period]
+#         for_op=make_generation, scorers=[contains_apology, contains_period]
 #     )
 
 #     assert stats["calls_found"] == 2
@@ -423,15 +428,15 @@ def test_smart_backfill(client):
 
 def test_eval_backfill(client):
     @weave.op
-    def contains_appology(model_output):
+    def contains_apology(model_output):
         return "sorry" in model_output
 
-    @weave.op(scorers=[contains_appology])
+    @weave.op(scorers=[contains_apology])
     def make_generation(prompt: str) -> str:
         return "I'm sorry, I am an AI."
 
     eval_v1 = Evaluation(
-        dataset=[{"prompt": "Hello, what is your name?"}], scorers=[contains_appology]
+        dataset=[{"prompt": "Hello, what is your name?"}], scorers=[contains_apology]
     )
 
     eval_v1.evaluate(make_generation)
@@ -457,7 +462,7 @@ def test_eval_backfill(client):
     # assert feedback_item["feedback_type"] == "score"
     # assert feedback_item["weave_ref"] == call.ref.uri()
     # assert feedback_item["payload"] == {
-    #     "name": "contains_appology",
+    #     "name": "contains_apology",
     #     "op_ref": score_call.op_name,
     #     "call_ref": score_call.ref.uri(),
     #     "supervision": None,
@@ -472,6 +477,10 @@ def test_eval_backfill(client):
 Notes to self:
 2. Make a smart forward-fill (needs to leverage the ID stuff - this might allow us to get rid of some refs?
     2.a) Explore if we can get rid of refs completely? Perhaps just by having a ref-map in the attributes?!??! - is it that easy?
+    {
+        [input_key]: hash,
+
+    }
 3. Rework evaluations to have a cache-based option:
     1. Use Smart foward-fill to calculate the needed rows
     2. Use smart backfill to calculate the scores
@@ -486,4 +495,12 @@ Bug:
 
 Probably want to cleanup the names of everyting
 Obviously: a bunch of cleanup and little todos & magic stuff
+
+
+
+Properties from Shawn:
+* Trials need to be first class
+* Steaming
+* Caching
+* Cost Estimation
 """
