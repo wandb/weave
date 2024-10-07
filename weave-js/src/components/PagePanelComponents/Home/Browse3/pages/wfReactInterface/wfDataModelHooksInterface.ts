@@ -206,7 +206,9 @@ export type WFDataModelHooksInterface = {
     expandedRefCols?: string[],
     includeFeedback?: boolean
   ) => Promise<Blob>;
-  useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
+  useOpVersion: (
+    key: OpVersionKey | null
+  ) => LoadableWithError<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,
     project: string,

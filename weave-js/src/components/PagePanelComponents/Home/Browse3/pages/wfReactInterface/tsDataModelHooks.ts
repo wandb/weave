@@ -654,7 +654,7 @@ const useFeedback = (
 const useOpVersion = (
   // Null value skips
   key: OpVersionKey | null
-): Loadable<OpVersionSchema | null> => {
+): LoadableWithError<OpVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const cachedOpVersion = key ? opVersionCache.get(key) : null;
@@ -678,15 +678,12 @@ const useOpVersion = (
         .then(res => {
           loadingRef.current = false;
           setOpVersionRes(res);
-        })
-        .catch(err => {
-          console.error(err);
-          // try to json parse the error
-          try {
-            const errJson = JSON.parse(err);
-            setError(errJson['reason']);
-          } catch (e) {
-            setError(err);
+          if (res.obj == null) {
+            setError(new Error(JSON.stringify(res)));
+            // be conservative and unset the cache when there's an error
+            if (deepKey) {
+              opVersionCache.del(deepKey);
+            }
           }
         });
     }
@@ -697,18 +694,21 @@ const useOpVersion = (
       return {
         loading: false,
         result: null,
+        error,
       };
     }
     if (cachedOpVersion != null) {
       return {
         loading: false,
         result: cachedOpVersion,
+        error,
       };
     }
     if (opVersionRes == null || loadingRef.current) {
       return {
         loading: true,
         result: null,
+        error,
       };
     }
 
@@ -716,6 +716,7 @@ const useOpVersion = (
       return {
         loading: false,
         result: null,
+        error,
       };
     }
 
@@ -732,6 +733,7 @@ const useOpVersion = (
       return {
         loading: true,
         result: null,
+        error,
       };
     }
 
@@ -744,8 +746,9 @@ const useOpVersion = (
     return {
       loading: false,
       result: cacheableResult,
+      error,
     };
-  }, [cachedOpVersion, key, opVersionRes]);
+  }, [cachedOpVersion, key, opVersionRes, error]);
 };
 
 const convertTraceServerObjectVersionToOpSchema = (
@@ -838,13 +841,17 @@ const useObjectVersion = (
           digest: deepKey?.versionHash ?? '',
         })
         .then(res => {
-          if (res.obj == null && res.reason != null) {
-            setError(new Error(res.reason));
+          loadingRef.current = false;
+          if (res.obj == null) {
+            setError(new Error(JSON.stringify(res)));
+            // be conservative and unset the cache when there's an error
+            if (deepKey) {
+              objectVersionCache.del(deepKey);
+            }
           } else {
             setObjectVersionRes(res);
           }
-          loadingRef.current = false;
-        })
+        });
     }
   }, [deepKey, getTsClient]);
 
@@ -853,20 +860,13 @@ const useObjectVersion = (
       return {
         loading: false,
         result: null,
-        error: null,
+        error,
       };
     }
     if (cachedObjectVersion != null) {
       return {
         loading: false,
         result: cachedObjectVersion,
-        error: null,
-      };
-    }
-    if (error != null) {
-      return {
-        loading: false,
-        result: null,
         error,
       };
     }
@@ -874,7 +874,7 @@ const useObjectVersion = (
       return {
         loading: true,
         result: null,
-        error: null,
+        error,
       };
     }
 

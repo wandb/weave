@@ -95,7 +95,7 @@ export const ObjectVersionPage: React.FC<{
     refExtra: props.refExtra,
   });
   if (objectVersion.error) {
-    return <NotFoundPanel title={objectVersion.error.reason as string} />;
+    return <NotFoundPanel title={objectVersion.error.message} />;
   } else if (objectVersion.loading) {
     return <CenteredAnimatedLoader />;
   } else if (objectVersion.result == null) {

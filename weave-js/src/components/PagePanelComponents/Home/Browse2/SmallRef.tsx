@@ -41,7 +41,7 @@ type WFDBTableType =
 
 export const objectRefDisplayName = (
   objRef: ObjectRef,
-  versionIndex?: number,
+  versionIndex?: number
 ) => {
   if (isWandbArtifactRef(objRef)) {
     const versionStr =
