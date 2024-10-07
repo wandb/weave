@@ -1,5 +1,8 @@
 export class TableRef {
-  constructor(public projectId: string, public digest: string) {}
+  constructor(
+    public projectId: string,
+    public digest: string
+  ) {}
 
   public uri() {
     return `weave:///${this.projectId}/table/${this.digest}`;

@@ -15,9 +15,7 @@ export function createFetchWithRetry(options: RetryOptions = {}) {
     retryOnStatus = (status: number) => status !== 429 && status !== 500,
   } = options;
 
-  return async function fetchWithRetry(
-    ...fetchParams: Parameters<typeof fetch>
-  ): Promise<Response> {
+  return async function fetchWithRetry(...fetchParams: Parameters<typeof fetch>): Promise<Response> {
     let attempt = 0;
 
     while (attempt <= maxRetries) {
@@ -37,10 +35,8 @@ export function createFetchWithRetry(options: RetryOptions = {}) {
 
         // Exponential backoff delay
         const delay = Math.min(baseDelay * 2 ** attempt, maxDelay);
-        console.log(
-          `Return code: ${response.status}. Retrying fetch after ${delay}ms`
-        );
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        console.log(`Return code: ${response.status}. Retrying fetch after ${delay}ms`);
+        await new Promise(resolve => setTimeout(resolve, delay));
         attempt++;
       } catch (error) {
         if (attempt === maxRetries || Date.now() - startTime > maxRetryTime) {
@@ -50,7 +46,7 @@ export function createFetchWithRetry(options: RetryOptions = {}) {
         // Exponential backoff delay
         const delay = Math.min(baseDelay * 2 ** attempt, maxDelay);
         console.log(`Exception ${error} Retrying fetch after ${delay}ms`);
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await new Promise(resolve => setTimeout(resolve, delay));
         attempt++;
       }
     }

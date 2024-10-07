@@ -1,11 +1,11 @@
-import { globalClient } from "./clientApi";
-import { OpOptions, Op } from "./opType";
+import { globalClient } from './clientApi';
+import { Op, OpOptions } from './opType';
 
 export function op<T extends (...args: any[]) => any>(
   fn: T,
   options?: OpOptions<T>
 ): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>> {
-  const fnName = options?.originalFunction?.name || fn.name || "anonymous";
+  const fnName = options?.originalFunction?.name || fn.name || 'anonymous';
   let actualOpName = fnName;
   const thisArg = options?.bindThis;
   if (options?.bindThis) {
@@ -16,9 +16,7 @@ export function op<T extends (...args: any[]) => any>(
     actualOpName = options.name;
   }
 
-  const opWrapper = async function (
-    ...params: Parameters<T>
-  ): Promise<ReturnType<T>> {
+  const opWrapper = async function (...params: Parameters<T>): Promise<ReturnType<T>> {
     if (!globalClient) {
       return await fn(...params);
     }
@@ -26,13 +24,9 @@ export function op<T extends (...args: any[]) => any>(
     const { newStack, currentCall, parentCall } = globalClient.pushNewCall();
     const startTime = new Date();
     if (!globalClient.quiet && parentCall == null) {
-      console.log(
-        `🍩 https://wandb.ai/${globalClient.projectId}/r/call/${currentCall.callId}`
-      );
+      console.log(`🍩 https://wandb.ai/${globalClient.projectId}/r/call/${currentCall.callId}`);
     }
-    const displayName = options?.callDisplayName
-      ? options.callDisplayName(...params)
-      : undefined;
+    const displayName = options?.callDisplayName ? options.callDisplayName(...params) : undefined;
     const startCallPromise = globalClient.startCall(
       opWrapper,
       params,
@@ -80,26 +74,13 @@ export function op<T extends (...args: any[]) => any>(
         return wrappedIterator as unknown as ReturnType<T>;
       } else {
         const endTime = new Date();
-        globalClient.finishCall(
-          result,
-          currentCall,
-          parentCall,
-          options?.summarize,
-          endTime,
-          startCallPromise
-        );
+        globalClient.finishCall(result, currentCall, parentCall, options?.summarize, endTime, startCallPromise);
         return result;
       }
     } catch (error) {
       // console.error(`Op ${actualOpName} failed:`, error);
       const endTime = new Date();
-      globalClient.finishCallWithException(
-        error,
-        currentCall,
-        parentCall,
-        endTime,
-        startCallPromise
-      );
+      globalClient.finishCallWithException(error, currentCall, parentCall, endTime, startCallPromise);
       throw error;
     } finally {
       // No need to do anything here.
@@ -128,11 +109,7 @@ export function isOp(fn: any): fn is Op<any> {
   return fn.__isOp === true;
 }
 
-export function boundOp<T extends (...args: any[]) => any>(
-  bindThis: any,
-  fn: T,
-  options?: OpOptions<T>
-) {
+export function boundOp<T extends (...args: any[]) => any>(bindThis: any, fn: T, options?: OpOptions<T>) {
   const boundFn = fn.bind(bindThis) as T;
   return op(boundFn, { originalFunction: fn, bindThis, ...options });
 }

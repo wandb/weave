@@ -1,4 +1,4 @@
-import { isOp } from "./op";
+import { isOp } from './op';
 
 export interface WeaveObjectParameters {
   id?: string;
@@ -33,15 +33,13 @@ export class WeaveObject {
   saveAttrs() {
     const attrs: { [key: string]: any } = {};
 
-    const nonUnderscoreKeys = Object.keys(this).filter(
-      (key) => !key.startsWith("_")
-    );
+    const nonUnderscoreKeys = Object.keys(this).filter(key => !key.startsWith('_'));
 
     // Include values first (non-functions)
     for (const key of Object.keys(this)) {
       // @ts-ignore
       const value: any = this[key];
-      if (typeof value !== "function") {
+      if (typeof value !== 'function') {
         attrs[key] = value;
       }
     }
@@ -71,11 +69,8 @@ export function getClassChain(instance: WeaveObject): string[] {
   const bases: string[] = [];
   let currentProto = Object.getPrototypeOf(instance);
 
-  while (currentProto && currentProto.constructor.name !== "Object") {
-    const className =
-      currentProto.constructor.name === "WeaveObject"
-        ? "Object"
-        : currentProto.constructor.name;
+  while (currentProto && currentProto.constructor.name !== 'Object') {
+    const className = currentProto.constructor.name === 'WeaveObject' ? 'Object' : currentProto.constructor.name;
     bases.push(className);
     currentProto = Object.getPrototypeOf(currentProto);
   }
@@ -83,7 +78,7 @@ export function getClassChain(instance: WeaveObject): string[] {
   //   data._type === 'Dataset' &&
   //   data._class_name === 'Dataset' &&
   //   _.isEqual(data._bases, ['Object', 'BaseModel'])
-  bases.push("BaseModel");
+  bases.push('BaseModel');
 
   return bases;
 }

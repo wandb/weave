@@ -1,18 +1,18 @@
-import { op } from "../op";
-import { weaveImage } from "../media";
+import { op } from '../op';
+import { weaveImage } from '../media';
 
 const openAIStreamReducer = {
   initialState: {
-    id: "",
-    object: "chat.completion",
+    id: '',
+    object: 'chat.completion',
     created: 0,
-    model: "",
+    model: '',
     choices: [
       {
         index: 0,
         message: {
-          role: "assistant",
-          content: "",
+          role: 'assistant',
+          content: '',
           function_call: null,
         },
         finish_reason: null,
@@ -38,17 +38,15 @@ const openAIStreamReducer = {
         if (choice.delta.function_call) {
           if (!state.choices[0].message.function_call) {
             state.choices[0].message.function_call = {
-              name: "",
-              arguments: "",
+              name: '',
+              arguments: '',
             };
           }
           if (choice.delta.function_call.name) {
-            state.choices[0].message.function_call.name =
-              choice.delta.function_call.name;
+            state.choices[0].message.function_call.name = choice.delta.function_call.name;
           }
           if (choice.delta.function_call.arguments) {
-            state.choices[0].message.function_call.arguments +=
-              choice.delta.function_call.arguments;
+            state.choices[0].message.function_call.arguments += choice.delta.function_call.arguments;
           }
         }
       }
@@ -88,8 +86,8 @@ export function makeOpenAIChatCompletionsOp(originalCreate: any, name: string) {
     },
     {
       name: name,
-      parameterNames: "useParam0Object",
-      summarize: (result) => ({
+      parameterNames: 'useParam0Object',
+      summarize: result => ({
         usage: {
           [result.model]: result.usage,
         },
@@ -109,8 +107,8 @@ export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
         result.data = await Promise.all(
           result.data.map(async (item: any) => {
             if (item.b64_json) {
-              const buffer = Buffer.from(item.b64_json, "base64");
-              return weaveImage({ data: buffer, imageType: "png" });
+              const buffer = Buffer.from(item.b64_json, 'base64');
+              return weaveImage({ data: buffer, imageType: 'png' });
             }
             return item;
           })
@@ -120,10 +118,10 @@ export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
       return result;
     },
     {
-      name: "openai.images.generate",
-      summarize: (result) => ({
+      name: 'openai.images.generate',
+      summarize: result => ({
         usage: {
-          "dall-e": {
+          'dall-e': {
             images_generated: result.data.length,
           },
         },
@@ -154,11 +152,8 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
   const chatCompletionsProxy = new Proxy(openai.chat.completions, {
     get(target, p, receiver) {
       const targetVal = Reflect.get(target, p, receiver);
-      if (p === "create") {
-        return makeOpenAIChatCompletionsOp(
-          targetVal.bind(target),
-          "openai.chat.completions.create"
-        );
+      if (p === 'create') {
+        return makeOpenAIChatCompletionsOp(targetVal.bind(target), 'openai.chat.completions.create');
       }
       return targetVal;
     },
@@ -166,7 +161,7 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
   const chatProxy = new Proxy(openai.chat, {
     get(target, p, receiver) {
       const targetVal = Reflect.get(target, p, receiver);
-      if (p === "completions") {
+      if (p === 'completions') {
         return chatCompletionsProxy;
       }
       return targetVal;
@@ -176,7 +171,7 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
   const imagesProxy = new Proxy(openai.images, {
     get(target, p, receiver) {
       const targetVal = Reflect.get(target, p, receiver);
-      if (p === "generate") {
+      if (p === 'generate') {
         return makeOpenAIImagesGenerateOp(targetVal.bind(target));
       }
       return targetVal;
@@ -186,11 +181,8 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
   const betaChatCompletionsProxy = new Proxy(openai.beta.chat.completions, {
     get(target, p, receiver) {
       const targetVal = Reflect.get(target, p, receiver);
-      if (p === "parse") {
-        return makeOpenAIChatCompletionsOp(
-          targetVal.bind(target),
-          "openai.beta.chat.completions.parse"
-        );
+      if (p === 'parse') {
+        return makeOpenAIChatCompletionsOp(targetVal.bind(target), 'openai.beta.chat.completions.parse');
       }
       return targetVal;
     },
@@ -198,7 +190,7 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
   const betaChatProxy = new Proxy(openai.beta.chat, {
     get(target, p, receiver) {
       const targetVal = Reflect.get(target, p, receiver);
-      if (p === "completions") {
+      if (p === 'completions') {
         return betaChatCompletionsProxy;
       }
       return targetVal;
@@ -207,7 +199,7 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
   const betaProxy = new Proxy(openai.beta, {
     get(target, p, receiver) {
       const targetVal = Reflect.get(target, p, receiver);
-      if (p === "chat") {
+      if (p === 'chat') {
         return betaChatProxy;
       }
       return targetVal;
@@ -217,13 +209,13 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
   return new Proxy(openai, {
     get(target, p, receiver) {
       const targetVal = Reflect.get(target, p, receiver);
-      if (p === "chat") {
+      if (p === 'chat') {
         return chatProxy;
       }
-      if (p === "images") {
+      if (p === 'images') {
         return imagesProxy;
       }
-      if (p === "beta") {
+      if (p === 'beta') {
         return betaProxy;
       }
       return targetVal;
