@@ -13,27 +13,24 @@ from wandb import Artifact
 from wandb.apis.public import api as wb_public
 from wandb.sdk.lib.hashutil import b64_to_hex_id, hex_to_b64_id
 
-from weave_query import weave_types as types
 from weave_query import (
-    filesystem,
-    urls,
-    errors,
-    engine_trace,
     artifact_fs,
-    eager,
+    engine_trace,
+    errors,
     file_base,
     file_util,
+    filesystem,
     memo,
     uris,
-    wandb_client_api,
+    urls,
     util,
+    wandb_client_api,
 )
+from weave_query import weave_types as types
 from weave_query.wandb_interface import wandb_artifact_pusher
 
 if typing.TYPE_CHECKING:
     from weave_query.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
-
-    from .run_streamtable_span import RunStreamTableSpan
 
 
 quote_slashes = functools.partial(parse.quote, safe="")
@@ -580,24 +577,33 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         raise NotImplementedError()
 
     def direct_url(self, path: str) -> typing.Optional[str]:
+        print(f">>> DIRECT_URL {uri=}")
         if self._read_artifact_uri is None:
             raise errors.WeaveInternalError(
                 'cannot get direct url for unsaved artifact"'
             )
         uri = self._read_artifact_uri.with_path(path)
-        return self.io_service.direct_url(uri)
+
+        x = self.io_service.direct_url(uri)
+        print(f">>> DIRECT_URL {x=}")
+        return x
 
     def path(self, name: str) -> str:
+        print(f">>> PATH {name=}")
         if not self.is_saved or not self._read_artifact_uri:
             raise errors.WeaveInternalError("cannot download of an unsaved artifact")
 
         uri = self._read_artifact_uri.with_path(name)
+        print(">>> BEFORE FS_PATH")
         fs_path = self.io_service.ensure_file(uri)
+        print(f">>> AFTER FS_PATH {fs_path=}")
         if fs_path is None:
             # Important to raise FileNotFoundError here, FileSystemArtifactRef.type
             # relies on this.
             raise FileNotFoundError("Path not in artifact %s %s" % (self, name))
-        return self.io_service.fs.path(fs_path)
+        x = self.io_service.fs.path(fs_path)
+        print(f">>> AFTER FS_PATH {x=}")
+        return x
 
     def size(self, path: str) -> int:
         manifest = self._manifest()
@@ -710,11 +716,14 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         )
 
     def _manifest(self) -> typing.Optional[WandbArtifactManifest]:
+        print(">>> _MANIFEST")
         if self._read_artifact_uri is None:
             raise errors.WeaveInternalError(
                 'cannot get path info for unsaved artifact"'
             )
-        return self.io_service.manifest(self._read_artifact_uri)
+        x = self.io_service.manifest(self._read_artifact_uri)
+        print(f">>> _MANIFEST {x=}")
+        return x
 
     def digest(self, path: str) -> typing.Optional[str]:
         manifest_entry = self._manifest_entry(path)

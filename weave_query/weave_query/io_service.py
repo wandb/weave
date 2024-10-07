@@ -28,18 +28,18 @@ print("IMPORTED BASIC PYTHON STUFF")
 
 
 from weave_query import (
-    weave_http,
-    filesystem,
-    errors,
-    engine_trace,
-    server_error_handling,
     artifact_wandb,
     async_queue,
     cache,
     context_state,
+    engine_trace,
+    errors,
+    filesystem,
+    server_error_handling,
     uris,
     wandb_api,
     wandb_file_manager,
+    weave_http,
 )
 
 print("WE IMPORTED EVERYTHING")
@@ -735,6 +735,7 @@ class ServerlessClient:
 
 
 def get_sync_client() -> typing.Union[SyncClient, ServerlessClient]:
+    print(">>> GET_SYNC_CLIENT")
     if context_state.serverless_io_service():
         # The io service can't be used during atexit handlers, you get an error like
         # "cannot schedule new futures after shutdown". So it can't really be cleaned up
@@ -744,9 +745,16 @@ def get_sync_client() -> typing.Union[SyncClient, ServerlessClient]:
         # a hang. So we just use the serverless client when setting up weaveflow for now.
         # TODO: this is still an issue for users of streamtable outside of weaveflow, and
         # could be an issue on the weave server if we want clean / flushing shutdowns.
-        return ServerlessClient(filesystem.get_filesystem())
-    return SyncClient(get_server(), filesystem.get_filesystem())
+        c = ServerlessClient(filesystem.get_filesystem())
+        print(f">>> SERVERLESS CLIENT {c=}")
+        return c
+    c = SyncClient(get_server(), filesystem.get_filesystem())
+    print(f">>> SYNC CLIENT {c=}")
+    return c
 
 
 def get_async_client() -> AsyncClient:
-    return AsyncClient(get_server())
+    print(">>> GET_ASYNC_CLIENT")
+    c = AsyncClient(get_server())
+    print(f">>> ASYNC CLIENT {c=}")
+    return c
