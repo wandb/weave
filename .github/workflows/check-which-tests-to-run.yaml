@@ -98,5 +98,4 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: 'Changes to the trace server have been detected. You may need a core migration for these changes.',
-              commit_id: context.payload.pull_request.head.sha
             })
