@@ -81,13 +81,13 @@ export const Suggestions = (props: SuggestionProps) => {
           {Object.keys(items).map(suggestionCategory => (
             <React.Fragment key={suggestionCategory}>
               <S.SuggestionCategory>{suggestionCategory}</S.SuggestionCategory>
-              {items[suggestionCategory].map((s: any) => {
-                itemIndex++;
+              {items[suggestionCategory].map((suggestion: any) => {
+                const currentIndex = itemIndex++;
                 return (
                   <SuggestionRow
-                    key={itemIndex}
-                    idx={itemIndex}
-                    suggestion={s}
+                    key={currentIndex}
+                    idx={currentIndex}
+                    suggestion={suggestion}
                     takeSuggestion={takeSuggestion}
                     suggestionIndex={props.suggestionIndex}
                     setSuggestionIndex={props.setSuggestionIndex}
