@@ -788,25 +788,27 @@ export const CallsTable: FC<{
               disabled={selectedCalls.length === 0}
             />
           )}
-          {!isReadonly && (
-            <div className="flex-none">
-              <BulkDeleteButton
-                onClick={() => setDeleteConfirmModalOpen(true)}
-                disabled={selectedCalls.length === 0}
-              />
-              <ConfirmDeleteModal
-                calls={tableData
-                  .filter(row => selectedCalls.includes(row.id))
-                  .map(traceCallToUICallSchema)}
-                confirmDelete={deleteConfirmModalOpen}
-                setConfirmDelete={setDeleteConfirmModalOpen}
-                onDeleteCallback={() => {
-                  setSelectedCalls([]);
-                }}
-              />
-            </div>
+          {!isReadonly && selectedCalls.length !== 0 && (
+            <>
+              <div className="flex-none">
+                <BulkDeleteButton
+                  onClick={() => setDeleteConfirmModalOpen(true)}
+                  disabled={selectedCalls.length === 0}
+                />
+                <ConfirmDeleteModal
+                  calls={tableData
+                    .filter(row => selectedCalls.includes(row.id))
+                    .map(traceCallToUICallSchema)}
+                  confirmDelete={deleteConfirmModalOpen}
+                  setConfirmDelete={setDeleteConfirmModalOpen}
+                  onDeleteCallback={() => {
+                    setSelectedCalls([]);
+                  }}
+                />
+              </div>
+              <ButtonDivider />
+            </>
           )}
-          <ButtonDivider />
 
           <div className="flex-none">
             <ExportSelector
