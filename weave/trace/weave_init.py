@@ -1,8 +1,7 @@
 import typing
 
 from weave.trace import autopatch, errors, init_message, trace_sentry, weave_client
-from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace_server import sqlite_trace_server
+from weave.trace.context import weave_client_context
 from weave.trace_server_bindings import remote_http_trace_server
 
 _current_inited_client = None
@@ -185,6 +184,8 @@ def init_weave_get_server(
 
 
 def init_local() -> InitializedClient:
+    from weave.trace_server import sqlite_trace_server
+
     server = sqlite_trace_server.SqliteTraceServer("weave.db")
     server.setup_tables()
     client = weave_client.WeaveClient("none", "none", server)
