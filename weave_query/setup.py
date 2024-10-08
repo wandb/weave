@@ -108,5 +108,5 @@ class Sdist(sdist):  # type: ignore
 
 setup(
     cmdclass={"build": Build, "editable_wheel": EditableWheel, "sdist": Sdist},
-    packages=find_namespace_packages(include=["weave*"]),
+    packages=find_namespace_packages(include=["weave_query*"]),
 )
