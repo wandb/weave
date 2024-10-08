@@ -1,8 +1,8 @@
 import {Box} from '@mui/material';
-import React, {useCallback, useState} from 'react';
+import React, {useState} from 'react';
 
-import {EditableMarkdown} from '../CompareEvaluationsPage/EditableMarkdown';
-import {fakeLeaderboardData} from '../CompareEvaluationsPage/fakeData';
+import {EditableMarkdown} from './EditableMarkdown';
+import {fakeLeaderboardData} from './fakeData';
 import {LeaderboardGrid} from './LeaderboardGrid';
 
 type LeaderboardPageProps = {
