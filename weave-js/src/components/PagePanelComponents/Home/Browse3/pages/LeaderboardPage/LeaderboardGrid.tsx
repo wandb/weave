@@ -1,29 +1,35 @@
 import {Box} from '@mui/material';
 import {
   GridColDef,
+  GridColumnGroup,
   GridColumnGroupingModel,
+  GridColumnNode,
   GridPaginationModel,
   GridRenderCellParams,
+  GridSortDirection,
 } from '@mui/x-data-grid-pro';
 import React, {useCallback, useMemo, useState} from 'react';
 
+import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {PaginationButtons} from '../CallsPage/CallsTableButtons';
+import {buildTree} from '../common/tabularListViews/buildTree';
 import {LeaderboardData} from './hooks';
 
 interface LeaderboardGridProps {
   data: LeaderboardData;
+  loading: boolean;
   onCellClick: (modelName: string, metricName: string, score: number) => void;
 }
 
-interface RowData {
+type RowData = {
   id: number;
   model: string;
-  [key: string]: number | string;
-}
+} & LeaderboardData['scores'][string];
 
 export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   data,
+  loading,
   onCellClick,
 }) => {
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
@@ -31,11 +37,18 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     page: 0,
   });
 
+  const orderedMetrics = useMemo(() => {
+    return Object.keys(data.metrics);
+    // return Object.keys(data.metrics).sort((a, b) => {
+    //   return a.localeCompare(b);
+    // });
+  }, [data.metrics]);
+
   const metricRanges = useMemo(() => {
     const ranges: {[key: string]: {min: number; max: number}} = {};
-    Object.keys(data.metrics).forEach(metric => {
+    orderedMetrics.forEach(metric => {
       const scores = data.models
-        .map(model => data.scores?.[model]?.[metric])
+        .map(model => data.scores?.[model]?.[metric]?.value)
         .filter(score => score !== undefined);
       ranges[metric] = {
         min: Math.min(...scores),
@@ -43,7 +56,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       };
     });
     return ranges;
-  }, [data]);
+  }, [data.models, data.scores, orderedMetrics]);
 
   const getColorForScore = useCallback(
     (metric: string, score: number | undefined) => {
@@ -57,14 +70,74 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     [metricRanges]
   );
 
-  const columns: GridColDef[] = useMemo(
+  const rows: RowData[] = useMemo(
+    () =>
+      data.models.map((model, index) => ({
+        id: index,
+        model,
+        ...data.scores[model],
+      })) as RowData[],
+    [data.models, data.scores]
+  );
+
+  const columns: Array<GridColDef<RowData>> = useMemo(
     () => [
-      {field: 'model', headerName: 'Model', width: 200, flex: 1},
-      ...Object.keys(data.metrics).map(metric => ({
-        field: metric,
-        headerName: metric,
-        width: 130,
+      {
+        field: 'model',
+        headerName: 'Model',
+        minWidth: 200,
         flex: 1,
+        renderCell: (params: GridRenderCellParams) => {
+          const modelRef = parseRefMaybe(params.value);
+          if (modelRef) {
+            return (
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  alignContent: 'center',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  lineHeight: '20px',
+                }}>
+                <SmallRef objRef={modelRef} />
+              </div>
+            );
+          }
+          return <div>{params.value}</div>;
+        },
+      },
+      ...orderedMetrics.map(metric => ({
+        field: metric,
+        headerName: metric.split('.').pop(),
+        minWidth: 130,
+        flex: 1,
+        valueGetter: (value: RowData) => {
+          return value?.value;
+        },
+        getSortComparator: (dir: GridSortDirection) => (a: any, b: any) => {
+          const aValue = a;
+          const bValue = b;
+          if (aValue == null && bValue == null) {
+            return 0;
+          }
+          // Ignoring direction here allows nulls to always sort to the end
+          if (aValue == null) {
+            return 1;
+          }
+          if (bValue == null) {
+            return -1;
+          }
+          if (typeof aValue === 'number' && typeof bValue === 'number') {
+            if (dir === 'asc') {
+              return aValue - bValue;
+            } else {
+              return bValue - aValue;
+            }
+          }
+          return aValue.localeCompare(bValue);
+        },
         renderCell: (params: GridRenderCellParams) => {
           let inner = params.value;
           if (typeof inner === 'number') {
@@ -100,32 +173,43 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         },
       })),
     ],
-    [data.metrics, getColorForScore, onCellClick]
+    [getColorForScore, onCellClick, orderedMetrics]
   );
 
-  const rows: RowData[] = useMemo(
-    () =>
-      data.models.map((model, index) => ({
-        id: index,
-        model,
-        ...data.scores[model],
-      })),
-    [data.models, data.scores]
-  );
+  const tree = buildTree([...Object.keys(data.metrics)]);
+  let groupingModel: GridColumnGroupingModel = tree.children.filter(
+    c => 'groupId' in c
+  ) as GridColumnGroup[];
+  groupingModel = walkGroupingModel(groupingModel, node => {
+    if ('groupId' in node) {
+      if (node.children.length === 1) {
+        if ('groupId' in node.children[0]) {
+          const currNode = node;
+          node = node.children[0];
+          node.headerName = currNode.headerName + '.' + node.headerName;
+        } else {
+          // pass
+          // node = node.children[0];
+        }
+      }
+    }
+    return node;
+  }) as GridColumnGroup[];
+  console.log(groupingModel);
 
-  const groupingModel: GridColumnGroupingModel = useMemo(
-    () => {
-      return [
-        {
-          groupId: 'metrics',
-          children: Object.keys(data.metrics).map(metric => ({
-            field: metric,
-          })),
-        },
-      ];
-    },
-    [data.metrics]
-  );
+  // const groupingModel: GridColumnGroupingModel = useMemo(
+  //   () => {
+  //     return [
+  //       {
+  //         groupId: 'metrics',
+  //         children: Object.keys(data.metrics).map(metric => ({
+  //           field: metric,
+  //         })),
+  //       },
+  //     ];
+  //   },
+  //   [data.metrics]
+  // );
 
   return (
     <Box
@@ -146,6 +230,9 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         pageSizeOptions={[25]}
         disableRowSelectionOnClick
         hideFooterSelectedRowCount
+        disableMultipleColumnsSorting={false}
+        columnHeaderHeight={40}
+        loading={loading}
         sx={{
           borderRadius: 0,
           '& .MuiDataGrid-footerContainer': {
@@ -173,4 +260,16 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       />
     </Box>
   );
+};
+
+const walkGroupingModel = (
+  nodes: GridColumnNode[],
+  fn: (node: GridColumnNode) => GridColumnNode
+) => {
+  return nodes.map(node => {
+    if ('children' in node) {
+      node.children = walkGroupingModel(node.children, fn);
+    }
+    return fn(node);
+  });
 };

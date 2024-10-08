@@ -17,10 +17,14 @@ export type LeaderboardData = {
     };
   };
   models: string[];
-  scores: {[modelId: string]: {[metricId: string]: number}};
+  scores: {
+    [modelId: string]: {
+      [metricId: string]: {value: number; sourceCallId: string};
+    };
+  };
 };
 
-const useEvaluations = (
+export const useLeaderboardData = (
   entity: string,
   project: string
 ): {loading: boolean; data: LeaderboardData} => {
@@ -129,7 +133,10 @@ const useEvaluations = (
         if (!finalData.scores[modelName]) {
           finalData.scores[modelName] = {};
         }
-        finalData.scores[modelName][metricName] = score;
+        finalData.scores[modelName][metricName] = {
+          value: score,
+          sourceCallId: r.callId,
+        };
       });
     });
 
@@ -144,12 +151,4 @@ const useEvaluations = (
   ]);
 
   return results;
-};
-
-export const useLeaderboardData = (
-  entity: string,
-  project: string
-): LeaderboardData => {
-  const {loading, data} = useEvaluations(entity, project);
-  return data;
 };
