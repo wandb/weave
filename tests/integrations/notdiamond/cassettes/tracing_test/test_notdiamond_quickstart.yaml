@@ -1,0 +1,55 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "user", "content": "Hello, world!"}], "llm_providers":
+      [{"provider": "openai", "model": "gpt-4o-mini", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "openai", "model": "gpt-4o", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}], "metric": "accuracy", "max_model_depth":
+      2, "hash_content": false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '445'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-mini"}],"session_id":"a580a6f3-4a17-4385-9366-7cbe3d2ac3b1"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf86116cfb2746a-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:24 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      alt-svc:
+      - h3=":443"; ma=86400
+      rndr-id:
+      - 6cdd78af-f85f-4798
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+version: 1

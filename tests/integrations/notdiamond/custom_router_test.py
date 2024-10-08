@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict
+from typing import Dict, Optional
 
 import pytest
 import yaml
@@ -39,19 +39,28 @@ def model_datasets(model_evals: Dict[str, EvaluationResults]):
 
 @pytest.fixture
 def preference_id():
-    with open(
-        "integrations/notdiamond/cassettes/custom_router_test/test_custom_router_train_router.yaml",
-        "r",
-    ) as file:
-        cassette = yaml.safe_load(file)
+    try:
+        with open(
+            "integrations/notdiamond/cassettes/custom_router_test/test_custom_router_train_router.yaml",
+            "r",
+        ) as file:
+            cassette = yaml.safe_load(file)
 
-    response_body = cassette["interactions"][0]["response"]["body"]
-    return json.loads(response_body["string"])["preference_id"]
+        response_body = cassette["interactions"][0]["response"]["body"]
+        return json.loads(response_body["string"])["preference_id"]
+    except FileNotFoundError:
+        return None
 
 
 @pytest.mark.skip_clickhouse_client
-def test_custom_router_train_router(
-    client: WeaveClient, model_evals: Dict[str, EvaluationResults]
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_train_router(
+    client: WeaveClient,
+    model_evals: Dict[str, EvaluationResults],
+    preference_id: Optional[str],
 ):
     api_key = os.getenv("NOTDIAMOND_API_KEY", "DUMMY_API_KEY")
     preference_id = train_router(
@@ -61,6 +70,7 @@ def test_custom_router_train_router(
         language="en",
         maximize=True,
         api_key=api_key,
+        preference_id=preference_id,
     )
 
     assert len(list(client.calls())) > 0
@@ -72,6 +82,10 @@ def test_custom_router_train_router(
 
 
 @pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
 def test_evaluate_router(
     client: WeaveClient, model_datasets: Dict[str, weave.Table], preference_id: str
 ):

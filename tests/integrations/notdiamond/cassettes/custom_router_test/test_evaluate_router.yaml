@@ -1,0 +1,933 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "user", "content": "from typing import List\n\n\ndef
+      has_close_elements(numbers: List[float], threshold: float) -> bool:\n    \"\"\"
+      Check if in given list of numbers, are any two numbers closer to each other
+      than\n    given threshold.\n    >>> has_close_elements([1.0, 2.0, 3.0], 0.5)\n    False\n    >>>
+      has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3)\n    True\n    \"\"\"\n"}],
+      "llm_providers": [{"provider": "anthropic", "model": "claude-3-5-sonnet-20240620",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "openai", "model": "gpt-4o-2024-05-13",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "google", "model": "gemini-1.5-pro-latest",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "anthropic", "model": "claude-3-opus-20240229",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}], "metric": "accuracy", "max_model_depth": 5, "hash_content":
+      false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1317'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"05e10076-7f35-41b2-ac98-502625abccb1"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf860c4dbe180ca-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:11 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - 09f44993-b948-48f5
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "from typing import List\n\n\ndef
+      separate_paren_groups(paren_string: str) -> List[str]:\n    \"\"\" Input to
+      this function is a string containing multiple groups of nested parentheses.
+      Your goal is to\n    separate those group into separate strings and return the
+      list of those.\n    Separate groups are balanced (each open brace is properly
+      closed) and not nested within each other\n    Ignore any spaces in the input
+      string.\n    >>> separate_paren_groups(''( ) (( )) (( )( ))'')\n    [''()'',
+      ''(())'', ''(()())'']\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic",
+      "model": "claude-3-5-sonnet-20240620", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "openai", "model": "gpt-4o-2024-05-13", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "google", "model": "gemini-1.5-pro-latest", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "anthropic", "model": "claude-3-opus-20240229", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}], "metric":
+      "accuracy", "max_model_depth": 5, "hash_content": false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1475'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"openai","model":"gpt-4-turbo-2024-04-09"}],"session_id":"0660043e-b627-4601-93bf-9bf3227b9756"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf860ca2c86a57e-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:12 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - 3c3ddbe9-8e09-4d13
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "\n\ndef truncate_number(number:
+      float) -> float:\n    \"\"\" Given a positive floating point number, it can
+      be decomposed into\n    and integer part (largest integer smaller than given
+      number) and decimals\n    (leftover part always smaller than 1).\n\n    Return
+      the decimal part of the number.\n    >>> truncate_number(3.5)\n    0.5\n    \"\"\"\n"}],
+      "llm_providers": [{"provider": "anthropic", "model": "claude-3-5-sonnet-20240620",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "openai", "model": "gpt-4o-2024-05-13",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "google", "model": "gemini-1.5-pro-latest",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "anthropic", "model": "claude-3-opus-20240229",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}], "metric": "accuracy", "max_model_depth": 5, "hash_content":
+      false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1300'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"anthropic","model":"claude-3-5-sonnet-20240620"}],"session_id":"e103dfc4-4a00-4950-b80a-73fbee56f708"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf860cf6edd4c21-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:13 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - e02bf931-68cb-4c9b
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "from typing import List\n\n\ndef
+      below_zero(operations: List[int]) -> bool:\n    \"\"\" You''re given a list
+      of deposit and withdrawal operations on a bank account that starts with\n    zero
+      balance. Your task is to detect if at any point the balance of account fallls
+      below zero, and\n    at that point function should return True. Otherwise it
+      should return False.\n    >>> below_zero([1, 2, 3])\n    False\n    >>> below_zero([1,
+      2, -4, 5])\n    True\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic",
+      "model": "claude-3-5-sonnet-20240620", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "openai", "model": "gpt-4o-2024-05-13", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "google", "model": "gemini-1.5-pro-latest", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "anthropic", "model": "claude-3-opus-20240229", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}], "metric":
+      "accuracy", "max_model_depth": 5, "hash_content": false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1418'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"535d34ca-c0ef-4246-b82a-01008ed04630"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf860d52da72876-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:13 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - 6cff55e7-86dd-4daa
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "from typing import List\n\n\ndef
+      mean_absolute_deviation(numbers: List[float]) -> float:\n    \"\"\" For a given
+      list of input numbers, calculate Mean Absolute Deviation\n    around the mean
+      of this dataset.\n    Mean Absolute Deviation is the average absolute difference
+      between each\n    element and a centerpoint (mean in this case):\n    MAD =
+      average | x - x_mean |\n    >>> mean_absolute_deviation([1.0, 2.0, 3.0, 4.0])\n    1.0\n    \"\"\"\n"}],
+      "llm_providers": [{"provider": "anthropic", "model": "claude-3-5-sonnet-20240620",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "openai", "model": "gpt-4o-2024-05-13",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "google", "model": "gemini-1.5-pro-latest",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "anthropic", "model": "claude-3-opus-20240229",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}], "metric": "accuracy", "max_model_depth": 5, "hash_content":
+      false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1400'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"anthropic","model":"claude-3-5-sonnet-20240620"}],"session_id":"7122454e-96c5-44b3-95d7-7cb666c682d1"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf860d9dd940349-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:14 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - b8958dae-f092-43ff
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "from typing import List\n\n\ndef
+      intersperse(numbers: List[int], delimeter: int) -> List[int]:\n    \"\"\" Insert
+      a number ''delimeter'' between every two consecutive elements of input list
+      `numbers''\n    >>> intersperse([], 4)\n    []\n    >>> intersperse([1, 2, 3],
+      4)\n    [1, 4, 2, 4, 3]\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic",
+      "model": "claude-3-5-sonnet-20240620", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "openai", "model": "gpt-4o-2024-05-13", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "google", "model": "gemini-1.5-pro-latest", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "anthropic", "model": "claude-3-opus-20240229", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}], "metric":
+      "accuracy", "max_model_depth": 5, "hash_content": false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1255'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"ce78d46b-246e-45a7-b6a8-3c91b328add8"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf860e029734c20-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:15 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - c6ee9dd5-1c35-4efc
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "from typing import List\n\n\ndef
+      parse_nested_parens(paren_string: str) -> List[int]:\n    \"\"\" Input to this
+      function is a string represented multiple groups for nested parentheses separated
+      by spaces.\n    For each of the group, output the deepest level of nesting of
+      parentheses.\n    E.g. (()()) has maximum two levels of nesting while ((()))
+      has three.\n\n    >>> parse_nested_parens(''(()()) ((())) () ((())()())'')\n    [2,
+      3, 1, 3]\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic", "model":
+      "claude-3-5-sonnet-20240620", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "openai", "model":
+      "gpt-4o-2024-05-13", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "google", "model":
+      "gemini-1.5-pro-latest", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "openai", "model":
+      "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "anthropic", "model":
+      "claude-3-opus-20240229", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}], "metric": "accuracy", "max_model_depth":
+      5, "hash_content": false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1405'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"anthropic","model":"claude-3-5-sonnet-20240620"}],"session_id":"d8647cbb-b3c3-4071-8ffc-50d84f46061f"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf860e5beda098e-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:16 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - 0829655e-185f-4ade
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "from typing import List\n\n\ndef
+      filter_by_substring(strings: List[str], substring: str) -> List[str]:\n    \"\"\"
+      Filter an input list of strings only for ones that contain given substring\n    >>>
+      filter_by_substring([], ''a'')\n    []\n    >>> filter_by_substring([''abc'',
+      ''bacd'', ''cde'', ''array''], ''a'')\n    [''abc'', ''bacd'', ''array'']\n    \"\"\"\n"}],
+      "llm_providers": [{"provider": "anthropic", "model": "claude-3-5-sonnet-20240620",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "openai", "model": "gpt-4o-2024-05-13",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "google", "model": "gemini-1.5-pro-latest",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "anthropic", "model": "claude-3-opus-20240229",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}], "metric": "accuracy", "max_model_depth": 5, "hash_content":
+      false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1298'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"d4acc398-394a-41a9-9b7a-28d717242801"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf860eaae8ba66f-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:17 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - 93d08526-2efa-4901
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "from typing import List, Tuple\n\n\ndef
+      sum_product(numbers: List[int]) -> Tuple[int, int]:\n    \"\"\" For a given
+      list of integers, return a tuple consisting of a sum and a product of all the
+      integers in a list.\n    Empty sum should be equal to 0 and empty product should
+      be equal to 1.\n    >>> sum_product([])\n    (0, 1)\n    >>> sum_product([1,
+      2, 3, 4])\n    (10, 24)\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic",
+      "model": "claude-3-5-sonnet-20240620", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "openai", "model": "gpt-4o-2024-05-13", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "google", "model": "gemini-1.5-pro-latest", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "anthropic", "model": "claude-3-opus-20240229", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}], "metric":
+      "accuracy", "max_model_depth": 5, "hash_content": false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1341'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"caa9c9ce-b474-4f0a-9b01-ac24e9f012c8"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf860efbd4fa695-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:18 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - 1bbc1fca-6548-4afe
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "from typing import List, Tuple\n\n\ndef
+      rolling_max(numbers: List[int]) -> List[int]:\n    \"\"\" From a given list
+      of integers, generate a list of rolling maximum element found until given moment\n    in
+      the sequence.\n    >>> rolling_max([1, 2, 3, 2, 3, 4, 2])\n    [1, 2, 3, 3,
+      3, 4, 4]\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic", "model":
+      "claude-3-5-sonnet-20240620", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "openai", "model":
+      "gpt-4o-2024-05-13", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "google", "model":
+      "gemini-1.5-pro-latest", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "openai", "model":
+      "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "anthropic", "model":
+      "claude-3-opus-20240229", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}], "metric": "accuracy", "max_model_depth":
+      5, "hash_content": false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1255'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"anthropic","model":"claude-3-5-sonnet-20240620"}],"session_id":"9b032858-510c-4509-a372-acbc02429e3a"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf860f5ac95a4c8-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:19 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - 8e346be9-91fd-46a0
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "\n\ndef is_palindrome(string:
+      str) -> bool:\n    \"\"\" Test if given string is a palindrome \"\"\"\n    return
+      string == string[::-1]\n\n\ndef make_palindrome(string: str) -> str:\n    \"\"\"
+      Find the shortest palindrome that begins with a supplied string.\n    Algorithm
+      idea is simple:\n    - Find the longest postfix of supplied string that is a
+      palindrome.\n    - Append to the end of the string reverse of a string prefix
+      that comes before the palindromic suffix.\n    >>> make_palindrome('''')\n    ''''\n    >>>
+      make_palindrome(''cat'')\n    ''catac''\n    >>> make_palindrome(''cata'')\n    ''catac''\n    \"\"\"\n"}],
+      "llm_providers": [{"provider": "anthropic", "model": "claude-3-5-sonnet-20240620",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "openai", "model": "gpt-4o-2024-05-13",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "google", "model": "gemini-1.5-pro-latest",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "anthropic", "model": "claude-3-opus-20240229",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}], "metric": "accuracy", "max_model_depth": 5, "hash_content":
+      false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1563'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"a13503c5-53dc-4ca3-89e2-a462459fbb3c"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf860fa9f67a669-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:19 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - deee74c5-a193-43ca
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "from typing import List\n\n\ndef
+      string_xor(a: str, b: str) -> str:\n    \"\"\" Input are two strings a and b
+      consisting only of 1s and 0s.\n    Perform binary XOR on these inputs and return
+      result also as a string.\n    >>> string_xor(''010'', ''110'')\n    ''100''\n    \"\"\"\n"}],
+      "llm_providers": [{"provider": "anthropic", "model": "claude-3-5-sonnet-20240620",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "openai", "model": "gpt-4o-2024-05-13",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "google", "model": "gemini-1.5-pro-latest",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "anthropic", "model": "claude-3-opus-20240229",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}], "metric": "accuracy", "max_model_depth": 5, "hash_content":
+      false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1226'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"c94f6483-6283-4183-819b-fb4d67f86b9f"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf860ff88944c0d-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:20 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - 7fe891e9-8332-4fb7
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "from typing import List, Optional\n\n\ndef
+      longest(strings: List[str]) -> Optional[str]:\n    \"\"\" Out of list of strings,
+      return the longest one. Return the first one in case of multiple\n    strings
+      of the same length. Return None in case the input list is empty.\n    >>> longest([])\n\n    >>>
+      longest([''a'', ''b'', ''c''])\n    ''a''\n    >>> longest([''a'', ''bb'', ''ccc''])\n    ''ccc''\n    \"\"\"\n"}],
+      "llm_providers": [{"provider": "anthropic", "model": "claude-3-5-sonnet-20240620",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "openai", "model": "gpt-4o-2024-05-13",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "google", "model": "gemini-1.5-pro-latest",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}, {"provider": "anthropic", "model": "claude-3-opus-20240229",
+      "is_custom": false, "context_length": null, "input_price": null, "output_price":
+      null, "latency": null}], "metric": "accuracy", "max_model_depth": 5, "hash_content":
+      false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1347'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"fb72d333-f7c2-4865-bc42-97c6e267f98d"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf86104bb47a53c-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:21 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - 731ad948-5547-426e
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "\n\ndef greatest_common_divisor(a:
+      int, b: int) -> int:\n    \"\"\" Return a greatest common divisor of two integers
+      a and b\n    >>> greatest_common_divisor(3, 5)\n    1\n    >>> greatest_common_divisor(25,
+      15)\n    5\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic", "model":
+      "claude-3-5-sonnet-20240620", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "openai", "model":
+      "gpt-4o-2024-05-13", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "google", "model":
+      "gemini-1.5-pro-latest", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "openai", "model":
+      "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "anthropic", "model":
+      "claude-3-opus-20240229", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}], "metric": "accuracy", "max_model_depth":
+      5, "hash_content": false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1184'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"1e737c59-98ff-4886-8dd6-a8640a924c8d"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf86109cf5f74ae-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:22 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - 4951be2f-c234-4cf8
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "from typing import List\n\n\ndef
+      all_prefixes(string: str) -> List[str]:\n    \"\"\" Return list of all prefixes
+      from shortest to longest of the input string\n    >>> all_prefixes(''abc'')\n    [''a'',
+      ''ab'', ''abc'']\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic",
+      "model": "claude-3-5-sonnet-20240620", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "openai", "model": "gpt-4o-2024-05-13", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "google", "model": "gemini-1.5-pro-latest", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
+      "anthropic", "model": "claude-3-opus-20240229", "is_custom": false, "context_length":
+      null, "input_price": null, "output_price": null, "latency": null}], "metric":
+      "accuracy", "max_model_depth": 5, "hash_content": false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1176'
+      User-Agent:
+      - Python-SDK/0.3.19
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
+  response:
+    body:
+      string: '{"providers":[{"provider":"anthropic","model":"claude-3-5-sonnet-20240620"}],"session_id":"73d9cc90-429a-4b8a-9629-533f949e0762"}'
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 8cf8610fff1cb3ce-MIA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Oct 2024 19:01:23 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      rndr-id:
+      - efee0175-b25a-4edb
+      x-render-origin-server:
+      - uvicorn
+    status:
+      code: 200
+      message: OK
+version: 1
