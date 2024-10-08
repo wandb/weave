@@ -11,7 +11,7 @@ from typing import Dict, TypedDict, List, Tuple, Optional
 import logging
 from clickhouse_connect.driver.client import Client
 
-COST_FILE = "costs.json"
+COST_FILE = "cost_checkpoint.json"
 
 logger = logging.getLogger(__name__)
 

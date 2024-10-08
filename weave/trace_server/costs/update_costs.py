@@ -10,7 +10,7 @@ from typing import Dict, TypedDict, List
 
 
 # The file that stores the costs
-COST_FILE = "costs.json"
+COST_FILE = "cost_checkpoint.json"
 # The file that stores the latest costs from litellm
 url = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 # Amount of historical costs to store for each model
@@ -121,7 +121,7 @@ def main(file_name: str = COST_FILE):
 
     # output costs to costs.json
     try:
-        with open(COST_FILE, "w") as f:
+        with open(file_path, "w") as f:
             json.dump(costs, f, indent=2)
     except Exception as e:
         print("Failed to write updated costs to file:", e)
