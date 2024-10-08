@@ -488,8 +488,8 @@ def create_client(request) -> weave_init.InitializedClient:
         )
     elif weave_server_flag == "clickhouse":
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
-        # ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
-        # ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
+        ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
+        ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
         ch_server._run_migrations()
         server = TestOnlyUserInjectingExternalTraceServer(
             ch_server, DummyIdConverter(), entity
@@ -512,7 +512,7 @@ def create_client(request) -> weave_init.InitializedClient:
     return inited_client
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def client(request):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality"""

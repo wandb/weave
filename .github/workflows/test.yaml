@@ -262,6 +262,7 @@ jobs:
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -n4 \
             -m "weave_client and not skip_clickhouse_client" \
             --weave-server=clickhouse
       - name: Run nox
