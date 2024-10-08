@@ -43,7 +43,8 @@ export const SummaryPlots: React.FC<{
     Array.from(allMetricNames)
   );
 
-  // filter down the plotlyRadarData to only include the selected metrics
+  // filter down the plotlyRadarData to only include the selected metrics, after
+  // computation, to allow quick addition/removal of metrics
   const filteredPlotlyRadarData = useMemo(() => {
     const filteredData: RadarPlotData = {};
     for (const [callId, metricBin] of Object.entries(radarData)) {
