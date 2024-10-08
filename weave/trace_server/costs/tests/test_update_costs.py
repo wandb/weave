@@ -1,16 +1,17 @@
-import unittest
-from unittest.mock import patch, mock_open, MagicMock
 import json
+import os
+import unittest
 from datetime import datetime
+from unittest.mock import MagicMock, mock_open, patch
+
 import requests
 
-
 from weave.trace_server.costs.update_costs import (
-    get_current_costs,
-    fetch_new_costs,
-    sum_costs,
-    main,
     COST_FILE,
+    fetch_new_costs,
+    get_current_costs,
+    main,
+    sum_costs,
 )
 
 
@@ -154,7 +155,7 @@ class TestUpdateCosts(unittest.TestCase):
             },
         }
         main()
-        mock_file.assert_called_with(COST_FILE, "w")
+        mock_file.assert_called_with(os.path.abspath(COST_FILE), "w")
         handle = mock_file()
         handle.write.assert_called()
         written_data = "".join(args[0] for args, kwargs in handle.write.call_args_list)
@@ -208,7 +209,7 @@ class TestUpdateCosts(unittest.TestCase):
             }
         }
         main()
-        mock_file.assert_called_with(COST_FILE, "w")
+        mock_file.assert_called_with(os.path.abspath(COST_FILE), "w")
         handle = mock_file()
         handle.write.assert_called()
         written_data = "".join(args[0] for args, kwargs in handle.write.call_args_list)
@@ -272,7 +273,7 @@ class TestUpdateCosts(unittest.TestCase):
             }
         }
         main()
-        mock_file.assert_called_with(COST_FILE, "w")
+        mock_file.assert_called_with(os.path.abspath(COST_FILE), "w")
         handle = mock_file()
         handle.write.assert_called()
         written_data = "".join(args[0] for args, kwargs in handle.write.call_args_list)

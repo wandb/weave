@@ -4,7 +4,7 @@
       "provider": "openai",
       "input": 3e-05,
       "output": 6e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4o": [
@@ -12,7 +12,7 @@
       "provider": "openai",
       "input": 5e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4o-mini": [
@@ -20,7 +20,7 @@
       "provider": "openai",
       "input": 1.5e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4o-mini-2024-07-18": [
@@ -28,7 +28,7 @@
       "provider": "openai",
       "input": 1.5e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "o1-mini": [
@@ -36,7 +36,7 @@
       "provider": "openai",
       "input": 3e-06,
       "output": 1.2e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "o1-mini-2024-09-12": [
@@ -44,7 +44,7 @@
       "provider": "openai",
       "input": 3e-06,
       "output": 1.2e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "o1-preview": [
@@ -52,7 +52,7 @@
       "provider": "openai",
       "input": 1.5e-05,
       "output": 6e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "o1-preview-2024-09-12": [
@@ -60,7 +60,7 @@
       "provider": "openai",
       "input": 1.5e-05,
       "output": 6e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "chatgpt-4o-latest": [
@@ -68,7 +68,7 @@
       "provider": "openai",
       "input": 5e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4o-2024-05-13": [
@@ -76,7 +76,7 @@
       "provider": "openai",
       "input": 5e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4o-2024-08-06": [
@@ -84,7 +84,7 @@
       "provider": "openai",
       "input": 2.5e-06,
       "output": 1e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4-turbo-preview": [
@@ -92,7 +92,7 @@
       "provider": "openai",
       "input": 1e-05,
       "output": 3e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4-0314": [
@@ -100,7 +100,7 @@
       "provider": "openai",
       "input": 3e-05,
       "output": 6e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4-0613": [
@@ -108,7 +108,7 @@
       "provider": "openai",
       "input": 3e-05,
       "output": 6e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4-32k": [
@@ -116,7 +116,7 @@
       "provider": "openai",
       "input": 6e-05,
       "output": 0.00012,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4-32k-0314": [
@@ -124,7 +124,7 @@
       "provider": "openai",
       "input": 6e-05,
       "output": 0.00012,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4-32k-0613": [
@@ -132,7 +132,7 @@
       "provider": "openai",
       "input": 6e-05,
       "output": 0.00012,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4-turbo": [
@@ -140,7 +140,7 @@
       "provider": "openai",
       "input": 1e-05,
       "output": 3e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4-turbo-2024-04-09": [
@@ -148,7 +148,7 @@
       "provider": "openai",
       "input": 1e-05,
       "output": 3e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4-1106-preview": [
@@ -156,7 +156,7 @@
       "provider": "openai",
       "input": 1e-05,
       "output": 3e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4-0125-preview": [
@@ -164,7 +164,7 @@
       "provider": "openai",
       "input": 1e-05,
       "output": 3e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4-vision-preview": [
@@ -172,7 +172,7 @@
       "provider": "openai",
       "input": 1e-05,
       "output": 3e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-4-1106-vision-preview": [
@@ -180,7 +180,7 @@
       "provider": "openai",
       "input": 1e-05,
       "output": 3e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-3.5-turbo": [
@@ -188,7 +188,7 @@
       "provider": "openai",
       "input": 1.5e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-3.5-turbo-0301": [
@@ -196,7 +196,7 @@
       "provider": "openai",
       "input": 1.5e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-3.5-turbo-0613": [
@@ -204,7 +204,7 @@
       "provider": "openai",
       "input": 1.5e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-3.5-turbo-1106": [
@@ -212,7 +212,7 @@
       "provider": "openai",
       "input": 1e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-3.5-turbo-0125": [
@@ -220,7 +220,7 @@
       "provider": "openai",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-3.5-turbo-16k": [
@@ -228,7 +228,7 @@
       "provider": "openai",
       "input": 3e-06,
       "output": 4e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-3.5-turbo-16k-0613": [
@@ -236,7 +236,7 @@
       "provider": "openai",
       "input": 3e-06,
       "output": 4e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ft:gpt-3.5-turbo": [
@@ -244,7 +244,7 @@
       "provider": "openai",
       "input": 3e-06,
       "output": 6e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ft:gpt-3.5-turbo-0125": [
@@ -252,7 +252,7 @@
       "provider": "openai",
       "input": 3e-06,
       "output": 6e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ft:gpt-3.5-turbo-1106": [
@@ -260,7 +260,7 @@
       "provider": "openai",
       "input": 3e-06,
       "output": 6e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ft:gpt-3.5-turbo-0613": [
@@ -268,7 +268,7 @@
       "provider": "openai",
       "input": 3e-06,
       "output": 6e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ft:gpt-4-0613": [
@@ -276,7 +276,7 @@
       "provider": "openai",
       "input": 3e-05,
       "output": 6e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ft:gpt-4o-2024-08-06": [
@@ -284,7 +284,7 @@
       "provider": "openai",
       "input": 3.75e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ft:gpt-4o-mini-2024-07-18": [
@@ -292,7 +292,7 @@
       "provider": "openai",
       "input": 3e-07,
       "output": 1.2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ft:davinci-002": [
@@ -300,7 +300,7 @@
       "provider": "text-completion-openai",
       "input": 2e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ft:babbage-002": [
@@ -308,7 +308,7 @@
       "provider": "text-completion-openai",
       "input": 4e-07,
       "output": 4e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-embedding-3-large": [
@@ -316,7 +316,7 @@
       "provider": "openai",
       "input": 1.3e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-embedding-3-small": [
@@ -324,7 +324,7 @@
       "provider": "openai",
       "input": 2e-08,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-embedding-ada-002": [
@@ -332,7 +332,7 @@
       "provider": "openai",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-embedding-ada-002-v2": [
@@ -340,7 +340,7 @@
       "provider": "openai",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-moderation-stable": [
@@ -348,7 +348,7 @@
       "provider": "openai",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-moderation-007": [
@@ -356,7 +356,7 @@
       "provider": "openai",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-moderation-latest": [
@@ -364,7 +364,7 @@
       "provider": "openai",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/o1-mini": [
@@ -372,7 +372,7 @@
       "provider": "azure",
       "input": 3e-06,
       "output": 1.2e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/o1-mini-2024-09-12": [
@@ -380,7 +380,7 @@
       "provider": "azure",
       "input": 3e-06,
       "output": 1.2e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/o1-preview": [
@@ -388,7 +388,7 @@
       "provider": "azure",
       "input": 1.5e-05,
       "output": 6e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/o1-preview-2024-09-12": [
@@ -396,7 +396,7 @@
       "provider": "azure",
       "input": 1.5e-05,
       "output": 6e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-4o": [
@@ -404,7 +404,7 @@
       "provider": "azure",
       "input": 5e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-4o-2024-08-06": [
@@ -412,7 +412,7 @@
       "provider": "azure",
       "input": 2.75e-06,
       "output": 1.1e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/global-standard/gpt-4o-2024-08-06": [
@@ -420,7 +420,7 @@
       "provider": "azure",
       "input": 2.5e-06,
       "output": 1e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/global-standard/gpt-4o-mini": [
@@ -428,7 +428,7 @@
       "provider": "azure",
       "input": 1.5e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-4o-mini": [
@@ -436,7 +436,7 @@
       "provider": "azure",
       "input": 1.65e-07,
       "output": 6.6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-4-turbo-2024-04-09": [
@@ -444,7 +444,7 @@
       "provider": "azure",
       "input": 1e-05,
       "output": 3e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-4-0125-preview": [
@@ -452,7 +452,7 @@
       "provider": "azure",
       "input": 1e-05,
       "output": 3e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-4-1106-preview": [
@@ -460,7 +460,7 @@
       "provider": "azure",
       "input": 1e-05,
       "output": 3e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-4-0613": [
@@ -468,7 +468,7 @@
       "provider": "azure",
       "input": 3e-05,
       "output": 6e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-4-32k-0613": [
@@ -476,7 +476,7 @@
       "provider": "azure",
       "input": 6e-05,
       "output": 0.00012,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-4-32k": [
@@ -484,7 +484,7 @@
       "provider": "azure",
       "input": 6e-05,
       "output": 0.00012,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-4": [
@@ -492,7 +492,7 @@
       "provider": "azure",
       "input": 3e-05,
       "output": 6e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-4-turbo": [
@@ -500,7 +500,7 @@
       "provider": "azure",
       "input": 1e-05,
       "output": 3e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-4-turbo-vision-preview": [
@@ -508,7 +508,7 @@
       "provider": "azure",
       "input": 1e-05,
       "output": 3e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-35-turbo-16k-0613": [
@@ -516,7 +516,7 @@
       "provider": "azure",
       "input": 3e-06,
       "output": 4e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-35-turbo-1106": [
@@ -524,7 +524,7 @@
       "provider": "azure",
       "input": 1e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-35-turbo-0613": [
@@ -532,7 +532,7 @@
       "provider": "azure",
       "input": 1.5e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-35-turbo-0301": [
@@ -540,7 +540,7 @@
       "provider": "azure",
       "input": 2e-07,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-35-turbo-0125": [
@@ -548,7 +548,7 @@
       "provider": "azure",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-35-turbo-16k": [
@@ -556,7 +556,7 @@
       "provider": "azure",
       "input": 3e-06,
       "output": 4e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-35-turbo": [
@@ -564,7 +564,7 @@
       "provider": "azure",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-3.5-turbo-instruct-0914": [
@@ -572,7 +572,7 @@
       "provider": "text-completion-openai",
       "input": 1.5e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-35-turbo-instruct": [
@@ -580,7 +580,7 @@
       "provider": "text-completion-openai",
       "input": 1.5e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/gpt-35-turbo-instruct-0914": [
@@ -588,7 +588,7 @@
       "provider": "text-completion-openai",
       "input": 1.5e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/mistral-large-latest": [
@@ -596,7 +596,7 @@
       "provider": "azure",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/mistral-large-2402": [
@@ -604,7 +604,7 @@
       "provider": "azure",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/command-r-plus": [
@@ -612,7 +612,7 @@
       "provider": "azure",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/ada": [
@@ -620,7 +620,7 @@
       "provider": "azure",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/text-embedding-ada-002": [
@@ -628,7 +628,7 @@
       "provider": "azure",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/text-embedding-3-large": [
@@ -636,7 +636,7 @@
       "provider": "azure",
       "input": 1.3e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure/text-embedding-3-small": [
@@ -644,7 +644,7 @@
       "provider": "azure",
       "input": 2e-08,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure_ai/jamba-instruct": [
@@ -652,7 +652,7 @@
       "provider": "azure_ai",
       "input": 5e-07,
       "output": 7e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure_ai/mistral-large": [
@@ -660,7 +660,7 @@
       "provider": "azure_ai",
       "input": 4e-06,
       "output": 1.2e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure_ai/mistral-small": [
@@ -668,7 +668,7 @@
       "provider": "azure_ai",
       "input": 1e-06,
       "output": 3e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure_ai/Meta-Llama-3-70B-Instruct": [
@@ -676,7 +676,7 @@
       "provider": "azure_ai",
       "input": 1.1e-06,
       "output": 3.7e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure_ai/Meta-Llama-31-8B-Instruct": [
@@ -684,7 +684,7 @@
       "provider": "azure_ai",
       "input": 3e-07,
       "output": 6.1e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure_ai/Meta-Llama-31-70B-Instruct": [
@@ -692,7 +692,7 @@
       "provider": "azure_ai",
       "input": 2.68e-06,
       "output": 3.54e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure_ai/Meta-Llama-31-405B-Instruct": [
@@ -700,7 +700,7 @@
       "provider": "azure_ai",
       "input": 5.33e-06,
       "output": 1.6e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure_ai/cohere-rerank-v3-multilingual": [
@@ -708,7 +708,7 @@
       "provider": "azure_ai",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure_ai/cohere-rerank-v3-english": [
@@ -716,7 +716,7 @@
       "provider": "azure_ai",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure_ai/Cohere-embed-v3-english": [
@@ -724,7 +724,7 @@
       "provider": "azure_ai",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "azure_ai/Cohere-embed-v3-multilingual": [
@@ -732,7 +732,7 @@
       "provider": "azure_ai",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "babbage-002": [
@@ -740,7 +740,7 @@
       "provider": "text-completion-openai",
       "input": 4e-07,
       "output": 4e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "davinci-002": [
@@ -748,7 +748,7 @@
       "provider": "text-completion-openai",
       "input": 2e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-3.5-turbo-instruct": [
@@ -756,7 +756,7 @@
       "provider": "text-completion-openai",
       "input": 1.5e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gpt-3.5-turbo-instruct-0914": [
@@ -764,7 +764,7 @@
       "provider": "text-completion-openai",
       "input": 1.5e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "claude-instant-1": [
@@ -772,7 +772,7 @@
       "provider": "anthropic",
       "input": 1.63e-06,
       "output": 5.51e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/mistral-tiny": [
@@ -780,7 +780,7 @@
       "provider": "mistral",
       "input": 2.5e-07,
       "output": 2.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/mistral-small": [
@@ -788,7 +788,7 @@
       "provider": "mistral",
       "input": 1e-06,
       "output": 3e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/mistral-small-latest": [
@@ -796,7 +796,7 @@
       "provider": "mistral",
       "input": 1e-06,
       "output": 3e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/mistral-medium": [
@@ -804,7 +804,7 @@
       "provider": "mistral",
       "input": 2.7e-06,
       "output": 8.1e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/mistral-medium-latest": [
@@ -812,7 +812,7 @@
       "provider": "mistral",
       "input": 2.7e-06,
       "output": 8.1e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/mistral-medium-2312": [
@@ -820,7 +820,7 @@
       "provider": "mistral",
       "input": 2.7e-06,
       "output": 8.1e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/mistral-large-latest": [
@@ -828,7 +828,7 @@
       "provider": "mistral",
       "input": 3e-06,
       "output": 9e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/mistral-large-2402": [
@@ -836,7 +836,7 @@
       "provider": "mistral",
       "input": 4e-06,
       "output": 1.2e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/mistral-large-2407": [
@@ -844,7 +844,7 @@
       "provider": "mistral",
       "input": 3e-06,
       "output": 9e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/pixtral-12b-2409": [
@@ -852,7 +852,7 @@
       "provider": "mistral",
       "input": 1.5e-07,
       "output": 1.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/open-mistral-7b": [
@@ -860,7 +860,7 @@
       "provider": "mistral",
       "input": 2.5e-07,
       "output": 2.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/open-mixtral-8x7b": [
@@ -868,7 +868,7 @@
       "provider": "mistral",
       "input": 7e-07,
       "output": 7e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/open-mixtral-8x22b": [
@@ -876,7 +876,7 @@
       "provider": "mistral",
       "input": 2e-06,
       "output": 6e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/codestral-latest": [
@@ -884,7 +884,7 @@
       "provider": "mistral",
       "input": 1e-06,
       "output": 3e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/codestral-2405": [
@@ -892,7 +892,7 @@
       "provider": "mistral",
       "input": 1e-06,
       "output": 3e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/open-mistral-nemo": [
@@ -900,7 +900,7 @@
       "provider": "mistral",
       "input": 3e-07,
       "output": 3e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/open-mistral-nemo-2407": [
@@ -908,7 +908,7 @@
       "provider": "mistral",
       "input": 3e-07,
       "output": 3e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/open-codestral-mamba": [
@@ -916,7 +916,7 @@
       "provider": "mistral",
       "input": 2.5e-07,
       "output": 2.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral/codestral-mamba-latest": [
@@ -924,7 +924,7 @@
       "provider": "mistral",
       "input": 2.5e-07,
       "output": 2.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepseek-chat": [
@@ -932,7 +932,7 @@
       "provider": "deepseek",
       "input": 1.4e-07,
       "output": 2.8e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "codestral/codestral-latest": [
@@ -940,7 +940,7 @@
       "provider": "codestral",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "codestral/codestral-2405": [
@@ -948,7 +948,7 @@
       "provider": "codestral",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-completion-codestral/codestral-latest": [
@@ -956,7 +956,7 @@
       "provider": "text-completion-codestral",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-completion-codestral/codestral-2405": [
@@ -964,7 +964,7 @@
       "provider": "text-completion-codestral",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepseek-coder": [
@@ -972,7 +972,7 @@
       "provider": "deepseek",
       "input": 1.4e-07,
       "output": 2.8e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "groq/llama2-70b-4096": [
@@ -980,7 +980,7 @@
       "provider": "groq",
       "input": 7e-07,
       "output": 8e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "groq/llama3-8b-8192": [
@@ -988,7 +988,7 @@
       "provider": "groq",
       "input": 5e-08,
       "output": 8e-08,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "groq/llama3-70b-8192": [
@@ -996,15 +996,15 @@
       "provider": "groq",
       "input": 5.9e-07,
       "output": 7.9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "groq/llama-3.1-8b-instant": [
     {
       "provider": "groq",
-      "input": 5.9e-07,
-      "output": 7.9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "input": 5e-08,
+      "output": 8e-08,
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "groq/llama-3.1-70b-versatile": [
@@ -1012,7 +1012,7 @@
       "provider": "groq",
       "input": 5.9e-07,
       "output": 7.9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "groq/llama-3.1-405b-reasoning": [
@@ -1020,7 +1020,7 @@
       "provider": "groq",
       "input": 5.9e-07,
       "output": 7.9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "groq/mixtral-8x7b-32768": [
@@ -1028,7 +1028,7 @@
       "provider": "groq",
       "input": 2.4e-07,
       "output": 2.4e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "groq/gemma-7b-it": [
@@ -1036,7 +1036,7 @@
       "provider": "groq",
       "input": 7e-08,
       "output": 7e-08,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "groq/gemma2-9b-it": [
@@ -1044,7 +1044,7 @@
       "provider": "groq",
       "input": 2e-07,
       "output": 2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "groq/llama3-groq-70b-8192-tool-use-preview": [
@@ -1052,7 +1052,7 @@
       "provider": "groq",
       "input": 8.9e-07,
       "output": 8.9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "groq/llama3-groq-8b-8192-tool-use-preview": [
@@ -1060,7 +1060,7 @@
       "provider": "groq",
       "input": 1.9e-07,
       "output": 1.9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "cerebras/llama3.1-8b": [
@@ -1068,7 +1068,7 @@
       "provider": "cerebras",
       "input": 1e-07,
       "output": 1e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "cerebras/llama3.1-70b": [
@@ -1076,7 +1076,7 @@
       "provider": "cerebras",
       "input": 6e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "friendliai/mixtral-8x7b-instruct-v0-1": [
@@ -1084,7 +1084,7 @@
       "provider": "friendliai",
       "input": 4e-07,
       "output": 4e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "friendliai/meta-llama-3-8b-instruct": [
@@ -1092,7 +1092,7 @@
       "provider": "friendliai",
       "input": 1e-07,
       "output": 1e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "friendliai/meta-llama-3-70b-instruct": [
@@ -1100,7 +1100,7 @@
       "provider": "friendliai",
       "input": 8e-07,
       "output": 8e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "claude-instant-1.2": [
@@ -1108,7 +1108,7 @@
       "provider": "anthropic",
       "input": 1.63e-07,
       "output": 5.51e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "claude-2": [
@@ -1116,7 +1116,7 @@
       "provider": "anthropic",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "claude-2.1": [
@@ -1124,7 +1124,7 @@
       "provider": "anthropic",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "claude-3-haiku-20240307": [
@@ -1132,7 +1132,7 @@
       "provider": "anthropic",
       "input": 2.5e-07,
       "output": 1.25e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "claude-3-opus-20240229": [
@@ -1140,7 +1140,7 @@
       "provider": "anthropic",
       "input": 1.5e-05,
       "output": 7.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "claude-3-sonnet-20240229": [
@@ -1148,7 +1148,7 @@
       "provider": "anthropic",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "claude-3-5-sonnet-20240620": [
@@ -1156,7 +1156,7 @@
       "provider": "anthropic",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-bison32k": [
@@ -1164,7 +1164,7 @@
       "provider": "vertex_ai-text-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-bison32k@002": [
@@ -1172,7 +1172,7 @@
       "provider": "vertex_ai-text-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-unicorn": [
@@ -1180,7 +1180,7 @@
       "provider": "vertex_ai-text-models",
       "input": 1e-05,
       "output": 2.8e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-unicorn@001": [
@@ -1188,7 +1188,7 @@
       "provider": "vertex_ai-text-models",
       "input": 1e-05,
       "output": 2.8e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "chat-bison": [
@@ -1196,7 +1196,7 @@
       "provider": "vertex_ai-chat-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "chat-bison@001": [
@@ -1204,7 +1204,7 @@
       "provider": "vertex_ai-chat-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "chat-bison@002": [
@@ -1212,7 +1212,7 @@
       "provider": "vertex_ai-chat-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "chat-bison-32k": [
@@ -1220,7 +1220,7 @@
       "provider": "vertex_ai-chat-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "chat-bison-32k@002": [
@@ -1228,7 +1228,7 @@
       "provider": "vertex_ai-chat-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "code-bison": [
@@ -1236,7 +1236,7 @@
       "provider": "vertex_ai-code-text-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "code-bison@001": [
@@ -1244,7 +1244,7 @@
       "provider": "vertex_ai-code-text-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "code-bison@002": [
@@ -1252,7 +1252,7 @@
       "provider": "vertex_ai-code-text-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "code-bison32k": [
@@ -1260,7 +1260,7 @@
       "provider": "vertex_ai-code-text-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "code-bison-32k@002": [
@@ -1268,7 +1268,7 @@
       "provider": "vertex_ai-code-text-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "code-gecko@001": [
@@ -1276,7 +1276,7 @@
       "provider": "vertex_ai-code-text-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "code-gecko@002": [
@@ -1284,7 +1284,7 @@
       "provider": "vertex_ai-code-text-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "code-gecko": [
@@ -1292,7 +1292,7 @@
       "provider": "vertex_ai-code-text-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "code-gecko-latest": [
@@ -1300,7 +1300,7 @@
       "provider": "vertex_ai-code-text-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "codechat-bison@latest": [
@@ -1308,7 +1308,7 @@
       "provider": "vertex_ai-code-chat-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "codechat-bison": [
@@ -1316,7 +1316,7 @@
       "provider": "vertex_ai-code-chat-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "codechat-bison@001": [
@@ -1324,7 +1324,7 @@
       "provider": "vertex_ai-code-chat-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "codechat-bison@002": [
@@ -1332,7 +1332,7 @@
       "provider": "vertex_ai-code-chat-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "codechat-bison-32k": [
@@ -1340,7 +1340,7 @@
       "provider": "vertex_ai-code-chat-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "codechat-bison-32k@002": [
@@ -1348,7 +1348,7 @@
       "provider": "vertex_ai-code-chat-models",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-pro": [
@@ -1356,7 +1356,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.0-pro": [
@@ -1364,7 +1364,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.0-pro-001": [
@@ -1372,7 +1372,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.0-ultra": [
@@ -1380,7 +1380,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.0-ultra-001": [
@@ -1388,7 +1388,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.0-pro-002": [
@@ -1396,7 +1396,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.5-pro": [
@@ -1404,7 +1404,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.5-pro-002": [
@@ -1412,7 +1412,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.5-pro-001": [
@@ -1420,7 +1420,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.5-pro-preview-0514": [
@@ -1428,7 +1428,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.5-pro-preview-0215": [
@@ -1436,7 +1436,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.5-pro-preview-0409": [
@@ -1444,7 +1444,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.5-flash": [
@@ -1452,7 +1452,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.5-flash-exp-0827": [
@@ -1460,7 +1460,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.5-flash-002": [
@@ -1468,7 +1468,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.5-flash-001": [
@@ -1476,7 +1476,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.5-flash-preview-0514": [
@@ -1484,7 +1484,7 @@
       "provider": "vertex_ai-language-models",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-pro-experimental": [
@@ -1492,7 +1492,7 @@
       "provider": "vertex_ai-language-models",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-flash-experimental": [
@@ -1500,7 +1500,7 @@
       "provider": "vertex_ai-language-models",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-pro-vision": [
@@ -1508,7 +1508,7 @@
       "provider": "vertex_ai-vision-models",
       "input": 2.5e-07,
       "output": 5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.0-pro-vision": [
@@ -1516,7 +1516,7 @@
       "provider": "vertex_ai-vision-models",
       "input": 2.5e-07,
       "output": 5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini-1.0-pro-vision-001": [
@@ -1524,7 +1524,7 @@
       "provider": "vertex_ai-vision-models",
       "input": 2.5e-07,
       "output": 5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/claude-3-sonnet@20240229": [
@@ -1532,7 +1532,7 @@
       "provider": "vertex_ai-anthropic_models",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/claude-3-5-sonnet@20240620": [
@@ -1540,7 +1540,7 @@
       "provider": "vertex_ai-anthropic_models",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/claude-3-haiku@20240307": [
@@ -1548,7 +1548,7 @@
       "provider": "vertex_ai-anthropic_models",
       "input": 2.5e-07,
       "output": 1.25e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/claude-3-opus@20240229": [
@@ -1556,7 +1556,7 @@
       "provider": "vertex_ai-anthropic_models",
       "input": 1.5e-05,
       "output": 7.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/meta/llama3-405b-instruct-maas": [
@@ -1564,7 +1564,7 @@
       "provider": "vertex_ai-llama_models",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/meta/llama3-70b-instruct-maas": [
@@ -1572,7 +1572,7 @@
       "provider": "vertex_ai-llama_models",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/meta/llama3-8b-instruct-maas": [
@@ -1580,7 +1580,7 @@
       "provider": "vertex_ai-llama_models",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/meta/llama-3.2-90b-vision-instruct-maas": [
@@ -1588,7 +1588,7 @@
       "provider": "vertex_ai-llama_models",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/mistral-large@latest": [
@@ -1596,7 +1596,7 @@
       "provider": "vertex_ai-mistral_models",
       "input": 3e-06,
       "output": 9e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/mistral-large@2407": [
@@ -1604,7 +1604,7 @@
       "provider": "vertex_ai-mistral_models",
       "input": 3e-06,
       "output": 9e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/mistral-nemo@latest": [
@@ -1612,7 +1612,7 @@
       "provider": "vertex_ai-mistral_models",
       "input": 3e-06,
       "output": 3e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/jamba-1.5-mini@001": [
@@ -1620,7 +1620,7 @@
       "provider": "vertex_ai-ai21_models",
       "input": 2e-07,
       "output": 4e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/jamba-1.5-large@001": [
@@ -1628,7 +1628,7 @@
       "provider": "vertex_ai-ai21_models",
       "input": 2e-06,
       "output": 8e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/jamba-1.5": [
@@ -1636,7 +1636,7 @@
       "provider": "vertex_ai-ai21_models",
       "input": 2e-07,
       "output": 4e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/jamba-1.5-mini": [
@@ -1644,7 +1644,7 @@
       "provider": "vertex_ai-ai21_models",
       "input": 2e-07,
       "output": 4e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/jamba-1.5-large": [
@@ -1652,7 +1652,7 @@
       "provider": "vertex_ai-ai21_models",
       "input": 2e-06,
       "output": 8e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/mistral-nemo@2407": [
@@ -1660,7 +1660,7 @@
       "provider": "vertex_ai-mistral_models",
       "input": 3e-06,
       "output": 3e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/codestral@latest": [
@@ -1668,7 +1668,7 @@
       "provider": "vertex_ai-mistral_models",
       "input": 1e-06,
       "output": 3e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "vertex_ai/codestral@2405": [
@@ -1676,7 +1676,7 @@
       "provider": "vertex_ai-mistral_models",
       "input": 1e-06,
       "output": 3e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-embedding-004": [
@@ -1684,7 +1684,7 @@
       "provider": "vertex_ai-embedding-models",
       "input": 6.25e-09,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-multilingual-embedding-002": [
@@ -1692,7 +1692,7 @@
       "provider": "vertex_ai-embedding-models",
       "input": 6.25e-09,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "textembedding-gecko": [
@@ -1700,7 +1700,7 @@
       "provider": "vertex_ai-embedding-models",
       "input": 6.25e-09,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "textembedding-gecko-multilingual": [
@@ -1708,7 +1708,7 @@
       "provider": "vertex_ai-embedding-models",
       "input": 6.25e-09,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "textembedding-gecko-multilingual@001": [
@@ -1716,7 +1716,7 @@
       "provider": "vertex_ai-embedding-models",
       "input": 6.25e-09,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "textembedding-gecko@001": [
@@ -1724,7 +1724,7 @@
       "provider": "vertex_ai-embedding-models",
       "input": 6.25e-09,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "textembedding-gecko@003": [
@@ -1732,7 +1732,7 @@
       "provider": "vertex_ai-embedding-models",
       "input": 6.25e-09,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-embedding-preview-0409": [
@@ -1740,7 +1740,7 @@
       "provider": "vertex_ai-embedding-models",
       "input": 6.25e-09,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "text-multilingual-embedding-preview-0409": [
@@ -1748,7 +1748,7 @@
       "provider": "vertex_ai-embedding-models",
       "input": 6.25e-09,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "palm/chat-bison": [
@@ -1756,7 +1756,7 @@
       "provider": "palm",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "palm/chat-bison-001": [
@@ -1764,7 +1764,7 @@
       "provider": "palm",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "palm/text-bison": [
@@ -1772,7 +1772,7 @@
       "provider": "palm",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "palm/text-bison-001": [
@@ -1780,7 +1780,7 @@
       "provider": "palm",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "palm/text-bison-safety-off": [
@@ -1788,7 +1788,7 @@
       "provider": "palm",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "palm/text-bison-safety-recitation-off": [
@@ -1796,7 +1796,7 @@
       "provider": "palm",
       "input": 1.25e-07,
       "output": 1.25e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-1.5-flash-002": [
@@ -1804,7 +1804,7 @@
       "provider": "gemini",
       "input": 7.5e-08,
       "output": 3e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-1.5-flash-001": [
@@ -1812,7 +1812,7 @@
       "provider": "gemini",
       "input": 7.5e-08,
       "output": 3e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-1.5-flash": [
@@ -1820,7 +1820,7 @@
       "provider": "gemini",
       "input": 7.5e-08,
       "output": 3e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-1.5-flash-latest": [
@@ -1828,7 +1828,7 @@
       "provider": "gemini",
       "input": 7.5e-08,
       "output": 3e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-1.5-flash-8b-exp-0924": [
@@ -1836,7 +1836,7 @@
       "provider": "gemini",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-1.5-flash-exp-0827": [
@@ -1844,7 +1844,7 @@
       "provider": "gemini",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-1.5-flash-8b-exp-0827": [
@@ -1852,7 +1852,7 @@
       "provider": "gemini",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-pro": [
@@ -1860,7 +1860,7 @@
       "provider": "gemini",
       "input": 3.5e-07,
       "output": 1.05e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-1.5-pro": [
@@ -1868,7 +1868,7 @@
       "provider": "gemini",
       "input": 3.5e-06,
       "output": 1.05e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-1.5-pro-002": [
@@ -1876,7 +1876,7 @@
       "provider": "gemini",
       "input": 3.5e-06,
       "output": 1.05e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-1.5-pro-001": [
@@ -1884,7 +1884,7 @@
       "provider": "gemini",
       "input": 3.5e-06,
       "output": 1.05e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-1.5-pro-exp-0801": [
@@ -1892,7 +1892,7 @@
       "provider": "gemini",
       "input": 3.5e-06,
       "output": 1.05e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-1.5-pro-exp-0827": [
@@ -1900,7 +1900,7 @@
       "provider": "gemini",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-1.5-pro-latest": [
@@ -1908,7 +1908,7 @@
       "provider": "gemini",
       "input": 3.5e-06,
       "output": 1.05e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-pro-vision": [
@@ -1916,7 +1916,7 @@
       "provider": "gemini",
       "input": 3.5e-07,
       "output": 1.05e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-gemma-2-27b-it": [
@@ -1924,7 +1924,7 @@
       "provider": "gemini",
       "input": 3.5e-07,
       "output": 1.05e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "gemini/gemini-gemma-2-9b-it": [
@@ -1932,7 +1932,7 @@
       "provider": "gemini",
       "input": 3.5e-07,
       "output": 1.05e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "command-r": [
@@ -1940,7 +1940,7 @@
       "provider": "cohere_chat",
       "input": 1.5e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "command-r-08-2024": [
@@ -1948,7 +1948,7 @@
       "provider": "cohere_chat",
       "input": 1.5e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "command-light": [
@@ -1956,7 +1956,7 @@
       "provider": "cohere_chat",
       "input": 3e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "command-r-plus": [
@@ -1964,7 +1964,7 @@
       "provider": "cohere_chat",
       "input": 2.5e-06,
       "output": 1e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "command-r-plus-08-2024": [
@@ -1972,7 +1972,7 @@
       "provider": "cohere_chat",
       "input": 2.5e-06,
       "output": 1e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "command-nightly": [
@@ -1980,7 +1980,7 @@
       "provider": "cohere",
       "input": 1e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "command": [
@@ -1988,7 +1988,7 @@
       "provider": "cohere",
       "input": 1e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "rerank-english-v3.0": [
@@ -1996,7 +1996,7 @@
       "provider": "cohere",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "rerank-multilingual-v3.0": [
@@ -2004,7 +2004,7 @@
       "provider": "cohere",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "rerank-english-v2.0": [
@@ -2012,7 +2012,7 @@
       "provider": "cohere",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "rerank-multilingual-v2.0": [
@@ -2020,7 +2020,7 @@
       "provider": "cohere",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "embed-english-v3.0": [
@@ -2028,7 +2028,7 @@
       "provider": "cohere",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "embed-english-light-v3.0": [
@@ -2036,7 +2036,7 @@
       "provider": "cohere",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "embed-multilingual-v3.0": [
@@ -2044,7 +2044,7 @@
       "provider": "cohere",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "embed-english-v2.0": [
@@ -2052,7 +2052,7 @@
       "provider": "cohere",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "embed-english-light-v2.0": [
@@ -2060,7 +2060,7 @@
       "provider": "cohere",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "embed-multilingual-v2.0": [
@@ -2068,7 +2068,7 @@
       "provider": "cohere",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "replicate/meta/llama-2-13b": [
@@ -2076,7 +2076,7 @@
       "provider": "replicate",
       "input": 1e-07,
       "output": 5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "replicate/meta/llama-2-13b-chat": [
@@ -2084,7 +2084,7 @@
       "provider": "replicate",
       "input": 1e-07,
       "output": 5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "replicate/meta/llama-2-70b": [
@@ -2092,7 +2092,7 @@
       "provider": "replicate",
       "input": 6.5e-07,
       "output": 2.75e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "replicate/meta/llama-2-70b-chat": [
@@ -2100,7 +2100,7 @@
       "provider": "replicate",
       "input": 6.5e-07,
       "output": 2.75e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "replicate/meta/llama-2-7b": [
@@ -2108,7 +2108,7 @@
       "provider": "replicate",
       "input": 5e-08,
       "output": 2.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "replicate/meta/llama-2-7b-chat": [
@@ -2116,7 +2116,7 @@
       "provider": "replicate",
       "input": 5e-08,
       "output": 2.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "replicate/meta/llama-3-70b": [
@@ -2124,7 +2124,7 @@
       "provider": "replicate",
       "input": 6.5e-07,
       "output": 2.75e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "replicate/meta/llama-3-70b-instruct": [
@@ -2132,7 +2132,7 @@
       "provider": "replicate",
       "input": 6.5e-07,
       "output": 2.75e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "replicate/meta/llama-3-8b": [
@@ -2140,7 +2140,7 @@
       "provider": "replicate",
       "input": 5e-08,
       "output": 2.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "replicate/meta/llama-3-8b-instruct": [
@@ -2148,7 +2148,7 @@
       "provider": "replicate",
       "input": 5e-08,
       "output": 2.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "replicate/mistralai/mistral-7b-v0.1": [
@@ -2156,7 +2156,7 @@
       "provider": "replicate",
       "input": 5e-08,
       "output": 2.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "replicate/mistralai/mistral-7b-instruct-v0.2": [
@@ -2164,7 +2164,7 @@
       "provider": "replicate",
       "input": 5e-08,
       "output": 2.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "replicate/mistralai/mixtral-8x7b-instruct-v0.1": [
@@ -2172,7 +2172,7 @@
       "provider": "replicate",
       "input": 3e-07,
       "output": 1e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/deepseek/deepseek-coder": [
@@ -2180,7 +2180,7 @@
       "provider": "openrouter",
       "input": 1.4e-07,
       "output": 2.8e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/microsoft/wizardlm-2-8x22b:nitro": [
@@ -2188,7 +2188,7 @@
       "provider": "openrouter",
       "input": 1e-06,
       "output": 1e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/google/gemini-pro-1.5": [
@@ -2196,7 +2196,7 @@
       "provider": "openrouter",
       "input": 2.5e-06,
       "output": 7.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/mistralai/mixtral-8x22b-instruct": [
@@ -2204,7 +2204,7 @@
       "provider": "openrouter",
       "input": 6.5e-07,
       "output": 6.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/cohere/command-r-plus": [
@@ -2212,7 +2212,7 @@
       "provider": "openrouter",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/databricks/dbrx-instruct": [
@@ -2220,7 +2220,7 @@
       "provider": "openrouter",
       "input": 6e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/anthropic/claude-3-haiku": [
@@ -2228,7 +2228,7 @@
       "provider": "openrouter",
       "input": 2.5e-07,
       "output": 1.25e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/anthropic/claude-3-haiku-20240307": [
@@ -2236,7 +2236,7 @@
       "provider": "openrouter",
       "input": 2.5e-07,
       "output": 1.25e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/anthropic/claude-3.5-sonnet": [
@@ -2244,7 +2244,7 @@
       "provider": "openrouter",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/anthropic/claude-3.5-sonnet:beta": [
@@ -2252,7 +2252,7 @@
       "provider": "openrouter",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/anthropic/claude-3-sonnet": [
@@ -2260,7 +2260,7 @@
       "provider": "openrouter",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/mistralai/mistral-large": [
@@ -2268,7 +2268,7 @@
       "provider": "openrouter",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/cognitivecomputations/dolphin-mixtral-8x7b": [
@@ -2276,7 +2276,7 @@
       "provider": "openrouter",
       "input": 5e-07,
       "output": 5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/google/gemini-pro-vision": [
@@ -2284,7 +2284,7 @@
       "provider": "openrouter",
       "input": 1.25e-07,
       "output": 3.75e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/fireworks/firellava-13b": [
@@ -2292,7 +2292,7 @@
       "provider": "openrouter",
       "input": 2e-07,
       "output": 2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/meta-llama/llama-3-8b-instruct:free": [
@@ -2300,7 +2300,7 @@
       "provider": "openrouter",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/meta-llama/llama-3-8b-instruct:extended": [
@@ -2308,7 +2308,7 @@
       "provider": "openrouter",
       "input": 2.25e-07,
       "output": 2.25e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/meta-llama/llama-3-70b-instruct:nitro": [
@@ -2316,7 +2316,7 @@
       "provider": "openrouter",
       "input": 9e-07,
       "output": 9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/meta-llama/llama-3-70b-instruct": [
@@ -2324,7 +2324,7 @@
       "provider": "openrouter",
       "input": 5.9e-07,
       "output": 7.9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/openai/o1-mini": [
@@ -2332,7 +2332,7 @@
       "provider": "openrouter",
       "input": 3e-06,
       "output": 1.2e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/openai/o1-mini-2024-09-12": [
@@ -2340,7 +2340,7 @@
       "provider": "openrouter",
       "input": 3e-06,
       "output": 1.2e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/openai/o1-preview": [
@@ -2348,7 +2348,7 @@
       "provider": "openrouter",
       "input": 1.5e-05,
       "output": 6e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/openai/o1-preview-2024-09-12": [
@@ -2356,7 +2356,7 @@
       "provider": "openrouter",
       "input": 1.5e-05,
       "output": 6e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/openai/gpt-4o": [
@@ -2364,7 +2364,7 @@
       "provider": "openrouter",
       "input": 5e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/openai/gpt-4o-2024-05-13": [
@@ -2372,7 +2372,7 @@
       "provider": "openrouter",
       "input": 5e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/openai/gpt-4-vision-preview": [
@@ -2380,7 +2380,7 @@
       "provider": "openrouter",
       "input": 1e-05,
       "output": 3e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/openai/gpt-3.5-turbo": [
@@ -2388,7 +2388,7 @@
       "provider": "openrouter",
       "input": 1.5e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/openai/gpt-3.5-turbo-16k": [
@@ -2396,7 +2396,7 @@
       "provider": "openrouter",
       "input": 3e-06,
       "output": 4e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/openai/gpt-4": [
@@ -2404,7 +2404,7 @@
       "provider": "openrouter",
       "input": 3e-05,
       "output": 6e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/anthropic/claude-instant-v1": [
@@ -2412,7 +2412,7 @@
       "provider": "openrouter",
       "input": 1.63e-06,
       "output": 5.51e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/anthropic/claude-2": [
@@ -2420,7 +2420,7 @@
       "provider": "openrouter",
       "input": 1.102e-05,
       "output": 3.268e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/anthropic/claude-3-opus": [
@@ -2428,7 +2428,7 @@
       "provider": "openrouter",
       "input": 1.5e-05,
       "output": 7.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/google/palm-2-chat-bison": [
@@ -2436,7 +2436,7 @@
       "provider": "openrouter",
       "input": 5e-07,
       "output": 5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/google/palm-2-codechat-bison": [
@@ -2444,7 +2444,7 @@
       "provider": "openrouter",
       "input": 5e-07,
       "output": 5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/meta-llama/llama-2-13b-chat": [
@@ -2452,7 +2452,7 @@
       "provider": "openrouter",
       "input": 2e-07,
       "output": 2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/meta-llama/llama-2-70b-chat": [
@@ -2460,7 +2460,7 @@
       "provider": "openrouter",
       "input": 1.5e-06,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/meta-llama/codellama-34b-instruct": [
@@ -2468,7 +2468,7 @@
       "provider": "openrouter",
       "input": 5e-07,
       "output": 5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/nousresearch/nous-hermes-llama2-13b": [
@@ -2476,7 +2476,7 @@
       "provider": "openrouter",
       "input": 2e-07,
       "output": 2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/mancer/weaver": [
@@ -2484,7 +2484,7 @@
       "provider": "openrouter",
       "input": 5.625e-06,
       "output": 5.625e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/gryphe/mythomax-l2-13b": [
@@ -2492,7 +2492,7 @@
       "provider": "openrouter",
       "input": 1.875e-06,
       "output": 1.875e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/jondurbin/airoboros-l2-70b-2.1": [
@@ -2500,7 +2500,7 @@
       "provider": "openrouter",
       "input": 1.3875e-05,
       "output": 1.3875e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/undi95/remm-slerp-l2-13b": [
@@ -2508,7 +2508,7 @@
       "provider": "openrouter",
       "input": 1.875e-06,
       "output": 1.875e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/pygmalionai/mythalion-13b": [
@@ -2516,7 +2516,7 @@
       "provider": "openrouter",
       "input": 1.875e-06,
       "output": 1.875e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/mistralai/mistral-7b-instruct": [
@@ -2524,7 +2524,7 @@
       "provider": "openrouter",
       "input": 1.3e-07,
       "output": 1.3e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "openrouter/mistralai/mistral-7b-instruct:free": [
@@ -2532,7 +2532,7 @@
       "provider": "openrouter",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "j2-ultra": [
@@ -2540,7 +2540,7 @@
       "provider": "ai21",
       "input": 1.5e-05,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "jamba-1.5-mini@001": [
@@ -2548,7 +2548,7 @@
       "provider": "ai21",
       "input": 2e-07,
       "output": 4e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "jamba-1.5-large@001": [
@@ -2556,7 +2556,7 @@
       "provider": "ai21",
       "input": 2e-06,
       "output": 8e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "jamba-1.5": [
@@ -2564,7 +2564,7 @@
       "provider": "ai21",
       "input": 2e-07,
       "output": 4e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "jamba-1.5-mini": [
@@ -2572,7 +2572,7 @@
       "provider": "ai21",
       "input": 2e-07,
       "output": 4e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "jamba-1.5-large": [
@@ -2580,7 +2580,7 @@
       "provider": "ai21",
       "input": 2e-06,
       "output": 8e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "j2-mid": [
@@ -2588,7 +2588,7 @@
       "provider": "ai21",
       "input": 1e-05,
       "output": 1e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "j2-light": [
@@ -2596,7 +2596,7 @@
       "provider": "ai21",
       "input": 3e-06,
       "output": 3e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "dolphin": [
@@ -2604,7 +2604,7 @@
       "provider": "nlp_cloud",
       "input": 5e-07,
       "output": 5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "chatdolphin": [
@@ -2612,7 +2612,7 @@
       "provider": "nlp_cloud",
       "input": 5e-07,
       "output": 5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "luminous-base": [
@@ -2620,7 +2620,7 @@
       "provider": "aleph_alpha",
       "input": 3e-05,
       "output": 3.3e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "luminous-base-control": [
@@ -2628,7 +2628,7 @@
       "provider": "aleph_alpha",
       "input": 3.75e-05,
       "output": 4.125e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "luminous-extended": [
@@ -2636,7 +2636,7 @@
       "provider": "aleph_alpha",
       "input": 4.5e-05,
       "output": 4.95e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "luminous-extended-control": [
@@ -2644,7 +2644,7 @@
       "provider": "aleph_alpha",
       "input": 5.625e-05,
       "output": 6.1875e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "luminous-supreme": [
@@ -2652,7 +2652,7 @@
       "provider": "aleph_alpha",
       "input": 0.000175,
       "output": 0.0001925,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "luminous-supreme-control": [
@@ -2660,7 +2660,7 @@
       "provider": "aleph_alpha",
       "input": 0.00021875,
       "output": 0.000240625,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ai21.j2-mid-v1": [
@@ -2668,7 +2668,7 @@
       "provider": "bedrock",
       "input": 1.25e-05,
       "output": 1.25e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ai21.j2-ultra-v1": [
@@ -2676,7 +2676,7 @@
       "provider": "bedrock",
       "input": 1.88e-05,
       "output": 1.88e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ai21.jamba-instruct-v1:0": [
@@ -2684,7 +2684,7 @@
       "provider": "bedrock",
       "input": 5e-07,
       "output": 7e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "amazon.titan-text-lite-v1": [
@@ -2692,7 +2692,7 @@
       "provider": "bedrock",
       "input": 3e-07,
       "output": 4e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "amazon.titan-text-express-v1": [
@@ -2700,7 +2700,7 @@
       "provider": "bedrock",
       "input": 1.3e-06,
       "output": 1.7e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "amazon.titan-text-premier-v1:0": [
@@ -2708,7 +2708,7 @@
       "provider": "bedrock",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "amazon.titan-embed-text-v1": [
@@ -2716,7 +2716,7 @@
       "provider": "bedrock",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "amazon.titan-embed-text-v2:0": [
@@ -2724,7 +2724,7 @@
       "provider": "bedrock",
       "input": 2e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral.mistral-7b-instruct-v0:2": [
@@ -2732,7 +2732,7 @@
       "provider": "bedrock",
       "input": 1.5e-07,
       "output": 2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral.mixtral-8x7b-instruct-v0:1": [
@@ -2740,7 +2740,7 @@
       "provider": "bedrock",
       "input": 4.5e-07,
       "output": 7e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral.mistral-large-2402-v1:0": [
@@ -2748,7 +2748,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral.mistral-large-2407-v1:0": [
@@ -2756,7 +2756,7 @@
       "provider": "bedrock",
       "input": 3e-06,
       "output": 9e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "mistral.mistral-small-2402-v1:0": [
@@ -2764,7 +2764,7 @@
       "provider": "bedrock",
       "input": 1e-06,
       "output": 3e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-west-2/mistral.mixtral-8x7b-instruct-v0:1": [
@@ -2772,7 +2772,7 @@
       "provider": "bedrock",
       "input": 4.5e-07,
       "output": 7e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-east-1/mistral.mixtral-8x7b-instruct-v0:1": [
@@ -2780,7 +2780,7 @@
       "provider": "bedrock",
       "input": 4.5e-07,
       "output": 7e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/eu-west-3/mistral.mixtral-8x7b-instruct-v0:1": [
@@ -2788,7 +2788,7 @@
       "provider": "bedrock",
       "input": 5.9e-07,
       "output": 9.1e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-west-2/mistral.mistral-7b-instruct-v0:2": [
@@ -2796,7 +2796,7 @@
       "provider": "bedrock",
       "input": 1.5e-07,
       "output": 2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-east-1/mistral.mistral-7b-instruct-v0:2": [
@@ -2804,7 +2804,7 @@
       "provider": "bedrock",
       "input": 1.5e-07,
       "output": 2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/eu-west-3/mistral.mistral-7b-instruct-v0:2": [
@@ -2812,7 +2812,7 @@
       "provider": "bedrock",
       "input": 2e-07,
       "output": 2.6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-east-1/mistral.mistral-large-2402-v1:0": [
@@ -2820,7 +2820,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-west-2/mistral.mistral-large-2402-v1:0": [
@@ -2828,7 +2828,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/eu-west-3/mistral.mistral-large-2402-v1:0": [
@@ -2836,7 +2836,7 @@
       "provider": "bedrock",
       "input": 1.04e-05,
       "output": 3.12e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anthropic.claude-3-sonnet-20240229-v1:0": [
@@ -2844,7 +2844,7 @@
       "provider": "bedrock",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anthropic.claude-3-5-sonnet-20240620-v1:0": [
@@ -2852,7 +2852,7 @@
       "provider": "bedrock",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anthropic.claude-3-haiku-20240307-v1:0": [
@@ -2860,7 +2860,7 @@
       "provider": "bedrock",
       "input": 2.5e-07,
       "output": 1.25e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anthropic.claude-3-opus-20240229-v1:0": [
@@ -2868,7 +2868,7 @@
       "provider": "bedrock",
       "input": 1.5e-05,
       "output": 7.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "us.anthropic.claude-3-sonnet-20240229-v1:0": [
@@ -2876,7 +2876,7 @@
       "provider": "bedrock",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "us.anthropic.claude-3-5-sonnet-20240620-v1:0": [
@@ -2884,7 +2884,7 @@
       "provider": "bedrock",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "us.anthropic.claude-3-haiku-20240307-v1:0": [
@@ -2892,7 +2892,7 @@
       "provider": "bedrock",
       "input": 2.5e-07,
       "output": 1.25e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "us.anthropic.claude-3-opus-20240229-v1:0": [
@@ -2900,7 +2900,7 @@
       "provider": "bedrock",
       "input": 1.5e-05,
       "output": 7.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "eu.anthropic.claude-3-sonnet-20240229-v1:0": [
@@ -2908,7 +2908,7 @@
       "provider": "bedrock",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "eu.anthropic.claude-3-5-sonnet-20240620-v1:0": [
@@ -2916,7 +2916,7 @@
       "provider": "bedrock",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "eu.anthropic.claude-3-haiku-20240307-v1:0": [
@@ -2924,7 +2924,7 @@
       "provider": "bedrock",
       "input": 2.5e-07,
       "output": 1.25e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "eu.anthropic.claude-3-opus-20240229-v1:0": [
@@ -2932,7 +2932,7 @@
       "provider": "bedrock",
       "input": 1.5e-05,
       "output": 7.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anthropic.claude-v1": [
@@ -2940,7 +2940,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-east-1/anthropic.claude-v1": [
@@ -2948,7 +2948,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-west-2/anthropic.claude-v1": [
@@ -2956,7 +2956,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/ap-northeast-1/anthropic.claude-v1": [
@@ -2964,7 +2964,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/eu-central-1/anthropic.claude-v1": [
@@ -2972,7 +2972,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anthropic.claude-v2": [
@@ -2980,7 +2980,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-east-1/anthropic.claude-v2": [
@@ -2988,7 +2988,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-west-2/anthropic.claude-v2": [
@@ -2996,7 +2996,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/ap-northeast-1/anthropic.claude-v2": [
@@ -3004,7 +3004,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/eu-central-1/anthropic.claude-v2": [
@@ -3012,7 +3012,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anthropic.claude-v2:1": [
@@ -3020,7 +3020,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-east-1/anthropic.claude-v2:1": [
@@ -3028,7 +3028,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-west-2/anthropic.claude-v2:1": [
@@ -3036,7 +3036,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/ap-northeast-1/anthropic.claude-v2:1": [
@@ -3044,7 +3044,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/eu-central-1/anthropic.claude-v2:1": [
@@ -3052,7 +3052,7 @@
       "provider": "bedrock",
       "input": 8e-06,
       "output": 2.4e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anthropic.claude-instant-v1": [
@@ -3060,7 +3060,7 @@
       "provider": "bedrock",
       "input": 1.63e-06,
       "output": 5.51e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-east-1/anthropic.claude-instant-v1": [
@@ -3068,7 +3068,7 @@
       "provider": "bedrock",
       "input": 8e-07,
       "output": 2.4e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-west-2/anthropic.claude-instant-v1": [
@@ -3076,7 +3076,7 @@
       "provider": "bedrock",
       "input": 8e-07,
       "output": 2.4e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/ap-northeast-1/anthropic.claude-instant-v1": [
@@ -3084,7 +3084,7 @@
       "provider": "bedrock",
       "input": 2.23e-06,
       "output": 7.55e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/eu-central-1/anthropic.claude-instant-v1": [
@@ -3092,7 +3092,7 @@
       "provider": "bedrock",
       "input": 2.48e-06,
       "output": 8.38e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "cohere.command-text-v14": [
@@ -3100,7 +3100,7 @@
       "provider": "bedrock",
       "input": 1.5e-06,
       "output": 2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "cohere.command-light-text-v14": [
@@ -3108,7 +3108,7 @@
       "provider": "bedrock",
       "input": 3e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "cohere.command-r-plus-v1:0": [
@@ -3116,7 +3116,7 @@
       "provider": "bedrock",
       "input": 3e-06,
       "output": 1.5e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "cohere.command-r-v1:0": [
@@ -3124,7 +3124,7 @@
       "provider": "bedrock",
       "input": 5e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "cohere.embed-english-v3": [
@@ -3132,7 +3132,7 @@
       "provider": "bedrock",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "cohere.embed-multilingual-v3": [
@@ -3140,7 +3140,7 @@
       "provider": "bedrock",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "meta.llama2-13b-chat-v1": [
@@ -3148,7 +3148,7 @@
       "provider": "bedrock",
       "input": 7.5e-07,
       "output": 1e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "meta.llama2-70b-chat-v1": [
@@ -3156,7 +3156,7 @@
       "provider": "bedrock",
       "input": 1.95e-06,
       "output": 2.56e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "meta.llama3-8b-instruct-v1:0": [
@@ -3164,7 +3164,7 @@
       "provider": "bedrock",
       "input": 3e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-east-1/meta.llama3-8b-instruct-v1:0": [
@@ -3172,7 +3172,7 @@
       "provider": "bedrock",
       "input": 3e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-west-1/meta.llama3-8b-instruct-v1:0": [
@@ -3180,7 +3180,7 @@
       "provider": "bedrock",
       "input": 3e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/ap-south-1/meta.llama3-8b-instruct-v1:0": [
@@ -3188,7 +3188,7 @@
       "provider": "bedrock",
       "input": 3.6e-07,
       "output": 7.2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/ca-central-1/meta.llama3-8b-instruct-v1:0": [
@@ -3196,7 +3196,7 @@
       "provider": "bedrock",
       "input": 3.5e-07,
       "output": 6.9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/eu-west-1/meta.llama3-8b-instruct-v1:0": [
@@ -3204,7 +3204,7 @@
       "provider": "bedrock",
       "input": 3.2e-07,
       "output": 6.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/eu-west-2/meta.llama3-8b-instruct-v1:0": [
@@ -3212,7 +3212,7 @@
       "provider": "bedrock",
       "input": 3.9e-07,
       "output": 7.8e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/sa-east-1/meta.llama3-8b-instruct-v1:0": [
@@ -3220,7 +3220,7 @@
       "provider": "bedrock",
       "input": 5e-07,
       "output": 1.01e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "meta.llama3-70b-instruct-v1:0": [
@@ -3228,7 +3228,7 @@
       "provider": "bedrock",
       "input": 2.65e-06,
       "output": 3.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-east-1/meta.llama3-70b-instruct-v1:0": [
@@ -3236,7 +3236,7 @@
       "provider": "bedrock",
       "input": 2.65e-06,
       "output": 3.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/us-west-1/meta.llama3-70b-instruct-v1:0": [
@@ -3244,7 +3244,7 @@
       "provider": "bedrock",
       "input": 2.65e-06,
       "output": 3.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/ap-south-1/meta.llama3-70b-instruct-v1:0": [
@@ -3252,7 +3252,7 @@
       "provider": "bedrock",
       "input": 3.18e-06,
       "output": 4.2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/ca-central-1/meta.llama3-70b-instruct-v1:0": [
@@ -3260,7 +3260,7 @@
       "provider": "bedrock",
       "input": 3.05e-06,
       "output": 4.03e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/eu-west-1/meta.llama3-70b-instruct-v1:0": [
@@ -3268,7 +3268,7 @@
       "provider": "bedrock",
       "input": 2.86e-06,
       "output": 3.78e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/eu-west-2/meta.llama3-70b-instruct-v1:0": [
@@ -3276,7 +3276,7 @@
       "provider": "bedrock",
       "input": 3.45e-06,
       "output": 4.55e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "bedrock/sa-east-1/meta.llama3-70b-instruct-v1:0": [
@@ -3284,7 +3284,7 @@
       "provider": "bedrock",
       "input": 4.45e-06,
       "output": 5.88e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "meta.llama3-1-8b-instruct-v1:0": [
@@ -3292,7 +3292,7 @@
       "provider": "bedrock",
       "input": 2.2e-07,
       "output": 2.2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "meta.llama3-1-70b-instruct-v1:0": [
@@ -3300,7 +3300,7 @@
       "provider": "bedrock",
       "input": 9.9e-07,
       "output": 9.9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "meta.llama3-1-405b-instruct-v1:0": [
@@ -3308,7 +3308,7 @@
       "provider": "bedrock",
       "input": 5.32e-06,
       "output": 1.6e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "sagemaker/meta-textgeneration-llama-2-7b": [
@@ -3316,7 +3316,7 @@
       "provider": "sagemaker",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "sagemaker/meta-textgeneration-llama-2-7b-f": [
@@ -3324,7 +3324,7 @@
       "provider": "sagemaker",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "sagemaker/meta-textgeneration-llama-2-13b": [
@@ -3332,7 +3332,7 @@
       "provider": "sagemaker",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "sagemaker/meta-textgeneration-llama-2-13b-f": [
@@ -3340,7 +3340,7 @@
       "provider": "sagemaker",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "sagemaker/meta-textgeneration-llama-2-70b": [
@@ -3348,7 +3348,7 @@
       "provider": "sagemaker",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "sagemaker/meta-textgeneration-llama-2-70b-b-f": [
@@ -3356,7 +3356,7 @@
       "provider": "sagemaker",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "together-ai-up-to-4b": [
@@ -3364,7 +3364,7 @@
       "provider": "together_ai",
       "input": 1e-07,
       "output": 1e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "together-ai-4.1b-8b": [
@@ -3372,7 +3372,7 @@
       "provider": "together_ai",
       "input": 2e-07,
       "output": 2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "together-ai-8.1b-21b": [
@@ -3380,7 +3380,7 @@
       "provider": "together_ai",
       "input": 3e-07,
       "output": 3e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "together-ai-21.1b-41b": [
@@ -3388,7 +3388,7 @@
       "provider": "together_ai",
       "input": 8e-07,
       "output": 8e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "together-ai-41.1b-80b": [
@@ -3396,7 +3396,7 @@
       "provider": "together_ai",
       "input": 9e-07,
       "output": 9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "together-ai-81.1b-110b": [
@@ -3404,7 +3404,7 @@
       "provider": "together_ai",
       "input": 1.8e-06,
       "output": 1.8e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "together-ai-embedding-up-to-150m": [
@@ -3412,7 +3412,7 @@
       "provider": "together_ai",
       "input": 8e-09,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "together-ai-embedding-151m-to-350m": [
@@ -3420,7 +3420,7 @@
       "provider": "together_ai",
       "input": 1.6e-08,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "together_ai/mistralai/Mixtral-8x7B-Instruct-v0.1": [
@@ -3428,7 +3428,7 @@
       "provider": "together_ai",
       "input": 6e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/codegemma": [
@@ -3436,7 +3436,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/codegeex4": [
@@ -3444,7 +3444,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/deepseek-coder-v2-instruct": [
@@ -3452,7 +3452,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/deepseek-coder-v2-base": [
@@ -3460,7 +3460,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/deepseek-coder-v2-lite-instruct": [
@@ -3468,7 +3468,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/deepseek-coder-v2-lite-base": [
@@ -3476,7 +3476,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/internlm2_5-20b-chat": [
@@ -3484,7 +3484,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/llama2": [
@@ -3492,7 +3492,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/llama2:7b": [
@@ -3500,7 +3500,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/llama2:13b": [
@@ -3508,7 +3508,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/llama2:70b": [
@@ -3516,7 +3516,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/llama2-uncensored": [
@@ -3524,7 +3524,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/llama3": [
@@ -3532,7 +3532,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/llama3:8b": [
@@ -3540,7 +3540,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/llama3:70b": [
@@ -3548,7 +3548,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/llama3.1": [
@@ -3556,7 +3556,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/mistral-large-instruct-2407": [
@@ -3564,7 +3564,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/mistral": [
@@ -3572,7 +3572,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/mistral-7B-Instruct-v0.1": [
@@ -3580,7 +3580,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/mistral-7B-Instruct-v0.2": [
@@ -3588,7 +3588,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/mixtral-8x7B-Instruct-v0.1": [
@@ -3596,7 +3596,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/mixtral-8x22B-Instruct-v0.1": [
@@ -3604,7 +3604,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/codellama": [
@@ -3612,7 +3612,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/orca-mini": [
@@ -3620,7 +3620,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "ollama/vicuna": [
@@ -3628,7 +3628,7 @@
       "provider": "ollama",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/lizpreciatior/lzlv_70b_fp16_hf": [
@@ -3636,7 +3636,7 @@
       "provider": "deepinfra",
       "input": 7e-07,
       "output": 9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/Gryphe/MythoMax-L2-13b": [
@@ -3644,7 +3644,7 @@
       "provider": "deepinfra",
       "input": 2.2e-07,
       "output": 2.2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/mistralai/Mistral-7B-Instruct-v0.1": [
@@ -3652,7 +3652,7 @@
       "provider": "deepinfra",
       "input": 1.3e-07,
       "output": 1.3e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/meta-llama/Llama-2-70b-chat-hf": [
@@ -3660,7 +3660,7 @@
       "provider": "deepinfra",
       "input": 7e-07,
       "output": 9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/cognitivecomputations/dolphin-2.6-mixtral-8x7b": [
@@ -3668,7 +3668,7 @@
       "provider": "deepinfra",
       "input": 2.7e-07,
       "output": 2.7e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/codellama/CodeLlama-34b-Instruct-hf": [
@@ -3676,7 +3676,7 @@
       "provider": "deepinfra",
       "input": 6e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/deepinfra/mixtral": [
@@ -3684,7 +3684,7 @@
       "provider": "deepinfra",
       "input": 2.7e-07,
       "output": 2.7e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/Phind/Phind-CodeLlama-34B-v2": [
@@ -3692,7 +3692,7 @@
       "provider": "deepinfra",
       "input": 6e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/mistralai/Mixtral-8x7B-Instruct-v0.1": [
@@ -3700,7 +3700,7 @@
       "provider": "deepinfra",
       "input": 2.7e-07,
       "output": 2.7e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/deepinfra/airoboros-70b": [
@@ -3708,7 +3708,7 @@
       "provider": "deepinfra",
       "input": 7e-07,
       "output": 9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/01-ai/Yi-34B-Chat": [
@@ -3716,7 +3716,7 @@
       "provider": "deepinfra",
       "input": 6e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/01-ai/Yi-6B-200K": [
@@ -3724,7 +3724,7 @@
       "provider": "deepinfra",
       "input": 1.3e-07,
       "output": 1.3e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/jondurbin/airoboros-l2-70b-gpt4-1.4.1": [
@@ -3732,7 +3732,7 @@
       "provider": "deepinfra",
       "input": 7e-07,
       "output": 9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/meta-llama/Llama-2-13b-chat-hf": [
@@ -3740,7 +3740,7 @@
       "provider": "deepinfra",
       "input": 2.2e-07,
       "output": 2.2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/amazon/MistralLite": [
@@ -3748,7 +3748,7 @@
       "provider": "deepinfra",
       "input": 2e-07,
       "output": 2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/meta-llama/Llama-2-7b-chat-hf": [
@@ -3756,7 +3756,7 @@
       "provider": "deepinfra",
       "input": 1.3e-07,
       "output": 1.3e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/meta-llama/Meta-Llama-3-8B-Instruct": [
@@ -3764,7 +3764,7 @@
       "provider": "deepinfra",
       "input": 8e-08,
       "output": 8e-08,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/meta-llama/Meta-Llama-3-70B-Instruct": [
@@ -3772,7 +3772,7 @@
       "provider": "deepinfra",
       "input": 5.9e-07,
       "output": 7.9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/01-ai/Yi-34B-200K": [
@@ -3780,7 +3780,7 @@
       "provider": "deepinfra",
       "input": 6e-07,
       "output": 6e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "deepinfra/openchat/openchat_3.5": [
@@ -3788,7 +3788,7 @@
       "provider": "deepinfra",
       "input": 1.3e-07,
       "output": 1.3e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/codellama-34b-instruct": [
@@ -3796,7 +3796,7 @@
       "provider": "perplexity",
       "input": 3.5e-07,
       "output": 1.4e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/codellama-70b-instruct": [
@@ -3804,7 +3804,7 @@
       "provider": "perplexity",
       "input": 7e-07,
       "output": 2.8e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/llama-3.1-70b-instruct": [
@@ -3812,7 +3812,7 @@
       "provider": "perplexity",
       "input": 1e-06,
       "output": 1e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/llama-3.1-8b-instruct": [
@@ -3820,7 +3820,7 @@
       "provider": "perplexity",
       "input": 2e-07,
       "output": 2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/llama-3.1-sonar-huge-128k-online": [
@@ -3828,7 +3828,7 @@
       "provider": "perplexity",
       "input": 5e-06,
       "output": 5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/llama-3.1-sonar-large-128k-online": [
@@ -3836,7 +3836,7 @@
       "provider": "perplexity",
       "input": 1e-06,
       "output": 1e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/llama-3.1-sonar-large-128k-chat": [
@@ -3844,7 +3844,7 @@
       "provider": "perplexity",
       "input": 1e-06,
       "output": 1e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/llama-3.1-sonar-small-128k-chat": [
@@ -3852,7 +3852,7 @@
       "provider": "perplexity",
       "input": 2e-07,
       "output": 2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/llama-3.1-sonar-small-128k-online": [
@@ -3860,7 +3860,7 @@
       "provider": "perplexity",
       "input": 2e-07,
       "output": 2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/pplx-7b-chat": [
@@ -3868,7 +3868,7 @@
       "provider": "perplexity",
       "input": 7e-08,
       "output": 2.8e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/pplx-70b-chat": [
@@ -3876,7 +3876,7 @@
       "provider": "perplexity",
       "input": 7e-07,
       "output": 2.8e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/pplx-7b-online": [
@@ -3884,7 +3884,7 @@
       "provider": "perplexity",
       "input": 0.0,
       "output": 2.8e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/pplx-70b-online": [
@@ -3892,7 +3892,7 @@
       "provider": "perplexity",
       "input": 0.0,
       "output": 2.8e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/llama-2-70b-chat": [
@@ -3900,7 +3900,7 @@
       "provider": "perplexity",
       "input": 7e-07,
       "output": 2.8e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/mistral-7b-instruct": [
@@ -3908,7 +3908,7 @@
       "provider": "perplexity",
       "input": 7e-08,
       "output": 2.8e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/mixtral-8x7b-instruct": [
@@ -3916,7 +3916,7 @@
       "provider": "perplexity",
       "input": 7e-08,
       "output": 2.8e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/sonar-small-chat": [
@@ -3924,7 +3924,7 @@
       "provider": "perplexity",
       "input": 7e-08,
       "output": 2.8e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/sonar-small-online": [
@@ -3932,7 +3932,7 @@
       "provider": "perplexity",
       "input": 0.0,
       "output": 2.8e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/sonar-medium-chat": [
@@ -3940,7 +3940,7 @@
       "provider": "perplexity",
       "input": 6e-07,
       "output": 1.8e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "perplexity/sonar-medium-online": [
@@ -3948,7 +3948,7 @@
       "provider": "perplexity",
       "input": 0.0,
       "output": 1.8e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks_ai/accounts/fireworks/models/llama-v3p2-1b-instruct": [
@@ -3956,7 +3956,7 @@
       "provider": "fireworks_ai",
       "input": 1e-07,
       "output": 1e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks_ai/accounts/fireworks/models/llama-v3p2-3b-instruct": [
@@ -3964,7 +3964,7 @@
       "provider": "fireworks_ai",
       "input": 1e-07,
       "output": 1e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks_ai/accounts/fireworks/models/llama-v3p2-11b-vision-instruct": [
@@ -3972,7 +3972,7 @@
       "provider": "fireworks_ai",
       "input": 2e-07,
       "output": 2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "accounts/fireworks/models/llama-v3p2-90b-vision-instruct": [
@@ -3980,7 +3980,7 @@
       "provider": "fireworks_ai",
       "input": 9e-07,
       "output": 9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks_ai/accounts/fireworks/models/firefunction-v2": [
@@ -3988,7 +3988,7 @@
       "provider": "fireworks_ai",
       "input": 9e-07,
       "output": 9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks_ai/accounts/fireworks/models/mixtral-8x22b-instruct-hf": [
@@ -3996,7 +3996,7 @@
       "provider": "fireworks_ai",
       "input": 1.2e-06,
       "output": 1.2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks_ai/accounts/fireworks/models/qwen2-72b-instruct": [
@@ -4004,7 +4004,7 @@
       "provider": "fireworks_ai",
       "input": 9e-07,
       "output": 9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks_ai/accounts/fireworks/models/yi-large": [
@@ -4012,7 +4012,7 @@
       "provider": "fireworks_ai",
       "input": 3e-06,
       "output": 3e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks_ai/accounts/fireworks/models/deepseek-coder-v2-instruct": [
@@ -4020,7 +4020,7 @@
       "provider": "fireworks_ai",
       "input": 1.2e-06,
       "output": 1.2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks_ai/nomic-ai/nomic-embed-text-v1.5": [
@@ -4028,7 +4028,7 @@
       "provider": "fireworks_ai-embedding-models",
       "input": 8e-09,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks_ai/nomic-ai/nomic-embed-text-v1": [
@@ -4036,7 +4036,7 @@
       "provider": "fireworks_ai-embedding-models",
       "input": 8e-09,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks_ai/WhereIsAI/UAE-Large-V1": [
@@ -4044,7 +4044,7 @@
       "provider": "fireworks_ai-embedding-models",
       "input": 1.6e-08,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks_ai/thenlper/gte-large": [
@@ -4052,7 +4052,7 @@
       "provider": "fireworks_ai-embedding-models",
       "input": 1.6e-08,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks_ai/thenlper/gte-base": [
@@ -4060,7 +4060,7 @@
       "provider": "fireworks_ai-embedding-models",
       "input": 8e-09,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks-ai-up-to-16b": [
@@ -4068,7 +4068,7 @@
       "provider": "fireworks_ai",
       "input": 2e-07,
       "output": 2e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks-ai-16.1b-to-80b": [
@@ -4076,7 +4076,7 @@
       "provider": "fireworks_ai",
       "input": 9e-07,
       "output": 9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks-ai-moe-up-to-56b": [
@@ -4084,7 +4084,7 @@
       "provider": "fireworks_ai",
       "input": 5e-07,
       "output": 5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks-ai-56b-to-176b": [
@@ -4092,7 +4092,7 @@
       "provider": "fireworks_ai",
       "input": 1.2e-06,
       "output": 1.2e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks-ai-default": [
@@ -4100,7 +4100,7 @@
       "provider": "fireworks_ai",
       "input": 0.0,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks-ai-embedding-up-to-150m": [
@@ -4108,7 +4108,7 @@
       "provider": "fireworks_ai-embedding-models",
       "input": 8e-09,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "fireworks-ai-embedding-150m-to-350m": [
@@ -4116,7 +4116,7 @@
       "provider": "fireworks_ai-embedding-models",
       "input": 1.6e-08,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anyscale/mistralai/Mistral-7B-Instruct-v0.1": [
@@ -4124,7 +4124,7 @@
       "provider": "anyscale",
       "input": 1.5e-07,
       "output": 1.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anyscale/mistralai/Mixtral-8x7B-Instruct-v0.1": [
@@ -4132,7 +4132,7 @@
       "provider": "anyscale",
       "input": 1.5e-07,
       "output": 1.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anyscale/mistralai/Mixtral-8x22B-Instruct-v0.1": [
@@ -4140,7 +4140,7 @@
       "provider": "anyscale",
       "input": 9e-07,
       "output": 9e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anyscale/HuggingFaceH4/zephyr-7b-beta": [
@@ -4148,7 +4148,7 @@
       "provider": "anyscale",
       "input": 1.5e-07,
       "output": 1.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anyscale/google/gemma-7b-it": [
@@ -4156,7 +4156,7 @@
       "provider": "anyscale",
       "input": 1.5e-07,
       "output": 1.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anyscale/meta-llama/Llama-2-7b-chat-hf": [
@@ -4164,7 +4164,7 @@
       "provider": "anyscale",
       "input": 1.5e-07,
       "output": 1.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anyscale/meta-llama/Llama-2-13b-chat-hf": [
@@ -4172,7 +4172,7 @@
       "provider": "anyscale",
       "input": 2.5e-07,
       "output": 2.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anyscale/meta-llama/Llama-2-70b-chat-hf": [
@@ -4180,7 +4180,7 @@
       "provider": "anyscale",
       "input": 1e-06,
       "output": 1e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anyscale/codellama/CodeLlama-34b-Instruct-hf": [
@@ -4188,7 +4188,7 @@
       "provider": "anyscale",
       "input": 1e-06,
       "output": 1e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anyscale/codellama/CodeLlama-70b-Instruct-hf": [
@@ -4196,7 +4196,7 @@
       "provider": "anyscale",
       "input": 1e-06,
       "output": 1e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anyscale/meta-llama/Meta-Llama-3-8B-Instruct": [
@@ -4204,7 +4204,7 @@
       "provider": "anyscale",
       "input": 1.5e-07,
       "output": 1.5e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "anyscale/meta-llama/Meta-Llama-3-70B-Instruct": [
@@ -4212,7 +4212,7 @@
       "provider": "anyscale",
       "input": 1e-06,
       "output": 1e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "cloudflare/@cf/meta/llama-2-7b-chat-fp16": [
@@ -4220,7 +4220,7 @@
       "provider": "cloudflare",
       "input": 1.923e-06,
       "output": 1.923e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "cloudflare/@cf/meta/llama-2-7b-chat-int8": [
@@ -4228,7 +4228,7 @@
       "provider": "cloudflare",
       "input": 1.923e-06,
       "output": 1.923e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "cloudflare/@cf/mistral/mistral-7b-instruct-v0.1": [
@@ -4236,7 +4236,7 @@
       "provider": "cloudflare",
       "input": 1.923e-06,
       "output": 1.923e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "cloudflare/@hf/thebloke/codellama-7b-instruct-awq": [
@@ -4244,7 +4244,7 @@
       "provider": "cloudflare",
       "input": 1.923e-06,
       "output": 1.923e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "voyage/voyage-01": [
@@ -4252,7 +4252,7 @@
       "provider": "voyage",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "voyage/voyage-lite-01": [
@@ -4260,7 +4260,7 @@
       "provider": "voyage",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "voyage/voyage-large-2": [
@@ -4268,7 +4268,7 @@
       "provider": "voyage",
       "input": 1.2e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "voyage/voyage-law-2": [
@@ -4276,7 +4276,7 @@
       "provider": "voyage",
       "input": 1.2e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "voyage/voyage-code-2": [
@@ -4284,7 +4284,7 @@
       "provider": "voyage",
       "input": 1.2e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "voyage/voyage-2": [
@@ -4292,7 +4292,7 @@
       "provider": "voyage",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "voyage/voyage-lite-02-instruct": [
@@ -4300,7 +4300,7 @@
       "provider": "voyage",
       "input": 1e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "databricks/databricks-meta-llama-3-1-405b-instruct": [
@@ -4308,7 +4308,7 @@
       "provider": "databricks",
       "input": 5e-06,
       "output": 1.500002e-05,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "databricks/databricks-meta-llama-3-1-70b-instruct": [
@@ -4316,7 +4316,7 @@
       "provider": "databricks",
       "input": 1.00002e-06,
       "output": 2.99999e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "databricks/databricks-dbrx-instruct": [
@@ -4324,7 +4324,7 @@
       "provider": "databricks",
       "input": 7.4998e-07,
       "output": 2.24901e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "databricks/databricks-meta-llama-3-70b-instruct": [
@@ -4332,7 +4332,7 @@
       "provider": "databricks",
       "input": 1.00002e-06,
       "output": 2.99999e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "databricks/databricks-llama-2-70b-chat": [
@@ -4340,7 +4340,7 @@
       "provider": "databricks",
       "input": 5.0001e-07,
       "output": 1.5e-06,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "databricks/databricks-mixtral-8x7b-instruct": [
@@ -4348,7 +4348,7 @@
       "provider": "databricks",
       "input": 5.0001e-07,
       "output": 9.9902e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "databricks/databricks-mpt-30b-instruct": [
@@ -4356,7 +4356,7 @@
       "provider": "databricks",
       "input": 9.9902e-07,
       "output": 9.9902e-07,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "databricks/databricks-mpt-7b-instruct": [
@@ -4364,7 +4364,7 @@
       "provider": "databricks",
       "input": 5.0001e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "databricks/databricks-bge-large-en": [
@@ -4372,7 +4372,7 @@
       "provider": "databricks",
       "input": 1.0003e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ],
   "databricks/databricks-gte-large-en": [
@@ -4380,7 +4380,7 @@
       "provider": "databricks",
       "input": 1.2999e-07,
       "output": 0.0,
-      "created_at": "2024-10-08 07:51:37"
+      "created_at": "2024-10-08 08:45:39"
     }
   ]
 }

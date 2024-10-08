@@ -3,12 +3,13 @@
 # It then inserts the remaining costs into the table
 # It is intended to run on migration
 import json
-import os
-import math
-import uuid
-from datetime import datetime
-from typing import Dict, TypedDict, List, Tuple, Optional
 import logging
+import math
+import os
+import uuid
+from datetime import datetime, timezone
+from typing import Dict, List, Optional, Tuple, TypedDict
+
 from clickhouse_connect.driver.client import Client
 
 COST_FILE = "cost_checkpoint.json"
@@ -18,17 +19,18 @@ logger = logging.getLogger(__name__)
 
 def get_current_costs(
     client: Client,
-) -> List[Tuple[str, float, float]]:
+) -> List[Tuple[str, float, float, datetime]]:
     current_costs = client.query(
         """
-        SELECT 
+        SELECT
             llm_id,
             prompt_token_cost,
-            completion_token_cost
+            completion_token_cost,
+            effective_date
         FROM llm_token_prices
         WHERE
         created_by = 'system'
-        -- There should not ever be more than 10000 default rows in the table, but just in case we limit    
+        -- There should not ever be more than 10000 default rows in the table, but just in case we limit
         LIMIT 10000
         """
     )
@@ -68,7 +70,9 @@ def insert_costs_into_db(client: Client, data: Dict[str, List[CostDetails]]) -> 
             date_str = cost.get(
                 "created_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             )
-            created_at = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+            created_at = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").replace(
+                tzinfo=timezone.utc
+            )
             rows.append(
                 (
                     str(uuid.uuid4()),
@@ -114,16 +118,20 @@ def filter_out_current_costs(
         llm_id,
         prompt_token_cost,
         completion_token_cost,
+        effective_date,
     ) in current_costs:
         if llm_id not in new_costs:
             continue
+        effective_date_str = effective_date.strftime("%Y-%m-%d %H:%M:%S")
         filtered_costs = []
         for cost in new_costs[llm_id]:
+            print(effective_date_str, cost["created_at"])
             # Filter out costs that already exist in the database by comparing
             # the prompt and completion token costs with a relative tolerance
             if not (
                 math.isclose(prompt_token_cost, cost["input"], rel_tol=1e-7)
                 and math.isclose(completion_token_cost, cost["output"], rel_tol=1e-7)
+                and effective_date_str == cost["created_at"]
             ):
                 filtered_costs.append(cost)
         if len(filtered_costs) == 0:

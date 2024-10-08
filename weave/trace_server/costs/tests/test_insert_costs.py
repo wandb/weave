@@ -1,10 +1,9 @@
 # weave/trace_server/costs/tests/test_insert_costs.py
 
 import unittest
-from unittest.mock import patch, MagicMock, mock_open, ANY
-from datetime import datetime
 import uuid
-import json
+from datetime import datetime
+from unittest.mock import ANY, MagicMock, mock_open, patch
 
 # Import the module to be tested
 from weave.trace_server.costs import insert_costs
@@ -52,7 +51,7 @@ class TestInsertCosts(unittest.TestCase):
         mock_file_open.assert_called_once_with(ANY, "r")
         args, kwargs = mock_file_open.call_args
         opened_file_path = args[0]
-        self.assertTrue(opened_file_path.endswith("costs.json"))
+        self.assertTrue(opened_file_path.endswith(insert_costs.COST_FILE))
         mock_json_load.assert_called_once()
         self.assertEqual(result, self.sample_costs_json)
 

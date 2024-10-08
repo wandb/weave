@@ -2,12 +2,11 @@
 # We store up to 3 historical costs for each model
 import json
 import os
+from datetime import datetime
 from decimal import Decimal
+from typing import Dict, List, TypedDict
 
 import requests
-from datetime import datetime
-from typing import Dict, TypedDict, List
-
 
 # The file that stores the costs
 COST_FILE = "cost_checkpoint.json"
@@ -58,7 +57,7 @@ def fetch_new_costs() -> Dict[str, CostDetails]:
         print("Failed to parse JSON:", e)
         raise
 
-    costs = {}
+    costs: Dict[str, CostDetails] = {}
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     for k in raw_costs:
         if (
@@ -68,13 +67,12 @@ def fetch_new_costs() -> Dict[str, CostDetails]:
         ):
             continue
 
-        costs[k] = {}
-        costs[k]["provider"] = raw_costs[k].get("litellm_provider", "default")
-        costs[k]["input"] = float(Decimal(raw_costs[k].get("input_cost_per_token", 0)))
-        costs[k]["output"] = float(
-            Decimal(raw_costs[k].get("output_cost_per_token", 0))
+        costs[k] = CostDetails(
+            provider=raw_costs[k].get("litellm_provider", "default"),
+            input=float(Decimal(raw_costs[k].get("input_cost_per_token", 0))),
+            output=float(Decimal(raw_costs[k].get("output_cost_per_token", 0))),
+            created_at=current_time,
         )
-        costs[k]["created_at"] = current_time
 
     return costs
 
@@ -87,7 +85,7 @@ def sum_costs(data: Dict[str, List[CostDetails]]) -> int:
     return total_costs
 
 
-def main(file_name: str = COST_FILE):
+def main(file_name: str = COST_FILE) -> None:
     if not os.path.isabs(file_name):
         file_path = os.path.join(os.path.dirname(__file__), file_name)
     else:
