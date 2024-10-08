@@ -43,10 +43,10 @@ from weave.trace_server.orm import (
     quote_json_path_parts,
 )
 from weave.trace_server.token_costs import cost_query
-from weave.trace_server.trace_server_interface_util import (
+from weave.trace_server_common import trace_server_interface as tsi
+from weave.trace_server_common.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
-from weave.trace_server_common import trace_server_interface as tsi
 
 logger = logging.getLogger(__name__)
 

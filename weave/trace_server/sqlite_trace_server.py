@@ -31,15 +31,15 @@ from weave.trace_server.trace_server_common import (
     make_feedback_query_req,
     set_nested_key,
 )
-from weave.trace_server.trace_server_interface_util import (
+from weave.trace_server.validation import object_id_validator
+from weave.trace_server_common import trace_server_interface as tsi
+from weave.trace_server_common.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     assert_non_null_wb_user_id,
     bytes_digest,
     extract_refs_from_values,
     str_digest,
 )
-from weave.trace_server.validation import object_id_validator
-from weave.trace_server_common import trace_server_interface as tsi
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15

@@ -99,13 +99,13 @@ from weave.trace_server.trace_server_common import (
     make_feedback_query_req,
     set_nested_key,
 )
-from weave.trace_server.trace_server_interface_util import (
+from weave.trace_server_common import trace_server_interface as tsi
+from weave.trace_server_common.trace_server_interface_util import (
     assert_non_null_wb_user_id,
     bytes_digest,
     extract_refs_from_values,
     str_digest,
 )
-from weave.trace_server_common import trace_server_interface as tsi
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
