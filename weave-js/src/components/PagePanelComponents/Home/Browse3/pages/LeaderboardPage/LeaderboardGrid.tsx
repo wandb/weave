@@ -8,13 +8,10 @@ import React, {useCallback, useMemo, useState} from 'react';
 
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {PaginationButtons} from '../CallsPage/CallsTableButtons';
+import {LeaderboardData} from './hooks';
 
 interface LeaderboardGridProps {
-  data: {
-    models: string[];
-    metrics: string[];
-    scores: {[key: string]: {[key: string]: number}};
-  };
+  data: LeaderboardData;
   onCellClick: (modelName: string, metricName: string, score: number) => void;
 }
 
@@ -35,8 +32,10 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 
   const metricRanges = useMemo(() => {
     const ranges: {[key: string]: {min: number; max: number}} = {};
-    data.metrics.forEach(metric => {
-      const scores = data.models.map(model => data.scores[model][metric]);
+    Object.keys(data.metrics).forEach(metric => {
+      const scores = data.models
+        .map(model => data.scores?.[model]?.[metric])
+        .filter(score => score !== undefined);
       ranges[metric] = {
         min: Math.min(...scores),
         max: Math.max(...scores),
@@ -46,7 +45,10 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   }, [data]);
 
   const getColorForScore = useCallback(
-    (metric: string, score: number) => {
+    (metric: string, score: number | undefined) => {
+      if (score === undefined) {
+        return 'transparent';
+      }
       const {min, max} = metricRanges[metric];
       const normalizedScore = (score - min) / (max - min);
       return `hsl(${120 * normalizedScore}, 70%, 85%)`;
@@ -57,7 +59,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   const columns: GridColDef[] = useMemo(
     () => [
       {field: 'model', headerName: 'Model', width: 200, flex: 1},
-      ...data.metrics.map(metric => ({
+      ...Object.keys(data.metrics).map(metric => ({
         field: metric,
         headerName: metric,
         width: 130,
@@ -70,7 +72,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: getColorForScore(metric, params.value as number),
+              backgroundColor: getColorForScore(metric, params.value),
             }}
             onClick={() =>
               onCellClick(
@@ -79,7 +81,8 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                 params.value as number
               )
             }>
-            {`${(params.value as number).toFixed(2)}%`}
+            {params.value ?? '-'}
+            {/* {`${(params.value as number).toFixed(2)}%`} */}
           </div>
         ),
       })),

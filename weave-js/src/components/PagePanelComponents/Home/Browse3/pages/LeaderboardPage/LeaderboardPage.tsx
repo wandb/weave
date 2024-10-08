@@ -3,6 +3,7 @@ import React, {useState} from 'react';
 
 import {EditableMarkdown} from './EditableMarkdown';
 import {fakeLeaderboardData} from './fakeData';
+import {useLeaderboardData} from './hooks';
 import {LeaderboardGrid} from './LeaderboardGrid';
 
 type LeaderboardPageProps = {
@@ -40,8 +41,9 @@ This leaderboard showcases the performance of various models across different me
 Happy analyzing!`;
 
 export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
+  const {entity, project} = props;
   const [description, setDescription] = useState(EXAMPLE_DESCRIPTION);
-  const [data] = useState(fakeLeaderboardData);
+  const data = useLeaderboardData(entity, project);
 
   // const setDescription = useCallback((newDescription: string) => {
   //   setDescriptionRaw(newDescription.trim());
