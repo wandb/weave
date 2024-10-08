@@ -132,6 +132,13 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
+            name: 'Leaderboard',
+            slug: 'weave/leaderboard',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.LayoutTabs,
+          },
+          {
+            type: 'button' as const,
             name: 'Traces',
             slug: 'weave/traces',
             isShown: showWeaveSidebarItems || isShowAll,

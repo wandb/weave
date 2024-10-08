@@ -82,6 +82,7 @@ import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
+import {LeaderboardPage} from './Browse3/pages/CompareEvaluationsPage/LeaderboardPage';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
 import {
@@ -151,6 +152,7 @@ const tabOptions = [
   'op-versions',
   'calls',
   'evaluations',
+  'leaderboard',
   'boards',
   'tables',
 ];
@@ -491,6 +493,9 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
+        </Route>
+        <Route path={`${projectRoot}/:tab(leaderboard)`}>
+          <LeaderboardPageBinding />
         </Route>
         {/* BOARDS */}
         <Route
@@ -933,6 +938,11 @@ const CompareEvaluationsBinding = () => {
       evaluationCallIds={evaluationCallIds}
     />
   );
+};
+
+const LeaderboardPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  return <LeaderboardPage entity={entity} project={project} />;
 };
 
 const OpsPageBinding = () => {
