@@ -130,7 +130,7 @@ const useEvaluations = (
         if (!finalData.scores[modelName]) {
           finalData.scores[modelName] = {};
         }
-        finalData.scores[modelName][metric] = score;
+        finalData.scores[modelName][metricName] = score;
       });
     });
 
