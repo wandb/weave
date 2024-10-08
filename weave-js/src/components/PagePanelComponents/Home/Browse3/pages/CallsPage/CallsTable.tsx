@@ -25,7 +25,9 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
+import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
+import {Icon} from '@wandb/weave/components/Icon';
 import React, {
   FC,
   useCallback,
@@ -85,8 +87,6 @@ import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
-
-const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -664,14 +664,32 @@ export const CallsTable: FC<{
       }}
       filterListItems={
         <Tailwind style={{display: 'contents'}}>
+          <RefreshButton onClick={() => calls.refetch()} />
           {!hideOpSelector && (
             <div className="flex-none">
-              <ListItem sx={{minWidth: 190, width: 320}}>
-                <FormControl fullWidth>
+              <ListItem
+                sx={{minWidth: 190, width: 320, height: 32, padding: 0}}>
+                <FormControl fullWidth sx={{borderColor: MOON_200}}>
                   <Autocomplete
                     PaperComponent={paperProps => (
                       <StyledPaper {...paperProps} />
                     )}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        height: '32px',
+                        '& fieldset': {
+                          borderColor: MOON_200,
+                        },
+                        '&:hover fieldset': {
+                          borderColor: `rgba(${TEAL_300}, 0.48)`,
+                        },
+                      },
+                      '& .MuiOutlinedInput-input': {
+                        height: '32px',
+                        padding: '0 14px',
+                        boxSizing: 'border-box',
+                      },
+                    }}
                     size="small"
                     // Temp disable multiple for simplicity - may want to re-enable
                     // multiple
@@ -696,7 +714,6 @@ export const CallsTable: FC<{
                     renderInput={renderParams => (
                       <StyledTextField
                         {...renderParams}
-                        label={OP_FILTER_GROUP_HEADER}
                         sx={{maxWidth: '350px'}}
                       />
                     )}
@@ -708,6 +725,8 @@ export const CallsTable: FC<{
                     }
                     groupBy={option => opVersionOptions[option]?.group}
                     options={Object.keys(opVersionOptions)}
+                    popupIcon={<Icon name="chevron-down" />}
+                    clearIcon={<Icon name="close" />}
                   />
                 </FormControl>
               </ListItem>
@@ -820,8 +839,6 @@ export const CallsTable: FC<{
               </div>
             </>
           )}
-          <ButtonDivider />
-          <RefreshButton onClick={() => calls.refetch()} />
         </Tailwind>
       }>
       <StyledDataGrid
