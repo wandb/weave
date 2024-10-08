@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from PIL import Image
 
 import weave
@@ -32,6 +34,7 @@ class ImageWrapper(weave.Object):
 
 
 def test_image_as_property(client: WeaveClient) -> None:
+    client.project = "test_image_as_property"
     img = Image.new("RGB", (512, 512), "purple")
     img_wrapper = ImageWrapper(img=img)
     assert img_wrapper.img == img
@@ -46,6 +49,7 @@ def test_image_as_property(client: WeaveClient) -> None:
 
 
 def test_image_as_dataset_cell(client: WeaveClient) -> None:
+    client.project = "test_image_as_dataset_cell"
     img = Image.new("RGB", (512, 512), "purple")
     dataset = weave.Dataset(rows=[{"img": img}])
     assert dataset.rows[0]["img"] == img
@@ -73,6 +77,7 @@ def image_as_input_and_output_part(in_img: Image.Image) -> dict:
 
 
 def test_image_as_call_io(client: WeaveClient) -> None:
+    client.project = "test_image_as_call_io"
     non_published_img = image_as_solo_output(publish_first=False)
     img_dict = image_as_input_and_output_part(non_published_img)
 
@@ -88,6 +93,7 @@ def test_image_as_call_io(client: WeaveClient) -> None:
 
 
 def test_image_as_call_io_refs(client: WeaveClient) -> None:
+    client.project = "test_image_as_call_io_refs"
     non_published_img = image_as_solo_output(publish_first=True)
     img_dict = image_as_input_and_output_part(non_published_img)
 
@@ -100,3 +106,25 @@ def test_image_as_call_io_refs(client: WeaveClient) -> None:
     assert image_as_solo_output_call.output.tobytes() == exp_bytes
     assert image_as_input_and_output_part_call.inputs["in_img"].tobytes() == exp_bytes
     assert image_as_input_and_output_part_call.output["out_img"].tobytes() == exp_bytes
+
+
+def test_image_as_file(client: WeaveClient) -> None:
+    client.project = "test_image_as_file"
+    file_path = Path(__file__).parent.resolve() / "example.jpg"
+
+    @weave.op()
+    def return_image_jpg_pillow(path: str):
+        file_path = Path(path)
+        return Image.open(file_path)
+
+    @weave.op()
+    def accept_image_jpg_pillow(val):
+        width, height = val.size
+        return f"Image size: {width}x{height}"
+
+    Image.new("RGB", (100, 100), "purple").save(file_path)
+    try:
+        res = accept_image_jpg_pillow(return_image_jpg_pillow(file_path))
+        assert res == "Image size: 100x100"
+    finally:
+        file_path.unlink()
