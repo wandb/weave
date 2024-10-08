@@ -24,6 +24,8 @@ export type EvaluationComparisonState = {
   comparisonDimensions?: ComparisonDimensionsType;
   // The current digest which is in view
   selectedInputDigest?: string;
+  // Selected metrics to compare
+  selectedMetrics?: string[];
 };
 
 export type ComparisonDimensionsType = Array<{
@@ -93,6 +95,7 @@ export const useEvaluationComparisonState = (
           baselineEvaluationCallId ?? evaluationCallIds[0],
         comparisonDimensions: newComparisonDimensions,
         selectedInputDigest,
+        selectedMetrics: newComparisonDimensions.map(dim => dim.metricId),
       },
     };
   }, [
