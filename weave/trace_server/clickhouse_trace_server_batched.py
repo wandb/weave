@@ -1717,6 +1717,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 final_batch.append(item)
         return final_batch
 
+    def table_query_stream(
+        self, req: tsi.TableQueryReq
+    ) -> Iterator[tsi.TableRowSchema]:
+        res = self.table_query(req)
+        for row in res.rows:
+            yield row
+
 
 def _num_bytes(data: Any) -> int:
     """
