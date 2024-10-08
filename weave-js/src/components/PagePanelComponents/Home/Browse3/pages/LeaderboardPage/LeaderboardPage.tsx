@@ -24,7 +24,7 @@ const DEFAULT_DESCRIPTION = `# Leaderboard`;
 
 export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
   const {entity, project} = props;
-  const [description, setDescription] = useState("");
+  const [description, setDescription] = useState('');
   const {loading, data} = useLeaderboardData(entity, project);
 
   // const setDescription = useCallback((newDescription: string) => {
