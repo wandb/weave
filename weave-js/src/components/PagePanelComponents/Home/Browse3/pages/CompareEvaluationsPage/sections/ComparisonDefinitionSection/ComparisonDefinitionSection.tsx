@@ -1,8 +1,13 @@
 import {Popover} from '@mui/material';
 import Input from '@wandb/weave/common/components/Input';
+import {
+  DragDropProvider,
+  DragSource,
+  DropTarget,
+} from '@wandb/weave/common/containers/DragDropContainer';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {parseRef, WeaveObjectRef} from '@wandb/weave/react';
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {Button} from '../../../../../../../Button';
 import {
@@ -19,37 +24,80 @@ import {
 } from '../../../wfReactInterface/wfDataModelHooksInterface';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {STANDARD_PADDING} from '../../ecpConstants';
-import {getOrderedCallIds} from '../../ecpState';
-import {EvaluationComparisonState} from '../../ecpState';
+import {EvaluationComparisonState, getOrderedCallIds} from '../../ecpState';
 import {HorizontalBox} from '../../Layout';
+import {useDragDropReorder} from './dragUtils';
 import {EvaluationDefinition, VerticalBar} from './EvaluationDefinition';
 
 export const ComparisonDefinitionSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const evalCallIds = useMemo(
-    () => getOrderedCallIds(props.state),
-    [props.state]
+  const {setSelectedCallIdsOrdered} = useCompareEvaluationsState();
+
+  const reorderItems = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      setSelectedCallIdsOrdered(prev => {
+        if (prev == null) {
+          return prev;
+        }
+        const newOrder = [...prev];
+        const from = newOrder[fromIndex];
+        newOrder[fromIndex] = newOrder[toIndex];
+        newOrder[toIndex] = from;
+        return newOrder;
+      });
+    },
+    [setSelectedCallIdsOrdered]
   );
 
+  const {
+    makeDragSourceCallbackRef,
+    renderDropIndicators,
+    onDragOver,
+    onDragEnd,
+    onDrop,
+  } = useDragDropReorder({
+    reorder: reorderItems,
+    dropzonePadding: 8,
+  });
+
+  const callIds = getOrderedCallIds(props.state);
+
   return (
-    <HorizontalBox
-      sx={{
-        alignItems: 'center',
-        paddingLeft: STANDARD_PADDING,
-        paddingRight: STANDARD_PADDING,
-        width: '100%',
-        overflow: 'auto',
-      }}>
-      {evalCallIds.map((key, ndx) => {
-        return (
-          <React.Fragment key={key}>
-            <EvaluationDefinition state={props.state} callId={key} />
-          </React.Fragment>
-        );
-      })}
-      <AddEvaluationButton state={props.state} />
-    </HorizontalBox>
+    <DragDropProvider>
+      <DropTarget
+        partRef={{id: `target`}}
+        onDragOver={onDragOver}
+        onDrop={onDrop}>
+        <HorizontalBox
+          sx={{
+            alignItems: 'center',
+            paddingLeft: STANDARD_PADDING,
+            paddingRight: STANDARD_PADDING,
+            width: '100%',
+            overflow: 'auto',
+          }}>
+          {callIds.map((key, ndx) => {
+            return (
+              <div key={key} ref={makeDragSourceCallbackRef(ndx)}>
+                {renderDropIndicators(ndx)}
+                <DragSource
+                  partRef={{id: `${ndx}`}}
+                  onDragEnd={onDragEnd}
+                  draggingStyle={{opacity: 0.25}}>
+                  <EvaluationDefinition
+                    state={props.state}
+                    callId={key}
+                    partRef={{id: `${ndx}`}}
+                  />
+                </DragSource>
+              </div>
+            );
+          })}
+          <AddEvaluationButton state={props.state} />
+        </HorizontalBox>
+      </DropTarget>
+    </DragDropProvider>
   );
 };
 
@@ -119,10 +167,9 @@ const AddEvaluationButton: React.FC<{
 
   const evalsNotComparing = useMemo(() => {
     return calls.result.filter(
-      call =>
-        !Object.keys(props.state.data.evaluationCalls).includes(call.callId)
+      call => !props.state.selectedCallIdsOrdered.includes(call.callId)
     );
-  }, [calls.result, props.state.data.evaluationCalls]);
+  }, [calls.result, props.state.selectedCallIdsOrdered]);
 
   const [menuOptions, setMenuOptions] =
     useState<CallSchema[]>(evalsNotComparing);
@@ -222,9 +269,7 @@ const AddEvaluationButton: React.FC<{
                     variant="ghost"
                     size="small"
                     className="pb-8 pt-8 font-['Source_Sans_Pro'] text-base font-normal text-moon-800"
-                    onClick={() => {
-                      addEvaluationCall(call.callId);
-                    }}>
+                    onClick={() => addEvaluationCall(call.callId)}>
                     <>
                       <span>{call.displayName ?? call.spanName}</span>
                       <Id id={call.callId} type="Call" className="ml-0 mr-4" />

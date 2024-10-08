@@ -18,12 +18,12 @@ import {getMetricIds} from './ecpUtil';
 export type EvaluationComparisonState = {
   // The normalized data for the evaluations
   data: EvaluationComparisonData;
-  // The evaluation call id of the baseline model
-  baselineEvaluationCallId: string;
   // The dimensions to compare & filter results
   comparisonDimensions?: ComparisonDimensionsType;
   // The current digest which is in view
   selectedInputDigest?: string;
+  // The order of the evaluation calls, the first call is always the baseline
+  selectedCallIdsOrdered: string[];
 };
 
 export type ComparisonDimensionsType = Array<{
@@ -41,7 +41,7 @@ export const useEvaluationComparisonState = (
   entity: string,
   project: string,
   evaluationCallIds: string[],
-  baselineEvaluationCallId?: string,
+  selectedCallIdsOrdered: string[],
   comparisonDimensions?: ComparisonDimensionsType,
   selectedInputDigest?: string
 ): Loadable<EvaluationComparisonState> => {
@@ -89,17 +89,15 @@ export const useEvaluationComparisonState = (
       loading: false,
       result: {
         data: data.result,
-        baselineEvaluationCallId:
-          baselineEvaluationCallId ?? evaluationCallIds[0],
         comparisonDimensions: newComparisonDimensions,
         selectedInputDigest,
+        selectedCallIdsOrdered,
       },
     };
   }, [
     data.result,
     data.loading,
-    baselineEvaluationCallId,
-    evaluationCallIds,
+    selectedCallIdsOrdered,
     comparisonDimensions,
     selectedInputDigest,
   ]);
@@ -112,17 +110,21 @@ export const useEvaluationComparisonState = (
  * evaluation call is first.
  */
 export const getOrderedCallIds = (state: EvaluationComparisonState) => {
-  const initial = Object.keys(state.data.evaluationCalls);
-  moveItemToFront(initial, state.baselineEvaluationCallId);
-  return initial;
+  return state.selectedCallIdsOrdered.filter(
+    callId => state.data.evaluationCalls[callId] != null
+  );
+};
+
+export const getBaselineCallId = (state: EvaluationComparisonState) => {
+  return state.selectedCallIdsOrdered[0];
 };
 
 /**
  * Should use this over keys of `state.data.models` because it ensures the baseline model is first.
  */
 export const getOrderedModelRefs = (state: EvaluationComparisonState) => {
-  const baselineRef =
-    state.data.evaluationCalls[state.baselineEvaluationCallId].modelRef;
+  const baselineCallId = getBaselineCallId(state);
+  const baselineRef = state.data.evaluationCalls[baselineCallId].modelRef;
   const refs = Object.keys(state.data.models);
   // Make sure the baseline model is first
   moveItemToFront(refs, baselineRef);

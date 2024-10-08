@@ -9,9 +9,7 @@ import {ComparisonDimensionsType} from './ecpState';
 
 const CompareEvaluationsContext = React.createContext<{
   state: EvaluationComparisonState;
-  setBaselineEvaluationCallId: React.Dispatch<
-    React.SetStateAction<string | null>
-  >;
+  setSelectedCallIdsOrdered: React.Dispatch<React.SetStateAction<string[]>>;
   setComparisonDimensions: React.Dispatch<
     React.SetStateAction<ComparisonDimensionsType | null>
   >;
@@ -32,26 +30,23 @@ export const CompareEvaluationsProvider: React.FC<{
   entity: string;
   project: string;
   initialEvaluationCallIds: string[];
-  setBaselineEvaluationCallId: React.Dispatch<
-    React.SetStateAction<string | null>
-  >;
+  selectedCallIdsOrdered: string[];
+  setSelectedCallIdsOrdered: React.Dispatch<React.SetStateAction<string[]>>;
   setComparisonDimensions: React.Dispatch<
     React.SetStateAction<ComparisonDimensionsType | null>
   >;
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
-  baselineEvaluationCallId?: string;
   comparisonDimensions?: ComparisonDimensionsType;
   selectedInputDigest?: string;
 }> = ({
   entity,
   project,
   initialEvaluationCallIds,
-  setBaselineEvaluationCallId,
+  setSelectedCallIdsOrdered,
+  selectedCallIdsOrdered,
   setComparisonDimensions,
-
   setSelectedInputDigest,
 
-  baselineEvaluationCallId,
   comparisonDimensions,
   selectedInputDigest,
   children,
@@ -63,7 +58,7 @@ export const CompareEvaluationsProvider: React.FC<{
     entity,
     project,
     evaluationCallIds,
-    baselineEvaluationCallId,
+    selectedCallIdsOrdered,
     comparisonDimensions,
     selectedInputDigest
   );
@@ -74,21 +69,25 @@ export const CompareEvaluationsProvider: React.FC<{
     }
     return {
       state: initialState.result,
-      setBaselineEvaluationCallId,
+      setSelectedCallIdsOrdered,
       setComparisonDimensions,
       setSelectedInputDigest,
       addEvaluationCall: (newCallId: string) => {
         setEvaluationCallIds(prev => [...prev, newCallId]);
+        setSelectedCallIdsOrdered(prev => [...(prev ?? []), newCallId]);
       },
       removeEvaluationCall: (callId: string) => {
         setEvaluationCallIds(prev => prev.filter(id => id !== callId));
+        setSelectedCallIdsOrdered(
+          prev => prev?.filter(id => id !== callId) ?? null
+        );
       },
     };
   }, [
     initialState.loading,
     initialState.result,
     setEvaluationCallIds,
-    setBaselineEvaluationCallId,
+    setSelectedCallIdsOrdered,
     setComparisonDimensions,
     setSelectedInputDigest,
   ]);

@@ -1,9 +1,12 @@
 import {Box} from '@material-ui/core';
 import {Circle} from '@mui/icons-material';
+import {WBIcon} from '@wandb/ui';
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
+import {DragHandle} from '@wandb/weave/common/containers/DragDropContainer/DragHandle';
 import {Button} from '@wandb/weave/components/Button';
 import {Pill} from '@wandb/weave/components/Tag';
 import React, {useMemo} from 'react';
+import styled from 'styled-components';
 
 import {
   MOON_300,
@@ -24,14 +27,31 @@ import {
   EVAL_DEF_HEIGHT,
   STANDARD_BORDER,
 } from '../../ecpConstants';
-import {EvaluationComparisonState} from '../../ecpState';
+import {EvaluationComparisonState, getBaselineCallId} from '../../ecpState';
 import {HorizontalBox} from '../../Layout';
+
+const DragHandleIcon = styled(WBIcon).attrs({name: 'vertical-handle'})`
+  font-size: calc(30 * 1.75);
+  border-radius: 50%;
+  color: gray300;
+  user-select: none;
+  cursor: grab;
+  &&&:hover {
+    background: gray100;
+    color: black;
+  }
+  &:active {
+    cursor: grabbing;
+  }
+`;
+DragHandle.displayName = 'S.DragHandle';
 
 export const EvaluationDefinition: React.FC<{
   state: EvaluationComparisonState;
   callId: string;
+  partRef: {id: string};
 }> = props => {
-  const {removeEvaluationCall, setBaselineEvaluationCallId} =
+  const {removeEvaluationCall, setSelectedCallIdsOrdered} =
     useCompareEvaluationsState();
 
   const menuOptions = useMemo(() => {
@@ -40,9 +60,21 @@ export const EvaluationDefinition: React.FC<{
         key: 'add-to-baseline',
         content: 'Set as baseline',
         onClick: () => {
-          setBaselineEvaluationCallId(props.callId);
+          setSelectedCallIdsOrdered(prev => {
+            if (prev == null) {
+              return prev;
+            }
+            const index = prev.indexOf(props.callId);
+            if (index === 0) {
+              return prev;
+            }
+            const newOrder = [...prev];
+            newOrder.splice(index, 1);
+            newOrder.unshift(props.callId);
+            return newOrder;
+          });
         },
-        disabled: props.callId === props.state.baselineEvaluationCallId,
+        disabled: props.callId === getBaselineCallId(props.state),
       },
       {
         key: 'remove',
@@ -55,10 +87,9 @@ export const EvaluationDefinition: React.FC<{
     ];
   }, [
     props.callId,
-    props.state.baselineEvaluationCallId,
-    props.state.data.evaluationCalls,
+    props.state,
     removeEvaluationCall,
-    setBaselineEvaluationCallId,
+    setSelectedCallIdsOrdered,
   ]);
 
   return (
@@ -71,8 +102,11 @@ export const EvaluationDefinition: React.FC<{
         alignItems: 'center',
         justifyContent: 'space-between',
       }}>
+      <DragHandle partRef={props.partRef}>
+        <DragHandleIcon />
+      </DragHandle>
       <EvaluationCallLink {...props} />
-      {props.callId === props.state.baselineEvaluationCallId && (
+      {props.callId === getBaselineCallId(props.state) && (
         <Pill label="Baseline" color="teal" />
       )}
       <PopupDropdown
@@ -95,7 +129,10 @@ export const EvaluationCallLink: React.FC<{
   callId: string;
   state: EvaluationComparisonState;
 }> = props => {
-  const evaluationCall = props.state.data.evaluationCalls[props.callId];
+  const evaluationCall = props.state.data.evaluationCalls?.[props.callId];
+  if (!evaluationCall) {
+    return null;
+  }
   const {entity, project} = props.state.data;
 
   return (

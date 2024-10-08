@@ -30,7 +30,11 @@ import {
   STANDARD_PADDING,
 } from '../../ecpConstants';
 import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
-import {getOrderedCallIds, getOrderedModelRefs} from '../../ecpState';
+import {
+  getBaselineCallId,
+  getOrderedCallIds,
+  getOrderedModelRefs,
+} from '../../ecpState';
 import {EvaluationComparisonState} from '../../ecpState';
 import {resolveSummaryMetricResultForEvaluateCall} from '../../ecpUtil';
 import {usePeekCall} from '../../hooks';
@@ -407,7 +411,7 @@ export const ScorecardSection: React.FC<{
                     </GridCell>
                     {evalCallIds.map((evalCallId, mNdx) => {
                       const baseline = resolveSummaryMetricResult(
-                        props.state.baselineEvaluationCallId,
+                        getBaselineCallId(props.state),
                         groupName,
                         metricKey,
                         compositeSummaryMetrics,
