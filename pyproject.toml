@@ -138,13 +138,7 @@ markers = [
 [tool.ruff.lint]
 preview = true
 select = [
-  "D200",   # https://docs.astral.sh/ruff/rules/fits-on-one-line/
-  "D201",   # https://docs.astral.sh/ruff/rules/no-blank-line-before-function/
-  "D202",   # https://docs.astral.sh/ruff/rules/no-blank-line-after-function/
-  "D204",   # https://docs.astral.sh/ruff/rules/one-blank-line-after-class/
-  "D210",   # https://docs.astral.sh/ruff/rules/surrounding-whitespace/
-  "D211",   # https://docs.astral.sh/ruff/rules/blank-line-before-class/
-  "D214",   # https://docs.astral.sh/ruff/rules/section-not-over-indented/
+  "D",      # need to explicitly enable D in ruff
   "FIX001", # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
   "FIX003", # https://docs.astral.sh/ruff/rules/line-contains-xxx/
   "F541",   # https://docs.astral.sh/ruff/rules/f-string-missing-placeholders/
@@ -154,13 +148,10 @@ select = [
   "F401",   # https://docs.astral.sh/ruff/rules/unused-import/
   "TID252", # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
 ]
-ignore = [
-  # we use Google style
-  "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/
-  "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/
-  "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/
-]
 exclude = ["weave_query"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.isort]
 known-third-party = ["wandb", "weave_query"]
