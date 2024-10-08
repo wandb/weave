@@ -39,7 +39,7 @@ This directory contains various integrations for Weave. As of this writing, ther
    ```
    import pytest
    import weave
-   from weave.trace_server import trace_server_interface as tsi
+   from weave.trace_server_common import trace_server_interface as tsi
    from typing import Generator
 
    @pytest.fixture()
