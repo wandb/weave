@@ -1,24 +1,23 @@
 import asyncio
 import dataclasses
-import datetime
 import json
 import logging
 import typing
 
-from weave_query import weave_internal
-from weave_query import weave_types as types
-from weave_query.api import op, weave_class
 from weave_query import (
     artifact_fs,
     artifact_wandb,
+    engine_trace,
+    errors,
     io_service,
     ops_arrow,
+    util,
     wandb_util,
-    engine_trace,
-    errors, 
-    util, 
+    weave_internal,
 )
 from weave_query import timestamp as weave_timestamp
+from weave_query import weave_types as types
+from weave_query.api import op, weave_class
 from weave_query.ops_domain import trace_tree, wbmedia
 
 
@@ -795,7 +794,9 @@ def _get_partitioned_table_awl_from_file(
 # Download files in a `FilesystemArtifactDir` in parallel.
 # This only downloads files that are `WandbArtifact`s and have a resolved `_read_artifact_uri`.
 async def ensure_files(files: dict[str, artifact_fs.FilesystemArtifactFile]):
+    print(">>> ENSURE_FILES")
     client = io_service.get_async_client()
+    print(f">>> ENSURE_FILES {client=}")
 
     loop = asyncio.get_running_loop()
 

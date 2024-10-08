@@ -5,17 +5,17 @@ import typing
 
 import pyarrow as pa
 
-from weave_query import errors
-from weave_query import weave_types as types
-from weave_query.api import op
 from weave_query import (
-    engine_trace,
     artifact_base,
     artifact_fs,
     artifact_mem,
+    engine_trace,
+    errors,
     gql_json_cache,
     io_service,
 )
+from weave_query import weave_types as types
+from weave_query.api import op
 from weave_query.arrow import convert
 from weave_query.arrow.list_ import (
     ArrowWeaveList,
@@ -26,14 +26,12 @@ from weave_query.arrow.list_ import (
     weave_arrow_type_check,
 )
 from weave_query.gql_op_plugin import wb_gql_op_plugin
-from weave_query.op_def import map_type
 from weave_query.ops_domain import trace_tree, wb_util, wbmedia
 from weave_query.ops_domain import wb_domain_types as wdt
 from weave_query.ops_domain.run_history import history_op_common
 from weave_query.ops_domain.run_history.context import (
     get_error_on_non_vectorized_history_transform,
 )
-from weave_query.ops_domain.table import _patch_legacy_image_file_types
 from weave_query.wandb_interface import wandb_stream_table
 
 tracer = engine_trace.tracer()
@@ -847,7 +845,9 @@ def _read_raw_history_awl_tables(
     columns=None,
     artifact: typing.Optional[artifact_base.Artifact] = None,
 ) -> list[ArrowWeaveList]:
+    print(">>> READ_RAW_HISTORY_AWL_TABLES")
     io = io_service.get_sync_client()
+    print(f">>> READ_RAW_HISTORY_AWL_TABLES {io=}")
     tables = []
     for url in run["sampledParquetHistory"]["parquetUrls"]:
         local_path = io.ensure_file_downloaded(url)

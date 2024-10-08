@@ -6,6 +6,8 @@
 # traces in local development.
 # TODO: Fix
 
+print("HELLO FROM TOP OF IO SERVICE")
+
 import asyncio
 import atexit
 import contextlib
@@ -22,23 +24,30 @@ from typing import Any, Callable, Dict, Iterator, TypeVar
 
 import aioprocessing
 
+print("IMPORTED BASIC PYTHON STUFF")
+
+
 from weave_query import (
-    weave_http,
-    filesystem,
-    errors,
-    engine_trace,
-    server_error_handling,
     artifact_wandb,
     async_queue,
     cache,
     context_state,
+    engine_trace,
+    errors,
+    filesystem,
+    server_error_handling,
     uris,
     wandb_api,
     wandb_file_manager,
+    weave_http,
 )
+
+print("WE IMPORTED EVERYTHING")
 
 tracer = engine_trace.tracer()  # type: ignore
 statsd = engine_trace.statsd()  # type: ignore
+
+print("SETUP TRACER AND STATSD")
 
 
 QueueItemType = TypeVar("QueueItemType")
@@ -240,25 +249,35 @@ class Server:
     # server_process runs the server's main coroutine
     def _request_handler_fn(self) -> None:
         try:
+            print("_REQUEST_HANDLER_FN: STARTED")
             asyncio.run(self._request_handler_fn_main(), debug=True)
+            print("_REQUEST_HANDLER_FN: FINISHED")
         except Exception as e:
             logging.exception(f"Error in request handler process: {e}")
             raise e
 
     # start starts the server thread or process
     def start(self) -> None:
+        print("STARTING REQUEST HANDLER")
         self.request_handler.start()
+        print("STARTING RESPONSE QUEUE ROUTER")
         self.response_queue_router.start()
+        print("WAITING FOR REQUEST HANDLER TO BE READY")
         self._request_handler_ready_event.wait()
+        print("WAITING FOR RESPONSE QUEUE ROUTER TO BE READY")
         self._response_queue_feeder_ready_event.wait()
+        print("REGISTERING SHUTDOWN FUNCTION")
         atexit.register(self.shutdown)
 
     # cleanup performs cleanup actions, such as flushing stats
     def cleanup(self) -> None:
+        print("CLEANING UP")
         statsd.flush()
+        print("CLEANED UP")
 
     # shutdown stops the server and joins the thread/process
     def shutdown(self) -> None:
+        print("SHUTTING DOWN")
         with self._shutdown_lock:
             self._shutting_down.set()
 
@@ -271,12 +290,16 @@ class Server:
             self._request_handler_ready_to_shut_down_event.wait()
 
             self.response_queue_router.join()
+            print("JOINING REQUEST HANDLER")
             self.request_handler.join()
+            print("JOINED REQUEST HANDLER")
             self.cleanup()
 
     def _response_queue_router_fn(self) -> None:
         try:
+            print("_RESPONSE_QUEUE_ROUTER_FN: STARTED")
             asyncio.run(self._response_queue_router_fn_main(), debug=True)
+            print("_RESPONSE_QUEUE_ROUTER_FN: FINISHED")
         except Exception as e:
             logging.exception(f"Error in response queue router: {e}")
             raise e
@@ -338,6 +361,7 @@ class Server:
         fs = filesystem.FilesystemAsync()
         net = weave_http.HttpAsync(fs)
         loop = asyncio.get_running_loop()
+        print(f"HELLO, {loop=}")
         active_tasks: set[asyncio.Task[typing.Any]] = set()
         async with net:
             self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
@@ -386,11 +410,13 @@ class Server:
     ) -> None:
         if client.client_id not in self.client_response_queues:
             if isinstance(client, SyncClient):
+                print("REGISTERING SYNC CLIENT")
                 self.client_response_queues[client.client_id] = queue.Queue()
             else:
-                self.client_response_queues[
-                    client.client_id
-                ] = async_queue.ThreadQueue()
+                print("REGISTERING ASYNC CLIENT")
+                self.client_response_queues[client.client_id] = (
+                    async_queue.ThreadQueue()
+                )
 
     def unregister_client(
         self, client: typing.Union["SyncClient", "AsyncClient"]
@@ -468,7 +494,9 @@ class AsyncConnection:
         self.response_queue: async_queue.ThreadQueue[ServerResponse] = typing.cast(
             async_queue.ThreadQueue[ServerResponse], response_queue
         )
+        print("BEFORE ASYNCIO.CREATE_TASK")
         self.response_task = asyncio.create_task(self.handle_responses())
+        print("AFTER ASYNCIO.CREATE_TASK")
         self.response_task.add_done_callback(self.response_task_ended)
         self.connected = True
 
@@ -707,6 +735,7 @@ class ServerlessClient:
 
 
 def get_sync_client() -> typing.Union[SyncClient, ServerlessClient]:
+    print(">>> GET_SYNC_CLIENT")
     if context_state.serverless_io_service():
         # The io service can't be used during atexit handlers, you get an error like
         # "cannot schedule new futures after shutdown". So it can't really be cleaned up
@@ -716,9 +745,16 @@ def get_sync_client() -> typing.Union[SyncClient, ServerlessClient]:
         # a hang. So we just use the serverless client when setting up weaveflow for now.
         # TODO: this is still an issue for users of streamtable outside of weaveflow, and
         # could be an issue on the weave server if we want clean / flushing shutdowns.
-        return ServerlessClient(filesystem.get_filesystem())
-    return SyncClient(get_server(), filesystem.get_filesystem())
+        c = ServerlessClient(filesystem.get_filesystem())
+        print(f">>> SERVERLESS CLIENT {c=}")
+        return c
+    c = SyncClient(get_server(), filesystem.get_filesystem())
+    print(f">>> SYNC CLIENT {c=}")
+    return c
 
 
 def get_async_client() -> AsyncClient:
-    return AsyncClient(get_server())
+    print(">>> GET_ASYNC_CLIENT")
+    c = AsyncClient(get_server())
+    print(f">>> ASYNC CLIENT {c=}")
+    return c
