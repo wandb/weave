@@ -11,7 +11,6 @@ from zoneinfo import ZoneInfo
 
 import emoji
 
-from weave.trace_server import refs_internal as ri
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.feedback import (
@@ -32,6 +31,7 @@ from weave.trace_server.trace_server_common import (
     set_nested_key,
 )
 from weave.trace_server.validation import object_id_validator
+from weave.trace_server_common import refs_internal as ri
 from weave.trace_server_common import trace_server_interface as tsi
 from weave.trace_server_common.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,

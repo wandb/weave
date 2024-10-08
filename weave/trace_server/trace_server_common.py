@@ -3,7 +3,7 @@ import datetime
 from collections import OrderedDict, defaultdict
 from typing import Any, Dict, Optional, Tuple, cast
 
-from weave.trace_server import refs_internal as ri
+from weave.trace_server_common import refs_internal as ri
 from weave.trace_server_common import trace_server_interface as tsi
 
 
