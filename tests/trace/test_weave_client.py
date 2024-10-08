@@ -9,7 +9,7 @@ import pytest
 import requests
 
 import weave
-import weave.trace_server.trace_server_interface as tsi
+import weave.trace_server_common.trace_server_interface as tsi
 from tests.trace.testutil import ObjectRefStrMatcher
 from tests.trace.util import (
     AnyIntMatcher,
@@ -34,7 +34,7 @@ from weave.trace_server.sqlite_trace_server import (
 from weave.trace_server.sqlite_trace_server import (
     SqliteTraceServer,
 )
-from weave.trace_server.trace_server_interface import (
+from weave.trace_server_common.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
     RefsReadBatchReq,

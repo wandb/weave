@@ -9,7 +9,7 @@ from PIL import Image
 import weave
 from tests.trace.util import AnyIntMatcher
 from weave import Evaluation, Model
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_common import trace_server_interface as tsi
 
 
 def flatten_calls(
