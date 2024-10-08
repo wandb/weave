@@ -27,7 +27,7 @@ provider as usual:
 from notdiamond import NotDiamond
 
 import weave
-weave.init()
+weave.init('notdiamond-quickstart')
 
 client = NotDiamond()
 session_id, provider = client.chat.completions.model_select(
@@ -78,6 +78,9 @@ to maximize performance and minimize cost on your evaluation data:
 ```python
 from notdiamond import NotDiamond
 client = NotDiamond()
+
+import weave
+weave.init('notdiamond-quickstart')
 
 session_id, provider = client.chat.completions.model_select(
     messages=[
