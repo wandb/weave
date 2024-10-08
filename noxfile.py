@@ -23,6 +23,7 @@ def lint(session):
         "dspy",
         "groq",
         "instructor",
+        "google_ai_studio",
         "langchain",
         "litellm",
         "llamaindex",
