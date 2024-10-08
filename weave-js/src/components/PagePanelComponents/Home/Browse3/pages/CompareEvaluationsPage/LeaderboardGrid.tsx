@@ -86,8 +86,8 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         hideFooterSelectedRowCount
         sx={{
           flexGrow: 1,
-          '& .MuiDataGrid-main': { overflow: 'unset' },
-          '& .MuiDataGrid-virtualScroller': { overflow: 'unset' },
+          '& .MuiDataGrid-main': { overflow: 'auto' },
+          '& .MuiDataGrid-virtualScroller': { overflow: 'auto' },
           '& .MuiDataGrid-footerContainer': { position: 'sticky', bottom: 0, bgcolor: 'background.paper', zIndex: 1 },
         }}
       />
