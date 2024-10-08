@@ -1,11 +1,10 @@
 import React, {useState} from 'react';
-import styled from 'styled-components';
+import {Box, Divider} from '@mui/material';
 
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {EditableMarkdown} from './EditableMarkdown';
 import {fakeLeaderboardData} from './fakeData';
 import {LeaderboardGrid} from './LeaderboardGrid';
-import {LeaderboardHeader} from './LeaderboardHeader';
 
 type LeaderboardPageProps = {
   entity: string;
@@ -48,30 +47,18 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
   };
 
   return (
-    <LeaderboardContainer>
-      <DescriptionArea>
+    <Box display="flex" flexDirection="column" height="100%">
+      <Box mb={2}>
         <EditableMarkdown
           value={description}
           onChange={setDescription}
           placeholder="Add a description for this leaderboard..."
         />
-      </DescriptionArea>
-      <LeaderboardGrid data={data} onCellClick={handleCellClick} />
-    </LeaderboardContainer>
+      </Box>
+      <Divider />
+      <Box flexGrow={1} mt={2}>
+        <LeaderboardGrid data={data} onCellClick={handleCellClick} />
+      </Box>
+    </Box>
   );
 };
-
-const LeaderboardContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 24px;
-  background-color: #f5f5f5;
-`;
-
-const DescriptionArea = styled.div`
-  background-color: white;
-  border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-`;

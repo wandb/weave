@@ -1,5 +1,5 @@
 import React from 'react';
-import styled from 'styled-components';
+import { DataGrid, GridColDef, GridValueGetterParams, GridRenderCellParams } from '@mui/x-data-grid';
 
 interface LeaderboardGridProps {
   data: {
@@ -10,75 +10,65 @@ interface LeaderboardGridProps {
   onCellClick: (modelName: string, metricName: string, score: number) => void;
 }
 
+interface RowData {
+  id: number;
+  model: string;
+  [key: string]: number | string;
+}
+
 export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   data,
   onCellClick,
-}) => (
-  <GridContainer>
-    <GridHeader>
-      <HeaderCell>Model</HeaderCell>
-      {data.metrics.map(metric => (
-        <HeaderCell key={metric}>{metric}</HeaderCell>
-      ))}
-    </GridHeader>
-    {data.models.map(model => (
-      <GridRow key={model}>
-        <ModelCell>{model}</ModelCell>
-        {data.metrics.map(metric => (
-          <ScoreCell
-            key={`${model}-${metric}`}
-            onClick={() =>
-              onCellClick(model, metric, data.scores[model][metric])
-            }
-            score={data.scores[model][metric]}>
-            {data.scores[model][metric].toFixed(2)}%
-          </ScoreCell>
-        ))}
-      </GridRow>
-    ))}
-  </GridContainer>
-);
+}) => {
+  const columns: GridColDef[] = [
+    { field: 'model', headerName: 'Model', width: 200 },
+    ...data.metrics.map(metric => ({
+      field: metric,
+      headerName: metric,
+      width: 130,
+    //   valueGetter: ((params: GridValueGetterParams)) => params.row[metric],
+      renderCell: (params: GridRenderCellParams) => (
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: `hsl(${120 * (params.value as number / 100)}, 70%, 90%)`,
+          }}
+          onClick={() =>
+            onCellClick(
+              params.row.model,
+              params.field as string,
+              params.value as number
+            )
+          }
+        >
+          {`${(params.value as number).toFixed(2)}%`}
+        </div>
+      ),
+    })),
+  ];
 
-const GridContainer = styled.div`
-  background-color: white;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-`;
+  const rows: RowData[] = data.models.map((model, index) => ({
+    id: index,
+    model,
+    ...data.scores[model],
+  }));
 
-const GridHeader = styled.div`
-  display: grid;
-  grid-template-columns: 200px repeat(auto-fit, minmax(100px, 1fr));
-  background-color: #34495e;
-  color: white;
-  font-weight: bold;
-`;
-
-const HeaderCell = styled.div`
-  padding: 16px;
-  text-align: center;
-`;
-
-const GridRow = styled.div`
-  display: grid;
-  grid-template-columns: 200px repeat(auto-fit, minmax(100px, 1fr));
-  &:nth-child(even) {
-    background-color: #f8f9fa;
-  }
-`;
-
-const ModelCell = styled.div`
-  padding: 16px;
-  font-weight: bold;
-`;
-
-const ScoreCell = styled.div<{score: number}>`
-  padding: 16px;
-  text-align: center;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  background-color: ${props => `hsl(${120 * (props.score / 100)}, 70%, 80%)`};
-  &:hover {
-    background-color: ${props => `hsl(${120 * (props.score / 100)}, 70%, 70%)`};
-  }
-`;
+  return (
+    <DataGrid
+      rows={rows}
+      columns={columns}
+      initialState={{
+        pagination: {
+          paginationModel: { pageSize: 25, page: 0 },
+        },
+      }}
+      pageSizeOptions={[25, 50, 100]}
+      disableRowSelectionOnClick
+      sx={{ height: '100%', width: '100%' }}
+    />
+  );
+};
