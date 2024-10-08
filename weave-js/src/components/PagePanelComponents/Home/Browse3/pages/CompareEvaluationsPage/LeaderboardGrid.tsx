@@ -1,5 +1,6 @@
-import React from 'react';
-import { DataGrid, GridColDef, GridValueGetterParams, GridRenderCellParams } from '@mui/x-data-grid';
+import React, { useMemo } from 'react';
+import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
+import { Box } from '@mui/material';
 
 interface LeaderboardGridProps {
   data: {
@@ -20,13 +21,31 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   data,
   onCellClick,
 }) => {
+  const metricRanges = useMemo(() => {
+    const ranges: {[key: string]: {min: number; max: number}} = {};
+    data.metrics.forEach(metric => {
+      const scores = data.models.map(model => data.scores[model][metric]);
+      ranges[metric] = {
+        min: Math.min(...scores),
+        max: Math.max(...scores)
+      };
+    });
+    return ranges;
+  }, [data]);
+
+  const getColorForScore = (metric: string, score: number) => {
+    const { min, max } = metricRanges[metric];
+    const normalizedScore = (score - min) / (max - min);
+    return `hsl(${120 * normalizedScore}, 70%, 85%)`;
+  };
+
   const columns: GridColDef[] = [
-    { field: 'model', headerName: 'Model', width: 200 },
+    { field: 'model', headerName: 'Model', width: 200, flex: 1 },
     ...data.metrics.map(metric => ({
       field: metric,
       headerName: metric,
       width: 130,
-    //   valueGetter: ((params: GridValueGetterParams)) => params.row[metric],
+      flex: 1,
       renderCell: (params: GridRenderCellParams) => (
         <div
           style={{
@@ -35,7 +54,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: `hsl(${120 * (params.value as number / 100)}, 70%, 90%)`,
+            backgroundColor: getColorForScore(metric, params.value as number),
           }}
           onClick={() =>
             onCellClick(
@@ -58,17 +77,20 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   }));
 
   return (
-    <DataGrid
-      rows={rows}
-      columns={columns}
-      initialState={{
-        pagination: {
-          paginationModel: { pageSize: 25, page: 0 },
-        },
-      }}
-      pageSizeOptions={[25, 50, 100]}
-      disableRowSelectionOnClick
-      sx={{ height: '100%', width: '100%' }}
-    />
+    <Box sx={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }}>
+      <DataGrid
+        rows={rows}
+        columns={columns}
+        autoPageSize
+        disableRowSelectionOnClick
+        hideFooterSelectedRowCount
+        sx={{
+          flexGrow: 1,
+          '& .MuiDataGrid-main': { overflow: 'unset' },
+          '& .MuiDataGrid-virtualScroller': { overflow: 'unset' },
+          '& .MuiDataGrid-footerContainer': { position: 'sticky', bottom: 0, bgcolor: 'background.paper', zIndex: 1 },
+        }}
+      />
+    </Box>
   );
 };
