@@ -1,6 +1,10 @@
 import {Box} from '@mui/material';
-import {GridColDef, GridRenderCellParams} from '@mui/x-data-grid-pro';
-import React, {useCallback, useMemo} from 'react';
+import {
+  GridColDef,
+  GridPaginationModel,
+  GridRenderCellParams,
+} from '@mui/x-data-grid-pro';
+import React, {useCallback, useMemo, useState} from 'react';
 
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {PaginationButtons} from '../CallsPage/CallsTableButtons';
@@ -24,6 +28,11 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   data,
   onCellClick,
 }) => {
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
+    pageSize: 25,
+    page: 0,
+  });
+
   const metricRanges = useMemo(() => {
     const ranges: {[key: string]: {min: number; max: number}} = {};
     data.metrics.forEach(metric => {
@@ -95,32 +104,36 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
+        overflow: 'hidden', // Prevent outer container from scrolling
       }}>
       <StyledDataGrid
         rows={rows}
         columns={columns}
         pagination
-        // paginationModel={{
-        //     page: 0,
-        //     pageSize: 25,
-        // }}
-        // pageSize={pageSize}
-        // onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
-        // rowsPerPageOptions={[25]}
-        // disableSelectionOnClick
+        paginationModel={paginationModel}
+        onPaginationModelChange={setPaginationModel}
         pageSizeOptions={[25]}
         disableColumnMenu
+        disableRowSelectionOnClick
         sx={{
           borderRadius: 0,
-          // This moves the pagination controls to the left
           '& .MuiDataGrid-footerContainer': {
             justifyContent: 'flex-start',
           },
-
+          '& .MuiDataGrid-cell': {
+            cursor: 'pointer',
+          },
           flexGrow: 1,
-          //   '& .MuiDataGrid-main': { overflow: 'auto' },
-          //   '& .MuiDataGrid-virtualScroller': { overflow: 'auto' },
-          //   '& .MuiDataGrid-footerContainer': { position: 'sticky', bottom: 0, bgcolor: 'background.paper', zIndex: 1 },
+          width: 'calc(100% + 1px)', // Add 1px to account for the right border
+          '& .MuiDataGrid-main': {
+            overflow: 'hidden',
+          },
+          '& .MuiDataGrid-virtualScroller': {
+            overflow: 'auto',
+          },
+          '& .MuiDataGrid-columnHeaders': {
+            overflow: 'hidden',
+          },
         }}
         slots={{
           pagination: PaginationButtons,

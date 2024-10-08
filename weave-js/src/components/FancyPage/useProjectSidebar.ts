@@ -135,7 +135,7 @@ export const useProjectSidebar = (
             name: 'Leaderboard',
             slug: 'weave/leaderboard',
             isShown: showWeaveSidebarItems || isShowAll,
-            iconName: IconNames.LayoutTabs,
+            iconName: IconNames.BenchmarkSquare,
           },
           {
             type: 'button' as const,
