@@ -75,7 +75,6 @@ from weave.trace_server.feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from weave.trace_server.ids import generate_id
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -100,6 +99,7 @@ from weave.trace_server.trace_server_common import (
 )
 from weave.trace_server_common import refs_internal as ri
 from weave.trace_server_common import trace_server_interface as tsi
+from weave.trace_server_common.ids import generate_id
 from weave.trace_server_common.trace_server_interface_util import (
     assert_non_null_wb_user_id,
     bytes_digest,

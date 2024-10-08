@@ -32,8 +32,8 @@ from weave.trace.settings import client_parallelism
 from weave.trace.table import Table
 from weave.trace.util import deprecated
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
-from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.trace_server_common.ids import generate_id
 from weave.trace_server_common.trace_server_interface import (
     CallEndReq,
     CallSchema,

@@ -5,9 +5,9 @@ from unittest.mock import patch
 import requests
 from pydantic import ValidationError
 
-from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.trace_server_common import trace_server_interface as tsi
+from weave.trace_server_common.ids import generate_id
 
 
 def generate_start(id) -> tsi.StartedCallSchemaForInsert:
