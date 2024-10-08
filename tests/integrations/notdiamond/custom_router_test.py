@@ -50,10 +50,6 @@ def preference_id():
 
 
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "api.notdiamond.ai"],
-)
 def test_custom_router_train_router(
     client: WeaveClient, model_evals: Dict[str, EvaluationResults]
 ):
@@ -76,10 +72,6 @@ def test_custom_router_train_router(
 
 
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "api.notdiamond.ai"],
-)
 def test_evaluate_router(
     client: WeaveClient, model_datasets: Dict[str, weave.Table], preference_id: str
 ):

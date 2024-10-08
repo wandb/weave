@@ -274,7 +274,9 @@ class Evaluation(Object):
 
         return summary
 
-    async def get_eval_results(self, model: Union[Callable, Model]) -> EvaluationResults:
+    async def get_eval_results(
+        self, model: Union[Callable, Model]
+    ) -> EvaluationResults:
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
         eval_rows = []

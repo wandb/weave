@@ -1,9 +1,9 @@
 from typing import Any, Dict, Optional, Tuple, Union
 
 import pandas as pd
-from notdiamond.toolkit.custom_router import CustomRouter
 
 import weave
+from notdiamond.toolkit.custom_router import CustomRouter
 from weave.flow.eval import EvaluationResults
 
 
