@@ -118,6 +118,7 @@ exclude = [
   "tests",
   "docs",
   "dev_docs",
+  "trace_server",
   "weave/clear_cache.py",
 ]
 
