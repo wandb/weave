@@ -2,7 +2,7 @@
 
 import unittest
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import ANY, MagicMock, mock_open, patch
 
 # Import the module to be tested
@@ -32,8 +32,22 @@ class TestInsertCosts(unittest.TestCase):
             ],
         }
         self.sample_current_costs = [
-            ("llm_model_1", 0.01, 0.02),
-            ("llm_model_3", 0.02, 0.03),
+            (
+                "llm_model_1",
+                0.01,
+                0.02,
+                datetime.strptime("2023-10-01 12:00:00", "%Y-%m-%d %H:%M:%S").replace(
+                    tzinfo=timezone.utc
+                ),
+            ),
+            (
+                "llm_model_3",
+                0.02,
+                0.03,
+                datetime.strptime("2023-10-02 13:30:00", "%Y-%m-%d %H:%M:%S").replace(
+                    tzinfo=timezone.utc
+                ),
+            ),
         ]
         self.mock_uuid = str(uuid.uuid4())
         self.mock_now = datetime.now()
@@ -92,7 +106,9 @@ class TestInsertCosts(unittest.TestCase):
             date_str = cost.get(
                 "created_at", self.mock_now.strftime("%Y-%m-%d %H:%M:%S")
             )
-            created_at = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+            created_at = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").replace(
+                tzinfo=timezone.utc
+            )
             expected_rows.append(
                 (
                     self.mock_uuid,

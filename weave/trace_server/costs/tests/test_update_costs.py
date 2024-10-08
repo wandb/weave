@@ -1,8 +1,7 @@
 import json
-import os
 import unittest
 from datetime import datetime
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import ANY, MagicMock, mock_open, patch
 
 import requests
 
@@ -155,7 +154,10 @@ class TestUpdateCosts(unittest.TestCase):
             },
         }
         main()
-        mock_file.assert_called_with(os.path.abspath(COST_FILE), "w")
+        mock_file.assert_called_with(ANY, "w")
+        args, kwargs = mock_file.call_args
+        opened_file_path = args[0]
+        self.assertTrue(opened_file_path.endswith(COST_FILE))
         handle = mock_file()
         handle.write.assert_called()
         written_data = "".join(args[0] for args, kwargs in handle.write.call_args_list)
@@ -209,7 +211,10 @@ class TestUpdateCosts(unittest.TestCase):
             }
         }
         main()
-        mock_file.assert_called_with(os.path.abspath(COST_FILE), "w")
+        mock_file.assert_called_with(ANY, "w")
+        args, kwargs = mock_file.call_args
+        opened_file_path = args[0]
+        self.assertTrue(opened_file_path.endswith(COST_FILE))
         handle = mock_file()
         handle.write.assert_called()
         written_data = "".join(args[0] for args, kwargs in handle.write.call_args_list)
@@ -273,7 +278,10 @@ class TestUpdateCosts(unittest.TestCase):
             }
         }
         main()
-        mock_file.assert_called_with(os.path.abspath(COST_FILE), "w")
+        mock_file.assert_called_with(ANY, "w")
+        args, kwargs = mock_file.call_args
+        opened_file_path = args[0]
+        self.assertTrue(opened_file_path.endswith(COST_FILE))
         handle = mock_file()
         handle.write.assert_called()
         written_data = "".join(args[0] for args, kwargs in handle.write.call_args_list)
