@@ -242,7 +242,6 @@ def _execute_call(
             call,
             output,
             exception,
-            postprocess_output=__op.postprocess_output,
             op=__op,
         )
         if not call_context.get_current_call():
