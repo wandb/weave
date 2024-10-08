@@ -18,7 +18,6 @@ from weave.trace_server.feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import Row, quote_json_path
 from weave.trace_server.trace_server_common import (
@@ -33,6 +32,7 @@ from weave.trace_server.trace_server_common import (
 from weave.trace_server.validation import object_id_validator
 from weave.trace_server_common import refs_internal as ri
 from weave.trace_server_common import trace_server_interface as tsi
+from weave.trace_server_common.ids import generate_id
 from weave.trace_server_common.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     assert_non_null_wb_user_id,
