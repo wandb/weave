@@ -523,7 +523,7 @@ def client(request):
         inited_client.reset()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def client_creator(request):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
 
