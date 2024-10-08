@@ -88,14 +88,15 @@ jobs:
           echo "run_tests=false" >> $GITHUB_OUTPUT
       - id: check_core_migration
         name: Check if core migration is needed
-        if: steps.trace_server.outputs.run_tests == 'true'
+        if: github.event_name == 'pull_request' && steps.trace_server.outputs.run_tests == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
+            github.rest.pulls.createReviewComment({
+              pull_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: 'Changes to the trace server have been detected.  You may need a core migration for these changes.'
+              body: 'Changes to the trace server have been detected. You may need a core migration for these changes.',
+              commit_id: context.payload.pull_request.head.sha
             })
