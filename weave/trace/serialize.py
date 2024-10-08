@@ -4,12 +4,12 @@ from typing import Any
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
-from weave.trace_server.trace_server_interface import (
+from weave.trace_server.trace_server_interface_util import bytes_digest
+from weave.trace_server_common.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
     TraceServerInterface,
 )
-from weave.trace_server.trace_server_interface_util import bytes_digest
 
 if typing.TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient

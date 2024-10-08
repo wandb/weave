@@ -52,7 +52,6 @@ from clickhouse_connect.driver.summary import QuerySummary
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -106,6 +105,7 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
     str_digest,
 )
+from weave.trace_server_common import trace_server_interface as tsi
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

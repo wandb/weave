@@ -25,7 +25,7 @@ from weave.trace.refs import (
 )
 from weave.trace.serialize import from_json
 from weave.trace.table import Table
-from weave.trace_server.trace_server_interface import (
+from weave.trace_server_common.trace_server_interface import (
     ObjReadReq,
     TableQueryReq,
     TableRowFilter,

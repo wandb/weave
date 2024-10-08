@@ -4,7 +4,10 @@ import numpy as np
 import pytest
 
 import weave
-from weave.trace_server.trace_server_interface import FileContentReadReq, ObjReadReq
+from weave.trace_server_common.trace_server_interface import (
+    FileContentReadReq,
+    ObjReadReq,
+)
 
 
 def get_saved_code(client, ref):

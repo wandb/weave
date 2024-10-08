@@ -2,10 +2,10 @@ from datetime import datetime
 
 import pytest
 
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+from weave.trace_server_common import trace_server_interface as tsi
 
 
 def test_cost_apis(client):

@@ -2,7 +2,7 @@ import random
 from typing import Iterator
 
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_common import trace_server_interface as tsi
 
 
 def generate_table_data(client: WeaveClient, n_rows: int, n_cols: int):

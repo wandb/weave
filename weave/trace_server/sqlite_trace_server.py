@@ -12,7 +12,6 @@ from zoneinfo import ZoneInfo
 import emoji
 
 from weave.trace_server import refs_internal as ri
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.feedback import (
@@ -40,6 +39,7 @@ from weave.trace_server.trace_server_interface_util import (
     str_digest,
 )
 from weave.trace_server.validation import object_id_validator
+from weave.trace_server_common import trace_server_interface as tsi
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
