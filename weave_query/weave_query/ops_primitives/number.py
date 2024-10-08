@@ -215,6 +215,9 @@ class Number(object):
         output_type=types.Timestamp(),
     )
     def to_timestamp(val):
+        """
+        Converts a number representing unix time in milliseconds to a timestamp.
+        """
         return weave_timestamp.ms_to_python_datetime(
             weave_timestamp.unitless_int_to_inferred_ms(val)
         )
