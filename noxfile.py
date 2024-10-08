@@ -56,8 +56,11 @@ def tests(session, shard):
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
 
-    # seems to resolve ci issues
-    if shard == "llamaindex":
+    has_n_arg = any(
+        arg.startswith("-n") and (len(arg) == 2 or arg[2:].isdigit())
+        for arg in session.posargs
+    )
+    if not has_n_arg:
         session.posargs.insert(0, "-n4")
 
     session.run("pytest", *session.posargs, *test_dirs, env=env)
