@@ -1,8 +1,8 @@
 import {Box} from '@mui/material';
-import React, {useState} from 'react';
+import React, {useCallback, useState} from 'react';
 
-import {EditableMarkdown} from './EditableMarkdown';
-import {fakeLeaderboardData} from './fakeData';
+import {EditableMarkdown} from '../CompareEvaluationsPage/EditableMarkdown';
+import {fakeLeaderboardData} from '../CompareEvaluationsPage/fakeData';
 import {LeaderboardGrid} from './LeaderboardGrid';
 
 type LeaderboardPageProps = {
@@ -14,28 +14,10 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   return (
     <LeaderboardPageContent entity={props.entity} project={props.project} />
   );
-  //   return (
-  //     <SimplePageLayout
-  //       title={`Leaderboard`}
-  //       hideTabsIfSingle
-  //       tabs={[
-  //         {
-  //           label: 'Results',
-  //           content: (
-  //             <LeaderboardPageContent
-  //               entity={props.entity}
-  //               project={props.project}
-  //             />
-  //           ),
-  //         },
-  //       ]}
-  //     />
-  //   );
 };
 
 const DEFAULT_DESCRIPTION = `# Leaderboard`;
-const EXAMPLE_DESCRIPTION = `
-# Welcome to the Leaderboard!
+const EXAMPLE_DESCRIPTION = `# Welcome to the Leaderboard!
 
 This leaderboard showcases the performance of various models across different metrics. Here's a quick guide:
 
@@ -55,12 +37,15 @@ This leaderboard showcases the performance of various models across different me
 
 > Note: Click on any cell in the grid to get more detailed information about that specific score.
 
-Happy analyzing!
-`;
+Happy analyzing!`;
 
 export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
   const [description, setDescription] = useState(EXAMPLE_DESCRIPTION);
   const [data] = useState(fakeLeaderboardData);
+
+  // const setDescription = useCallback((newDescription: string) => {
+  //   setDescriptionRaw(newDescription.trim());
+  // }, []);
 
   const handleCellClick = (
     modelName: string,
