@@ -10,8 +10,8 @@ import typing
 from pydantic import BaseModel
 from typing_extensions import TypeAlias
 
-from weave.trace_server.interface import query as tsi_query
 from weave.trace_server_common import trace_server_interface as tsi
+from weave.trace_server_common.interface import query as tsi_query
 
 DatabaseType = typing.Literal["clickhouse", "sqlite"]
 

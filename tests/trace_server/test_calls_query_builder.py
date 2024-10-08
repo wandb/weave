@@ -1,9 +1,9 @@
 import sqlparse
 
 from weave.trace_server.calls_query_builder import CallsQuery, HardCodedFilter
-from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server_common import trace_server_interface as tsi
+from weave.trace_server_common.interface import query as tsi_query
 
 
 def test_query_baseline() -> None:
