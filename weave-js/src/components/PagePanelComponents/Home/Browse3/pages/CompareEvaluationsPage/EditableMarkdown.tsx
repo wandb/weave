@@ -1,6 +1,6 @@
-import React, { useState, useRef, useLayoutEffect, useCallback } from 'react';
+import {Box, TextField, Typography} from '@mui/material';
+import React, {useCallback, useLayoutEffect, useRef, useState} from 'react';
 import ReactMarkdown from 'react-markdown';
-import { TextField, Typography, Box } from '@mui/material';
 
 interface EditableMarkdownProps {
   value: string;
@@ -21,7 +21,7 @@ export const EditableMarkdown: React.FC<EditableMarkdownProps> = ({
   const updateHeight = useCallback(() => {
     if (containerRef.current) {
       let newHeight: number;
-      
+
       if (isEditing && textFieldRef.current) {
         // For editing mode, use scrollHeight of the textarea
         newHeight = textFieldRef.current.scrollHeight;
@@ -76,13 +76,13 @@ export const EditableMarkdown: React.FC<EditableMarkdownProps> = ({
   };
 
   return (
-    <Box ref={containerRef} sx={{ padding: '16px', transition: 'height 0.3s' }}>
+    <Box ref={containerRef} sx={{padding: '16px', transition: 'height 0.3s'}}>
       {isEditing ? (
         <TextField
           fullWidth
           multiline
           value={value}
-          onChange={(e) => {
+          onChange={e => {
             onChange(e.target.value);
             requestAnimationFrame(() => {
               updateHeight();
@@ -93,7 +93,7 @@ export const EditableMarkdown: React.FC<EditableMarkdownProps> = ({
           autoFocus
           variant="outlined"
           inputRef={textFieldRef}
-          sx={{ 
+          sx={{
             '& .MuiOutlinedInput-root': {
               padding: 0,
               '& textarea': {
@@ -113,8 +113,7 @@ export const EditableMarkdown: React.FC<EditableMarkdownProps> = ({
               backgroundColor: 'action.hover',
             },
           }}
-          onClick={handleEdit}
-        >
+          onClick={handleEdit}>
           <ReactMarkdown>{value || placeholder}</ReactMarkdown>
         </Typography>
       )}

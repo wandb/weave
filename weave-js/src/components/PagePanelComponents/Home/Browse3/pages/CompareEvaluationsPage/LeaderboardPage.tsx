@@ -1,7 +1,6 @@
-import React, {useMemo, useState} from 'react';
 import {Box} from '@mui/material';
+import React, {useState} from 'react';
 
-import {SimplePageLayout} from '../common/SimplePageLayout';
 import {EditableMarkdown} from './EditableMarkdown';
 import {fakeLeaderboardData} from './fakeData';
 import {LeaderboardGrid} from './LeaderboardGrid';
@@ -12,27 +11,26 @@ type LeaderboardPageProps = {
 };
 
 export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
-    return <LeaderboardPageContent
-    entity={props.entity}
-    project={props.project}
-  />
-//   return (
-//     <SimplePageLayout
-//       title={`Leaderboard`}
-//       hideTabsIfSingle
-//       tabs={[
-//         {
-//           label: 'Results',
-//           content: (
-//             <LeaderboardPageContent
-//               entity={props.entity}
-//               project={props.project}
-//             />
-//           ),
-//         },
-//       ]}
-//     />
-//   );
+  return (
+    <LeaderboardPageContent entity={props.entity} project={props.project} />
+  );
+  //   return (
+  //     <SimplePageLayout
+  //       title={`Leaderboard`}
+  //       hideTabsIfSingle
+  //       tabs={[
+  //         {
+  //           label: 'Results',
+  //           content: (
+  //             <LeaderboardPageContent
+  //               entity={props.entity}
+  //               project={props.project}
+  //             />
+  //           ),
+  //         },
+  //       ]}
+  //     />
+  //   );
 };
 
 const DEFAULT_DESCRIPTION = `# Leaderboard`;
@@ -82,7 +80,12 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
           placeholder={DEFAULT_DESCRIPTION}
         />
       </Box>
-      <Box flexGrow={1} display="flex" flexDirection="column" overflow="hidden" minHeight="50%">
+      <Box
+        flexGrow={1}
+        display="flex"
+        flexDirection="column"
+        overflow="hidden"
+        minHeight="50%">
         <LeaderboardGrid data={data} onCellClick={handleCellClick} />
       </Box>
     </Box>
