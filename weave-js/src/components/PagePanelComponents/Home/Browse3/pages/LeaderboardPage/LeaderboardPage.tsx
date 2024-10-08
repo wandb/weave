@@ -2,7 +2,6 @@ import {Box} from '@mui/material';
 import React, {useState} from 'react';
 
 import {EditableMarkdown} from './EditableMarkdown';
-import {fakeLeaderboardData} from './fakeData';
 import {useLeaderboardData} from './hooks';
 import {LeaderboardGrid} from './LeaderboardGrid';
 

@@ -1,4 +1,4 @@
-import {useMemo, useState} from 'react';
+import {useMemo} from 'react';
 
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
@@ -8,7 +8,6 @@ import {
   objectVersionKeyToRefUri,
   opVersionKeyToRefUri,
 } from '../wfReactInterface/utilities';
-import {fakeLeaderboardData} from './fakeData';
 
 export type LeaderboardData = {
   metrics: {
@@ -33,7 +32,7 @@ const useEvaluations = (
     project,
     {
       baseObjectClasses: ['Evaluation'],
-      latestOnly: true,
+      // latestOnly: true,
     },
     100,
     true

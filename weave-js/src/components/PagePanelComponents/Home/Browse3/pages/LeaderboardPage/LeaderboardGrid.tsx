@@ -1,6 +1,7 @@
 import {Box} from '@mui/material';
 import {
   GridColDef,
+  GridColumnGroupingModel,
   GridPaginationModel,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
@@ -64,27 +65,39 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         headerName: metric,
         width: 130,
         flex: 1,
-        renderCell: (params: GridRenderCellParams) => (
-          <div
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: getColorForScore(metric, params.value),
-            }}
-            onClick={() =>
-              onCellClick(
-                params.row.model,
-                params.field as string,
-                params.value as number
-              )
-            }>
-            {params.value ?? '-'}
-            {/* {`${(params.value as number).toFixed(2)}%`} */}
-          </div>
-        ),
+        renderCell: (params: GridRenderCellParams) => {
+          let inner = params.value;
+          if (typeof inner === 'number') {
+            if (inner < 1) {
+              inner = `${(inner * 100).toFixed(2)}%`;
+            } else {
+              inner = `${inner.toFixed(2)}`;
+            }
+          }
+          // const value =
+          // <CellValue value={params.value} />
+          return (
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: getColorForScore(metric, params.value),
+              }}
+              onClick={() =>
+                onCellClick(
+                  params.row.model,
+                  params.field as string,
+                  params.value as number
+                )
+              }>
+              {' '}
+              {inner}
+            </div>
+          );
+        },
       })),
     ],
     [data.metrics, getColorForScore, onCellClick]
@@ -100,6 +113,20 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     [data.models, data.scores]
   );
 
+  const groupingModel: GridColumnGroupingModel = useMemo(
+    () => {
+      return [
+        {
+          groupId: 'metrics',
+          children: Object.keys(data.metrics).map(metric => ({
+            field: metric,
+          })),
+        },
+      ];
+    },
+    [data.metrics]
+  );
+
   return (
     <Box
       sx={{
@@ -112,12 +139,13 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       <StyledDataGrid
         rows={rows}
         columns={columns}
+        columnGroupingModel={groupingModel}
         pagination
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
         pageSizeOptions={[25]}
-        disableColumnMenu
         disableRowSelectionOnClick
+        hideFooterSelectedRowCount
         sx={{
           borderRadius: 0,
           '& .MuiDataGrid-footerContainer': {
@@ -139,6 +167,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           },
         }}
         slots={{
+          // columnMenu: CallsCustomColumnMenu,
           pagination: PaginationButtons,
         }}
       />
