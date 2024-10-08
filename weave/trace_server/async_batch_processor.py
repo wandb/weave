@@ -5,6 +5,7 @@ from queue import Queue
 from threading import Event, Lock, Thread
 from typing import Callable, Generic, List, TypeVar
 
+from weave.trace.context import get_raise_on_captured_errors
 from weave.trace_server import requests
 
 T = TypeVar("T")
@@ -63,6 +64,8 @@ class AsyncBatchProcessor(Generic[T]):
                 except requests.HTTPError as e:
                     if e.response.status_code == 413:
                         # 413: payload too large, don't raise just log
+                        if get_raise_on_captured_errors():
+                            raise
                         logger.error(f"Error processing batch: {e}")
                     else:
                         raise e

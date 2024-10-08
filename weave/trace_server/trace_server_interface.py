@@ -5,7 +5,7 @@ from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Union
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
 
-from .interface.query import Query
+from weave.trace_server.interface.query import Query
 
 WB_USER_ID_DESCRIPTION = (
     "Do not set directly. Server will automatically populate this field."
@@ -414,6 +414,11 @@ class ObjQueryReq(BaseModel):
         description="Sorting criteria for the query results. Currently only supports 'object_id' and 'created_at'.",
         examples=[[SortBy(field="created_at", direction="desc")]],
     )
+    metadata_only: Optional[bool] = Field(
+        default=False,
+        description="If true, the `val` column is not read from the database and is empty."
+        "All other fields are returned.",
+    )
 
 
 class ObjQueryRes(BaseModel):
@@ -596,6 +601,20 @@ class TableQueryReq(BaseModel):
 
 class TableQueryRes(BaseModel):
     rows: List[TableRowSchema]
+
+
+class TableQueryStatsReq(BaseModel):
+    project_id: str = Field(
+        description="The ID of the project", examples=["my_entity/my_project"]
+    )
+    digest: str = Field(
+        description="The digest of the table to query",
+        examples=["aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"],
+    )
+
+
+class TableQueryStatsRes(BaseModel):
+    count: int
 
 
 class RefsReadBatchReq(BaseModel):
@@ -810,22 +829,10 @@ class TraceServerInterface(Protocol):
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...
     def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
+    def table_query_stats(self, req: TableQueryStatsReq) -> TableQueryStatsRes: ...
     def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes: ...
     def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes: ...
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
-
-
-# These symbols are used in the WB Trace Server and it is not safe
-# to remove them, else it will break the server. Once the server
-# is updated to use the new symbols, these can be removed.
-
-# Legacy Names (i think these might be used in a few growth examples, so keeping
-# around until we clean those up of them)
-_CallsFilter = CallsFilter
-_SortBy = SortBy
-_OpVersionFilter = OpVersionFilter
-_ObjectVersionFilter = ObjectVersionFilter
-_TableRowFilter = TableRowFilter

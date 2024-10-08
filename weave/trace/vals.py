@@ -10,6 +10,7 @@ from pydantic import v1 as pydantic_v1
 
 from weave.trace import box
 from weave.trace.client_context.weave_client import get_weave_client
+from weave.trace.context import get_raise_on_captured_errors
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
 from weave.trace.op import is_op, maybe_bind_method
@@ -155,12 +156,20 @@ def attribute_access_result(
         return maybe_bind_method(val_attr_val, self)
 
     if (ref := getattr(self, "ref", None)) is None:
-        return val_attr_val
+        # Even if we have not parent ref, if our current value is an object
+        # ref, we should still process it with make_trace_obj. Practically,
+        # this allows a user to "get" a Model, update a field, then invoke it.
+        # Primary test: `test_dirty_model_op_retrieval`
+        if not isinstance(val_attr_val, ObjectRef):
+            return val_attr_val
+        new_ref = None
+    else:
+        new_ref = ref.with_attr(attr_name)
+
     if server is None:
         return val_attr_val
 
     root = getattr(self, "root", None)
-    new_ref = ref.with_attr(attr_name)
 
     return make_trace_obj(
         val_attr_val,
@@ -261,7 +270,7 @@ class WeaveTable(Traceable):
             should_local_iter = (
                 self.ref is not None
                 and self.table_ref is not None
-                and self.table_ref.row_digests is not None
+                and self.table_ref._row_digests is not None
                 and self._prefetched_rows is not None
             )
             if should_local_iter:
@@ -311,29 +320,41 @@ class WeaveTable(Traceable):
 
         In this case, we don't need to make any calls and can just return the rows
         """
+        wc = get_weave_client()
         if (
-            self.ref is None
+            wc is None
+            or self.ref is None
             or self.table_ref is None
-            or self.table_ref.row_digests is None
+            or self.table_ref._row_digests is None
             or self._prefetched_rows is None
         ):
+            if get_raise_on_captured_errors():
+                raise
             logger.error(
                 "Expected all row digests and prefetched rows to be set, falling back to remote iteration"
             )
             yield from self._remote_iter()
             return
 
-        row_digest_len = len(self.table_ref.row_digests)
-        prefetched_rows_len = len(self._prefetched_rows)
-        if row_digest_len != prefetched_rows_len:
-            logger.error(
-                f"Expected length of row digests ({row_digest_len}) to match prefetched rows ({prefetched_rows_len}). Falling back to remote iteration."
-            )
-            yield from self._remote_iter()
-            return
+        cached_table_ref = self.table_ref
+        if isinstance(self.table_ref._row_digests, list):
+            # Only do this check if it is resolved
+            row_digest_len = len(self.table_ref._row_digests)
+            prefetched_rows_len = len(self._prefetched_rows)
+            if row_digest_len != prefetched_rows_len:
+                if get_raise_on_captured_errors():
+                    raise
+                logger.error(
+                    f"Expected length of row digests ({row_digest_len}) to match prefetched rows ({prefetched_rows_len}). Falling back to remote iteration."
+                )
+                yield from self._remote_iter()
+                return
 
-        for ndx, item in enumerate(self.table_ref.row_digests):
-            new_ref = self.ref.with_item(item)
+        for ndx, row in enumerate(self._prefetched_rows):
+            next_id_future = wc.future_executor.defer(
+                lambda: cached_table_ref.row_digests[ndx]
+            )
+            new_ref = self.ref.with_item(next_id_future)
             val = self._prefetched_rows[ndx]
             res = from_json(
                 val, self.table_ref.entity + "/" + self.table_ref.project, self.server
@@ -343,7 +364,7 @@ class WeaveTable(Traceable):
 
     def _remote_iter(self) -> Generator[dict, None, None]:
         page_index = 0
-        page_size = 1000
+        page_size = 100
         while True:
             if self.table_ref is None:
                 break
@@ -361,6 +382,8 @@ class WeaveTable(Traceable):
             if self._prefetched_rows is not None and len(response.rows) != len(
                 self._prefetched_rows
             ):
+                if get_raise_on_captured_errors():
+                    raise
                 logger.error(
                     f"Expected length of response rows ({len(response.rows)}) to match prefetched rows ({len(self._prefetched_rows)}). Ignoring prefetched rows."
                 )

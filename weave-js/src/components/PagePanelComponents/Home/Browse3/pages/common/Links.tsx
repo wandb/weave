@@ -226,6 +226,7 @@ export const OpVersionLink: React.FC<{
   versionIndex: number;
   variant?: LinkVariant;
   fullWidth?: boolean;
+  color?: string;
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
@@ -243,7 +244,10 @@ export const OpVersionLink: React.FC<{
     history.push(to);
   };
   return (
-    <LinkWrapper onClick={onClick} fullWidth={props.fullWidth}>
+    <LinkWrapper
+      onClick={onClick}
+      fullWidth={props.fullWidth}
+      color={props.color}>
       <LinkTruncater fullWidth={props.fullWidth}>
         <Link $variant={props.variant} to={to}>
           {text}

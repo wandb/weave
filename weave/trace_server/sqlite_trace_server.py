@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 import emoji
 
 from weave.trace_server import refs_internal as ri
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.feedback import (
@@ -19,8 +20,11 @@ from weave.trace_server.feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
+from weave.trace_server.ids import generate_id
+from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import Row, quote_json_path
 from weave.trace_server.trace_server_common import (
+    digest_is_version_like,
     empty_str_to_none,
     get_nested_key,
     hydrate_calls_with_feedback,
@@ -30,18 +34,12 @@ from weave.trace_server.trace_server_common import (
 )
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
-)
-from weave.trace_server.validation import object_id_validator
-
-from . import trace_server_interface as tsi
-from .ids import generate_id
-from .interface import query as tsi_query
-from .trace_server_interface_util import (
     assert_non_null_wb_user_id,
     bytes_digest,
     extract_refs_from_values,
     str_digest,
 )
+from weave.trace_server.validation import object_id_validator
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
@@ -666,7 +664,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
-            conds.append(f"digest = '{req.digest}'")
+            (is_version, version_index) = digest_is_version_like(req.digest)
+            if is_version:
+                conds.append(f"version_index = '{version_index}'")
+            else:
+                conds.append(f"digest = '{req.digest}'")
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
@@ -700,6 +702,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             req.project_id,
             conditions=conds,
             parameters=parameters,
+            metadata_only=req.metadata_only,
             limit=req.limit,
             offset=req.offset,
             sort_by=req.sort_by,
@@ -884,6 +887,27 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 for r in query_result
             ]
         )
+
+    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+        parameters: list[Any] = [req.project_id, req.digest]
+
+        query = """
+        SELECT json_array_length(row_digests)
+        FROM
+            tables
+        WHERE
+            tables.project_id = ? AND
+            tables.digest = ?
+        """
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(query, parameters)
+        row = cursor.fetchone()
+        count = 0
+        if row is not None:
+            count = row[0]
+
+        return tsi.TableQueryStatsRes(count=count)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches
@@ -1079,14 +1103,29 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         project_id: str,
         conditions: Optional[list[str]] = None,
         parameters: Optional[Dict[str, Any]] = None,
+        metadata_only: Optional[bool] = False,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
         sort_by: Optional[list[tsi.SortBy]] = None,
     ) -> list[tsi.ObjSchema]:
         conn, cursor = get_conn_cursor(self.db_path)
         pred = " AND ".join(conditions or ["1 = 1"])
-        query = f"""SELECT * FROM objects
-                    WHERE deleted_at IS NULL AND project_id = ? AND {pred}"""
+        val_dump_part = "'{}' as val_dump" if metadata_only else "val_dump"
+        query = f"""
+            SELECT
+                project_id,
+                object_id,
+                created_at,
+                kind,
+                base_object_class,
+                {val_dump_part},
+                digest,
+                version_index,
+                is_latest
+            FROM objects
+            WHERE deleted_at IS NULL AND
+                project_id = ? AND {pred}
+        """
 
         if sort_by:
             valid_sort_fields = {"object_id", "created_at"}
@@ -1123,10 +1162,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     created_at=row[2],
                     kind=row[3],
                     base_object_class=row[4],
-                    val=json.loads(row[6]),
-                    digest=row[7],
-                    version_index=row[8],
-                    is_latest=row[9],
+                    val=json.loads(row[5]),
+                    digest=row[6],
+                    version_index=row[7],
+                    is_latest=row[8],
                 )
             )
         return result

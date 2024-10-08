@@ -9,15 +9,24 @@ export const useProjectSidebar = (
   viewingRestricted: boolean,
   hasModelsData: boolean,
   hasWeaveData: boolean,
-  hasTraceBackend: boolean = true
+  hasTraceBackend: boolean = true,
+  hasModelsAccess: boolean = true
 ): FancyPageSidebarItem[] => {
   // Should show models sidebar items if we have models data or if we don't have a trace backend
-  const showModelsSidebarItems = hasModelsData || !hasTraceBackend;
+  let showModelsSidebarItems = hasModelsData || !hasTraceBackend;
   // Should show weave sidebar items if we have weave data and we have a trace backend
-  const showWeaveSidebarItems = hasWeaveData && hasTraceBackend;
+  let showWeaveSidebarItems = hasWeaveData && hasTraceBackend;
 
-  const isModelsOnly = showModelsSidebarItems && !showWeaveSidebarItems;
-  const isWeaveOnly = !showModelsSidebarItems && showWeaveSidebarItems;
+  let isModelsOnly = showModelsSidebarItems && !showWeaveSidebarItems;
+  let isWeaveOnly = !showModelsSidebarItems && showWeaveSidebarItems;
+
+  if (!hasModelsAccess) {
+    showModelsSidebarItems = false;
+    isModelsOnly = false;
+
+    showWeaveSidebarItems = true;
+    isWeaveOnly = true;
+  }
 
   const isNoSidebarItems = !showModelsSidebarItems && !showWeaveSidebarItems;
   const isBothSidebarItems = showModelsSidebarItems && showWeaveSidebarItems;
@@ -123,11 +132,17 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
-            name: 'Evaluations',
+            name: 'Traces',
+            slug: 'weave/traces',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.LayoutTabs,
+          },
+          {
+            type: 'button' as const,
+            name: 'Evals',
             slug: 'weave/evaluations',
             isShown: showWeaveSidebarItems || isShowAll,
-            iconName: IconNames.TypeBoolean,
-            // path: baseRouter.callsUIUrl(entity, project, evaluationsFilter),
+            iconName: IconNames.BaselineAlt,
           },
           {
             type: 'button' as const,
@@ -150,17 +165,7 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
-            name: 'Traces',
-            slug: 'weave/traces',
-            isShown: showWeaveSidebarItems || isShowAll,
-            iconName: IconNames.LayoutTabs,
-            // path: baseRouter.callsUIUrl(entity, project, {
-            //   traceRootsOnly: true,
-            // }),
-          },
-          {
-            type: 'button' as const,
-            name: 'Operations',
+            name: 'Ops',
             slug: 'weave/operations',
             additionalSlugs: ['weave/op-versions'],
             isShown: isWeaveOnly,

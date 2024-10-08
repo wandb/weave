@@ -3,6 +3,7 @@ import builtins
 import collections
 import collections.abc
 import inspect
+import io
 import json
 import os
 import re
@@ -13,20 +14,17 @@ import typing
 from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any, Callable, Optional, Union, get_args, get_origin
 
-from weave import context_state
-from weave.legacy.weave import artifact_fs, errors, storage
-from weave.trace import settings
+from weave.trace import serializer, settings
+from weave.trace.client_context.weave_client import get_weave_client
 from weave.trace.ipython import (
     ClassNotFoundError,
     get_class_source,
     is_running_interactively,
 )
+from weave.trace.mem_artifact import MemTraceFilesArtifact
 from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef
 from weave.trace_server.trace_server_interface_util import str_digest
-
-from ..legacy.weave import environment
-from . import serializer
 
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
@@ -176,12 +174,7 @@ class RefJSONEncoder(json.JSONEncoder):
     SPECIAL_REF_TOKEN = "__WEAVE_REF__"
 
     def default(self, o: Any) -> Any:
-        if isinstance(o, artifact_fs.FilesystemArtifactRef):
-            if o.serialize_as_path_ref:
-                ref_code = f"weave.storage.artifact_path_ref('{o.local_ref_str()}')"
-            else:
-                ref_code = f"weave.ref('{str(o)}')"
-        elif isinstance(o, (ObjectRef)):
+        if isinstance(o, (ObjectRef)):
             ref_code = f"weave.ref('{str(o)}')"
 
         if ref_code is not None:
@@ -304,7 +297,7 @@ def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
 
 def get_code_deps(
     fn: Union[typing.Callable, type],  # A function or a class
-    artifact: artifact_fs.FilesystemArtifact,
+    artifact: MemTraceFilesArtifact,
     depth: int = 0,
 ) -> GetCodeDepsResult:
     """Given a python function, return source code that contains the dependencies of that function.
@@ -334,7 +327,7 @@ def get_code_deps(
 
 def _get_code_deps(
     fn: Union[typing.Callable, type],  # A function or a class
-    artifact: artifact_fs.FilesystemArtifact,
+    artifact: MemTraceFilesArtifact,
     seen: dict[Union[Callable, type], bool],
     depth: int = 0,
 ) -> GetCodeDepsResult:
@@ -430,12 +423,13 @@ def _get_code_deps(
                 import_code.append(import_line)
             else:
                 try:
-                    # This relies on old Weave type mechanism.
-                    # TODO: Update to use new Weave trace serialization mechanism.
-                    json_val = storage.to_json_with_refs(
-                        var_value, artifact, path=[var_name]
-                    )
-                except (errors.WeaveTypeError, errors.WeaveSerializeError) as e:
+                    if (client := get_weave_client()) is None:
+                        raise ValueError("Weave client not found")
+
+                    from weave.trace.serialize import to_json
+
+                    json_val = to_json(var_value, client._project_id(), client)
+                except Exception as e:
                     warnings.append(
                         f"Serialization error for value of {var_name} needed by {fn}. Encountered:\n    {e}"
                     )
@@ -494,9 +488,7 @@ def dedupe_list(original_list: list[str]) -> list[str]:
     return deduped
 
 
-def save_instance(
-    obj: "Op", artifact: artifact_fs.FilesystemArtifact, name: str
-) -> None:
+def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None:
     result = get_code_deps(obj.resolve_fn, artifact)
     import_code = result["import_code"]
     code = result["code"]
@@ -505,11 +497,6 @@ def save_instance(
         message = f"Warning: Incomplete serialization for op {obj}. This op may not be reloadable"
         for warning in warnings:
             message += "\n  " + warning
-        if context_state.get_strict_op_saving():
-            raise errors.WeaveOpSerializeError(message)
-        else:
-            # print(message)
-            pass
 
     op_function_code = get_source_or_fallback(obj, warnings=warnings)
 
@@ -522,6 +509,7 @@ def save_instance(
     code.append(op_function_code)
 
     with artifact.new_file(f"{name}.py") as f:
+        assert isinstance(f, io.StringIO)
         import_block = "\n".join(import_code)
         import_lines = ["import weave"] + import_block.split("\n")
         import_lines = dedupe_list(import_lines)
@@ -532,14 +520,9 @@ def save_instance(
 
 
 def load_instance(
-    artifact: artifact_fs.FilesystemArtifact,
+    artifact: MemTraceFilesArtifact,
     name: str,
 ) -> Optional["Op"]:
-    if environment.wandb_production():
-        # Returning None here instead of erroring allows the Weaveflow app
-        # to reference op defs without crashing.
-        return None
-
     file_name = f"{name}.py"
     module_path = artifact.path(file_name)
 

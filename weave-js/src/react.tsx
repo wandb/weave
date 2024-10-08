@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react';
 import {
   callOpVeryUnsafe,
   Client,
@@ -354,8 +355,9 @@ export const useNodeValue = <T extends Type>(
       const message =
         'Node execution failed (useNodeValue): ' + errorToText(error);
       // console.error(message);
-
-      throw new UseNodeValueServerExecutionError(message);
+      const err = new UseNodeValueServerExecutionError(message);
+      Sentry.captureException(err, {fingerprint: ['useNodeValue']});
+      throw err;
     }
     if (isConstNode(node)) {
       if (isFunction(node.type)) {
