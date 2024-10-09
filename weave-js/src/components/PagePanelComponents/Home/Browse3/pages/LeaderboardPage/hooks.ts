@@ -8,7 +8,7 @@ import {
   objectVersionKeyToRefUri,
   opVersionKeyToRefUri,
 } from '../wfReactInterface/utilities';
-import { LeaderboardConfigType } from './LeaderboardConfigType';
+import {LeaderboardConfigType} from './LeaderboardConfigType';
 
 export type LeaderboardData = {
   metrics: {

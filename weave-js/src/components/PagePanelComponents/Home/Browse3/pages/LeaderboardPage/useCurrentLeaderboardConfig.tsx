@@ -4,12 +4,12 @@ import {LeaderboardConfigType} from './LeaderboardConfigType';
 
 export const useCurrentLeaderboardConfig = (): LeaderboardConfigType => {
   // TODO: Implement this
-  console.log("Fetching current leaderboard config")
+  console.log('Fetching current leaderboard config');
   return useMemo(() => {
     return {
       version: 1,
       config: {
-      description: '',
+        description: '',
         columns: [],
         models: [],
       },
