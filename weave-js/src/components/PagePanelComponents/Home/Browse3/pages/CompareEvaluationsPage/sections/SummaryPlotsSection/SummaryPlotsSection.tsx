@@ -35,13 +35,13 @@ import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
  */
 export const SummaryPlots: React.FC<{
   state: EvaluationComparisonState;
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
 }> = props => {
   const {radarData, allMetricNames} = useNormalizedPlotDataFromMetrics(
     props.state
   );
-  const [selectedMetrics, setSelectedMetrics] = useState<string[]>(
-    Array.from(allMetricNames)
-  );
+  const {selectedMetrics} = props.state;
+  const setSelectedMetrics = props.setSelectedMetrics;
 
   // filter down the plotlyRadarData to only include the selected metrics, after
   // computation, to allow quick addition/removal of metrics
@@ -50,13 +50,13 @@ export const SummaryPlots: React.FC<{
     for (const [callId, metricBin] of Object.entries(radarData)) {
       const metrics: {[metric: string]: number} = {};
       for (const [metric, value] of Object.entries(metricBin.metrics)) {
-        if (selectedMetrics.includes(metric)) {
+        if (selectedMetrics?.[metric]) {
           metrics[metric] = value;
         }
       }
       if (Object.keys(metrics).length > 0) {
         filteredData[callId] = {
-          metrics: metrics,
+          metrics,
           name: metricBin.name,
           color: metricBin.color,
         };
@@ -90,8 +90,8 @@ export const SummaryPlots: React.FC<{
           <div style={{display: 'flex', alignItems: 'center'}}>
             <div style={{marginRight: '4px'}}>Configure displayed metrics</div>
             <MetricsSelector
-              setSelectedMetrics={setSelectedMetrics}
               selectedMetrics={selectedMetrics}
+              setSelectedMetrics={setSelectedMetrics}
               allMetrics={Array.from(allMetricNames)}
             />
           </div>
@@ -134,8 +134,8 @@ export const SummaryPlots: React.FC<{
 };
 
 const MetricsSelector: React.FC<{
-  setSelectedMetrics: (metrics: string[]) => void;
-  selectedMetrics: string[];
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
+  selectedMetrics: Record<string, boolean> | undefined;
   allMetrics: string[];
 }> = ({setSelectedMetrics, selectedMetrics, allMetrics}) => {
   const [search, setSearch] = useState('');
@@ -153,7 +153,9 @@ const MetricsSelector: React.FC<{
     ? allMetrics.filter(col => col.toLowerCase().includes(search.toLowerCase()))
     : allMetrics;
 
-  const numHidden = allMetrics.length - selectedMetrics.length;
+  const shownMetrics = Object.values(selectedMetrics ?? {}).filter(Boolean);
+
+  const numHidden = allMetrics.length - shownMetrics.length;
   const buttonSuffix = search ? `(${filteredCols.length})` : 'all';
 
   return (
@@ -211,7 +213,7 @@ const MetricsSelector: React.FC<{
               {Array.from(allMetrics).map((metric: string) => {
                 const value = metric;
                 const idSwitch = `toggle-vis_${value}`;
-                const checked = selectedMetrics.includes(metric);
+                const checked = selectedMetrics?.[metric] ?? false;
                 const label = metric;
                 const disabled = false;
                 if (
@@ -234,8 +236,8 @@ const MetricsSelector: React.FC<{
                         onCheckedChange={isOn => {
                           setSelectedMetrics(
                             isOn
-                              ? [...selectedMetrics, metric]
-                              : selectedMetrics.filter(m => m !== metric)
+                              ? {...selectedMetrics, [metric]: true}
+                              : {...selectedMetrics, [metric]: false}
                           );
                         }}
                         disabled={disabled}>
@@ -260,11 +262,13 @@ const MetricsSelector: React.FC<{
                 variant="quiet"
                 icon="hide-hidden"
                 disabled={filteredCols.length === 0}
-                onClick={() =>
-                  setSelectedMetrics(
-                    selectedMetrics.filter(m => !filteredCols.includes(m))
-                  )
-                }>
+                onClick={() => {
+                  const newModel = {...selectedMetrics};
+                  for (const metric of filteredCols) {
+                    newModel[metric] = false;
+                  }
+                  setSelectedMetrics(newModel);
+                }}>
                 {`Hide ${buttonSuffix}`}
               </Button>
               <div className="flex-auto" />
@@ -273,11 +277,13 @@ const MetricsSelector: React.FC<{
                 variant="quiet"
                 icon="show-visible"
                 disabled={filteredCols.length === 0}
-                onClick={() =>
-                  setSelectedMetrics(
-                    Array.from(new Set([...selectedMetrics, ...filteredCols]))
-                  )
-                }>
+                onClick={() => {
+                  const newModel = {...selectedMetrics};
+                  for (const metric of filteredCols) {
+                    newModel[metric] = true;
+                  }
+                  setSelectedMetrics(newModel);
+                }}>
                 {`Show ${buttonSuffix}`}
               </Button>
             </div>

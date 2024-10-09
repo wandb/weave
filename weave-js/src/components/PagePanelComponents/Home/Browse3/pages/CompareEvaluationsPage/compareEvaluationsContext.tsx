@@ -16,6 +16,7 @@ const CompareEvaluationsContext = React.createContext<{
     React.SetStateAction<ComparisonDimensionsType | null>
   >;
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
 } | null>(null);
 
 export const useCompareEvaluationsState = () => {
@@ -30,6 +31,9 @@ export const CompareEvaluationsProvider: React.FC<{
   entity: string;
   project: string;
   evaluationCallIds: string[];
+  selectedMetrics: Record<string, boolean>;
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
+
   setBaselineEvaluationCallId: React.Dispatch<
     React.SetStateAction<string | null>
   >;
@@ -44,11 +48,13 @@ export const CompareEvaluationsProvider: React.FC<{
   entity,
   project,
   evaluationCallIds,
+  selectedMetrics,
+  setSelectedMetrics,
+
   setBaselineEvaluationCallId,
   setComparisonDimensions,
 
   setSelectedInputDigest,
-
   baselineEvaluationCallId,
   comparisonDimensions,
   selectedInputDigest,
@@ -60,7 +66,8 @@ export const CompareEvaluationsProvider: React.FC<{
     evaluationCallIds,
     baselineEvaluationCallId,
     comparisonDimensions,
-    selectedInputDigest
+    selectedInputDigest,
+    selectedMetrics
   );
 
   const value = useMemo(() => {
@@ -72,6 +79,7 @@ export const CompareEvaluationsProvider: React.FC<{
       setBaselineEvaluationCallId,
       setComparisonDimensions,
       setSelectedInputDigest,
+      setSelectedMetrics,
     };
   }, [
     initialState.loading,
@@ -79,6 +87,7 @@ export const CompareEvaluationsProvider: React.FC<{
     setBaselineEvaluationCallId,
     setComparisonDimensions,
     setSelectedInputDigest,
+    setSelectedMetrics,
   ]);
 
   if (!value) {

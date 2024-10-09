@@ -38,6 +38,8 @@ type CompareEvaluationsPageProps = {
   entity: string;
   project: string;
   evaluationCallIds: string[];
+  selectedMetrics: Record<string, boolean>;
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
 };
 
 export const CompareEvaluationsPage: React.FC<
@@ -55,6 +57,8 @@ export const CompareEvaluationsPage: React.FC<
               entity={props.entity}
               project={props.project}
               evaluationCallIds={props.evaluationCallIds}
+              selectedMetrics={props.selectedMetrics}
+              setSelectedMetrics={props.setSelectedMetrics}
             />
           ),
         },
@@ -109,6 +113,8 @@ export const CompareEvaluationsPageContent: React.FC<
       entity={props.entity}
       project={props.project}
       evaluationCallIds={props.evaluationCallIds}
+      selectedMetrics={props.selectedMetrics}
+      setSelectedMetrics={props.setSelectedMetrics}
       baselineEvaluationCallId={baselineEvaluationCallId ?? undefined}
       comparisonDimensions={comparisonDimensions ?? undefined}
       setBaselineEvaluationCallId={setBaselineEvaluationCallId}
@@ -174,7 +180,7 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 const CompareEvaluationsPageInner: React.FC<{
   height: number;
 }> = props => {
-  const {state} = useCompareEvaluationsState();
+  const {state, setSelectedMetrics} = useCompareEvaluationsState();
   const showExampleFilter =
     Object.keys(state.data.evaluationCalls).length === 2;
   const showExamples = Object.keys(state.data.resultRows).length > 0;
@@ -195,7 +201,7 @@ const CompareEvaluationsPageInner: React.FC<{
           evaluationCalls={Object.values(state.data.evaluationCalls)}
         />
         <ComparisonDefinitionSection state={state} />
-        <SummaryPlots state={state} />
+        <SummaryPlots state={state} setSelectedMetrics={setSelectedMetrics} />
         <ScorecardSection state={state} />
         {showExamples ? (
           <>

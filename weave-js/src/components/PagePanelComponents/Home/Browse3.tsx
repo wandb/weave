@@ -921,16 +921,34 @@ const OpPageBinding = () => {
 };
 
 const CompareEvaluationsBinding = () => {
+  const history = useHistory();
+  const location = useLocation();
   const {entity, project} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
   const evaluationCallIds = useMemo(() => {
     return JSON.parse(query.evaluationCallIds);
   }, [query.evaluationCallIds]);
+
+  const selectedMetrics = useMemo(() => {
+    try {
+      return JSON.parse(query.metrics);
+    } catch (e) {
+      return null;
+    }
+  }, [query.metrics]);
+
+  const setSelectedMetrics = (newModel: Record<string, boolean>) => {
+    const newQuery = new URLSearchParams(location.search);
+    newQuery.set('metrics', JSON.stringify(newModel));
+    history.push({search: newQuery.toString()});
+  };
   return (
     <CompareEvaluationsPage
       entity={entity}
       project={project}
       evaluationCallIds={evaluationCallIds}
+      selectedMetrics={selectedMetrics}
+      setSelectedMetrics={setSelectedMetrics}
     />
   );
 };

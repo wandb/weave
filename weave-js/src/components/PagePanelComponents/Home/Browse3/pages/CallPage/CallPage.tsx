@@ -64,6 +64,9 @@ const useCallTabs = (call: CallSchema) => {
                 entity={call.entity}
                 project={call.project}
                 evaluationCallIds={[call.callId]}
+                // TODO: Add selected metrics handling
+                selectedMetrics={{}}
+                setSelectedMetrics={() => {}}
               />
             ),
           },
