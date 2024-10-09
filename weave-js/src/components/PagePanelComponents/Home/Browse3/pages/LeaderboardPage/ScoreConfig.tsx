@@ -135,6 +135,8 @@ export const ScoreConfig: React.FC<{
       {score.metrics.map((metric, index) => (
         <MetricConfig
           key={index}
+          entity={entity}
+          project={project}
           metric={metric}
           datasetName={datasetName}
           datasetVersion={datasetVersion}

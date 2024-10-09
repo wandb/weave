@@ -17,6 +17,8 @@ import {Direction, LeaderboardConfigType} from './LeaderboardConfigType';
 
 export const MetricConfig: React.FC<{
   metric: LeaderboardConfigType['config']['columns'][0]['scores'][0]['metrics'][0];
+  entity: string;
+  project: string;
   datasetName: string;
   datasetVersion: string;
   scorerName: string;
@@ -27,6 +29,8 @@ export const MetricConfig: React.FC<{
   onRemove: () => void;
 }> = ({
   metric,
+  entity,
+  project,
   datasetName,
   datasetVersion,
   scorerName,
@@ -35,6 +39,8 @@ export const MetricConfig: React.FC<{
   onRemove,
 }) => {
   const metricPaths = useMetricPathsForDatasetAndScorer(
+    entity,
+    project,
     datasetName,
     datasetVersion,
     scorerName,
@@ -53,13 +59,13 @@ export const MetricConfig: React.FC<{
           <DeleteIcon />
         </IconButton>
       </Stack>
-      <TextField
+      {/* <TextField
         fullWidth
         label="Display Name"
         value={metric.displayName}
         onChange={e => onUpdate({...metric, displayName: e.target.value})}
         sx={{mb: 2}}
-      />
+      /> */}
       <FormControl fullWidth sx={{mb: 2}}>
         <InputLabel>Metric Path</InputLabel>
         <Select
@@ -75,7 +81,7 @@ export const MetricConfig: React.FC<{
           ))}
         </Select>
       </FormControl>
-      <TextField
+      {/* <TextField
         fullWidth
         label="Min Trials"
         type="number"
@@ -100,7 +106,7 @@ export const MetricConfig: React.FC<{
           })
         }
         sx={{mb: 2}}
-      />
+      /> */}
       <FormControl fullWidth sx={{mb: 2}}>
         <InputLabel>Sort Direction</InputLabel>
         <Select
@@ -125,7 +131,7 @@ export const MetricConfig: React.FC<{
           fullWidth
           label="Sort Precedence"
           type="number"
-          value={metric.sort.precedence}
+          value={metric.sort.precedence === 0 ? '' : metric.sort.precedence}
           onChange={e =>
             onUpdate({
               ...metric,

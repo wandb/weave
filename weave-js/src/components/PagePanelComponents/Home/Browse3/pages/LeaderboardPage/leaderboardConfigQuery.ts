@@ -1,7 +1,10 @@
 import {useMemo} from 'react';
 
+import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {useWFHooks} from '../wfReactInterface/context';
+import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {LeaderboardConfigType, VersionSpec} from './LeaderboardConfigType';
 
 export const useCurrentLeaderboardConfig = (): LeaderboardConfigType => {
@@ -235,15 +238,79 @@ export const useScorerVersionsForDatasetAndScorer = (
 };
 
 export const useMetricPathsForDatasetAndScorer = (
+  entity: string,
+  project: string,
   datasetName: string,
   datasetVersion: string,
   scorerName: string,
   scorerVersion: string
 ): string[] => {
-  // TODO: Implement this
+  const {useRootObjectVersions, useCalls} = useWFHooks();
+  const evalQuery = useRootObjectVersions(
+    entity,
+    project,
+    {
+      baseObjectClasses: ['Evaluation'],
+    },
+    // This 100 is very limited
+    100
+  );
+
+  const evals = useMemo(() => {
+    // Find the matching evals:
+    console.log(evalQuery.result, scorerName, scorerVersion);
+    return (evalQuery.result ?? []).filter(e => {
+      const match = (e.val.scorers ?? []).find((s: string) => {
+        const sRef = parseRefMaybe(s);
+        if (!sRef) {
+          return false;
+        }
+        console.log(sRef);
+        return (
+          sRef.artifactName === scorerName &&
+          sRef.artifactVersion === scorerVersion
+        );
+      });
+      return !!match;
+    });
+  }, [evalQuery.result, scorerName, scorerVersion]);
+
+  const evalCalls = useCalls(
+    entity,
+    project,
+    {
+      inputObjectVersionRefs: evals.map(objectVersionKeyToRefUri),
+    },
+    10,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+      skip: evals.length === 0,
+    }
+  );
+
   return useMemo(() => {
-    return ['accuracy', 'f1.macro', 'precision.micro', 'recall.micro.data'];
-  }, []);
+    const foundCall = (evalCalls.result ?? []).find(
+      (call: CallSchema) =>
+        call.traceCall?.exception == null && call.traceCall?.ended_at != null
+    );
+    console.log(foundCall, evalCalls);
+    const output = foundCall?.traceCall?.output;
+    if (!output) {
+      return [];
+    }
+    if (typeof output !== 'object') {
+      return [];
+    }
+    return Object.keys(
+      flattenObjectPreservingWeaveTypes(
+        (output as {[key: string]: any})[scorerName] ?? {}
+      )
+    );
+  }, [evalCalls, scorerName]);
 };
 
 export const useModelNames = (): string[] => {
