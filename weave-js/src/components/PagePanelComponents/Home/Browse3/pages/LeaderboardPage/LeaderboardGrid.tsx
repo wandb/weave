@@ -146,6 +146,8 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
             } else {
               inner = `${inner.toFixed(2)}`;
             }
+          } else {
+            inner = JSON.stringify(params.value);
           }
           // const value =
           // <CellValue value={params.value} />

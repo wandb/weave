@@ -184,7 +184,8 @@ const TempAlert: React.FC<{onClose: () => void}> = ({onClose}) => {
   return (
     <Alert severity="info" onClose={onClose}>
       <Typography variant="body1">
-        Configuration edtior purely for internal exploration, not for production use.
+        Configuration edtior purely for internal exploration, not for production
+        use.
       </Typography>
     </Alert>
   );

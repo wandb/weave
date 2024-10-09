@@ -3,9 +3,13 @@ import {useMemo} from 'react';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {useWFHooks} from '../wfReactInterface/context';
-import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
-import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {objectVersionKeyToRefUri, opVersionKeyToRefUri} from '../wfReactInterface/utilities';
+import {
+  CallSchema,
+  ObjectVersionSchema,
+} from '../wfReactInterface/wfDataModelHooksInterface';
 import {LeaderboardConfigType, VersionSpec} from './LeaderboardConfigType';
+import { EVALUATE_OP_NAME_POST_PYDANTIC } from '../common/heuristics';
 
 export const useCurrentLeaderboardConfig = (): LeaderboardConfigType => {
   // TODO: Implement this
@@ -331,4 +335,117 @@ export const useModelVersionsForModelName = (
       {version: 'madsgf3f451d', versionIndex: 2},
     ];
   }, []);
+};
+
+export const useEvalObjsForConfig = (
+  entity: string,
+  project: string,
+  config: LeaderboardConfigType
+) => {
+  const {useRootObjectVersions} = useWFHooks();
+  // # TODO: handle latests
+  const evalQuery = useRootObjectVersions(
+    entity,
+    project,
+    {
+      baseObjectClasses: ['Evaluation'],
+    },
+    // This 100 is very limited
+    100
+  );
+  return useMemo(() => {
+    if (!evalQuery.result) {
+      return [];
+    }
+    const finalEvals: ObjectVersionSchema[] = [];
+    evalQuery.result.forEach(evaluation => {
+      const datasetRef = parseRefMaybe(evaluation.val.dataset);
+      if (!datasetRef) {
+        return;
+      }
+      if (config.config.columns.length === 0) {
+        finalEvals.push(evaluation);
+        return;
+      }
+      const datasetName = datasetRef.artifactName;
+      const datasetVersion = datasetRef.artifactVersion;
+      // Determine this dataset matches any of the config's datasets
+      let matched = false;
+      for (const column of config.config.columns) {
+        if (
+          datasetName === column.dataset.name &&
+          (column.dataset.version === datasetVersion ||
+            (column.dataset.version !== 'latest' &&
+              column.dataset.version !== 'all'))
+        ) {
+          if (column.scores.length === 0) {
+            finalEvals.push(evaluation);
+            break;
+          }
+          for (const scorer of evaluation.val.scorers ?? []) {
+            const sRef = parseRefMaybe(scorer);
+            if (!sRef) {
+              continue;
+            }
+            const scorerName = sRef.artifactName;
+            const scorerVersion = sRef.artifactVersion;
+            for (const score of column.scores) {
+              if (
+                scorerName === score.scorer.name &&
+                (scorerVersion === score.scorer.version ||
+                  (score.scorer.version !== 'latest' &&
+                    score.scorer.version !== 'all'))
+              ) {
+                finalEvals.push(evaluation);
+                matched = true;
+                break;
+              }
+            }
+          }
+          if (matched) {
+            break;
+          }
+        }
+      }
+    });
+
+    return finalEvals;
+  }, [config.config.columns, evalQuery.result]);
+};
+
+export const useEvalCallsForConfig = (
+  entity: string,
+  project: string,
+  config: LeaderboardConfigType
+) => {
+  const {useCalls} = useWFHooks();
+  // Step 1: Get the qualifying evaluation objects
+  const evals = useEvalObjsForConfig(entity, project, config);
+  // Step 2: Get the calls for each evaluation object
+  const calls = useCalls(
+    entity,
+    project,
+    {
+      opVersionRefs: [
+        opVersionKeyToRefUri({
+          entity,
+          project,
+          opId: EVALUATE_OP_NAME_POST_PYDANTIC,
+          versionHash: '*',
+        }),
+      ],
+      traceRootsOnly: true,
+      inputObjectVersionRefs: evals.map(objectVersionKeyToRefUri),
+    },
+    1000,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+      skip: evals.length === 0,
+    }
+  );
+  return calls;
 };

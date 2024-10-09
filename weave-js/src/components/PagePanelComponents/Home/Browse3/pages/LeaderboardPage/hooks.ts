@@ -8,6 +8,7 @@ import {
   objectVersionKeyToRefUri,
   opVersionKeyToRefUri,
 } from '../wfReactInterface/utilities';
+import { useEvalCallsForConfig } from './leaderboardConfigQuery';
 import {LeaderboardConfigType} from './LeaderboardConfigType';
 
 export type LeaderboardData = {
@@ -30,54 +31,55 @@ export const useLeaderboardData = (
   project: string,
   config: LeaderboardConfigType
 ): {loading: boolean; data: LeaderboardData} => {
-  console.log('Fetching leaderboard data', config);
-  const {useRootObjectVersions, useCalls} = useWFHooks();
+  // console.log('Fetching leaderboard data', config);
+  // const {useRootObjectVersions, useCalls} = useWFHooks();
 
-  // Get the last 100 (latest) evaluation versions
-  const evaluationVersions = useRootObjectVersions(
-    entity,
-    project,
-    {
-      baseObjectClasses: ['Evaluation'],
-      // latestOnly: true,
-    },
-    100,
-    true
-  );
+  // // Get the last 100 (latest) evaluation versions
+  // const evaluationVersions = useRootObjectVersions(
+  //   entity,
+  //   project,
+  //   {
+  //     baseObjectClasses: ['Evaluation'],
+  //     // latestOnly: true,
+  //   },
+  //   100,
+  //   true
+  // );
 
-  // Unfortunately, the eval framework does not build models automatically!!
-  // const modelVersions = useRootObjectVersions(entity, project, {
-  //     baseObjectClasses: ['Model'],
-  //     latestOnly: true,
-  // }, 100, true)
+  // // Unfortunately, the eval framework does not build models automatically!!
+  // // const modelVersions = useRootObjectVersions(entity, project, {
+  // //     baseObjectClasses: ['Model'],
+  // //     latestOnly: true,
+  // // }, 100, true)
 
-  // Get the runs for these evaluation versions.
-  const evaluationVersionsResult = evaluationVersions?.result;
-  const evaluationRuns = useCalls(
-    entity,
-    project,
-    {
-      opVersionRefs: [
-        opVersionKeyToRefUri({
-          entity,
-          project,
-          opId: EVALUATE_OP_NAME_POST_PYDANTIC,
-          versionHash: '*',
-        }),
-      ],
-      traceRootsOnly: true,
-      inputObjectVersionRefs: (evaluationVersionsResult ?? []).map(version =>
-        objectVersionKeyToRefUri(version)
-      ),
-    },
-    100,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    {skip: !evaluationVersionsResult}
-  );
+  // // Get the runs for these evaluation versions.
+  // const evaluationVersionsResult = evaluationVersions?.result;
+  // const evaluationRuns = useCalls(
+  //   entity,
+  //   project,
+  //   {
+  //     opVersionRefs: [
+  //       opVersionKeyToRefUri({
+  //         entity,
+  //         project,
+  //         opId: EVALUATE_OP_NAME_POST_PYDANTIC,
+  //         versionHash: '*',
+  //       }),
+  //     ],
+  //     traceRootsOnly: true,
+  //     inputObjectVersionRefs: (evaluationVersionsResult ?? []).map(version =>
+  //       objectVersionKeyToRefUri(version)
+  //     ),
+  //   },
+  //   100,
+  //   undefined,
+  //   undefined,
+  //   undefined,
+  //   undefined,
+  //   undefined,
+  //   {skip: !evaluationVersionsResult}
+  // );
+  const evaluationRuns = useEvalCallsForConfig(entity, project, config);
 
   // Build the dataset
 
@@ -87,7 +89,7 @@ export const useLeaderboardData = (
       models: [],
       scores: {},
     };
-    if (evaluationVersions.loading || evaluationRuns.loading) {
+    if (evaluationRuns.loading) {
       return {
         loading: true,
         data: finalData,
@@ -147,11 +149,7 @@ export const useLeaderboardData = (
       loading: false,
       data: finalData,
     };
-  }, [
-    evaluationRuns.loading,
-    evaluationRuns.result,
-    evaluationVersions.loading,
-  ]);
+  }, [evaluationRuns.loading, evaluationRuns.result]);
 
   return results;
 };
