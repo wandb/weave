@@ -8,12 +8,14 @@ import {ModelConfig} from './ModelConfig';
 
 export const LeaderboardConfig: React.FC<{
   currentConfig: LeaderboardConfigType;
-  onConfigUpdate: (newConfig: LeaderboardConfigType) => void;
+  onConfigUpdate: (
+    updater: (oldConfig: LeaderboardConfigType) => LeaderboardConfigType
+  ) => void;
 }> = ({currentConfig, onConfigUpdate}) => {
   const [config, setConfig] = useState<LeaderboardConfigType>(currentConfig);
 
   const handleSave = () => {
-    onConfigUpdate(config);
+    onConfigUpdate(prev => config);
   };
 
   const handleCancel = () => {
@@ -96,51 +98,77 @@ export const LeaderboardConfig: React.FC<{
   const [showAlert, setShowAlert] = useState(true);
 
   return (
-    <Box sx={{width: '100%', p: 2, border: '1px solid #e0e0e0'}}>
-      {showAlert && <TempAlert onClose={() => setShowAlert(false)} />}
-      <Typography variant="h5" gutterBottom>
-        Leaderboard Configuration
-      </Typography>
-
-      <Box sx={{mb: 4}}>
-        <Typography variant="h6" gutterBottom>
-          Columns
+    <Box
+      sx={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        border: '1px solid #e0e0e0',
+      }}>
+      <Box
+        sx={{
+          flexGrow: 1,
+          overflowY: 'auto',
+          p: 2,
+        }}>
+        {showAlert && <TempAlert onClose={() => setShowAlert(false)} />}
+        <Typography variant="h5" gutterBottom>
+          Leaderboard Configuration
         </Typography>
-        {config.config.columns.map((column, index) => (
-          <ColumnConfig
-            key={index}
-            column={column}
-            onUpdate={updatedColumn => handleUpdateColumn(index, updatedColumn)}
-            onRemove={() => handleRemoveColumn(index)}
-          />
-        ))}
-        <Button startIcon={<AddIcon />} onClick={handleAddColumn} sx={{mt: 2}}>
-          Add Column
-        </Button>
+
+        <Box sx={{mb: 4}}>
+          <Typography variant="h6" gutterBottom>
+            Columns
+          </Typography>
+          {config.config.columns.map((column, index) => (
+            <ColumnConfig
+              key={index}
+              column={column}
+              onUpdate={updatedColumn =>
+                handleUpdateColumn(index, updatedColumn)
+              }
+              onRemove={() => handleRemoveColumn(index)}
+            />
+          ))}
+          <Button
+            startIcon={<AddIcon />}
+            onClick={handleAddColumn}
+            sx={{mt: 2}}>
+            Add Column
+          </Button>
+        </Box>
+
+        <Box sx={{mb: 4}}>
+          <Typography variant="h6" gutterBottom>
+            Models
+          </Typography>
+          {config.config.models.map((model, index) => (
+            <ModelConfig
+              key={index}
+              model={model}
+              onUpdate={updatedModel => handleUpdateModel(index, updatedModel)}
+              onRemove={() => handleRemoveModel(index)}
+            />
+          ))}
+          <Button startIcon={<AddIcon />} onClick={handleAddModel} sx={{mt: 2}}>
+            Add Model
+          </Button>
+        </Box>
       </Box>
 
-      <Box sx={{mb: 4}}>
-        <Typography variant="h6" gutterBottom>
-          Models
-        </Typography>
-        {config.config.models.map((model, index) => (
-          <ModelConfig
-            key={index}
-            model={model}
-            onUpdate={updatedModel => handleUpdateModel(index, updatedModel)}
-            onRemove={() => handleRemoveModel(index)}
-          />
-        ))}
-        <Button startIcon={<AddIcon />} onClick={handleAddModel} sx={{mt: 2}}>
-          Add Model
-        </Button>
-      </Box>
-
-      <Box sx={{display: 'flex', justifyContent: 'flex-end', mt: 4}}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          height: '51px',
+          p: 1,
+          borderTop: '1px solid #e0e0e0',
+        }}>
         <Button variant="outlined" onClick={handleCancel} sx={{mr: 2}}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={handleSave}>
+        <Button variant="contained" onClick={handleSave} sx={{mr: 2}}>
           Save
         </Button>
       </Box>

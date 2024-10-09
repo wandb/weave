@@ -1,6 +1,6 @@
 import {Alert, Box, Typography} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
-import React, {useState} from 'react';
+import React, {useCallback, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../../context';
@@ -9,7 +9,7 @@ import {useLeaderboardData} from './hooks';
 import {LeaderboardConfigType} from './LeaderboardConfigType';
 import {LeaderboardGrid} from './LeaderboardGrid';
 import {LeaderboardConfig} from './LeaderboardPageConfig';
-import {useCurrentLeaderboardConfig} from './useCurrentLeaderboardConfig';
+import {persistLeaderboardConfig, useCurrentLeaderboardConfig} from './useCurrentLeaderboardConfig';
 
 const USE_COMPARE_EVALUATIONS_PAGE = false;
 
@@ -26,23 +26,36 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
 
 const DEFAULT_DESCRIPTION = `# Leaderboard`;
 
+const usePersistedLeaderboardConfig = (): [LeaderboardConfigType, (updater: (oldConfig: LeaderboardConfigType) => LeaderboardConfigType) => void] => {
+  const [config, setConfigLocal] = useState<LeaderboardConfigType>(
+    useCurrentLeaderboardConfig()
+  );
+
+  const setConfig = (updater: (oldConfig: LeaderboardConfigType) => LeaderboardConfigType) => {
+    const newConfig = updater(config);
+    setConfigLocal(newConfig);
+    persistLeaderboardConfig(newConfig);
+  };
+
+  return [config, setConfig]
+};
+
 export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
   const {entity, project} = props;
-  const [description, setDescription] = useState('');
-  const {loading, data} = useLeaderboardData(entity, project);
 
-  // const setDescription = useCallback((newDescription: string) => {
-  //   setDescriptionRaw(newDescription.trim());
-  // }, []);
 
   const {peekingRouter} = useWeaveflowRouteContext();
   const history = useHistory();
 
   const [showConfig, setShowConfig] = useState(false);
 
-  const [currentConfig, setCurrentConfig] = useState<LeaderboardConfigType>(
-    useCurrentLeaderboardConfig()
-  );
+  const [currentConfig, setCurrentConfig] = usePersistedLeaderboardConfig()
+  const description = currentConfig.config.description
+  const setDescription = useCallback((newDescription: string) => {
+    setCurrentConfig(newConfig => ({...newConfig, config: {...newConfig.config, description: newDescription}}))
+  }, [setCurrentConfig]); 
+
+  const {loading, data} = useLeaderboardData(entity, project, currentConfig);
 
   const handleCellClick = (
     modelName: string,

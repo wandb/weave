@@ -8,6 +8,7 @@ import {
   objectVersionKeyToRefUri,
   opVersionKeyToRefUri,
 } from '../wfReactInterface/utilities';
+import { LeaderboardConfigType } from './LeaderboardConfigType';
 
 export type LeaderboardData = {
   metrics: {
@@ -26,8 +27,10 @@ export type LeaderboardData = {
 
 export const useLeaderboardData = (
   entity: string,
-  project: string
+  project: string,
+  config: LeaderboardConfigType
 ): {loading: boolean; data: LeaderboardData} => {
+  console.log('Fetching leaderboard data', config);
   const {useRootObjectVersions, useCalls} = useWFHooks();
 
   // Get the last 100 (latest) evaluation versions

@@ -4,6 +4,7 @@ export type Direction = 'asc' | 'desc';
 export type LeaderboardConfigType = {
   version: number;
   config: {
+    description: string;
     columns: Array<{
       dataset: {
         name: string;

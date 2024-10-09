@@ -4,16 +4,23 @@ import {LeaderboardConfigType} from './LeaderboardConfigType';
 
 export const useCurrentLeaderboardConfig = (): LeaderboardConfigType => {
   // TODO: Implement this
+  console.log("Fetching current leaderboard config")
   return useMemo(() => {
     return {
       version: 1,
       config: {
+      description: '',
         columns: [],
         models: [],
       },
     };
   }, []);
 };
+export const persistLeaderboardConfig = (config: LeaderboardConfigType) => {
+  // TODO: Implement this
+  console.log('Persisting leaderboard config:', config);
+};
+
 export const useDatasetNames = (): string[] => {
   // TODO: Implement this
   return useMemo(() => {
