@@ -929,7 +929,7 @@ const CompareEvaluationsBinding = () => {
     return JSON.parse(query.evaluationCallIds);
   }, [query.evaluationCallIds]);
 
-  const selectedMetrics = useMemo(() => {
+  const selectedMetrics: Record<string, boolean> | null = useMemo(() => {
     try {
       return JSON.parse(query.metrics);
     } catch (e) {

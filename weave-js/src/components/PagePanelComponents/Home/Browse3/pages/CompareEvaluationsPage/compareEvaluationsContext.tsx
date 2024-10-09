@@ -31,7 +31,7 @@ export const CompareEvaluationsProvider: React.FC<{
   entity: string;
   project: string;
   evaluationCallIds: string[];
-  selectedMetrics: Record<string, boolean>;
+  selectedMetrics: Record<string, boolean> | null;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
 
   setBaselineEvaluationCallId: React.Dispatch<
@@ -67,7 +67,7 @@ export const CompareEvaluationsProvider: React.FC<{
     baselineEvaluationCallId,
     comparisonDimensions,
     selectedInputDigest,
-    selectedMetrics
+    selectedMetrics ?? undefined
   );
 
   const value = useMemo(() => {

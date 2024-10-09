@@ -38,7 +38,7 @@ type CompareEvaluationsPageProps = {
   entity: string;
   project: string;
   evaluationCallIds: string[];
-  selectedMetrics: Record<string, boolean>;
+  selectedMetrics: Record<string, boolean> | null;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
 };
 
