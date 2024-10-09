@@ -1,4 +1,5 @@
 import {Alert, Box, Typography} from '@mui/material';
+import { useTraceUpdate } from '@wandb/weave/common/util/hooks';
 import {Button} from '@wandb/weave/components/Button';
 import React, {useCallback, useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -72,6 +73,7 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
   );
 
   const {loading, data} = useLeaderboardData(entity, project, currentConfig);
+  useTraceUpdate('a', {entity, project, currentConfig});
 
   const handleCellClick = (
     modelName: string,

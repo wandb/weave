@@ -30,7 +30,11 @@ export const ColumnConfig: React.FC<{
   onRemove: () => void;
 }> = ({entity, project, column, onUpdate, onRemove}) => {
   const datasetNames = useDatasetNames(entity, project);
-  const datasetVersions = useDatasetVersionsForDatasetName(column.dataset.name);
+  const datasetVersions = useDatasetVersionsForDatasetName(
+    entity,
+    project,
+    column.dataset.name
+  );
 
   const handleAddScore = () => {
     onUpdate({
@@ -109,7 +113,7 @@ export const ColumnConfig: React.FC<{
           <MenuItem value="all">All</MenuItem>
           {datasetVersions.map(({version, versionIndex}) => (
             <MenuItem key={version} value={version}>
-              Version {versionIndex}
+              Version {versionIndex}: {version}
             </MenuItem>
           ))}
         </Select>

@@ -24,7 +24,7 @@ export const persistLeaderboardConfig = (config: LeaderboardConfigType) => {
 
 export const useDatasetNames = (entity: string, project: string): string[] => {
   const {useRootObjectVersions} = useWFHooks();
-  const names = useRootObjectVersions(
+  const query = useRootObjectVersions(
     entity,
     project,
     {
@@ -35,20 +35,29 @@ export const useDatasetNames = (entity: string, project: string): string[] => {
     true
   );
   return useMemo(() => {
-    return names.result?.map(obj => obj.objectId) ?? [];
-  }, [names]);
+    return query.result?.map(obj => obj.objectId) ?? [];
+  }, [query]);
 };
 export const useDatasetVersionsForDatasetName = (
+  entity: string,
+  project: string,
   datasetName: string
 ): Array<{version: string; versionIndex: number}> => {
-  // TODO: Implement this
+  const {useRootObjectVersions} = useWFHooks();
+  const query = useRootObjectVersions(
+    entity,
+    project,
+    {
+      baseObjectClasses: ['Dataset'],
+      objectIds: [datasetName],
+    },
+    100,
+    true
+  );
+
   return useMemo(() => {
-    return [
-      {version: 'dug657ioy8j1', versionIndex: 0},
-      {version: 'dnkjubyhvasd', versionIndex: 1},
-      {version: 'dadsgf3f451d', versionIndex: 2},
-    ];
-  }, []);
+    return query.result?.map(obj => ({version: obj.versionHash, versionIndex: obj.versionIndex})) ?? [];
+  }, [query]);
 };
 export const useScorerNamesForDataset = (
   datasetName: string,
