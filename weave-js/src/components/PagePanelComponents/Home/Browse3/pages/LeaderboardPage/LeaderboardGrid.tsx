@@ -195,7 +195,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     }
     return node;
   }) as GridColumnGroup[];
-  console.log(groupingModel);
 
   // const groupingModel: GridColumnGroupingModel = useMemo(
   //   () => {

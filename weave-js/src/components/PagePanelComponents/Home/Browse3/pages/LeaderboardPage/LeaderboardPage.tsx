@@ -1,11 +1,13 @@
 import {Box} from '@mui/material';
-import React, {useState} from 'react';
+
+import React, {useContext, useEffect, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {useWeaveflowRouteContext} from '../../context';
+import {usePeekLocation, useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
 import {EditableMarkdown} from './EditableMarkdown';
 import {useLeaderboardData} from './hooks';
 import {LeaderboardGrid} from './LeaderboardGrid';
+import {Button} from '@wandb/weave/components/Button';
 
 const USE_COMPARE_EVALUATIONS_PAGE = false;
 
@@ -34,6 +36,8 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const history = useHistory();
 
+  const [showConfig, setShowConfig] = useState(false);
+
   const handleCellClick = (
     modelName: string,
     metricName: string,
@@ -53,9 +57,16 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
     }
   };
 
+
   return (
     <Box display="flex" flexDirection="column" height="100%">
-      <Box flexShrink={0} maxHeight="50%" overflow="auto">
+      <div style={{
+        position: 'absolute',
+        top: 20,
+        right: 24,
+      }}><ToggleLeaderboardConfig isOpen={showConfig} onClick={() => setShowConfig(c => !c)}/></div>
+
+      <Box flexShrink={0} maxHeight="35%" overflow="auto">
         <EditableMarkdown
           value={description}
           onChange={setDescription}
@@ -65,15 +76,45 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
       <Box
         flexGrow={1}
         display="flex"
-        flexDirection="column"
+        flexDirection="row"
         overflow="hidden"
-        minHeight="50%">
+        minHeight="65%">
         <LeaderboardGrid
           loading={loading}
           data={data}
           onCellClick={handleCellClick}
         />
+        {showConfig && <LeaderboardConfig />}
       </Box>
     </Box>
   );
+};
+
+export const ToggleLeaderboardConfig: React.FC<{
+  isOpen: boolean;
+  onClick: () => void;
+}> = ({isOpen, onClick}) => {
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      <Button
+        variant="ghost"
+        size="medium"
+        onClick={onClick}
+        tooltip="Configure Leaderboard"
+        icon={isOpen ? "close" : "settings"}
+      />
+    </Box>
+  );
+};
+
+
+const LeaderboardConfig = () => {
+  return <Box sx={{
+    width: '100%'
+  }}>LeaderboardConfig</Box>;
 };
