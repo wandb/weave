@@ -133,6 +133,7 @@ export const FilterableObjectVersionsTable: React.FC<{
       latestOnly: effectivelyLatestOnly,
     },
     undefined,
+    undefined,
     effectivelyLatestOnly // metadata only when getting latest
   );
 
@@ -401,6 +402,7 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
       objectIds: [obj.objectId],
     },
     100,
+    undefined,
     true // metadataOnly
   );
   if (objectVersionsNode.loading) {

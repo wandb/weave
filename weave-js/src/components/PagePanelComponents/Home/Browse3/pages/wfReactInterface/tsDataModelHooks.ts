@@ -913,6 +913,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     project: string,
     filter: ObjectVersionFilter,
     limit?: number,
+    sortBy?: traceServerTypes.SortBy[],
     metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => ({
@@ -925,6 +926,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
         is_op: false,
       },
       limit,
+      sort_by: sortBy,
       metadata_only: metadataOnly,
     },
     skip: opts?.skip,
