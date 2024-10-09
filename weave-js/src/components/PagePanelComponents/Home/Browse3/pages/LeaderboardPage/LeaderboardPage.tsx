@@ -1,4 +1,4 @@
-import {Box} from '@mui/material';
+import {Alert, Box, Typography} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import React, {useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -63,12 +63,15 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
     }
   };
 
+  const [showingAlert, setShowingAlert] = useState(true);
+
   return (
     <Box display="flex" flexDirection="column" height="100%">
+      {showingAlert && <UnlistedAlert onClose={() => setShowingAlert(false)} />}
       <div
         style={{
           position: 'absolute',
-          top: 20,
+          top: 20 + (showingAlert ? 52 : 0),
           right: 24,
         }}>
         <ToggleLeaderboardConfig
@@ -76,7 +79,6 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
           onClick={() => setShowConfig(c => !c)}
         />
       </div>
-
       <Box flexShrink={0} maxHeight="35%" overflow="auto">
         <EditableMarkdown
           value={description}
@@ -121,9 +123,20 @@ export const ToggleLeaderboardConfig: React.FC<{
         variant="ghost"
         size="medium"
         onClick={onClick}
-        tooltip="Configure Leaderboard"
+        tooltip={isOpen ? 'Discard Changes' : 'Configure Leaderboard'}
         icon={isOpen ? 'close' : 'settings'}
       />
     </Box>
+  );
+};
+
+const UnlistedAlert: React.FC<{onClose: () => void}> = ({onClose}) => {
+  return (
+    <Alert severity="info" onClose={onClose}>
+      <Typography variant="body1">
+        You have found an internal, unlisted beta page! Please expect bugs and
+        incomplete features. Permilinks are not yet supported.
+      </Typography>
+    </Alert>
   );
 };
