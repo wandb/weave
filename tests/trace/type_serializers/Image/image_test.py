@@ -77,14 +77,9 @@ def image_as_input_and_output_part(in_img: Image.Image) -> dict:
     return {"out_img": in_img}
 
 
-reruns = 0
-
-
-@pytest.mark.flaky(reruns=3)
+@pytest.mark.skip("Flakes when running in parallel")
 def test_image_as_call_io(client: WeaveClient) -> None:
-    global reruns
-    client.project = f"test_image_as_call_io_{reruns}"
-    reruns += 1
+    client.project = "test_image_as_call_io"
     non_published_img = image_as_solo_output(publish_first=False)
     img_dict = image_as_input_and_output_part(non_published_img)
 
