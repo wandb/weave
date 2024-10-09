@@ -9,10 +9,11 @@ import os
 import re
 import sys
 import textwrap
+import threading
 import types as py_types
 import typing
 from _ast import AsyncFunctionDef, ExceptHandler
-from typing import Any, Callable, Optional, Union, get_args, get_origin
+from typing import Any, Callable, Generator, Optional, Union, get_args, get_origin
 
 from weave.trace import serializer, settings
 from weave.trace.client_context.weave_client import get_weave_client
@@ -519,6 +520,15 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
         f.write(f"{import_block}\n\n{code_block}")
 
 
+sys_path_lock = threading.Lock()
+
+
+@contextlib.contextmanager
+def with_sys_path_lock() -> Generator[None, None, None]:
+    with sys_path_lock:
+        yield
+
+
 def load_instance(
     artifact: MemTraceFilesArtifact,
     name: str,
@@ -539,19 +549,22 @@ def load_instance(
     )
 
     abs_mod_dir = os.path.abspath(module_dir)
-    sys.path.insert(0, abs_mod_dir)
-    try:
-        mod = __import__(import_name, fromlist=[module_dir])
-    except Exception as e:
-        exists = os.path.exists(module_path)
-        contents = os.listdir(module_dir) if os.path.isdir(module_dir) else []
-        print(f"Op loading exception. This might be fine! {module_path=} {import_name=} {abs_mod_dir=} {contents=} {exists=} {e=}")
-        # print("Op loading exception. This might be fine!", e)
-        import traceback
+    with with_sys_path_lock():
+        sys.path.insert(0, abs_mod_dir)
+        try:
+            mod = __import__(import_name, fromlist=[module_dir])
+        except Exception as e:
+            exists = os.path.exists(module_path)
+            contents = os.listdir(module_dir) if os.path.isdir(module_dir) else []
+            print(
+                f"Op loading exception. This might be fine! {module_path=} {import_name=} {abs_mod_dir=} {contents=} {exists=} {e=}"
+            )
+            # print("Op loading exception. This might be fine!", e)
+            import traceback
 
-        traceback.print_exc()
-        return None
-    sys.path.pop(0)
+            traceback.print_exc()
+            return None
+        sys.path.pop(0)
 
     # In the case where the saved op calls another op, we will have multiple
     # ops in the file. The file will look like
