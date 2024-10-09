@@ -11,7 +11,7 @@ export const useProjectSidebar = (
   hasWeaveData: boolean,
   hasTraceBackend: boolean = true,
   hasModelsAccess: boolean = true,
-  viewerIsAdmin: boolean = false,
+  viewerIsAdmin: boolean = false
 ): FancyPageSidebarItem[] => {
   // Should show models sidebar items if we have models data or if we don't have a trace backend
   let showModelsSidebarItems = hasModelsData || !hasTraceBackend;
@@ -137,7 +137,8 @@ export const useProjectSidebar = (
             name: 'Leaderboard',
             slug: 'weave/leaderboard',
             // TODO: remove this `true`
-            isShown: (viewerIsAdmin || true) && (showWeaveSidebarItems || isShowAll),
+            isShown:
+              (viewerIsAdmin || true) && (showWeaveSidebarItems || isShowAll),
             iconName: IconNames.BenchmarkSquare,
           },
           {
