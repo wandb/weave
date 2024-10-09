@@ -106,6 +106,25 @@ asyncio.run(evaluation.evaluate(model))
 
 This will run `predict` on each example and score the output with each scoring functions.
 
+#### Custom Naming
+
+You can change the name of the Evaluation itself by passing a `name` parameter to the `Evaluation` class.
+
+```python
+evaluation = Evaluation(
+    dataset=examples, scorers=[match_score1], name="My Evaluation"
+)
+```
+
+You can also change the name of individual evaluations by setting the `display_name` key of the `_weave_` dictionary.
+
+```python
+evaluation = Evaluation(
+    dataset=examples, scorers=[match_score1]
+)
+evaluation.evaluate(model, _weave_={"display_name": "My Evaluation Run"})
+```
+
 ### Define a function to evaluate
 
 Alternatively, you can also evaluate a function that is wrapped in a `@weave.op()`.
