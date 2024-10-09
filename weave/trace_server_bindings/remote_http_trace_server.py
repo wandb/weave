@@ -118,7 +118,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @classmethod
     def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
-        return cls(weave_trace_server_url(), should_batch)
+        # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
+        # that type checking is applied to the constructor.
+        return RemoteHTTPTraceServer(weave_trace_server_url(), should_batch)
 
     def set_auth(self, auth: Tuple[str, str]) -> None:
         self._auth = auth
@@ -438,6 +440,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return self._generic_request(
             "/table/query", req, tsi.TableQueryReq, tsi.TableQueryRes
         )
+
+    def table_query_stream(
+        self, req: tsi.TableQueryReq
+    ) -> Iterator[tsi.TableRowSchema]:
+        # Need to manually iterate over this until the stram endpoint is built and shipped.
+        res = self.table_query(req)
+        for row in res.rows:
+            yield row
 
     def table_query_stats(
         self, req: Union[tsi.TableQueryStatsReq, dict[str, Any]]
