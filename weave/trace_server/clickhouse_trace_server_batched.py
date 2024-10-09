@@ -797,7 +797,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
                 sort_fields.append(field)
 
-        # TODO: Make this stram
         rows = self._table_query_stream(
             req.project_id,
             req.digest,
