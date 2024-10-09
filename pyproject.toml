@@ -173,7 +173,7 @@ exclude = ["weave_query"]
 [tool.mypy]
 warn_unused_configs = true
 # Note: You have to update .pre-commit-config.yaml too!
-exclude = [".*pyi$", "weave_query", "tests", "examples", "weave/docker"]
+exclude = [".*pyi$", "weave_query", "tests", "examples"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -186,7 +186,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.13-dev0"
+current_version = "0.51.15-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

@@ -211,7 +211,9 @@ const ObjectVersionsTable: React.FC<{
   const {cols: columns, groups: columnGroupingModel} = useMemo(() => {
     let groups: GridColumnGroupingModel = [];
     const cols: GridColDef[] = [
-      basicField('object', 'Object', {
+      // This field name chosen to reduce possibility of conflict
+      // with the dynamic fields added below.
+      basicField('weave__object_version_link', 'Object', {
         hideable: false,
         renderCell: cellParams => {
           // Icon to indicate navigation to the object version

@@ -712,18 +712,17 @@ class WeaveClient:
         output: Any = None,
         exception: Optional[BaseException] = None,
         *,
-        postprocess_output: Optional[Callable[..., Any]] = None,
+        op: Optional[Op] = None,
     ) -> None:
         original_output = output
 
-        if postprocess_output:
-            postprocessed_output = postprocess_output(original_output)
+        if op is not None and op.postprocess_output:
+            postprocessed_output = op.postprocess_output(original_output)
         else:
             postprocessed_output = original_output
         self._save_nested_objects(postprocessed_output)
 
-        output = map_to_refs(postprocessed_output)
-        call.output = output
+        call.output = map_to_refs(postprocessed_output)
 
         # Summary handling
         summary = {}
@@ -750,6 +749,20 @@ class WeaveClient:
                 summary["usage"] = {}
                 summary["usage"][model] = {"requests": 1, **usage}
 
+        # JR Oct 24 - This descendants stats code has been commented out since
+        # it entered the code base. A screenshot of the non-ideal UI that the
+        # comment refers to is available in the description of that PR:
+        # https://github.com/wandb/weave/pull/1414
+        # These should probably be added under the "weave" key in the summary.
+        # ---
+        # Descendent error tracking disabled til we fix UI
+        # Add this call's summary after logging the call, so that only
+        # descendents are included in what we log
+        # summary.setdefault("descendants", {}).setdefault(
+        #     call.op_name, {"successes": 0, "errors": 0}
+        # )["successes"] += 1
+        call.summary = summary
+
         # Exception Handling
         exception_str: Optional[str] = None
         if exception:
@@ -759,8 +772,13 @@ class WeaveClient:
         project_id = self._project_id()
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
 
+        # The finish handler serves as a last chance for integrations
+        # to customize what gets logged for a call.
+        if op is not None and op._on_finish_handler:
+            op._on_finish_handler(call, original_output, exception)
+
         def send_end_call() -> None:
-            output_json = to_json(output, project_id, self)
+            output_json = to_json(call.output, project_id, self)
             self.server.call_end(
                 CallEndReq(
                     end=EndedCallSchemaForInsert(
@@ -776,13 +794,6 @@ class WeaveClient:
 
         self.future_executor.defer(send_end_call)
 
-        # Descendent error tracking disabled til we fix UI
-        # Add this call's summary after logging the call, so that only
-        # descendents are included in what we log
-        # summary.setdefault("descendants", {}).setdefault(
-        #     call.op_name, {"successes": 0, "errors": 0}
-        # )["successes"] += 1
-        call.summary = summary
         call_context.pop_call(call.id)
 
     @trace_sentry.global_trace_sentry.watch()
