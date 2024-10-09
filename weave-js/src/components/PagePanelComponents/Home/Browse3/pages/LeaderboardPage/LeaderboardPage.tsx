@@ -6,13 +6,13 @@ import {useHistory} from 'react-router-dom';
 import {useWeaveflowRouteContext} from '../../context';
 import {EditableMarkdown} from './EditableMarkdown';
 import {useLeaderboardData} from './hooks';
-import {LeaderboardConfigType} from './LeaderboardConfigType';
-import {LeaderboardGrid} from './LeaderboardGrid';
-import {LeaderboardConfig} from './LeaderboardPageConfig';
 import {
   persistLeaderboardConfig,
   useCurrentLeaderboardConfig,
-} from './useCurrentLeaderboardConfig';
+} from './leaderboardConfigQuery';
+import {LeaderboardConfigType} from './LeaderboardConfigType';
+import {LeaderboardGrid} from './LeaderboardGrid';
+import {LeaderboardConfig} from './LeaderboardPageConfig';
 
 const USE_COMPARE_EVALUATIONS_PAGE = false;
 

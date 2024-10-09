@@ -13,12 +13,12 @@ import {
 } from '@mui/material';
 import React from 'react';
 
-import {LeaderboardConfigType, VersionSpec} from './LeaderboardConfigType';
-import {ScoreConfig} from './ScoreConfig';
 import {
   useDatasetNames,
   useDatasetVersionsForDatasetName,
-} from './useCurrentLeaderboardConfig';
+} from './leaderboardConfigQuery';
+import {LeaderboardConfigType, VersionSpec} from './LeaderboardConfigType';
+import {ScoreConfig} from './ScoreConfig';
 
 export const ColumnConfig: React.FC<{
   column: LeaderboardConfigType['config']['columns'][0];

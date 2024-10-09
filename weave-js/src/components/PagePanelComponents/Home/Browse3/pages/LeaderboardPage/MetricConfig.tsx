@@ -12,8 +12,8 @@ import {
 } from '@mui/material';
 import React from 'react';
 
+import {useMetricPathsForDatasetAndScorer} from './leaderboardConfigQuery';
 import {Direction, LeaderboardConfigType} from './LeaderboardConfigType';
-import {useMetricPathsForDatasetAndScorer} from './useCurrentLeaderboardConfig';
 
 export const MetricConfig: React.FC<{
   metric: LeaderboardConfigType['config']['columns'][0]['scores'][0]['metrics'][0];
