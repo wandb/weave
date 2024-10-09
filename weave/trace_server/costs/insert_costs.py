@@ -15,6 +15,7 @@ from clickhouse_connect.driver.client import Client
 COST_FILE = "cost_checkpoint.json"
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def get_current_costs(
@@ -125,7 +126,6 @@ def filter_out_current_costs(
         effective_date_str = effective_date.strftime("%Y-%m-%d %H:%M:%S")
         filtered_costs = []
         for cost in new_costs[llm_id]:
-            print(effective_date_str, cost["created_at"])
             # Filter out costs that already exist in the database by comparing
             # the prompt and completion token costs with a relative tolerance
             if not (
@@ -183,5 +183,9 @@ def insert_costs(client: Client) -> None:
 
 # We only want to insert costs if the target db version is 5 or higher
 # because the costs table was added in migration 5
-def should_insert_costs(db_target_version: Optional[int] = None) -> bool:
-    return db_target_version is None or db_target_version >= 5
+def should_insert_costs(
+    db_curr_version: int, db_target_version: Optional[int] = None
+) -> bool:
+    return db_target_version is None or (
+        db_target_version >= 5 and db_curr_version < db_target_version
+    )

@@ -37,7 +37,7 @@ class ClickHouseTraceServerMigrator:
         )
         if len(migrations_to_apply) == 0:
             logger.info(f"No migrations to apply to `{target_db}`")
-            if should_insert_costs(target_version):
+            if should_insert_costs(status["curr_version"], target_version):
                 insert_costs(self.ch_client)
             return
         logger.info(f"Migrations to apply: {migrations_to_apply}")
@@ -45,7 +45,7 @@ class ClickHouseTraceServerMigrator:
             self.ch_client.command(f"CREATE DATABASE IF NOT EXISTS {target_db}")
         for target_version, migration_file in migrations_to_apply:
             self._apply_migration(target_db, target_version, migration_file)
-        if should_insert_costs(target_version):
+        if should_insert_costs(status["curr_version"], target_version):
             insert_costs(self.ch_client)
 
     def _initialize_migration_db(self) -> None:

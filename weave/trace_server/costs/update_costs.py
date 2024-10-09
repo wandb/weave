@@ -107,7 +107,9 @@ def main(file_name: str = COST_FILE) -> None:
         if k not in costs:
             costs[k] = [v]
         elif costs[k] and (
-            costs[k][-1]["input"] != v["input"] or costs[k][-1]["output"] != v["output"]
+            # If the new cost is different from the last cost, we store it
+            costs[k][-1]["input"] != v["input"]
+            or costs[k][-1]["output"] != v["output"]
         ):
             # We store up to 3 historical costs for each model
             if len(costs[k]) < HISTORICAL_COSTS:
