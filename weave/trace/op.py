@@ -323,7 +323,7 @@ def call(op: Op, *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
     ```
     """
     wvkw = kwargs.pop(WEAVE_KWARGS_KEY, {})
-    c = _create_call(op, *args, _weave_=wvkw, **kwargs)
+    c = _create_call(op, *args, wvkw=wvkw, **kwargs)
     return _execute_call(op, c, *args, __should_raise=False, **kwargs)
 
 
