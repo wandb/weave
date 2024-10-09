@@ -195,7 +195,9 @@ def _is_unbound_method(func: Callable) -> bool:
     return bool(is_method)
 
 
-def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
+def _create_call(
+    func: Op, *args: Any, wvkw: Optional[dict] = None, **kwargs: Any
+) -> "Call":
     client = weave_client_context.require_weave_client()
 
     try:
@@ -208,6 +210,8 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
     if "api_key" in inputs_with_defaults:
         inputs_with_defaults["api_key"] = "REDACTED"
 
+    call_time_display_name = wvkw.get("display_name", None) if wvkw else None
+
     # If/When we do memoization, this would be a good spot
 
     parent_call = call_context.get_current_call()
@@ -217,7 +221,7 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
         func,
         inputs_with_defaults,
         parent_call,
-        display_name=func.call_display_name,
+        display_name=call_time_display_name or func.call_display_name,
         attributes=attributes,
     )
 
@@ -317,7 +321,8 @@ def call(op: Op, *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
     result, call = add.call(1, 2)
     ```
     """
-    c = _create_call(op, *args, **kwargs)
+    wvkw = kwargs.pop("_weave_", {})
+    c = _create_call(op, *args, _weave_=wvkw, **kwargs)
     return _execute_call(op, c, *args, __should_raise=False, **kwargs)
 
 
@@ -438,6 +443,7 @@ def op(
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                    wvkw = kwargs.pop("_weave_", {})
                     if settings.should_disable_weave():
                         return await func(*args, **kwargs)
                     if weave_client_context.get_weave_client() is None:
@@ -447,7 +453,7 @@ def op(
                     try:
                         # This try/except allows us to fail gracefully and
                         # still let the user code continue to execute
-                        call = _create_call(wrapper, *args, **kwargs)  # type: ignore
+                        call = _create_call(wrapper, *args, wvkw=wvkw, **kwargs)  # type: ignore
                     except Exception as e:
                         if get_raise_on_captured_errors():
                             raise
@@ -462,6 +468,7 @@ def op(
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
+                    wvkw = kwargs.pop("_weave_", {})
                     if settings.should_disable_weave():
                         return func(*args, **kwargs)
                     if weave_client_context.get_weave_client() is None:
@@ -471,7 +478,8 @@ def op(
                     try:
                         # This try/except allows us to fail gracefully and
                         # still let the user code continue to execute
-                        call = _create_call(wrapper, *args, **kwargs)  # type: ignore
+
+                        call = _create_call(wrapper, *args, wvkw=wvkw, **kwargs)  # type: ignore
                     except Exception as e:
                         if get_raise_on_captured_errors():
                             raise
