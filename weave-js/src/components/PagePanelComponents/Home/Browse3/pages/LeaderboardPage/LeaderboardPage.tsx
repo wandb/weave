@@ -29,23 +29,20 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
 
 const DEFAULT_DESCRIPTION = `# Leaderboard`;
 
-const usePersistedLeaderboardConfig = (): [
-  LeaderboardConfigType,
-  (updater: (oldConfig: LeaderboardConfigType) => LeaderboardConfigType) => void
-] => {
-  const [config, setConfigLocal] = useState<LeaderboardConfigType>(
-    useCurrentLeaderboardConfig()
-  );
+const usePersistedLeaderboardConfig = () => {
+  const initialConfig = useCurrentLeaderboardConfig();
+  const [config, setConfigLocal] =
+    useState<LeaderboardConfigType>(initialConfig);
 
-  const setConfig = (
-    updater: (oldConfig: LeaderboardConfigType) => LeaderboardConfigType
-  ) => {
-    const newConfig = updater(config);
-    setConfigLocal(newConfig);
-    persistLeaderboardConfig(newConfig);
-  };
+  const persistConfig = useCallback(() => {
+    persistLeaderboardConfig(config);
+  }, [config]);
 
-  return [config, setConfig];
+  const cancelChanges = useCallback(() => {
+    setConfigLocal(initialConfig);
+  }, [initialConfig]);
+
+  return {config, setConfigLocal, persistConfig, cancelChanges};
 };
 
 export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
@@ -56,16 +53,22 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
 
   const [showConfig, setShowConfig] = useState(false);
 
-  const [currentConfig, setCurrentConfig] = usePersistedLeaderboardConfig();
+  const {
+    config: currentConfig,
+    setConfigLocal,
+    persistConfig,
+    cancelChanges,
+  } = usePersistedLeaderboardConfig();
   const description = currentConfig.config.description;
   const setDescription = useCallback(
     (newDescription: string) => {
-      setCurrentConfig(newConfig => ({
+      setConfigLocal(newConfig => ({
         ...newConfig,
         config: {...newConfig.config, description: newDescription},
       }));
+      persistConfig();
     },
-    [setCurrentConfig]
+    [setConfigLocal, persistConfig]
   );
 
   const {loading, data} = useLeaderboardData(entity, project, currentConfig);
@@ -125,8 +128,16 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
         />
         {showConfig && (
           <LeaderboardConfig
-            currentConfig={currentConfig}
-            onConfigUpdate={setCurrentConfig}
+            config={currentConfig}
+            onCancel={() => {
+              cancelChanges();
+              setShowConfig(false);
+            }}
+            onPersist={() => {
+              persistConfig();
+              setShowConfig(false);
+            }}
+            setConfig={setConfigLocal}
           />
         )}
       </Box>

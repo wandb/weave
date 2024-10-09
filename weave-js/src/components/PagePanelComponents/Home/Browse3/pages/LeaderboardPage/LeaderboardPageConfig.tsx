@@ -7,19 +7,19 @@ import {LeaderboardConfigType} from './LeaderboardConfigType';
 import {ModelConfig} from './ModelConfig';
 
 export const LeaderboardConfig: React.FC<{
-  currentConfig: LeaderboardConfigType;
-  onConfigUpdate: (
-    updater: (oldConfig: LeaderboardConfigType) => LeaderboardConfigType
+  config: LeaderboardConfigType;
+  onCancel: () => void;
+  onPersist: () => void;
+  setConfig: (
+    updater: (config: LeaderboardConfigType) => LeaderboardConfigType
   ) => void;
-}> = ({currentConfig, onConfigUpdate}) => {
-  const [config, setConfig] = useState<LeaderboardConfigType>(currentConfig);
-
+}> = ({config, setConfig, onPersist, onCancel}) => {
   const handleSave = () => {
-    onConfigUpdate(prev => config);
+    onPersist();
   };
 
   const handleCancel = () => {
-    setConfig(currentConfig);
+    onCancel();
   };
 
   const handleAddColumn = () => {
