@@ -276,7 +276,7 @@ jobs:
           nox_output=$(nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -n4)
           echo "$nox_output"
           if echo "$nox_output" | grep -q "Skipping shard="; then
-            echo "::warning::Nox session was skipped for shard ${{ matrix.nox-shard }}. This might be due to incompatibility with the current Python version or other configuration issues."
+            echo "::warning file=.github/workflows/test.yaml,line=1,col=1::Nox session was skipped for shard ${{ matrix.nox-shard }}. Check noxfile.py for more details."
           fi
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
