@@ -48,7 +48,7 @@ def tests(session, shard):
 
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
-        "trace": ["trace/"],
+        "trace": ["trace/", "type_serializers/"],
         "trace_server": ["trace_server/"],
         "mistral0": ["integrations/mistral/v0/"],
         "mistral1": ["integrations/mistral/v1/"],
