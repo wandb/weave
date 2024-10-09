@@ -109,10 +109,9 @@ const ObjectVersionPageInner: React.FC<{
     projectName,
     {
       objectIds: [objectName],
+      latestOnly: true,
     },
     1,
-    // HACK, grab the latest version and version_index as count
-    [{field: 'created_at', direction: 'desc'}],
     true
   );
   const objectVersionCount = latestObjectVersion.result?.[0]?.versionIndex
