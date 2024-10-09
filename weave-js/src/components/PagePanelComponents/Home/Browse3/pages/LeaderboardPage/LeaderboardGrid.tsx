@@ -13,10 +13,13 @@ import React, {useCallback, useMemo, useState} from 'react';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {PaginationButtons} from '../CallsPage/CallsTableButtons';
+import {ObjectVersionLink} from '../common/Links';
 import {buildTree} from '../common/tabularListViews/buildTree';
 import {LeaderboardData} from './hooks';
 
 interface LeaderboardGridProps {
+  entity: string;
+  project: string;
   data: LeaderboardData;
   loading: boolean;
   onCellClick: (modelName: string, metricName: string, score: number) => void;
@@ -28,12 +31,14 @@ type RowData = {
 } & LeaderboardData['scores'][string];
 
 export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
+  entity,
+  project,
   data,
   loading,
   onCellClick,
 }) => {
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
-    pageSize: 25,
+    pageSize: 50,
     page: 0,
   });
 
@@ -85,7 +90,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       {
         field: 'model',
         headerName: 'Model',
-        minWidth: 200,
+        minWidth: 100,
         flex: 1,
         renderCell: (params: GridRenderCellParams) => {
           const modelRef = parseRefMaybe(params.value);
@@ -110,8 +115,8 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       },
       ...orderedMetrics.map(metric => ({
         field: metric,
-        headerName: metric.split('.').pop(),
-        minWidth: 130,
+        headerName: data.metrics[metric].metricPath.split('.').pop(),
+        minWidth: 100,
         flex: 1,
         valueGetter: (value: RowData) => {
           return value?.value;
@@ -175,7 +180,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         },
       })),
     ],
-    [getColorForScore, onCellClick, orderedMetrics]
+    [data.metrics, getColorForScore, onCellClick, orderedMetrics]
   );
 
   const tree = buildTree([...Object.keys(data.metrics)]);
@@ -185,7 +190,11 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   groupingModel = walkGroupingModel(groupingModel, node => {
     if ('groupId' in node) {
       if (node.children.length === 1) {
-        if ('groupId' in node.children[0]) {
+        if (
+          'groupId' in node.children[0] &&
+          !node.headerName?.includes(':') &&
+          !node.children[0].headerName?.includes(':')
+        ) {
           const currNode = node;
           node = node.children[0];
           node.headerName = currNode.headerName + '.' + node.headerName;
@@ -194,6 +203,21 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           // node = node.children[0];
         }
       }
+    }
+    return node;
+  }) as GridColumnGroup[];
+  groupingModel = walkGroupingModel(groupingModel, node => {
+    if ('groupId' in node) {
+      node.renderHeaderGroup = params => {
+        const ref = parseRefMaybe(
+          `weave:///${entity}/${project}/object/${node.headerName}` ?? ''
+        );
+        // console.log(node.headerName, ref);
+        if (ref) {
+          return <SmallRef objRef={ref} />;
+        }
+        return <div>{node.headerName}</div>;
+      };
     }
     return node;
   }) as GridColumnGroup[];
@@ -228,7 +252,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         pagination
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
-        pageSizeOptions={[25]}
+        pageSizeOptions={[50]}
         disableRowSelectionOnClick
         hideFooterSelectedRowCount
         disableMultipleColumnsSorting={false}

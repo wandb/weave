@@ -2,18 +2,21 @@ import {useMemo} from 'react';
 
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
+import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {useWFHooks} from '../wfReactInterface/context';
-import {objectVersionKeyToRefUri, opVersionKeyToRefUri} from '../wfReactInterface/utilities';
+import {
+  objectVersionKeyToRefUri,
+  opVersionKeyToRefUri,
+} from '../wfReactInterface/utilities';
 import {
   CallSchema,
   ObjectVersionSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {LeaderboardConfigType, VersionSpec} from './LeaderboardConfigType';
-import { EVALUATE_OP_NAME_POST_PYDANTIC } from '../common/heuristics';
 
 export const useCurrentLeaderboardConfig = (): LeaderboardConfigType => {
   // TODO: Implement this
-  console.log('Fetching current leaderboard config');
+  // console.log('Fetching current leaderboard config');
   return useMemo(() => {
     return {
       version: 1,
@@ -27,7 +30,7 @@ export const useCurrentLeaderboardConfig = (): LeaderboardConfigType => {
 };
 export const persistLeaderboardConfig = (config: LeaderboardConfigType) => {
   // TODO: Implement this
-  console.log('Persisting leaderboard config:', config);
+  // console.log('Persisting leaderboard config:', config);
 };
 
 export const useDatasetNames = (entity: string, project: string): string[] => {
@@ -145,6 +148,7 @@ export const useScorerNamesForDataset = (
         }
         return ref.artifactVersion === datasetVersion;
       }) ?? [];
+
     const res = evalResults
       .map(obj => obj.val.scorers ?? [])
       .flat()
@@ -209,7 +213,7 @@ export const useScorerVersionsForDatasetAndScorer = (
     {skip: allVersions.length === 0}
   );
 
-  console.log(allVersions);
+  // console.log(allVersions);
 
   return useMemo(() => {
     const scorers = (evalQuery.result ?? [])
@@ -262,14 +266,14 @@ export const useMetricPathsForDatasetAndScorer = (
 
   const evals = useMemo(() => {
     // Find the matching evals:
-    console.log(evalQuery.result, scorerName, scorerVersion);
+    // console.log(evalQuery.result, scorerName, scorerVersion);
     return (evalQuery.result ?? []).filter(e => {
       const match = (e.val.scorers ?? []).find((s: string) => {
         const sRef = parseRefMaybe(s);
         if (!sRef) {
           return false;
         }
-        console.log(sRef);
+        // console.log(sRef);
         return (
           sRef.artifactName === scorerName &&
           sRef.artifactVersion === scorerVersion
@@ -299,9 +303,11 @@ export const useMetricPathsForDatasetAndScorer = (
   return useMemo(() => {
     const foundCall = (evalCalls.result ?? []).find(
       (call: CallSchema) =>
-        call.traceCall?.exception == null && call.traceCall?.ended_at != null
+        call.traceCall?.exception == null &&
+        call.traceCall?.ended_at != null &&
+        (call?.traceCall?.output as any)?.[scorerName] != null
     );
-    console.log(foundCall, evalCalls);
+    // console.log(foundCall, evalCalls);
     const output = foundCall?.traceCall?.output;
     if (!output) {
       return [];
@@ -309,11 +315,13 @@ export const useMetricPathsForDatasetAndScorer = (
     if (typeof output !== 'object') {
       return [];
     }
-    return Object.keys(
+    const res = Object.keys(
       flattenObjectPreservingWeaveTypes(
         (output as {[key: string]: any})[scorerName] ?? {}
       )
     );
+    console.log(foundCall, scorerName, res);
+    return res;
   }, [evalCalls, scorerName]);
 };
 
@@ -368,6 +376,10 @@ export const useEvalObjsForConfig = (
         return;
       }
       const datasetName = datasetRef.artifactName;
+      // if (datasetName === '') {
+      //   finalEvals.push(evaluation);
+      //   return;
+      // }
       const datasetVersion = datasetRef.artifactVersion;
       // Determine this dataset matches any of the config's datasets
       let matched = false;
@@ -447,5 +459,5 @@ export const useEvalCallsForConfig = (
       skip: evals.length === 0,
     }
   );
-  return calls;
+  return {calls, evals};
 };

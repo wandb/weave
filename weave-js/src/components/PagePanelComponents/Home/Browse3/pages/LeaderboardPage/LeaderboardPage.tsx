@@ -80,7 +80,8 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
     metricName: string,
     score: number
   ) => {
-    const sourceCallId = data.scores?.[modelName]?.[metricName]?.sourceCallId;
+    const sourceCallId =
+      data.scores?.[modelName]?.[metricName]?.sourceEvalCallId;
     if (sourceCallId) {
       let to: string;
       if (USE_COMPARE_EVALUATIONS_PAGE) {
@@ -124,6 +125,8 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
         overflow="hidden"
         minHeight="65%">
         <LeaderboardGrid
+          entity={entity}
+          project={project}
           loading={loading}
           data={data}
           onCellClick={handleCellClick}

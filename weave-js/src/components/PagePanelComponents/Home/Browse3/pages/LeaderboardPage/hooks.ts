@@ -8,20 +8,25 @@ import {
   objectVersionKeyToRefUri,
   opVersionKeyToRefUri,
 } from '../wfReactInterface/utilities';
-import { useEvalCallsForConfig } from './leaderboardConfigQuery';
+import {useEvalCallsForConfig} from './leaderboardConfigQuery';
 import {LeaderboardConfigType} from './LeaderboardConfigType';
+import { ObjectRef } from '@wandb/weave/react';
 
 export type LeaderboardData = {
   metrics: {
     [metricId: string]: {
-      evaluationName: string;
+      // evaluationName: string;
+      datasetName: string;
+      datasetVersion: string;
+      scorerName: string;
+      scorerVersion: string;
       metricPath: string;
     };
   };
   models: string[];
   scores: {
     [modelId: string]: {
-      [metricId: string]: {value: number; sourceCallId: string};
+      [metricId: string]: {value: number; sourceEvalCallId: string};
     };
   };
 };
@@ -79,7 +84,8 @@ export const useLeaderboardData = (
   //   undefined,
   //   {skip: !evaluationVersionsResult}
   // );
-  const evaluationRuns = useEvalCallsForConfig(entity, project, config);
+  const {calls: evaluationRuns, evals: evaluationVersions} =
+    useEvalCallsForConfig(entity, project, config);
 
   // Build the dataset
 
@@ -113,43 +119,79 @@ export const useLeaderboardData = (
       if (!evaluationVersion) {
         return;
       }
-      const evalName = parseRefMaybe(evaluationVersion)?.artifactName;
-      if (!evalName) {
+      const evalVersion = parseRefMaybe(evaluationVersion)?.artifactVersion;
+      if (!evalVersion) {
+        return;
+      }
+      const evalObject = evaluationVersions.find(
+        e => e.versionHash === evalVersion
+      );
+      if (!evalObject) {
         return;
       }
       const outputSummary = r.traceCall?.output;
       if (!outputSummary) {
         return;
       }
+
+      const datasetRef = parseRefMaybe(evalObject.val.dataset);
+      if (!datasetRef) {
+        return;
+      }
       if (!finalData.models.includes(modelName)) {
         finalData.models.push(modelName);
-      }
-      const modelScores = flattenObjectPreservingWeaveTypes(
-        outputSummary ?? {}
-      );
-      Object.entries(modelScores).forEach(([metric, score]) => {
-        const metricName = `${evalName}.${metric}`;
-        if (!finalData.metrics[metricName]) {
-          finalData.metrics[metricName] = {
-            evaluationName: evalName,
-            metricPath: metric,
-          };
-        }
         if (!finalData.scores[modelName]) {
           finalData.scores[modelName] = {};
         }
-        finalData.scores[modelName][metricName] = {
-          value: score,
-          sourceCallId: r.callId,
-        };
-      });
+      }
+
+      const datasetName = datasetRef.artifactName;
+      const datasetVersion = datasetRef.artifactVersion;
+      const scorerNameMap = Object.fromEntries(
+        (evalObject.val.scorers ?? [])
+          .map(parseRefMaybe)
+          .filter(Boolean)
+          .map((s: ObjectRef) => [s.artifactName, s.artifactVersion])
+      );
+
+      Object.entries(outputSummary ?? {}).forEach(
+        ([scorerName, scorerMetricsVal]) => {
+          const scorerVersion = scorerNameMap[scorerName];
+          if (!scorerVersion) {
+            return;
+          }
+          if (
+            scorerMetricsVal == null ||
+            typeof scorerMetricsVal !== 'object'
+          ) {
+            return;
+          }
+          const flattened = flattenObjectPreservingWeaveTypes(scorerMetricsVal);
+          Object.entries(flattened).forEach(([metricPath, metricValue]) => {
+            const metricId = `${datasetName}:${datasetVersion}.${scorerName}:${scorerVersion}.${metricPath}`;
+            if (!finalData.metrics[metricId]) {
+              finalData.metrics[metricId] = {
+                datasetName,
+                datasetVersion,
+                scorerName,
+                scorerVersion,
+                metricPath,
+              };
+            }
+            finalData.scores[modelName][metricId] = {
+              value: metricValue,
+              sourceEvalCallId: r.callId,
+            };
+          });
+        }
+      );
     });
 
     return {
       loading: false,
       data: finalData,
     };
-  }, [evaluationRuns.loading, evaluationRuns.result]);
+  }, [evaluationRuns.loading, evaluationRuns.result, evaluationVersions]);
 
   return results;
 };
