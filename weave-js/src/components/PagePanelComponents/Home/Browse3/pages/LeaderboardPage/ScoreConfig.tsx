@@ -21,6 +21,8 @@ import {LeaderboardConfigType, VersionSpec} from './LeaderboardConfigType';
 import {MetricConfig} from './MetricConfig';
 
 export const ScoreConfig: React.FC<{
+  entity: string;
+  project: string;
   score: LeaderboardConfigType['config']['columns'][0]['scores'][0];
   datasetName: string;
   datasetVersion: string;
@@ -28,8 +30,13 @@ export const ScoreConfig: React.FC<{
     updatedScore: LeaderboardConfigType['config']['columns'][0]['scores'][0]
   ) => void;
   onRemove: () => void;
-}> = ({score, datasetName, datasetVersion, onUpdate, onRemove}) => {
-  const scorerNames = useScorerNamesForDataset(datasetName, datasetVersion);
+}> = ({ entity, project, score, datasetName, datasetVersion, onUpdate, onRemove}) => {
+  const scorerNames = useScorerNamesForDataset(
+    entity,
+    project,
+    datasetName,
+    datasetVersion
+  );
   const scorerVersions = useScorerVersionsForDatasetAndScorer(
     datasetName,
     datasetVersion,

@@ -120,6 +120,8 @@ export const ColumnConfig: React.FC<{
       </FormControl>
       {column.scores.map((score, index) => (
         <ScoreConfig
+          entity={entity}
+          project={project}
           key={index}
           score={score}
           datasetName={column.dataset.name}
