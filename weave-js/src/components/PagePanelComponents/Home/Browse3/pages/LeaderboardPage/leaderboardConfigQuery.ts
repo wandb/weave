@@ -376,19 +376,15 @@ export const useEvalObjsForConfig = (
         return;
       }
       const datasetName = datasetRef.artifactName;
-      // if (datasetName === '') {
-      //   finalEvals.push(evaluation);
-      //   return;
-      // }
       const datasetVersion = datasetRef.artifactVersion;
       // Determine this dataset matches any of the config's datasets
       let matched = false;
       for (const column of config.config.columns) {
         if (
-          datasetName === column.dataset.name &&
+          (datasetName === column.dataset.name || column.dataset.name === '') &&
           (column.dataset.version === datasetVersion ||
-            (column.dataset.version !== 'latest' &&
-              column.dataset.version !== 'all'))
+            column.dataset.version === 'latest' ||
+            column.dataset.version === 'all')
         ) {
           if (column.scores.length === 0) {
             finalEvals.push(evaluation);
@@ -403,10 +399,11 @@ export const useEvalObjsForConfig = (
             const scorerVersion = sRef.artifactVersion;
             for (const score of column.scores) {
               if (
-                scorerName === score.scorer.name &&
+                (scorerName === score.scorer.name ||
+                  score.scorer.name === '') &&
                 (scorerVersion === score.scorer.version ||
-                  (score.scorer.version !== 'latest' &&
-                    score.scorer.version !== 'all'))
+                  score.scorer.version === 'latest' ||
+                  score.scorer.version === 'all')
               ) {
                 finalEvals.push(evaluation);
                 matched = true;

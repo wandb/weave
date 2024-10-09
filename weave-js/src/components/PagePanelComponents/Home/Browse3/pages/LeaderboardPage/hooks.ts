@@ -1,3 +1,4 @@
+import {ObjectRef} from '@wandb/weave/react';
 import {useMemo} from 'react';
 
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
@@ -10,7 +11,6 @@ import {
 } from '../wfReactInterface/utilities';
 import {useEvalCallsForConfig} from './leaderboardConfigQuery';
 import {LeaderboardConfigType} from './LeaderboardConfigType';
-import { ObjectRef } from '@wandb/weave/react';
 
 export type LeaderboardData = {
   metrics: {
@@ -138,12 +138,6 @@ export const useLeaderboardData = (
       if (!datasetRef) {
         return;
       }
-      if (!finalData.models.includes(modelName)) {
-        finalData.models.push(modelName);
-        if (!finalData.scores[modelName]) {
-          finalData.scores[modelName] = {};
-        }
-      }
 
       const datasetName = datasetRef.artifactName;
       const datasetVersion = datasetRef.artifactVersion;
@@ -152,7 +146,36 @@ export const useLeaderboardData = (
           .map(parseRefMaybe)
           .filter(Boolean)
           .map((s: ObjectRef) => [s.artifactName, s.artifactVersion])
+          .filter(([name, version]: [string, string]) => {
+            return (
+              config.config.columns.length === 0 ||
+              config.config.columns.some(dc => {
+                return (
+                  (dc.dataset.name === '' || dc.dataset.name === datasetName) &&
+                  (dc.dataset.version === 'all' ||
+                    dc.dataset.version === 'latest' ||
+                    dc.dataset.version === datasetVersion) &&
+                  (dc.scores.length === 0 ||
+                    dc.scores.some(s => {
+                      return (
+                        (s.scorer.name === '' || s.scorer.name === name) &&
+                        (s.scorer.version === 'all' ||
+                          s.scorer.version === 'latest' ||
+                          s.scorer.version === version)
+                      );
+                    }))
+                );
+              })
+            );
+          })
       );
+
+      if (!finalData.models.includes(modelName)) {
+        finalData.models.push(modelName);
+        if (!finalData.scores[modelName]) {
+          finalData.scores[modelName] = {};
+        }
+      }
 
       Object.entries(outputSummary ?? {}).forEach(
         ([scorerName, scorerMetricsVal]) => {
@@ -191,7 +214,7 @@ export const useLeaderboardData = (
       loading: false,
       data: finalData,
     };
-  }, [evaluationRuns.loading, evaluationRuns.result, evaluationVersions]);
+  }, [config.config.columns, evaluationRuns.loading, evaluationRuns.result, evaluationVersions]);
 
   return results;
 };
