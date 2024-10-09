@@ -82,6 +82,8 @@ def print_call_link(call: "Call") -> None:
 
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
 OnOutputHandlerType = Callable[[Any, FinishCallbackType, Dict], Any]
+# Call, original function output, exception if occurred
+OnFinishHandlerType = Callable[["Call", Any, Optional[BaseException]], None]
 
 
 def value_is_sentinel(param: Any) -> bool:
@@ -149,6 +151,9 @@ class Op(Protocol):
     _set_on_output_handler: Callable[[OnOutputHandlerType], None]
     _on_output_handler: Optional[OnOutputHandlerType]
 
+    _set_on_finish_handler: Callable[[OnFinishHandlerType], None]
+    _on_finish_handler: Optional[OnFinishHandlerType]
+
     __call__: Callable[..., Any]
     __self__: Any
 
@@ -166,6 +171,12 @@ def _set_on_output_handler(func: Op, on_output: OnOutputHandlerType) -> None:
     if func._on_output_handler is not None:
         raise ValueError("Cannot set on_output_handler multiple times")
     func._on_output_handler = on_output
+
+
+def _set_on_finish_handler(func: Op, on_finish: OnFinishHandlerType) -> None:
+    if func._on_finish_handler is not None:
+        raise ValueError("Cannot set on_finish_handler multiple times")
+    func._on_finish_handler = on_finish
 
 
 def _is_unbound_method(func: Callable) -> bool:
@@ -231,7 +242,7 @@ def _execute_call(
             call,
             output,
             exception,
-            postprocess_output=__op.postprocess_output,
+            op=__op,
         )
         if not call_context.get_current_call():
             print_call_link(call)
@@ -496,6 +507,9 @@ def op(
 
             wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
             wrapper._on_output_handler = None  # type: ignore
+
+            wrapper._set_on_finish_handler = partial(_set_on_finish_handler, wrapper)  # type: ignore
+            wrapper._on_finish_handler = None  # type: ignore
 
             wrapper._tracing_enabled = True  # type: ignore
 
