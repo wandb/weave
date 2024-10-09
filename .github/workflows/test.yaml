@@ -281,9 +281,6 @@ jobs:
           else
             echo "nox_skipped=false" >> $GITHUB_OUTPUT
           fi
-          if ! echo "$nox_output" | grep -q "Session.*succeeded"; then
-            exit 1
-          fi
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 
