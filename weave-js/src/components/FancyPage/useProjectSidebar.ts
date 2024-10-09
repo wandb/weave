@@ -224,10 +224,11 @@ export const useProjectSidebar = (
     return onlyShownItems;
   }, [
     isLoading,
-    isModelsOnly,
-    isWeaveOnly,
-    showWeaveSidebarItems,
     isShowAll,
+    isWeaveOnly,
     viewingRestricted,
+    isModelsOnly,
+    viewerIsAdmin,
+    showWeaveSidebarItems,
   ]);
 };

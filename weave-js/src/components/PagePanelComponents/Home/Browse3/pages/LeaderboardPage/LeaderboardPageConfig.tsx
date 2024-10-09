@@ -66,14 +66,22 @@ export const useCurrentLeaderboardConfig = (): LeaderboardConfigType => {
 const useDatasetNames = (): string[] => {
   // TODO: Implement this
   return useMemo(() => {
-    return [];
+    return [
+      'leaderboard-test-dataset',
+      'leaderboard-test-dataset-2',
+      'leaderboard-test-dataset-3',
+    ];
   }, []);
 };
 
 const useDatasetVersionsForDatasetName = (datasetName: string): string[] => {
   // TODO: Implement this
   return useMemo(() => {
-    return [];
+    return [
+      'dug657ioy8j1',
+      'dnkjubyhvasd',
+      'dadsgf3f451d',
+    ];
   }, []);
 };
 
@@ -83,7 +91,11 @@ const useScorerNamesForDataset = (
 ): string[] => {
   // TODO: Implement this
   return useMemo(() => {
-    return [];
+    return [
+      'scorer-1',
+      'scorer-2',
+      'scorer-3',
+    ];
   }, []);
 };
 
@@ -94,7 +106,11 @@ const useScorerVersionsForDatasetAndScorer = (
 ): string[] => {
   // TODO: Implement this
   return useMemo(() => {
-    return [];
+    return [
+      'sug657ioy8j1',
+      'snkjubyhvasd',
+      'sadsgf3f451d',
+    ];
   }, []);
 };
 
@@ -106,13 +122,33 @@ const useMetricPathsForDatasetAndScorer = (
 ): string[] => {
   // TODO: Implement this
   return useMemo(() => {
-    return [];
+    return [
+      'accuracy',
+      'f1.macro',
+      'precision.micro',
+      'recall.micro.data',
+    ];
   }, []);
 };
 
 const useModelNames = (): string[] => {
   // TODO: Implement this
   return useMemo(() => {
-    return [];
+    return [
+      'model-1',
+      'model-2',
+      'model-3',
+    ];
+  }, []);
+};
+
+const useModelVersionsForModelName = (modelName: string): string[] => {
+  // TODO: Implement this
+  return useMemo(() => {
+    return [
+      'mug657ioy8j1',
+      'mnkjubyhvasd',
+      'madsgf3f451d',
+    ];
   }, []);
 };
