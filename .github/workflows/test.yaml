@@ -57,7 +57,7 @@ jobs:
 
       - name: Build legacy (query service) unit test image
         if: steps.build_check.outputs.build_needed == 'true'
-        run: python3 weave/docker/docker_build.py build_deps weave-test-python-query-service builder . weave_query/Dockerfile.ci.test
+        run: python3 weave_query/docker/docker_build.py build_deps weave-test-python-query-service builder . weave_query/Dockerfile.ci.test
 
   test-query-service:
     name: Legacy (Query Service) Python unit tests
@@ -273,7 +273,7 @@ jobs:
           WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -n4
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 

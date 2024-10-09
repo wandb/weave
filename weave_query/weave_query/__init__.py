@@ -17,6 +17,7 @@ from weave_query import storage
 
 from weave_query.api import *
 from weave_query.decorators import op
+from weave_query import ops
 
 from weave_query.errors import *
 
