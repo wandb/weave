@@ -1507,7 +1507,7 @@ async def test_op_calltime_display_name(client):
     def my_op(a: int) -> int:
         return a
 
-    result = my_op(1, _weave_={"display_name": "custom_display_name"})
+    result = my_op(1, __weave={"display_name": "custom_display_name"})
     calls = list(my_op.calls())
     assert len(calls) == 1
     call = calls[0]
@@ -1515,7 +1515,7 @@ async def test_op_calltime_display_name(client):
 
     evaluation = weave.Evaluation(dataset=[{"a": 1}], scorers=[])
     res = await evaluation.evaluate(
-        my_op, _weave_={"display_name": "custom_display_name"}
+        my_op, __weave={"display_name": "custom_display_name"}
     )
     calls = list(evaluation.evaluate.calls())
     assert len(calls) == 1

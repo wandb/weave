@@ -116,13 +116,13 @@ evaluation = Evaluation(
 )
 ```
 
-You can also change the name of individual evaluations by setting the `display_name` key of the `_weave_` dictionary.
+You can also change the name of individual evaluations by setting the `display_name` key of the `__weave` dictionary.
 
 ```python
 evaluation = Evaluation(
     dataset=examples, scorers=[match_score1]
 )
-evaluation.evaluate(model, _weave_={"display_name": "My Evaluation Run"})
+evaluation.evaluate(model, __weave={"display_name": "My Evaluation Run"})
 ```
 
 ### Define a function to evaluate

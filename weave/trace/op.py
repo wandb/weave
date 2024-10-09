@@ -32,6 +32,7 @@ from weave.trace.refs import ObjectRef
 
 logger = logging.getLogger(__name__)
 
+WEAVE_KWARGS_KEY = "__weave"
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import Call, CallsIter
@@ -321,7 +322,7 @@ def call(op: Op, *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
     result, call = add.call(1, 2)
     ```
     """
-    wvkw = kwargs.pop("_weave_", {})
+    wvkw = kwargs.pop(WEAVE_KWARGS_KEY, {})
     c = _create_call(op, *args, _weave_=wvkw, **kwargs)
     return _execute_call(op, c, *args, __should_raise=False, **kwargs)
 
@@ -443,7 +444,7 @@ def op(
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    wvkw = kwargs.pop("_weave_", {})
+                    wvkw = kwargs.pop(WEAVE_KWARGS_KEY, {})
                     if settings.should_disable_weave():
                         return await func(*args, **kwargs)
                     if weave_client_context.get_weave_client() is None:
@@ -468,7 +469,7 @@ def op(
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    wvkw = kwargs.pop("_weave_", {})
+                    wvkw = kwargs.pop(WEAVE_KWARGS_KEY, {})
                     if settings.should_disable_weave():
                         return func(*args, **kwargs)
                     if weave_client_context.get_weave_client() is None:
