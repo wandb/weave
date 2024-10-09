@@ -30,7 +30,15 @@ export const ScoreConfig: React.FC<{
     updatedScore: LeaderboardConfigType['config']['columns'][0]['scores'][0]
   ) => void;
   onRemove: () => void;
-}> = ({ entity, project, score, datasetName, datasetVersion, onUpdate, onRemove}) => {
+}> = ({
+  entity,
+  project,
+  score,
+  datasetName,
+  datasetVersion,
+  onUpdate,
+  onRemove,
+}) => {
   const scorerNames = useScorerNamesForDataset(
     entity,
     project,
@@ -38,6 +46,8 @@ export const ScoreConfig: React.FC<{
     datasetVersion
   );
   const scorerVersions = useScorerVersionsForDatasetAndScorer(
+    entity,
+    project,
     datasetName,
     datasetVersion,
     score.scorer.name
@@ -117,7 +127,7 @@ export const ScoreConfig: React.FC<{
           <MenuItem value="all">All</MenuItem>
           {scorerVersions.map(({version, versionIndex}) => (
             <MenuItem key={version} value={version}>
-              Version {versionIndex}
+              Version {versionIndex}: {version}
             </MenuItem>
           ))}
         </Select>

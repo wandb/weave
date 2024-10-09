@@ -1,8 +1,8 @@
 import {useMemo} from 'react';
 
+import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {useWFHooks} from '../wfReactInterface/context';
 import {LeaderboardConfigType, VersionSpec} from './LeaderboardConfigType';
-import { parseRefMaybe } from '../../../Browse2/SmallRef';
 
 export const useCurrentLeaderboardConfig = (): LeaderboardConfigType => {
   // TODO: Implement this
@@ -32,11 +32,15 @@ export const useDatasetNames = (entity: string, project: string): string[] => {
       baseObjectClasses: ['Evaluation'],
     },
     // This 100 is very limited
-    100,
+    100
   );
 
   return useMemo(() => {
-    const datasets = (evalQuery.result ?? []).map(e => parseRefMaybe(e.val.dataset)?.artifactName).filter(name => !!name).sort().filter((name, index, self) => self.indexOf(name) === index) as string[];
+    const datasets = (evalQuery.result ?? [])
+      .map(e => parseRefMaybe(e.val.dataset)?.artifactName)
+      .filter(name => !!name)
+      .sort()
+      .filter((name, index, self) => self.indexOf(name) === index) as string[];
     return datasets;
   }, [evalQuery.result]);
 };
@@ -58,7 +62,12 @@ export const useDatasetVersionsForDatasetName = (
   );
 
   const allVersions = useMemo(() => {
-    return (query.result ?? []).map(obj => ({version: obj.versionHash, versionIndex: obj.versionIndex})) ?? [];
+    return (
+      (query.result ?? []).map(obj => ({
+        version: obj.versionHash,
+        versionIndex: obj.versionIndex,
+      })) ?? []
+    );
   }, [query]);
 
   const evalQuery = useRootObjectVersions(
@@ -74,18 +83,22 @@ export const useDatasetVersionsForDatasetName = (
   );
 
   return useMemo(() => {
-    
-    const datasets = (evalQuery.result ?? []).map(e => {
-      const ref = parseRefMaybe(e.val.dataset)
-      if (!ref) {
-        return null;
-      }
-      if (ref.artifactName !== datasetName) {
-        return null;
-      }
-      const match = allVersions.find(v => v.version === ref.artifactVersion)
-      return match
-    }).filter(version => !!version)
+    const datasets = (evalQuery.result ?? [])
+      .map(e => {
+        const ref = parseRefMaybe(e.val.dataset);
+        if (!ref) {
+          return null;
+        }
+        if (ref.artifactName !== datasetName) {
+          return null;
+        }
+        const match = allVersions.find(v => v.version === ref.artifactVersion);
+        return match;
+      })
+      .filter(version => !!version) as Array<{
+      version: string;
+      versionIndex: number;
+    }>;
     return datasets;
   }, [allVersions, datasetName, evalQuery.result]);
 };
@@ -107,45 +120,120 @@ export const useScorerNamesForDataset = (
       baseObjectClasses: ['Evaluation'],
     },
     // This 100 is very limited
-    100,
+    100
   );
 
   return useMemo(() => {
-    const eval_results = evalQuery.result?.filter(obj => {
-      const ref = parseRefMaybe(obj.val.dataset ?? "")
-      if (!ref) {
-        return false;
-      }
-      if (ref.artifactName !== datasetName) {
-        return false;
-      }
-      if (datasetVersion === "latest" || datasetVersion === "all") {
-        return true;
-      }
-      return ref.artifactVersion === datasetVersion;
-    }) ?? [];
-    const res = eval_results.map(obj => obj.val.scorers ?? []).flat().map(scorer => parseRefMaybe(scorer)?.artifactName).filter(name => !!name).sort() // .filter((name, index, self) => self.indexOf(name) === index) as string[];
+    const evalResults =
+      evalQuery.result?.filter(obj => {
+        const ref = parseRefMaybe(obj.val.dataset ?? '');
+        if (!ref) {
+          return false;
+        }
+        if (ref.artifactName !== datasetName) {
+          return false;
+        }
+        if (datasetVersion === 'latest' || datasetVersion === 'all') {
+          return true;
+        }
+        return ref.artifactVersion === datasetVersion;
+      }) ?? [];
+    const res = evalResults
+      .map(obj => obj.val.scorers ?? [])
+      .flat()
+      .map(scorer => parseRefMaybe(scorer)?.artifactName)
+      .filter(name => !!name)
+      .sort() as string[]; // .filter((name, index, self) => self.indexOf(name) === index) as string[];
 
     return res;
-  }, [datasetName, datasetVersion, evalQuery.result])
-  
-
-
+  }, [datasetName, datasetVersion, evalQuery.result]);
 };
 export const useScorerVersionsForDatasetAndScorer = (
+  entity: string,
+  project: string,
   datasetName: string,
   datasetVersion: string,
   scorerName: string
 ): Array<{version: string; versionIndex: number}> => {
-  // TODO: Implement this
+  const {useRootObjectVersions, useOpVersions} = useWFHooks();
+  const query1 = useRootObjectVersions(
+    entity,
+    project,
+    {
+      objectIds: [scorerName],
+    },
+    100,
+    true
+  );
+
+  const query2 = useOpVersions(
+    entity,
+    project,
+    {
+      opIds: [scorerName],
+    },
+    100,
+    true
+  );
+
+  const allVersions = useMemo(() => {
+    const versions1 =
+      (query1.result ?? []).map(obj => ({
+        version: obj.versionHash,
+        versionIndex: obj.versionIndex,
+      })) ?? [];
+    const versions2 =
+      (query2.result ?? []).map(obj => ({
+        version: obj.versionHash,
+        versionIndex: obj.versionIndex,
+      })) ?? [];
+    return versions1.concat(versions2);
+  }, [query1, query2]);
+
+  const evalQuery = useRootObjectVersions(
+    entity,
+    project,
+    {
+      baseObjectClasses: ['Evaluation'],
+    },
+    // This 100 is very limited
+    100,
+    false,
+    {skip: allVersions.length === 0}
+  );
+
+  console.log(allVersions);
+
   return useMemo(() => {
-    return [
-      {version: 'sug657ioy8j1', versionIndex: 0},
-      {version: 'snkjubyhvasd', versionIndex: 1},
-      {version: 'sadsgf3f451d', versionIndex: 2},
-    ];
-  }, []);
+    const scorers = (evalQuery.result ?? [])
+      .map(e => {
+        const ref = parseRefMaybe(e.val.dataset);
+        if (!ref) {
+          return [];
+        }
+        if (
+          ref.artifactName !== datasetName ||
+          ref.artifactVersion !== datasetVersion
+        ) {
+          return [];
+        }
+        return (e.val.scorers ?? []).map((scorer: string) => {
+          const sRef = parseRefMaybe(scorer);
+          if (!sRef) {
+            return null;
+          }
+          const match = allVersions.find(
+            v => v.version === sRef.artifactVersion
+          );
+          return match;
+        });
+      })
+      .flat()
+      .filter(version => !!version);
+    return scorers;
+  }, [allVersions, datasetName, datasetVersion, evalQuery.result]);
 };
+
 export const useMetricPathsForDatasetAndScorer = (
   datasetName: string,
   datasetVersion: string,
@@ -157,12 +245,14 @@ export const useMetricPathsForDatasetAndScorer = (
     return ['accuracy', 'f1.macro', 'precision.micro', 'recall.micro.data'];
   }, []);
 };
+
 export const useModelNames = (): string[] => {
   // TODO: Implement this
   return useMemo(() => {
     return ['model-1', 'model-2', 'model-3'];
   }, []);
 };
+
 export const useModelVersionsForModelName = (
   modelName: string
 ): Array<{version: string; versionIndex: number}> => {
