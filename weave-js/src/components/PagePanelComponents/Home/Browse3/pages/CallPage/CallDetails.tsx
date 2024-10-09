@@ -71,6 +71,14 @@ export const CallSchemaLink = ({call}: {call: CallSchema}) => {
   );
 };
 
+const ALLOWED_COLUMN_PATTERNS = [
+  'op_name',
+  'status',
+  'inputs.*',
+  'output',
+  'output.*',
+];
+
 export const CallDetails: FC<{
   call: CallSchema;
 }> = ({call}) => {
@@ -176,6 +184,7 @@ export const CallDetails: FC<{
               }}
               entity={call.entity}
               project={call.project}
+              allowedColumnPatterns={ALLOWED_COLUMN_PATTERNS}
             />
           );
           if (isPeeking) {

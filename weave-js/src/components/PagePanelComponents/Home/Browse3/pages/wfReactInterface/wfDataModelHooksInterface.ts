@@ -206,7 +206,8 @@ export type WFDataModelHooksInterface = {
     sortBy?: traceServerClientTypes.SortBy[],
     query?: Query,
     columns?: string[],
-    expandedRefCols?: string[]
+    expandedRefCols?: string[],
+    includeFeedback?: boolean
   ) => Promise<Blob>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
@@ -220,6 +221,22 @@ export type WFDataModelHooksInterface = {
   useObjectVersion: (
     key: ObjectVersionKey | null
   ) => Loadable<ObjectVersionSchema | null>;
+  useTableRowsQuery: (
+    entity: string,
+    project: string,
+    digest: string,
+    filter?: traceServerClientTypes.TraceTableQueryReq['filter'],
+    limit?: traceServerClientTypes.TraceTableQueryReq['limit'],
+    offset?: traceServerClientTypes.TraceTableQueryReq['offset'],
+    sortBy?: traceServerClientTypes.TraceTableQueryReq['sort_by'],
+    opts?: {skip?: boolean}
+  ) => Loadable<traceServerClientTypes.TraceTableQueryRes>;
+  useTableQueryStats: (
+    entity: string,
+    project: string,
+    digest: string,
+    opts?: {skip?: boolean}
+  ) => Loadable<traceServerClientTypes.TraceTableQueryStatsRes>;
   useRootObjectVersions: (
     entity: string,
     project: string,

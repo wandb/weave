@@ -18,6 +18,7 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {TEAL_600} from '../../../../../common/css/color.styles';
 import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
@@ -210,7 +211,9 @@ const ObjectVersionsTable: React.FC<{
   const {cols: columns, groups: columnGroupingModel} = useMemo(() => {
     let groups: GridColumnGroupingModel = [];
     const cols: GridColDef[] = [
-      basicField('object', 'Object', {
+      // This field name chosen to reduce possibility of conflict
+      // with the dynamic fields added below.
+      basicField('weave__object_version_link', 'Object', {
         hideable: false,
         renderCell: cellParams => {
           // Icon to indicate navigation to the object version
@@ -223,6 +226,7 @@ const ObjectVersionsTable: React.FC<{
               version={obj.versionHash}
               versionIndex={obj.versionIndex}
               fullWidth={true}
+              color={TEAL_600}
             />
           );
         },

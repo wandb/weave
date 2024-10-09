@@ -40,9 +40,9 @@ const getStyles = (props: AdditionalProps) => {
               paddingBottom: '0px !important',
               fontSize: FONT_SIZES[size],
               fontFamily: 'Source Sans Pro',
-              minWidth: '100px',
               color: MOON_800,
               maxWidth: props.maxWidth ? `${props.maxWidth}px` : '100%',
+              minWidth: props.minWidth ? `${props.minWidth}px` : '100px',
               '& fieldset': {
                 borderColor: MOON_250,
               },
@@ -59,7 +59,7 @@ const getStyles = (props: AdditionalProps) => {
                 opacity: 1,
               },
               '& .MuiInputBase-input': {
-                padding: '0px', // Adjust padding as needed
+                padding: '0px',
                 minHeight: `${HEIGHTS[size]} !important`,
               },
             },
@@ -142,18 +142,29 @@ const SelectSizes = {
 type SelectSize = (typeof SelectSizes)[keyof typeof SelectSizes];
 
 type AdditionalProps = {
-  size?: SelectSize;
+  autocompleteRef?: React.MutableRefObject<HTMLDivElement | null>;
+  hasInputValue?: boolean;
   isDarkMode?: boolean;
   maxWidth?: number;
-  hasInputValue?: boolean;
+  minWidth?: number;
+  size?: SelectSize;
 };
 
 export const AutoComplete = <Option,>(
   props: AutocompleteProps<Option, boolean, boolean, boolean> & AdditionalProps
 ) => {
+  const {
+    autocompleteRef,
+    hasInputValue,
+    isDarkMode,
+    maxWidth,
+    minWidth,
+    size,
+    ...safeProps // we're just destructuring the other values out since they're unrecognized by the autocomplete component
+  } = props;
   return (
     <ThemeProvider theme={getStyles(props)}>
-      <Autocomplete {...props} />
+      <Autocomplete ref={props.autocompleteRef} {...safeProps} />
     </ThemeProvider>
   );
 };

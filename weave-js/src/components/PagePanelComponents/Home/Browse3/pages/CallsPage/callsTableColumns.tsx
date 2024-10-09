@@ -19,7 +19,7 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {Reactions} from '../../feedback/Reactions';
-import {CellFilterWrapper} from '../../filters/CellFilterWrapper';
+import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../filters/common';
 import {
   getCostsFromCellParams,
@@ -55,7 +55,8 @@ export const useCallsTableColumns = (
   onCollapse: (col: string) => void,
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
-  onAddFilter?: (field: string, operator: string | null, value: any) => void,
+  allowedColumnPatterns?: string[],
+  onAddFilter?: OnAddFilter,
   costsLoading: boolean = false
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
@@ -131,6 +132,7 @@ export const useCallsTableColumns = (
         onExpand,
         columnIsRefExpanded,
         userDefinedColumnWidths,
+        allowedColumnPatterns,
         onAddFilter,
         costsLoading
       ),
@@ -147,6 +149,7 @@ export const useCallsTableColumns = (
       onExpand,
       columnIsRefExpanded,
       userDefinedColumnWidths,
+      allowedColumnPatterns,
       onAddFilter,
       costsLoading,
     ]
@@ -172,16 +175,30 @@ function buildCallsTableColumns(
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
   userDefinedColumnWidths: Record<string, number>,
-  onAddFilter?: (field: string, operator: string | null, value: any) => void,
+  allowedColumnPatterns?: string[],
+  onAddFilter?: OnAddFilter,
   costsLoading: boolean = false
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
 } {
   // Filters summary.usage. because we add a derived column for tokens and cost
-  const filteredDynamicColumnNames = allDynamicColumnNames.filter(
-    c => !HIDDEN_DYNAMIC_COLUMN_PREFIXES.some(p => c.startsWith(p + '.'))
-  );
+  // Sort attributes after inputs and outputs.
+  const filteredDynamicColumnNames = allDynamicColumnNames
+    .filter(
+      c => !HIDDEN_DYNAMIC_COLUMN_PREFIXES.some(p => c.startsWith(p + '.'))
+    )
+    .sort((a, b) => {
+      const prefixes = ['inputs.', 'output.', 'attributes.'];
+      const aPrefix =
+        a === 'output' ? 'output.' : prefixes.find(p => a.startsWith(p)) ?? '';
+      const bPrefix =
+        b === 'output' ? 'output.' : prefixes.find(p => b.startsWith(p)) ?? '';
+      if (aPrefix !== bPrefix) {
+        return prefixes.indexOf(aPrefix) - prefixes.indexOf(bPrefix);
+      }
+      return a.localeCompare(b);
+    });
 
   const cols: Array<GridColDef<TraceCallSchema>> = [
     {
@@ -304,8 +321,8 @@ function buildCallsTableColumns(
     onExpand,
     // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
     key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
-    (key, operator, value) => {
-      onAddFilter?.(key, operator, value);
+    (key, operator, value, rowId) => {
+      onAddFilter?.(key, operator, value, rowId);
     }
   );
   cols.push(...newCols);
@@ -328,6 +345,7 @@ function buildCallsTableColumns(
         <CellFilterWrapper
           onAddFilter={onAddFilter}
           field="wb_user_id"
+          rowId={cellParams.id.toString()}
           operation="(string): equals"
           value={userId}>
           <UserLink userId={userId} />
@@ -355,6 +373,7 @@ function buildCallsTableColumns(
         <CellFilterWrapper
           onAddFilter={onAddFilter}
           field="started_at"
+          rowId={cellParams.id.toString()}
           operation="(date): after"
           value={filterValue}>
           <Timestamp value={value} format="relative" />
@@ -444,7 +463,21 @@ function buildCallsTableColumns(
     }
   });
 
-  return {cols, colGroupingModel: groupingModel};
+  // TODO: It would be better to build up the cols rather than throwing away
+  //       some at the end, but making simpler change for now.
+  let orderedCols = cols;
+  if (allowedColumnPatterns !== undefined) {
+    orderedCols = allowedColumnPatterns.flatMap(shownCol => {
+      if (shownCol.includes('*')) {
+        const regex = new RegExp('^' + shownCol.replace('*', '.*') + '$');
+        return cols.filter(col => regex.test(col.field));
+      } else {
+        return cols.filter(col => col.field === shownCol);
+      }
+    });
+  }
+
+  return {cols: orderedCols, colGroupingModel: groupingModel};
 }
 /**
  * This function maintains an ever-growing list of dynamic column names. It is used to

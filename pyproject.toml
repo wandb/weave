@@ -2,13 +2,17 @@
 name = "weave"
 description = "A toolkit for building composable interactive data driven applications."
 readme = "README.md"
-license = { text = "Apache-2.0" }
+license = { file = "LICENSE" }
 maintainers = [{ name = "W&B", email = "support@wandb.com" }]
 authors = [
   { name = "Shawn Lewis", email = "shawn@wandb.com" },
-  { name = "Danny Goldstein", email = "danny@wandb.com" },
   { name = "Tim Sweeney", email = "tim@wandb.com" },
   { name = "Nick Peneranda", email = "nick.penaranda@wandb.com" },
+  { name = "Jeff Raubitschek", email = "jeff@wandb.com" },
+  { name = "Jamie Rasmussen", email = "jamie.rasmussen@wandb.com" },
+  { name = "Griffin Tarpenning", email = "griffin.tarpenning@wandb.com" },
+  { name = "Josiah Lee", email = "josiah.lee@wandb.com" },
+  { name = "Andrew Truong", email = "andrew@wandb.com" },
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -28,10 +32,65 @@ classifiers = [
   "Topic :: Software Development :: Widget Sets",
 ]
 requires-python = ">=3.9"
-dynamic = ["version", "dependencies", "optional-dependencies"]
+dynamic = ["version"]
+dependencies = [
+  "pydantic>=2.0.0",
+  "wandb>=0.17.1",
+  "packaging>=21.0",         # For version parsing in integrations
+  "tenacity>=8.3.0,!=8.4.0", # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
+  "emoji>=2.12.1",           # For emoji shortcode support in Feedback
+  "uuid-utils>=0.9.0",       # Used for ID generation - remove once python's built-in uuid supports UUIDv7
+  "numpy>1.21.0",            # Used in box.py and scorer.py (should be made optional)
+  "rich",                    # Used for special formatting of tables (should be made optional)
+  "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
+]
+
+[project.optional-dependencies]
+trace_server = []
+anthropic = ["anthropic>=0.18.0"]
+cerebras = ["cerebras-cloud-sdk"]
+cohere = ["cohere>=5.9.1,<5.9.3"]
+dspy = ["dspy>=0.1.5"]
+groq = ["groq>=0.9.0"]
+instructor = ["instructor>=1.4.3"]
+langchain = [
+  "langchain-core>=0.2.1",
+  "langchain-openai>=0.1.7",
+  "langchain-community>=0.2.1",
+  "chromadb>=0.5.0",
+  "pysqlite3",
+  "opentelemetry-exporter-otlp",
+]
+litellm = ["litellm>=1.36.1"]
+llamaindex = ["llama-index>=0.10.35"]
+mistral0 = ["mistralai>=0.1.8,<1.0.0"]
+mistral1 = ["mistralai>=1.0.0"]
+openai = ["openai>=1.0.0"]
+modal = ["modal", "python-dotenv"]
+test = [
+  "nox",
+  "pytest>=8.2.0",
+  "pytest-asyncio>=0.23.6",
+  "pytest-xdist>=3.1.0",
+  "pytest-rerunfailures>=12.0",
+  "clickhouse_connect==0.7.0",
+  "fastapi>=0.110.0",
+  "sqlparse==0.5.0",
+
+  # Integration Tests
+  "pytest-recording>=0.13.2",
+  "vcrpy>=6.0.1",
+
+  # serving tests
+  "flask",
+  "uvicorn>=0.27.0",
+  "pillow",
+  "filelock",
+  "httpx",
+]
 
 [project.scripts]
-weave = "weave.cli:cli"
+weave = "weave.trace.cli:cli"
 
 [project.urls]
 Company = "https://wandb.com"
@@ -42,26 +101,39 @@ Changes = "https://github.com/wandb/weave/releases"
 Twitter = "https://twitter.com/weights_biases"
 
 [build-system]
-requires = ["setuptools>=42", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.setuptools]
-packages = ["weave"]
+[tool.hatch.version]
+path = "weave/version.py"
 
-[tool.setuptools.dynamic]
-version = { attr = "weave.version.VERSION" }
-dependencies = { file = ["requirements.txt"] }
+[tool.hatch.build]
+include = ["weave"]
+exclude = [
+  "weave_query",
+  "weave-js",
+  "examples",
+  "tests",
+  "docs",
+  "dev_docs",
+  "weave/clear_cache.py",
+]
 
-[tool.setuptools.dynamic.optional-dependencies]
-examples = { file = ["requirements.legacy.ecosystem.txt"] }
-engine = { file = ["requirements.legacy.engine.txt"] }
-ecosystem = { file = ["requirements.legacy.ecosystem.txt"] }
-datadog = { file = ["requirements.legacy.datadog.txt"] }
-modal = { file = ["requirements.modal.txt"] }
 
 [tool.pytest.ini_options]
-testpaths = ["weave"]
-filterwarnings = ["error"]
+filterwarnings = [
+  # treat warnings as errors
+  # "error",
+  # ignore deprecation warnings from installed packages, they're printed at the
+  # bottom of test output, making it hard to find the actual errors.
+  "ignore::DeprecationWarning",
+]
+addopts = "-v"
+markers = [
+  "skip_clickhouse_client: marks tests as requiring clickhouse client to be skipped",
+  "weave_client: alias for `client` fixture used for CI dispatching. Do not use directly in code.",
+  "disable_logging_error_check: means that the test expects logging errors (and the default assertion for no logging errors will fail)",
+]
 
 [tool.ruff.lint]
 preview = true
@@ -74,48 +146,47 @@ select = [
   "D211",   # https://docs.astral.sh/ruff/rules/blank-line-before-class/
   "D214",   # https://docs.astral.sh/ruff/rules/section-not-over-indented/
   "FIX001", # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
-  "FIX003",
-  "F541",
+  "FIX003", # https://docs.astral.sh/ruff/rules/line-contains-xxx/
+  "F541",   # https://docs.astral.sh/ruff/rules/f-string-missing-placeholders/
   "I",      # https://docs.astral.sh/ruff/rules/#isort-i
   "W291",   # https://docs.astral.sh/ruff/rules/trailing-whitespace/
   "W391",   # https://docs.astral.sh/ruff/rules/too-many-newlines-at-end-of-file/
   "F401",   # https://docs.astral.sh/ruff/rules/unused-import/
+  "TID252", # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
 ]
 ignore = [
-  "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/ - we use Google style
-  "D206", # https://docs.astral.sh/ruff/rules/indent-with-spaces/ - redundant with formatter
-  "D207", # https://docs.astral.sh/ruff/rules/under-indentation/ - redundant with formatter
-  "D208", # https://docs.astral.sh/ruff/rules/over-indentation/ - redundant with formatter
-  "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/ - we use Google style
-  "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/ - we use Google style
+  # we use Google style
+  "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/
+  "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/
+  "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/
 ]
-exclude = [
-  "weave/api.py",
-  "weave/__init__.py",
-  "weave/legacy/**/*.py",
-  "examples",
-]
+exclude = ["weave_query"]
 
 [tool.ruff.lint.isort]
-known-third-party = ["wandb"]
-
-[tool.ruff.lint.per-file-ignores]
-"weave/tests/*" = ["F401"]
-"weave/weave_server.py" = ["F401"]
-
+known-third-party = ["wandb", "weave_query"]
 
 [tool.ruff]
 line-length = 88
 show-fixes = true
-exclude = [
-  "weave/query_api.py",
-  "weave/__init__.py",
-  "weave/legacy/**/*.py",
-  "examples",
-]
+exclude = ["weave_query"]
+
+[tool.mypy]
+warn_unused_configs = true
+# Note: You have to update .pre-commit-config.yaml too!
+exclude = [".*pyi$", "weave_query", "tests", "examples"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "weave.*"
+disallow_untyped_defs = true
+disallow_untyped_calls = true
+
+[[tool.mypy.overrides]]
+module = "weave_query.*"
+ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.11-dev0"
+current_version = "0.51.15-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

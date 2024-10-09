@@ -14,10 +14,8 @@ import typing
 from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any, Callable, Optional, Union, get_args, get_origin
 
-from weave.trace import settings
-from weave.trace.client_context import context_state
+from weave.trace import serializer, settings
 from weave.trace.client_context.weave_client import get_weave_client
-from weave.trace.errors import WeaveOpSerializeError
 from weave.trace.ipython import (
     ClassNotFoundError,
     get_class_source,
@@ -27,8 +25,6 @@ from weave.trace.mem_artifact import MemTraceFilesArtifact
 from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef
 from weave.trace_server.trace_server_interface_util import str_digest
-
-from . import serializer
 
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
@@ -432,7 +428,7 @@ def _get_code_deps(
 
                     from weave.trace.serialize import to_json
 
-                    json_val = to_json(var_value, client._project_id(), client.server)
+                    json_val = to_json(var_value, client._project_id(), client)
                 except Exception as e:
                     warnings.append(
                         f"Serialization error for value of {var_name} needed by {fn}. Encountered:\n    {e}"
@@ -501,11 +497,6 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
         message = f"Warning: Incomplete serialization for op {obj}. This op may not be reloadable"
         for warning in warnings:
             message += "\n  " + warning
-        if context_state.get_strict_op_saving():
-            raise WeaveOpSerializeError(message)
-        else:
-            # print(message)
-            pass
 
     op_function_code = get_source_or_fallback(obj, warnings=warnings)
 

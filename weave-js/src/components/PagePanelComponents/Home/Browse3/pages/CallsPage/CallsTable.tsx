@@ -25,7 +25,9 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
+import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
+import {Icon} from '@wandb/weave/components/Icon';
 import React, {
   FC,
   useCallback,
@@ -39,7 +41,9 @@ import {useHistory} from 'react-router-dom';
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {Tailwind} from '../../../../../Tailwind';
+import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {useWeaveflowCurrentRouteContext} from '../../context';
+import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
@@ -62,6 +66,7 @@ import {
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
+import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
@@ -69,6 +74,7 @@ import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
   ExportSelector,
+  PaginationButtons,
   RefreshButton,
 } from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
@@ -81,8 +87,6 @@ import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
-
-const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -140,6 +144,9 @@ export const CallsTable: FC<{
 
   paginationModel?: GridPaginationModel;
   setPaginationModel?: (newModel: GridPaginationModel) => void;
+
+  // Can include glob for prefix match, e.g. "inputs.*"
+  allowedColumnPatterns?: string[];
 }> = ({
   entity,
   project,
@@ -158,6 +165,7 @@ export const CallsTable: FC<{
   setSortModel,
   paginationModel,
   setPaginationModel,
+  allowedColumnPatterns,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
 
@@ -268,14 +276,75 @@ export const CallsTable: FC<{
   }, [calls, effectiveFilter]);
 
   // Construct Flattened Table Data
-  const tableData: TraceCallSchema[] = useMemo(
+  const tableData: FlattenedCallData[] = useMemo(
     () => prepareFlattenedCallDataForTable(callsResult),
     [callsResult]
   );
 
-  const onAddFilter =
+  // This is a specific helper that is used when the user attempts to option-click
+  // a cell that is a child cell of an expanded ref. In this case, we want to
+  // add a filter on the parent ref itself, not the child cell. Once we can properly
+  // filter by reffed values on the backend, this can be removed.
+  const getFieldAndValueForRefExpandedFilter = useCallback(
+    (field: string, rowId: string) => {
+      if (columnIsRefExpanded(field)) {
+        // In this case, we actually just want to filter by the parent ref itself.
+        // This means we need to:
+        // 1. Determine the column of the highest level ancestor column with a ref
+        // 2. Get the value of that corresponding cell (ref column @ row)
+        // 3. Add a filter for that ref on that column.
+        // The acknowledge drawback of this approach is that we are not filtering by that
+        // cell's value, but rather the entire object itself. This still might confuse users,
+        // but is better than returning nothing.
+        const fieldParts = field.split('.');
+        let ancestorField: string | null = null;
+        let targetRef: string | null = null;
+        for (let i = 1; i <= fieldParts.length; i++) {
+          const ancestorFieldCandidate = fieldParts.slice(0, i).join('.');
+          if (expandedRefCols.has(ancestorFieldCandidate)) {
+            const candidateRow = callsResult.find(
+              row => row.traceCall?.id === rowId
+            )?.traceCall;
+            if (candidateRow != null) {
+              const flattenedCandidateRow =
+                flattenObjectPreservingWeaveTypes(candidateRow);
+              const targetRefCandidate =
+                flattenedCandidateRow[
+                  ancestorFieldCandidate + '.' + EXPANDED_REF_REF_KEY
+                ];
+              if (targetRefCandidate != null) {
+                ancestorField = ancestorFieldCandidate;
+                targetRef = targetRefCandidate;
+                break;
+              }
+            }
+          }
+        }
+        if (ancestorField == null) {
+          console.warn('Could not find ancestor ref column for', field);
+          return null;
+        }
+
+        return {value: targetRef, field: ancestorField};
+      }
+      return null;
+    },
+    [callsResult, columnIsRefExpanded, expandedRefCols]
+  );
+
+  const onAddFilter: OnAddFilter | undefined =
     filterModel && setFilterModel
-      ? (field: string, operator: string | null, value: any) => {
+      ? (field: string, operator: string | null, value: any, rowId: string) => {
+          // This condition is used to filter by the parent ref itself, not the child cell.
+          // Should be removed once we can filter by reffed values on the backend.
+          const expandedRef = getFieldAndValueForRefExpandedFilter(
+            field,
+            rowId
+          );
+          if (expandedRef != null) {
+            value = expandedRef.value;
+            field = expandedRef.field;
+          }
           const op = operator ? operator : getDefaultOperatorForValue(value);
           const newModel = {
             ...filterModel,
@@ -303,9 +372,22 @@ export const CallsTable: FC<{
     onCollapse,
     onExpand,
     columnIsRefExpanded,
+    allowedColumnPatterns,
     onAddFilter,
     calls.costsLoading
   );
+
+  // This contains columns which are suitable for selection and raw data
+  // entry. Notably, not children of expanded refs.
+  const filterFriendlyColumnInfo = useMemo(() => {
+    const filteredCols = columns.cols.filter(
+      col => !columnIsRefExpanded(col.field)
+    );
+    return {
+      cols: filteredCols,
+      colGroupingModel: columns.colGroupingModel,
+    };
+  }, [columnIsRefExpanded, columns.colGroupingModel, columns.cols]);
 
   // Now, there are 4 primary controls:
   // 1. Op Version
@@ -583,14 +665,32 @@ export const CallsTable: FC<{
       }}
       filterListItems={
         <Tailwind style={{display: 'contents'}}>
+          <RefreshButton onClick={() => calls.refetch()} />
           {!hideOpSelector && (
             <div className="flex-none">
-              <ListItem sx={{minWidth: 190, width: 320}}>
-                <FormControl fullWidth>
+              <ListItem
+                sx={{minWidth: 190, width: 320, height: 32, padding: 0}}>
+                <FormControl fullWidth sx={{borderColor: MOON_200}}>
                   <Autocomplete
                     PaperComponent={paperProps => (
                       <StyledPaper {...paperProps} />
                     )}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        height: '32px',
+                        '& fieldset': {
+                          borderColor: MOON_200,
+                        },
+                        '&:hover fieldset': {
+                          borderColor: `rgba(${TEAL_300}, 0.48)`,
+                        },
+                      },
+                      '& .MuiOutlinedInput-input': {
+                        height: '32px',
+                        padding: '0 14px',
+                        boxSizing: 'border-box',
+                      },
+                    }}
                     size="small"
                     // Temp disable multiple for simplicity - may want to re-enable
                     // multiple
@@ -615,7 +715,6 @@ export const CallsTable: FC<{
                     renderInput={renderParams => (
                       <StyledTextField
                         {...renderParams}
-                        label={OP_FILTER_GROUP_HEADER}
                         sx={{maxWidth: '350px'}}
                       />
                     )}
@@ -627,6 +726,8 @@ export const CallsTable: FC<{
                     }
                     groupBy={option => opVersionOptions[option]?.group}
                     options={Object.keys(opVersionOptions)}
+                    popupIcon={<Icon name="chevron-down" />}
+                    clearIcon={<Icon name="close" />}
                   />
                 </FormControl>
               </ListItem>
@@ -635,7 +736,7 @@ export const CallsTable: FC<{
           {filterModel && setFilterModel && (
             <FilterPanel
               filterModel={filterModel}
-              columnInfo={columns}
+              columnInfo={filterFriendlyColumnInfo}
               setFilterModel={setFilterModel}
               selectedCalls={selectedCalls}
               clearSelectedCalls={clearSelectedCalls}
@@ -688,25 +789,27 @@ export const CallsTable: FC<{
               disabled={selectedCalls.length === 0}
             />
           )}
-          {!isReadonly && (
-            <div className="flex-none">
-              <BulkDeleteButton
-                onClick={() => setDeleteConfirmModalOpen(true)}
-                disabled={selectedCalls.length === 0}
-              />
-              <ConfirmDeleteModal
-                calls={tableData
-                  .filter(row => selectedCalls.includes(row.id))
-                  .map(traceCallToUICallSchema)}
-                confirmDelete={deleteConfirmModalOpen}
-                setConfirmDelete={setDeleteConfirmModalOpen}
-                onDeleteCallback={() => {
-                  setSelectedCalls([]);
-                }}
-              />
-            </div>
+          {!isReadonly && selectedCalls.length !== 0 && (
+            <>
+              <div className="flex-none">
+                <BulkDeleteButton
+                  onClick={() => setDeleteConfirmModalOpen(true)}
+                  disabled={selectedCalls.length === 0}
+                />
+                <ConfirmDeleteModal
+                  calls={tableData
+                    .filter(row => selectedCalls.includes(row.id))
+                    .map(traceCallToUICallSchema)}
+                  confirmDelete={deleteConfirmModalOpen}
+                  setConfirmDelete={setDeleteConfirmModalOpen}
+                  onDeleteCallback={() => {
+                    setSelectedCalls([]);
+                  }}
+                />
+              </div>
+              <ButtonDivider />
+            </>
           )}
-          <ButtonDivider />
 
           <div className="flex-none">
             <ExportSelector
@@ -739,8 +842,6 @@ export const CallsTable: FC<{
               </div>
             </>
           )}
-          <ButtonDivider />
-          <RefreshButton onClick={() => calls.refetch()} />
         </Tailwind>
       }>
       <StyledDataGrid
@@ -803,6 +904,10 @@ export const CallsTable: FC<{
         onPinnedColumnsChange={onPinnedColumnsChange}
         sx={{
           borderRadius: 0,
+          // This moves the pagination controls to the left
+          '& .MuiDataGrid-footerContainer': {
+            justifyContent: 'flex-start',
+          },
         }}
         slots={{
           noRowsOverlay: () => {
@@ -856,6 +961,7 @@ export const CallsTable: FC<{
             );
           },
           columnMenu: CallsCustomColumnMenu,
+          pagination: PaginationButtons,
         }}
       />
     </FilterLayoutTemplate>
@@ -904,8 +1010,10 @@ const getPeekId = (peekPath: string | null): string | null => {
   return pathname.split('/').pop() ?? null;
 };
 
+export type FlattenedCallData = TraceCallSchema & {[key: string]: string};
+
 function prepareFlattenedCallDataForTable(
   callsResult: CallSchema[]
-): Array<TraceCallSchema & {[key: string]: string}> {
+): FlattenedCallData[] {
   return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
 }

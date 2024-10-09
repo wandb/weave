@@ -90,7 +90,7 @@ def _wandb_api_key_via_netrc_file(filepath: str) -> Optional[str]:
 def weave_wandb_api_key() -> Optional[str]:
     env_api_key = _wandb_api_key_via_env()
     netrc_api_key = _wandb_api_key_via_netrc()
-    if env_api_key != netrc_api_key:
+    if env_api_key and netrc_api_key and env_api_key != netrc_api_key:
         logger.warning(
             "There are different credentials in the netrc file and the environment. Using the environment value."
         )

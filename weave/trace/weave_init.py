@@ -76,7 +76,7 @@ def init_weave(
         else:
             _current_inited_client.reset()
 
-    from weave.legacy.weave import wandb_api
+    from weave.wandb_interface import wandb_api  # type: ignore
 
     # Must init to read ensure we've read auth from the environment, in
     # case we're on a new thread.
@@ -99,7 +99,7 @@ def init_weave(
         api_key = wandb_context.api_key
 
     remote_server = init_weave_get_server(api_key)
-    # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+    # from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
     # server = ClickHouseTraceServer(host="localhost")
     client = weave_client.WeaveClient(
@@ -110,7 +110,7 @@ def init_weave(
 
     _current_inited_client = InitializedClient(client)
     # entity_name, project_name = get_entity_project_from_project_name(project_name)
-    # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+    # from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
     # client = weave_client.WeaveClient(ClickHouseTraceServer(host="localhost"))
 

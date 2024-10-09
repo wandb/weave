@@ -62,19 +62,25 @@ MODEL_NAMES = [
     ("gpt-4o-mini", 0.03, 0.06),
     ("gpt-4-turbo", 0.03, 0.06),
     ("claude-3-haiku-20240307", 0.01, 0.03),
-    ("gpt-4o", 0.03, 0.06)
+    ("gpt-4o", 0.03, 0.06),
 ]
+
 
 def init_weave_client(project_name):
     try:
         client = weave.init(project_name)
         for model, prompt_cost, completion_cost in MODEL_NAMES:
-            client.add_cost(llm_id=model, prompt_token_cost=prompt_cost, completion_token_cost=completion_cost)
+            client.add_cost(
+                llm_id=model,
+                prompt_token_cost=prompt_cost,
+                completion_token_cost=completion_cost,
+            )
         return client
     except Exception as e:
         print(f"Failed to initialize Weave client for project '{project_name}': {e}")
         return None
-    
+
+
 client = init_weave_client(PROJECT_NAME)
 ```
 
@@ -96,8 +102,10 @@ The first option to access data from Weave is to retrieve a list of filtered cal
 
 ```python
 import itertools
-import pandas as pd
 from datetime import datetime, timedelta
+
+import pandas as pd
+
 
 def fetch_calls(client, project_id, start_time, trace_roots_only, limit):
     filter_params = {
@@ -110,13 +118,16 @@ def fetch_calls(client, project_id, start_time, trace_roots_only, limit):
     }
     try:
         calls_stream = client.server.calls_query_stream(filter_params)
-        calls = list(itertools.islice(calls_stream, limit)) # limit the number of calls to fetch if too many
+        calls = list(
+            itertools.islice(calls_stream, limit)
+        )  # limit the number of calls to fetch if too many
         print(f"Fetched {len(calls)} calls.")
         return calls
     except Exception as e:
         print(f"Error fetching calls: {e}")
         return []
-    
+
+
 calls = fetch_calls(client, PROJECT_NAME, datetime.now() - timedelta(days=1), True, 100)
 ```
 
@@ -131,28 +142,40 @@ Processing the calls is very easy with the return from Weave - we'll extract the
 
 ```python
 import json
-import pandas as pd
 from datetime import datetime
+
+import pandas as pd
+
 
 def process_calls(calls):
     records = []
     for call in calls:
         feedback = call.summary.get("weave", {}).get("feedback", [])
-        thumbs_up = sum(1 for item in feedback if isinstance(item, dict) and item.get("payload", {}).get("emoji") == "👍")
-        thumbs_down = sum(1 for item in feedback if isinstance(item, dict) and item.get("payload", {}).get("emoji") == "👎")
+        thumbs_up = sum(
+            1
+            for item in feedback
+            if isinstance(item, dict) and item.get("payload", {}).get("emoji") == "👍"
+        )
+        thumbs_down = sum(
+            1
+            for item in feedback
+            if isinstance(item, dict) and item.get("payload", {}).get("emoji") == "👎"
+        )
         latency = call.summary.get("weave", {}).get("latency_ms", 0)
-        
-        records.append({
-            "Call ID": call.id,
-            "Trace ID": call.trace_id,         # this is a unique ID for the trace that can be used to retrieve it
-            "Display Name": call.display_name, # this is an optional name you can set in the UI or programatically
-            "Latency (ms)": latency,
-            "Thumbs Up": thumbs_up,
-            "Thumbs Down": thumbs_down,
-            "Started At": pd.to_datetime(getattr(call, 'started_at', datetime.min)),
-            "Inputs": json.dumps(call.inputs, default=str),
-            "Outputs": json.dumps(call.output, default=str)
-        })
+
+        records.append(
+            {
+                "Call ID": call.id,
+                "Trace ID": call.trace_id,  # this is a unique ID for the trace that can be used to retrieve it
+                "Display Name": call.display_name,  # this is an optional name you can set in the UI or programatically
+                "Latency (ms)": latency,
+                "Thumbs Up": thumbs_up,
+                "Thumbs Down": thumbs_down,
+                "Started At": pd.to_datetime(getattr(call, "started_at", datetime.min)),
+                "Inputs": json.dumps(call.inputs, default=str),
+                "Outputs": json.dumps(call.output, default=str),
+            }
+        )
     return pd.DataFrame(records)
 ```
 
@@ -171,7 +194,9 @@ For example, for the cost, we'll use the `query_costs` API to fetch the costs of
 # Use cost API to get costs
 costs = client.query_costs()
 df_costs = pd.DataFrame([cost.dict() for cost in costs])
-df_costs['total_cost'] = df_costs['prompt_token_cost'] + df_costs['completion_token_cost']
+df_costs["total_cost"] = (
+    df_costs["prompt_token_cost"] + df_costs["completion_token_cost"]
+)
 
 # only show the first row for every unqiue llm_id
 df_costs
@@ -185,16 +210,34 @@ Next, we can generate the visualizations using plotly. This is the most basic da
 import plotly.express as px
 import plotly.graph_objects as go
 
+
 def plot_feedback_pie_chart(thumbs_up, thumbs_down):
-    fig = go.Figure(data=[go.Pie(labels=['Thumbs Up', 'Thumbs Down'], values=[thumbs_up, thumbs_down], marker=dict(colors=['#66b3ff', '#ff9999']), hole=.3)])
-    fig.update_traces(textinfo='percent+label', hoverinfo='label+percent')
+    fig = go.Figure(
+        data=[
+            go.Pie(
+                labels=["Thumbs Up", "Thumbs Down"],
+                values=[thumbs_up, thumbs_down],
+                marker=dict(colors=["#66b3ff", "#ff9999"]),
+                hole=0.3,
+            )
+        ]
+    )
+    fig.update_traces(textinfo="percent+label", hoverinfo="label+percent")
     fig.update_layout(showlegend=False, title="Feedback Summary")
     return fig
 
+
 def plot_model_cost_distribution(df):
-    fig = px.bar(df, x="llm_id", y="total_cost", color="llm_id", title="Cost Distribution by Model")
+    fig = px.bar(
+        df,
+        x="llm_id",
+        y="total_cost",
+        color="llm_id",
+        title="Cost Distribution by Model",
+    )
     fig.update_layout(xaxis_title="Model", yaxis_title="Cost (USD)")
     return fig
+
 
 # See the source code for all the plots
 ```

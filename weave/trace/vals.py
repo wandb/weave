@@ -270,7 +270,7 @@ class WeaveTable(Traceable):
             should_local_iter = (
                 self.ref is not None
                 and self.table_ref is not None
-                and self.table_ref.row_digests is not None
+                and self.table_ref._row_digests is not None
                 and self._prefetched_rows is not None
             )
             if should_local_iter:
@@ -320,10 +320,12 @@ class WeaveTable(Traceable):
 
         In this case, we don't need to make any calls and can just return the rows
         """
+        wc = get_weave_client()
         if (
-            self.ref is None
+            wc is None
+            or self.ref is None
             or self.table_ref is None
-            or self.table_ref.row_digests is None
+            or self.table_ref._row_digests is None
             or self._prefetched_rows is None
         ):
             if get_raise_on_captured_errors():
@@ -334,19 +336,25 @@ class WeaveTable(Traceable):
             yield from self._remote_iter()
             return
 
-        row_digest_len = len(self.table_ref.row_digests)
-        prefetched_rows_len = len(self._prefetched_rows)
-        if row_digest_len != prefetched_rows_len:
-            if get_raise_on_captured_errors():
-                raise
-            logger.error(
-                f"Expected length of row digests ({row_digest_len}) to match prefetched rows ({prefetched_rows_len}). Falling back to remote iteration."
-            )
-            yield from self._remote_iter()
-            return
+        cached_table_ref = self.table_ref
+        if isinstance(self.table_ref._row_digests, list):
+            # Only do this check if it is resolved
+            row_digest_len = len(self.table_ref._row_digests)
+            prefetched_rows_len = len(self._prefetched_rows)
+            if row_digest_len != prefetched_rows_len:
+                if get_raise_on_captured_errors():
+                    raise
+                logger.error(
+                    f"Expected length of row digests ({row_digest_len}) to match prefetched rows ({prefetched_rows_len}). Falling back to remote iteration."
+                )
+                yield from self._remote_iter()
+                return
 
-        for ndx, item in enumerate(self.table_ref.row_digests):
-            new_ref = self.ref.with_item(item)
+        for ndx, row in enumerate(self._prefetched_rows):
+            next_id_future = wc.future_executor.defer(
+                lambda: cached_table_ref.row_digests[ndx]
+            )
+            new_ref = self.ref.with_item(next_id_future)
             val = self._prefetched_rows[ndx]
             res = from_json(
                 val, self.table_ref.entity + "/" + self.table_ref.project, self.server
@@ -356,7 +364,7 @@ class WeaveTable(Traceable):
 
     def _remote_iter(self) -> Generator[dict, None, None]:
         page_index = 0
-        page_size = 1000
+        page_size = 100
         while True:
             if self.table_ref is None:
                 break

@@ -114,7 +114,11 @@ const useCallTabs = (call: CallSchema) => {
     },
     {
       label: 'Use',
-      content: <TabUseCall call={call} />,
+      content: (
+        <Tailwind>
+          <TabUseCall call={call} />
+        </Tailwind>
+      ),
     },
   ];
 };

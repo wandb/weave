@@ -180,6 +180,8 @@ const ObjectVersionPageInner: React.FC<{
     return viewerData;
   }, [viewerData]);
 
+  const isDataset = baseObjectClass === 'Dataset' && refExtra == null;
+
   return (
     <SimplePageLayoutWithHeader
       title={
@@ -263,9 +265,9 @@ const ObjectVersionPageInner: React.FC<{
       // ]}
       tabs={[
         {
-          label: 'Values',
+          label: isDataset ? 'Rows' : 'Values',
           content: (
-            <ScrollableTabContent>
+            <ScrollableTabContent sx={isDataset ? {p: 0} : {}}>
               <Box
                 sx={{
                   flex: '0 0 auto',
@@ -292,22 +294,25 @@ const ObjectVersionPageInner: React.FC<{
         },
         {
           label: 'Use',
-          content:
-            baseObjectClass === 'Dataset' ? (
-              <TabUseDataset
-                name={objectName}
-                uri={refUri}
-                versionIndex={objectVersionIndex}
-              />
-            ) : baseObjectClass === 'Model' ? (
-              <TabUseModel
-                name={objectName}
-                uri={refUri}
-                projectName={projectName}
-              />
-            ) : (
-              <TabUseObject name={objectName} uri={refUri} />
-            ),
+          content: (
+            <Tailwind>
+              {baseObjectClass === 'Dataset' ? (
+                <TabUseDataset
+                  name={objectName}
+                  uri={refUri}
+                  versionIndex={objectVersionIndex}
+                />
+              ) : baseObjectClass === 'Model' ? (
+                <TabUseModel
+                  name={objectName}
+                  uri={refUri}
+                  projectName={projectName}
+                />
+              ) : (
+                <TabUseObject name={objectName} uri={refUri} />
+              )}
+            </Tailwind>
+          ),
         },
 
         // {

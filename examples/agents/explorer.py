@@ -1,7 +1,5 @@
 import json
 import subprocess
-from rich import print
-
 
 import weave
 from weave.flow.agent import Agent, AgentState
