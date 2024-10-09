@@ -1,4 +1,4 @@
-name: Validate PR
+name: Check PR
 
 on:
   pull_request_target:
@@ -10,26 +10,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # https://github.com/amannn/action-semantic-pull-request/releases
-      - uses: amannn/action-semantic-pull-request@v4.2.0
+      - uses: amannn/action-semantic-pull-request@v5
         env:
           GITHUB_TOKEN: ${{ secrets.PR_TITLE_GITHUB_TOKEN }}
         with:
-          # Allowed types: https://www.notion.so/wandbai/Pull-Requests-17966b997841407b95b7c36414ae0634
+          # Allowed types: See CONTRIBUTING.md
           types: |
             feat
             fix
+            refactor
             docs
             style
-            refactor
-            perf
-            test
-            analytics
-            build
-            ci
             chore
             revert
             security
-            release
+          scopes: |
+            weave
+            weave_query
+            ui
           wip: false
+          requireScope: true
           validateSingleCommit: false
           validateSingleCommitMatchesPrTitle: false
