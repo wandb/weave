@@ -545,7 +545,10 @@ def load_instance(
     except Exception as e:
         exists = os.path.exists(module_path)
         contents = os.listdir(module_dir) if os.path.isdir(module_dir) else []
-        print(f"Op loading exception. This might be fine! {module_path=} {import_name=} {abs_mod_dir=} {contents=} {exists=} {e=}")
+        print(
+            f"Op loading exception. This might be fine! {module_path=} {import_name=} {abs_mod_dir=} {contents=} {exists=} {e=} {sys.path=}"
+        )
+        print(os.listdir(os.path.abspath(art_and_version_dir)))
         # print("Op loading exception. This might be fine!", e)
         import traceback
 
