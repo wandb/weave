@@ -8,6 +8,7 @@ import {
   GridColumnGroupingModel,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
@@ -21,9 +22,9 @@ import {Reactions} from '../../feedback/Reactions';
 import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../filters/common';
 import {
-  getTokensAndCostFromUsage,
-  getUsageFromCellParams,
-} from '../CallPage/TraceUsageStats';
+  getCostsFromCellParams,
+  getTokensFromCellParams,
+} from '../CallPage/cost';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
@@ -55,7 +56,8 @@ export const useCallsTableColumns = (
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
   allowedColumnPatterns?: string[],
-  onAddFilter?: OnAddFilter
+  onAddFilter?: OnAddFilter,
+  costsLoading: boolean = false
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -131,7 +133,8 @@ export const useCallsTableColumns = (
         columnIsRefExpanded,
         userDefinedColumnWidths,
         allowedColumnPatterns,
-        onAddFilter
+        onAddFilter,
+        costsLoading
       ),
     [
       entity,
@@ -148,6 +151,7 @@ export const useCallsTableColumns = (
       userDefinedColumnWidths,
       allowedColumnPatterns,
       onAddFilter,
+      costsLoading,
     ]
   );
 
@@ -172,7 +176,8 @@ function buildCallsTableColumns(
   columnIsRefExpanded: (col: string) => boolean,
   userDefinedColumnWidths: Record<string, number>,
   allowedColumnPatterns?: string[],
-  onAddFilter?: OnAddFilter
+  onAddFilter?: OnAddFilter,
+  costsLoading: boolean = false
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -388,17 +393,18 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: false,
     valueGetter: (unused: any, row: any) => {
-      const usage = getUsageFromCellParams(row);
-      const {tokensNum} = getTokensAndCostFromUsage(usage);
+      const {tokensNum} = getTokensFromCellParams(row);
       return tokensNum;
     },
     renderCell: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {tokens, tokenToolTip} = getTokensAndCostFromUsage(usage);
-      return <Tooltip trigger={<div>{tokens}</div>} content={tokenToolTip} />;
+      const {tokens, tokenToolTipContent} = getTokensFromCellParams(
+        cellParams.row
+      );
+      return (
+        <Tooltip trigger={<div>{tokens}</div>} content={tokenToolTipContent} />
+      );
     },
   });
-
   cols.push({
     field: 'cost',
     headerName: 'Cost',
@@ -409,14 +415,17 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: false,
     valueGetter: (unused: any, row: any) => {
-      const usage = getUsageFromCellParams(row);
-      const {costNum} = getTokensAndCostFromUsage(usage);
+      const {costNum} = getCostsFromCellParams(row);
       return costNum;
     },
     renderCell: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {cost, costToolTip} = getTokensAndCostFromUsage(usage);
-      return <Tooltip trigger={<div>{cost}</div>} content={costToolTip} />;
+      if (costsLoading) {
+        return <LoadingDots />;
+      }
+      const {cost, costToolTipContent} = getCostsFromCellParams(cellParams.row);
+      return (
+        <Tooltip trigger={<div>{cost}</div>} content={costToolTipContent} />
+      );
     },
   });
 

@@ -7,10 +7,13 @@ import {UserLink} from '../../../../../UserLink';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {CostTable} from './CostTable';
-import {UsageData} from './TraceUsageStats';
+import {CostTable} from './cost';
 
-const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = ['latency_s', 'usage'];
+const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = [
+  'latency_s',
+  'usage',
+  'weave',
+];
 
 export const CallSummary: React.FC<{
   call: CallSchema;
@@ -30,6 +33,7 @@ export const CallSummary: React.FC<{
         !SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER.includes(k)
     )
   );
+  const costData = call.traceCall?.summary?.weave?.costs;
 
   return (
     <div style={{padding: 8, overflow: 'auto'}}>
@@ -63,7 +67,7 @@ export const CallSummary: React.FC<{
           ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
         }}
       />
-      {span.summary.usage && (
+      {costData && (
         <>
           <Divider sx={{marginY: '16px'}} />
           <div>
@@ -76,9 +80,7 @@ export const CallSummary: React.FC<{
               }}>
               Usage
             </p>
-            <CostTable
-              usage={span.summary.usage as {[key: string]: UsageData}}
-            />
+            <CostTable costs={costData} />
           </div>
         </>
       )}
