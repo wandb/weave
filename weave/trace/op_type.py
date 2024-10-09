@@ -538,11 +538,15 @@ def load_instance(
         version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split("/"))
     )
 
-    sys.path.insert(0, os.path.abspath(module_dir))
+    abs_mod_dir = os.path.abspath(module_dir)
+    sys.path.insert(0, abs_mod_dir)
     try:
         mod = __import__(import_name, fromlist=[module_dir])
     except Exception as e:
-        print("Op loading exception. This might be fine!", e)
+        exists = os.path.exists(module_path)
+        contents = os.listdir(module_dir) if os.path.isdir(module_dir) else []
+        print(f"Op loading exception. This might be fine! {module_path=} {import_name=} {abs_mod_dir=} {contents=} {exists=} {e=}")
+        # print("Op loading exception. This might be fine!", e)
         import traceback
 
         traceback.print_exc()
