@@ -1,5 +1,6 @@
 import {useMemo} from 'react';
 
+import {useWFHooks} from '../wfReactInterface/context';
 import {LeaderboardConfigType} from './LeaderboardConfigType';
 
 export const useCurrentLeaderboardConfig = (): LeaderboardConfigType => {
@@ -21,15 +22,21 @@ export const persistLeaderboardConfig = (config: LeaderboardConfigType) => {
   console.log('Persisting leaderboard config:', config);
 };
 
-export const useDatasetNames = (): string[] => {
-  // TODO: Implement this
+export const useDatasetNames = (entity: string, project: string): string[] => {
+  const {useRootObjectVersions} = useWFHooks();
+  const names = useRootObjectVersions(
+    entity,
+    project,
+    {
+      baseObjectClasses: ['Dataset'],
+      latestOnly: true,
+    },
+    100,
+    true
+  );
   return useMemo(() => {
-    return [
-      'leaderboard-test-dataset',
-      'leaderboard-test-dataset-2',
-      'leaderboard-test-dataset-3',
-    ];
-  }, []);
+    return names.result?.map(obj => obj.objectId) ?? [];
+  }, [names]);
 };
 export const useDatasetVersionsForDatasetName = (
   datasetName: string

@@ -21,13 +21,15 @@ import {LeaderboardConfigType, VersionSpec} from './LeaderboardConfigType';
 import {ScoreConfig} from './ScoreConfig';
 
 export const ColumnConfig: React.FC<{
+  entity: string;
+  project: string;
   column: LeaderboardConfigType['config']['columns'][0];
   onUpdate: (
     updatedColumn: LeaderboardConfigType['config']['columns'][0]
   ) => void;
   onRemove: () => void;
-}> = ({column, onUpdate, onRemove}) => {
-  const datasetNames = useDatasetNames();
+}> = ({entity, project, column, onUpdate, onRemove}) => {
+  const datasetNames = useDatasetNames(entity, project);
   const datasetVersions = useDatasetVersionsForDatasetName(column.dataset.name);
 
   const handleAddScore = () => {

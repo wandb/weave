@@ -128,6 +128,8 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
         />
         {showConfig && (
           <LeaderboardConfig
+            entity={entity}
+            project={project}
             config={currentConfig}
             onCancel={() => {
               cancelChanges();

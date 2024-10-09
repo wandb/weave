@@ -7,13 +7,15 @@ import {LeaderboardConfigType} from './LeaderboardConfigType';
 import {ModelConfig} from './ModelConfig';
 
 export const LeaderboardConfig: React.FC<{
+  entity: string;
+  project: string;
   config: LeaderboardConfigType;
   onCancel: () => void;
   onPersist: () => void;
   setConfig: (
     updater: (config: LeaderboardConfigType) => LeaderboardConfigType
   ) => void;
-}> = ({config, setConfig, onPersist, onCancel}) => {
+}> = ({entity, project, config, setConfig, onPersist, onCancel}) => {
   const handleSave = () => {
     onPersist();
   };
@@ -123,6 +125,8 @@ export const LeaderboardConfig: React.FC<{
           </Typography>
           {config.config.columns.map((column, index) => (
             <ColumnConfig
+              entity={entity}
+              project={project}
               key={index}
               column={column}
               onUpdate={updatedColumn =>
