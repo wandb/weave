@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 import weave
@@ -16,6 +17,27 @@ Calls:
 5. Using as inputs, output, and output component (refs)
 
 """
+
+
+@pytest.fixture
+def image_as_solo_output():
+    @weave.op
+    def _image_as_solo_output(publish_first: bool) -> Image.Image:
+        img = Image.new("RGB", (512, 512), "purple")
+        if publish_first:
+            weave.publish(img)
+        return img
+
+    yield _image_as_solo_output
+
+
+@pytest.fixture
+def image_as_input_and_output_part():
+    @weave.op
+    def _image_as_input_and_output_part(in_img: Image.Image) -> dict:
+        return {"out_img": in_img}
+
+    yield _image_as_input_and_output_part
 
 
 def test_image_publish(client: WeaveClient) -> None:
@@ -63,20 +85,9 @@ def test_image_as_dataset_cell(client: WeaveClient) -> None:
     assert gotten_dataset.rows[0]["img"].tobytes() == img.tobytes()
 
 
-@weave.op
-def image_as_solo_output(publish_first: bool) -> Image.Image:
-    img = Image.new("RGB", (512, 512), "purple")
-    if publish_first:
-        weave.publish(img)
-    return img
-
-
-@weave.op
-def image_as_input_and_output_part(in_img: Image.Image) -> dict:
-    return {"out_img": in_img}
-
-
-def test_image_as_call_io(client: WeaveClient) -> None:
+def test_image_as_call_io(
+    client, image_as_solo_output, image_as_input_and_output_part
+) -> None:
     client.project = "test_image_as_call_io"
     non_published_img = image_as_solo_output(publish_first=False)
     img_dict = image_as_input_and_output_part(non_published_img)
@@ -92,7 +103,9 @@ def test_image_as_call_io(client: WeaveClient) -> None:
     assert image_as_input_and_output_part_call.output["out_img"].tobytes() == exp_bytes
 
 
-def test_image_as_call_io_refs(client: WeaveClient) -> None:
+def test_image_as_call_io_refs(
+    client, image_as_solo_output, image_as_input_and_output_part
+) -> None:
     client.project = "test_image_as_call_io_refs"
     non_published_img = image_as_solo_output(publish_first=True)
     img_dict = image_as_input_and_output_part(non_published_img)
