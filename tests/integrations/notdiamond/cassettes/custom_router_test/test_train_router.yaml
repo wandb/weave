@@ -1,6 +1,6 @@
 interactions:
 - request:
-    body: "--ece9674410dbc5b38323f591963f8ab4\r\nContent-Disposition: form-data; name=\"language\"\r\n\r\nen\r\n--ece9674410dbc5b38323f591963f8ab4\r\nContent-Disposition:
+    body: "--8fb5b93a4379aeb913282a36eb286900\r\nContent-Disposition: form-data; name=\"language\"\r\n\r\nen\r\n--8fb5b93a4379aeb913282a36eb286900\r\nContent-Disposition:
       form-data; name=\"llm_providers\"\r\n\r\n[{\"provider\": \"anthropic\", \"model\":
       \"claude-3-5-sonnet-20240620\", \"is_custom\": false, \"context_length\": null,
       \"input_price\": null, \"output_price\": null, \"latency\": null}, {\"provider\":
@@ -12,10 +12,10 @@ interactions:
       null, \"input_price\": null, \"output_price\": null, \"latency\": null}, {\"provider\":
       \"anthropic\", \"model\": \"claude-3-opus-20240229\", \"is_custom\": false,
       \"context_length\": null, \"input_price\": null, \"output_price\": null, \"latency\":
-      null}]\r\n--ece9674410dbc5b38323f591963f8ab4\r\nContent-Disposition: form-data;
-      name=\"prompt_column\"\r\n\r\nprompt\r\n--ece9674410dbc5b38323f591963f8ab4\r\nContent-Disposition:
-      form-data; name=\"maximize\"\r\n\r\nTrue\r\n--ece9674410dbc5b38323f591963f8ab4\r\nContent-Disposition:
-      form-data; name=\"dataset_file\"; filename=\"tmpulbe_o2u.csv\"\r\n\r\nprompt,anthropic/claude-3-5-sonnet-20240620/response,anthropic/claude-3-5-sonnet-20240620/score,openai/gpt-4o-2024-05-13/response,openai/gpt-4o-2024-05-13/score,google/gemini-1.5-pro-latest/response,google/gemini-1.5-pro-latest/score,openai/gpt-4-turbo-2024-04-09/response,openai/gpt-4-turbo-2024-04-09/score,anthropic/claude-3-opus-20240229/response,anthropic/claude-3-opus-20240229/score\n\"from
+      null}]\r\n--8fb5b93a4379aeb913282a36eb286900\r\nContent-Disposition: form-data;
+      name=\"prompt_column\"\r\n\r\nprompt\r\n--8fb5b93a4379aeb913282a36eb286900\r\nContent-Disposition:
+      form-data; name=\"maximize\"\r\n\r\nTrue\r\n--8fb5b93a4379aeb913282a36eb286900\r\nContent-Disposition:
+      form-data; name=\"dataset_file\"; filename=\"tmpf4v8z1k6.csv\"\r\n\r\nprompt,anthropic/claude-3-5-sonnet-20240620/response,anthropic/claude-3-5-sonnet-20240620/score,openai/gpt-4o-2024-05-13/response,openai/gpt-4o-2024-05-13/score,google/gemini-1.5-pro-latest/response,google/gemini-1.5-pro-latest/score,openai/gpt-4-turbo-2024-04-09/response,openai/gpt-4-turbo-2024-04-09/score,anthropic/claude-3-opus-20240229/response,anthropic/claude-3-opus-20240229/score\n\"from
       typing import List\n\n\ndef has_close_elements(numbers: List[float], threshold:
       float) -> bool:\n    \"\"\"\"\"\" Check if in given list of numbers, are any
       two numbers closer to each other than\n    given threshold.\n    >>> has_close_elements([1.0,
@@ -619,30 +619,32 @@ interactions:
       str) -> List[str]:\n    \"\"\"\"\"\" Return list of all prefixes from shortest
       to longest of the input string\n    >>> all_prefixes('abc')\n    ['a', 'ab',
       'abc']\n    \"\"\"\"\"\"\n    return [string[:i] for i in range(1, len(string)
-      + 1)]\",1\n\r\n--ece9674410dbc5b38323f591963f8ab4--\r\n"
+      + 1)]\",1\n\r\n--8fb5b93a4379aeb913282a36eb286900--\r\n"
     headers:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate, zstd
+      - gzip, deflate
       Connection:
       - keep-alive
       Content-Length:
       - '48395'
       Content-Type:
-      - multipart/form-data; boundary=ece9674410dbc5b38323f591963f8ab4
+      - multipart/form-data; boundary=8fb5b93a4379aeb913282a36eb286900
       User-Agent:
-      - Python-SDK/0.3.19
+      - Python-SDK/0.3.21
     method: POST
     uri: https://api.notdiamond.ai/v2/pzn/trainCustomRouter
   response:
     body:
-      string: '{"preference_id":"c6a3577f-1f99-4828-a1da-d6e96cee6af4"}'
+      string: !!binary |
+        H4sIAAAAAAAAA6pWKihKTUstSs1LTo3PTFGyUrI0NLEwSjRL0zUwN03SNUm2NNG1NE001rVMSzMz
+        NzO0tDBONlaqBQAAAP//AwAFTJiUOAAAAA==
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8cf860bfeaa6746f-MIA
+      - 8d010a8a9e043359-MIA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -650,15 +652,17 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Tue, 08 Oct 2024 19:01:10 GMT
+      - Wed, 09 Oct 2024 20:15:11 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
       Vary:
       - Accept-Encoding
+      alt-svc:
+      - h3=":443"; ma=86400
       rndr-id:
-      - 2260e59d-a71c-4aa1
+      - b1ea13c6-34fd-4758
       x-render-origin-server:
       - uvicorn
     status:

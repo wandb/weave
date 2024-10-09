@@ -53,10 +53,7 @@ def preference_id():
 
 
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 def test_train_router(
     client: WeaveClient,
     model_evals: Dict[str, EvaluationResults],
@@ -82,10 +79,7 @@ def test_train_router(
 
 
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 def test_evaluate_router(
     client: WeaveClient, model_datasets: Dict[str, weave.Table], preference_id: str
 ):

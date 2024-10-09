@@ -11,10 +11,7 @@ from weave.trace_server import trace_server_interface as tsi
 
 
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 def test_notdiamond_quickstart(
     client: WeaveClient,
 ) -> None:
