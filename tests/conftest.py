@@ -512,7 +512,7 @@ def create_client(request) -> weave_init.InitializedClient:
     return inited_client
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def client(request):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality"""
@@ -523,7 +523,7 @@ def client(request):
         inited_client.reset()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def client_creator(request):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
 
