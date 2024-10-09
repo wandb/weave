@@ -14,8 +14,11 @@
 
 ## Issues
 1. Check the [issues](https://github.com/wandb/weave/issues) and [PRs](https://github.com/wandb/weave/pulls) to see if the feature/bug has already been requested/fixed. If not, [open an issue](https://github.com/wandb/weave/issues/new/choose). This helps us keep track of feature requests and bugs!
-2. If you're having issues, the best way we can help is when you can share a reproducible example.  See [example_error_script.py](examples/contributing/example_error_script.py) for an example.
-    1. We use `uv` which can run the script with dependencies included.  If you know the dependencies, you can add them to the script.  [See the `uv` docs for more details](https://docs.astral.sh/uv/guides/scripts/).
+2. If you're having issues, the best way we can help is when you can share a reproducible example.
+   1. In general, it's helpful to include:
+       1. Links to your project
+       2. System info, including weave version, python version, and OS
+   2. For SDK issues, a reproducible script like [example_error_script.py](examples/contributing/example_error_script.py) is helpful.  We use `uv` which can run the script with the dependencies included.  If you know the dependencies, you can add them to the script.  [See the `uv` docs for more details](https://docs.astral.sh/uv/guides/scripts/).
 
 ## PRs
 1. If you are a first-time contributor, welcome! To get started, make a fork and point to the main `weave` repo:
