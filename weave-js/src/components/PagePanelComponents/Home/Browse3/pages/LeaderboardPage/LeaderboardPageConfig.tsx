@@ -96,7 +96,7 @@ export const LeaderboardConfig: React.FC<{
   const [showAlert, setShowAlert] = useState(true);
 
   return (
-    <Box sx={{width: '100%', p: 2, borderLeft: '1px solid #e0e0e0'}}>
+    <Box sx={{width: '100%', p: 2, border: '1px solid #e0e0e0'}}>
       {showAlert && <TempAlert onClose={() => setShowAlert(false)} />}
       <Typography variant="h5" gutterBottom>
         Leaderboard Configuration
