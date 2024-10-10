@@ -189,7 +189,7 @@ const SourceEvaluationItem: React.FC<{
   const [versions, setVersions] = useState<string[]>([]);
 
   useEffect(() => {
-    if (evaluation.name) {
+    if (evaluation.name && evaluation.name !== '*') {
       fetchEvaluationVersionsForName(evaluation.name).then(setVersions);
     }
   }, [evaluation.name]);
@@ -199,7 +199,7 @@ const SourceEvaluationItem: React.FC<{
     updateConfig(spec => ({
       ...spec,
       sourceEvaluations: spec.sourceEvaluations?.map((e, i) =>
-        i === index ? {...e, name: newName} : e
+        i === index ? {...e, name: newName, version: '*'} : e
       ),
     }));
   };
@@ -218,7 +218,7 @@ const SourceEvaluationItem: React.FC<{
     <Box sx={{display: 'flex', gap: 2, mb: 2}}>
       <FormControl fullWidth>
         <InputLabel>Name</InputLabel>
-        <Select value={evaluation.name} onChange={handleNameChange}>
+        <Select value={evaluation.name || '*'} onChange={handleNameChange}>
           <MenuItem value="*">All</MenuItem>
           {evaluationNames.map(name => (
             <MenuItem key={name} value={name}>
@@ -227,9 +227,13 @@ const SourceEvaluationItem: React.FC<{
           ))}
         </Select>
       </FormControl>
-      <FormControl fullWidth>
+      <FormControl fullWidth disabled={evaluation.name === '*'}>
         <InputLabel>Version</InputLabel>
-        <Select value={evaluation.version} onChange={handleVersionChange}>
+        <Select
+          value={evaluation.version}
+          onChange={handleVersionChange}
+          disabled={evaluation.name === '*'}
+        >
           <MenuItem value="*">All</MenuItem>
           {versions.map(version => (
             <MenuItem key={version} value={version}>
@@ -297,10 +301,10 @@ const DatasetItem: React.FC<{
   const [scorerNames, setScorerNames] = useState<string[]>([]);
 
   useEffect(() => {
-    if (dataset.name) {
+    if (dataset.name && dataset.name !== '*') {
       fetchDatasetVersionsForSpecAndName({}, dataset.name).then(setVersions);
-      fetchScorerNamesForSpec({}).then(setScorerNames);
     }
+    fetchScorerNamesForSpec({}).then(setScorerNames);
   }, [dataset.name]);
 
   const handleNameChange = (event: SelectChangeEvent<string>) => {
@@ -308,7 +312,7 @@ const DatasetItem: React.FC<{
     updateConfig(spec => ({
       ...spec,
       datasets: spec.datasets?.map((d, i) =>
-        i === index ? {...d, name: newName} : d
+        i === index ? {...d, name: newName, version: '*'} : d
       ),
     }));
   };
@@ -357,7 +361,7 @@ const DatasetItem: React.FC<{
       <Box sx={{display: 'flex', gap: 2}}>
         <FormControl fullWidth>
           <InputLabel>Name</InputLabel>
-          <Select value={dataset.name} onChange={handleNameChange}>
+          <Select value={dataset.name || '*'} onChange={handleNameChange}>
             <MenuItem value="*">All</MenuItem>
             {datasetNames.map(name => (
               <MenuItem key={name} value={name}>
@@ -366,9 +370,13 @@ const DatasetItem: React.FC<{
             ))}
           </Select>
         </FormControl>
-        <FormControl fullWidth>
+        <FormControl fullWidth disabled={dataset.name === '*'}>
           <InputLabel>Version</InputLabel>
-          <Select value={dataset.version} onChange={handleVersionChange}>
+          <Select
+            value={dataset.version}
+            onChange={handleVersionChange}
+            disabled={dataset.name === '*'}
+          >
             <MenuItem value="*">All</MenuItem>
             {versions.map(version => (
               <MenuItem key={version} value={version}>
@@ -418,10 +426,10 @@ const ScorerItem: React.FC<{
   const [metricPaths, setMetricPaths] = useState<string[]>([]);
 
   useEffect(() => {
-    if (scorer.name) {
+    if (scorer.name && scorer.name !== '*') {
       fetchScorerVersionsForSpecAndName({}, scorer.name).then(setVersions);
-      fetchMetricPathsForSpec({}).then(setMetricPaths);
     }
+    fetchMetricPathsForSpec({}).then(setMetricPaths);
   }, [scorer.name]);
 
   const handleNameChange = (event: SelectChangeEvent<string>) => {
@@ -433,7 +441,7 @@ const ScorerItem: React.FC<{
           ? {
               ...d,
               scorers: d.scorers?.map((s, j) =>
-                j === scorerIndex ? {...s, name: newName} : s
+                j === scorerIndex ? {...s, name: newName, version: '*'} : s
               ),
             }
           : d
@@ -505,7 +513,7 @@ const ScorerItem: React.FC<{
       <Box sx={{display: 'flex', gap: 2}}>
         <FormControl fullWidth>
           <InputLabel>Name</InputLabel>
-          <Select value={scorer.name} onChange={handleNameChange}>
+          <Select value={scorer.name || '*'} onChange={handleNameChange}>
             <MenuItem value="*">All</MenuItem>
             {scorerNames.map(name => (
               <MenuItem key={name} value={name}>
@@ -514,9 +522,13 @@ const ScorerItem: React.FC<{
             ))}
           </Select>
         </FormControl>
-        <FormControl fullWidth>
+        <FormControl fullWidth disabled={scorer.name === '*'}>
           <InputLabel>Version</InputLabel>
-          <Select value={scorer.version} onChange={handleVersionChange}>
+          <Select
+            value={scorer.version}
+            onChange={handleVersionChange}
+            disabled={scorer.name === '*'}
+          >
             <MenuItem value="*">All</MenuItem>
             {versions.map(version => (
               <MenuItem key={version} value={version}>
@@ -703,7 +715,7 @@ const ModelItem: React.FC<{
   const [versions, setVersions] = useState<string[]>([]);
 
   useEffect(() => {
-    if (model.name) {
+    if (model.name && model.name !== '*') {
       fetchModelVersionsForSpecndName({}, model.name).then(setVersions);
     }
   }, [model.name]);
@@ -713,7 +725,7 @@ const ModelItem: React.FC<{
     updateConfig(spec => ({
       ...spec,
       models: spec.models?.map((m, i) =>
-        i === index ? {...m, name: newName} : m
+        i === index ? {...m, name: newName, version: '*'} : m
       ),
     }));
   };
@@ -729,7 +741,7 @@ const ModelItem: React.FC<{
   };
 
   const handleGroupAllVersionsChange = (
-    event: SelectChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const newGroupAllVersions = event.target.checked;
     updateConfig(spec => ({
@@ -745,7 +757,7 @@ const ModelItem: React.FC<{
       <Box sx={{display: 'flex', gap: 2}}>
         <FormControl fullWidth>
           <InputLabel>Name</InputLabel>
-          <Select value={model.name} onChange={handleNameChange}>
+          <Select value={model.name || '*'} onChange={handleNameChange}>
             <MenuItem value="*">All</MenuItem>
             {modelNames.map(name => (
               <MenuItem key={name} value={name}>
@@ -754,9 +766,13 @@ const ModelItem: React.FC<{
             ))}
           </Select>
         </FormControl>
-        <FormControl fullWidth>
+        <FormControl fullWidth disabled={model.name === '*'}>
           <InputLabel>Version</InputLabel>
-          <Select value={model.version} onChange={handleVersionChange}>
+          <Select
+            value={model.version}
+            onChange={handleVersionChange}
+            disabled={model.name === '*'}
+          >
             <MenuItem value="*">All</MenuItem>
             {versions.map(version => (
               <MenuItem key={version} value={version}>
