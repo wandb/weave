@@ -19,6 +19,15 @@ const StyledReactMarkdown = styled(ReactMarkdown)`
   > *:first-child {
     margin-top: 0;
   }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+    font-size: 1.25rem;
+  }
 `;
 
 export const EditableMarkdown: React.FC<EditableMarkdownProps> = ({
@@ -45,11 +54,10 @@ export const EditableMarkdown: React.FC<EditableMarkdownProps> = ({
         return; // Exit if we can't determine the height
       }
 
-      // Add padding (16px top + 16px bottom)
-      newHeight += 32;
+      newHeight -= 1;
 
       // Set a minimum height to prevent collapsing
-      newHeight = Math.max(newHeight, 56);
+      newHeight = Math.max(newHeight, 25);
 
       containerRef.current.style.height = `${newHeight}px`;
     }
@@ -95,7 +103,9 @@ export const EditableMarkdown: React.FC<EditableMarkdownProps> = ({
   }, [updateHeight, value]);
 
   return (
-    <Box ref={containerRef} sx={{padding: '16px', transition: 'height 0.3s'}}>
+    <Box
+      ref={containerRef}
+      sx={{padding: '0px', transition: 'height 0.3s', flex: 1}}>
       {isEditing ? (
         <TextField
           fullWidth

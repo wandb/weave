@@ -114,8 +114,18 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
           width="100%"
           sx={{
             alignItems: 'flex-start',
+            padding: '12px',
+            gap: '12px',
           }}>
-          <Box flexShrink={0} flexGrow={1} overflow="auto">
+          <Box
+            flexShrink={0}
+            flexGrow={1}
+            sx={{
+              overflow: 'auto',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+            }}>
             <EditableMarkdown
               value={description}
               onChange={setDescription}
@@ -125,8 +135,8 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
           <div
             style={{
               display: showConfig ? 'none' : 'block',
-              paddingRight: '16px',
-              paddingTop: '16px',
+              // paddingRight: '12px',
+              // paddingTop: '12px',
             }}>
             <ToggleLeaderboardConfig
               isOpen={showConfig}
@@ -182,7 +192,7 @@ export const ToggleLeaderboardConfig: React.FC<{
       }}>
       <Button
         variant="ghost"
-        size="medium"
+        size="small"
         onClick={onClick}
         tooltip={isOpen ? 'Discard Changes' : 'Configure Leaderboard'}
         icon={isOpen ? 'close' : 'settings'}
