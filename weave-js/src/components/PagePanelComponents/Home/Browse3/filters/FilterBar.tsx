@@ -8,7 +8,6 @@ import React, {useCallback, useRef} from 'react';
 
 import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
-import {IconFilterAlt} from '../../../../Icon';
 import {Tailwind} from '../../../../Tailwind';
 import {ColumnInfo} from '../types';
 import {
@@ -32,7 +31,6 @@ type FilterBarProps = {
   clearSelectedCalls: () => void;
 
   width: number;
-  height: number;
 };
 
 const isFilterIncomplete = (filter: GridFilterItem): boolean => {
@@ -50,7 +48,7 @@ export const FilterBar = ({
   clearSelectedCalls,
   width,
 }: FilterBarProps) => {
-  const refBar = useRef<HTMLDivElement>(null);
+  const refBar = useRef<HTMLButtonElement>(null);
   const refLabel = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -209,26 +207,26 @@ export const FilterBar = ({
 
   return (
     <>
-      <div
+      <Button
+        variant="outline"
+        icon="filter-alt"
         ref={refBar}
-        className="border-box flex h-32 cursor-pointer items-center gap-4 rounded border border-moon-200 px-8 hover:border-teal-500/40"
         onClick={onClick}>
-        <div>
-          <IconFilterAlt />
-        </div>
-        <div ref={refLabel} className="select-none">
-          Filter
-        </div>
-        <VariableChildrenDisplay width={availableWidth} gap={8}>
-          {completeItems.map(f => (
-            <FilterTagItem
-              key={f.id}
-              item={f}
-              onRemoveFilter={onRemoveFilter}
-            />
-          ))}
-        </VariableChildrenDisplay>
-      </div>
+        <>
+          <div ref={refLabel} className="select-none">
+            Filter
+          </div>
+          <VariableChildrenDisplay width={availableWidth} gap={8}>
+            {completeItems.map(f => (
+              <FilterTagItem
+                key={f.id}
+                item={f}
+                onRemoveFilter={onRemoveFilter}
+              />
+            ))}
+          </VariableChildrenDisplay>
+        </>
+      </Button>
       <Popover
         id={id}
         open={open}
