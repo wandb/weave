@@ -9,13 +9,16 @@ import {
   MenuItem,
   Select,
   SelectChangeEvent,
-  TextField,
   Typography,
 } from '@mui/material';
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useEffect, useState} from 'react';
 
-import {useWFHooks} from '../wfReactInterface/context';
-import {FilterAndGroupDatasetSpec, FilterAndGroupSourceEvaluationSpec, FilterAndGroupSpec, LeaderboardConfigType} from './LeaderboardConfigType';
+import {
+  FilterAndGroupDatasetSpec,
+  FilterAndGroupSourceEvaluationSpec,
+  FilterAndGroupSpec,
+  LeaderboardConfigType,
+} from './LeaderboardConfigType';
 
 export const LeaderboardConfig: React.FC<{
   entity: string;
@@ -37,8 +40,10 @@ export const LeaderboardConfig: React.FC<{
     onCancel();
   };
 
-  const updateConfig = (updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec) => {
-    setConfig((prevConfig) => ({
+  const updateConfig = (
+    updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
+  ) => {
+    setConfig(prevConfig => ({
       ...prevConfig,
       config: {
         ...prevConfig.config,
@@ -132,7 +137,9 @@ const TempAlert: React.FC<{onClose: () => void}> = ({onClose}) => {
 
 const SourceEvaluationsConfig: React.FC<{
   sourceEvaluations: FilterAndGroupSourceEvaluationSpec[] | undefined;
-  updateConfig: (updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec) => void;
+  updateConfig: (
+    updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
+  ) => void;
 }> = ({sourceEvaluations, updateConfig}) => {
   const [evaluationNames, setEvaluationNames] = useState<string[]>([]);
 
@@ -141,9 +148,12 @@ const SourceEvaluationsConfig: React.FC<{
   }, []);
 
   const handleAddSourceEvaluation = () => {
-    updateConfig((spec) => ({
+    updateConfig(spec => ({
       ...spec,
-      sourceEvaluations: [...(spec.sourceEvaluations || []), {name: '', version: '*'}],
+      sourceEvaluations: [
+        ...(spec.sourceEvaluations || []),
+        {name: '', version: '*'},
+      ],
     }));
   };
 
@@ -171,7 +181,9 @@ const SourceEvaluationsConfig: React.FC<{
 const SourceEvaluationItem: React.FC<{
   evaluation: FilterAndGroupSourceEvaluationSpec;
   evaluationNames: string[];
-  updateConfig: (updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec) => void;
+  updateConfig: (
+    updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
+  ) => void;
   index: number;
 }> = ({evaluation, evaluationNames, updateConfig, index}) => {
   const [versions, setVersions] = useState<string[]>([]);
@@ -184,7 +196,7 @@ const SourceEvaluationItem: React.FC<{
 
   const handleNameChange = (event: SelectChangeEvent<string>) => {
     const newName = event.target.value as string;
-    updateConfig((spec) => ({
+    updateConfig(spec => ({
       ...spec,
       sourceEvaluations: spec.sourceEvaluations?.map((e, i) =>
         i === index ? {...e, name: newName} : e
@@ -194,7 +206,7 @@ const SourceEvaluationItem: React.FC<{
 
   const handleVersionChange = (event: SelectChangeEvent<string>) => {
     const newVersion = event.target.value as string;
-    updateConfig((spec) => ({
+    updateConfig(spec => ({
       ...spec,
       sourceEvaluations: spec.sourceEvaluations?.map((e, i) =>
         i === index ? {...e, version: newVersion} : e
@@ -208,7 +220,7 @@ const SourceEvaluationItem: React.FC<{
         <InputLabel>Name</InputLabel>
         <Select value={evaluation.name} onChange={handleNameChange}>
           <MenuItem value="*">All</MenuItem>
-          {evaluationNames.map((name) => (
+          {evaluationNames.map(name => (
             <MenuItem key={name} value={name}>
               {name}
             </MenuItem>
@@ -219,7 +231,7 @@ const SourceEvaluationItem: React.FC<{
         <InputLabel>Version</InputLabel>
         <Select value={evaluation.version} onChange={handleVersionChange}>
           <MenuItem value="*">All</MenuItem>
-          {versions.map((version) => (
+          {versions.map(version => (
             <MenuItem key={version} value={version}>
               {version}
             </MenuItem>
@@ -232,7 +244,9 @@ const SourceEvaluationItem: React.FC<{
 
 const DatasetsConfig: React.FC<{
   datasets: FilterAndGroupDatasetSpec[] | undefined;
-  updateConfig: (updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec) => void;
+  updateConfig: (
+    updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
+  ) => void;
 }> = ({datasets, updateConfig}) => {
   const [datasetNames, setDatasetNames] = useState<string[]>([]);
 
@@ -241,9 +255,12 @@ const DatasetsConfig: React.FC<{
   }, []);
 
   const handleAddDataset = () => {
-    updateConfig((spec) => ({
+    updateConfig(spec => ({
       ...spec,
-      datasets: [...(spec.datasets || []), {name: '', version: '*', groupAllVersions: false}],
+      datasets: [
+        ...(spec.datasets || []),
+        {name: '', version: '*', groupAllVersions: false},
+      ],
     }));
   };
 
@@ -271,20 +288,24 @@ const DatasetsConfig: React.FC<{
 const DatasetItem: React.FC<{
   dataset: FilterAndGroupDatasetSpec;
   datasetNames: string[];
-  updateConfig: (updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec) => void;
+  updateConfig: (
+    updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
+  ) => void;
   index: number;
 }> = ({dataset, datasetNames, updateConfig, index}) => {
   const [versions, setVersions] = useState<string[]>([]);
+  const [scorerNames, setScorerNames] = useState<string[]>([]);
 
   useEffect(() => {
     if (dataset.name) {
       fetchDatasetVersionsForSpecAndName({}, dataset.name).then(setVersions);
+      fetchScorerNamesForSpec({}).then(setScorerNames);
     }
   }, [dataset.name]);
 
-    const handleNameChange = (event: SelectChangeEvent<string>) => {
+  const handleNameChange = (event: SelectChangeEvent<string>) => {
     const newName = event.target.value as string;
-    updateConfig((spec) => ({
+    updateConfig(spec => ({
       ...spec,
       datasets: spec.datasets?.map((d, i) =>
         i === index ? {...d, name: newName} : d
@@ -294,7 +315,7 @@ const DatasetItem: React.FC<{
 
   const handleVersionChange = (event: SelectChangeEvent<string>) => {
     const newVersion = event.target.value as string;
-    updateConfig((spec) => ({
+    updateConfig(spec => ({
       ...spec,
       datasets: spec.datasets?.map((d, i) =>
         i === index ? {...d, version: newVersion} : d
@@ -302,12 +323,31 @@ const DatasetItem: React.FC<{
     }));
   };
 
-  const handleGroupAllVersionsChange = (event: SelectChangeEvent<HTMLInputElement>) => {
+  const handleGroupAllVersionsChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const newGroupAllVersions = event.target.checked;
-    updateConfig((spec) => ({
+    updateConfig(spec => ({
       ...spec,
       datasets: spec.datasets?.map((d, i) =>
         i === index ? {...d, groupAllVersions: newGroupAllVersions} : d
+      ),
+    }));
+  };
+
+  const handleAddScorer = () => {
+    updateConfig(spec => ({
+      ...spec,
+      datasets: spec.datasets?.map((d, i) =>
+        i === index
+          ? {
+              ...d,
+              scorers: [
+                ...(d.scorers || []),
+                {name: '', version: '*', groupAllVersions: false, metrics: []},
+              ],
+            }
+          : d
       ),
     }));
   };
@@ -319,7 +359,7 @@ const DatasetItem: React.FC<{
           <InputLabel>Name</InputLabel>
           <Select value={dataset.name} onChange={handleNameChange}>
             <MenuItem value="*">All</MenuItem>
-            {datasetNames.map((name) => (
+            {datasetNames.map(name => (
               <MenuItem key={name} value={name}>
                 {name}
               </MenuItem>
@@ -330,7 +370,7 @@ const DatasetItem: React.FC<{
           <InputLabel>Version</InputLabel>
           <Select value={dataset.version} onChange={handleVersionChange}>
             <MenuItem value="*">All</MenuItem>
-            {versions.map((version) => (
+            {versions.map(version => (
               <MenuItem key={version} value={version}>
                 {version}
               </MenuItem>
@@ -347,13 +387,273 @@ const DatasetItem: React.FC<{
         }
         label="Group All Versions"
       />
+      <Typography variant="subtitle1">Scorers</Typography>
+      {dataset.scorers?.map((scorer, scorerIndex) => (
+        <ScorerItem
+          key={scorerIndex}
+          scorer={scorer}
+          scorerNames={scorerNames}
+          updateConfig={updateConfig}
+          datasetIndex={index}
+          scorerIndex={scorerIndex}
+        />
+      ))}
+      <Button variant="outlined" onClick={handleAddScorer}>
+        Add Scorer
+      </Button>
+    </Box>
+  );
+};
+
+const ScorerItem: React.FC<{
+  scorer: FilterAndGroupDatasetSpec['scorers'][0];
+  scorerNames: string[];
+  updateConfig: (
+    updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
+  ) => void;
+  datasetIndex: number;
+  scorerIndex: number;
+}> = ({scorer, scorerNames, updateConfig, datasetIndex, scorerIndex}) => {
+  const [versions, setVersions] = useState<string[]>([]);
+  const [metricPaths, setMetricPaths] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (scorer.name) {
+      fetchScorerVersionsForSpecAndName({}, scorer.name).then(setVersions);
+      fetchMetricPathsForSpec({}).then(setMetricPaths);
+    }
+  }, [scorer.name]);
+
+  const handleNameChange = (event: SelectChangeEvent<string>) => {
+    const newName = event.target.value as string;
+    updateConfig(spec => ({
+      ...spec,
+      datasets: spec.datasets?.map((d, i) =>
+        i === datasetIndex
+          ? {
+              ...d,
+              scorers: d.scorers?.map((s, j) =>
+                j === scorerIndex ? {...s, name: newName} : s
+              ),
+            }
+          : d
+      ),
+    }));
+  };
+
+  const handleVersionChange = (event: SelectChangeEvent<string>) => {
+    const newVersion = event.target.value as string;
+    updateConfig(spec => ({
+      ...spec,
+      datasets: spec.datasets?.map((d, i) =>
+        i === datasetIndex
+          ? {
+              ...d,
+              scorers: d.scorers?.map((s, j) =>
+                j === scorerIndex ? {...s, version: newVersion} : s
+              ),
+            }
+          : d
+      ),
+    }));
+  };
+
+  const handleGroupAllVersionsChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const newGroupAllVersions = event.target.checked;
+    updateConfig(spec => ({
+      ...spec,
+      datasets: spec.datasets?.map((d, i) =>
+        i === datasetIndex
+          ? {
+              ...d,
+              scorers: d.scorers?.map((s, j) =>
+                j === scorerIndex
+                  ? {...s, groupAllVersions: newGroupAllVersions}
+                  : s
+              ),
+            }
+          : d
+      ),
+    }));
+  };
+
+  const handleAddMetric = () => {
+    updateConfig(spec => ({
+      ...spec,
+      datasets: spec.datasets?.map((d, i) =>
+        i === datasetIndex
+          ? {
+              ...d,
+              scorers: d.scorers?.map((s, j) =>
+                j === scorerIndex
+                  ? {
+                      ...s,
+                      metrics: [...(s.metrics || []), {path: '', shouldMinimize: false}],
+                    }
+                  : s
+              ),
+            }
+          : d
+      ),
+    }));
+  };
+
+  return (
+    <Box sx={{display: 'flex', flexDirection: 'column', gap: 2, ml: 2, mb: 2}}>
+      <Box sx={{display: 'flex', gap: 2}}>
+        <FormControl fullWidth>
+          <InputLabel>Name</InputLabel>
+          <Select value={scorer.name} onChange={handleNameChange}>
+            <MenuItem value="*">All</MenuItem>
+            {scorerNames.map(name => (
+              <MenuItem key={name} value={name}>
+                {name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl fullWidth>
+          <InputLabel>Version</InputLabel>
+          <Select value={scorer.version} onChange={handleVersionChange}>
+            <MenuItem value="*">All</MenuItem>
+            {versions.map(version => (
+              <MenuItem key={version} value={version}>
+                {version}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={scorer.groupAllVersions}
+            onChange={handleGroupAllVersionsChange}
+          />
+        }
+        label="Group All Versions"
+      />
+      <Typography variant="subtitle2">Metrics</Typography>
+      {scorer.metrics?.map((metric, metricIndex) => (
+        <MetricItem
+          key={metricIndex}
+          metric={metric}
+          metricPaths={metricPaths}
+          updateConfig={updateConfig}
+          datasetIndex={datasetIndex}
+          scorerIndex={scorerIndex}
+          metricIndex={metricIndex}
+        />
+      ))}
+      <Button variant="outlined" onClick={handleAddMetric}>
+        Add Metric
+      </Button>
+    </Box>
+  );
+};
+
+const MetricItem: React.FC<{
+  metric: FilterAndGroupDatasetSpec['scorers'][0]['metrics'][0];
+  metricPaths: string[];
+  updateConfig: (
+    updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
+  ) => void;
+  datasetIndex: number;
+  scorerIndex: number;
+  metricIndex: number;
+}> = ({
+  metric,
+  metricPaths,
+  updateConfig,
+  datasetIndex,
+  scorerIndex,
+  metricIndex,
+}) => {
+  const handlePathChange = (event: SelectChangeEvent<string>) => {
+    const newPath = event.target.value as string;
+    updateConfig(spec => ({
+      ...spec,
+      datasets: spec.datasets?.map((d, i) =>
+        i === datasetIndex
+          ? {
+              ...d,
+              scorers: d.scorers?.map((s, j) =>
+                j === scorerIndex
+                  ? {
+                      ...s,
+                      metrics: s.metrics?.map((m, k) =>
+                        k === metricIndex ? {...m, path: newPath} : m
+                      ),
+                    }
+                  : s
+              ),
+            }
+          : d
+      ),
+    }));
+  };
+
+  const handleShouldMinimizeChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const newShouldMinimize = event.target.checked;
+    updateConfig(spec => ({
+      ...spec,
+      datasets: spec.datasets?.map((d, i) =>
+        i === datasetIndex
+          ? {
+              ...d,
+              scorers: d.scorers?.map((s, j) =>
+                j === scorerIndex
+                  ? {
+                      ...s,
+                      metrics: s.metrics?.map((m, k) =>
+                        k === metricIndex
+                          ? {...m, shouldMinimize: newShouldMinimize}
+                          : m
+                      ),
+                    }
+                  : s
+              ),
+            }
+          : d
+      ),
+    }));
+  };
+
+  return (
+    <Box sx={{display: 'flex', gap: 2, ml: 2, mb: 2}}>
+      <FormControl fullWidth>
+        <InputLabel>Metric Path</InputLabel>
+        <Select value={metric.path} onChange={handlePathChange}>
+          <MenuItem value="*">All</MenuItem>
+          {metricPaths.map(path => (
+            <MenuItem key={path} value={path}>
+              {path}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={metric.shouldMinimize}
+            onChange={handleShouldMinimizeChange}
+          />
+        }
+        label="Should Minimize"
+      />
     </Box>
   );
 };
 
 const ModelsConfig: React.FC<{
   models: FilterAndGroupDatasetSpec[] | undefined;
-  updateConfig: (updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec) => void;
+  updateConfig: (
+    updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
+  ) => void;
 }> = ({models, updateConfig}) => {
   const [modelNames, setModelNames] = useState<string[]>([]);
 
@@ -362,9 +662,12 @@ const ModelsConfig: React.FC<{
   }, []);
 
   const handleAddModel = () => {
-    updateConfig((spec) => ({
+    updateConfig(spec => ({
       ...spec,
-      models: [...(spec.models || []), {name: '', version: '*', groupAllVersions: false}],
+      models: [
+        ...(spec.models || []),
+        {name: '', version: '*', groupAllVersions: false},
+      ],
     }));
   };
 
@@ -392,7 +695,9 @@ const ModelsConfig: React.FC<{
 const ModelItem: React.FC<{
   model: FilterAndGroupDatasetSpec;
   modelNames: string[];
-  updateConfig: (updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec) => void;
+  updateConfig: (
+    updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
+  ) => void;
   index: number;
 }> = ({model, modelNames, updateConfig, index}) => {
   const [versions, setVersions] = useState<string[]>([]);
@@ -405,7 +710,7 @@ const ModelItem: React.FC<{
 
   const handleNameChange = (event: SelectChangeEvent<string>) => {
     const newName = event.target.value as string;
-    updateConfig((spec) => ({
+    updateConfig(spec => ({
       ...spec,
       models: spec.models?.map((m, i) =>
         i === index ? {...m, name: newName} : m
@@ -415,7 +720,7 @@ const ModelItem: React.FC<{
 
   const handleVersionChange = (event: SelectChangeEvent<string>) => {
     const newVersion = event.target.value as string;
-    updateConfig((spec) => ({
+    updateConfig(spec => ({
       ...spec,
       models: spec.models?.map((m, i) =>
         i === index ? {...m, version: newVersion} : m
@@ -423,9 +728,11 @@ const ModelItem: React.FC<{
     }));
   };
 
-  const handleGroupAllVersionsChange = (event: SelectChangeEvent<HTMLInputElement>) => {
+  const handleGroupAllVersionsChange = (
+    event: SelectChangeEvent<HTMLInputElement>
+  ) => {
     const newGroupAllVersions = event.target.checked;
-    updateConfig((spec) => ({
+    updateConfig(spec => ({
       ...spec,
       models: spec.models?.map((m, i) =>
         i === index ? {...m, groupAllVersions: newGroupAllVersions} : m
@@ -440,7 +747,7 @@ const ModelItem: React.FC<{
           <InputLabel>Name</InputLabel>
           <Select value={model.name} onChange={handleNameChange}>
             <MenuItem value="*">All</MenuItem>
-            {modelNames.map((name) => (
+            {modelNames.map(name => (
               <MenuItem key={name} value={name}>
                 {name}
               </MenuItem>
@@ -451,7 +758,7 @@ const ModelItem: React.FC<{
           <InputLabel>Version</InputLabel>
           <Select value={model.version} onChange={handleVersionChange}>
             <MenuItem value="*">All</MenuItem>
-            {versions.map((version) => (
+            {versions.map(version => (
               <MenuItem key={version} value={version}>
                 {version}
               </MenuItem>
@@ -474,45 +781,64 @@ const ModelItem: React.FC<{
 
 const fetchEvaluationNames = async (): Promise<string[]> => {
   // TODO
-  return Promise.resolve([])
-}
+  return Promise.resolve(["E1", "E2", "E3"]);
+};
 
-const fetchEvaluationVersionsForName = async (name: string): Promise<string[]> => {
+const fetchEvaluationVersionsForName = async (
+  name: string
+): Promise<string[]> => {
   // TODO
-  return Promise.resolve([])
-}
+  return Promise.resolve(["EV1", "EV2", "EV3"]);
+};
 
-const fetchDatasetNamesForSpec = async (spec: FilterAndGroupSpec): Promise<string[]> => {
+const fetchDatasetNamesForSpec = async (
+  spec: FilterAndGroupSpec
+): Promise<string[]> => {
   // TODO
-  return Promise.resolve([])
-}
+  return Promise.resolve(["D1", "D2", "D3"]);
+};
 
-const fetchDatasetVersionsForSpecAndName = async (spec: FilterAndGroupSpec, name: string): Promise<string[]> => {
+const fetchDatasetVersionsForSpecAndName = async (
+  spec: FilterAndGroupSpec,
+  name: string
+): Promise<string[]> => {
   // TODO
-  return Promise.resolve([])
-}
+  return Promise.resolve(["DV1", "DV2", "DV3"]);
+};
 
-const fetchModelNamesForSpec = async (spec: FilterAndGroupSpec): Promise<string[]> => {
+const fetchModelNamesForSpec = async (
+  spec: FilterAndGroupSpec
+): Promise<string[]> => {
   // TODO
-  return Promise.resolve([])
-}
+  return Promise.resolve(["M1", "M2", "M3"]);
+};
 
-const fetchModelVersionsForSpecndName = async (spec: FilterAndGroupSpec, name: string): Promise<string[]> => {
+const fetchModelVersionsForSpecndName = async (
+  spec: FilterAndGroupSpec,
+  name: string
+): Promise<string[]> => {
   // TODO
-  return Promise.resolve([])
-}
+  return Promise.resolve(["MV1", "MV2", "MV3"]);
+};
 
-const fetchScorerNamesForSpec = async (spec: FilterAndGroupSpec): Promise<string[]> => {
+const fetchScorerNamesForSpec = async (
+  spec: FilterAndGroupSpec
+): Promise<string[]> => {
   // TODO
-  return Promise.resolve([])
-}
+  return Promise.resolve(["S1", "S2", "S3"]);
+};
 
-const fetchScorerVersionsForSpecAndName = async (spec: FilterAndGroupSpec, name: string): Promise<string[]> => {
+const fetchScorerVersionsForSpecAndName = async (
+  spec: FilterAndGroupSpec,
+  name: string
+): Promise<string[]> => {
   // TODO
-  return Promise.resolve([])
-}
+  return Promise.resolve(["SV1", "SV2", "SV3"]);
+};
 
-const fetchMetricPathsForSpec = async (spec: FilterAndGroupSpec): Promise<string[]> => {
-    // TODO
-    return Promise.resolve([])
-}
+const fetchMetricPathsForSpec = async (
+  spec: FilterAndGroupSpec
+): Promise<string[]> => {
+  // TODO
+  return Promise.resolve(["MP1", "MP2", "MP3"]);
+};
