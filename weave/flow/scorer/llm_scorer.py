@@ -23,6 +23,28 @@ class LLMScorer(Scorer):
             raise ValueError(f"Invalid client type. Expected one of {_LLM_CLIENT_TYPES}, got {type(v)}")
         return v
 
+class PromptScorer(LLMScorer):
+    """
+    Score an LLM output based on the prompt.
+    """
+    system_prompt: str = Field(default="You are a helpful assistant.", description="The system prompt to use")
+    user_prompt: str = Field(description="The user prompt to use")
+
+    @field_validator('user_prompt')
+    def validate_user_prompt(cls, v):
+        "The user prompt must contain the `model_output` variable."
+        if "{model_output}" not in v:
+            raise ValueError("The user prompt must contain the `model_output` variable.")
+        return v
+    
+    def score(self, model_output: Any) -> Any:
+        llm = LLMFactory.create(self.client, self.model)
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": self.user_prompt.format(model_output=model_output)},
+        ]
+        return llm.chat(messages=messages)
+
 class EmbeddingScorer(LLMScorer):
     """
     Check the embedding distance between the model output and the target.
@@ -64,24 +86,35 @@ class OpenAIModerationScorer(LLMScorer):
 
 
 if __name__ == "__main__":
-    try:
-        import openai
-        client = openai.OpenAI()
-        scorer = EmbeddingScorer(
-            client=client, 
-            model="text-embedding-3-small")
-        print(scorer.score("I don't know", "I don't know"))
-    except Exception as e:
-        print("Install openai to run this script")
+    # try:
+    #     import openai
+    #     client = openai.OpenAI()
+    #     scorer = EmbeddingScorer(
+    #         client=client, 
+    #         model="text-embedding-3-small")
+    #     print(scorer.score("I don't know", "I don't know"))
+    # except Exception as e:
+    #     print("Install openai to run this script")
 
-    try:
+    # try:
+    #     import openai
+    #     client = openai.OpenAI()
+    #     scorer = OpenAIModerationScorer(
+    #         client=client, 
+    #         model="omni-moderation-latest")
+    #     print(scorer.score("I should kill myself"))
+    # except Exception as e:
+    #     print("Install openai to run this script")
+    
+    # try:
         import openai
         client = openai.OpenAI()
-        scorer = OpenAIModerationScorer(
+        scorer = PromptScorer(
             client=client, 
-            model="omni-moderation-latest")
-        print(scorer.score("I should kill myself"))
-    except Exception as e:
-        print("Install openai to run this script")
-    
+            model="gpt-4o",
+            system_prompt="You are a helpful assistant.",
+            user_prompt="Extract the entity from this phrase: \m {model_output}")
+        print(scorer.score("The cat is happy"))
+    # except Exception as e:
+    #     print("Install openai to run this script")
 
