@@ -110,7 +110,11 @@ const useCallTabs = (call: CallSchema) => {
     },
     {
       label: 'Summary',
-      content: <CallSummary call={call} />,
+      content: (
+        <Tailwind style={{height: '100%', overflow: 'auto'}}>
+          <CallSummary call={call} />
+        </Tailwind>
+      ),
     },
     {
       label: 'Use',

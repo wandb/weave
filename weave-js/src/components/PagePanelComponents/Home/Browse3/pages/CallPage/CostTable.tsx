@@ -21,30 +21,35 @@ const columns: GridColDef[] = [
   {
     field: 'requests',
     headerName: 'Requests',
+    headerAlign: 'right',
     flex: 2,
     renderCell: renderNumberCell,
   },
   {
     field: 'prompt_tokens',
     headerName: 'Input tokens',
+    headerAlign: 'right',
     flex: 3,
     renderCell: renderNumberCell,
   },
   {
     field: 'completion_tokens',
     headerName: 'Output tokens',
+    headerAlign: 'right',
     flex: 3,
     renderCell: renderNumberCell,
   },
   {
     field: 'total_tokens',
     headerName: 'Total tokens',
+    headerAlign: 'right',
     flex: 3,
     renderCell: renderNumberCell,
   },
   {
     field: 'cost',
     headerName: 'Total Cost',
+    headerAlign: 'right',
     flex: 3,
     renderCell: (params: GridRenderCellParams) => (
       <Box sx={{textAlign: 'right', width: '100%'}}>
