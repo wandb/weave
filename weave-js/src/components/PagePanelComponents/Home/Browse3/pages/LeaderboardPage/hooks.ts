@@ -1,16 +1,12 @@
-import {ObjectRef} from '@wandb/weave/react';
-import {useMemo} from 'react';
+import { ObjectRef } from '@wandb/weave/react';
+import { useEffect, useMemo, useState, } from 'react';
 
-import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
-import {parseRefMaybe} from '../../../Browse2/SmallRef';
-import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
-import {useWFHooks} from '../wfReactInterface/context';
-import {
-  objectVersionKeyToRefUri,
-  opVersionKeyToRefUri,
-} from '../wfReactInterface/utilities';
-import {useEvalCallsForConfig} from './leaderboardConfigQuery';
-import {LeaderboardConfigType} from './LeaderboardConfigType';
+import { flattenObjectPreservingWeaveTypes } from '../../../Browse2/browse2Util';
+import { parseRefMaybe } from '../../../Browse2/SmallRef';
+import { useGetTraceServerClientContext } from '../wfReactInterface/traceServerClientContext';
+import { useEvalCallsForConfig } from './leaderboardConfigQuery';
+import { LeaderboardConfigType } from './LeaderboardConfigType';
+import { getLeaderboardData, LeaderboardData2 } from './leaderboardServerInterface';
 
 export type LeaderboardData = {
   metrics: {
@@ -26,7 +22,7 @@ export type LeaderboardData = {
   models: string[];
   scores: {
     [modelId: string]: {
-      [metricId: string]: {value: number; sourceEvalCallId: string};
+      [metricId: string]: { value: number; sourceEvalCallId: string };
     };
   };
 };
@@ -35,7 +31,7 @@ export const useLeaderboardData = (
   entity: string,
   project: string,
   config: LeaderboardConfigType
-): {loading: boolean; data: LeaderboardData} => {
+): { loading: boolean; data: LeaderboardData } => {
   // console.log('Fetching leaderboard data', config);
   // const {useRootObjectVersions, useCalls} = useWFHooks();
 
@@ -84,12 +80,12 @@ export const useLeaderboardData = (
   //   undefined,
   //   {skip: !evaluationVersionsResult}
   // );
-  const {calls: evaluationRuns, evals: evaluationVersions} =
+  const { calls: evaluationRuns, evals: evaluationVersions } =
     useEvalCallsForConfig(entity, project, config);
 
   // Build the dataset
 
-  const results: {loading: boolean; data: LeaderboardData} = useMemo(() => {
+  const results: { loading: boolean; data: LeaderboardData } = useMemo(() => {
     const finalData: LeaderboardData = {
       metrics: {},
       models: [],
@@ -218,3 +214,39 @@ export const useLeaderboardData = (
 
   return results;
 };
+
+
+export const useLeaderboardData2 = (
+  entity: string, project: string
+) => {
+  const getTraceServerClient = useGetTraceServerClientContext();
+  const [state, setState] = useState<{ loading: boolean; data: LeaderboardData2 }>({ loading: true, data: [] });
+  useEffect(() => {
+    let mounted = true;
+    getLeaderboardData(
+      getTraceServerClient(), entity, project, {
+      datasets: [{
+        name: 'SWEBenchVerified-shuffle808-50',
+        version: '*'
+      }],
+      models: [{
+        name: '*',
+        version: '*',
+        splitByVersion: false,
+      }, {
+        name: "reproProblem",
+        version: '*',
+        splitByVersion: true,
+      }]
+    }
+    ).then(data => {
+      if (mounted) {
+        setState({ loading: false, data });
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [entity, project, getTraceServerClient]);
+  return state;
+}
