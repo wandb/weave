@@ -10,7 +10,8 @@ export const useProjectSidebar = (
   hasModelsData: boolean,
   hasWeaveData: boolean,
   hasTraceBackend: boolean = true,
-  hasModelsAccess: boolean = true
+  hasModelsAccess: boolean = true,
+  viewerIsAdmin: boolean = false
 ): FancyPageSidebarItem[] => {
   // Should show models sidebar items if we have models data or if we don't have a trace backend
   let showModelsSidebarItems = hasModelsData || !hasTraceBackend;
@@ -31,6 +32,7 @@ export const useProjectSidebar = (
   const isNoSidebarItems = !showModelsSidebarItems && !showWeaveSidebarItems;
   const isBothSidebarItems = showModelsSidebarItems && showWeaveSidebarItems;
   const isShowAll = isNoSidebarItems || isBothSidebarItems;
+
   return useMemo(() => {
     const allItems = isLoading
       ? []
@@ -132,6 +134,15 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
+            name: 'Leaderboard',
+            slug: 'weave/leaderboard',
+            // TODO: remove this `true`
+            isShown:
+              (viewerIsAdmin || true) && (showWeaveSidebarItems || isShowAll),
+            iconName: IconNames.BenchmarkSquare,
+          },
+          {
+            type: 'button' as const,
             name: 'Traces',
             slug: 'weave/traces',
             isShown: showWeaveSidebarItems || isShowAll,
@@ -213,10 +224,11 @@ export const useProjectSidebar = (
     return onlyShownItems;
   }, [
     isLoading,
-    isModelsOnly,
-    isWeaveOnly,
-    showWeaveSidebarItems,
     isShowAll,
+    isWeaveOnly,
     viewingRestricted,
+    isModelsOnly,
+    viewerIsAdmin,
+    showWeaveSidebarItems,
   ]);
 };

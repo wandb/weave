@@ -148,6 +148,10 @@ interface TraceObjectsFilter {
 export type TraceObjQueryReq = {
   project_id: string;
   filter?: TraceObjectsFilter;
+  limit?: number;
+  offset?: number;
+  sort_by?: SortBy[];
+  metadata_only?: boolean;
 };
 
 export interface TraceObjSchema {

@@ -271,6 +271,7 @@ export const CallLink: React.FC<{
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
+
   const opName = opNiceName(props.opName);
 
   // Custom logic to calculate path and tracetree here is not good. Shows
