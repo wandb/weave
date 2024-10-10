@@ -39,8 +39,8 @@ from weave.integrations.integration_utilities import (
     make_pythonic_function_name,
     truncate_op_name,
 )
-from weave.trace import call_context
-from weave.trace.client_context import weave_client as weave_client_context
+from weave.trace.context import call
+from weave.trace.context import weave_client as weave_client_context
 from weave.trace.patcher import Patcher
 from weave.trace.weave_client import Call
 
@@ -156,7 +156,7 @@ if not import_failed:
                 parent_run = wv_parent_run
             else:
                 # Here is our check for the specific condition
-                wv_current_run = call_context.get_current_call()
+                wv_current_run = call.get_current_call()
 
                 # First, there needs to be something on the stack.
                 if wv_current_run is not None:

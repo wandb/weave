@@ -13,14 +13,14 @@ import pytest
 
 import weave
 from tests.trace.util import DummyTestException
-from weave.trace import call_context
-from weave.trace.context import raise_on_captured_errors
+from weave.trace.context import call
+from weave.trace.context.test import raise_on_captured_errors
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 
 def assert_no_current_call():
-    assert call_context.get_current_call() is None
+    assert call.get_current_call() is None
 
 
 def test_resilience_to_user_code_errors(client):
