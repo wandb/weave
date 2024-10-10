@@ -326,9 +326,9 @@ export const getLeaderboardData = async (
     if (spec.datasets.length === 0) {
       return {include: true, groupableRow};
     }
-    if (spec.datasets.some(dataset => dataset.name === ALL_VALUE)) {
-      return {include: true, groupableRow};
-    }
+    // if (spec.datasets.some(dataset => dataset.name === ALL_VALUE)) {
+    //   return {include: true, groupableRow};
+    // }
 
     let datasetSpec = spec.datasets.find(
       dataset =>
@@ -357,7 +357,7 @@ export const getLeaderboardData = async (
     if (datasetSpec.groupAllVersions) {
       groupableRow.datasetGroup = `${row.datasetName}`;
     }
-    if (datasetSpec.scorers) {
+    if (datasetSpec.scorers && datasetSpec.scorers.length > 0) {
       let scorerSpec = datasetSpec.scorers.find(
         scorer =>
           scorer.name === row.scorerName && scorer.version === row.scorerVersion
@@ -378,13 +378,18 @@ export const getLeaderboardData = async (
             (scorer.version === ALL_VALUE ||
               scorer.version === row.scorerVersion)
         );
+      console.log({
+        scorerSpec,
+        dss: datasetSpec.scorers,
+        row,
+      });
       if (!scorerSpec) {
         return {include: false, groupableRow};
       }
       if (scorerSpec.groupAllVersions) {
         groupableRow.scorerGroup = `${row.scorerName}`;
       }
-      if (scorerSpec.metrics) {
+      if (scorerSpec.metrics && scorerSpec.metrics.length > 0) {
         const metricSpec = scorerSpec.metrics.find(
           metric => metric.path === ALL_VALUE || metric.path === row.metricPath
         );
