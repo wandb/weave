@@ -921,16 +921,27 @@ const OpPageBinding = () => {
 };
 
 const CompareEvaluationsBinding = () => {
+  const history = useHistory();
+  const location = useLocation();
   const {entity, project} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
   const evaluationCallIds = useMemo(() => {
     return JSON.parse(query.evaluationCallIds);
   }, [query.evaluationCallIds]);
+  const onEvaluationCallIdsUpdate = useCallback(
+    (newEvaluationCallIds: string[]) => {
+      const newQuery = new URLSearchParams(location.search);
+      newQuery.set('evaluationCallIds', JSON.stringify(newEvaluationCallIds));
+      history.push({search: newQuery.toString()});
+    },
+    [history, location.search]
+  );
   return (
     <CompareEvaluationsPage
       entity={entity}
       project={project}
       evaluationCallIds={evaluationCallIds}
+      onEvaluationCallIdsUpdate={onEvaluationCallIdsUpdate}
     />
   );
 };

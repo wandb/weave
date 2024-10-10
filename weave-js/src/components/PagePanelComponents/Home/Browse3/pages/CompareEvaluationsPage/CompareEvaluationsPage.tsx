@@ -38,6 +38,7 @@ type CompareEvaluationsPageProps = {
   entity: string;
   project: string;
   evaluationCallIds: string[];
+  onEvaluationCallIdsUpdate: (newEvaluationCallIds: string[]) => void;
 };
 
 export const CompareEvaluationsPage: React.FC<
@@ -55,6 +56,7 @@ export const CompareEvaluationsPage: React.FC<
               entity={props.entity}
               project={props.project}
               evaluationCallIds={props.evaluationCallIds}
+              onEvaluationCallIdsUpdate={props.onEvaluationCallIdsUpdate}
             />
           ),
         },
@@ -95,7 +97,9 @@ export const CompareEvaluationsPageContent: React.FC<
   );
 
   React.useEffect(() => {
-    if (props.evaluationCallIds.length > 0) {
+    // Only update the baseline if we are switching evaluations, if there
+    // is more than 1, we are in the compare view and baseline is auto set
+    if (props.evaluationCallIds.length === 1) {
       setBaselineEvaluationCallId(props.evaluationCallIds[0]);
     }
   }, [props.evaluationCallIds]);
@@ -108,9 +112,10 @@ export const CompareEvaluationsPageContent: React.FC<
     <CompareEvaluationsProvider
       entity={props.entity}
       project={props.project}
-      evaluationCallIds={props.evaluationCallIds}
+      initialEvaluationCallIds={props.evaluationCallIds}
       baselineEvaluationCallId={baselineEvaluationCallId ?? undefined}
       comparisonDimensions={comparisonDimensions ?? undefined}
+      onEvaluationCallIdsUpdate={props.onEvaluationCallIdsUpdate}
       setBaselineEvaluationCallId={setBaselineEvaluationCallId}
       setComparisonDimensions={setComparisonDimensionsAndClearInputDigest}
       selectedInputDigest={selectedInputDigest ?? undefined}

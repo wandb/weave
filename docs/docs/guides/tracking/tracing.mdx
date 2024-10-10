@@ -104,7 +104,19 @@ instance.my_method.call(instance, "World")
 
 #### Call Display Name
 
-Sometimes you may want to override the display name of a call. You can achieve this in one of three ways:
+Sometimes you may want to override the display name of a call. You can achieve this in one of four ways:
+
+0. Change the display name at the time of calling the op:
+
+```python showLineNumbers
+result = my_function("World", __weave={"display_name": "My Custom Display Name"})
+```
+
+:::note
+
+Using the `__weave` dictionary sets the call display name which will take precedence over the Op display name.
+
+:::
 
 1. Change the display name on a per-call basis. This uses the [`Op.call`](../../reference/python-sdk/weave/trace/weave.trace.op.md#function-call) method to return a `Call` object, which you can then use to set the display name using [`Call.set_display_name`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-set_display_name).
 ```python showLineNumbers
