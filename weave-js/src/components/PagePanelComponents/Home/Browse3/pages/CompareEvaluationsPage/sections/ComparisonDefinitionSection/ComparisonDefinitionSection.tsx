@@ -16,6 +16,7 @@ import {
 import {useCallsForQuery} from '../../../CallsPage/callsTableQuery';
 import {useEvaluationsFilter} from '../../../CallsPage/evaluationsFilter';
 import {Id} from '../../../common/Id';
+import {opNiceName} from '../../../common/Links';
 import {useWFHooks} from '../../../wfReactInterface/context';
 import {
   CallSchema,
@@ -272,7 +273,7 @@ const AddEvaluationButton: React.FC<{
                           flexShrink: 1,
                           maxWidth: '250px',
                         }}>
-                        {call.displayName ?? call.spanName}
+                        {call.displayName ?? opNiceName(call.spanName)}
                       </span>
                       <span style={{flexShrink: 0}}>
                         <Id
