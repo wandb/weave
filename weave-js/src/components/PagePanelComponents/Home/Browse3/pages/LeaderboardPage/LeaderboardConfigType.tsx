@@ -36,5 +36,5 @@ export type FilterAndGroupDatasetScorerMetricSpec = {
 export type FilterAndGroupModelSpec = {
   name: string; // "*" means all
   version: string; // "*" means all
-  splitByVersion?: boolean;
+  groupByVersion?: boolean;
 };

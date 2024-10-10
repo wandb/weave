@@ -78,7 +78,9 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         minWidth: 150,
         flex: 1,
         renderCell: (params: GridRenderCellParams) => {
-          const modelRef = parseRefMaybe(params.value);
+          const modelRef = parseRefMaybe(
+            `weave:///${entity}/${project}/object/${params.value}` ?? ''
+          );
           if (modelRef) {
             return (
               <div
@@ -172,7 +174,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           )
       ),
     ],
-    [columnStats.datasetGroups, getColorForScore, onCellClick]
+    [columnStats.datasetGroups, entity, getColorForScore, onCellClick, project]
   );
 
   const groupingModel: GridColumnGroup[] = useMemo(() => {

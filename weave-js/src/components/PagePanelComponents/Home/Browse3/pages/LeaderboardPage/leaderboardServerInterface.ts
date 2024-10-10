@@ -63,6 +63,7 @@ export type GroupedLeaderboardModelGroup = {
     };
   };
 };
+
 export const getLeaderboardData = async (
   client: TraceServerClient,
   entity: string,
@@ -230,7 +231,7 @@ export const getLeaderboardData = async (
     const groupableRow: GroupableLeaderboardValueRecord = {
       datasetGroup: row.datasetName,
       scorerGroup: row.scorerName,
-      modelGroup: row.modelName,
+      modelGroup: `${row.modelName}:${row.modelVersion}`,
       metricPathGroup: row.metricPath,
       sortKey: -row.createdAt.getTime(),
       row,
@@ -269,7 +270,7 @@ export const getLeaderboardData = async (
       return {include: false, groupableRow};
     }
     if (datasetSpec.splitByVersion) {
-      groupableRow.datasetGroup += `${row.datasetName}:${row.datasetVersion}`;
+      groupableRow.datasetGroup = `${row.datasetName}:${row.datasetVersion}`;
     }
     if (datasetSpec.scorers) {
       let scorerSpec = datasetSpec.scorers.find(
@@ -294,7 +295,7 @@ export const getLeaderboardData = async (
         return {include: false, groupableRow};
       }
       if (scorerSpec.splitByVersion) {
-        groupableRow.scorerGroup += `${row.scorerName}:${row.scorerVersion}`;
+        groupableRow.scorerGroup = `${row.scorerName}:${row.scorerVersion}`;
       }
       if (scorerSpec.metrics) {
         const metricSpec = scorerSpec.metrics.find(
@@ -327,8 +328,8 @@ export const getLeaderboardData = async (
       if (!modelSpec) {
         return {include: false, groupableRow};
       }
-      if (modelSpec.splitByVersion) {
-        groupableRow.modelGroup += `${row.modelName}:${row.modelVersion}`;
+      if (modelSpec.groupByVersion) {
+        groupableRow.modelGroup = `${row.modelName}`;
       }
     }
     return {include: true, groupableRow};
