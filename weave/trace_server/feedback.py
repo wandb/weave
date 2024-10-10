@@ -1,12 +1,12 @@
 from pydantic import BaseModel, ValidationError
 
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.orm import Column, Table
 from weave.trace_server.validation import (
     validate_purge_req_multiple,
     validate_purge_req_one,
 )
+from weave.trace_server_common import trace_server_interface as tsi
 
 TABLE_FEEDBACK = Table(
     "feedback",
