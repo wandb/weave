@@ -186,7 +186,6 @@ const UnlistedAlert: React.FC<{onClose: () => void}> = ({onClose}) => {
   );
 };
 
-
 // TODO:
 // * [ ] Make the editable context (i think we should have an object and version and isEditing, etc... Think more like reports)
 // * [ ] Edit panel revisions

@@ -10,7 +10,10 @@ import {
   convertISOToDate,
   projectIdFromParts,
 } from '../wfReactInterface/tsDataModelHooks';
-import {objectVersionKeyToRefUri, opVersionKeyToRefUri} from '../wfReactInterface/utilities';
+import {
+  objectVersionKeyToRefUri,
+  opVersionKeyToRefUri,
+} from '../wfReactInterface/utilities';
 import {FilterAndGroupSpec} from './LeaderboardConfigType';
 
 export type LeaderboardValueRecord = {
@@ -70,18 +73,18 @@ export const getLeaderboardData = async (
   project: string,
   spec: FilterAndGroupSpec = {}
 ): Promise<GroupedLeaderboardData> => {
-  const sourceEvals = (spec.sourceEvaluations ?? [])
-  const evalNames  =sourceEvals.map(sourceEvaluation => sourceEvaluation.name)
-  const fullyQualifiedEvalRefs =sourceEvals.map(sourceEvaluation => {
+  const sourceEvals = spec.sourceEvaluations ?? [];
+  const evalNames = sourceEvals.map(sourceEvaluation => sourceEvaluation.name);
+  const fullyQualifiedEvalRefs = sourceEvals.map(sourceEvaluation => {
     return objectVersionKeyToRefUri({
-        scheme: 'weave',
-        weaveKind: 'object',
-        entity,
-        project,
-        objectId: sourceEvaluation.name,
-        versionHash: sourceEvaluation.version,
-        path: '',
-    })
+      scheme: 'weave',
+      weaveKind: 'object',
+      entity,
+      project,
+      objectId: sourceEvaluation.name,
+      versionHash: sourceEvaluation.version,
+      path: '',
+    });
   });
   // get all the evaluations
   const allEvaluationObjectsProm = client.objsQuery({
@@ -106,19 +109,21 @@ export const getLeaderboardData = async (
           versionHash: '*',
         }),
       ],
-      input_refs: fullyQualifiedEvalRefs
+      input_refs: fullyQualifiedEvalRefs,
     },
   });
-
 
   const allEvaluationObjectsRes = await allEvaluationObjectsProm;
 
   // This hack to get around the fact that we can't filter by version in the query
   if (sourceEvals.length > 0) {
     allEvaluationObjectsRes.objs = allEvaluationObjectsRes.objs.filter(obj => {
-        return sourceEvals.some(sourceEval => {
-            return obj.object_id === sourceEval.name && (obj.digest === sourceEval.version || sourceEval.version === '*');
-        });
+      return sourceEvals.some(sourceEval => {
+        return (
+          obj.object_id === sourceEval.name &&
+          (obj.digest === sourceEval.version || sourceEval.version === '*')
+        );
+      });
     });
   }
 

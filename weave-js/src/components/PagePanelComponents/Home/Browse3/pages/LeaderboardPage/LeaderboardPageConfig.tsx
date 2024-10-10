@@ -8,10 +8,8 @@ import {
   Select,
   Typography,
 } from '@mui/material';
-import {ObjectRef} from '@wandb/weave/react';
 import React, {useCallback, useMemo, useState} from 'react';
 
-import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {useWFHooks} from '../wfReactInterface/context';
 import {LeaderboardConfigType} from './LeaderboardConfigType';
 
@@ -37,10 +35,16 @@ export const LeaderboardConfig: React.FC<{
 
   const {useRootObjectVersions} = useWFHooks();
 
-  const evalObjects = useRootObjectVersions(entity, project, {
-    baseObjectClasses: ['Evaluation'],
-    latestOnly: true,
-  }, undefined, true);
+  const evalObjects = useRootObjectVersions(
+    entity,
+    project,
+    {
+      baseObjectClasses: ['Evaluation'],
+      latestOnly: true,
+    },
+    undefined,
+    true
+  );
 
   const [selectedEvalObject, setSelectedEvalObject] = useState<string | null>(
     null
@@ -80,9 +84,9 @@ export const LeaderboardConfig: React.FC<{
             sourceEvaluations: [
               ...(old.config.dataSelectionSpec.sourceEvaluations ?? []),
               {
-                name: name,
-                version: version,
-              }
+                name,
+                version,
+              },
             ],
           },
         },
