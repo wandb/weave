@@ -6,7 +6,7 @@ from threading import Event, Lock, Thread
 from typing import Callable, Generic, List, TypeVar
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
-from weave.trace_server_common import requests
+from weave.trace_server_bindings import requests
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
