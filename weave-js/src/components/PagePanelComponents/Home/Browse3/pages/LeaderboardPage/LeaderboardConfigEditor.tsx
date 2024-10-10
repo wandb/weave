@@ -73,7 +73,7 @@ export const LeaderboardConfigEditor: React.FC<{
   return (
     <Box
       sx={{
-        width: '50%',
+        width: '100%',
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
@@ -100,8 +100,11 @@ export const LeaderboardConfigEditor: React.FC<{
         sx={{
           display: 'flex',
           justifyContent: 'flex-end',
-          p: 2,
+          pt: 1,
+          pb: 1,
+          pr: 1.5,
           borderTop: '1px solid #e0e0e0',
+          height: '51px',
         }}>
         <Button variant="outlined" onClick={handleCancel} sx={{mr: 2}}>
           Cancel

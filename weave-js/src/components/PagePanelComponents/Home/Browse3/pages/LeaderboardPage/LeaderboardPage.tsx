@@ -99,40 +99,47 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
   const [showingAlert, setShowingAlert] = useState(true);
 
   return (
-    <Box display="flex" flexDirection="column" height="100%">
-      {showingAlert && <UnlistedAlert onClose={() => setShowingAlert(false)} />}
-      <div
-        style={{
-          position: 'absolute',
-          top: 20 + (showingAlert ? 52 : 0),
-          right: 24,
-        }}>
-        <ToggleLeaderboardConfig
-          isOpen={showConfig}
-          onClick={() => setShowConfig(c => !c)}
-        />
-      </div>
-      <Box flexShrink={0} maxHeight="35%" overflow="auto">
-        <EditableMarkdown
-          value={description}
-          onChange={setDescription}
-          placeholder={DEFAULT_DESCRIPTION}
-        />
-      </Box>
+    <Box display="flex" flexDirection="row" height="100%" flexGrow={1}>
       <Box
-        flexGrow={1}
+        flex={1}
         display="flex"
-        flexDirection="row"
-        overflow="hidden"
-        minHeight="65%">
-        <LeaderboardGrid
-          entity={entity}
-          project={project}
-          loading={loading}
-          data={data}
-          onCellClick={handleCellClick}
-        />
-        {showConfig && (
+        flexDirection="column"
+        height="100%"
+        minWidth="65%">
+        <div
+          style={{
+            position: 'absolute',
+            display: showConfig ? 'none' : 'block',
+            top: 20,
+            right: 24,
+          }}>
+          <ToggleLeaderboardConfig
+            isOpen={showConfig}
+            onClick={() => setShowConfig(c => !c)}
+          />
+        </div>
+        <Box flexShrink={0} maxHeight="35%" overflow="auto">
+          <EditableMarkdown
+            value={description}
+            onChange={setDescription}
+            placeholder={DEFAULT_DESCRIPTION}
+          />
+        </Box>
+        {showingAlert && (
+          <UnlistedAlert onClose={() => setShowingAlert(false)} />
+        )}
+        <Box flexGrow={1} display="flex" flexDirection="row" overflow="hidden">
+          <LeaderboardGrid
+            entity={entity}
+            project={project}
+            loading={loading}
+            data={data}
+            onCellClick={handleCellClick}
+          />
+        </Box>
+      </Box>
+      {showConfig && (
+        <Box flex={1} width="35%" height="100%" overflow="hidden">
           <LeaderboardConfigEditor
             entity={entity}
             project={project}
@@ -147,8 +154,8 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
             }}
             setConfig={setConfigLocal}
           />
-        )}
-      </Box>
+        </Box>
+      )}
     </Box>
   );
 };
