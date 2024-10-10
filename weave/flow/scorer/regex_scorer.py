@@ -5,6 +5,8 @@ import re
 from pydantic import Field
 import weave
 
+from weave.flow.scorer.base_scorer import Scorer
+
 class RegexScorer(Scorer):
     patterns: Union[str, list[str]] = Field(default_factory=list, description="The patterns or keywords to match")
     ignore_case: bool = True
