@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Callable, Optional, Sequence
 
-from weave.trace.context import get_raise_on_captured_errors
+from weave.trace.context.test import get_raise_on_captured_errors
 
 logger = logging.getLogger(__name__)
 

@@ -22,10 +22,12 @@ from typing import (
     runtime_checkable,
 )
 
-from weave.trace import box, call_context, settings
-from weave.trace.client_context import weave_client as weave_client_context
+from weave.trace import box, settings
 from weave.trace.constants import TRACE_CALL_EMOJI
-from weave.trace.context import call_attributes, get_raise_on_captured_errors
+from weave.trace.context import call
+from weave.trace.context import weave_client as weave_client_context
+from weave.trace.context.call import call_attributes
+from weave.trace.context.test import get_raise_on_captured_errors
 from weave.trace.errors import OpCallError
 from weave.trace.op_extensions.log_once import log_once
 from weave.trace.refs import ObjectRef
@@ -210,7 +212,7 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
 
     # If/When we do memoization, this would be a good spot
 
-    parent_call = call_context.get_current_call()
+    parent_call = call.get_current_call()
     attributes = call_attributes.get()
 
     return client.create_call(
@@ -244,7 +246,7 @@ def _execute_call(
             exception,
             op=__op,
         )
-        if not call_context.get_current_call():
+        if not call.get_current_call():
             print_call_link(call)
 
     def on_output(output: Any) -> Any:
@@ -268,7 +270,7 @@ def _execute_call(
             # Is there a better place for this? We want to ensure that even
             # if the final output fails to be captured, we still pop the call
             # so we don't put future calls under the old call.
-            call_context.pop_call(call.id)
+            call.pop_call(call.id)
 
         return res, call
 

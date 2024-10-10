@@ -12,9 +12,10 @@ import pydantic
 from requests import HTTPError
 
 from weave import version
-from weave.trace import call_context, trace_sentry, urls
-from weave.trace.client_context import weave_client as weave_client_context
+from weave.trace import trace_sentry, urls
 from weave.trace.concurrent.futures import FutureExecutor
+from weave.trace.context import call
+from weave.trace.context import weave_client as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.object_record import (
@@ -634,7 +635,7 @@ class WeaveClient:
         call_id = generate_id()
 
         if parent is None and use_stack:
-            parent = call_context.get_current_call()
+            parent = call.get_current_call()
 
         if parent:
             trace_id = parent.trace_id
@@ -701,7 +702,7 @@ class WeaveClient:
         self.future_executor.defer(send_start_call)
 
         if use_stack:
-            call_context.push_call(call)
+            call.push_call(call)
 
         return call
 
@@ -794,7 +795,7 @@ class WeaveClient:
 
         self.future_executor.defer(send_end_call)
 
-        call_context.pop_call(call.id)
+        call.pop_call(call.id)
 
     @trace_sentry.global_trace_sentry.watch()
     def fail_call(self, call: Call, exception: BaseException) -> None:
