@@ -82,7 +82,7 @@ export const EvaluationDefinition: React.FC<{
             <Button
               className="rotate-90"
               icon="overflow-horizontal"
-              size="medium"
+              size="small"
               variant="ghost"
               style={{marginLeft: '4px'}}
             />
