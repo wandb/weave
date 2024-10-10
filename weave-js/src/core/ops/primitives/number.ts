@@ -665,10 +665,10 @@ const timestampNanoSecondUpperBound = timestampMicroSecondUpperBound * 1000;
 export const opNumberToTimestamp = OpKinds.makeStandardOp({
   name: 'number-toTimestamp',
   argTypes: {val: 'number'},
-  description: `Converts a ${docType('number')} to a ${docType(
+  description: `Converts a ${docType('number')} representing unix time in milliseconds to a ${docType(
     'timestamp'
-  )}. Values less than ${timestampSecondUpperBound} will be converted to seconds, values less than ${timestampMilliSecondUpperBound} will be converted to milliseconds, values less than ${timestampMicroSecondUpperBound} will be converted to microseconds, and values less than ${timestampNanoSecondUpperBound} will be converted to nanoseconds.`,
-  argDescriptions: {val: 'Number to convert to a timestamp'},
+  )}.`,
+  argDescriptions: {val: 'Number (unix time in milliseconds) to convert to a timestamp'},
   returnValueDescription: `Timestamp`,
   returnType: inputTypes => ({
     type: 'timestamp',
