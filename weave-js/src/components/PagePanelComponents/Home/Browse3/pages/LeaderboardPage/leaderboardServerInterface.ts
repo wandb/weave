@@ -13,7 +13,7 @@ import {
 import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {FilterAndGroupSpec} from './LeaderboardConfigType';
 
-type LeaderboardValueRecord = {
+export type LeaderboardValueRecord = {
   datasetName: string;
   datasetVersion: string;
   metricType:
@@ -46,22 +46,23 @@ export type GroupableLeaderboardValueRecord = {
 
 export type GroupedLeaderboardData = {
   modelGroups: {
-    [modelGroup: string]: {
-      datasetGroups: {
-        [datasetGroup: string]: {
-          scorerGroups: {
-            [scorerGroup: string]: {
-              metricPathGroups: {
-                [metricPathGroup: string]: LeaderboardValueRecord;
-              };
-            };
+    [modelGroup: string]: GroupedLeaderboardModelGroup;
+  };
+};
+
+export type GroupedLeaderboardModelGroup = {
+  datasetGroups: {
+    [datasetGroup: string]: {
+      scorerGroups: {
+        [scorerGroup: string]: {
+          metricPathGroups: {
+            [metricPathGroup: string]: LeaderboardValueRecord[];
           };
         };
       };
     };
   };
 };
-
 export const getLeaderboardData = async (
   client: TraceServerClient,
   entity: string,
@@ -353,9 +354,10 @@ export const getLeaderboardData = async (
                       metricPathGroups: _.mapValues(
                         _.groupBy(scorerGroup, 'metricPathGroup'),
                         metricPathGroup => {
-                          return metricPathGroup.sort(
-                            (a, b) => a.sortKey - b.sortKey
-                          )[0].row;
+                          return metricPathGroup.map(row => row.row);
+                          //   .sort(
+                          //     (a, b) => a.sortKey - b.sortKey
+                          //   )[0].row;
                         }
                       ),
                     };
