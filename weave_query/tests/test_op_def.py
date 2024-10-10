@@ -2,7 +2,7 @@
 import json
 import typing
 from dataclasses import dataclass
-
+from pathlib import Path
 import pytest
 
 from weave_query import api as weave
@@ -55,7 +55,9 @@ def wrap(obj: typing.Any):
 
 context_state.clear_loading_built_ins(_loading_builtins_token)
 
-test_data = json.load(open("./tests/test_op_def_data.json"))
+CURRENT_DIR = Path(__file__).parent
+
+test_data = json.load(open(CURRENT_DIR / "test_op_def_data.json"))
 
 
 def test_op_def_to_dict():

@@ -19,7 +19,7 @@ repos:
           [types-pkg-resources==0.1.3, types-all, wandb>=0.15.5]
         # Note: You have to update pyproject.toml[tool.mypy] too!
         args: ['--config-file=pyproject.toml']
-        exclude: (.*pyi$)|(weave_query)|(tests)|(examples)|(weave/docker)
+        exclude: (.*pyi$)|(weave_query)|(tests)|(examples)
   # This is legacy Weave when we were building a notebook product - should be removed
   - repo: local
     hooks:

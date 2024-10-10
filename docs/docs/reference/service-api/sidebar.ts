@@ -128,6 +128,12 @@ const sidebar: SidebarsConfig = {
           label: "Table Query",
           className: "api-method post",
         },
+        {
+          type: "doc",
+          id: "reference/service-api/table-query-stats-table-query-stats-post",
+          label: "Table Query Stats",
+          className: "api-method post",
+        },
       ],
     },
     {

@@ -458,7 +458,7 @@ export const RefreshButton: FC<{
         alignItems: 'center',
       }}>
       <Button
-        variant={'ghost'}
+        variant="outline"
         size="medium"
         onClick={onClick}
         tooltip="Refresh"

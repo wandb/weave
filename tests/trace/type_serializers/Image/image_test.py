@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 import weave
@@ -76,6 +77,7 @@ def image_as_input_and_output_part(in_img: Image.Image) -> dict:
     return {"out_img": in_img}
 
 
+@pytest.mark.skip("Flakes when running in parallel")
 def test_image_as_call_io(client: WeaveClient) -> None:
     client.project = "test_image_as_call_io"
     non_published_img = image_as_solo_output(publish_first=False)

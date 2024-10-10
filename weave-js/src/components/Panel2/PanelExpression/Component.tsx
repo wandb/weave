@@ -11,11 +11,14 @@ import Sidebar from '../../Sidebar/Sidebar';
 import {themes} from '../Editor.styles';
 import {Panel2Loader, PanelComp2} from '../PanelComp';
 import {PanelContextProvider} from '../PanelContext';
+import {makeEventRecorder} from '../panellib/libanalytics';
 import {ExpressionEditorActions} from './actions';
 import type {PanelExpressionProps} from './common';
 import {ConfigComponent} from './ConfigComponent';
 import {usePanelExpressionState} from './hooks';
 import * as S from './styles';
+
+const recordEvent = makeEventRecorder('Expression');
 
 const PanelExpression: React.FC<PanelExpressionProps> = props => {
   const state = usePanelExpressionState(props);
@@ -158,7 +161,10 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
                         }
                         on="click"
                         open={configOpen}
-                        onOpen={() => setConfigOpen(true)}
+                        onOpen={() => {
+                          recordEvent('OPEN_CONFIG');
+                          setConfigOpen(true);
+                        }}
                         onClose={() => setConfigOpen(false)}>
                         <ConfigComponent
                           {...state}
