@@ -1,12 +1,25 @@
 import {Box, TextField, Typography} from '@mui/material';
-import React, {useCallback, useLayoutEffect, useRef, useState} from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import ReactMarkdown from 'react-markdown';
+import styled from 'styled-components';
 
 interface EditableMarkdownProps {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
 }
+
+const StyledReactMarkdown = styled(ReactMarkdown)`
+  > *:first-child {
+    margin-top: 0;
+  }
+`;
 
 export const EditableMarkdown: React.FC<EditableMarkdownProps> = ({
   value,
@@ -75,6 +88,12 @@ export const EditableMarkdown: React.FC<EditableMarkdownProps> = ({
     });
   };
 
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      updateHeight();
+    });
+  }, [updateHeight, value]);
+
   return (
     <Box ref={containerRef} sx={{padding: '16px', transition: 'height 0.3s'}}>
       {isEditing ? (
@@ -84,9 +103,6 @@ export const EditableMarkdown: React.FC<EditableMarkdownProps> = ({
           value={value}
           onChange={e => {
             onChange(e.target.value);
-            requestAnimationFrame(() => {
-              updateHeight();
-            });
           }}
           onBlur={handleBlur}
           placeholder={placeholder}
@@ -114,7 +130,7 @@ export const EditableMarkdown: React.FC<EditableMarkdownProps> = ({
             },
           }}
           onClick={handleEdit}>
-          <ReactMarkdown>{value || placeholder}</ReactMarkdown>
+          <StyledReactMarkdown>{value || placeholder}</StyledReactMarkdown>
         </Typography>
       )}
     </Box>

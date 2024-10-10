@@ -106,24 +106,33 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
         flexDirection="column"
         height="100%"
         minWidth="65%">
-        <div
-          style={{
-            position: 'absolute',
-            display: showConfig ? 'none' : 'block',
-            top: 20,
-            right: 24,
+        <Box
+          flex={1}
+          display="flex"
+          flexDirection="row"
+          maxHeight="35%"
+          width="100%"
+          sx={{
+            alignItems: 'flex-start',
           }}>
-          <ToggleLeaderboardConfig
-            isOpen={showConfig}
-            onClick={() => setShowConfig(c => !c)}
-          />
-        </div>
-        <Box flexShrink={0} maxHeight="35%" overflow="auto">
-          <EditableMarkdown
-            value={description}
-            onChange={setDescription}
-            placeholder={DEFAULT_DESCRIPTION}
-          />
+          <Box flexShrink={0} flexGrow={1} overflow="auto">
+            <EditableMarkdown
+              value={description}
+              onChange={setDescription}
+              placeholder={DEFAULT_DESCRIPTION}
+            />
+          </Box>
+          <div
+            style={{
+              display: showConfig ? 'none' : 'block',
+              paddingRight: '16px',
+              paddingTop: '16px',
+            }}>
+            <ToggleLeaderboardConfig
+              isOpen={showConfig}
+              onClick={() => setShowConfig(c => !c)}
+            />
+          </div>
         </Box>
         {showingAlert && (
           <UnlistedAlert onClose={() => setShowingAlert(false)} />

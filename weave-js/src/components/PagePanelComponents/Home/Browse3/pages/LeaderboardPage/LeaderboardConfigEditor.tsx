@@ -12,7 +12,7 @@ import {
   Tabs,
   Typography,
 } from '@mui/material';
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 
 import {
   fetchDatasetNamesForSpec,
@@ -66,6 +66,16 @@ export const LeaderboardConfigEditor: React.FC<{
     }));
   };
 
+  const updateDescription = (newDescription: string) => {
+    setConfig(prevConfig => ({
+      ...prevConfig,
+      config: {
+        ...prevConfig.config,
+        description: newDescription,
+      },
+    }));
+  };
+
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
@@ -81,7 +91,8 @@ export const LeaderboardConfigEditor: React.FC<{
       }}>
       <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
         <Tabs value={activeTab} onChange={handleTabChange}>
-          <Tab label="Config Editor" />
+          <Tab label="Editor" />
+          <Tab label="Description" />
           <Tab label="Config Preview" />
         </Tabs>
       </Box>
@@ -93,7 +104,13 @@ export const LeaderboardConfigEditor: React.FC<{
             updateConfig={updateConfig}
           />
         )}
-        {activeTab === 1 && <ConfigPreview config={config} />}
+        {activeTab === 1 && (
+          <DescriptionEditor
+            description={config.config.description}
+            updateDescription={updateDescription}
+          />
+        )}
+        {activeTab === 2 && <ConfigPreview config={config} />}
       </Box>
 
       <Box
@@ -155,6 +172,69 @@ const ConfigPreview: React.FC<{
     </Box>
   );
 };
+
+const DescriptionEditor: React.FC<{
+  description: string;
+  updateDescription: (newDescription: string) => void;
+}> = ({description, updateDescription}) => {
+  const [localDescription, setLocalDescription] = useState(description);
+
+  const debouncedUpdate = useMemo(
+    () =>
+      debounce((value: string) => {
+        updateDescription(value);
+      }, 300),
+    [updateDescription]
+  );
+
+  useEffect(() => {
+    setLocalDescription(description);
+  }, [description]);
+
+  const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = event.target.value;
+    setLocalDescription(newValue);
+    debouncedUpdate(newValue);
+  };
+
+  return (
+    <Box sx={{height: 'calc(100vh - 200px)'}}>
+      <textarea
+        value={localDescription}
+        onChange={handleChange}
+        style={{
+          width: '100%',
+          height: '100%',
+          fontFamily: 'monospace',
+          fontSize: '14px',
+          padding: '10px',
+          border: '1px solid #ccc',
+          borderRadius: '4px',
+          resize: 'none',
+          backgroundColor: '#f5f5f5',
+          lineHeight: '1.5',
+          whiteSpace: 'pre-wrap',
+          overflowWrap: 'break-word',
+        }}
+        placeholder="Enter markdown description here..."
+      />
+    </Box>
+  );
+};
+
+// Debounce function
+function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout | null = null;
+  return (...args: Parameters<T>) => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
 
 const SourceEvaluationsConfig: React.FC<{
   sourceEvaluations: FilterAndGroupSourceEvaluationSpec[] | undefined;
