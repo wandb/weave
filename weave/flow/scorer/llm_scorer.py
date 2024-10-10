@@ -72,6 +72,20 @@ class EmbeddingScorer(LLMScorer):
         return float(cosine_sim)
 
 
+class OpenAIModerationScorer(LLMScorer):
+    "Use OpenAI moderation API to check if the model output is safe"
+
+    def score(self, model_output: Any) -> Any:
+        if not isinstance(self.client, (OpenAI, AsyncOpenAI)):
+            raise ValueError("Moderation scoring only works with OpenAI or AsyncOpenAI")
+        
+        response = self.client.moderations.create(
+            model=self.model,
+            input=model_output,
+        )
+        
+        return response.results[0]
+
 
 if __name__ == "__main__":
     try:
@@ -81,6 +95,16 @@ if __name__ == "__main__":
             client=client, 
             model="text-embedding-3-small")
         print(scorer.score("I don't know", "I don't know"))
+    except Exception as e:
+        print("Install openai to run this script")
+
+    try:
+        import openai
+        client = openai.OpenAI()
+        scorer = OpenAIModerationScorer(
+            client=client, 
+            model="omni-moderation-latest")
+        print(scorer.score("I should kill myself"))
     except Exception as e:
         print("Install openai to run this script")
     
