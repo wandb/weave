@@ -1,20 +1,20 @@
 import {isWeaveObjectRef} from '@wandb/weave/react';
 import _ from 'lodash';
 
-import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
-import {parseRefMaybe} from '../../../Browse2/SmallRef';
-import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
-import {TraceServerClient} from '../wfReactInterface/traceServerClient';
-import {TraceObjSchema} from '../wfReactInterface/traceServerClientTypes';
+import {flattenObjectPreservingWeaveTypes} from '../../../../Browse2/browse2Util';
+import {parseRefMaybe} from '../../../../Browse2/SmallRef';
+import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../../common/heuristics';
+import {TraceServerClient} from '../../wfReactInterface/traceServerClient';
+import {TraceObjSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {
   convertISOToDate,
   projectIdFromParts,
-} from '../wfReactInterface/tsDataModelHooks';
+} from '../../wfReactInterface/tsDataModelHooks';
 import {
   objectVersionKeyToRefUri,
   opVersionKeyToRefUri,
-} from '../wfReactInterface/utilities';
-import {FilterAndGroupSpec} from './LeaderboardConfigType';
+} from '../../wfReactInterface/utilities';
+import {FilterAndGroupSpec} from '../types/leaderboardConfigType';
 
 export type LeaderboardValueRecord = {
   datasetName: string;

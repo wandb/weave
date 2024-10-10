@@ -1,11 +1,8 @@
 import {useEffect, useState} from 'react';
 
-import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
-import {FilterAndGroupSpec} from './LeaderboardConfigType';
-import {
-  getLeaderboardData,
-  GroupedLeaderboardData,
-} from './leaderboardServerInterface';
+import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
+import {FilterAndGroupSpec} from '../types/leaderboardConfigType';
+import {getLeaderboardData, GroupedLeaderboardData} from './leaderboardQuery';
 
 type LeaderboardDataState = {
   loading: boolean;

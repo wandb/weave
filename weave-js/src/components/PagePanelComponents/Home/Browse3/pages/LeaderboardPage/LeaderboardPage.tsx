@@ -5,11 +5,11 @@ import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../../context';
 import {EditableMarkdown} from './EditableMarkdown';
-import {useLeaderboardData} from './hooks';
-import {LeaderboardConfigType} from './LeaderboardConfigType';
+import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
 import {LeaderboardGrid} from './LeaderboardGrid';
-import {LeaderboardConfig} from './LeaderboardPageConfig';
-import {LeaderboardValueRecord} from './leaderboardServerInterface';
+import {useLeaderboardData} from './query/hookAdapters';
+import {LeaderboardValueRecord} from './query/leaderboardQuery';
+import {LeaderboardConfigType} from './types/leaderboardConfigType';
 
 const USE_COMPARE_EVALUATIONS_PAGE = false;
 
@@ -133,7 +133,7 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
           onCellClick={handleCellClick}
         />
         {showConfig && (
-          <LeaderboardConfig
+          <LeaderboardConfigEditor
             entity={entity}
             project={project}
             config={currentConfig}
@@ -187,6 +187,4 @@ const UnlistedAlert: React.FC<{onClose: () => void}> = ({onClose}) => {
 };
 
 // TODO:
-// * [ ] Make the editable context (i think we should have an object and version and isEditing, etc... Think more like reports)
 // * [ ] Edit panel revisions
-// * [ ] UX Cleanup

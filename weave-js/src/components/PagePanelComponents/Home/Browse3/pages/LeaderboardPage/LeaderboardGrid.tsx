@@ -20,7 +20,7 @@ import {
   GroupedLeaderboardData,
   GroupedLeaderboardModelGroup,
   LeaderboardValueRecord,
-} from './leaderboardServerInterface';
+} from './query/leaderboardQuery';
 
 interface LeaderboardGridProps {
   entity: string;

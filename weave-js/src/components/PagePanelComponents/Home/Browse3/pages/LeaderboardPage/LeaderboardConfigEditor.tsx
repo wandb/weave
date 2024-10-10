@@ -1,5 +1,4 @@
 import {
-  Alert,
   Box,
   Button,
   Checkbox,
@@ -9,20 +8,31 @@ import {
   MenuItem,
   Select,
   SelectChangeEvent,
-  Typography,
-  Tabs,
   Tab,
+  Tabs,
+  Typography,
 } from '@mui/material';
 import React, {useEffect, useState} from 'react';
 
+import {
+  fetchDatasetNamesForSpec,
+  fetchDatasetVersionsForSpecAndName,
+  fetchEvaluationNames,
+  fetchEvaluationVersionsForName,
+  fetchMetricPathsForSpec,
+  fetchModelNamesForSpec,
+  fetchModelVersionsForSpecndName,
+  fetchScorerNamesForSpec,
+  fetchScorerVersionsForSpecAndName,
+} from './query/configEditorQuery';
 import {
   FilterAndGroupDatasetSpec,
   FilterAndGroupSourceEvaluationSpec,
   FilterAndGroupSpec,
   LeaderboardConfigType,
-} from './LeaderboardConfigType';
+} from './types/leaderboardConfigType';
 
-export const LeaderboardConfig: React.FC<{
+export const LeaderboardConfigEditor: React.FC<{
   entity: string;
   project: string;
   config: LeaderboardConfigType;
@@ -114,14 +124,8 @@ const ConfigEditor: React.FC<{
         sourceEvaluations={config.sourceEvaluations}
         updateConfig={updateConfig}
       />
-      <DatasetsConfig
-        datasets={config.datasets}
-        updateConfig={updateConfig}
-      />
-      <ModelsConfig
-        models={config.models}
-        updateConfig={updateConfig}
-      />
+      <DatasetsConfig datasets={config.datasets} updateConfig={updateConfig} />
+      <ModelsConfig models={config.models} updateConfig={updateConfig} />
     </>
   );
 };
@@ -244,8 +248,7 @@ const SourceEvaluationItem: React.FC<{
         <Select
           value={evaluation.version}
           onChange={handleVersionChange}
-          disabled={evaluation.name === '*'}
-        >
+          disabled={evaluation.name === '*'}>
           <MenuItem value="*">All</MenuItem>
           {versions.map(version => (
             <MenuItem key={version} value={version}>
@@ -387,8 +390,7 @@ const DatasetItem: React.FC<{
           <Select
             value={dataset.version}
             onChange={handleVersionChange}
-            disabled={dataset.name === '*'}
-          >
+            disabled={dataset.name === '*'}>
             <MenuItem value="*">All</MenuItem>
             {versions.map(version => (
               <MenuItem key={version} value={version}>
@@ -510,7 +512,10 @@ const ScorerItem: React.FC<{
                 j === scorerIndex
                   ? {
                       ...s,
-                      metrics: [...(s.metrics || []), {path: '', shouldMinimize: false}],
+                      metrics: [
+                        ...(s.metrics || []),
+                        {path: '', shouldMinimize: false},
+                      ],
                     }
                   : s
               ),
@@ -539,8 +544,7 @@ const ScorerItem: React.FC<{
           <Select
             value={scorer.version}
             onChange={handleVersionChange}
-            disabled={scorer.name === '*'}
-          >
+            disabled={scorer.name === '*'}>
             <MenuItem value="*">All</MenuItem>
             {versions.map(version => (
               <MenuItem key={version} value={version}>
@@ -783,8 +787,7 @@ const ModelItem: React.FC<{
           <Select
             value={model.version}
             onChange={handleVersionChange}
-            disabled={model.name === '*'}
-          >
+            disabled={model.name === '*'}>
             <MenuItem value="*">All</MenuItem>
             {versions.map(version => (
               <MenuItem key={version} value={version}>
@@ -805,68 +808,4 @@ const ModelItem: React.FC<{
       />
     </Box>
   );
-};
-
-const fetchEvaluationNames = async (): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(["E1", "E2", "E3"]);
-};
-
-const fetchEvaluationVersionsForName = async (
-  name: string
-): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(["EV1", "EV2", "EV3"]);
-};
-
-const fetchDatasetNamesForSpec = async (
-  spec: FilterAndGroupSpec
-): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(["D1", "D2", "D3"]);
-};
-
-const fetchDatasetVersionsForSpecAndName = async (
-  spec: FilterAndGroupSpec,
-  name: string
-): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(["DV1", "DV2", "DV3"]);
-};
-
-const fetchModelNamesForSpec = async (
-  spec: FilterAndGroupSpec
-): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(["M1", "M2", "M3"]);
-};
-
-const fetchModelVersionsForSpecndName = async (
-  spec: FilterAndGroupSpec,
-  name: string
-): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(["MV1", "MV2", "MV3"]);
-};
-
-const fetchScorerNamesForSpec = async (
-  spec: FilterAndGroupSpec
-): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(["S1", "S2", "S3"]);
-};
-
-const fetchScorerVersionsForSpecAndName = async (
-  spec: FilterAndGroupSpec,
-  name: string
-): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(["SV1", "SV2", "SV3"]);
-};
-
-const fetchMetricPathsForSpec = async (
-  spec: FilterAndGroupSpec
-): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(["MP1", "MP2", "MP3"]);
 };
