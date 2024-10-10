@@ -73,8 +73,9 @@ export const CompareEvaluationsPage: React.FC<
 export const CompareEvaluationsPageContent: React.FC<
   CompareEvaluationsPageProps
 > = props => {
-  const [baselineEvaluationCallId, setBaselineEvaluationCallId] =
-    React.useState<string | null>(null);
+  const [selectedCallIdsOrdered, setSelectedCallIdsOrdered] = React.useState<
+    string[]
+  >([]);
   const [comparisonDimensions, setComparisonDimensions] =
     React.useState<ComparisonDimensionsType | null>(null);
 
@@ -101,12 +102,8 @@ export const CompareEvaluationsPageContent: React.FC<
   );
 
   React.useEffect(() => {
-    // Only update the baseline if we are switching evaluations, if there
-    // is more than 1, we are in the compare view and baseline is auto set
-    if (props.evaluationCallIds.length === 1) {
-      setBaselineEvaluationCallId(props.evaluationCallIds[0]);
-    }
-  }, [props.evaluationCallIds]);
+    setSelectedCallIdsOrdered(props.evaluationCallIds);
+  }, [props.evaluationCallIds, setSelectedCallIdsOrdered]);
 
   if (props.evaluationCallIds.length === 0) {
     return <div>No evaluations to compare</div>;
@@ -116,13 +113,13 @@ export const CompareEvaluationsPageContent: React.FC<
     <CompareEvaluationsProvider
       entity={props.entity}
       project={props.project}
+      initialEvaluationCallIds={props.evaluationCallIds}
       selectedMetrics={props.selectedMetrics}
       setSelectedMetrics={props.setSelectedMetrics}
-      initialEvaluationCallIds={props.evaluationCallIds}
-      baselineEvaluationCallId={baselineEvaluationCallId ?? undefined}
+      selectedCallIdsOrdered={selectedCallIdsOrdered}
+      setSelectedCallIdsOrdered={setSelectedCallIdsOrdered}
       comparisonDimensions={comparisonDimensions ?? undefined}
       onEvaluationCallIdsUpdate={props.onEvaluationCallIdsUpdate}
-      setBaselineEvaluationCallId={setBaselineEvaluationCallId}
       setComparisonDimensions={setComparisonDimensionsAndClearInputDigest}
       selectedInputDigest={selectedInputDigest ?? undefined}
       setSelectedInputDigest={setSelectedInputDigest}>

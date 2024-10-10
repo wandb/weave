@@ -9,9 +9,7 @@ import {ComparisonDimensionsType} from './ecpState';
 
 const CompareEvaluationsContext = React.createContext<{
   state: EvaluationComparisonState;
-  setBaselineEvaluationCallId: React.Dispatch<
-    React.SetStateAction<string | null>
-  >;
+  setSelectedCallIdsOrdered: React.Dispatch<React.SetStateAction<string[]>>;
   setComparisonDimensions: React.Dispatch<
     React.SetStateAction<ComparisonDimensionsType | null>
   >;
@@ -32,34 +30,30 @@ export const useCompareEvaluationsState = () => {
 export const CompareEvaluationsProvider: React.FC<{
   entity: string;
   project: string;
+  initialEvaluationCallIds: string[];
+  selectedCallIdsOrdered: string[];
+  setSelectedCallIdsOrdered: React.Dispatch<React.SetStateAction<string[]>>;
   selectedMetrics: Record<string, boolean> | null;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
 
-  initialEvaluationCallIds: string[];
   onEvaluationCallIdsUpdate: (newEvaluationCallIds: string[]) => void;
-  setBaselineEvaluationCallId: React.Dispatch<
-    React.SetStateAction<string | null>
-  >;
   setComparisonDimensions: React.Dispatch<
     React.SetStateAction<ComparisonDimensionsType | null>
   >;
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
-  baselineEvaluationCallId?: string;
   comparisonDimensions?: ComparisonDimensionsType;
   selectedInputDigest?: string;
 }> = ({
   entity,
   project,
+  initialEvaluationCallIds,
+  setSelectedCallIdsOrdered,
+  selectedCallIdsOrdered,
   selectedMetrics,
   setSelectedMetrics,
-
-  initialEvaluationCallIds,
   onEvaluationCallIdsUpdate,
-  setBaselineEvaluationCallId,
   setComparisonDimensions,
-
   setSelectedInputDigest,
-  baselineEvaluationCallId,
   comparisonDimensions,
   selectedInputDigest,
   children,
@@ -71,7 +65,7 @@ export const CompareEvaluationsProvider: React.FC<{
     entity,
     project,
     evaluationCallIds,
-    baselineEvaluationCallId,
+    selectedCallIdsOrdered,
     comparisonDimensions,
     selectedInputDigest,
     selectedMetrics ?? undefined
@@ -83,13 +77,14 @@ export const CompareEvaluationsProvider: React.FC<{
     }
     return {
       state: initialState.result,
-      setBaselineEvaluationCallId,
+      setSelectedCallIdsOrdered,
       setComparisonDimensions,
       setSelectedInputDigest,
       setSelectedMetrics,
       addEvaluationCall: (newCallId: string) => {
         const newEvaluationCallIds = [...evaluationCallIds, newCallId];
         setEvaluationCallIds(newEvaluationCallIds);
+        setSelectedCallIdsOrdered(newEvaluationCallIds);
         onEvaluationCallIdsUpdate(newEvaluationCallIds);
       },
       removeEvaluationCall: (callId: string) => {
@@ -97,16 +92,17 @@ export const CompareEvaluationsProvider: React.FC<{
           id => id !== callId
         );
         setEvaluationCallIds(newEvaluationCallIds);
+        setSelectedCallIdsOrdered(newEvaluationCallIds);
         onEvaluationCallIdsUpdate(newEvaluationCallIds);
       },
     };
   }, [
     initialState.loading,
     initialState.result,
+    setEvaluationCallIds,
+    setSelectedCallIdsOrdered,
     evaluationCallIds,
     onEvaluationCallIdsUpdate,
-    setEvaluationCallIds,
-    setBaselineEvaluationCallId,
     setComparisonDimensions,
     setSelectedInputDigest,
     setSelectedMetrics,
