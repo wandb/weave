@@ -180,7 +180,7 @@ const UnlistedAlert: React.FC<{onClose: () => void}> = ({onClose}) => {
     <Alert severity="info" onClose={onClose}>
       <Typography variant="body1">
         You have found an internal, unlisted beta page! Please expect bugs and
-        incomplete features. Permilinks are not yet supported.
+        incomplete features. Permilinks & saving state are not yet supported
       </Typography>
     </Alert>
   );

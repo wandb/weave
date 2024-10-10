@@ -11,7 +11,7 @@ import {
 import React, {useCallback, useMemo, useState} from 'react';
 
 import {useWFHooks} from '../wfReactInterface/context';
-import {LeaderboardConfigType} from './LeaderboardConfigType';
+import {FilterAndGroupDatasetSpec, FilterAndGroupSourceEvaluationSpec, FilterAndGroupSpec, LeaderboardConfigType} from './LeaderboardConfigType';
 
 export const LeaderboardConfig: React.FC<{
   entity: string;
@@ -33,112 +33,6 @@ export const LeaderboardConfig: React.FC<{
 
   const [showAlert, setShowAlert] = useState(true);
 
-  const {useRootObjectVersions} = useWFHooks();
-
-  const evalObjects = useRootObjectVersions(
-    entity,
-    project,
-    {
-      baseObjectClasses: ['Evaluation'],
-      latestOnly: true,
-    },
-    undefined,
-    true
-  );
-
-  const [selectedEvalObject, setSelectedEvalObject] = useState<string | null>(
-    null
-  );
-
-  // const evalObjectsMap = useMemo(() => {
-  //   return new Map(
-  //     (evalObjects.result ?? []).map(obj => [
-  //       `${obj.objectId}:${obj.versionHash}`,
-  //       obj,
-  //     ])
-  //   );
-  // }, [evalObjects]);
-
-  const onEvalObjectChange = useCallback(
-    (newEvalObject: string) => {
-      // const evalObject = evalObjectsMap.get(newEvalObject);
-      // if (!evalObject) {
-      //   console.warn('Invalid eval object selected', newEvalObject);
-      //   return;
-      // }
-      const [name, version] = newEvalObject.split(':');
-      // const datasetRef = parseRefMaybe(evalObject.val.dataset ?? '');
-      // const scorers = (evalObject.val.scorers ?? [])
-      //   .map((scorer: string) => parseRefMaybe(scorer ?? ''))
-      //   .filter((scorer: ObjectRef | null) => scorer !== null) as ObjectRef[];
-      // if (!datasetRef) {
-      //   console.warn('Invalid dataset ref', evalObject.val.dataset);
-      //   return;
-      // }
-      setConfig(old => ({
-        ...old,
-        config: {
-          ...old.config,
-          dataSelectionSpec: {
-            ...old.config.dataSelectionSpec,
-            sourceEvaluations: [
-              ...(old.config.dataSelectionSpec.sourceEvaluations ?? []),
-              {
-                name,
-                version,
-              },
-            ],
-          },
-        },
-      }));
-      setSelectedEvalObject(newEvalObject);
-    },
-    [setConfig]
-  );
-
-  const evalOptions = useMemo(() => {
-    return (evalObjects.result ?? []).flatMap(obj => [
-      {
-        label: `${obj.objectId}:v${
-          obj.versionIndex
-        } (latest) (${obj.versionHash.slice(0, 6)})`,
-        value: `${obj.objectId}:${obj.versionHash}`,
-      },
-      {
-        label: `${obj.objectId}:* (all)`,
-        value: `${obj.objectId}:*`,
-      },
-    ]);
-  }, [evalObjects]);
-
-  const toggleModelsGrouped = (shouldGroup: boolean) => {
-    setConfig(old => {
-      let newModels = [];
-      const currModels = old.config.dataSelectionSpec.models ?? [];
-      if (currModels.length === 0) {
-        newModels.push({
-          name: '*',
-          version: '*',
-          groupAllVersions: shouldGroup,
-        });
-      } else {
-        newModels = currModels.map(model => ({
-          ...model,
-          groupAllVersions: shouldGroup,
-        }));
-      }
-      return {
-        ...old,
-        config: {
-          ...old.config,
-          dataSelectionSpec: {
-            ...old.config.dataSelectionSpec,
-            models: newModels,
-          },
-        },
-      };
-    });
-  };
 
   return (
     <Box
@@ -159,38 +53,6 @@ export const LeaderboardConfig: React.FC<{
         <Typography variant="h5" gutterBottom>
           Leaderboard Configuration
         </Typography>
-        <FormControl fullWidth sx={{mt: 2, mb: 2}}>
-          <InputLabel id="eval-select-label">
-            Add 'Preset' Evaluation
-          </InputLabel>
-          <Select
-            labelId="eval-select-label"
-            id="eval-select"
-            value={selectedEvalObject || ''}
-            onChange={event => {
-              const selectedValue = event.target.value;
-              onEvalObjectChange(selectedValue);
-            }}
-            label="Add 'Preset' Evaluation">
-            {evalOptions.map(option => (
-              <MenuItem key={option.value} value={option.value}>
-                {option.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Button
-          variant="outlined"
-          onClick={() => toggleModelsGrouped(true)}
-          sx={{mt: 2, mb: 2}}>
-          Mark Model Versions as Grouped
-        </Button>
-        <Button
-          variant="outlined"
-          onClick={() => toggleModelsGrouped(false)}
-          sx={{mt: 2, mb: 2}}>
-          Mark Model Versions as Individual
-        </Button>
       </Box>
 
       <Box sx={{mt: 2, mb: 2, flex: 1, overflowY: 'auto'}}>
@@ -209,6 +71,8 @@ export const LeaderboardConfig: React.FC<{
           {JSON.stringify(config, null, 2)}
         </pre>
       </Box>
+
+      {/* Add config builder / editor here */}
 
       <Box
         sx={{
@@ -239,3 +103,51 @@ const TempAlert: React.FC<{onClose: () => void}> = ({onClose}) => {
     </Alert>
   );
 };
+
+// These functions are placeholders which I will implement.
+
+const fetchEvaluationNames = async (): Promise<string[]> => {
+  // TODO
+  return Promise.resolve([])
+}
+
+const fetchEvaluationVersionsForName = async (name: string): Promise<string[]> => {
+  // TODO
+  return Promise.resolve([])
+}
+
+const fetchDatasetNamesForSpec = async (spec: FilterAndGroupSpec): Promise<string[]> => {
+  // TODO
+  return Promise.resolve([])
+}
+
+const fetchDatasetVersionsForSpecAndName = async (spec: FilterAndGroupSpec, name: string): Promise<string[]> => {
+  // TODO
+  return Promise.resolve([])
+}
+
+const fetchModelNamesForSpec = async (spec: FilterAndGroupSpec): Promise<string[]> => {
+  // TODO
+  return Promise.resolve([])
+}
+
+const fetchModelVersionsForSpecndName = async (spec: FilterAndGroupSpec, name: string): Promise<string[]> => {
+  // TODO
+  return Promise.resolve([])
+}
+
+const fetchScorerNamesForSpec = async (spec: FilterAndGroupSpec): Promise<string[]> => {
+  // TODO
+  return Promise.resolve([])
+}
+
+const fetchScorerVersionsForSpecAndName = async (spec: FilterAndGroupSpec, name: string): Promise<string[]> => {
+  // TODO
+  return Promise.resolve([])
+}
+
+const fetchMetricPathsForSpec = async (spec: FilterAndGroupSpec): Promise<string[]> => {
+    // TODO
+    return Promise.resolve([])
+}
+
