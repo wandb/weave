@@ -1,6 +1,6 @@
 import {Alert, Box, Typography} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../../context';
