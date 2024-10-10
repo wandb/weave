@@ -118,6 +118,16 @@ type LeaderboardValueRecord = {
     sourceEvaluationObjectRef: string;
 }
 
+type GroupableLeaderboardValueRecord = {
+    datasetGroup: string;
+    scorerGroup: string;
+    metricPathGroup: string;
+    modelGroup: string;
+    sortKey: number;
+    row: LeaderboardValueRecord;
+}
+
+export type GroupedLeaderboardData2 = Array<GroupableLeaderboardValueRecord>;
 export type LeaderboardData2 = Array<LeaderboardValueRecord>;
 
 export type FilterAndGroupSpec = {
@@ -142,7 +152,7 @@ export type FilterAndGroupSpec = {
     }> // null is all
 }
 
-export const getLeaderboardData = async (client: TraceServerClient, entity: string, project: string, spec: FilterAndGroupSpec = {}): Promise<LeaderboardData2> => {
+export const getLeaderboardData = async (client: TraceServerClient, entity: string, project: string, spec: FilterAndGroupSpec = {}): Promise<GroupedLeaderboardData2> => {
     // get all the evaluations
     const allEvaluationObjectsProm = client.objsQuery(
         {
@@ -304,7 +314,7 @@ export const getLeaderboardData = async (client: TraceServerClient, entity: stri
     //    Allow-list of Names + Versions
 
     const filterableGroupableData = data.map(row => {
-        const groupableRow = {
+        const groupableRow: GroupableLeaderboardValueRecord = {
             datasetGroup: row.datasetName,
             scorerGroup: row.scorerName,
             modelGroup: row.modelName,
@@ -366,8 +376,8 @@ export const getLeaderboardData = async (client: TraceServerClient, entity: stri
 
     const groupableData = filterableGroupableData.filter(entry => entry.include).map(entry => entry.groupableRow);
 
-    const finalData = [];
-    const groupData = (data: { [key: string]: any } & { sortKey: number }[], fields: string[]): any => {
+    const finalData: GroupedLeaderboardData2 = [];
+    const groupData = (data: GroupableLeaderboardValueRecord[], fields: string[]): any => {
         if (fields.length === 0) {
             // Sort by created at descending and return the most recent record
             // Would be better to use some form of latest.
@@ -386,7 +396,7 @@ export const getLeaderboardData = async (client: TraceServerClient, entity: stri
     console.log(groupedData);
     console.table(finalData)
 
-    return data;
+    return finalData;
 }
 
 
