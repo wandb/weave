@@ -7,9 +7,10 @@ import {
   GridLeafColumn,
   GridRenderCellParams,
   GridSortDirection,
+  GridSortItem,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
@@ -140,7 +141,12 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                       } else {
                         inner = JSON.stringify(params.value);
                       }
-                      const record = recordFromRowData(params.row, datasetGroupName, scorerGroupName, metricPathGroupName);
+                      const record = recordFromRowData(
+                        params.row,
+                        datasetGroupName,
+                        scorerGroupName,
+                        metricPathGroupName
+                      );
                       return (
                         <div
                           style={{
@@ -283,6 +289,14 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     return finalGroupingModel;
   }, [columnStats.datasetGroups, entity, project]);
 
+  const [sortModel, setSortModel] = useState<GridSortItem[]>([]);
+
+  useEffect(() => {
+    if (sortModel.length === 0 && columns.length > 1) {
+      setSortModel([{field: columns[1].field, sort: 'desc'}]);
+    }
+  }, [columns, sortModel]);
+
   return (
     <Box
       sx={{
@@ -290,7 +304,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden', // Prevent outer container from scrolling
+        overflow: 'hidden',
       }}>
       <StyledDataGrid
         rows={rows}
@@ -301,6 +315,8 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         disableMultipleColumnsSorting={false}
         columnHeaderHeight={40}
         loading={loading}
+        sortModel={sortModel}
+        onSortModelChange={setSortModel}
         sx={{
           borderRadius: 0,
           '& .MuiDataGrid-footerContainer': {
@@ -322,25 +338,12 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           },
         }}
         slots={{
-          // columnMenu: CallsCustomColumnMenu,
           pagination: PaginationButtons,
         }}
       />
     </Box>
   );
 };
-
-// const walkGroupingModel = (
-//   nodes: GridColumnNode[],
-//   fn: (node: GridColumnNode) => GridColumnNode
-// ) => {
-//   return nodes.map(node => {
-//     if ('children' in node) {
-//       node.children = walkGroupingModel(node.children, fn);
-//     }
-//     return fn(node);
-//   });
-// };
 
 type ColumnStats = {
   datasetGroups: {
@@ -440,7 +443,7 @@ const recordFromRowData = (
 ): LeaderboardValueRecord | null => {
   return rowData.modelGroup.datasetGroups[datasetGroupName]?.scorerGroups[
     scorerGroupName
-  ]?.metricPathGroups[metricPathGroupName]?.[0]
+  ]?.metricPathGroups[metricPathGroupName]?.[0];
 };
 const getAggregatedResults = (
   data: null | LeaderboardValueRecord[]

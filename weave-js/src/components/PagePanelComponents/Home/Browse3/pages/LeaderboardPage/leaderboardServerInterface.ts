@@ -242,6 +242,33 @@ export const getLeaderboardData = async (
       row,
     };
 
+    if (spec.models) {
+      let modelSpec = spec.models.find(
+        model =>
+          model.name === row.modelName && model.version === row.modelVersion
+      );
+      modelSpec =
+        modelSpec ||
+        spec.models.find(
+          model =>
+            model.name === row.modelName &&
+            (model.version === '*' || model.version === row.modelVersion)
+        );
+      modelSpec =
+        modelSpec ||
+        spec.models.find(
+          model =>
+            (model.name === '*' || model.name === row.modelName) &&
+            (model.version === '*' || model.version === row.modelVersion)
+        );
+      if (!modelSpec) {
+        return {include: false, groupableRow};
+      }
+      if (modelSpec.groupAllVersions) {
+        groupableRow.modelGroup = `${row.modelName}`;
+      }
+    }
+
     if (!spec.datasets) {
       return {include: true, groupableRow};
     }
@@ -311,32 +338,7 @@ export const getLeaderboardData = async (
         }
       }
     }
-    if (spec.models) {
-      let modelSpec = spec.models.find(
-        model =>
-          model.name === row.modelName && model.version === row.modelVersion
-      );
-      modelSpec =
-        modelSpec ||
-        spec.models.find(
-          model =>
-            model.name === row.modelName &&
-            (model.version === '*' || model.version === row.modelVersion)
-        );
-      modelSpec =
-        modelSpec ||
-        spec.models.find(
-          model =>
-            (model.name === '*' || model.name === row.modelName) &&
-            (model.version === '*' || model.version === row.modelVersion)
-        );
-      if (!modelSpec) {
-        return {include: false, groupableRow};
-      }
-      if (modelSpec.groupAllVersions) {
-        groupableRow.modelGroup = `${row.modelName}`;
-      }
-    }
+
     return {include: true, groupableRow};
   });
 

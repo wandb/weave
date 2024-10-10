@@ -1,6 +1,18 @@
-import {Alert, Box, Button, Typography} from '@mui/material';
-import React, {useState} from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  Typography,
+} from '@mui/material';
+import {ObjectRef} from '@wandb/weave/react';
+import React, {useCallback, useMemo, useState} from 'react';
 
+import {parseRefMaybe} from '../../../Browse2/SmallRef';
+import {useWFHooks} from '../wfReactInterface/context';
 import {LeaderboardConfigType} from './LeaderboardConfigType';
 
 export const LeaderboardConfig: React.FC<{
@@ -23,6 +35,109 @@ export const LeaderboardConfig: React.FC<{
 
   const [showAlert, setShowAlert] = useState(true);
 
+  const {useRootObjectVersions} = useWFHooks();
+
+  const evalObjects = useRootObjectVersions(entity, project, {
+    baseObjectClasses: ['Evaluation'],
+  });
+
+  const [selectedEvalObject, setSelectedEvalObject] = useState<string | null>(
+    null
+  );
+
+  const evalObjectsMap = useMemo(() => {
+    return new Map(
+      (evalObjects.result ?? []).map(obj => [
+        `${obj.objectId}:${obj.versionHash}`,
+        obj,
+      ])
+    );
+  }, [evalObjects]);
+
+  const onEvalObjectChange = useCallback(
+    (newEvalObject: string) => {
+      const evalObject = evalObjectsMap.get(newEvalObject);
+      if (!evalObject) {
+        console.warn('Invalid eval object selected', newEvalObject);
+        return;
+      }
+      const datasetRef = parseRefMaybe(evalObject.val.dataset ?? '');
+      const scorers = (evalObject.val.scorers ?? [])
+        .map((scorer: string) => parseRefMaybe(scorer ?? ''))
+        .filter((scorer: ObjectRef | null) => scorer !== null) as ObjectRef[];
+      if (!datasetRef) {
+        console.warn('Invalid dataset ref', evalObject.val.dataset);
+        return;
+      }
+      setConfig(old => ({
+        ...old,
+        config: {
+          ...old.config,
+          dataSelectionSpec: {
+            datasets: [
+              ...(old.config.dataSelectionSpec.datasets ?? []),
+              {
+                name: datasetRef.artifactName,
+                version: datasetRef.artifactVersion,
+                scorers: [
+                  ...scorers.map(scorer => ({
+                    name: scorer.artifactName,
+                    version: scorer.artifactVersion,
+                  })),
+                  {
+                    name: 'modelLatency',
+                    version: 'modelLatency',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      }));
+      setSelectedEvalObject(newEvalObject);
+    },
+    [evalObjectsMap, setConfig]
+  );
+
+  const evalOptions = useMemo(() => {
+    return (evalObjects.result ?? []).map(obj => ({
+      label: `${obj.objectId}:v${obj.versionIndex} (${obj.versionHash.slice(
+        0,
+        6
+      )})`,
+      value: `${obj.objectId}:${obj.versionHash}`,
+    }));
+  }, [evalObjects]);
+
+  const toggleModelsGrouped = (shouldGroup: boolean) => {
+    setConfig(old => {
+      let newModels = [];
+      const currModels = old.config.dataSelectionSpec.models ?? [];
+      if (currModels.length === 0) {
+        newModels.push({
+          name: '*',
+          version: '*',
+          groupAllVersions: shouldGroup,
+        });
+      } else {
+        newModels = currModels.map(model => ({
+          ...model,
+          groupAllVersions: shouldGroup,
+        }));
+      }
+      return {
+        ...old,
+        config: {
+          ...old.config,
+          dataSelectionSpec: {
+            ...old.config.dataSelectionSpec,
+            models: newModels,
+          },
+        },
+      };
+    });
+  };
+
   return (
     <Box
       sx={{
@@ -34,7 +149,7 @@ export const LeaderboardConfig: React.FC<{
       }}>
       <Box
         sx={{
-          flexGrow: 1,
+          // flexGrow: 1,
           overflowY: 'auto',
           p: 2,
         }}>
@@ -42,6 +157,55 @@ export const LeaderboardConfig: React.FC<{
         <Typography variant="h5" gutterBottom>
           Leaderboard Configuration
         </Typography>
+        <FormControl fullWidth sx={{mt: 2, mb: 2}}>
+          <InputLabel id="eval-select-label">
+            Add 'Preset' Evaluation
+          </InputLabel>
+          <Select
+            labelId="eval-select-label"
+            id="eval-select"
+            value={selectedEvalObject || ''}
+            onChange={event => {
+              const selectedValue = event.target.value;
+              onEvalObjectChange(selectedValue);
+            }}
+            label="Add 'Preset' Evaluation">
+            {evalOptions.map(option => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <Button
+          variant="outlined"
+          onClick={() => toggleModelsGrouped(true)}
+          sx={{mt: 2, mb: 2}}>
+          Mark Model Versions as Grouped
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() => toggleModelsGrouped(false)}
+          sx={{mt: 2, mb: 2}}>
+          Mark Model Versions as Individual
+        </Button>
+      </Box>
+
+      <Box sx={{mt: 2, mb: 2, flex: 1, overflowY: 'auto'}}>
+        <Typography variant="h6" gutterBottom>
+          Configuration Preview
+        </Typography>
+        <pre
+          style={{
+            backgroundColor: '#f5f5f5',
+            padding: '10px',
+            borderRadius: '4px',
+            overflowX: 'auto',
+            whiteSpace: 'pre-wrap',
+            wordWrap: 'break-word',
+          }}>
+          {JSON.stringify(config, null, 2)}
+        </pre>
       </Box>
 
       <Box

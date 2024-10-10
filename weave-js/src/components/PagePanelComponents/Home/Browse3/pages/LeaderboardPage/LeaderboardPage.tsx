@@ -1,5 +1,4 @@
 import {Alert, Box, Typography} from '@mui/material';
-import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
 import {Button} from '@wandb/weave/components/Button';
 import React, {useCallback, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -28,23 +27,24 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
 const DEFAULT_DESCRIPTION = `# Leaderboard`;
 
 const usePersistedLeaderboardConfig = () => {
-  const initialConfig: LeaderboardConfigType = useMemo(() => {
-    return {
+  const [configPersisted, setConfigPersisted] = useState<LeaderboardConfigType>(
+    {
       version: 1,
       config: {description: '', dataSelectionSpec: {}},
-    };
-  }, []);
+    }
+  );
 
   const [config, setConfigLocal] =
-    useState<LeaderboardConfigType>(initialConfig);
+    useState<LeaderboardConfigType>(configPersisted);
 
   const persistConfig = useCallback(() => {
+    setConfigPersisted(config);
     // persistLeaderboardConfig(config);
-  }, []);
+  }, [config]);
 
   const cancelChanges = useCallback(() => {
-    setConfigLocal(initialConfig);
-  }, [initialConfig]);
+    setConfigLocal(configPersisted);
+  }, [configPersisted]);
 
   return {config, setConfigLocal, persistConfig, cancelChanges};
 };
@@ -80,7 +80,6 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
     project,
     currentConfig.config.dataSelectionSpec
   );
-  useTraceUpdate('a', {entity, project, currentConfig});
 
   const handleCellClick = (record: LeaderboardValueRecord) => {
     const sourceCallId = record.sourceEvaluationCallId;
