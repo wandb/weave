@@ -97,16 +97,18 @@ export const LeaderboardConfig: React.FC<{
   );
 
   const evalOptions = useMemo(() => {
-    return (evalObjects.result ?? []).flatMap(obj => ([{
-      label: `${obj.objectId}:v${obj.versionIndex} (latest) (${obj.versionHash.slice(
-        0,
-        6
-      )})`,
-      value: `${obj.objectId}:${obj.versionHash}`,
-    }, {
-      label: `${obj.objectId}:* (all)`,
-      value: `${obj.objectId}:*`,
-    }]));
+    return (evalObjects.result ?? []).flatMap(obj => [
+      {
+        label: `${obj.objectId}:v${
+          obj.versionIndex
+        } (latest) (${obj.versionHash.slice(0, 6)})`,
+        value: `${obj.objectId}:${obj.versionHash}`,
+      },
+      {
+        label: `${obj.objectId}:* (all)`,
+        value: `${obj.objectId}:*`,
+      },
+    ]);
   }, [evalObjects]);
 
   const toggleModelsGrouped = (shouldGroup: boolean) => {
