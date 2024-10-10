@@ -10,8 +10,14 @@ export type LeaderboardConfigType = {
 };
 
 export type FilterAndGroupSpec = {
+  sourceEvaluations?: FilterAndGroupSourceEvaluationSpec[]; // null is all
   datasets?: FilterAndGroupDatasetSpec[]; // null is all
   models?: FilterAndGroupModelSpec[]; // null is all
+};
+
+export type FilterAndGroupSourceEvaluationSpec = {
+  name: string;
+  version: string; // "*" means all
 };
 
 export type FilterAndGroupDatasetSpec = {

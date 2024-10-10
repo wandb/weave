@@ -39,64 +39,57 @@ export const LeaderboardConfig: React.FC<{
 
   const evalObjects = useRootObjectVersions(entity, project, {
     baseObjectClasses: ['Evaluation'],
-  });
+    latestOnly: true,
+  }, undefined, true);
 
   const [selectedEvalObject, setSelectedEvalObject] = useState<string | null>(
     null
   );
 
-  const evalObjectsMap = useMemo(() => {
-    return new Map(
-      (evalObjects.result ?? []).map(obj => [
-        `${obj.objectId}:${obj.versionHash}`,
-        obj,
-      ])
-    );
-  }, [evalObjects]);
+  // const evalObjectsMap = useMemo(() => {
+  //   return new Map(
+  //     (evalObjects.result ?? []).map(obj => [
+  //       `${obj.objectId}:${obj.versionHash}`,
+  //       obj,
+  //     ])
+  //   );
+  // }, [evalObjects]);
 
   const onEvalObjectChange = useCallback(
     (newEvalObject: string) => {
-      const evalObject = evalObjectsMap.get(newEvalObject);
-      if (!evalObject) {
-        console.warn('Invalid eval object selected', newEvalObject);
-        return;
-      }
-      const datasetRef = parseRefMaybe(evalObject.val.dataset ?? '');
-      const scorers = (evalObject.val.scorers ?? [])
-        .map((scorer: string) => parseRefMaybe(scorer ?? ''))
-        .filter((scorer: ObjectRef | null) => scorer !== null) as ObjectRef[];
-      if (!datasetRef) {
-        console.warn('Invalid dataset ref', evalObject.val.dataset);
-        return;
-      }
+      // const evalObject = evalObjectsMap.get(newEvalObject);
+      // if (!evalObject) {
+      //   console.warn('Invalid eval object selected', newEvalObject);
+      //   return;
+      // }
+      const [name, version] = newEvalObject.split(':');
+      // const datasetRef = parseRefMaybe(evalObject.val.dataset ?? '');
+      // const scorers = (evalObject.val.scorers ?? [])
+      //   .map((scorer: string) => parseRefMaybe(scorer ?? ''))
+      //   .filter((scorer: ObjectRef | null) => scorer !== null) as ObjectRef[];
+      // if (!datasetRef) {
+      //   console.warn('Invalid dataset ref', evalObject.val.dataset);
+      //   return;
+      // }
       setConfig(old => ({
         ...old,
         config: {
           ...old.config,
           dataSelectionSpec: {
-            datasets: [
-              ...(old.config.dataSelectionSpec.datasets ?? []),
+            ...old.config.dataSelectionSpec,
+            sourceEvaluations: [
+              ...(old.config.dataSelectionSpec.sourceEvaluations ?? []),
               {
-                name: datasetRef.artifactName,
-                version: datasetRef.artifactVersion,
-                scorers: [
-                  ...scorers.map(scorer => ({
-                    name: scorer.artifactName,
-                    version: scorer.artifactVersion,
-                  })),
-                  {
-                    name: 'modelLatency',
-                    version: 'modelLatency',
-                  },
-                ],
-              },
+                name: name,
+                version: version,
+              }
             ],
           },
         },
       }));
       setSelectedEvalObject(newEvalObject);
     },
-    [evalObjectsMap, setConfig]
+    [setConfig]
   );
 
   const evalOptions = useMemo(() => {
