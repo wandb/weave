@@ -12,7 +12,7 @@ CREATE TABLE files_stats
 ORDER BY (project_id, digest, chunk_index);
 
 CREATE MATERIALIZED VIEW files_stats_view
-TO weave_trace_db.files_stats
+TO files_stats
 AS
 SELECT
     project_id,
@@ -23,7 +23,7 @@ SELECT
     anySimpleState(length(val_bytes)) AS size_bytes,
     minSimpleState(created_at) AS created_at,
     maxSimpleState(created_at) AS updated_at
-FROM weave_trace_db.files
+FROM files
 GROUP BY
     project_id,
     digest,
@@ -41,7 +41,7 @@ CREATE TABLE table_rows_stats
 ORDER BY (project_id, digest);
 
 CREATE MATERIALIZED VIEW table_rows_stats_view
-TO weave_trace_db.table_rows_stats
+TO table_rows_stats
 AS
 SELECT
     project_id,
@@ -50,7 +50,7 @@ SELECT
     anySimpleState(length(val_dump)) AS size_bytes,
     minSimpleState(created_at) AS created_at,
     maxSimpleState(created_at) AS updated_at
-FROM weave_trace_db.table_rows
+FROM table_rows
 GROUP BY
     project_id, digest;
 
@@ -70,7 +70,7 @@ CREATE TABLE object_versions_stats
 ORDER BY (project_id, kind, object_id, digest);
 
 CREATE MATERIALIZED VIEW object_versions_stats_view
-TO weave_trace_db.object_versions_stats
+TO object_versions_stats
 AS
 SELECT
     project_id,
@@ -82,9 +82,40 @@ SELECT
     anySimpleState(length(val_dump)) AS size_bytes,
     minSimpleState(created_at) AS created_at,
     maxSimpleState(created_at) AS updated_at
-FROM weave_trace_db.object_versions
+FROM object_versions
 GROUP BY
     project_id, kind, object_id, digest;
+
+CREATE TABLE feedback_stats
+(
+    project_id String,
+    weave_ref String,
+    wb_user_id String,
+    id String,
+    creator SimpleAggregateFunction(any, Nullable(String)),
+    created_at SimpleAggregateFunction(min, DateTime64(3)),
+    updated_at SimpleAggregateFunction(max, DateTime64(3)),
+    feedback_type SimpleAggregateFunction(any, String),
+    payload_size_bytes SimpleAggregateFunction(any, UInt64),
+) ENGINE = AggregatingMergeTree()
+ORDER BY (project_id, weave_ref, wb_user_id, id);
+
+CREATE MATERIALIZED VIEW feedback_stats_view
+TO feedback_stats
+AS
+SELECT
+    project_id,
+    weave_ref,
+    wb_user_id,
+    id,
+    anySimpleState(creator) as creator,
+    minSimpleState(created_at) as created_at,
+    maxSimpleState(created_at) as updated_at,
+    argMaxState(feedback_type, created_at) as feedback_type,
+    anySimpleState(length(payload_dump)) as payload_size_bytes,
+FROM feedback
+GROUP BY
+    project_id, weave_ref, wb_user_id, id;
 
 CREATE TABLE calls_merged_stats
 (
@@ -112,7 +143,7 @@ ORDER BY (project_id, id);
 
 -- NOTE: This needs to be generally kept in sync with calls_merged.
 CREATE MATERIALIZED VIEW calls_merged_stats_view
-TO weave_trace_db.calls_merged_stats
+TO calls_merged_stats
 AS
 SELECT
     project_id,
@@ -133,6 +164,6 @@ SELECT
     anySimpleState(wb_run_id) as wb_run_id,
     anySimpleState(deleted_at) as deleted_at,
     maxSimpleState(created_at) as updated_at,
-    argMaxSimpleState(display_name, created_at) as display_name
-FROM weave_trace_db.call_parts
+    argMaxState(display_name, created_at) as display_name
+FROM call_parts
 GROUP BY project_id, id;
