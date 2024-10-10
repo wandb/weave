@@ -16,9 +16,9 @@ class XMLScorer(Scorer):
 
         try:
             ET.fromstring(xml_string)
-            return True
+            return {"xml_valid": True}
         except ET.ParseError:
-            return False
+            return {"xml_valid": False}
 
 
 if __name__ == "__main__":

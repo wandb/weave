@@ -12,11 +12,11 @@ class JSONScorer(Scorer):
             result = json.loads(model_output)
 
             if isinstance(result, dict) or isinstance(result, list):
-                return True
+                return {"json_valid": True}
 
         except json.JSONDecodeError:
             pass
-        return False
+        return {"json_valid": False}
     
 
 if __name__ == "__main__":
