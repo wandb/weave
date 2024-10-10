@@ -2,7 +2,8 @@ import nox
 
 nox.options.default_venv_backend = "uv"
 
-SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12"]
+SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
+PY313_INCOMPATIBLE_SHARDS = ["anthropic", "cohere", "dspy", "langchain", "litellm"]
 
 
 @nox.session
@@ -32,6 +33,9 @@ def lint(session):
     ],
 )
 def tests(session, shard):
+    if session.python.startswith("3.13") and shard in PY313_INCOMPATIBLE_SHARDS:
+        session.skip(f"Skipping {shard=} as it is not compatible with Python 3.13")
+
     session.install("-e", f".[{shard},test]")
     session.chdir("tests")
 
@@ -64,6 +68,5 @@ def tests(session, shard):
 
 
 # Configure pytest
-# nox.options.sessions = ["tests", "lint", "integration_tests"]
 nox.options.reuse_existing_virtualenvs = True
 nox.options.stop_on_first_error = True
