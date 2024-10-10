@@ -14,7 +14,7 @@ import {
   objectVersionKeyToRefUri,
   opVersionKeyToRefUri,
 } from '../../wfReactInterface/utilities';
-import {FilterAndGroupSpec} from '../types/leaderboardConfigType';
+import {ALL_VALUE, FilterAndGroupSpec} from '../types/leaderboardConfigType';
 
 export type LeaderboardValueRecord = {
   datasetName: string;
@@ -74,7 +74,7 @@ export const getLeaderboardData = async (
   spec: FilterAndGroupSpec = {}
 ): Promise<GroupedLeaderboardData> => {
   const atLeastOneStarName = spec.sourceEvaluations?.some(
-    sourceEvaluation => sourceEvaluation.name === '*'
+    sourceEvaluation => sourceEvaluation.name === ALL_VALUE
   );
   const sourceEvals = atLeastOneStarName ? [] : spec.sourceEvaluations ?? [];
   const evalNames = sourceEvals.map(sourceEvaluation => sourceEvaluation.name);
@@ -109,7 +109,8 @@ export const getLeaderboardData = async (
       return sourceEvals.some(sourceEval => {
         return (
           obj.object_id === sourceEval.name &&
-          (obj.digest === sourceEval.version || sourceEval.version === '*')
+          (obj.digest === sourceEval.version ||
+            sourceEval.version === ALL_VALUE)
         );
       });
     });
@@ -158,7 +159,7 @@ export const getLeaderboardData = async (
           entity,
           project,
           opId: EVALUATE_OP_NAME_POST_PYDANTIC,
-          versionHash: '*',
+          versionHash: ALL_VALUE,
         }),
       ],
       input_refs: fullyQualifiedEvalRefs,
@@ -302,14 +303,14 @@ export const getLeaderboardData = async (
         spec.models.find(
           model =>
             model.name === row.modelName &&
-            (model.version === '*' || model.version === row.modelVersion)
+            (model.version === ALL_VALUE || model.version === row.modelVersion)
         );
       modelSpec =
         modelSpec ||
         spec.models.find(
           model =>
-            (model.name === '*' || model.name === row.modelName) &&
-            (model.version === '*' || model.version === row.modelVersion)
+            (model.name === ALL_VALUE || model.name === row.modelName) &&
+            (model.version === ALL_VALUE || model.version === row.modelVersion)
         );
       if (!modelSpec) {
         return {include: false, groupableRow};
@@ -325,7 +326,7 @@ export const getLeaderboardData = async (
     if (spec.datasets.length === 0) {
       return {include: true, groupableRow};
     }
-    if (spec.datasets.some(dataset => dataset.name === '*')) {
+    if (spec.datasets.some(dataset => dataset.name === ALL_VALUE)) {
       return {include: true, groupableRow};
     }
 
@@ -339,14 +340,16 @@ export const getLeaderboardData = async (
       spec.datasets.find(
         dataset =>
           dataset.name === row.datasetName &&
-          (dataset.version === '*' || dataset.version === row.datasetVersion)
+          (dataset.version === ALL_VALUE ||
+            dataset.version === row.datasetVersion)
       );
     datasetSpec =
       datasetSpec ||
       spec.datasets.find(
         dataset =>
-          (dataset.name === '*' || dataset.name === row.datasetName) &&
-          (dataset.version === '*' || dataset.version === row.datasetVersion)
+          (dataset.name === ALL_VALUE || dataset.name === row.datasetName) &&
+          (dataset.version === ALL_VALUE ||
+            dataset.version === row.datasetVersion)
       );
     if (!datasetSpec) {
       return {include: false, groupableRow};
@@ -364,14 +367,16 @@ export const getLeaderboardData = async (
         datasetSpec.scorers.find(
           scorer =>
             scorer.name === row.scorerName &&
-            (scorer.version === '*' || scorer.version === row.scorerVersion)
+            (scorer.version === ALL_VALUE ||
+              scorer.version === row.scorerVersion)
         );
       scorerSpec =
         scorerSpec ||
         datasetSpec.scorers.find(
           scorer =>
-            (scorer.name === '*' || scorer.name === row.scorerName) &&
-            (scorer.version === '*' || scorer.version === row.scorerVersion)
+            (scorer.name === ALL_VALUE || scorer.name === row.scorerName) &&
+            (scorer.version === ALL_VALUE ||
+              scorer.version === row.scorerVersion)
         );
       if (!scorerSpec) {
         return {include: false, groupableRow};
@@ -381,7 +386,7 @@ export const getLeaderboardData = async (
       }
       if (scorerSpec.metrics) {
         const metricSpec = scorerSpec.metrics.find(
-          metric => metric.path === '*' || metric.path === row.metricPath
+          metric => metric.path === ALL_VALUE || metric.path === row.metricPath
         );
         if (!metricSpec) {
           return {include: false, groupableRow};

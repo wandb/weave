@@ -105,7 +105,7 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
         display="flex"
         flexDirection="column"
         height="100%"
-        minWidth="65%">
+        minWidth="50%">
         <Box
           flex={1}
           display="flex"

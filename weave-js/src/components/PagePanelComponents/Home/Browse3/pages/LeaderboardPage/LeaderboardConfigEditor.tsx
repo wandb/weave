@@ -29,6 +29,7 @@ import {
   fetchScorerVersionsForSpecAndName,
 } from './query/configEditorQuery';
 import {
+  ALL_VALUE,
   FilterAndGroupDatasetScorerMetricSpec,
   FilterAndGroupDatasetScorerSpec,
   FilterAndGroupDatasetSpec,
@@ -267,7 +268,7 @@ const SourceEvaluationsConfig: React.FC<{
       ...spec,
       sourceEvaluations: [
         ...(spec.sourceEvaluations || []),
-        {name: '*', version: '*'},
+        {name: ALL_VALUE, version: ALL_VALUE},
       ],
     }));
   };
@@ -311,7 +312,7 @@ const SourceEvaluationItem: React.FC<{
   >([]);
 
   useEffect(() => {
-    if (evaluation.name && evaluation.name !== '*') {
+    if (evaluation.name && evaluation.name !== ALL_VALUE) {
       fetchEvaluationVersionsForName(
         getTraceServerClient(),
         entity,
@@ -326,7 +327,7 @@ const SourceEvaluationItem: React.FC<{
     updateConfig(spec => ({
       ...spec,
       sourceEvaluations: spec.sourceEvaluations?.map((e, i) =>
-        i === index ? {...e, name: newName, version: '*'} : e
+        i === index ? {...e, name: newName, version: ALL_VALUE} : e
       ),
     }));
   };
@@ -352,8 +353,10 @@ const SourceEvaluationItem: React.FC<{
     <Box sx={{display: 'flex', gap: 2, mb: 2, alignItems: 'center'}}>
       <FormControl fullWidth>
         <InputLabel>Name</InputLabel>
-        <Select value={evaluation.name || '*'} onChange={handleNameChange}>
-          <MenuItem value="*">All</MenuItem>
+        <Select
+          value={evaluation.name || ALL_VALUE}
+          onChange={handleNameChange}>
+          <MenuItem value={ALL_VALUE}>All</MenuItem>
           {evaluationNames.map(name => (
             <MenuItem key={name} value={name}>
               {name}
@@ -361,13 +364,13 @@ const SourceEvaluationItem: React.FC<{
           ))}
         </Select>
       </FormControl>
-      <FormControl fullWidth disabled={evaluation.name === '*'}>
+      <FormControl fullWidth disabled={evaluation.name === ALL_VALUE}>
         <InputLabel>Version</InputLabel>
         <Select
           value={evaluation.version}
           onChange={handleVersionChange}
-          disabled={evaluation.name === '*'}>
-          <MenuItem value="*">All</MenuItem>
+          disabled={evaluation.name === ALL_VALUE}>
+          <MenuItem value={ALL_VALUE}>All</MenuItem>
           {versions.map(version => (
             <MenuItem key={version.digest} value={version.digest}>
               v{version.index} ({version.digest.slice(0, 6)})
@@ -399,7 +402,7 @@ const DatasetsConfig: React.FC<{
       ...spec,
       datasets: [
         ...(spec.datasets || []),
-        {name: '', version: '*', groupAllVersions: false},
+        {name: ALL_VALUE, version: ALL_VALUE, groupAllVersions: false},
       ],
     }));
   };
@@ -437,7 +440,7 @@ const DatasetItem: React.FC<{
   const [scorerNames, setScorerNames] = useState<string[]>([]);
 
   useEffect(() => {
-    if (dataset.name && dataset.name !== '*') {
+    if (dataset.name && dataset.name !== ALL_VALUE) {
       fetchDatasetVersionsForSpecAndName({}, dataset.name).then(setVersions);
     }
     fetchScorerNamesForSpec({}).then(setScorerNames);
@@ -448,7 +451,7 @@ const DatasetItem: React.FC<{
     updateConfig(spec => ({
       ...spec,
       datasets: spec.datasets?.map((d, i) =>
-        i === index ? {...d, name: newName, version: '*'} : d
+        i === index ? {...d, name: newName, version: ALL_VALUE} : d
       ),
     }));
   };
@@ -484,7 +487,12 @@ const DatasetItem: React.FC<{
               ...d,
               scorers: [
                 ...(d.scorers || []),
-                {name: '', version: '*', groupAllVersions: false, metrics: []},
+                {
+                  name: ALL_VALUE,
+                  version: ALL_VALUE,
+                  groupAllVersions: false,
+                  metrics: [],
+                },
               ],
             }
           : d
@@ -504,8 +512,8 @@ const DatasetItem: React.FC<{
       <Box sx={{display: 'flex', gap: 2, alignItems: 'center'}}>
         <FormControl fullWidth>
           <InputLabel>Name</InputLabel>
-          <Select value={dataset.name || '*'} onChange={handleNameChange}>
-            <MenuItem value="*">All</MenuItem>
+          <Select value={dataset.name || ALL_VALUE} onChange={handleNameChange}>
+            <MenuItem value={ALL_VALUE}>All</MenuItem>
             {datasetNames.map(name => (
               <MenuItem key={name} value={name}>
                 {name}
@@ -513,13 +521,13 @@ const DatasetItem: React.FC<{
             ))}
           </Select>
         </FormControl>
-        <FormControl fullWidth disabled={dataset.name === '*'}>
+        <FormControl fullWidth disabled={dataset.name === ALL_VALUE}>
           <InputLabel>Version</InputLabel>
           <Select
             value={dataset.version}
             onChange={handleVersionChange}
-            disabled={dataset.name === '*'}>
-            <MenuItem value="*">All</MenuItem>
+            disabled={dataset.name === ALL_VALUE}>
+            <MenuItem value={ALL_VALUE}>All</MenuItem>
             {versions.map(version => (
               <MenuItem key={version} value={version}>
                 {version}
@@ -571,7 +579,7 @@ const ScorerItem: React.FC<{
   const [metricPaths, setMetricPaths] = useState<string[]>([]);
 
   useEffect(() => {
-    if (scorer.name && scorer.name !== '*') {
+    if (scorer.name && scorer.name !== ALL_VALUE) {
       fetchScorerVersionsForSpecAndName({}, scorer.name).then(setVersions);
     }
     fetchMetricPathsForSpec({}).then(setMetricPaths);
@@ -586,7 +594,9 @@ const ScorerItem: React.FC<{
           ? {
               ...d,
               scorers: d.scorers?.map((s, j) =>
-                j === scorerIndex ? {...s, name: newName, version: '*'} : s
+                j === scorerIndex
+                  ? {...s, name: newName, version: ALL_VALUE}
+                  : s
               ),
             }
           : d
@@ -645,7 +655,7 @@ const ScorerItem: React.FC<{
                       ...s,
                       metrics: [
                         ...(s.metrics || []),
-                        {path: '', shouldMinimize: false},
+                        {path: ALL_VALUE, shouldMinimize: false},
                       ],
                     }
                   : s
@@ -675,8 +685,8 @@ const ScorerItem: React.FC<{
       <Box sx={{display: 'flex', gap: 2, alignItems: 'center'}}>
         <FormControl fullWidth>
           <InputLabel>Name</InputLabel>
-          <Select value={scorer.name || '*'} onChange={handleNameChange}>
-            <MenuItem value="*">All</MenuItem>
+          <Select value={scorer.name || ALL_VALUE} onChange={handleNameChange}>
+            <MenuItem value={ALL_VALUE}>All</MenuItem>
             {scorerNames.map(name => (
               <MenuItem key={name} value={name}>
                 {name}
@@ -684,13 +694,13 @@ const ScorerItem: React.FC<{
             ))}
           </Select>
         </FormControl>
-        <FormControl fullWidth disabled={scorer.name === '*'}>
+        <FormControl fullWidth disabled={scorer.name === ALL_VALUE}>
           <InputLabel>Version</InputLabel>
           <Select
             value={scorer.version}
             onChange={handleVersionChange}
-            disabled={scorer.name === '*'}>
-            <MenuItem value="*">All</MenuItem>
+            disabled={scorer.name === ALL_VALUE}>
+            <MenuItem value={ALL_VALUE}>All</MenuItem>
             {versions.map(version => (
               <MenuItem key={version} value={version}>
                 {version}
@@ -825,7 +835,7 @@ const MetricItem: React.FC<{
       <FormControl fullWidth>
         <InputLabel>Metric Path</InputLabel>
         <Select value={metric.path} onChange={handlePathChange}>
-          <MenuItem value="*">All</MenuItem>
+          <MenuItem value={ALL_VALUE}>All</MenuItem>
           {metricPaths.map(path => (
             <MenuItem key={path} value={path}>
               {path}
@@ -866,7 +876,7 @@ const ModelsConfig: React.FC<{
       ...spec,
       models: [
         ...(spec.models || []),
-        {name: '', version: '*', groupAllVersions: false},
+        {name: ALL_VALUE, version: ALL_VALUE, groupAllVersions: false},
       ],
     }));
   };
@@ -903,7 +913,7 @@ const ModelItem: React.FC<{
   const [versions, setVersions] = useState<string[]>([]);
 
   useEffect(() => {
-    if (model.name && model.name !== '*') {
+    if (model.name && model.name !== ALL_VALUE) {
       fetchModelVersionsForSpecndName({}, model.name).then(setVersions);
     }
   }, [model.name]);
@@ -913,7 +923,7 @@ const ModelItem: React.FC<{
     updateConfig(spec => ({
       ...spec,
       models: spec.models?.map((m, i) =>
-        i === index ? {...m, name: newName, version: '*'} : m
+        i === index ? {...m, name: newName, version: ALL_VALUE} : m
       ),
     }));
   };
@@ -952,8 +962,8 @@ const ModelItem: React.FC<{
       <Box sx={{display: 'flex', gap: 2, alignItems: 'center'}}>
         <FormControl fullWidth>
           <InputLabel>Name</InputLabel>
-          <Select value={model.name || '*'} onChange={handleNameChange}>
-            <MenuItem value="*">All</MenuItem>
+          <Select value={model.name || ALL_VALUE} onChange={handleNameChange}>
+            <MenuItem value={ALL_VALUE}>All</MenuItem>
             {modelNames.map(name => (
               <MenuItem key={name} value={name}>
                 {name}
@@ -961,13 +971,13 @@ const ModelItem: React.FC<{
             ))}
           </Select>
         </FormControl>
-        <FormControl fullWidth disabled={model.name === '*'}>
+        <FormControl fullWidth disabled={model.name === ALL_VALUE}>
           <InputLabel>Version</InputLabel>
           <Select
             value={model.version}
             onChange={handleVersionChange}
-            disabled={model.name === '*'}>
-            <MenuItem value="*">All</MenuItem>
+            disabled={model.name === ALL_VALUE}>
+            <MenuItem value={ALL_VALUE}>All</MenuItem>
             {versions.map(version => (
               <MenuItem key={version} value={version}>
                 {version}

@@ -1,5 +1,4 @@
-export type VersionSpec = string | 'latest' | 'all';
-export type Direction = 'asc' | 'desc';
+export const ALL_VALUE = '*';
 
 export type LeaderboardConfigType = {
   version: number;
