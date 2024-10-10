@@ -451,7 +451,7 @@ def op(
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    __weave: Optional[WeaveKwargs] = kwargs.pop(WEAVE_KWARGS_KEY)
+                    __weave: Optional[WeaveKwargs] = kwargs.pop(WEAVE_KWARGS_KEY, None)
                     if settings.should_disable_weave():
                         return await func(*args, **kwargs)
                     if weave_client_context.get_weave_client() is None:
@@ -476,7 +476,7 @@ def op(
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    __weave: Optional[WeaveKwargs] = kwargs.pop(WEAVE_KWARGS_KEY)
+                    __weave: Optional[WeaveKwargs] = kwargs.pop(WEAVE_KWARGS_KEY, None)
                     if settings.should_disable_weave():
                         return func(*args, **kwargs)
                     if weave_client_context.get_weave_client() is None:
