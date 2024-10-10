@@ -10,6 +10,8 @@ import {
   Select,
   SelectChangeEvent,
   Typography,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import React, {useEffect, useState} from 'react';
 
@@ -30,7 +32,7 @@ export const LeaderboardConfig: React.FC<{
     updater: (config: LeaderboardConfigType) => LeaderboardConfigType
   ) => void;
 }> = ({entity, project, config, setConfig, onPersist, onCancel}) => {
-  const [showAlert, setShowAlert] = useState(true);
+  const [activeTab, setActiveTab] = useState(0);
 
   const handleSave = () => {
     onPersist();
@@ -52,6 +54,10 @@ export const LeaderboardConfig: React.FC<{
     }));
   };
 
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+  };
+
   return (
     <Box
       sx={{
@@ -61,62 +67,34 @@ export const LeaderboardConfig: React.FC<{
         flexDirection: 'column',
         border: '1px solid #e0e0e0',
       }}>
-      <Box
-        sx={{
-          overflowY: 'auto',
-          p: 2,
-        }}>
-        {showAlert && <TempAlert onClose={() => setShowAlert(false)} />}
-        <Typography variant="h5" gutterBottom>
-          Leaderboard Configuration
-        </Typography>
+      <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
+        <Tabs value={activeTab} onChange={handleTabChange}>
+          <Tab label="Config Editor" />
+          <Tab label="Config Preview" />
+        </Tabs>
       </Box>
 
-      <Box sx={{mt: 2, mb: 2, flex: 1, overflowY: 'auto', px: 2}}>
-        <SourceEvaluationsConfig
-          sourceEvaluations={config.config.dataSelectionSpec.sourceEvaluations}
-          updateConfig={updateConfig}
-        />
-        <DatasetsConfig
-          datasets={config.config.dataSelectionSpec.datasets}
-          updateConfig={updateConfig}
-        />
-        <ModelsConfig
-          models={config.config.dataSelectionSpec.models}
-          updateConfig={updateConfig}
-        />
-      </Box>
-
-      <Box sx={{mt: 2, mb: 2, px: 2}}>
-        <Typography variant="h6" gutterBottom>
-          Configuration Preview
-        </Typography>
-        <pre
-          style={{
-            backgroundColor: '#f5f5f5',
-            padding: '10px',
-            borderRadius: '4px',
-            overflowX: 'auto',
-            maxHeight: '400px',
-            whiteSpace: 'pre-wrap',
-            wordWrap: 'break-word',
-          }}>
-          {JSON.stringify(config, null, 2)}
-        </pre>
+      <Box sx={{flex: 1, overflowY: 'auto', p: 2}}>
+        {activeTab === 0 && (
+          <ConfigEditor
+            config={config.config.dataSelectionSpec}
+            updateConfig={updateConfig}
+          />
+        )}
+        {activeTab === 1 && <ConfigPreview config={config} />}
       </Box>
 
       <Box
         sx={{
           display: 'flex',
           justifyContent: 'flex-end',
-          height: '51px',
-          p: 1,
+          p: 2,
           borderTop: '1px solid #e0e0e0',
         }}>
         <Button variant="outlined" onClick={handleCancel} sx={{mr: 2}}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={handleSave} sx={{mr: 2}}>
+        <Button variant="contained" onClick={handleSave}>
           Save
         </Button>
       </Box>
@@ -124,14 +102,48 @@ export const LeaderboardConfig: React.FC<{
   );
 };
 
-const TempAlert: React.FC<{onClose: () => void}> = ({onClose}) => {
+const ConfigEditor: React.FC<{
+  config: FilterAndGroupSpec;
+  updateConfig: (
+    updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
+  ) => void;
+}> = ({config, updateConfig}) => {
   return (
-    <Alert severity="info" onClose={onClose}>
-      <Typography variant="body1">
-        Configuration edtior purely for internal exploration, not for production
-        use.
-      </Typography>
-    </Alert>
+    <>
+      <SourceEvaluationsConfig
+        sourceEvaluations={config.sourceEvaluations}
+        updateConfig={updateConfig}
+      />
+      <DatasetsConfig
+        datasets={config.datasets}
+        updateConfig={updateConfig}
+      />
+      <ModelsConfig
+        models={config.models}
+        updateConfig={updateConfig}
+      />
+    </>
+  );
+};
+
+const ConfigPreview: React.FC<{
+  config: LeaderboardConfigType;
+}> = ({config}) => {
+  return (
+    <Box>
+      <pre
+        style={{
+          backgroundColor: '#f5f5f5',
+          padding: '10px',
+          borderRadius: '4px',
+          overflowX: 'auto',
+          maxHeight: 'calc(100vh - 200px)',
+          whiteSpace: 'pre-wrap',
+          wordWrap: 'break-word',
+        }}>
+        {JSON.stringify(config, null, 2)}
+      </pre>
+    </Box>
   );
 };
 
