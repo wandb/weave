@@ -16,6 +16,7 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
+    TypedDict,
     Union,
     cast,
     overload,
@@ -117,6 +118,10 @@ def _apply_fn_defaults_to_inputs(
     return inputs
 
 
+class WeaveKwargs(TypedDict):
+    display_name: Optional[str]
+
+
 @runtime_checkable
 class Op(Protocol):
     """
@@ -197,7 +202,7 @@ def _is_unbound_method(func: Callable) -> bool:
 
 
 def _create_call(
-    func: Op, *args: Any, wvkw: Optional[dict] = None, **kwargs: Any
+    func: Op, *args: Any, __weave: Optional[WeaveKwargs] = None, **kwargs: Any
 ) -> "Call":
     client = weave_client_context.require_weave_client()
 
@@ -211,7 +216,7 @@ def _create_call(
     if "api_key" in inputs_with_defaults:
         inputs_with_defaults["api_key"] = "REDACTED"
 
-    call_time_display_name = wvkw.get("display_name", None) if wvkw else None
+    call_time_display_name = __weave.get("display_name") if __weave else None
 
     # If/When we do memoization, this would be a good spot
 
@@ -222,6 +227,7 @@ def _create_call(
         func,
         inputs_with_defaults,
         parent_call,
+        # Very important for `call_time_display_name` to take precedence over `func.call_display_name`
         display_name=call_time_display_name or func.call_display_name,
         attributes=attributes,
     )
@@ -305,7 +311,9 @@ def _execute_call(
     return None, call
 
 
-def call(op: Op, *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
+def call(
+    op: Op, *args: Any, __weave: Optional[WeaveKwargs] = None, **kwargs: Any
+) -> tuple[Any, "Call"]:
     """
     Executes the op and returns both the result and a Call representing the execution.
 
@@ -322,8 +330,7 @@ def call(op: Op, *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
     result, call = add.call(1, 2)
     ```
     """
-    wvkw = kwargs.pop(WEAVE_KWARGS_KEY, {})
-    c = _create_call(op, *args, wvkw=wvkw, **kwargs)
+    c = _create_call(op, *args, __weave=__weave, **kwargs)
     return _execute_call(op, c, *args, __should_raise=False, **kwargs)
 
 
@@ -444,7 +451,7 @@ def op(
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    wvkw = kwargs.pop(WEAVE_KWARGS_KEY, {})
+                    __weave: Optional[WeaveKwargs] = kwargs.pop(WEAVE_KWARGS_KEY)
                     if settings.should_disable_weave():
                         return await func(*args, **kwargs)
                     if weave_client_context.get_weave_client() is None:
@@ -454,7 +461,7 @@ def op(
                     try:
                         # This try/except allows us to fail gracefully and
                         # still let the user code continue to execute
-                        call = _create_call(wrapper, *args, wvkw=wvkw, **kwargs)  # type: ignore
+                        call = _create_call(wrapper, *args, __weave=__weave, **kwargs)  # type: ignore
                     except Exception as e:
                         if get_raise_on_captured_errors():
                             raise
@@ -469,7 +476,7 @@ def op(
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    wvkw = kwargs.pop(WEAVE_KWARGS_KEY, {})
+                    __weave: Optional[WeaveKwargs] = kwargs.pop(WEAVE_KWARGS_KEY)
                     if settings.should_disable_weave():
                         return func(*args, **kwargs)
                     if weave_client_context.get_weave_client() is None:
@@ -480,7 +487,7 @@ def op(
                         # This try/except allows us to fail gracefully and
                         # still let the user code continue to execute
 
-                        call = _create_call(wrapper, *args, wvkw=wvkw, **kwargs)  # type: ignore
+                        call = _create_call(wrapper, *args, __weave=__weave, **kwargs)  # type: ignore
                     except Exception as e:
                         if get_raise_on_captured_errors():
                             raise

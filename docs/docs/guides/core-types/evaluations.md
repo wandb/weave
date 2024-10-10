@@ -118,6 +118,13 @@ evaluation = Evaluation(
 
 You can also change the name of individual evaluations by setting the `display_name` key of the `__weave` dictionary.
 
+:::note
+
+Using the `__weave` dictionary sets the call display name which is distinct from the Evaluation object name. In the
+UI, you will see the display name if set, otherwise the Evaluation object name will be used.
+
+:::
+
 ```python
 evaluation = Evaluation(
     dataset=examples, scorers=[match_score1]
