@@ -140,6 +140,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                       } else {
                         inner = JSON.stringify(params.value);
                       }
+                      const record = recordFromRowData(params.row, datasetGroupName, scorerGroupName, metricPathGroupName);
                       return (
                         <div
                           style={{
@@ -155,8 +156,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                               value
                             ),
                           }}
-                          onClick={() => onCellClick(params.row)}>
-                          {' '}
+                          onClick={() => record && onCellClick(record)}>
                           {inner}
                         </div>
                       );
@@ -431,6 +431,16 @@ const valueFromRowData = (
       scorerGroupName
     ]?.metricPathGroups[metricPathGroupName] ?? []
   );
+};
+const recordFromRowData = (
+  rowData: RowData,
+  datasetGroupName: string,
+  scorerGroupName: string,
+  metricPathGroupName: string
+): LeaderboardValueRecord | null => {
+  return rowData.modelGroup.datasetGroups[datasetGroupName]?.scorerGroups[
+    scorerGroupName
+  ]?.metricPathGroups[metricPathGroupName]?.[0]
 };
 const getAggregatedResults = (
   data: null | LeaderboardValueRecord[]
