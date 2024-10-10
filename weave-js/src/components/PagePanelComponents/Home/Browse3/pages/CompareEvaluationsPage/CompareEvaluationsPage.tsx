@@ -38,6 +38,7 @@ type CompareEvaluationsPageProps = {
   entity: string;
   project: string;
   evaluationCallIds: string[];
+  onEvaluationCallIdsUpdate: (newEvaluationCallIds: string[]) => void;
 };
 
 export const CompareEvaluationsPage: React.FC<
@@ -55,6 +56,7 @@ export const CompareEvaluationsPage: React.FC<
               entity={props.entity}
               project={props.project}
               evaluationCallIds={props.evaluationCallIds}
+              onEvaluationCallIdsUpdate={props.onEvaluationCallIdsUpdate}
             />
           ),
         },
@@ -113,6 +115,7 @@ export const CompareEvaluationsPageContent: React.FC<
       initialEvaluationCallIds={props.evaluationCallIds}
       baselineEvaluationCallId={baselineEvaluationCallId ?? undefined}
       comparisonDimensions={comparisonDimensions ?? undefined}
+      onEvaluationCallIdsUpdate={props.onEvaluationCallIdsUpdate}
       setBaselineEvaluationCallId={setBaselineEvaluationCallId}
       setComparisonDimensions={setComparisonDimensionsAndClearInputDigest}
       selectedInputDigest={selectedInputDigest ?? undefined}
