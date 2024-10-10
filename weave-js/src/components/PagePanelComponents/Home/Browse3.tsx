@@ -104,7 +104,7 @@ import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/t
 import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
-  '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
+  'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
 );
 
 type Browse3Params = Partial<Browse3ProjectParams> &
