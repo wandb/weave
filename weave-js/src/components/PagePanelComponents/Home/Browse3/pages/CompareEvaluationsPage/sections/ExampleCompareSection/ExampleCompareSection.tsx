@@ -194,7 +194,6 @@ const stickySidebarHeaderMixin: React.CSSProperties = {
 export const ExampleCompareSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  console.log('ExampleCompareSection.props.state', props.state);
   const {
     filteredRows,
     outputColumnKeys,

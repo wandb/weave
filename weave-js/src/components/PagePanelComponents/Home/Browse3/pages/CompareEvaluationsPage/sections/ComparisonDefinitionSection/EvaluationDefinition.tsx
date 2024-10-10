@@ -2,6 +2,10 @@ import {Box} from '@material-ui/core';
 import {Circle} from '@mui/icons-material';
 import {WBIcon} from '@wandb/ui';
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
+import {
+  DragDropState,
+  DragSource,
+} from '@wandb/weave/common/containers/DragDropContainer';
 import {DragHandle} from '@wandb/weave/common/containers/DragDropContainer/DragHandle';
 import {Button} from '@wandb/weave/components/Button';
 import {Pill} from '@wandb/weave/components/Tag';
@@ -49,7 +53,8 @@ DragHandle.displayName = 'S.DragHandle';
 export const EvaluationDefinition: React.FC<{
   state: EvaluationComparisonState;
   callId: string;
-  partRef: {id: string};
+  ndx: number;
+  onDragEnd?: (ctx: DragDropState, e: React.DragEvent) => void;
 }> = props => {
   const {removeEvaluationCall, setSelectedCallIdsOrdered} =
     useCompareEvaluationsState();
@@ -92,36 +97,43 @@ export const EvaluationDefinition: React.FC<{
     setSelectedCallIdsOrdered,
   ]);
 
+  const partRef = useMemo(() => ({id: `${props.ndx}`}), [props.ndx]);
+
   return (
-    <HorizontalBox
-      sx={{
-        height: EVAL_DEF_HEIGHT,
-        borderRadius: BOX_RADIUS,
-        border: STANDARD_BORDER,
-        padding: '12px',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
-      <DragHandle partRef={props.partRef}>
-        <DragHandleIcon />
-      </DragHandle>
-      <EvaluationCallLink {...props} />
-      {props.callId === getBaselineCallId(props.state) && (
-        <Pill label="Baseline" color="teal" />
-      )}
-      <PopupDropdown
-        sections={[menuOptions]}
-        trigger={
-          <Button
-            className="rotate-90"
-            icon="overflow-horizontal"
-            size="small"
-            variant="ghost"
-            style={{marginLeft: '4px'}}
-          />
-        }
-      />
-    </HorizontalBox>
+    <DragSource
+      partRef={partRef}
+      onDragEnd={props.onDragEnd}
+      draggingStyle={{opacity: 0.25}}>
+      <HorizontalBox
+        sx={{
+          height: EVAL_DEF_HEIGHT,
+          borderRadius: BOX_RADIUS,
+          border: STANDARD_BORDER,
+          padding: '12px',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+        <DragHandle partRef={partRef}>
+          <DragHandleIcon />
+        </DragHandle>
+        <EvaluationCallLink {...props} />
+        {props.callId === getBaselineCallId(props.state) && (
+          <Pill label="Baseline" color="teal" />
+        )}
+        <PopupDropdown
+          sections={[menuOptions]}
+          trigger={
+            <Button
+              className="rotate-90"
+              icon="overflow-horizontal"
+              size="small"
+              variant="ghost"
+              style={{marginLeft: '4px'}}
+            />
+          }
+        />
+      </HorizontalBox>
+    </DragSource>
   );
 };
 

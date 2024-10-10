@@ -2,7 +2,6 @@ import {Popover} from '@mui/material';
 import Input from '@wandb/weave/common/components/Input';
 import {
   DragDropProvider,
-  DragSource,
   DropTarget,
 } from '@wandb/weave/common/containers/DragDropContainer';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
@@ -50,16 +49,11 @@ export const ComparisonDefinitionSection: React.FC<{
     [setSelectedCallIdsOrdered]
   );
 
-  const {
-    makeDragSourceCallbackRef,
-    renderDropIndicators,
-    onDragOver,
-    onDragEnd,
-    onDrop,
-  } = useDragDropReorder({
-    reorder: reorderItems,
-    dropzonePadding: 8,
-  });
+  const {makeDragSourceCallbackRef, onDragOver, onDrop, onDragEnd} =
+    useDragDropReorder({
+      reorder: reorderItems,
+      dropzonePadding: 8,
+    });
 
   const callIds = getOrderedCallIds(props.state);
 
@@ -80,17 +74,12 @@ export const ComparisonDefinitionSection: React.FC<{
           {callIds.map((key, ndx) => {
             return (
               <div key={key} ref={makeDragSourceCallbackRef(ndx)}>
-                {renderDropIndicators(ndx)}
-                <DragSource
-                  partRef={{id: `${ndx}`}}
+                <EvaluationDefinition
+                  state={props.state}
+                  callId={key}
+                  ndx={ndx}
                   onDragEnd={onDragEnd}
-                  draggingStyle={{opacity: 0.25}}>
-                  <EvaluationDefinition
-                    state={props.state}
-                    callId={key}
-                    partRef={{id: `${ndx}`}}
-                  />
-                </DragSource>
+                />
               </div>
             );
           })}
