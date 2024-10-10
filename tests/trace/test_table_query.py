@@ -59,7 +59,7 @@ def test_table_query(client: WeaveClient):
 def test_table_query_stream(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 10)
 
-    res = client.server.table_query(
+    res = client.server.table_query_stream(
         tsi.TableQueryReq(
             project_id=client._project_id(),
             digest=digest,
