@@ -1,5 +1,6 @@
 /***** COPIED FROM app/src/util/dragDrop.tsx *****/
 
+import {WBIcon} from '@wandb/ui';
 import {
   DragDropState,
   DragSourceProps,
@@ -291,3 +292,19 @@ const DropIndicatorLine = styled.div<{
     }
   }}
 `;
+
+export const DragHandleIcon = styled(WBIcon).attrs({name: 'vertical-handle'})`
+  font-size: 26px;
+  border-radius: 50%;
+  color: gray300;
+  user-select: none;
+  cursor: grab;
+  &&&:hover {
+    background: gray100;
+    color: black;
+  }
+  &:active {
+    cursor: grabbing;
+  }
+`;
+DragHandleIcon.displayName = 'S.DragHandle';

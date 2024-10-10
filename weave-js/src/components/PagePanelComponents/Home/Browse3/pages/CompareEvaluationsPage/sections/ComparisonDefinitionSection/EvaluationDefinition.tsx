@@ -1,6 +1,5 @@
 import {Box} from '@material-ui/core';
 import {Circle} from '@mui/icons-material';
-import {WBIcon} from '@wandb/ui';
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {
   DragDropState,
@@ -10,7 +9,6 @@ import {DragHandle} from '@wandb/weave/common/containers/DragDropContainer/DragH
 import {Button} from '@wandb/weave/components/Button';
 import {Pill} from '@wandb/weave/components/Tag';
 import React, {useMemo} from 'react';
-import styled from 'styled-components';
 
 import {
   MOON_300,
@@ -33,6 +31,7 @@ import {
 } from '../../ecpConstants';
 import {EvaluationComparisonState, getBaselineCallId} from '../../ecpState';
 import {HorizontalBox} from '../../Layout';
+import {DragHandleIcon} from './dragUtils';
 
 export const EvaluationDefinition: React.FC<{
   state: EvaluationComparisonState;
@@ -120,7 +119,6 @@ export const EvaluationDefinition: React.FC<{
                 icon="overflow-horizontal"
                 size="small"
                 variant="ghost"
-                // style={{marginLeft: '4px'}}
               />
             }
           />
@@ -249,19 +247,3 @@ export const VerticalBar: React.FC = () => {
     />
   );
 };
-
-const DragHandleIcon = styled(WBIcon).attrs({name: 'vertical-handle'})`
-  font-size: 26px;
-  border-radius: 50%;
-  color: gray300;
-  user-select: none;
-  cursor: grab;
-  &&&:hover {
-    background: gray100;
-    color: black;
-  }
-  &:active {
-    cursor: grabbing;
-  }
-`;
-DragHandle.displayName = 'S.DragHandle';
