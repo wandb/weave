@@ -214,6 +214,7 @@ jobs:
             'cohere',
             'dspy',
             'groq',
+            'google_ai_studio',
             'instructor',
             'langchain',
             'litellm',
