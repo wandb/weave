@@ -10,28 +10,30 @@ class RegexScorer(Scorer):
     ignore_case: bool = True
     ignore_whitespace: bool = False
     use_regex: bool = False  # Use regex patterns if True
-    target_column: str = Field(default=["target"], description="The class names to match")
+    match_full_string: bool = False  # Match the entire string if True
+    target_column: str = Field(default="target", description="The class name to match")
 
     @weave.op
-    def score(self, model_output: Union[dict, str], target: dict ={}) -> dict:
+    def score(self, model_output: Union[dict, str], target: Union[str, list[str], None] = None) -> dict:
         if isinstance(model_output, str):
             model_output = {"output": model_output}
 
-        if target is not None:
-            patterns = target
+        # Use target patterns if provided
+        patterns = target if target else self.patterns
+        if isinstance(patterns, str):
+            patterns = [patterns]
 
         flags = re.IGNORECASE if self.ignore_case else 0
-
-        patterns = [self.patterns] if isinstance(self.patterns, str) else self.patterns
         compiled_patterns = []
         for pattern in patterns:
             if not self.use_regex:
                 pattern = re.escape(pattern)
             if self.ignore_whitespace:
                 pattern = ''.join(pattern.split())
+            if self.match_full_string:
+                pattern = f'^{pattern}$'
             compiled_patterns.append(re.compile(pattern, flags=flags))
 
-        # for class_name in self.class_names:
         text_to_search = model_output.get("output") if model_output else ""
         if self.ignore_whitespace:
             text_to_search = ''.join(text_to_search.split())
