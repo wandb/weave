@@ -29,6 +29,7 @@ def lint(session):
         "llamaindex",
         "mistral0",
         "mistral1",
+        "notdiamond",
         "openai",
     ],
 )
