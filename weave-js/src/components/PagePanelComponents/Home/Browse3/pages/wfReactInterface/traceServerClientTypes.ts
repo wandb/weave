@@ -1,4 +1,4 @@
-import { Query } from './traceServerClientInterface/query';
+import {Query} from './traceServerClientInterface/query';
 
 export type KeyedDictType = {
   [key: string]: any;
@@ -49,7 +49,7 @@ interface TraceCallsFilter {
   wb_user_ids?: string[];
 }
 
-export type SortBy = { field: string; direction: 'asc' | 'desc' };
+export type SortBy = {field: string; direction: 'asc' | 'desc'};
 
 export type TraceCallsQueryReq = {
   project_id: string;

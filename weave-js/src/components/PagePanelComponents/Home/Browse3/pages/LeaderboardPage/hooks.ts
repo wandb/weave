@@ -1,12 +1,15 @@
-import { ObjectRef } from '@wandb/weave/react';
-import { useEffect, useMemo, useState, } from 'react';
+import {ObjectRef} from '@wandb/weave/react';
+import {useEffect, useMemo, useState} from 'react';
 
-import { flattenObjectPreservingWeaveTypes } from '../../../Browse2/browse2Util';
-import { parseRefMaybe } from '../../../Browse2/SmallRef';
-import { useGetTraceServerClientContext } from '../wfReactInterface/traceServerClientContext';
-import { useEvalCallsForConfig } from './leaderboardConfigQuery';
-import { LeaderboardConfigType } from './LeaderboardConfigType';
-import { getLeaderboardData, LeaderboardData2 } from './leaderboardServerInterface';
+import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
+import {parseRefMaybe} from '../../../Browse2/SmallRef';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import {useEvalCallsForConfig} from './leaderboardConfigQuery';
+import {LeaderboardConfigType} from './LeaderboardConfigType';
+import {
+  getLeaderboardData,
+  GroupedLeaderboardData2,
+} from './leaderboardServerInterface';
 
 export type LeaderboardData = {
   metrics: {
@@ -22,7 +25,7 @@ export type LeaderboardData = {
   models: string[];
   scores: {
     [modelId: string]: {
-      [metricId: string]: { value: number; sourceEvalCallId: string };
+      [metricId: string]: {value: number; sourceEvalCallId: string};
     };
   };
 };
@@ -31,7 +34,7 @@ export const useLeaderboardData = (
   entity: string,
   project: string,
   config: LeaderboardConfigType
-): { loading: boolean; data: LeaderboardData } => {
+): {loading: boolean; data: LeaderboardData} => {
   // console.log('Fetching leaderboard data', config);
   // const {useRootObjectVersions, useCalls} = useWFHooks();
 
@@ -80,12 +83,12 @@ export const useLeaderboardData = (
   //   undefined,
   //   {skip: !evaluationVersionsResult}
   // );
-  const { calls: evaluationRuns, evals: evaluationVersions } =
+  const {calls: evaluationRuns, evals: evaluationVersions} =
     useEvalCallsForConfig(entity, project, config);
 
   // Build the dataset
 
-  const results: { loading: boolean; data: LeaderboardData } = useMemo(() => {
+  const results: {loading: boolean; data: LeaderboardData} = useMemo(() => {
     const finalData: LeaderboardData = {
       metrics: {},
       models: [],
@@ -210,38 +213,46 @@ export const useLeaderboardData = (
       loading: false,
       data: finalData,
     };
-  }, [config.config.columns, evaluationRuns.loading, evaluationRuns.result, evaluationVersions]);
+  }, [
+    config.config.columns,
+    evaluationRuns.loading,
+    evaluationRuns.result,
+    evaluationVersions,
+  ]);
 
   return results;
 };
 
-
-export const useLeaderboardData2 = (
-  entity: string, project: string
-) => {
+export const useLeaderboardData2 = (entity: string, project: string) => {
   const getTraceServerClient = useGetTraceServerClientContext();
-  const [state, setState] = useState<{ loading: boolean; data: LeaderboardData2 }>({ loading: true, data: [] });
+  const [state, setState] = useState<{
+    loading: boolean;
+    data: GroupedLeaderboardData2;
+  }>({loading: true, data: []});
   useEffect(() => {
     let mounted = true;
-    getLeaderboardData(
-      getTraceServerClient(), entity, project, {
-      datasets: [{
-        name: 'SWEBenchVerified-shuffle808-50',
-        version: '*'
-      }],
-      models: [{
-        name: '*',
-        version: '*',
-        splitByVersion: false,
-      }, {
-        name: "reproProblem",
-        version: '*',
-        splitByVersion: true,
-      }]
-    }
-    ).then(data => {
+    getLeaderboardData(getTraceServerClient(), entity, project, {
+      datasets: [
+        {
+          name: 'SWEBenchVerified-shuffle808-50',
+          version: '*',
+        },
+      ],
+      models: [
+        {
+          name: '*',
+          version: '*',
+          splitByVersion: false,
+        },
+        {
+          name: 'reproProblem',
+          version: '*',
+          splitByVersion: true,
+        },
+      ],
+    }).then(data => {
       if (mounted) {
-        setState({ loading: false, data });
+        setState({loading: false, data});
       }
     });
     return () => {
@@ -249,4 +260,4 @@ export const useLeaderboardData2 = (
     };
   }, [entity, project, getTraceServerClient]);
   return state;
-}
+};

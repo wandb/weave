@@ -1,19 +1,19 @@
-import { Alert, Box, Typography } from '@mui/material';
-import { useTraceUpdate } from '@wandb/weave/common/util/hooks';
-import { Button } from '@wandb/weave/components/Button';
-import React, { useCallback, useState } from 'react';
-import { useHistory } from 'react-router-dom';
+import {Alert, Box, Typography} from '@mui/material';
+import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
+import {Button} from '@wandb/weave/components/Button';
+import React, {useCallback, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
-import { useWeaveflowRouteContext } from '../../context';
-import { EditableMarkdown } from './EditableMarkdown';
-import { useLeaderboardData, useLeaderboardData2 } from './hooks';
+import {useWeaveflowRouteContext} from '../../context';
+import {EditableMarkdown} from './EditableMarkdown';
+import {useLeaderboardData, useLeaderboardData2} from './hooks';
 import {
   persistLeaderboardConfig,
   useCurrentLeaderboardConfig,
 } from './leaderboardConfigQuery';
-import { LeaderboardConfigType } from './LeaderboardConfigType';
-import { LeaderboardGrid } from './LeaderboardGrid';
-import { LeaderboardConfig } from './LeaderboardPageConfig';
+import {LeaderboardConfigType} from './LeaderboardConfigType';
+import {LeaderboardGrid} from './LeaderboardGrid';
+import {LeaderboardConfig} from './LeaderboardPageConfig';
 
 const USE_COMPARE_EVALUATIONS_PAGE = false;
 
@@ -43,13 +43,13 @@ const usePersistedLeaderboardConfig = () => {
     setConfigLocal(initialConfig);
   }, [initialConfig]);
 
-  return { config, setConfigLocal, persistConfig, cancelChanges };
+  return {config, setConfigLocal, persistConfig, cancelChanges};
 };
 
 export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
-  const { entity, project } = props;
+  const {entity, project} = props;
 
-  const { peekingRouter } = useWeaveflowRouteContext();
+  const {peekingRouter} = useWeaveflowRouteContext();
   const history = useHistory();
 
   const [showConfig, setShowConfig] = useState(false);
@@ -65,15 +65,15 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
     (newDescription: string) => {
       setConfigLocal(newConfig => ({
         ...newConfig,
-        config: { ...newConfig.config, description: newDescription },
+        config: {...newConfig.config, description: newDescription},
       }));
       persistConfig();
     },
     [setConfigLocal, persistConfig]
   );
-  useLeaderboardData2(entity, project)
-  const { loading, data } = useLeaderboardData(entity, project, currentConfig);
-  useTraceUpdate('a', { entity, project, currentConfig });
+  useLeaderboardData2(entity, project);
+  const {loading, data} = useLeaderboardData(entity, project, currentConfig);
+  useTraceUpdate('a', {entity, project, currentConfig});
 
   const handleCellClick = (
     modelName: string,
@@ -155,7 +155,7 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
 export const ToggleLeaderboardConfig: React.FC<{
   isOpen: boolean;
   onClick: () => void;
-}> = ({ isOpen, onClick }) => {
+}> = ({isOpen, onClick}) => {
   return (
     <Box
       sx={{
@@ -174,7 +174,7 @@ export const ToggleLeaderboardConfig: React.FC<{
   );
 };
 
-const UnlistedAlert: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+const UnlistedAlert: React.FC<{onClose: () => void}> = ({onClose}) => {
   return (
     <Alert severity="info" onClose={onClose}>
       <Typography variant="body1">

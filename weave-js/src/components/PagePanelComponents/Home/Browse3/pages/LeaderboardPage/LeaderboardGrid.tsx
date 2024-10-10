@@ -13,7 +13,7 @@ import React, {useCallback, useMemo, useState} from 'react';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {PaginationButtons} from '../CallsPage/CallsTableButtons';
-import {ObjectVersionLink} from '../common/Links';
+// import {ObjectVersionLink} from '../common/Links';
 import {buildTree} from '../common/tabularListViews/buildTree';
 import {LeaderboardData} from './hooks';
 
