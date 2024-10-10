@@ -10,7 +10,7 @@ import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralize} from '@wandb/weave/core/util/string';
 import classNames from 'classnames';
-import React, {useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
 import {
@@ -42,6 +42,15 @@ export const SummaryPlots: React.FC<{
   );
   const {selectedMetrics} = props.state;
   const setSelectedMetrics = props.setSelectedMetrics;
+
+  useEffect(() => {
+    // If selectedMetrics is null, we should show all metrics
+    if (selectedMetrics == null) {
+      setSelectedMetrics(
+        Object.fromEntries(Array.from(allMetricNames).map(m => [m, true]))
+      );
+    }
+  }, [selectedMetrics, setSelectedMetrics, allMetricNames]);
 
   // filter down the plotlyRadarData to only include the selected metrics, after
   // computation, to allow quick addition/removal of metrics

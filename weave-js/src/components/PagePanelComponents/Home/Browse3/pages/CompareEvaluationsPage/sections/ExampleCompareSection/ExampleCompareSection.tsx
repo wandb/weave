@@ -257,9 +257,13 @@ export const ExampleCompareSection: React.FC<{
       .length;
   });
   const numEvals = numTrials.length;
+  // Get derived scores, then filter out any not in the selected metrics
   const derivedScores = Object.values(
     getMetricIds(props.state.data, 'score', 'derived')
+  ).filter(
+    score => props.state.selectedMetrics?.[flattenedDimensionPath(score)]
   );
+
   const numMetricScorers = metricGroupNames.length;
   const numDerivedScores = derivedScores.length;
   const numMetricsPerScorer = [

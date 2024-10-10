@@ -928,7 +928,7 @@ const CompareEvaluationsBinding = () => {
   const evaluationCallIds = useMemo(() => {
     return JSON.parse(query.evaluationCallIds);
   }, [query.evaluationCallIds]);
-  
+
   const onEvaluationCallIdsUpdate = useCallback(
     (newEvaluationCallIds: string[]) => {
       const newQuery = new URLSearchParams(location.search);
