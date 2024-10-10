@@ -39,6 +39,8 @@ type CompareEvaluationsPageProps = {
   project: string;
   evaluationCallIds: string[];
   onEvaluationCallIdsUpdate: (newEvaluationCallIds: string[]) => void;
+  selectedMetrics: Record<string, boolean> | null;
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
 };
 
 export const CompareEvaluationsPage: React.FC<
@@ -57,6 +59,8 @@ export const CompareEvaluationsPage: React.FC<
               project={props.project}
               evaluationCallIds={props.evaluationCallIds}
               onEvaluationCallIdsUpdate={props.onEvaluationCallIdsUpdate}
+              selectedMetrics={props.selectedMetrics}
+              setSelectedMetrics={props.setSelectedMetrics}
             />
           ),
         },
@@ -112,6 +116,8 @@ export const CompareEvaluationsPageContent: React.FC<
     <CompareEvaluationsProvider
       entity={props.entity}
       project={props.project}
+      selectedMetrics={props.selectedMetrics}
+      setSelectedMetrics={props.setSelectedMetrics}
       initialEvaluationCallIds={props.evaluationCallIds}
       baselineEvaluationCallId={baselineEvaluationCallId ?? undefined}
       comparisonDimensions={comparisonDimensions ?? undefined}
@@ -179,7 +185,7 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 const CompareEvaluationsPageInner: React.FC<{
   height: number;
 }> = props => {
-  const {state} = useCompareEvaluationsState();
+  const {state, setSelectedMetrics} = useCompareEvaluationsState();
   const showExampleFilter =
     Object.keys(state.data.evaluationCalls).length === 2;
   const showExamples = Object.keys(state.data.resultRows).length > 0;
@@ -200,7 +206,7 @@ const CompareEvaluationsPageInner: React.FC<{
           evaluationCalls={Object.values(state.data.evaluationCalls)}
         />
         <ComparisonDefinitionSection state={state} />
-        <SummaryPlots state={state} />
+        <SummaryPlots state={state} setSelectedMetrics={setSelectedMetrics} />
         <ScorecardSection state={state} />
         {showExamples ? (
           <>

@@ -16,6 +16,7 @@ const CompareEvaluationsContext = React.createContext<{
     React.SetStateAction<ComparisonDimensionsType | null>
   >;
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
   addEvaluationCall: (newCallId: string) => void;
   removeEvaluationCall: (callId: string) => void;
 } | null>(null);
@@ -31,6 +32,9 @@ export const useCompareEvaluationsState = () => {
 export const CompareEvaluationsProvider: React.FC<{
   entity: string;
   project: string;
+  selectedMetrics: Record<string, boolean> | null;
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
+
   initialEvaluationCallIds: string[];
   onEvaluationCallIdsUpdate: (newEvaluationCallIds: string[]) => void;
   setBaselineEvaluationCallId: React.Dispatch<
@@ -46,13 +50,15 @@ export const CompareEvaluationsProvider: React.FC<{
 }> = ({
   entity,
   project,
+  selectedMetrics,
+  setSelectedMetrics,
+
   initialEvaluationCallIds,
   onEvaluationCallIdsUpdate,
   setBaselineEvaluationCallId,
   setComparisonDimensions,
 
   setSelectedInputDigest,
-
   baselineEvaluationCallId,
   comparisonDimensions,
   selectedInputDigest,
@@ -67,7 +73,8 @@ export const CompareEvaluationsProvider: React.FC<{
     evaluationCallIds,
     baselineEvaluationCallId,
     comparisonDimensions,
-    selectedInputDigest
+    selectedInputDigest,
+    selectedMetrics ?? undefined
   );
 
   const value = useMemo(() => {
@@ -79,6 +86,7 @@ export const CompareEvaluationsProvider: React.FC<{
       setBaselineEvaluationCallId,
       setComparisonDimensions,
       setSelectedInputDigest,
+      setSelectedMetrics,
       addEvaluationCall: (newCallId: string) => {
         const newEvaluationCallIds = [...evaluationCallIds, newCallId];
         setEvaluationCallIds(newEvaluationCallIds);
@@ -101,6 +109,7 @@ export const CompareEvaluationsProvider: React.FC<{
     setBaselineEvaluationCallId,
     setComparisonDimensions,
     setSelectedInputDigest,
+    setSelectedMetrics,
   ]);
 
   if (!value) {

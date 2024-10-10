@@ -64,6 +64,9 @@ const useCallTabs = (call: CallSchema) => {
                 entity={call.entity}
                 project={call.project}
                 evaluationCallIds={[call.callId]}
+                // Dont persist metric selection in the URL
+                selectedMetrics={{}}
+                setSelectedMetrics={() => {}}
                 // Dont persist changes to evaluationCallIds in the URL
                 onEvaluationCallIdsUpdate={() => {}}
               />
