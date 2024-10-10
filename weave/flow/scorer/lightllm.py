@@ -98,11 +98,27 @@ class OpenAILLM(BaseLLM):
 
 class AnthropicLLM(BaseLLM):
     def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        response = self.client.messages.create(model=self.model_id, messages=messages, max_tokens=2048, **kwargs)
+        system_message = next((msg['content'] for msg in messages if msg['role'] == 'system'), None)
+        user_messages = [msg for msg in messages if msg['role'] != 'system']
+        response = self.client.messages.create(
+            model=self.model_id,
+            messages=user_messages,
+            system=system_message,
+            max_tokens=2048,
+            **kwargs
+        )
         return response.content
 
     async def achat(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        response = await self.client.messages.create(model=self.model_id, messages=messages, max_tokens=2048, **kwargs)
+        system_message = next((msg['content'] for msg in messages if msg['role'] == 'system'), None)
+        user_messages = [msg for msg in messages if msg['role'] != 'system']
+        response = await self.client.messages.create(
+            model=self.model_id,
+            messages=user_messages,
+            system=system_message,
+            max_tokens=2048,
+            **kwargs
+        )
         return response.content
 
     def embed(self, texts: Union[str, List[str]], **kwargs) -> List[List[float]]:
@@ -152,23 +168,26 @@ if __name__ == "__main__":
         mistral_response = mistral_llm.chat([{"role": "user", "content": "What is the best French cheese?"}])
         print("Mistral response:", mistral_response)
 
-    # OpenAI example
+    # OpenAI example with system message
     OpenAIClient = import_client("openai")
     if OpenAIClient:
         openai_client = OpenAIClient()
         openai_llm = LLMFactory.create(openai_client, OPENAI_DEFAULT_MODEL)
         openai_response = openai_llm.chat([
-            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "system", "content": "You are a helpful assistant specialized in writing poetry."},
             {"role": "user", "content": "Write a haiku about recursion in programming."}
         ])
         print("OpenAI response:", openai_response)
 
-    # Anthropic example
+    # Anthropic example with system message
     AnthropicClient = import_client("anthropic")
     if AnthropicClient:
         anthropic_client = AnthropicClient(api_key=os.environ.get("ANTHROPIC_API_KEY"))
         anthropic_llm = LLMFactory.create(anthropic_client, ANTHROPIC_DEFAULT_MODEL)
-        anthropic_response = anthropic_llm.chat([{"role": "user", "content": "Hello, Claude"}])
+        anthropic_response = anthropic_llm.chat([
+            {"role": "system", "content": "You are Claude, an AI assistant created by Anthropic."},
+            {"role": "user", "content": "Hello, Claude"}
+        ])
         print("Anthropic response:", anthropic_response)
 
     # Embedding example
@@ -178,13 +197,14 @@ if __name__ == "__main__":
         mistral_embeddings = mistral_embed_llm.embed(["Embed this sentence.", "As well as this one."])
         print("Mistral embeddings:", mistral_embeddings)
 
-    # Async example
+    # Async example with system message
     async def async_example():
         if OpenAIClient:
             from openai import AsyncOpenAI
             openai_async_client = AsyncOpenAI()
             openai_async_llm = LLMFactory.create(openai_async_client, OPENAI_DEFAULT_MODEL)
             openai_async_response = await openai_async_llm.achat([
+                {"role": "system", "content": "You are a philosopher AI assistant."},
                 {"role": "user", "content": "What's the meaning of life?"}
             ])
             print("OpenAI async response:", openai_async_response)
