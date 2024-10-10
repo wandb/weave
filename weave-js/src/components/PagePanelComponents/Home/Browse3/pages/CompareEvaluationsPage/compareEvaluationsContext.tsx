@@ -32,6 +32,7 @@ export const CompareEvaluationsProvider: React.FC<{
   entity: string;
   project: string;
   initialEvaluationCallIds: string[];
+  onEvaluationCallIdsUpdate: (newEvaluationCallIds: string[]) => void;
   setBaselineEvaluationCallId: React.Dispatch<
     React.SetStateAction<string | null>
   >;
@@ -46,6 +47,7 @@ export const CompareEvaluationsProvider: React.FC<{
   entity,
   project,
   initialEvaluationCallIds,
+  onEvaluationCallIdsUpdate,
   setBaselineEvaluationCallId,
   setComparisonDimensions,
 
@@ -78,15 +80,23 @@ export const CompareEvaluationsProvider: React.FC<{
       setComparisonDimensions,
       setSelectedInputDigest,
       addEvaluationCall: (newCallId: string) => {
-        setEvaluationCallIds(prev => [...prev, newCallId]);
+        const newEvaluationCallIds = [...evaluationCallIds, newCallId];
+        setEvaluationCallIds(newEvaluationCallIds);
+        onEvaluationCallIdsUpdate(newEvaluationCallIds);
       },
       removeEvaluationCall: (callId: string) => {
-        setEvaluationCallIds(prev => prev.filter(id => id !== callId));
+        const newEvaluationCallIds = evaluationCallIds.filter(
+          id => id !== callId
+        );
+        setEvaluationCallIds(newEvaluationCallIds);
+        onEvaluationCallIdsUpdate(newEvaluationCallIds);
       },
     };
   }, [
     initialState.loading,
     initialState.result,
+    evaluationCallIds,
+    onEvaluationCallIdsUpdate,
     setEvaluationCallIds,
     setBaselineEvaluationCallId,
     setComparisonDimensions,
