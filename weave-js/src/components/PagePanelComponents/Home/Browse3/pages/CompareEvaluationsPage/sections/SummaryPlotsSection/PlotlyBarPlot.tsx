@@ -2,26 +2,12 @@ import * as Plotly from 'plotly.js';
 import React, {useEffect, useMemo, useRef} from 'react';
 
 import {PLOT_GRID_COLOR} from '../../ecpConstants';
-import {RadarPlotData} from './PlotlyRadarPlot';
 
 export const PlotlyBarPlot: React.FC<{
   height: number;
-  data: RadarPlotData;
+  plotlyData: Plotly.Data;
 }> = props => {
   const divRef = useRef<HTMLDivElement>(null);
-  const plotlyData: Plotly.Data[] = useMemo(() => {
-    return Object.keys(props.data).map((key, i) => {
-      const {metrics, name, color} = props.data[key];
-      return {
-        type: 'bar',
-        y: Object.values(metrics),
-        x: Object.keys(metrics),
-        name,
-        marker: {color},
-      };
-    });
-  }, [props.data]);
-
   const plotlyLayout: Partial<Plotly.Layout> = useMemo(() => {
     return {
       height: props.height - 40,
@@ -30,7 +16,7 @@ export const PlotlyBarPlot: React.FC<{
         l: 0,
         r: 0,
         b: 20,
-        t: 0,
+        t: 20,
         pad: 0,
       },
       xaxis: {
@@ -44,8 +30,17 @@ export const PlotlyBarPlot: React.FC<{
         gridcolor: PLOT_GRID_COLOR,
         linecolor: PLOT_GRID_COLOR,
       },
+      title: {
+        text: props.plotlyData.name ?? '',
+        font: {size: 14},
+        xref: 'paper',
+        x: 0.5,
+        y: 1, // Position at the top
+        yanchor: 'top',
+      },
     };
-  }, [props.height]);
+  }, [props.height, props.plotlyData]);
+
   const plotlyConfig = useMemo(() => {
     return {
       displayModeBar: false,
@@ -57,11 +52,11 @@ export const PlotlyBarPlot: React.FC<{
   useEffect(() => {
     Plotly.newPlot(
       divRef.current as any,
-      plotlyData,
+      [props.plotlyData],
       plotlyLayout,
       plotlyConfig
     );
-  }, [plotlyConfig, plotlyData, plotlyLayout]);
+  }, [plotlyConfig, props.plotlyData, plotlyLayout]);
 
   return <div ref={divRef}></div>;
 };

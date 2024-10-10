@@ -52,9 +52,9 @@ export const SummaryPlots: React.FC<{
     }
   }, [selectedMetrics, setSelectedMetrics, allMetricNames]);
 
-  // filter down the plotlyRadarData to only include the selected metrics, after
-  // computation, to allow quick addition/removal of metrics
-  const filteredPlotlyRadarData = useMemo(() => {
+  // filter down the data to only include the selected metrics, after
+  // computation, to allow quick addition/removal of metrics.
+  const filteredData = useMemo(() => {
     const filteredData: RadarPlotData = {};
     for (const [callId, metricBin] of Object.entries(radarData)) {
       const metrics: {[metric: string]: number} = {};
@@ -74,71 +74,144 @@ export const SummaryPlots: React.FC<{
     return filteredData;
   }, [radarData, selectedMetrics]);
 
+  const plots = useMemo(() => {
+    const plots = [
+      <PlotlyRadarPlot key="radar" height={PLOT_HEIGHT} data={filteredData} />,
+    ];
+
+    // transform the data to be a list of metrics for each callId
+    const metrics: {[metric: string]: {callIds: string[], values: number[], name: string, colors: string[]}} = {};
+    for (const [callId, metricBin] of Object.entries(filteredData)) {
+      for (const [metric, value] of Object.entries(metricBin.metrics)) {
+        metrics[metric] = {
+          callIds: [...(metrics[metric]?.callIds ?? []), callId],
+          values: [...(metrics[metric]?.values ?? []), value],
+          name: metric,
+          colors: [...(metrics[metric]?.colors ?? []), metricBin.color],
+        };
+      }
+    }
+    
+    for (const metric of Object.keys(metrics)) {
+      const metricBin = metrics[metric];
+      const plotlyData: Plotly.Data = {
+        type: 'bar',
+        y: metricBin.values,
+        // x: metricBin.callIds,
+        xaxis: '',
+        name: metric,
+        marker: {color: metricBin.colors},
+      };
+      plots.push(
+        <PlotlyBarPlot key={metric} height={PLOT_HEIGHT} plotlyData={plotlyData} />
+      );
+    }
+
+    return plots;
+  }, [filteredData]);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+
+    updateWidth(); // Initial width
+
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
+
+  console.log('containerWidth', containerWidth);
+
+  const plotsPerPage = useMemo(() => {
+    return Math.max(1, Math.floor(containerWidth / (PLOT_HEIGHT + 20))); // 20px for margin
+  }, [containerWidth]);
+
+  const [currentPage, setCurrentPage] = useState(0);
+
+  const totalPages = Math.ceil(plots.length / plotsPerPage);
+
+  const handleNextPage = () => {
+    setCurrentPage((prevPage) => Math.min(prevPage + 1, totalPages - 1));
+  };
+
+  const handlePrevPage = () => {
+    setCurrentPage((prevPage) => Math.max(prevPage - 1, 0));
+  };
+
+  const startIndex = currentPage * plotsPerPage;
+  const endIndex = Math.min(startIndex + plotsPerPage, plots.length);
+  const currentPlots = plots.slice(startIndex, endIndex);
+
   return (
-    <VerticalBox
-      sx={{
-        paddingLeft: STANDARD_PADDING,
-        paddingRight: STANDARD_PADDING,
-        flex: '1 1 auto',
-        width: '100%',
-      }}>
-      <HorizontalBox
+      <VerticalBox
         sx={{
+          paddingLeft: STANDARD_PADDING,
+          paddingRight: STANDARD_PADDING,
+          flex: '1 1 auto',
           width: '100%',
-          alignItems: 'center',
-          justifyContent: 'flex-start',
         }}>
-        <Box
+        <HorizontalBox
           sx={{
-            fontSize: '1.5em',
-            fontWeight: 'bold',
+            width: '100%',
+            alignItems: 'center',
+            justifyContent: 'flex-start',
           }}>
-          Summary Metrics
-        </Box>
-        <Box sx={{marginLeft: 'auto'}}>
-          <div style={{display: 'flex', alignItems: 'center'}}>
-            <div style={{marginRight: '4px'}}>Configure displayed metrics</div>
-            <MetricsSelector
-              selectedMetrics={selectedMetrics}
-              setSelectedMetrics={setSelectedMetrics}
-              allMetrics={Array.from(allMetricNames)}
-            />
-          </div>
-        </Box>
-      </HorizontalBox>
-      <HorizontalBox
-        sx={{
-          flexWrap: 'wrap',
-        }}>
-        <Box
+          <Box
+            sx={{
+              fontSize: '1.5em',
+              fontWeight: 'bold',
+            }}>
+            Summary Metrics
+          </Box>
+          <Box sx={{marginLeft: 'auto'}}>
+            <div style={{display: 'flex', alignItems: 'center'}}>
+              <div style={{marginRight: '4px'}}>Configure displayed metrics</div>
+              <MetricsSelector
+                selectedMetrics={selectedMetrics}
+                setSelectedMetrics={setSelectedMetrics}
+                allMetrics={Array.from(allMetricNames)}
+              />
+            </div>
+          </Box>
+        </HorizontalBox>
+        <div ref={containerRef} style={{width: '100%'}}>
+        <HorizontalBox
           sx={{
-            flex: '1 2 ' + PLOT_HEIGHT + 'px',
-            height: PLOT_HEIGHT,
-            borderRadius: BOX_RADIUS,
-            border: STANDARD_BORDER,
-            overflow: 'hidden',
-            alignContent: 'center',
-            width: PLOT_HEIGHT,
+            display: 'grid',
+            gridTemplateColumns: `repeat(${plotsPerPage}, 1fr)`,
           }}>
-          <PlotlyRadarPlot
-            height={PLOT_HEIGHT}
-            data={filteredPlotlyRadarData}
-          />
-        </Box>
-        <Box
-          sx={{
-            flex: '2 1 ' + PLOT_HEIGHT + 'px',
-            height: PLOT_HEIGHT,
-            overflow: 'hidden',
-            borderRadius: BOX_RADIUS,
-            border: STANDARD_BORDER,
-            padding: PLOT_PADDING,
-            width: PLOT_HEIGHT,
-          }}>
-          <PlotlyBarPlot height={PLOT_HEIGHT} data={filteredPlotlyRadarData} />
-        </Box>
-      </HorizontalBox>
-    </VerticalBox>
+          {currentPlots.map((plot, index) => (
+            <Box
+              key={index}
+              sx={{
+                height: PLOT_HEIGHT,
+                borderRadius: BOX_RADIUS,
+                border: STANDARD_BORDER,
+                padding: PLOT_PADDING,
+              }}>
+              {plot}
+            </Box>
+          ))}
+        </HorizontalBox>
+        </div>
+        <HorizontalBox sx={{width: '100%', marginTop: '4px'}}>
+          <Box sx={{marginLeft: 'auto'}}>
+            <Tailwind>
+              <Button variant="quiet" onClick={handlePrevPage} disabled={currentPage === 0} icon='chevron-next' className='rotate-180'/>
+              <span className='mx-4 text-moon-500 text-sm pb-12'>
+                {startIndex + 1}-{endIndex} of {plots.length}
+              </span>
+              <Button variant="quiet" onClick={handleNextPage} disabled={currentPage === totalPages - 1} icon='chevron-next'/>
+            </Tailwind>
+          </Box>
+        </HorizontalBox>
+      </VerticalBox>
   );
 };
 
