@@ -5,7 +5,7 @@ export type LeaderboardConfigType = {
   version: number;
   config: {
     description: string;
-    columns: Array<{
+    datasets: Array<{
       dataset: {
         name: string;
         version: VersionSpec;

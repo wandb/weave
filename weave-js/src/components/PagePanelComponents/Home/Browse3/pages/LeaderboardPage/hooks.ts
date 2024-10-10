@@ -147,8 +147,8 @@ export const useLeaderboardData = (
           .map((s: ObjectRef) => [s.artifactName, s.artifactVersion])
           .filter(([name, version]: [string, string]) => {
             return (
-              config.config.columns.length === 0 ||
-              config.config.columns.some(dc => {
+              config.config.datasets.length === 0 ||
+              config.config.datasets.some(dc => {
                 return (
                   (dc.dataset.name === '' || dc.dataset.name === datasetName) &&
                   (dc.dataset.version === 'all' ||
@@ -214,7 +214,7 @@ export const useLeaderboardData = (
       data: finalData,
     };
   }, [
-    config.config.columns,
+    config.config.datasets,
     evaluationRuns.loading,
     evaluationRuns.result,
     evaluationVersions,

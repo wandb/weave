@@ -371,7 +371,7 @@ export const useEvalObjsForConfig = (
       if (!datasetRef) {
         return;
       }
-      if (config.config.columns.length === 0) {
+      if (config.config.datasets.length === 0) {
         finalEvals.push(evaluation);
         return;
       }
@@ -379,7 +379,7 @@ export const useEvalObjsForConfig = (
       const datasetVersion = datasetRef.artifactVersion;
       // Determine this dataset matches any of the config's datasets
       let matched = false;
-      for (const column of config.config.columns) {
+      for (const column of config.config.datasets) {
         if (
           (datasetName === column.dataset.name || column.dataset.name === '') &&
           (column.dataset.version === datasetVersion ||
@@ -419,7 +419,7 @@ export const useEvalObjsForConfig = (
     });
 
     return finalEvals;
-  }, [config.config.columns, evalQuery.result]);
+  }, [config.config.datasets, evalQuery.result]);
 };
 
 export const useEvalCallsForConfig = (

@@ -1,8 +1,3 @@
-// type EvaluationMatrix = {
-//     datasets: {
-//         datasetName: string;
-//         versions: {
-
 import {isWeaveObjectRef} from '@wandb/weave/react';
 import _ from 'lodash';
 
@@ -16,90 +11,6 @@ import {
   projectIdFromParts,
 } from '../wfReactInterface/tsDataModelHooks';
 import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
-
-//         }
-
-//     }
-// };
-
-// const getProjectEvaluationMatrix = () => { }
-
-// type EvaluationResultRecord = {
-//     datasetName: string;
-//     datasetVersion: string;
-//     scorerName: string;
-//     scorerVersion: string;
-//     metricPath: string;
-//     metricValue: number | string | boolean | null;
-//     modelName: string;
-//     modelVersion: string;
-//     modelType: 'object' | 'op';
-//     trials: number;
-//     sourceEvaluationCallId: string;
-//     sourceEvaluationObjectRef: string;
-// }
-
-// type EvaluationDefinition = {
-//     sourceEvaluationObjectRef: string;
-//     datasetName: string;
-//     datasetVersion: string;
-//     scorers: Array<{
-//         scorerName: string;
-//         scorerVersion: string;
-//     }>
-// }
-
-// type ScorerDefinition = {
-//     scorerName: string;
-//     scorerVersion: string;
-//     type: 'object' | 'op'
-//     sampleResult: { [key: string]: any }
-// }
-
-// //
-
-// type EvaluationObjectLeaderboardSpec = {
-//     evaluationObjectVersionRefUri: string;
-// }
-
-// ----
-
-// type LeaderboardSpec = {
-//     columnGroups: LeaderboardDatasetColumnGroupSpec;
-//     modelSpec?: ExplicitModelSpec
-// }
-
-// type ExplicitModelSpec = {
-//     modelType: 'explicit';
-//     models: Array<{
-//         modelName: string;
-//         modelVersion?: string;
-//     }>
-// }
-
-// type LeaderboardDatasetColumnGroupSpec = {
-//     datasetName: string;
-//     datasetVersion?: string;
-//     metricSpecs: MetricSpec[];
-//     // TODO: min/max trials
-// }
-
-// type ScorerMetricSpec = {
-//     metricType: 'scorerMetric';
-//     scorerName: string;
-//     scorerVersion?: string;
-//     scorerType: 'object' | 'op';
-//     metrics: Array<{
-//         metricPath: string;
-//         shouldMinimize?: boolean;
-//     }>;
-// }
-
-// type ModelMetricSpec = {
-//     metricType: 'modelLatency' | 'modelCost' | 'modelTokens' | 'modelErrors';
-// }
-
-// type MetricSpec = ScorerMetricSpec | ModelMetricSpec;
 
 type LeaderboardValueRecord = {
   datasetName: string;
@@ -320,31 +231,6 @@ export const getLeaderboardData = async (
     });
   });
 
-  // console.table(data);
-
-  // First, apply the filters. Filter can work by:
-  // Datasets:
-  //    Take All
-  //       Option; should split by version
-  //    Allow-list of Names
-  //       Option (per name); should split by version
-  //    Allow-list of Names + Versions
-  // Scorers (specified per dataset spec)
-  //    Take All
-  //       Option; should split by version
-  //    Allow-list of Names
-  //       Option (per name); should split by version
-  //    Allow-list of Names + Versions
-  // Metrics (specified per scorer spec)
-  //    Take All
-  //    Allow-list of Metric Paths
-  // Models
-  //    Take All
-  //       Option; should split by version
-  //    Allow-list of Names
-  //       Option (per name); should split by version
-  //    Allow-list of Names + Versions
-
   const filterableGroupableData = data.map(row => {
     const groupableRow: GroupableLeaderboardValueRecord = {
       datasetGroup: row.datasetName,
@@ -458,7 +344,7 @@ export const getLeaderboardData = async (
     .map(entry => entry.groupableRow);
 
   const finalData: GroupedLeaderboardData2 = [];
-  const groupData = (
+  const groupedVisitor = (
     recordList: GroupableLeaderboardValueRecord[],
     fields: string[]
   ): any => {
@@ -467,72 +353,20 @@ export const getLeaderboardData = async (
       // Would be better to use some form of latest.
       const res = recordList.sort((a, b) => a.sortKey - b.sortKey)[0];
       finalData.push(res);
-      return res;
     }
 
     const [currentField, ...remainingFields] = fields;
-    return _.mapValues(_.groupBy(recordList, currentField), groupedRecords =>
-      groupData(groupedRecords, remainingFields)
+    return _.values(_.groupBy(recordList, currentField)).forEach(groupedRecords =>
+      groupedVisitor(groupedRecords, remainingFields)
     );
   };
 
-  const groupedData = groupData(groupableData, [
+  groupedVisitor(groupableData, [
     'datasetGroup',
     'scorerGroup',
     'metricPathGroup',
     'modelGroup',
   ]);
-  console.log(groupedData);
-  console.table(finalData);
 
   return finalData;
 };
-
-// type LeaderboardSpec = {
-//     columnGroups: LeaderboardDatasetColumnGroupSpec;
-//     modelSpec?: ExplicitModelSpec
-// }
-
-// type ExplicitModelSpec = {
-//     modelType: 'explicit';
-//     models: Array<{
-//         modelName: string;
-//         modelVersion?: string;
-//     }>
-// }
-
-// type LeaderboardDatasetColumnGroupSpec = {
-//     datasetName: string;
-//     datasetVersion?: string;
-//     metricSpecs: MetricSpec[];
-//     // TODO: min/max trials
-// }
-
-// type ScorerMetricSpec = {
-//     metricType: 'scorerMetric';
-//     scorerName: string;
-//     scorerVersion?: string;
-//     scorerType: 'object' | 'op';
-//     metrics: Array<{
-//         metricPath: string;
-//         shouldMinimize?: boolean;
-//     }>;
-// }
-
-// const groupedData = _.mapValues(_.groupBy(data, 'datasetName'), (data) => {
-//     return _.mapValues(_.groupBy(data, 'datasetVersion'), (data) => {
-//         return _.mapValues(_.groupBy(data, 'scorerName'), (data) => {
-//             return _.mapValues(_.groupBy(data, 'scorerVersion'), (data) => {
-//                 return _.mapValues(_.groupBy(data, 'metricPath'), (data) => {
-//                     return _.mapValues(_.groupBy(data, 'modelName'), (data) => {
-//                         return _.mapValues(_.groupBy(data, 'modelVersion'), (data) => {
-//                             // sort by created at descending
-//                             // Opportunity to aggregate based on the metricType (ex. avg)
-//                             return data.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0]
-//                         });
-//                     });
-//                 });
-//             });
-//         });
-//     });
-// });

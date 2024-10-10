@@ -29,8 +29,8 @@ export const LeaderboardConfig: React.FC<{
       ...prev,
       config: {
         ...prev.config,
-        columns: [
-          ...prev.config.columns,
+        datasets: [
+          ...prev.config.datasets,
           {dataset: {name: '', version: 'latest'}, scores: []},
         ],
       },
@@ -42,20 +42,20 @@ export const LeaderboardConfig: React.FC<{
       ...prev,
       config: {
         ...prev.config,
-        columns: prev.config.columns.filter((_, i) => i !== index),
+        datasets: prev.config.datasets.filter((_, i) => i !== index),
       },
     }));
   };
 
   const handleUpdateColumn = (
     index: number,
-    updatedColumn: LeaderboardConfigType['config']['columns'][0]
+    updatedColumn: LeaderboardConfigType['config']['datasets'][0]
   ) => {
     setConfig(prev => ({
       ...prev,
       config: {
         ...prev.config,
-        columns: prev.config.columns.map((column, i) =>
+        datasets: prev.config.datasets.map((column, i) =>
           i === index ? updatedColumn : column
         ),
       },
@@ -123,7 +123,7 @@ export const LeaderboardConfig: React.FC<{
           <Typography variant="h6" gutterBottom>
             Columns
           </Typography>
-          {config.config.columns.map((column, index) => (
+          {config.config.datasets.map((column, index) => (
             <ColumnConfig
               entity={entity}
               project={project}
