@@ -57,9 +57,10 @@ class OpenAIModerationScorer(LLMScorer):
         response = self.client.moderations.create(
             model=self.model,
             input=model_output,
-        )
+        ).results[0]
+        categories = {k: v for k, v in response.categories.dict().items() if v}
+        return {"flagged": response.flagged, "categories": categories}
         
-        return response.results[0]
 
 
 if __name__ == "__main__":
