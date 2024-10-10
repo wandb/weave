@@ -206,7 +206,9 @@ export type WFDataModelHooksInterface = {
     expandedRefCols?: string[],
     includeFeedback?: boolean
   ) => Promise<Blob>;
-  useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
+  useOpVersion: (
+    key: OpVersionKey | null
+  ) => LoadableWithError<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,
     project: string,
@@ -217,7 +219,7 @@ export type WFDataModelHooksInterface = {
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (
     key: ObjectVersionKey | null
-  ) => Loadable<ObjectVersionSchema | null>;
+  ) => LoadableWithError<ObjectVersionSchema | null>;
   useTableRowsQuery: (
     entity: string,
     project: string,
@@ -242,6 +244,7 @@ export type WFDataModelHooksInterface = {
     metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => LoadableWithError<ObjectVersionSchema[]>;
+  useObjectDeleteFunc: () => (key: ObjectVersionKey) => Promise<void>;
   // `useRefsData` is in beta while we integrate Shawn's new Object DB
   useRefsData: (refUris: string[], tableQuery?: TableQuery) => Loadable<any[]>;
   // `useApplyMutationsToRef` is in beta while we integrate Shawn's new Object DB
