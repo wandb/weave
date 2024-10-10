@@ -1,3 +1,4 @@
+import DeleteIcon from '@mui/icons-material/Delete';
 import {
   Box,
   Button,
@@ -12,8 +13,10 @@ import {
   Tabs,
   Typography,
 } from '@mui/material';
+import IconButton from '@mui/material/IconButton';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {
   fetchDatasetNamesForSpec,
   fetchDatasetVersionsForSpecAndName,
@@ -33,7 +36,6 @@ import {
   FilterAndGroupSpec,
   LeaderboardConfigType,
 } from './types/leaderboardConfigType';
-import { useGetTraceServerClientContext } from '../wfReactInterface/traceServerClientContext';
 
 export const LeaderboardConfigEditor: React.FC<{
   entity: string;
@@ -88,7 +90,7 @@ export const LeaderboardConfigEditor: React.FC<{
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        border: '1px solid #e0e0e0',
+        borderLeft: '1px solid #e0e0e0',
       }}>
       <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
         <Tabs value={activeTab} onChange={handleTabChange}>
@@ -122,9 +124,9 @@ export const LeaderboardConfigEditor: React.FC<{
           justifyContent: 'flex-end',
           pt: 1,
           pb: 1,
-          pr: 1.5,
+          pr: 1,
           borderTop: '1px solid #e0e0e0',
-          height: '51px',
+          height: '52px',
         }}>
         <Button variant="outlined" onClick={handleCancel} sx={{mr: 2}}>
           Cancel
@@ -255,7 +257,9 @@ const SourceEvaluationsConfig: React.FC<{
   const [evaluationNames, setEvaluationNames] = useState<string[]>([]);
 
   useEffect(() => {
-    fetchEvaluationNames(getTraceServerClient(), entity, project).then(setEvaluationNames);
+    fetchEvaluationNames(getTraceServerClient(), entity, project).then(
+      setEvaluationNames
+    );
   }, [entity, getTraceServerClient, project]);
 
   const handleAddSourceEvaluation = () => {
@@ -302,11 +306,18 @@ const SourceEvaluationItem: React.FC<{
   index: number;
 }> = ({entity, project, evaluation, evaluationNames, updateConfig, index}) => {
   const getTraceServerClient = useGetTraceServerClientContext();
-  const [versions, setVersions] = useState<{digest: string, index: number}[]>([]);
+  const [versions, setVersions] = useState<
+    Array<{digest: string; index: number}>
+  >([]);
 
   useEffect(() => {
     if (evaluation.name && evaluation.name !== '*') {
-      fetchEvaluationVersionsForName(getTraceServerClient(), entity, project, evaluation.name).then(setVersions);
+      fetchEvaluationVersionsForName(
+        getTraceServerClient(),
+        entity,
+        project,
+        evaluation.name
+      ).then(setVersions);
     }
   }, [entity, evaluation.name, getTraceServerClient, project]);
 
@@ -330,8 +341,15 @@ const SourceEvaluationItem: React.FC<{
     }));
   };
 
+  const handleDelete = () => {
+    updateConfig(spec => ({
+      ...spec,
+      sourceEvaluations: spec.sourceEvaluations?.filter((_, i) => i !== index),
+    }));
+  };
+
   return (
-    <Box sx={{display: 'flex', gap: 2, mb: 2}}>
+    <Box sx={{display: 'flex', gap: 2, mb: 2, alignItems: 'center'}}>
       <FormControl fullWidth>
         <InputLabel>Name</InputLabel>
         <Select value={evaluation.name || '*'} onChange={handleNameChange}>
@@ -357,6 +375,9 @@ const SourceEvaluationItem: React.FC<{
           ))}
         </Select>
       </FormControl>
+      <IconButton onClick={handleDelete} size="small">
+        <DeleteIcon />
+      </IconButton>
     </Box>
   );
 };
@@ -471,9 +492,16 @@ const DatasetItem: React.FC<{
     }));
   };
 
+  const handleDelete = () => {
+    updateConfig(spec => ({
+      ...spec,
+      datasets: spec.datasets?.filter((_, i) => i !== index),
+    }));
+  };
+
   return (
     <Box sx={{display: 'flex', flexDirection: 'column', gap: 2, mb: 2}}>
-      <Box sx={{display: 'flex', gap: 2}}>
+      <Box sx={{display: 'flex', gap: 2, alignItems: 'center'}}>
         <FormControl fullWidth>
           <InputLabel>Name</InputLabel>
           <Select value={dataset.name || '*'} onChange={handleNameChange}>
@@ -499,6 +527,9 @@ const DatasetItem: React.FC<{
             ))}
           </Select>
         </FormControl>
+        <IconButton onClick={handleDelete} size="small">
+          <DeleteIcon />
+        </IconButton>
       </Box>
       <FormControlLabel
         control={
@@ -625,9 +656,23 @@ const ScorerItem: React.FC<{
     }));
   };
 
+  const handleDelete = () => {
+    updateConfig(spec => ({
+      ...spec,
+      datasets: spec.datasets?.map((d, i) =>
+        i === datasetIndex
+          ? {
+              ...d,
+              scorers: d.scorers?.filter((_, j) => j !== scorerIndex),
+            }
+          : d
+      ),
+    }));
+  };
+
   return (
     <Box sx={{display: 'flex', flexDirection: 'column', gap: 2, ml: 2, mb: 2}}>
-      <Box sx={{display: 'flex', gap: 2}}>
+      <Box sx={{display: 'flex', gap: 2, alignItems: 'center'}}>
         <FormControl fullWidth>
           <InputLabel>Name</InputLabel>
           <Select value={scorer.name || '*'} onChange={handleNameChange}>
@@ -653,6 +698,9 @@ const ScorerItem: React.FC<{
             ))}
           </Select>
         </FormControl>
+        <IconButton onClick={handleDelete} size="small">
+          <DeleteIcon />
+        </IconButton>
       </Box>
       <FormControlLabel
         control={
@@ -751,8 +799,29 @@ const MetricItem: React.FC<{
     }));
   };
 
+  const handleDelete = () => {
+    updateConfig(spec => ({
+      ...spec,
+      datasets: spec.datasets?.map((d, i) =>
+        i === datasetIndex
+          ? {
+              ...d,
+              scorers: d.scorers?.map((s, j) =>
+                j === scorerIndex
+                  ? {
+                      ...s,
+                      metrics: s.metrics?.filter((_, k) => k !== metricIndex),
+                    }
+                  : s
+              ),
+            }
+          : d
+      ),
+    }));
+  };
+
   return (
-    <Box sx={{display: 'flex', gap: 2, ml: 2, mb: 2}}>
+    <Box sx={{display: 'flex', gap: 2, ml: 2, mb: 2, alignItems: 'center'}}>
       <FormControl fullWidth>
         <InputLabel>Metric Path</InputLabel>
         <Select value={metric.path} onChange={handlePathChange}>
@@ -773,6 +842,9 @@ const MetricItem: React.FC<{
         }
         label="Should Minimize"
       />
+      <IconButton onClick={handleDelete} size="small">
+        <DeleteIcon />
+      </IconButton>
     </Box>
   );
 };
@@ -868,9 +940,16 @@ const ModelItem: React.FC<{
     }));
   };
 
+  const handleDelete = () => {
+    updateConfig(spec => ({
+      ...spec,
+      models: spec.models?.filter((_, i) => i !== index),
+    }));
+  };
+
   return (
     <Box sx={{display: 'flex', flexDirection: 'column', gap: 2, mb: 2}}>
-      <Box sx={{display: 'flex', gap: 2}}>
+      <Box sx={{display: 'flex', gap: 2, alignItems: 'center'}}>
         <FormControl fullWidth>
           <InputLabel>Name</InputLabel>
           <Select value={model.name || '*'} onChange={handleNameChange}>
@@ -896,6 +975,9 @@ const ModelItem: React.FC<{
             ))}
           </Select>
         </FormControl>
+        <IconButton onClick={handleDelete} size="small">
+          <DeleteIcon />
+        </IconButton>
       </Box>
       <FormControlLabel
         control={

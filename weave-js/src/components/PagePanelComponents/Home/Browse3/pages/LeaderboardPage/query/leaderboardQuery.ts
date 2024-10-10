@@ -67,16 +67,16 @@ export type GroupedLeaderboardModelGroup = {
   };
 };
 
-
-
 export const getLeaderboardData = async (
   client: TraceServerClient,
   entity: string,
   project: string,
   spec: FilterAndGroupSpec = {}
 ): Promise<GroupedLeaderboardData> => {
-  const atLeastOneStarName = spec.sourceEvaluations?.some(sourceEvaluation => sourceEvaluation.name === '*');
-  const sourceEvals = atLeastOneStarName ? [] : (spec.sourceEvaluations ?? []);
+  const atLeastOneStarName = spec.sourceEvaluations?.some(
+    sourceEvaluation => sourceEvaluation.name === '*'
+  );
+  const sourceEvals = atLeastOneStarName ? [] : spec.sourceEvaluations ?? [];
   const evalNames = sourceEvals.map(sourceEvaluation => sourceEvaluation.name);
   // const fullyQualifiedEvalRefs = sourceEvals.map(sourceEvaluation => {
   //   return objectVersionKeyToRefUri({

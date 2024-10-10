@@ -2,46 +2,53 @@
  * This file is not performant yet.
  */
 
-import { TraceServerClient } from '../../wfReactInterface/traceServerClient';
-import { projectIdFromParts } from '../../wfReactInterface/tsDataModelHooks';
+import {TraceServerClient} from '../../wfReactInterface/traceServerClient';
+import {projectIdFromParts} from '../../wfReactInterface/tsDataModelHooks';
 import {FilterAndGroupSpec} from '../types/leaderboardConfigType';
 
 export const fetchEvaluationNames = async (
   client: TraceServerClient,
   entity: string,
-  project: string,
+  project: string
 ): Promise<string[]> => {
-  return client.objsQuery({
-    project_id: projectIdFromParts({entity, project}),
-    filter: {
-      base_object_classes: ['Evaluation'],
-      is_op: false,
-      latest_only: true
-    },
-    metadata_only: true,
-    sort_by: [{field: 'created_at', direction: 'desc'}],
-  }).then(res => {
-    return res.objs.map(obj => obj.object_id);
-  });
+  return client
+    .objsQuery({
+      project_id: projectIdFromParts({entity, project}),
+      filter: {
+        base_object_classes: ['Evaluation'],
+        is_op: false,
+        latest_only: true,
+      },
+      metadata_only: true,
+      sort_by: [{field: 'created_at', direction: 'desc'}],
+    })
+    .then(res => {
+      return res.objs.map(obj => obj.object_id);
+    });
 };
 export const fetchEvaluationVersionsForName = async (
   client: TraceServerClient,
   entity: string,
   project: string,
   name: string
-): Promise<{digest: string, index: number}[]> => {
-  return client.objsQuery({
-    project_id: projectIdFromParts({entity, project}),
-    filter: {
-      base_object_classes: ['Evaluation'],
-      is_op: false,
-      object_ids: [name]
-    },
-    metadata_only: true,
-    sort_by: [{field: 'created_at', direction: 'desc'}],
-  }).then(res => {
-    return res.objs.map(obj => ({digest: obj.digest, index: obj.version_index}));
-  });
+): Promise<Array<{digest: string; index: number}>> => {
+  return client
+    .objsQuery({
+      project_id: projectIdFromParts({entity, project}),
+      filter: {
+        base_object_classes: ['Evaluation'],
+        is_op: false,
+        object_ids: [name],
+      },
+      metadata_only: true,
+      sort_by: [{field: 'created_at', direction: 'desc'}],
+    })
+    .then(res => {
+      return res.objs.map(obj => ({
+        digest: obj.digest,
+        index: obj.version_index,
+      }));
+    });
 };
 export const fetchDatasetNamesForSpec = async (
   spec: FilterAndGroupSpec

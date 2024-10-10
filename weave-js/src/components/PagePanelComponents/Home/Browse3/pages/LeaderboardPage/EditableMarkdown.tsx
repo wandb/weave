@@ -54,10 +54,10 @@ export const EditableMarkdown: React.FC<EditableMarkdownProps> = ({
         return; // Exit if we can't determine the height
       }
 
-      newHeight -= 1;
+      newHeight -= 3;
 
       // Set a minimum height to prevent collapsing
-      newHeight = Math.max(newHeight, 25);
+      newHeight = Math.max(newHeight, 24);
 
       containerRef.current.style.height = `${newHeight}px`;
     }
