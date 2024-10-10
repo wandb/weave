@@ -26,7 +26,7 @@ interface LeaderboardGridProps {
   project: string;
   data: GroupedLeaderboardData;
   loading: boolean;
-  onCellClick: (modelName: string, metricName: string, score: number) => void;
+  onCellClick: (record: LeaderboardValueRecord) => void;
 }
 
 type RowData = {
@@ -155,13 +155,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                               value
                             ),
                           }}
-                          onClick={() =>
-                            onCellClick(
-                              params.row.model,
-                              params.field as string,
-                              params.value as number
-                            )
-                          }>
+                          onClick={() => onCellClick(params.row)}>
                           {' '}
                           {inner}
                         </div>
@@ -204,8 +198,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
               children: [],
               renderHeaderGroup: params => {
                 const ref = parseRefMaybe(
-                  `weave:///${entity}/${project}/object/${scorerGroupName}` ??
-                    ''
+                  `weave:///${entity}/${project}/op/${scorerGroupName}` ?? ''
                 );
                 // console.log(node.headerName, ref);
                 if (ref) {

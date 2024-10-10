@@ -77,9 +77,11 @@ export const getLeaderboardData = async (
       base_object_classes: ['Evaluation'],
       is_op: false,
     },
+    sort_by: [{field: 'created_at', direction: 'desc'}],
   });
   const allEvaluationCallsProm = client.callsStreamQuery({
     project_id: projectIdFromParts({entity, project}),
+    sort_by: [{field: 'ended_at', direction: 'desc'}],
     filter: {
       op_names: [
         opVersionKeyToRefUri({
@@ -175,23 +177,6 @@ export const getLeaderboardData = async (
       sourceEvaluationObjectRef: evalObjectRefUri,
     };
 
-    const modelLatency = (call.output as any)?.model_latency?.mean;
-    if (modelLatency == null) {
-      console.warn('Skipping model latency', call);
-    } else {
-      const modelLatencyRecord: LeaderboardValueRecord = {
-        ...recordPartial,
-        metricType: 'modelLatency',
-        scorerName: 'modelLatency',
-        scorerVersion: 'modelLatency',
-        metricPath: 'model_latency.mean',
-        metricValue: modelLatency,
-      };
-      data.push(modelLatencyRecord);
-    }
-
-    // TODO: add modelCost, modelTokens, modelErrors
-
     const scorerRefUris = (evalObject.val.scorers ?? []) as string[];
     scorerRefUris.forEach(scorerRefUri => {
       const scorerRef = parseRefMaybe(scorerRefUri);
@@ -225,12 +210,32 @@ export const getLeaderboardData = async (
         data.push(scoreRecord);
       });
     });
+
+    const modelLatency = (call.output as any)?.model_latency?.mean;
+    if (modelLatency == null) {
+      console.warn('Skipping model latency', call);
+    } else {
+      const modelLatencyRecord: LeaderboardValueRecord = {
+        ...recordPartial,
+        metricType: 'modelLatency',
+        scorerName: 'modelLatency',
+        scorerVersion: 'modelLatency',
+        metricPath: 'model_latency.mean',
+        metricValue: modelLatency,
+      };
+      data.push(modelLatencyRecord);
+    }
+
+    // TODO: add modelCost, modelTokens, modelErrors
   });
 
   const filterableGroupableData = data.map(row => {
     const groupableRow: GroupableLeaderboardValueRecord = {
-      datasetGroup: row.datasetName,
-      scorerGroup: row.scorerName,
+      datasetGroup: `${row.datasetName}:${row.datasetVersion}`,
+      scorerGroup:
+        row.metricType === 'scorerMetric'
+          ? `${row.scorerName}:${row.scorerVersion}`
+          : row.scorerName,
       modelGroup: `${row.modelName}:${row.modelVersion}`,
       metricPathGroup: row.metricPath,
       sortKey: -row.createdAt.getTime(),
@@ -269,8 +274,8 @@ export const getLeaderboardData = async (
     if (!datasetSpec) {
       return {include: false, groupableRow};
     }
-    if (datasetSpec.splitByVersion) {
-      groupableRow.datasetGroup = `${row.datasetName}:${row.datasetVersion}`;
+    if (datasetSpec.groupAllVersions) {
+      groupableRow.datasetGroup = `${row.datasetName}`;
     }
     if (datasetSpec.scorers) {
       let scorerSpec = datasetSpec.scorers.find(
@@ -294,8 +299,8 @@ export const getLeaderboardData = async (
       if (!scorerSpec) {
         return {include: false, groupableRow};
       }
-      if (scorerSpec.splitByVersion) {
-        groupableRow.scorerGroup = `${row.scorerName}:${row.scorerVersion}`;
+      if (scorerSpec.groupAllVersions) {
+        groupableRow.scorerGroup = `${row.scorerName}`;
       }
       if (scorerSpec.metrics) {
         const metricSpec = scorerSpec.metrics.find(
@@ -328,7 +333,7 @@ export const getLeaderboardData = async (
       if (!modelSpec) {
         return {include: false, groupableRow};
       }
-      if (modelSpec.groupByVersion) {
+      if (modelSpec.groupAllVersions) {
         groupableRow.modelGroup = `${row.modelName}`;
       }
     }

@@ -10,6 +10,7 @@ import {useLeaderboardData} from './hooks';
 import {LeaderboardConfigType} from './LeaderboardConfigType';
 import {LeaderboardGrid} from './LeaderboardGrid';
 import {LeaderboardConfig} from './LeaderboardPageConfig';
+import {LeaderboardValueRecord} from './leaderboardServerInterface';
 
 const USE_COMPARE_EVALUATIONS_PAGE = false;
 
@@ -81,13 +82,8 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
   );
   useTraceUpdate('a', {entity, project, currentConfig});
 
-  const handleCellClick = (
-    modelName: string,
-    metricName: string,
-    score: number
-  ) => {
-    const sourceCallId = false;
-    // data.scores?.[modelName]?.[metricName]?.sourceEvalCallId;
+  const handleCellClick = (record: LeaderboardValueRecord) => {
+    const sourceCallId = record.sourceEvaluationCallId;
     if (sourceCallId) {
       let to: string;
       if (USE_COMPARE_EVALUATIONS_PAGE) {

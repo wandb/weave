@@ -17,14 +17,14 @@ export type FilterAndGroupSpec = {
 export type FilterAndGroupDatasetSpec = {
   name: string; // "*" means all
   version: string; // "*" means all
-  splitByVersion?: boolean;
+  groupAllVersions?: boolean;
   scorers?: FilterAndGroupDatasetScorerSpec[]; // null is all
 };
 
 export type FilterAndGroupDatasetScorerSpec = {
   name: string; // "*" means all
   version: string; // "*" means all
-  splitByVersion?: boolean;
+  groupAllVersions?: boolean;
   metrics?: FilterAndGroupDatasetScorerMetricSpec[]; // null is all
 };
 
@@ -36,5 +36,5 @@ export type FilterAndGroupDatasetScorerMetricSpec = {
 export type FilterAndGroupModelSpec = {
   name: string; // "*" means all
   version: string; // "*" means all
-  groupByVersion?: boolean;
+  groupAllVersions?: boolean;
 };
