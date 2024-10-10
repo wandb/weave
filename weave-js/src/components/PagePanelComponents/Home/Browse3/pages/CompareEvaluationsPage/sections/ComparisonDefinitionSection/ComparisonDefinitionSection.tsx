@@ -60,6 +60,7 @@ export const ComparisonDefinitionSection: React.FC<{
   return (
     <DragDropProvider>
       <DropTarget
+        style={{width: '100%', overflow: 'auto'}}
         partRef={{id: `target`}}
         onDragOver={onDragOver}
         onDrop={onDrop}>
@@ -83,7 +84,9 @@ export const ComparisonDefinitionSection: React.FC<{
               </div>
             );
           })}
-          <AddEvaluationButton state={props.state} />
+          <HorizontalBox>
+            <AddEvaluationButton state={props.state} />
+          </HorizontalBox>
         </HorizontalBox>
       </DropTarget>
     </DragDropProvider>
@@ -118,7 +121,7 @@ const ModelRefLabel: React.FC<{modelRef: string}> = props => {
   const objectVersion = useObjectVersion(objVersionKey);
   return (
     <span className="ml-2">
-      {objectVersion.result?.objectId}:{objectVersion.result?.versionIndex}
+      {objectVersion.result?.objectId}:v{objectVersion.result?.versionIndex}
     </span>
   );
 };
@@ -142,7 +145,7 @@ const AddEvaluationButton: React.FC<{
   );
   const expandedRefCols = useMemo(() => new Set<string>(), []);
   // Don't query for output here, re-queried in tsDataModelHooksEvaluationComparison.ts
-  const columns = useMemo(() => ['inputs'], []);
+  const columns = useMemo(() => ['inputs', 'display_name'], []);
   const calls = useCallsForQuery(
     props.state.data.entity,
     props.state.data.project,
@@ -260,8 +263,24 @@ const AddEvaluationButton: React.FC<{
                     className="pb-8 pt-8 font-['Source_Sans_Pro'] text-base font-normal text-moon-800"
                     onClick={() => addEvaluationCall(call.callId)}>
                     <>
-                      <span>{call.displayName ?? call.spanName}</span>
-                      <Id id={call.callId} type="Call" className="ml-0 mr-4" />
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          flexGrow: 1,
+                          flexShrink: 1,
+                          maxWidth: '250px',
+                        }}>
+                        {call.displayName ?? call.spanName}
+                      </span>
+                      <span style={{flexShrink: 0}}>
+                        <Id
+                          id={call.callId}
+                          type="Call"
+                          className="ml-0 mr-4"
+                        />
+                      </span>
                       <VerticalBar />
                       <ModelRefLabel modelRef={call.traceCall?.inputs.model} />
                     </>

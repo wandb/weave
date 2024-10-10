@@ -34,22 +34,6 @@ import {
 import {EvaluationComparisonState, getBaselineCallId} from '../../ecpState';
 import {HorizontalBox} from '../../Layout';
 
-const DragHandleIcon = styled(WBIcon).attrs({name: 'vertical-handle'})`
-  font-size: calc(30 * 1.75);
-  border-radius: 50%;
-  color: gray300;
-  user-select: none;
-  cursor: grab;
-  &&&:hover {
-    background: gray100;
-    color: black;
-  }
-  &:active {
-    cursor: grabbing;
-  }
-`;
-DragHandle.displayName = 'S.DragHandle';
-
 export const EvaluationDefinition: React.FC<{
   state: EvaluationComparisonState;
   callId: string;
@@ -109,27 +93,34 @@ export const EvaluationDefinition: React.FC<{
           height: EVAL_DEF_HEIGHT,
           borderRadius: BOX_RADIUS,
           border: STANDARD_BORDER,
-          padding: '12px',
+          paddingTop: '12px',
+          paddingBottom: '12px',
           alignItems: 'center',
           justifyContent: 'space-between',
         }}>
-        <DragHandle partRef={partRef}>
+        <DragHandle
+          partRef={partRef}
+          style={{marginTop: '5px', marginRight: '-20px', marginLeft: '4px'}}>
           <DragHandleIcon />
         </DragHandle>
-        <EvaluationCallLink {...props} />
+        <div style={{marginRight: '-8px'}}>
+          <EvaluationCallLink {...props} />
+        </div>
         {props.callId === getBaselineCallId(props.state) && (
-          <Pill label="Baseline" color="teal" />
+          <div style={{marginRight: '-8px'}}>
+            <Pill label="Baseline" color="teal" />
+          </div>
         )}
-        <div style={{marginLeft: '-14px'}}>
+        <div style={{marginLeft: '-6px', marginRight: '8px'}}>
           <PopupDropdown
             sections={[menuOptions]}
             trigger={
               <Button
-                className="rotate-90"
+                className="ml-4 rotate-90"
                 icon="overflow-horizontal"
                 size="small"
                 variant="ghost"
-                style={{marginLeft: '4px'}}
+                // style={{marginLeft: '4px'}}
               />
             }
           />
@@ -258,3 +249,19 @@ export const VerticalBar: React.FC = () => {
     />
   );
 };
+
+const DragHandleIcon = styled(WBIcon).attrs({name: 'vertical-handle'})`
+  font-size: 26px;
+  border-radius: 50%;
+  color: gray300;
+  user-select: none;
+  cursor: grab;
+  &&&:hover {
+    background: gray100;
+    color: black;
+  }
+  &:active {
+    cursor: grabbing;
+  }
+`;
+DragHandle.displayName = 'S.DragHandle';
