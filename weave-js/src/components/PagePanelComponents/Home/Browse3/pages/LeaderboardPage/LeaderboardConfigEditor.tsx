@@ -26,6 +26,8 @@ import {
   fetchScorerVersionsForSpecAndName,
 } from './query/configEditorQuery';
 import {
+  FilterAndGroupDatasetScorerMetricSpec,
+  FilterAndGroupDatasetScorerSpec,
   FilterAndGroupDatasetSpec,
   FilterAndGroupSourceEvaluationSpec,
   FilterAndGroupSpec,
@@ -428,7 +430,7 @@ const DatasetItem: React.FC<{
 };
 
 const ScorerItem: React.FC<{
-  scorer: FilterAndGroupDatasetSpec['scorers'][0];
+  scorer: FilterAndGroupDatasetScorerSpec;
   scorerNames: string[];
   updateConfig: (
     updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
@@ -583,7 +585,7 @@ const ScorerItem: React.FC<{
 };
 
 const MetricItem: React.FC<{
-  metric: FilterAndGroupDatasetSpec['scorers'][0]['metrics'][0];
+  metric: FilterAndGroupDatasetScorerMetricSpec;
   metricPaths: string[];
   updateConfig: (
     updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
