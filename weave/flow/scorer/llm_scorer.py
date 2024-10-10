@@ -32,9 +32,8 @@ class PromptScorer(LLMScorer):
 
     @field_validator('user_prompt')
     def validate_user_prompt(cls, v):
-        "The user prompt must contain the `model_output` variable."
         if "{model_output}" not in v:
-            raise ValueError("The user prompt must contain the `model_output` variable.")
+            raise ValueError("The user prompt must contain the `{model_output}` variable.")
         return v
     
     def score(self, model_output: Any) -> Any:
@@ -86,35 +85,35 @@ class OpenAIModerationScorer(LLMScorer):
 
 
 if __name__ == "__main__":
-    # try:
-    #     import openai
-    #     client = openai.OpenAI()
-    #     scorer = EmbeddingScorer(
-    #         client=client, 
-    #         model="text-embedding-3-small")
-    #     print(scorer.score("I don't know", "I don't know"))
-    # except Exception as e:
-    #     print("Install openai to run this script")
+    try:
+        import openai
+        client = openai.OpenAI()
+        scorer = EmbeddingScorer(
+            client=client, 
+            model="text-embedding-3-small")
+        print(scorer.score("I don't know", "I don't know"))
+    except Exception as e:
+        print("Install openai to run this script")
 
-    # try:
-    #     import openai
-    #     client = openai.OpenAI()
-    #     scorer = OpenAIModerationScorer(
-    #         client=client, 
-    #         model="omni-moderation-latest")
-    #     print(scorer.score("I should kill myself"))
-    # except Exception as e:
-    #     print("Install openai to run this script")
+    try:
+        import openai
+        client = openai.OpenAI()
+        scorer = OpenAIModerationScorer(
+            client=client, 
+            model="omni-moderation-latest")
+        print(scorer.score("I should kill myself"))
+    except Exception as e:
+        print("Install openai to run this script")
     
-    # try:
+    try:
         import openai
         client = openai.OpenAI()
         scorer = PromptScorer(
             client=client, 
             model="gpt-4o",
             system_prompt="You are a helpful assistant.",
-            user_prompt="Extract the entity from this phrase: \m {model_output}")
+            user_prompt="Extract the entity from this phrase: \n {model_output}")
         print(scorer.score("The cat is happy"))
-    # except Exception as e:
-    #     print("Install openai to run this script")
+    except Exception as e:
+        print("Install openai to run this script")
 
