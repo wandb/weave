@@ -3,30 +3,12 @@ from typing import Any, Union, Type
 import numpy as np
 
 from weave.flow.scorer.base_scorer import Scorer
-
-_LLM_CLIENT_TYPES = []
+from weave.flow.scorer.lightllm import LLMFactory, _LLM_CLIENT_TYPES
 
 try:
     from openai import OpenAI, AsyncOpenAI
-    _LLM_CLIENT_TYPES.append(OpenAI)
-    _LLM_CLIENT_TYPES.append(AsyncOpenAI)
 except:
     pass    
-try:
-    from anthropic import Anthropic, AsyncAnthropic
-    _LLM_CLIENT_TYPES.append(Anthropic)
-    _LLM_CLIENT_TYPES.append(AsyncAnthropic)
-except:
-    pass    
-try:
-    from mistralai import Mistral
-    _LLM_CLIENT_TYPES.append(Mistral)
-except:
-    pass    
-
-_LLM_CLIENTS = Union[tuple(_LLM_CLIENT_TYPES)]
-
-_DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 
 class LLMScorer(Scorer):
     """
@@ -46,20 +28,13 @@ class EmbeddingScorer(LLMScorer):
     Check the embedding distance between the model output and the target.
     """
     def score(self, model_output: Any, target: Any) -> Any:
-        if not isinstance(self.client, (OpenAI, AsyncOpenAI)):
-            raise ValueError("Embedding scoring only works with OpenAI or AsyncOpenAI")
-        
-        # Use AsyncOpenAI if available, otherwise use OpenAI
-        client = self.client if isinstance(self.client, AsyncOpenAI) else self.client
-        
-        model_embedding = client.embeddings.create(
-            input=model_output, model=self.model).data[0].embedding
-        target_embedding = client.embeddings.create(
-            input=target, model=self.model).data[0].embedding
-        
+        model_embedding, target_embedding = self._compute_embeddings(model_output, target)
         return self.cosine_similarity(model_embedding, target_embedding)
     
-
+    def _compute_embeddings(self, model_output: str, target: str) -> list[float]:
+        llm = LLMFactory.create(self.client, self.model)
+        return llm.embed([model_output, target])
+    
     def cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
         """
         Compute the cosine similarity between two vectors.
