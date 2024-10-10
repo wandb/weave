@@ -33,6 +33,7 @@ import {
   FilterAndGroupSpec,
   LeaderboardConfigType,
 } from './types/leaderboardConfigType';
+import { useGetTraceServerClientContext } from '../wfReactInterface/traceServerClientContext';
 
 export const LeaderboardConfigEditor: React.FC<{
   entity: string;
@@ -100,6 +101,8 @@ export const LeaderboardConfigEditor: React.FC<{
       <Box sx={{flex: 1, overflowY: 'auto', p: 2}}>
         {activeTab === 0 && (
           <ConfigEditor
+            entity={entity}
+            project={project}
             config={config.config.dataSelectionSpec}
             updateConfig={updateConfig}
           />
@@ -135,14 +138,18 @@ export const LeaderboardConfigEditor: React.FC<{
 };
 
 const ConfigEditor: React.FC<{
+  entity: string;
+  project: string;
   config: FilterAndGroupSpec;
   updateConfig: (
     updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
   ) => void;
-}> = ({config, updateConfig}) => {
+}> = ({entity, project, config, updateConfig}) => {
   return (
     <>
       <SourceEvaluationsConfig
+        entity={entity}
+        project={project}
         sourceEvaluations={config.sourceEvaluations}
         updateConfig={updateConfig}
       />
@@ -237,23 +244,26 @@ function debounce<T extends (...args: any[]) => any>(
 }
 
 const SourceEvaluationsConfig: React.FC<{
+  entity: string;
+  project: string;
   sourceEvaluations: FilterAndGroupSourceEvaluationSpec[] | undefined;
   updateConfig: (
     updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
   ) => void;
-}> = ({sourceEvaluations, updateConfig}) => {
+}> = ({sourceEvaluations, updateConfig, entity, project}) => {
+  const getTraceServerClient = useGetTraceServerClientContext();
   const [evaluationNames, setEvaluationNames] = useState<string[]>([]);
 
   useEffect(() => {
-    fetchEvaluationNames().then(setEvaluationNames);
-  }, []);
+    fetchEvaluationNames(getTraceServerClient(), entity, project).then(setEvaluationNames);
+  }, [entity, getTraceServerClient, project]);
 
   const handleAddSourceEvaluation = () => {
     updateConfig(spec => ({
       ...spec,
       sourceEvaluations: [
         ...(spec.sourceEvaluations || []),
-        {name: '', version: '*'},
+        {name: '*', version: '*'},
       ],
     }));
   };
@@ -266,6 +276,8 @@ const SourceEvaluationsConfig: React.FC<{
       {sourceEvaluations?.map((evaluation, index) => (
         <SourceEvaluationItem
           key={index}
+          entity={entity}
+          project={project}
           evaluation={evaluation}
           evaluationNames={evaluationNames}
           updateConfig={updateConfig}
@@ -280,20 +292,23 @@ const SourceEvaluationsConfig: React.FC<{
 };
 
 const SourceEvaluationItem: React.FC<{
+  entity: string;
+  project: string;
   evaluation: FilterAndGroupSourceEvaluationSpec;
   evaluationNames: string[];
   updateConfig: (
     updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
   ) => void;
   index: number;
-}> = ({evaluation, evaluationNames, updateConfig, index}) => {
-  const [versions, setVersions] = useState<string[]>([]);
+}> = ({entity, project, evaluation, evaluationNames, updateConfig, index}) => {
+  const getTraceServerClient = useGetTraceServerClientContext();
+  const [versions, setVersions] = useState<{digest: string, index: number}[]>([]);
 
   useEffect(() => {
     if (evaluation.name && evaluation.name !== '*') {
-      fetchEvaluationVersionsForName(evaluation.name).then(setVersions);
+      fetchEvaluationVersionsForName(getTraceServerClient(), entity, project, evaluation.name).then(setVersions);
     }
-  }, [evaluation.name]);
+  }, [entity, evaluation.name, getTraceServerClient, project]);
 
   const handleNameChange = (event: SelectChangeEvent<string>) => {
     const newName = event.target.value as string;
@@ -336,8 +351,8 @@ const SourceEvaluationItem: React.FC<{
           disabled={evaluation.name === '*'}>
           <MenuItem value="*">All</MenuItem>
           {versions.map(version => (
-            <MenuItem key={version} value={version}>
-              {version}
+            <MenuItem key={version.digest} value={version.digest}>
+              v{version.index} ({version.digest.slice(0, 6)})
             </MenuItem>
           ))}
         </Select>
