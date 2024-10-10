@@ -120,18 +120,20 @@ export const EvaluationDefinition: React.FC<{
         {props.callId === getBaselineCallId(props.state) && (
           <Pill label="Baseline" color="teal" />
         )}
-        <PopupDropdown
-          sections={[menuOptions]}
-          trigger={
-            <Button
-              className="rotate-90"
-              icon="overflow-horizontal"
-              size="small"
-              variant="ghost"
-              style={{marginLeft: '4px'}}
-            />
-          }
-        />
+        <div style={{marginLeft: '-14px'}}>
+          <PopupDropdown
+            sections={[menuOptions]}
+            trigger={
+              <Button
+                className="rotate-90"
+                icon="overflow-horizontal"
+                size="small"
+                variant="ghost"
+                style={{marginLeft: '4px'}}
+              />
+            }
+          />
+        </div>
       </HorizontalBox>
     </DragSource>
   );

@@ -229,8 +229,13 @@ export const ExampleCompareSection: React.FC<{
   const {ref1, ref2} = useLinkHorizontalScroll();
 
   const compositeScoreMetrics = useMemo(
-    () => buildCompositeMetricsMap(props.state.data, 'score'),
-    [props.state.data]
+    () =>
+      buildCompositeMetricsMap(
+        props.state.data,
+        'score',
+        props.state.selectedMetrics
+      ),
+    [props.state.data, props.state.selectedMetrics]
   );
 
   if (target == null) {
@@ -252,9 +257,13 @@ export const ExampleCompareSection: React.FC<{
       .length;
   });
   const numEvals = numTrials.length;
+  // Get derived scores, then filter out any not in the selected metrics
   const derivedScores = Object.values(
     getMetricIds(props.state.data, 'score', 'derived')
+  ).filter(
+    score => props.state.selectedMetrics?.[flattenedDimensionPath(score)]
   );
+
   const numMetricScorers = metricGroupNames.length;
   const numDerivedScores = derivedScores.length;
   const numMetricsPerScorer = [

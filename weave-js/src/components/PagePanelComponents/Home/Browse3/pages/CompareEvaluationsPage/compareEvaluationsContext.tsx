@@ -14,6 +14,7 @@ const CompareEvaluationsContext = React.createContext<{
     React.SetStateAction<ComparisonDimensionsType | null>
   >;
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
   addEvaluationCall: (newCallId: string) => void;
   removeEvaluationCall: (callId: string) => void;
 } | null>(null);
@@ -32,6 +33,10 @@ export const CompareEvaluationsProvider: React.FC<{
   initialEvaluationCallIds: string[];
   selectedCallIdsOrdered: string[];
   setSelectedCallIdsOrdered: React.Dispatch<React.SetStateAction<string[]>>;
+  selectedMetrics: Record<string, boolean> | null;
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
+
+  onEvaluationCallIdsUpdate: (newEvaluationCallIds: string[]) => void;
   setComparisonDimensions: React.Dispatch<
     React.SetStateAction<ComparisonDimensionsType | null>
   >;
@@ -44,9 +49,11 @@ export const CompareEvaluationsProvider: React.FC<{
   initialEvaluationCallIds,
   setSelectedCallIdsOrdered,
   selectedCallIdsOrdered,
+  selectedMetrics,
+  setSelectedMetrics,
+  onEvaluationCallIdsUpdate,
   setComparisonDimensions,
   setSelectedInputDigest,
-
   comparisonDimensions,
   selectedInputDigest,
   children,
@@ -60,7 +67,8 @@ export const CompareEvaluationsProvider: React.FC<{
     evaluationCallIds,
     selectedCallIdsOrdered,
     comparisonDimensions,
-    selectedInputDigest
+    selectedInputDigest,
+    selectedMetrics ?? undefined
   );
 
   const value = useMemo(() => {
@@ -72,15 +80,20 @@ export const CompareEvaluationsProvider: React.FC<{
       setSelectedCallIdsOrdered,
       setComparisonDimensions,
       setSelectedInputDigest,
+      setSelectedMetrics,
       addEvaluationCall: (newCallId: string) => {
-        setEvaluationCallIds(prev => [...prev, newCallId]);
-        setSelectedCallIdsOrdered(prev => [...(prev ?? []), newCallId]);
+        const newEvaluationCallIds = [...evaluationCallIds, newCallId];
+        setEvaluationCallIds(newEvaluationCallIds);
+        setSelectedCallIdsOrdered(newEvaluationCallIds);
+        onEvaluationCallIdsUpdate(newEvaluationCallIds);
       },
       removeEvaluationCall: (callId: string) => {
-        setEvaluationCallIds(prev => prev.filter(id => id !== callId));
-        setSelectedCallIdsOrdered(
-          prev => prev?.filter(id => id !== callId) ?? null
+        const newEvaluationCallIds = evaluationCallIds.filter(
+          id => id !== callId
         );
+        setEvaluationCallIds(newEvaluationCallIds);
+        setSelectedCallIdsOrdered(newEvaluationCallIds);
+        onEvaluationCallIdsUpdate(newEvaluationCallIds);
       },
     };
   }, [
@@ -88,8 +101,11 @@ export const CompareEvaluationsProvider: React.FC<{
     initialState.result,
     setEvaluationCallIds,
     setSelectedCallIdsOrdered,
+    evaluationCallIds,
+    onEvaluationCallIdsUpdate,
     setComparisonDimensions,
     setSelectedInputDigest,
+    setSelectedMetrics,
   ]);
 
   if (!value) {

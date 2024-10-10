@@ -22,6 +22,8 @@ export type EvaluationComparisonState = {
   comparisonDimensions?: ComparisonDimensionsType;
   // The current digest which is in view
   selectedInputDigest?: string;
+  // The selected metrics to display
+  selectedMetrics?: Record<string, boolean>;
   // The order of the evaluation calls, the first call is always the baseline
   selectedCallIdsOrdered: string[];
 };
@@ -43,7 +45,8 @@ export const useEvaluationComparisonState = (
   evaluationCallIds: string[],
   selectedCallIdsOrdered: string[],
   comparisonDimensions?: ComparisonDimensionsType,
-  selectedInputDigest?: string
+  selectedInputDigest?: string,
+  selectedMetrics?: Record<string, boolean>
 ): Loadable<EvaluationComparisonState> => {
   const data = useEvaluationComparisonData(entity, project, evaluationCallIds);
 
@@ -92,6 +95,7 @@ export const useEvaluationComparisonState = (
         comparisonDimensions: newComparisonDimensions,
         selectedInputDigest,
         selectedCallIdsOrdered,
+        selectedMetrics,
       },
     };
   }, [
@@ -100,6 +104,7 @@ export const useEvaluationComparisonState = (
     selectedCallIdsOrdered,
     comparisonDimensions,
     selectedInputDigest,
+    selectedMetrics,
   ]);
 
   return value;
