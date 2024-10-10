@@ -292,10 +292,10 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   const [sortModel, setSortModel] = useState<GridSortItem[]>([]);
 
   useEffect(() => {
-    if (sortModel.length === 0 && columns.length > 1) {
+    if (sortModel.length === 0 && columns.length > 1 && !loading) {
       setSortModel([{field: columns[1].field, sort: 'desc'}]);
     }
-  }, [columns, sortModel]);
+  }, [columns, loading, sortModel]);
 
   return (
     <Box

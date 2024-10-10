@@ -75,17 +75,17 @@ export const getLeaderboardData = async (
 ): Promise<GroupedLeaderboardData> => {
   const sourceEvals = spec.sourceEvaluations ?? [];
   const evalNames = sourceEvals.map(sourceEvaluation => sourceEvaluation.name);
-  const fullyQualifiedEvalRefs = sourceEvals.map(sourceEvaluation => {
-    return objectVersionKeyToRefUri({
-      scheme: 'weave',
-      weaveKind: 'object',
-      entity,
-      project,
-      objectId: sourceEvaluation.name,
-      versionHash: sourceEvaluation.version,
-      path: '',
-    });
-  });
+  // const fullyQualifiedEvalRefs = sourceEvals.map(sourceEvaluation => {
+  //   return objectVersionKeyToRefUri({
+  //     scheme: 'weave',
+  //     weaveKind: 'object',
+  //     entity,
+  //     project,
+  //     objectId: sourceEvaluation.name,
+  //     versionHash: sourceEvaluation.version,
+  //     path: '',
+  //   });
+  // });
   // get all the evaluations
   const allEvaluationObjectsProm = client.objsQuery({
     project_id: projectIdFromParts({entity, project}),
@@ -96,21 +96,6 @@ export const getLeaderboardData = async (
       object_ids: evalNames,
     },
     sort_by: [{field: 'created_at', direction: 'desc'}],
-  });
-  const allEvaluationCallsProm = client.callsStreamQuery({
-    project_id: projectIdFromParts({entity, project}),
-    sort_by: [{field: 'ended_at', direction: 'desc'}],
-    filter: {
-      op_names: [
-        opVersionKeyToRefUri({
-          entity,
-          project,
-          opId: EVALUATE_OP_NAME_POST_PYDANTIC,
-          versionHash: '*',
-        }),
-      ],
-      input_refs: fullyQualifiedEvalRefs,
-    },
   });
 
   const allEvaluationObjectsRes = await allEvaluationObjectsProm;
@@ -148,7 +133,37 @@ export const getLeaderboardData = async (
       .map(entry => entry[0]);
   });
 
+  const fullyQualifiedEvalRefs = allEvaluationObjectsRes.objs.map(obj => {
+    return objectVersionKeyToRefUri({
+      scheme: 'weave',
+      weaveKind: 'object',
+      entity,
+      project,
+      objectId: obj.object_id,
+      versionHash: obj.digest,
+      path: '',
+    });
+  });
+
+  // SAD: if `input_refs` supported `*` wildcard, then we could do the queries in parallel
+  const allEvaluationCallsProm = client.callsStreamQuery({
+    project_id: projectIdFromParts({entity, project}),
+    sort_by: [{field: 'ended_at', direction: 'desc'}],
+    filter: {
+      op_names: [
+        opVersionKeyToRefUri({
+          entity,
+          project,
+          opId: EVALUATE_OP_NAME_POST_PYDANTIC,
+          versionHash: '*',
+        }),
+      ],
+      input_refs: fullyQualifiedEvalRefs,
+    },
+  });
+
   const allEvaluationCallsRes = await allEvaluationCallsProm;
+
   const data: LeaderboardValueRecord[] = [];
   allEvaluationCallsRes.calls.forEach(call => {
     const evalObjectRefUri = call.inputs.self;
