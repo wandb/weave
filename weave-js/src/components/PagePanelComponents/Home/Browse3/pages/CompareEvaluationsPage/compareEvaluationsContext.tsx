@@ -1,5 +1,5 @@
 import {Box} from '@material-ui/core';
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 
 import {WeaveLoader} from '../../../../../../common/components/WeaveLoader';
 import {LinearProgress} from '../../../../../LinearProgress';
@@ -17,6 +17,8 @@ const CompareEvaluationsContext = React.createContext<{
   >;
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
+  addEvaluationCall: (newCallId: string) => void;
+  removeEvaluationCall: (callId: string) => void;
 } | null>(null);
 
 export const useCompareEvaluationsState = () => {
@@ -30,10 +32,11 @@ export const useCompareEvaluationsState = () => {
 export const CompareEvaluationsProvider: React.FC<{
   entity: string;
   project: string;
-  evaluationCallIds: string[];
   selectedMetrics: Record<string, boolean> | null;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
 
+  initialEvaluationCallIds: string[];
+  onEvaluationCallIdsUpdate: (newEvaluationCallIds: string[]) => void;
   setBaselineEvaluationCallId: React.Dispatch<
     React.SetStateAction<string | null>
   >;
@@ -47,10 +50,11 @@ export const CompareEvaluationsProvider: React.FC<{
 }> = ({
   entity,
   project,
-  evaluationCallIds,
   selectedMetrics,
   setSelectedMetrics,
 
+  initialEvaluationCallIds,
+  onEvaluationCallIdsUpdate,
   setBaselineEvaluationCallId,
   setComparisonDimensions,
 
@@ -60,6 +64,9 @@ export const CompareEvaluationsProvider: React.FC<{
   selectedInputDigest,
   children,
 }) => {
+  const [evaluationCallIds, setEvaluationCallIds] = useState(
+    initialEvaluationCallIds
+  );
   const initialState = useEvaluationComparisonState(
     entity,
     project,
@@ -80,10 +87,25 @@ export const CompareEvaluationsProvider: React.FC<{
       setComparisonDimensions,
       setSelectedInputDigest,
       setSelectedMetrics,
+      addEvaluationCall: (newCallId: string) => {
+        const newEvaluationCallIds = [...evaluationCallIds, newCallId];
+        setEvaluationCallIds(newEvaluationCallIds);
+        onEvaluationCallIdsUpdate(newEvaluationCallIds);
+      },
+      removeEvaluationCall: (callId: string) => {
+        const newEvaluationCallIds = evaluationCallIds.filter(
+          id => id !== callId
+        );
+        setEvaluationCallIds(newEvaluationCallIds);
+        onEvaluationCallIdsUpdate(newEvaluationCallIds);
+      },
     };
   }, [
     initialState.loading,
     initialState.result,
+    evaluationCallIds,
+    onEvaluationCallIdsUpdate,
+    setEvaluationCallIds,
     setBaselineEvaluationCallId,
     setComparisonDimensions,
     setSelectedInputDigest,

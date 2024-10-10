@@ -928,6 +928,15 @@ const CompareEvaluationsBinding = () => {
   const evaluationCallIds = useMemo(() => {
     return JSON.parse(query.evaluationCallIds);
   }, [query.evaluationCallIds]);
+  
+  const onEvaluationCallIdsUpdate = useCallback(
+    (newEvaluationCallIds: string[]) => {
+      const newQuery = new URLSearchParams(location.search);
+      newQuery.set('evaluationCallIds', JSON.stringify(newEvaluationCallIds));
+      history.push({search: newQuery.toString()});
+    },
+    [history, location.search]
+  );
 
   const selectedMetrics: Record<string, boolean> | null = useMemo(() => {
     try {
@@ -936,7 +945,6 @@ const CompareEvaluationsBinding = () => {
       return null;
     }
   }, [query.metrics]);
-
   const setSelectedMetrics = (newModel: Record<string, boolean>) => {
     const newQuery = new URLSearchParams(location.search);
     newQuery.set('metrics', JSON.stringify(newModel));
@@ -947,6 +955,7 @@ const CompareEvaluationsBinding = () => {
       entity={entity}
       project={project}
       evaluationCallIds={evaluationCallIds}
+      onEvaluationCallIdsUpdate={onEvaluationCallIdsUpdate}
       selectedMetrics={selectedMetrics}
       setSelectedMetrics={setSelectedMetrics}
     />
