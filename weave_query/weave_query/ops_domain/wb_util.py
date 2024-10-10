@@ -58,6 +58,9 @@ def escape_artifact_path(artifact_path: str) -> str:
     prefix = "wandb-client-artifact://"
     if artifact_path.startswith(prefix):
         artifact_path = artifact_path[len(prefix) :]
+        if "/" not in artifact_path:
+            # No path portion to escape
+            return f"{prefix}{artifact_path}"
         if ":" in artifact_path:
             name, version_path = artifact_path.split(":", 1)
             version, path = version_path.split("/", 1)
