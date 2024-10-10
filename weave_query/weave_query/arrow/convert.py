@@ -6,7 +6,14 @@ import pyarrow.compute as pc
 from weave_query import api as api
 from weave_query import weave_internal
 from weave_query import weave_types as types
-from weave_query import errors, arrow_util, artifact_base, artifact_mem, box, mappers_arrow
+from weave_query import (
+    errors,
+    arrow_util,
+    artifact_base,
+    artifact_mem,
+    box,
+    mappers_arrow,
+)
 from weave_query.arrow.arrow import (
     ArrowWeaveListType,
 )
@@ -223,12 +230,13 @@ def recursively_build_pyarrow_array(
                             if i == 0:
                                 mask.append(py_obj is None)
 
-                        array = recursively_build_pyarrow_array(
-                            data,
-                            field.type,
-                            mapper._value_serializer,
-                            py_objs_already_mapped,
-                        )
+                        with tag_store.with_tags_stripped_from_objects(py_objs):
+                            array = recursively_build_pyarrow_array(
+                                data,
+                                field.type,
+                                mapper._value_serializer,
+                                py_objs_already_mapped,
+                            )
                 else:
                     assert isinstance(
                         mapper,
