@@ -53,7 +53,7 @@ def preference_id():
 
 
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(filter_headers=["authorization"])
+@pytest.mark.vcr(filter_headers=["authorization"], decode_compressed_response=True)
 def test_train_router(
     client: WeaveClient,
     model_evals: Dict[str, EvaluationResults],

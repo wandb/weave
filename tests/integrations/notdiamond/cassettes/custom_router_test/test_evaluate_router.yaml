@@ -21,7 +21,7 @@ interactions:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       Connection:
       - keep-alive
       Content-Length:
@@ -34,15 +34,12 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: !!binary |
-        H4sIAAAAAAAAAzzHQQrDIBAF0Lv8dQZ0omK8SillgmMQ0iixdBNy9+76du9CP9u3Zj0H0uP6Dwmt
-        6yEVE94t646ErX/INWLDjownO+N+Thg6Rm3Hq2YkBF90Xl0kLmLJLYFJolhaCktcsys+GNw/AAAA
-        //8DALpdYGx1AAAA
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"0edef89c-fe12-4c27-b35f-177fbf653779"}'
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8d010a90382bda27-MIA
+      - 8d06ed9f2cd6ade7-ATL
       Connection:
       - keep-alive
       Content-Encoding:
@@ -50,7 +47,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 09 Oct 2024 20:15:12 GMT
+      - Thu, 10 Oct 2024 13:24:01 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -60,7 +57,7 @@ interactions:
       alt-svc:
       - h3=":443"; ma=86400
       rndr-id:
-      - a5431baf-4a21-4daa
+      - e7d313b1-59b0-4280
       x-render-origin-server:
       - uvicorn
     status:
@@ -90,7 +87,7 @@ interactions:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       Connection:
       - keep-alive
       Content-Length:
@@ -103,15 +100,12 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: !!binary |
-        H4sIAAAAAAAAAzzHQQrCMBAF0Lv8dQfSdFCTq4hIhkwkoJ2QtG5K7+7Ot3sHWrdvzdoH4v34DxHW
-        dE0VEz6W9Y2IV9uIadu7GHnnmRyTCzgfE4aOUW191owIXeQqt0ugkkoidiqU2AVivxTJPoeZZ5w/
-        AAAA//8DAJdWNlR6AAAA
+      string: '{"providers":[{"provider":"openai","model":"gpt-4-turbo-2024-04-09"}],"session_id":"839d937f-a736-456a-bd1b-7f5cc6c9e5ce"}'
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8d010a96f9e63343-MIA
+      - 8d06eda74c34bd3f-ATL
       Connection:
       - keep-alive
       Content-Encoding:
@@ -119,7 +113,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 09 Oct 2024 20:15:13 GMT
+      - Thu, 10 Oct 2024 13:24:02 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -129,7 +123,7 @@ interactions:
       alt-svc:
       - h3=":443"; ma=86400
       rndr-id:
-      - 0b16b749-e4a2-4f6f
+      - fc55ad81-c616-4864
       x-render-origin-server:
       - uvicorn
     status:
@@ -157,7 +151,7 @@ interactions:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       Connection:
       - keep-alive
       Content-Length:
@@ -170,15 +164,12 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: !!binary |
-        H4sIAAAAAAAAAzzHTQ6CMBAG0Lt8ayahf0h7FUNMZaaxCbakRTeEu7vz7d6JvdVvZmkd4X7+h4BY
-        jlere14x4F1ZNgSsW/ywkCFHvZYiB+lR23HSI65lQJfecy2PzAhwSaXZCJNNUyJrk6L56T3dzORZ
-        sSjHEdcPAAD//wMASXHQ0oEAAAA=
+      string: '{"providers":[{"provider":"anthropic","model":"claude-3-5-sonnet-20240620"}],"session_id":"59e75912-1bd8-4183-bf2a-d8eca95f22f5"}'
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8d010a9dec79a56a-MIA
+      - 8d06edad5dd069ed-ATL
       Connection:
       - keep-alive
       Content-Encoding:
@@ -186,7 +177,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 09 Oct 2024 20:15:14 GMT
+      - Thu, 10 Oct 2024 13:24:03 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -196,7 +187,7 @@ interactions:
       alt-svc:
       - h3=":443"; ma=86400
       rndr-id:
-      - e103dc1b-f364-4032
+      - 0db6f733-4692-4673
       x-render-origin-server:
       - uvicorn
     status:
@@ -225,7 +216,7 @@ interactions:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       Connection:
       - keep-alive
       Content-Length:
@@ -238,15 +229,12 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: !!binary |
-        H4sIAAAAAAAAAzzHQQrDIBAF0Lv8dQY0jmnjVUopjk6K0EaJoZuQu3eXt3sH2lZ/JevWER7HNQTU
-        pmssGPCtWT8IeLeduNJoRibjyTqczwFdey91fZWMgLQsEt19JpfFEMvNk0S1ZD1HSUnjNDPOPwAA
-        AP//AwAoWL5bdQAAAA==
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"70b6bff3-da48-451a-9330-2f1a2e6941e3"}'
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8d010aa45c4467de-MIA
+      - 8d06edb53bf97bde-ATL
       Connection:
       - keep-alive
       Content-Encoding:
@@ -254,7 +242,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 09 Oct 2024 20:15:15 GMT
+      - Thu, 10 Oct 2024 13:24:04 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -264,7 +252,7 @@ interactions:
       alt-svc:
       - h3=":443"; ma=86400
       rndr-id:
-      - 73852250-9046-410b
+      - f1c69680-eed1-4519
       x-render-origin-server:
       - uvicorn
     status:
@@ -293,7 +281,7 @@ interactions:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       Connection:
       - keep-alive
       Content-Length:
@@ -306,15 +294,12 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: !!binary |
-        H4sIAAAAAAAAAzzHQQ6DIBAF0Lv8tZOMCKhcpWkahDGSWDBguzHevbu+3btw1PJNUWqDe1z/wcHn
-        c6vlSAEd3iXKDoew+08UGshQKznLSYqVZqsY97NDk9ZSya8U4cDj7KWfPPGqhPQ4LeSDXcisLFYP
-        c1RGcP8AAAD//wMApp+RNIEAAAA=
+      string: '{"providers":[{"provider":"anthropic","model":"claude-3-5-sonnet-20240620"}],"session_id":"0e52a652-43ee-451b-88cd-8176331b01d6"}'
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8d010aaa980e67ba-MIA
+      - 8d06edbe9aea53da-ATL
       Connection:
       - keep-alive
       Content-Encoding:
@@ -322,7 +307,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 09 Oct 2024 20:15:16 GMT
+      - Thu, 10 Oct 2024 13:24:06 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -332,7 +317,7 @@ interactions:
       alt-svc:
       - h3=":443"; ma=86400
       rndr-id:
-      - 85259a74-6d56-4941
+      - b2fff2a7-b702-48b3
       x-render-origin-server:
       - uvicorn
     status:
@@ -359,7 +344,7 @@ interactions:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       Connection:
       - keep-alive
       Content-Length:
@@ -372,15 +357,12 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: !!binary |
-        H4sIAAAAAAAAAzzHQQrCMBAF0Lv8dQeSZqbGXEVEDMlIQDuhKW5K7+7Ot3sH+mbfVuo2kG7Hf0iw
-        Xtdnw4SPlfpGwqvvxEazm5mckA847xNGHaPZ+mgFCZrzJUv0pFo88XURys5FUuGwBBbVEHH+AAAA
-        //8DAFINBuV1AAAA
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"843aaf6f-b7c9-4bd4-bfdb-fbd1fa948dab"}'
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8d010ab0bd29749a-MIA
+      - 8d06edc50861bcfc-ATL
       Connection:
       - keep-alive
       Content-Encoding:
@@ -388,7 +370,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 09 Oct 2024 20:15:17 GMT
+      - Thu, 10 Oct 2024 13:24:07 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -398,7 +380,7 @@ interactions:
       alt-svc:
       - h3=":443"; ma=86400
       rndr-id:
-      - abecd4ed-264c-4cee
+      - 9bb0f771-7da6-4505
       x-render-origin-server:
       - uvicorn
     status:
@@ -427,7 +409,7 @@ interactions:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       Connection:
       - keep-alive
       Content-Length:
@@ -440,15 +422,12 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: !!binary |
-        H4sIAAAAAAAAAzzHTQrDIBAG0Lt86wyIf2m9SilldAwVUg2adBNy9+76du/E1tu3SO4D4XH+hwCu
-        +7u3rSRM+DTJKwLSyodkMuRotFrzTlppq7xWuJ4TRh6jtPoqggBhP99lNrRodmS9scTGRLIqRs/u
-        tqjEuH4AAAD//wMAmKB0eoEAAAA=
+      string: '{"providers":[{"provider":"anthropic","model":"claude-3-5-sonnet-20240620"}],"session_id":"a3effa5b-d276-4968-a3f7-34e94ee099dc"}'
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8d010ab60a635c66-MIA
+      - 8d06edccab784533-ATL
       Connection:
       - keep-alive
       Content-Encoding:
@@ -456,7 +435,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 09 Oct 2024 20:15:18 GMT
+      - Thu, 10 Oct 2024 13:24:08 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -466,7 +445,7 @@ interactions:
       alt-svc:
       - h3=":443"; ma=86400
       rndr-id:
-      - 46cebdf5-f5a9-4fe7
+      - 05cb9579-9d87-42f0
       x-render-origin-server:
       - uvicorn
     status:
@@ -494,7 +473,7 @@ interactions:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       Connection:
       - keep-alive
       Content-Length:
@@ -507,15 +486,12 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: !!binary |
-        H4sIAAAAAAAAAzzHQQrDIBAF0Lv8dQY0jtF6lVKCYSZFaKPE0E3I3bPr270Tba+/Irp3pOf5HxJq
-        0y0XDPhW0Q8S3u0grjSakcl4sg7Xa0DX3kvd5iJIEDGL1zBRMHklZm8prm4hDpGze0Q/qcV1AwAA
-        //8DAKtghC51AAAA
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"d051bcca-2ee1-4cd6-b0b7-a07f88542453"}'
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8d010abc3fb9287a-MIA
+      - 8d06edd31e0d53cd-ATL
       Connection:
       - keep-alive
       Content-Encoding:
@@ -523,7 +499,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 09 Oct 2024 20:15:19 GMT
+      - Thu, 10 Oct 2024 13:24:09 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -533,7 +509,7 @@ interactions:
       alt-svc:
       - h3=":443"; ma=86400
       rndr-id:
-      - 1d9f6050-3426-48e8
+      - c461fc4a-fd6d-4973
       x-render-origin-server:
       - uvicorn
     status:
@@ -561,7 +537,7 @@ interactions:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       Connection:
       - keep-alive
       Content-Length:
@@ -574,15 +550,12 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: !!binary |
-        H4sIAAAAAAAAAzzHTQqDMBAG0Lt8awcmf9MkVylFlIQSaJ1gihvx7t35du9E3/Vope4D+XneQ4b2
-        ui0NE75a6gcZ7/4jr2TZeuJAxuF6TRh1jKbb3AoyHiGkVEwk9sLkY3S0JmdIhMNizSpiIq4/AAAA
-        //8DAILfXJB1AAAA
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"0a7a4332-4f01-4e03-88d2-4d4824039b3e"}'
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8d010ac39c2e7477-MIA
+      - 8d06edd98945bf6e-ATL
       Connection:
       - keep-alive
       Content-Encoding:
@@ -590,7 +563,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 09 Oct 2024 20:15:20 GMT
+      - Thu, 10 Oct 2024 13:24:10 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -600,7 +573,7 @@ interactions:
       alt-svc:
       - h3=":443"; ma=86400
       rndr-id:
-      - 55360ea7-7e44-4d85
+      - 04ef84c4-5df4-4690
       x-render-origin-server:
       - uvicorn
     status:
@@ -627,7 +600,7 @@ interactions:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       Connection:
       - keep-alive
       Content-Length:
@@ -640,15 +613,12 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: !!binary |
-        H4sIAAAAAAAAAzzHQQ6DIBAF0Lv8tZPgFLVwlaZp0BkiiQUDthvj3bvr270Tey3fJFob/OP8Dx4h
-        H2ste1rQ4V1EN3gsW/iI0o0GaiVnPYgNWzOywfXs0LS1VPIrCTx4FhldmKifYyQrfKfQi6UQnUo0
-        k7Nscf0AAAD//wMAnCtyOoEAAAA=
+      string: '{"providers":[{"provider":"anthropic","model":"claude-3-5-sonnet-20240620"}],"session_id":"e8106862-22b9-4c48-812f-3c9e222fcc37"}'
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8d010ac9bb6c7496-MIA
+      - 8d06eddf9f9f69ec-ATL
       Connection:
       - keep-alive
       Content-Encoding:
@@ -656,7 +626,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 09 Oct 2024 20:15:21 GMT
+      - Thu, 10 Oct 2024 13:24:11 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -666,7 +636,7 @@ interactions:
       alt-svc:
       - h3=":443"; ma=86400
       rndr-id:
-      - 692ae2d5-c294-411c
+      - 64aeaa4d-7ea8-409e
       x-render-origin-server:
       - uvicorn
     status:
@@ -697,7 +667,7 @@ interactions:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       Connection:
       - keep-alive
       Content-Length:
@@ -710,15 +680,12 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: !!binary |
-        H4sIAAAAAAAAAzzHQQqDMBAF0Lv8tQNxHLXmKqWUpDMpgdYEI92Id+/Ot3sH6lZ+WW1r8PfjGjxK
-        tTVkdPgWtQ883nUnKcSOhdxI/YDz0aFZa7msz6zwCDzNLqlSiHMiYVkoRutJeImv6SZx4ITzDwAA
-        //8DAHwFUfJ1AAAA
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"05b979d4-2716-4c54-bc53-de391b220bf9"}'
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8d010ad13ac2743e-MIA
+      - 8d06ede6892cb057-ATL
       Connection:
       - keep-alive
       Content-Encoding:
@@ -726,7 +693,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 09 Oct 2024 20:15:22 GMT
+      - Thu, 10 Oct 2024 13:24:12 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -736,7 +703,7 @@ interactions:
       alt-svc:
       - h3=":443"; ma=86400
       rndr-id:
-      - 71761280-91d7-4997
+      - 93758d85-838f-44b8
       x-render-origin-server:
       - uvicorn
     status:
@@ -763,7 +730,7 @@ interactions:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       Connection:
       - keep-alive
       Content-Length:
@@ -776,15 +743,12 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: !!binary |
-        H4sIAAAAAAAAAzzHQQrCMBAF0Lv8dQeSTEZqriIiSTNKQDuhKW5K7+7Ot3sH+mbfVnUbSLfjPyRY
-        1zU3TPhY1TcSXn2naBRciOSEPOO8Txg6RrP10SoSIhd34VkolJwpchTKSxB6Xt2inuci3uH8AQAA
-        //8DADi10YB1AAAA
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"85771f10-73a3-466e-ac7a-052d2e8dd8f1"}'
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8d010ad69c437489-MIA
+      - 8d06eded9974b053-ATL
       Connection:
       - keep-alive
       Content-Encoding:
@@ -792,7 +756,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 09 Oct 2024 20:15:24 GMT
+      - Thu, 10 Oct 2024 13:24:13 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -802,7 +766,7 @@ interactions:
       alt-svc:
       - h3=":443"; ma=86400
       rndr-id:
-      - 71fa3aef-3b11-4f1d
+      - d45e80c7-e666-43b9
       x-render-origin-server:
       - uvicorn
     status:
@@ -830,7 +794,7 @@ interactions:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       Connection:
       - keep-alive
       Content-Length:
@@ -843,15 +807,12 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: !!binary |
-        H4sIAAAAAAAAAzzHQQqDMBAF0Lv8tQOTZDSaq5RSohlKoHWCKd2Id++ub/dOtMO+tejRkW7nf0iw
-        pnuuGPC2oi8kPNuHxMizF+KRXMB1H9C192r7oxYkTLouqnEhl30gcZ4pxznSLLxp0HVyLLh+AAAA
-        //8DACMEYlB1AAAA
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"1c85a72d-36a7-4154-a471-22347158ea74"}'
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8d010ae0cb48098e-MIA
+      - 8d06edf3fe6a6767-ATL
       Connection:
       - keep-alive
       Content-Encoding:
@@ -859,7 +820,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 09 Oct 2024 20:15:25 GMT
+      - Thu, 10 Oct 2024 13:24:14 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -869,7 +830,7 @@ interactions:
       alt-svc:
       - h3=":443"; ma=86400
       rndr-id:
-      - 54c52163-4f0b-45de
+      - 6dbb39f8-b83c-4518
       x-render-origin-server:
       - uvicorn
     status:
@@ -895,7 +856,7 @@ interactions:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       Connection:
       - keep-alive
       Content-Length:
@@ -908,15 +869,12 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: !!binary |
-        H4sIAAAAAAAAAzzHQQrCMBAF0Lv8dQcyk8S2uYqItE4iAe2ERtyU3t2db/cOtN2+VfPeka7Hf0iw
-        lrelYsDbNL+Q8GwfCkbiJJCLxB7nbUDPvVfb7lWRwKKPqC7SGiamoGWmZZyYPOvspchYLivOHwAA
-        AP//AwBXAAdMdQAAAA==
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"41b3265c-3eb6-4f8b-be73-ec463d583a3e"}'
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8d010ae65fea9071-MIA
+      - 8d06edfa3db778c6-ATL
       Connection:
       - keep-alive
       Content-Encoding:
@@ -924,7 +882,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 09 Oct 2024 20:15:25 GMT
+      - Thu, 10 Oct 2024 13:24:15 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -934,7 +892,7 @@ interactions:
       alt-svc:
       - h3=":443"; ma=86400
       rndr-id:
-      - 29b1fe80-182e-40e2
+      - d20741ad-70af-46fe
       x-render-origin-server:
       - uvicorn
     status:
@@ -960,7 +918,7 @@ interactions:
       Accept:
       - '*/*'
       Accept-Encoding:
-      - gzip, deflate
+      - gzip, deflate, zstd
       Connection:
       - keep-alive
       Content-Length:
@@ -973,15 +931,12 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: !!binary |
-        H4sIAAAAAAAAAzzHTQ6DIBAG0Lt8ayfhR6lwlcY0yExTEgsGbDfGu3fXt3sn9la/maV1hPv5HwJi
-        OV6t7jlhwLuybAhIW/ywkKWJei1FDjLKjMoZhWsZ0KX3XMsjMwIMuxSZZ1qtPGl0Sch7s5K9aefV
-        pJVOM64fAAAA//8DADfFm5+BAAAA
+      string: '{"providers":[{"provider":"anthropic","model":"claude-3-5-sonnet-20240620"}],"session_id":"014f4434-488e-43b1-bdbe-31d6dcb02c40"}'
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-Ray:
-      - 8d010aebfdf374c8-MIA
+      - 8d06ee001bbbbaea-ATL
       Connection:
       - keep-alive
       Content-Encoding:
@@ -989,7 +944,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 09 Oct 2024 20:15:26 GMT
+      - Thu, 10 Oct 2024 13:24:16 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -999,7 +954,7 @@ interactions:
       alt-svc:
       - h3=":443"; ma=86400
       rndr-id:
-      - 96897d5e-c248-4a28
+      - 477da270-028a-4871
       x-render-origin-server:
       - uvicorn
     status:
