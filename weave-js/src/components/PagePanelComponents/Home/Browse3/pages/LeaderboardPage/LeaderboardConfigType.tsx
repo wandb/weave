@@ -5,31 +5,36 @@ export type LeaderboardConfigType = {
   version: number;
   config: {
     description: string;
-    datasets: Array<{
-      dataset: {
-        name: string;
-        version: VersionSpec;
-      };
-      scores: Array<{
-        scorer: {
-          name: string;
-          version: VersionSpec;
-        };
-        metrics: Array<{
-          displayName: string;
-          path: string[];
-          minTrials?: number;
-          maxTrials?: number;
-          sort?: {
-            precedence: number;
-            direction: Direction;
-          };
-        }>;
-      }>;
-    }>;
-    models: Array<{
-      name: string;
-      version: VersionSpec;
-    }>;
+    dataSelectionSpec: FilterAndGroupSpec;
   };
+};
+
+export type FilterAndGroupSpec = {
+  datasets?: FilterAndGroupDatasetSpec[]; // null is all
+  models?: FilterAndGroupModelSpec[]; // null is all
+};
+
+export type FilterAndGroupDatasetSpec = {
+  name: string; // "*" means all
+  version: string; // "*" means all
+  splitByVersion?: boolean;
+  scorers?: FilterAndGroupDatasetScorerSpec[]; // null is all
+};
+
+export type FilterAndGroupDatasetScorerSpec = {
+  name: string; // "*" means all
+  version: string; // "*" means all
+  splitByVersion?: boolean;
+  metrics?: FilterAndGroupDatasetScorerMetricSpec[]; // null is all
+};
+
+export type FilterAndGroupDatasetScorerMetricSpec = {
+  path: string; // "*" means all
+  shouldMinimize?: boolean;
+};
+
+export type FilterAndGroupModelSpec = {
+  name: string; // "*" means all
+  version: string; // "*" means all
+  splitByVersion?: boolean;
 };

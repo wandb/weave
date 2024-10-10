@@ -11,6 +11,7 @@ import {
   projectIdFromParts,
 } from '../wfReactInterface/tsDataModelHooks';
 import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
+import {FilterAndGroupSpec} from './LeaderboardConfigType';
 
 type LeaderboardValueRecord = {
   datasetName: string;
@@ -34,38 +35,31 @@ type LeaderboardValueRecord = {
   sourceEvaluationObjectRef: string;
 };
 
-type GroupableLeaderboardValueRecord = {
+export type GroupableLeaderboardValueRecord = {
+  modelGroup: string;
   datasetGroup: string;
   scorerGroup: string;
   metricPathGroup: string;
-  modelGroup: string;
   sortKey: number;
   row: LeaderboardValueRecord;
 };
 
-export type GroupedLeaderboardData2 = GroupableLeaderboardValueRecord[];
-export type LeaderboardData2 = LeaderboardValueRecord[];
-
-export type FilterAndGroupSpec = {
-  datasets?: Array<{
-    name: string; // "*" means all
-    version: string; // "*" means all
-    splitByVersion?: boolean;
-    scorers?: Array<{
-      name: string; // "*" means all
-      version: string; // "*" means all
-      splitByVersion?: boolean;
-      metrics?: Array<{
-        path: string; // "*" means all
-        shouldMinimize?: boolean;
-      }>; // null is all
-    }>; // null is all
-  }>; // null is all
-  models?: Array<{
-    name: string; // "*" means all
-    version: string; // "*" means all
-    splitByVersion?: boolean;
-  }>; // null is all
+export type GroupedLeaderboardData = {
+  modelGroups: {
+    [modelGroup: string]: {
+      datasetGroups: {
+        [datasetGroup: string]: {
+          scorerGroups: {
+            [scorerGroup: string]: {
+              metricPathGroups: {
+                [metricPathGroup: string]: LeaderboardValueRecord;
+              };
+            };
+          };
+        };
+      };
+    };
+  };
 };
 
 export const getLeaderboardData = async (
@@ -73,7 +67,7 @@ export const getLeaderboardData = async (
   entity: string,
   project: string,
   spec: FilterAndGroupSpec = {}
-): Promise<GroupedLeaderboardData2> => {
+): Promise<GroupedLeaderboardData> => {
   // get all the evaluations
   const allEvaluationObjectsProm = client.objsQuery({
     project_id: projectIdFromParts({entity, project}),
@@ -119,7 +113,7 @@ export const getLeaderboardData = async (
   });
 
   const allEvaluationCallsRes = await allEvaluationCallsProm;
-  const data: LeaderboardData2 = [];
+  const data: LeaderboardValueRecord[] = [];
   allEvaluationCallsRes.calls.forEach(call => {
     const evalObjectRefUri = call.inputs.self;
     const evalObjectRef = parseRefMaybe(evalObjectRefUri ?? '');
@@ -343,30 +337,37 @@ export const getLeaderboardData = async (
     .filter(entry => entry.include)
     .map(entry => entry.groupableRow);
 
-  const finalData: GroupedLeaderboardData2 = [];
-  const groupedVisitor = (
-    recordList: GroupableLeaderboardValueRecord[],
-    fields: string[]
-  ): any => {
-    if (fields.length === 0) {
-      // Sort by created at descending and return the most recent record
-      // Would be better to use some form of latest.
-      const res = recordList.sort((a, b) => a.sortKey - b.sortKey)[0];
-      finalData.push(res);
-    }
-
-    const [currentField, ...remainingFields] = fields;
-    return _.values(_.groupBy(recordList, currentField)).forEach(groupedRecords =>
-      groupedVisitor(groupedRecords, remainingFields)
-    );
+  const finalData: GroupedLeaderboardData = {
+    modelGroups: _.mapValues(
+      _.groupBy(groupableData, 'modelGroup'),
+      modelGroup => {
+        return {
+          datasetGroups: _.mapValues(
+            _.groupBy(modelGroup, 'datasetGroup'),
+            datasetGroup => {
+              return {
+                scorerGroups: _.mapValues(
+                  _.groupBy(datasetGroup, 'scorerGroup'),
+                  scorerGroup => {
+                    return {
+                      metricPathGroups: _.mapValues(
+                        _.groupBy(scorerGroup, 'metricPathGroup'),
+                        metricPathGroup => {
+                          return metricPathGroup.sort(
+                            (a, b) => a.sortKey - b.sortKey
+                          )[0].row;
+                        }
+                      ),
+                    };
+                  }
+                ),
+              };
+            }
+          ),
+        };
+      }
+    ),
   };
-
-  groupedVisitor(groupableData, [
-    'datasetGroup',
-    'scorerGroup',
-    'metricPathGroup',
-    'modelGroup',
-  ]);
 
   return finalData;
 };

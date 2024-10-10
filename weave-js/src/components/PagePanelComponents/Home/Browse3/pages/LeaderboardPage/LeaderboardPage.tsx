@@ -1,16 +1,12 @@
 import {Alert, Box, Typography} from '@mui/material';
 import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
 import {Button} from '@wandb/weave/components/Button';
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../../context';
 import {EditableMarkdown} from './EditableMarkdown';
-import {useLeaderboardData, useLeaderboardData2} from './hooks';
-import {
-  persistLeaderboardConfig,
-  useCurrentLeaderboardConfig,
-} from './leaderboardConfigQuery';
+import {useLeaderboardData} from './hooks';
 import {LeaderboardConfigType} from './LeaderboardConfigType';
 import {LeaderboardGrid} from './LeaderboardGrid';
 import {LeaderboardConfig} from './LeaderboardPageConfig';
@@ -31,13 +27,19 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
 const DEFAULT_DESCRIPTION = `# Leaderboard`;
 
 const usePersistedLeaderboardConfig = () => {
-  const initialConfig = useCurrentLeaderboardConfig();
+  const initialConfig: LeaderboardConfigType = useMemo(() => {
+    return {
+      version: 1,
+      config: {description: '', dataSelectionSpec: {}},
+    };
+  }, []);
+
   const [config, setConfigLocal] =
     useState<LeaderboardConfigType>(initialConfig);
 
   const persistConfig = useCallback(() => {
-    persistLeaderboardConfig(config);
-  }, [config]);
+    // persistLeaderboardConfig(config);
+  }, []);
 
   const cancelChanges = useCallback(() => {
     setConfigLocal(initialConfig);
@@ -71,8 +73,12 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
     },
     [setConfigLocal, persistConfig]
   );
-  useLeaderboardData2(entity, project);
-  const {loading, data} = useLeaderboardData(entity, project, currentConfig);
+
+  const {loading, data} = useLeaderboardData(
+    entity,
+    project,
+    currentConfig.config.dataSelectionSpec
+  );
   useTraceUpdate('a', {entity, project, currentConfig});
 
   const handleCellClick = (
@@ -80,8 +86,8 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
     metricName: string,
     score: number
   ) => {
-    const sourceCallId =
-      data.scores?.[modelName]?.[metricName]?.sourceEvalCallId;
+    const sourceCallId = false;
+    // data.scores?.[modelName]?.[metricName]?.sourceEvalCallId;
     if (sourceCallId) {
       let to: string;
       if (USE_COMPARE_EVALUATIONS_PAGE) {
