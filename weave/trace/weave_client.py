@@ -715,6 +715,8 @@ class WeaveClient:
         *,
         op: Optional[Op] = None,
     ) -> None:
+        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        call.ended_at = ended_at
         original_output = output
 
         if op is not None and op.postprocess_output:
@@ -771,7 +773,6 @@ class WeaveClient:
             call.exception = exception_str
 
         project_id = self._project_id()
-        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
 
         # The finish handler serves as a last chance for integrations
         # to customize what gets logged for a call.
