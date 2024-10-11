@@ -66,12 +66,14 @@ llamaindex = ["llama-index>=0.10.35"]
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
 scorers = ["openai>=1.0.0", "instructor>=1.5.2"]
+notdiamond = ["notdiamond>=0.3.21"]
 openai = ["openai>=1.0.0"]
 modal = ["modal", "python-dotenv"]
 test = [
   "nox",
   "pytest>=8.2.0",
   "pytest-asyncio>=0.23.6",
+  "pytest-cov>=5.0.0",
   "pytest-xdist>=3.1.0",
   "pytest-rerunfailures>=12.0",
   "clickhouse_connect==0.7.0",

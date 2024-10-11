@@ -13,7 +13,6 @@ title: Integrating with Weave - Production Dashboard
 
 
 
-<img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 <!--- @wandbcode{cod-notebook} -->
 
 # Integrating with Weave: Production Dashboard

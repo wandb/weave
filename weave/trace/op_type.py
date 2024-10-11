@@ -15,7 +15,7 @@ from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any, Callable, Optional, Union, get_args, get_origin
 
 from weave.trace import serializer, settings
-from weave.trace.client_context.weave_client import get_weave_client
+from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.ipython import (
     ClassNotFoundError,
     get_class_source,

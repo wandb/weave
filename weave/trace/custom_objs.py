@@ -1,7 +1,7 @@
 from typing import Any, Dict, Mapping, Optional, Union
 
 from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
-from weave.trace.client_context.weave_client import require_weave_client
+from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.mem_artifact import MemTraceFilesArtifact
 from weave.trace.op import Op, op
 from weave.trace.refs import ObjectRef, parse_uri

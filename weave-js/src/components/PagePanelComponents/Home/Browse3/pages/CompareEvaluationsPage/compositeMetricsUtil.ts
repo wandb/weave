@@ -75,7 +75,8 @@ export type CompositeSummaryMetricGroupForKeyPath = {
  */
 export const buildCompositeMetricsMap = (
   data: EvaluationComparisonData,
-  mType: MetricType
+  mType: MetricType,
+  selectedMetrics: Record<string, boolean> | undefined = undefined
 ): CompositeScoreMetrics => {
   const composite: CompositeScoreMetrics = {};
 
@@ -93,6 +94,12 @@ export const buildCompositeMetricsMap = (
   Object.entries(metricDefinitionMap).forEach(([metricId, metric]) => {
     const groupName = groupNameForMetric(metric);
     const ref = refForMetric(metric);
+    const keyPath = flattenedDimensionPath(metric);
+
+    if (selectedMetrics && !selectedMetrics[keyPath]) {
+      // Skip metrics that are not in the selectedMetrics map
+      return;
+    }
 
     if (!composite[groupName]) {
       composite[groupName] = {
@@ -104,8 +111,6 @@ export const buildCompositeMetricsMap = (
     if (!metricGroup.scorerRefs.includes(ref)) {
       metricGroup.scorerRefs.push(ref);
     }
-
-    const keyPath = flattenedDimensionPath(metric);
 
     if (!metricGroup.metrics[keyPath]) {
       metricGroup.metrics[keyPath] = {

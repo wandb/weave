@@ -1,4 +1,4 @@
-from weave.trace.client_context import weave_client as weave_client_context
+from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.patcher import Patcher
 from weave.trace.weave_client import Call
 

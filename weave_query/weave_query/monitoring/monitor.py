@@ -20,8 +20,8 @@ from weave_query import (
     stream_data_interfaces
 )
 from weave_query.wandb_interface.wandb_stream_table import StreamTable
-from weave.trace import context as trace_context
-from weave.trace.client_context import weave_client as weave_client_context
+from weave.trace.context import call_context as trace_context
+from weave.trace.context import weave_client_context as weave_client_context
 
 logger = logging.getLogger(__name__)
 

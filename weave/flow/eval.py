@@ -294,8 +294,9 @@ class Evaluation(Object):
 
         return summary
 
-    @weave.op()
-    async def evaluate(self, model: Union[Callable, Model]) -> dict:
+    async def get_eval_results(
+        self, model: Union[Callable, Model]
+    ) -> EvaluationResults:
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
         eval_rows = []
@@ -322,7 +323,6 @@ class Evaluation(Object):
             trial_rows, eval_example, get_weave_parallelism()
         ):
             n_complete += 1
-            duration = time.time() - start_time
             print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
             # status.update(
             #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
@@ -336,7 +336,10 @@ class Evaluation(Object):
                 if scorer_name not in eval_row["scores"]:
                     eval_row["scores"][scorer_name] = {}
             eval_rows.append(eval_row)
+        return EvaluationResults(rows=weave.Table(eval_rows))
 
+    @weave.op()
+    async def evaluate(self, model: Union[Callable, Model]) -> dict:
         # The need for this pattern is quite unfortunate and highlights a gap in our
         # data model. As a user, I just want to pass a list of data `eval_rows` to
         # summarize. Under the hood, Weave should choose the appropriate storage
@@ -347,7 +350,7 @@ class Evaluation(Object):
         # also bad. In the near-term, this will at least solve the problem of
         # breaking summarization with big datasets, but this is not the correct
         # long-term solution.
-        eval_results = EvaluationResults(rows=weave.Table(eval_rows))
+        eval_results = await self.get_eval_results(model)
         summary = await self.summarize(eval_results)
 
         print("Evaluation summary", summary)

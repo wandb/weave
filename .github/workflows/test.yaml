@@ -221,6 +221,7 @@ jobs:
             'llamaindex',
             'mistral0',
             'mistral1',
+            'notdiamond',
             'openai',
             'scorers',
           ]
@@ -274,8 +275,7 @@ jobs:
           WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -n4
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 
