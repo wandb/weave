@@ -1501,6 +1501,28 @@ def test_object_version_read(client):
         )
 
 
+@pytest.mark.asyncio
+async def test_op_calltime_display_name(client):
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a
+
+    result = my_op(1, __weave={"display_name": "custom_display_name"})
+    calls = list(my_op.calls())
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.display_name == "custom_display_name"
+
+    evaluation = weave.Evaluation(dataset=[{"a": 1}], scorers=[])
+    res = await evaluation.evaluate(
+        my_op, __weave={"display_name": "custom_display_name"}
+    )
+    calls = list(evaluation.evaluate.calls())
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.display_name == "custom_display_name"
+
+
 def test_object_deletion(client):
     # Simple case, delete a single version of an object
     obj = {"a": 5}
@@ -1575,24 +1597,41 @@ def test_recursive_object_deletion(client):
     # Object2 should store the ref to object2, as instantiated
     assert client.get(obj3_ref) == {"c": obj2}
 
-    
-@pytest.mark.asyncio
-async def test_op_calltime_display_name(client):
-    @weave.op()
-    def my_op(a: int) -> int:
-        return a
 
-    result = my_op(1, __weave={"display_name": "custom_display_name"})
-    calls = list(my_op.calls())
-    assert len(calls) == 1
-    call = calls[0]
-    assert call.display_name == "custom_display_name"
+def test_table_object_deletion(client):
+    # create a dataset
+    data = [{"a": 1}, {"a": 2}, {"a": 3}]
+    dataset = weave.Table(data)
+    dataset_ref = client.save(dataset, "my-dataset").ref
 
-    evaluation = weave.Evaluation(dataset=[{"a": 1}], scorers=[])
-    res = await evaluation.evaluate(
-        my_op, __weave={"display_name": "custom_display_name"}
+    # get the dataset
+    assert client.get(dataset_ref) == dataset
+
+    # delete the dataset
+    client.delete_object(dataset_ref)
+
+    # make sure we can't get the dataset
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        client.get(dataset_ref)
+
+    # recreate the EXACT SAME dataset
+    dataset = weave.Table(data)
+    dataset_ref = client.save(dataset, "my-dataset").ref
+
+    assert client.get(dataset_ref) == dataset
+    read_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=dataset_ref.name,
+            digest=dataset_ref.digest,
+        )
     )
-    calls = list(evaluation.evaluate.calls())
-    assert len(calls) == 1
-    call = calls[0]
-    assert call.display_name == "custom_display_name"
+    # Version should be bumped
+    assert read_res.obj.version_index == 1
+
+    # delete the dataset again
+    client.delete_object(dataset_ref)
+
+    # make sure we can't get the dataset
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        client.get(dataset_ref)

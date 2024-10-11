@@ -127,7 +127,7 @@ export const SmallRef: FC<{
   const objectVersion = useObjectVersion(objVersionKey);
   const opVersion = useOpVersion(opVersionKey);
 
-  const isDeleted = objectVersion.error || opVersion.error;
+  const isDeleted = objectVersion?.error || opVersion?.error;
 
   const versionIndex =
     objectVersion.result?.versionIndex ?? opVersion.result?.versionIndex;

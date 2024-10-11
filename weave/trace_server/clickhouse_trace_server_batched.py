@@ -643,6 +643,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(objs) == 0:
             raise NotFoundError(f"Obj {object_id}:{digest} not found")
 
+        print(objs)
+
         if objs[0].deleted_at is not None:
             raise ObjectDeletedError(
                 f"Obj {object_id}:v{objs[0].version_index} was deleted at {objs[0].deleted_at}"
@@ -719,6 +721,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             refs=db_obj.refs,
             base_object_class=db_obj.base_object_class,
             deleted_at=datetime.datetime.now(datetime.timezone.utc),
+            # Use the original created_at time
             created_at=_ensure_datetimes_have_tz(db_obj.created_at),
         )
         self._insert(
@@ -1564,6 +1567,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     sort_clauses.append(f"{sort.field} {sort.direction.upper()}")
             if sort_clauses:
                 sort_part = f"ORDER BY {', '.join(sort_clauses)}"
+        elif include_deleted:
+            # If we are including deleted objects, sort the non-deleted first
+            sort_part = "ORDER BY (deleted_at IS NULL) DESC, created_at ASC"
         else:
             sort_part = "ORDER BY created_at ASC"
 
@@ -1619,10 +1625,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         deleted_at,
                         if (kind = 'op', 1, 0) AS is_op,
                         row_number() OVER (
-                            PARTITION BY project_id,
-                            kind,
-                            object_id,
-                            digest
+                            PARTITION BY project_id, kind, object_id, digest, created_at
                             ORDER BY (deleted_at IS NULL) ASC, created_at ASC
                         ) AS rn
                     FROM object_versions

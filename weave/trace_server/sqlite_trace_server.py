@@ -631,7 +631,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             version_index = cursor.fetchone()[0]
 
             cursor.execute(
-                """INSERT OR IGNORE INTO objects (
+                """INSERT INTO objects (
                     project_id,
                     object_id,
                     created_at,
@@ -641,8 +641,19 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     val_dump,
                     digest,
                     version_index,
-                    is_latest
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    is_latest,
+                    deleted_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(project_id, kind, object_id, digest) DO UPDATE SET
+                    created_at = excluded.created_at,
+                    kind = excluded.kind,
+                    base_object_class = excluded.base_object_class,
+                    refs = excluded.refs,
+                    val_dump = excluded.val_dump,
+                    version_index = excluded.version_index,
+                    is_latest = excluded.is_latest,
+                    deleted_at = excluded.deleted_at
+                """,
                 (
                     req_obj.project_id,
                     req_obj.object_id,
@@ -654,6 +665,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     digest,
                     version_index,
                     1,
+                    None,
                 ),
             )
             conn.commit()
@@ -678,7 +690,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
         if objs[0].deleted_at is not None:
             raise ObjectDeletedError(
-                f"Obj {req.object_id}:{req.digest} was deleted at {objs[0].deleted_at}"
+                f"Obj {req.object_id}:v{objs[0].version_index} was deleted at {objs[0].deleted_at}"
             )
         return tsi.ObjReadRes(obj=objs[0])
 
