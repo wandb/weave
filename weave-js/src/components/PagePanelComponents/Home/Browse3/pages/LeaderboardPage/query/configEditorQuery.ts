@@ -2,9 +2,20 @@
  * This file is not performant yet.
  */
 
+import {ObjectRef} from '@wandb/weave/react';
+import _ from 'lodash';
+
+import {parseRefMaybe} from '../../../../Browse2/SmallRef';
 import {TraceServerClient} from '../../wfReactInterface/traceServerClient';
 import {projectIdFromParts} from '../../wfReactInterface/tsDataModelHooks';
 import {FilterAndGroupSpec} from '../types/leaderboardConfigType';
+import {
+  getEvaluationObjectsForSpec,
+  getLeaderboardData,
+  getLeaderboardGroupableData,
+} from './leaderboardQuery';
+
+export type VersionDetails = {digest: string; index: number};
 
 export const fetchEvaluationNames = async (
   client: TraceServerClient,
@@ -31,7 +42,7 @@ export const fetchEvaluationVersionsForName = async (
   entity: string,
   project: string,
   name: string
-): Promise<Array<{digest: string; index: number}>> => {
+): Promise<VersionDetails[]> => {
   return client
     .objsQuery({
       project_id: projectIdFromParts({entity, project}),
@@ -51,25 +62,47 @@ export const fetchEvaluationVersionsForName = async (
     });
 };
 export const fetchDatasetNamesForSpec = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
   spec: FilterAndGroupSpec
 ): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(['D1', 'D2', 'D3']);
+  // This is def a hacky/slow solution, just getting it working.
+  const groupableData = await getLeaderboardGroupableData(
+    client,
+    entity,
+    project,
+    spec
+  );
+  return _.uniq(groupableData.map(g => g.row.datasetName));
 };
 export const fetchDatasetVersionsForSpecAndName = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
   spec: FilterAndGroupSpec,
   name: string
-): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(['DV1', 'DV2', 'DV3']);
+): Promise<VersionDetails[]> => {
+  const groupableData = await getLeaderboardGroupableData(
+    client,
+    entity,
+    project,
+    spec
+  );
+
+  return _.uniqBy(
+    groupableData.map(g => ({digest: g.row.datasetVersion, index: -1})),
+    o => `${o.digest}-${o.index}`
+  );
 };
+
 export const fetchModelNamesForSpec = async (
   spec: FilterAndGroupSpec
 ): Promise<string[]> => {
   // TODO
   return Promise.resolve(['M1', 'M2', 'M3']);
 };
-export const fetchModelVersionsForSpecndName = async (
+export const fetchModelVersionsForSpecAndName = async (
   spec: FilterAndGroupSpec,
   name: string
 ): Promise<string[]> => {

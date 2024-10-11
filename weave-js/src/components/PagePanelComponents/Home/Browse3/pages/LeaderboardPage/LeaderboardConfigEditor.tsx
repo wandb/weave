@@ -24,9 +24,10 @@ import {
   fetchEvaluationVersionsForName,
   fetchMetricPathsForSpec,
   fetchModelNamesForSpec,
-  fetchModelVersionsForSpecndName,
+  fetchModelVersionsForSpecAndName,
   fetchScorerNamesForSpec,
   fetchScorerVersionsForSpecAndName,
+  VersionDetails,
 } from './query/configEditorQuery';
 import {
   ALL_VALUE,
@@ -156,7 +157,16 @@ const ConfigEditor: React.FC<{
         sourceEvaluations={config.sourceEvaluations}
         updateConfig={updateConfig}
       />
-      <DatasetsConfig datasets={config.datasets} updateConfig={updateConfig} />
+      <DatasetsConfig
+        entity={entity}
+        project={project}
+        parentSpec={{
+          sourceEvaluations: config.sourceEvaluations,
+          // Purposely exclude models and datasets
+        }}
+        datasets={config.datasets}
+        updateConfig={updateConfig}
+      />
       <ModelsConfig models={config.models} updateConfig={updateConfig} />
     </>
   );
@@ -307,9 +317,7 @@ const SourceEvaluationItem: React.FC<{
   index: number;
 }> = ({entity, project, evaluation, evaluationNames, updateConfig, index}) => {
   const getTraceServerClient = useGetTraceServerClientContext();
-  const [versions, setVersions] = useState<
-    Array<{digest: string; index: number}>
-  >([]);
+  const [versions, setVersions] = useState<VersionDetails[]>([]);
 
   useEffect(() => {
     if (evaluation.name && evaluation.name !== ALL_VALUE) {
@@ -386,16 +394,25 @@ const SourceEvaluationItem: React.FC<{
 };
 
 const DatasetsConfig: React.FC<{
+  entity: string;
+  project: string;
+  parentSpec: FilterAndGroupSpec;
   datasets: FilterAndGroupDatasetSpec[] | undefined;
   updateConfig: (
     updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
   ) => void;
-}> = ({datasets, updateConfig}) => {
+}> = ({datasets, updateConfig, entity, project, parentSpec}) => {
+  const getTraceServerClient = useGetTraceServerClientContext();
   const [datasetNames, setDatasetNames] = useState<string[]>([]);
 
   useEffect(() => {
-    fetchDatasetNamesForSpec({}).then(setDatasetNames);
-  }, []);
+    fetchDatasetNamesForSpec(
+      getTraceServerClient(),
+      entity,
+      project,
+      parentSpec
+    ).then(setDatasetNames);
+  }, [entity, getTraceServerClient, project, parentSpec]);
 
   const handleAddDataset = () => {
     updateConfig(spec => ({
@@ -415,6 +432,17 @@ const DatasetsConfig: React.FC<{
       {datasets?.map((dataset, index) => (
         <DatasetItem
           key={index}
+          entity={entity}
+          project={project}
+          parentSpec={{
+            sourceEvaluations: parentSpec.sourceEvaluations,
+            datasets: [
+              {
+                name: dataset.name,
+                version: '*',
+              },
+            ],
+          }}
           dataset={dataset}
           datasetNames={datasetNames}
           updateConfig={updateConfig}
@@ -429,22 +457,40 @@ const DatasetsConfig: React.FC<{
 };
 
 const DatasetItem: React.FC<{
+  entity: string;
+  project: string;
+  parentSpec: FilterAndGroupSpec;
   dataset: FilterAndGroupDatasetSpec;
   datasetNames: string[];
   updateConfig: (
     updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
   ) => void;
   index: number;
-}> = ({dataset, datasetNames, updateConfig, index}) => {
-  const [versions, setVersions] = useState<string[]>([]);
+}> = ({
+  entity,
+  project,
+  parentSpec,
+  dataset,
+  datasetNames,
+  updateConfig,
+  index,
+}) => {
+  const getTraceServerClient = useGetTraceServerClientContext();
+  const [versions, setVersions] = useState<VersionDetails[]>([]);
   const [scorerNames, setScorerNames] = useState<string[]>([]);
 
   useEffect(() => {
     if (dataset.name && dataset.name !== ALL_VALUE) {
-      fetchDatasetVersionsForSpecAndName({}, dataset.name).then(setVersions);
+      fetchDatasetVersionsForSpecAndName(
+        getTraceServerClient(),
+        entity,
+        project,
+        parentSpec,
+        dataset.name
+      ).then(setVersions);
     }
-    fetchScorerNamesForSpec({}).then(setScorerNames);
-  }, [dataset.name]);
+    fetchScorerNamesForSpec(parentSpec).then(setScorerNames);
+  }, [dataset.name, entity, getTraceServerClient, project, parentSpec]);
 
   const handleNameChange = (event: SelectChangeEvent<string>) => {
     const newName = event.target.value as string;
@@ -529,8 +575,8 @@ const DatasetItem: React.FC<{
             disabled={dataset.name === ALL_VALUE}>
             <MenuItem value={ALL_VALUE}>All</MenuItem>
             {versions.map(version => (
-              <MenuItem key={version} value={version}>
-                {version}
+              <MenuItem key={version.digest} value={version.digest}>
+                v{version.index} ({version.digest.slice(0, 6)})
               </MenuItem>
             ))}
           </Select>
@@ -914,7 +960,7 @@ const ModelItem: React.FC<{
 
   useEffect(() => {
     if (model.name && model.name !== ALL_VALUE) {
-      fetchModelVersionsForSpecndName({}, model.name).then(setVersions);
+      fetchModelVersionsForSpecAndName({}, model.name).then(setVersions);
     }
   }, [model.name]);
 

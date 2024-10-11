@@ -53,13 +53,15 @@ export type GroupedLeaderboardData = {
   };
 };
 
-export type GroupedLeaderboardModelGroup = {
+export type GroupedLeaderboardModelGroup<
+  T extends any = LeaderboardValueRecord[]
+> = {
   datasetGroups: {
     [datasetGroup: string]: {
       scorerGroups: {
         [scorerGroup: string]: {
           metricPathGroups: {
-            [metricPathGroup: string]: LeaderboardValueRecord[];
+            [metricPathGroup: string]: T;
           };
         };
       };
@@ -67,12 +69,12 @@ export type GroupedLeaderboardModelGroup = {
   };
 };
 
-export const getLeaderboardData = async (
+export const getEvaluationObjectsForSpec = async (
   client: TraceServerClient,
   entity: string,
   project: string,
-  spec: FilterAndGroupSpec = {}
-): Promise<GroupedLeaderboardData> => {
+  spec: FilterAndGroupSpec
+) => {
   const atLeastOneStarName = spec.sourceEvaluations?.some(
     sourceEvaluation => sourceEvaluation.name === ALL_VALUE
   );
@@ -115,6 +117,22 @@ export const getLeaderboardData = async (
       });
     });
   }
+
+  return allEvaluationObjectsRes;
+};
+
+export const getLeaderboardGroupableData = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
+  spec: FilterAndGroupSpec = {}
+): Promise<GroupableLeaderboardValueRecord[]> => {
+  const allEvaluationObjectsRes = await getEvaluationObjectsForSpec(
+    client,
+    entity,
+    project,
+    spec
+  );
 
   const evaluationObjectDigestMap = new Map<
     string,
@@ -402,10 +420,22 @@ export const getLeaderboardData = async (
     return {include: true, groupableRow};
   });
 
-  const groupableData = filterableGroupableData
+  return filterableGroupableData
     .filter(entry => entry.include)
     .map(entry => entry.groupableRow);
-
+};
+export const getLeaderboardData = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
+  spec: FilterAndGroupSpec = {}
+): Promise<GroupedLeaderboardData> => {
+  const groupableData = await getLeaderboardGroupableData(
+    client,
+    entity,
+    project,
+    spec
+  );
   const finalData: GroupedLeaderboardData = {
     modelGroups: _.mapValues(
       _.groupBy(groupableData, 'modelGroup'),
@@ -423,9 +453,6 @@ export const getLeaderboardData = async (
                         _.groupBy(scorerGroup, 'metricPathGroup'),
                         metricPathGroup => {
                           return metricPathGroup.map(row => row.row);
-                          //   .sort(
-                          //     (a, b) => a.sortKey - b.sortKey
-                          //   )[0].row;
                         }
                       ),
                     };
