@@ -44,7 +44,7 @@ class PromptScorer(LLMScorer):
         ]
         return llm.chat(messages=messages)
 
-class EmbeddingScorer(LLMScorer):
+class EmbeddingSimilarityScorer(LLMScorer):
     """
     Check the embedding distance between the model output and the target.
     """
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     try:
         import openai
         client = openai.OpenAI()
-        scorer = EmbeddingScorer(
+        scorer = EmbeddingSimilarityScorer(
             client=client, 
             model="text-embedding-3-small")
         print(scorer.score("I don't know", "I don't know"))
