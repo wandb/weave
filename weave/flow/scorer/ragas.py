@@ -1,185 +1,92 @@
 # implementing metrics from ragas: https://github.com/explodinggradients/ragas
 
-from typing import Any, List
-from pydantic import BaseModel
-from weave.flow.scorer.llm import instruct_client
-from weave.flow.scorer.llm_scorer import EmbeddingSimilarityScorer, LLMScorer
+from typing import List
+from pydantic import BaseModel, Field
+from textwrap import dedent
 
+import weave
+from weave.flow.scorer.llm_utils import instructor_client
+from weave.flow.scorer.llm_scorer import LLMScorer
+from weave.flow.scorer.similarity_score import EmbeddingSimilarityScorer
 
 class EntityExtractionResponse(BaseModel):
-    entities: List[str]
+    entities: List[str] = Field(description="A list of unique entities extracted from the text")
 
 class ContextEntityRecallScorer(LLMScorer):
     """
-    Estimates context recall by extracting entities from the expected answer and
-    the provided context, then computes the recall.
+    Estimates context recall by extracting entities from the model output 
+    and the expected answer, then computes the recall.
     """
 
-    extraction_prompt: str = """
+    extraction_prompt: str = dedent("""
     Extract unique entities from the following text without repetition.
 
     Text: {text}
     Entities:
-    """  
+    """)
+    answer_column: str = Field(description="The column in the dataset that contains the expected answer")
+    
     def extract_entities(self, text: str) -> List[str]:
         # Use LLM to extract entities
-        llm = instruct_client(self.client)
+        client = instructor_client(self.client)
         prompt = self.extraction_prompt.format(text=text)
-        response = llm.chat.completions.create(
+        response = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            response_model=str
+            response_model=EntityExtractionResponse,
+            model=self.model_id
         )
         # Assume entities are returned as a comma-separated list
-        entities = [e.strip() for e in response.split(",")]
+        entities = [e.strip() for e in response.entities]
         return entities
-
-    def score(self, model_output: Any, expected: str, context: str) -> float:
+    
+    @weave.op
+    def score(self, model_output: str, dataset_row: dict) -> float:
         # Extract entities
-        expected_entities = self.extract_entities(expected)
-        context_entities = self.extract_entities(context)
+        if self.answer_column not in dataset_row:
+            raise ValueError(f"Answer column {self.answer_column} not found in dataset_row")
+        expected_entities = self.extract_entities(model_output)
+        context_entities = self.extract_entities(dataset_row[self.answer_column])
         # Calculate recall
         if not expected_entities:
             return 0.0
         matches = set(expected_entities) & set(context_entities)
         recall = len(matches) / len(expected_entities)
-        return recall
+        return {"recall": recall}
 
-
+class RelevancyResponse(BaseModel):
+    reasoning: str = Field(description="Think step by step about whether the context is relevant to the question")
+    relevancy_score: int = Field(ge=0, le=1, description="The relevancy score of the context to the question (0 for not relevant, 1 for relevant)")
 class ContextRelevancyScorer(LLMScorer):
-    """Evaluates the relevancy of the provided context to the input question."""
+    """Evaluates the relevancy of the provided context to the model output."""
 
-    relevancy_prompt: str = """
+    relevancy_prompt: str = dedent("""
     Given the following question and context, rate the relevancy of the context to the question on a scale from 0 to 1.
 
     Question: {question}
     Context: {context}
     Relevancy Score (0-1):
-    """
+    """)
+    context_column: str = Field(description="The column in the dataset that contains the context")
 
-    def score(self, model_output: Any, input_text: str, context: str) -> float:
-        llm = instruct_client(self.client)
-        prompt = self.relevancy_prompt.format(question=input_text, context=context)
+    @weave.op
+    def score(self, model_output: str, dataset_row: dict) -> float:
+        if self.context_column not in dataset_row:
+            raise ValueError(f"Context column {self.context_column} not found in dataset_row")
+        context = dataset_row[self.context_column]
+        llm = instructor_client(self.client)
+        prompt = self.relevancy_prompt.format(question=model_output, context=context)
         response = llm.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            response_model=str
+            response_model=RelevancyResponse,
+            model=self.model_id
         )
-        # Parse the response to get the relevancy score
-        try:
-            score = float(response.strip())
-            return max(0.0, min(score, 1.0))  # Ensure the score is between 0 and 1
-        except ValueError:
-            return 0.0  # Return 0 if parsing fails
-
-
-class ContextPrecisionScorer(LLMScorer):
-    """Determines whether the provided context was useful in arriving at the given answer."""
-
-    precision_prompt: str = """
-    Given the question, answer, and context, determine if the context was useful in arriving at the answer.
-    Respond with 1 if useful, 0 if not.
-
-    Question: {question}
-    Answer: {answer}
-    Context: {context}
-    Verdict (1 for useful, 0 for not useful):
-    """
-
-    def score(
-        self, model_output: Any, input_text: str, expected: str, context: str
-    ) -> float:
-        llm = instruct_client(self.client)
-        prompt = self.precision_prompt.format(
-            question=input_text, answer=expected, context=context
-        )
-        response = llm.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            response_model=str
-        )
-        # Parse the response to get the verdict
-        try:
-            verdict = int(response.strip())
-            return float(verdict)
-        except ValueError:
-            return 0.0  # Return 0 if parsing fails
-
-
-class FaithfulnessScorer(LLMScorer):
-    """Measures the factual consistency of the generated answer against the provided context."""
-
-    faithfulness_prompt: str = """
-    Compare the following answer and context for factual consistency. Rate the faithfulness on a scale from 0 to 1.
-
-    Answer: {answer}
-    Context: {context}
-    Faithfulness Score (0-1):
-    """
-
-    def score(self, model_output: Any, expected: str, context: str) -> float:
-        llm = instruct_client(self.client)
-        answer = model_output.get("answer", "")
-        prompt = self.faithfulness_prompt.format(answer=answer, context=context)
-        response = llm.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            response_model=str
-        )
-        # Parse the response to get the faithfulness score
-        try:
-            score = float(response.strip())
-            return max(0.0, min(score, 1.0))
-        except ValueError:
-            return 0.0  # Return 0 if parsing fails
-
-
-class AnswerSimilarityScorer(EmbeddingSimilarityScorer):
-    """Measures the similarity between the generated answer and the expected answer."""
-
-    def score(self, model_output: Any, expected: str) -> float:
-        generated_answer = model_output.get("answer", "")
-        return super().score(generated_answer, expected)
-
-
-from typing import Any
-
-from weave.flow.scorer.llm_scorer import LLMScorer
-
-
-class AnswerCorrectnessScorer(LLMScorer):
-    """Evaluates the correctness of the answer based on the ground truth."""
-
-    correctness_prompt: str = """
-    Given the question, generated answer, and ground truth, rate the correctness of the answer on a scale from 0 to 1.
-
-    Question: {question}
-    Generated Answer: {generated_answer}
-    Ground Truth: {ground_truth}
-    Correctness Score (0-1):
-    """
-
-    def score(self, model_output: Any, input_text: str, expected: str) -> float:
-        llm = instruct_client(self.client)
-        generated_answer = model_output.get("answer", "")
-        prompt = self.correctness_prompt.format(
-            question=input_text,
-            generated_answer=generated_answer,
-            ground_truth=expected,
-        )
-        response = llm.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            response_model=str
-        )
-        # Parse the response to get the correctness score
-        try:
-            score = float(response.strip())
-            return max(0.0, min(score, 1.0))
-        except ValueError:
-            return 0.0  # Return 0 if parsing fails
-
-
+        return {"relevancy_score": response.relevancy_score}
+        
 if __name__ == "__main__":
     import os
 
     try:
-        from weave.flow.scorer.llm import import_client
+        from weave.flow.scorer.llm_utils import import_client
 
         # Instantiate your LLM client
         OpenAIClient = import_client("openai")
@@ -190,22 +97,13 @@ if __name__ == "__main__":
 
         # Instantiate scorers
         context_entity_recall_scorer = ContextEntityRecallScorer(
-            client=llm_client, model="gpt-4o"
+            client=llm_client, model_id="gpt-4o",
+            answer_column="expected"
         )
         context_relevancy_scorer = ContextRelevancyScorer(
-            client=llm_client, model="gpt-4"
+            client=llm_client, model_id="gpt-4o",
+            context_column="context"
         )
-        context_precision_scorer = ContextPrecisionScorer(
-            client=llm_client, model="gpt-4"
-        )
-        faithfulness_scorer = FaithfulnessScorer(client=llm_client, model="gpt-4")
-        answer_similarity_scorer = AnswerSimilarityScorer(
-            client=llm_client, model="text-embedding-ada-002"
-        )
-        answer_correctness_scorer = AnswerCorrectnessScorer(
-            client=llm_client, model="gpt-4o"
-        )
-
         # Create your dataset of examples
         examples = [
             {
@@ -221,45 +119,15 @@ if __name__ == "__main__":
             # Add more examples as needed
         ]
 
-        scorers = [
-            context_entity_recall_scorer,
-            context_relevancy_scorer,
-            context_precision_scorer,
-            faithfulness_scorer,
-            answer_similarity_scorer,
-            answer_correctness_scorer,
-        ]
-
         for example in examples:
             model_output = {"answer": example["expected"]}  # Simulate model output
-            for scorer in scorers:
-                if isinstance(scorer, ContextEntityRecallScorer):
-                    score = scorer.score(
-                        model_output, example["expected"], example["context"]
-                    )
-                elif isinstance(scorer, ContextRelevancyScorer):
-                    score = scorer.score(
-                        model_output, example["question"], example["context"]
-                    )
-                elif isinstance(scorer, ContextPrecisionScorer):
-                    score = scorer.score(
-                        model_output,
-                        example["question"],
-                        example["expected"],
-                        example["context"],
-                    )
-                elif isinstance(scorer, FaithfulnessScorer):
-                    score = scorer.score(
-                        model_output, example["expected"], example["context"]
-                    )
-                elif isinstance(scorer, AnswerSimilarityScorer):
-                    score = scorer.score(model_output, example["expected"])
-                elif isinstance(scorer, AnswerCorrectnessScorer):
-                    score = scorer.score(
-                        model_output, example["question"], example["expected"]
-                    )
-                print(
-                    f"{scorer.__class__.__name__} score for '{example['question']}': {score}"
-                )
+            score = context_entity_recall_scorer.score(
+                model_output, example
+            )
+            print(f"Context Entity Recall Score: {score}")
+            score = context_relevancy_scorer.score(
+                model_output, example
+            )
+            print(f"Context Relevancy Score: {score}")
     except Exception as e:
         print(e)
