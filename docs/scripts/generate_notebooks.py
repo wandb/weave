@@ -1,4 +1,5 @@
 import os
+import re
 import tempfile
 
 import nbformat
@@ -62,6 +63,23 @@ def export_notebook(notebook_path, output_path):
         output = output[:start] + output[end + len(meta_mark_end) :]
 
     output = extract_meta + make_header(notebook_path) + output
+
+    # Fixes image paths by replacing markdown links containing '../docs/' with '/docs/'
+    pattern = re.compile(
+        r"""
+        \(
+        (
+            \.\./docs/
+            .*?
+        )
+        \)
+    """,
+        re.VERBOSE,
+    )
+
+    replacement = r"(/\1)"
+
+    output = pattern.sub(replacement, output)
 
     with open(output_path, "w") as f:
         f.write(output)
