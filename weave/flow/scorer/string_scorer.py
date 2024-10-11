@@ -1,18 +1,19 @@
 import re
-from typing import Union, Callable
+from typing import Callable, Union
 
 from pydantic import Field, model_validator
 
 import weave
 from weave.flow.scorer.base_scorer import Scorer
 
+
 class StringMatchScorer(Scorer):
-    """
-    Scorer that checks if the model output string is found in the search columns of the dataset row.
-    """
+    """Scorer that checks if the model output string is found in the search columns of the dataset row."""
+
     def score(self, output: str, target: str) -> dict:
         string_in_input = output.lower() in target.lower()
         return {"string_in_input": string_in_input}
+
 
 class RegexScorer(Scorer):
     patterns: Union[str, list[str]] = Field(
@@ -58,14 +59,20 @@ class RegexScorer(Scorer):
 
 
 class LevenshteinScorer(Scorer):
-    distance: Callable[[str, str], int] = Field(default=None, description="The Levenshtein distance function")
-    @model_validator(mode='after')
+    distance: Callable[[str, str], int] = Field(
+        default=None, description="The Levenshtein distance function"
+    )
+
+    @model_validator(mode="after")
     def check_levenshtein(self):
         try:
             from Levenshtein import distance
+
             self.distance = distance
         except ImportError:
-            raise ValueError("Levenshtein package not found. Please install it with `pip install Levenshtein`")
+            raise ValueError(
+                "Levenshtein package not found. Please install it with `pip install Levenshtein`"
+            )
 
     @weave.op
     def score(self, output: str, target: str) -> dict:
@@ -79,14 +86,21 @@ if __name__ == "__main__":
     match_scorer = StringMatchScorer(column_map={"target": "col1"})
     levenshtein_scorer = LevenshteinScorer(column_map={"target": "col2"})
 
-    
     @weave.op
-    def f(col1, col2): 
-        return "Hello"    
+    def f(col1, col2):
+        return "Hello"
 
-    dataset = [{"col1": "Hello my name is Morgan", "col2": "I am an engineer", "target": "Morgan"}, 
-               {"col1": "Hello my name is John", "col2": "I am a doctor", "target": "John"}]
-    
-    evaluation = weave.Evaluation(dataset=dataset, scorers=[match_scorer, levenshtein_scorer])
+    dataset = [
+        {
+            "col1": "Hello my name is Morgan",
+            "col2": "I am an engineer",
+            "target": "Morgan",
+        },
+        {"col1": "Hello my name is John", "col2": "I am a doctor", "target": "John"},
+    ]
+
+    evaluation = weave.Evaluation(
+        dataset=dataset, scorers=[match_scorer, levenshtein_scorer]
+    )
 
     eval_out = asyncio.run(evaluation.evaluate(f))

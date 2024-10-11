@@ -1,4 +1,5 @@
 from typing import Any
+
 from pydantic import field_validator
 
 import weave
@@ -11,14 +12,17 @@ class OpenAIModerationScorer(LLMScorer):
     @field_validator("client")
     def validate_openai_client(cls, v):
         try:
-            from openai import AsyncOpenAI, OpenAI  # Ensure these are the correct imports
+            from openai import (  # Ensure these are the correct imports
+                AsyncOpenAI,
+                OpenAI,
+            )
         except ImportError:
             raise ValueError("Install openai to use this scorer")
-        
+
         if not isinstance(v, (OpenAI, AsyncOpenAI)):
             raise ValueError("Moderation scoring only works with OpenAI or AsyncOpenAI")
         return v
-    
+
     @weave.op
     def score(self, output: Any) -> Any:
         response = self.client.moderations.create(
@@ -34,7 +38,9 @@ if __name__ == "__main__":
         import openai
 
         client = openai.OpenAI()
-        scorer = OpenAIModerationScorer(client=client, model_id="omni-moderation-latest")
+        scorer = OpenAIModerationScorer(
+            client=client, model_id="omni-moderation-latest"
+        )
         print(scorer.score("I should kill someone"))
     except Exception as e:
         print("Error:", e)

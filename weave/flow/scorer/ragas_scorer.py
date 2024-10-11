@@ -1,19 +1,24 @@
 # implementing metrics from ragas: https://github.com/explodinggradients/ragas
 
-from typing import List
-from pydantic import BaseModel, Field
 from textwrap import dedent
+from typing import List
+
+from pydantic import BaseModel, Field
 
 import weave
-from weave.flow.scorer.llm_utils import instructor_client, create
 from weave.flow.scorer.llm_scorer import InstructorLLMScorer
+from weave.flow.scorer.llm_utils import create
+
 
 class EntityExtractionResponse(BaseModel):
-    entities: List[str] = Field(description="A list of unique entities extracted from the text")
+    entities: List[str] = Field(
+        description="A list of unique entities extracted from the text"
+    )
+
 
 class ContextEntityRecallScorer(InstructorLLMScorer):
     """
-    Estimates context recall by extracting entities from the model output 
+    Estimates context recall by extracting entities from the model output
     and the context, then computes the recall.
     """
 
@@ -23,7 +28,7 @@ class ContextEntityRecallScorer(InstructorLLMScorer):
     Text: {text}
     Entities:
     """)
-    
+
     def extract_entities(self, text: str) -> List[str]:
         # Use LLM to extract entities
         prompt = self.extraction_prompt.format(text=text)
@@ -31,12 +36,12 @@ class ContextEntityRecallScorer(InstructorLLMScorer):
             self.client,
             messages=[{"role": "user", "content": prompt}],
             response_model=EntityExtractionResponse,
-            model=self.model_id
+            model=self.model_id,
         )
         # Assume entities are returned as a comma-separated list
         entities = [e.strip() for e in response.entities]
         return entities
-    
+
     @weave.op
     def score(self, output: str, context: str) -> float:
         expected_entities = self.extract_entities(output)
@@ -48,9 +53,18 @@ class ContextEntityRecallScorer(InstructorLLMScorer):
         recall = len(matches) / len(expected_entities)
         return {"recall": recall}
 
+
 class RelevancyResponse(BaseModel):
-    reasoning: str = Field(description="Think step by step about whether the context is relevant to the question")
-    relevancy_score: int = Field(ge=0, le=1, description="The relevancy score of the context to the question (0 for not relevant, 1 for relevant)")
+    reasoning: str = Field(
+        description="Think step by step about whether the context is relevant to the question"
+    )
+    relevancy_score: int = Field(
+        ge=0,
+        le=1,
+        description="The relevancy score of the context to the question (0 for not relevant, 1 for relevant)",
+    )
+
+
 class ContextRelevancyScorer(InstructorLLMScorer):
     """Evaluates the relevancy of the provided context to the model output."""
 
@@ -69,10 +83,11 @@ class ContextRelevancyScorer(InstructorLLMScorer):
             self.client,
             messages=[{"role": "user", "content": prompt}],
             response_model=RelevancyResponse,
-            model=self.model_id
+            model=self.model_id,
         )
         return {"relevancy_score": response.relevancy_score}
-        
+
+
 if __name__ == "__main__":
     import os
 
@@ -88,10 +103,12 @@ if __name__ == "__main__":
 
         # Instantiate scorers
         context_entity_recall_scorer = ContextEntityRecallScorer(
-            client=llm_client, model_id="gpt-4o",
+            client=llm_client,
+            model_id="gpt-4o",
         )
         context_relevancy_scorer = ContextRelevancyScorer(
-            client=llm_client, model_id="gpt-4o",
+            client=llm_client,
+            model_id="gpt-4o",
         )
         # Create your dataset of examples
         examples = [
@@ -110,13 +127,9 @@ if __name__ == "__main__":
 
         for example in examples:
             output = {"answer": example["expected"]}  # Simulate model output
-            score = context_entity_recall_scorer.score(
-                output, example
-            )
+            score = context_entity_recall_scorer.score(output, example)
             print(f"Context Entity Recall Score: {score}")
-            score = context_relevancy_scorer.score(
-                output, example
-            )
+            score = context_relevancy_scorer.score(output, example)
             print(f"Context Relevancy Score: {score}")
     except Exception as e:
         print(e)

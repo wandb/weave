@@ -16,6 +16,7 @@ def stringify(output: Any) -> str:
     else:
         raise ValueError(f"Unsupported model output type: {type(output)}")
 
+
 if __name__ == "__main__":
     # test
     output = "hey"

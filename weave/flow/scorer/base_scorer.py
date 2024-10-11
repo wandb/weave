@@ -11,7 +11,11 @@ from weave.trace.op import Op, as_op, is_op
 
 
 class Scorer(Object):
-    column_map: Optional[dict[str, str]] = Field(default=None, description="A mapping from column names in the dataset to the names expected by the scorer")
+    column_map: Optional[dict[str, str]] = Field(
+        default=None,
+        description="A mapping from column names in the dataset to the names expected by the scorer",
+    )
+
     def score(self, input: Any, target: Any, output: Any) -> Any:
         raise NotImplementedError
 

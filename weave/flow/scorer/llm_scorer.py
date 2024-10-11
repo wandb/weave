@@ -3,7 +3,8 @@ from typing import Any
 from pydantic import Field, field_validator
 
 from weave.flow.scorer.base_scorer import Scorer
-from weave.flow.scorer.llm_utils import instructor_client, _LLM_CLIENT_TYPES
+from weave.flow.scorer.llm_utils import _LLM_CLIENT_TYPES, instructor_client
+
 
 class LLMScorer(Scorer):
     """Score a model output using an LLM"""
@@ -21,6 +22,7 @@ class LLMScorer(Scorer):
             )
         return v
 
+
 class InstructorLLMScorer(Scorer):
     """Score a model output using an LLM"""
 
@@ -28,8 +30,12 @@ class InstructorLLMScorer(Scorer):
         description="The LLM client to use, has to be instantiated with an api_key"
     )
     model_id: str = Field(description="The model to use")
-    temperature: float = Field(..., description="The temperature to use for the response")
-    max_tokens: int = Field(..., description="The maximum number of tokens in the response")
+    temperature: float = Field(
+        ..., description="The temperature to use for the response"
+    )
+    max_tokens: int = Field(
+        ..., description="The maximum number of tokens in the response"
+    )
 
     @field_validator("client")
     def validate_client(cls, v):
