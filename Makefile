@@ -4,10 +4,9 @@ setup-docs-ci:
 	pip install -e . playwright
 	playwright install
 
-	cd docs
-	npm install --global yarn
+	cd docs && \
+	npm install --global yarn && \
 	npm install
-	cd ..
 
 docs: 
 	cd docs && make generate_all
