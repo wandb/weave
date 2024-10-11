@@ -9,7 +9,8 @@
     "test": "jest",
     "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\"",
     "run": "tsx",
-    "generate-api": "swagger-typescript-api -p ./weave.openapi.json -o ./src -n serverApi.ts"
+    "generate-api": "swagger-typescript-api -p ./weave.openapi.json -o ./src -n serverApi.ts",
+    "dev": "nodemon"
   },
   "repository": {
     "type": "git",
@@ -34,6 +35,13 @@
       "json",
       "node"
     ]
+  },
+  "nodemonConfig": {
+    "watch": [
+      "."
+    ],
+    "ext": "ts,json",
+    "exec": "tsx examples/evaluate.ts"
   },
   "dependencies": {
     "cli-progress": "^3.12.0",
