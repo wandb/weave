@@ -171,8 +171,7 @@ export const SummaryPlots: React.FC<{
   if (isInitialRender) {
     return <div ref={containerRef} style={{width: '100%', height: '400px'}} />;
   }
-  console.log(currentPlots);
-
+  
   return (
     <VerticalBox
       sx={{
@@ -207,10 +206,7 @@ export const SummaryPlots: React.FC<{
       </HorizontalBox>
       <div ref={containerRef} style={{width: '100%'}}>
         <HorizontalBox
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${plotsPerPage}, 1fr)`,
-          }}>
+          sx={{display: 'flex'}}>
           {currentPlots.map((plot, index) => (
             <Box
               key={index}
