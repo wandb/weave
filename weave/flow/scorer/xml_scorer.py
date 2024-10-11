@@ -7,11 +7,11 @@ from weave.flow.scorer.base_scorer import Scorer
 class XMLScorer(Scorer):
     """Score an XML string."""
 
-    def score(self, model_output: Union[str, dict]) -> dict:
-        if isinstance(model_output, dict):
-            xml_string = model_output.get("output", "")
+    def score(self, output: Union[str, dict]) -> dict:
+        if isinstance(output, dict):
+            xml_string = output.get("output", "")
         else:
-            xml_string = model_output
+            xml_string = output
 
         try:
             ET.fromstring(xml_string)

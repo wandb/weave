@@ -2,7 +2,7 @@ from numbers import Number
 from typing import Any, Callable, Optional, Sequence, Tuple, Union
 
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import weave
 from weave.flow.obj import Object
@@ -11,7 +11,8 @@ from weave.trace.op import Op, as_op, is_op
 
 
 class Scorer(Object):
-    def score(self, target: Any, model_output: Any) -> Any:
+    column_map: Optional[dict[str, str]] = Field(default=None, description="A mapping from column names in the dataset to the names expected by the scorer")
+    def score(self, input: Any, target: Any, output: Any) -> Any:
         raise NotImplementedError
 
     @weave.op()

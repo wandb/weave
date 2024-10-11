@@ -40,11 +40,11 @@ class ContextEntityRecallScorer(LLMScorer):
         return entities
     
     @weave.op
-    def score(self, model_output: str, dataset_row: dict) -> float:
+    def score(self, output: str, dataset_row: dict) -> float:
         # Extract entities
         if self.answer_column not in dataset_row:
             raise ValueError(f"Answer column {self.answer_column} not found in dataset_row")
-        expected_entities = self.extract_entities(model_output)
+        expected_entities = self.extract_entities(output)
         context_entities = self.extract_entities(dataset_row[self.answer_column])
         # Calculate recall
         if not expected_entities:
@@ -69,12 +69,12 @@ class ContextRelevancyScorer(LLMScorer):
     context_column: str = Field(description="The column in the dataset that contains the context")
 
     @weave.op
-    def score(self, model_output: str, dataset_row: dict) -> float:
+    def score(self, output: str, dataset_row: dict) -> float:
         if self.context_column not in dataset_row:
             raise ValueError(f"Context column {self.context_column} not found in dataset_row")
         context = dataset_row[self.context_column]
         llm = instructor_client(self.client)
-        prompt = self.relevancy_prompt.format(question=model_output, context=context)
+        prompt = self.relevancy_prompt.format(question=output, context=context)
         response = llm.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
             response_model=RelevancyResponse,
@@ -120,13 +120,13 @@ if __name__ == "__main__":
         ]
 
         for example in examples:
-            model_output = {"answer": example["expected"]}  # Simulate model output
+            output = {"answer": example["expected"]}  # Simulate model output
             score = context_entity_recall_scorer.score(
-                model_output, example
+                output, example
             )
             print(f"Context Entity Recall Score: {score}")
             score = context_relevancy_scorer.score(
-                model_output, example
+                output, example
             )
             print(f"Context Relevancy Score: {score}")
     except Exception as e:

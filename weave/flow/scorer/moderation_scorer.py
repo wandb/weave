@@ -20,10 +20,10 @@ class OpenAIModerationScorer(LLMScorer):
         return v
     
     @weave.op
-    def score(self, model_output: Any) -> Any:
+    def score(self, output: Any) -> Any:
         response = self.client.moderations.create(
             model=self.model_id,
-            input=model_output,
+            input=output,
         ).results[0]
         categories = {k: v for k, v in response.categories.dict().items() if v}
         return {"flagged": response.flagged, "categories": categories}

@@ -206,14 +206,23 @@ class Evaluation(Object):
 
             # TODO: Check for input columns parameters in the signature of the scorer
 
-            if "model_output" not in score_arg_names:
+            if "model_output" not in score_arg_names and "output" not in score_arg_names:
                 raise OpCallError(
-                    f"Scorer {scorer_name} must have a 'model_output' argument, to receive the output of the model function."
+                    f"Scorer {scorer_name} must have a 'model_output' or 'output' argument, to receive the output of the model function."
                 )
 
             if isinstance(example, dict):
                 score_args = {k: v for k, v in example.items() if k in score_arg_names}
-                score_args.update({"dataset_row": example}) # TODO: investigate deduplication of dataset_row for performance
+                # If we get a column_map from the scorer, it means that the scorer expects the input to have different names than the dataset columns
+                # So we need to remap the input names to the expected names in the scorer
+                # For instance, if the scorer expects "input" and "target" and we have a dataset with columns "question" and "expected"
+                # we need to remap {"question": "input", "expected": "target"}
+                # and pass those to the scorer
+                # input: is the full row, we have access to it via example
+                # output: is the model output, we have access to it via model_output
+
+                if scorer.column_map is not None:
+                    score_args = {scorer.column_map[k]: v for k, v in score_args.items()}
             else:
                 if len(score_arg_names) == 2:
                     score_args = {score_arg_names[0]: example}

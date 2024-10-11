@@ -10,16 +10,16 @@ class PydanticScorer(Scorer):
 
     model: Type[BaseModel]
 
-    def score(self, model_output: Any):
-        if isinstance(model_output, str):
+    def score(self, output: Any):
+        if isinstance(output, str):
             try:
-                self.model.model_validate_json(model_output)
+                self.model.model_validate_json(output)
                 return True
             except ValidationError:
                 return False
         else:
             try:
-                self.model.model_validate(model_output)
+                self.model.model_validate(output)
                 return True
             except ValidationError:
                 return False
@@ -34,8 +34,8 @@ if __name__ == "__main__":
 
     scorer = PydanticScorer(model=User)
 
-    model_output = '{"name": "John", "age": 30}'
-    print(scorer.score(model_output))
+    output = '{"name": "John", "age": 30}'
+    print(scorer.score(output))
 
-    model_output = {"name": "John", "age": 30}
-    print(scorer.score(model_output))
+    output = {"name": "John", "age": 30}
+    print(scorer.score(output))

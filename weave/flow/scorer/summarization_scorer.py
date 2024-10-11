@@ -36,11 +36,11 @@ class SummarizationScorer(LLMScorer):
         return entities
     
     @weave.op
-    def score(self, model_output: str, dataset_row: dict) -> float:
+    def score(self, output: str, dataset_row: dict) -> float:
         # Extract entities
         if self.input_column not in dataset_row:
             raise ValueError(f"Answer column {self.input_column} not found in dataset_row")
-        output_entities = self.extract_entities(model_output)
+        output_entities = self.extract_entities(output)
         input_entities = self.extract_entities(dataset_row[self.input_column])
         # Calculate recall
         if not output_entities:
@@ -72,12 +72,12 @@ if __name__ == "__main__":
         # Create your dataset of examples
         examples = [
             {"input":"Harry Potter is a wizard. He is friends with Ron Weasley. They all go to Hogwarts to learn magic. They have been doing this for years. Their enemy is Voldemort, a dark wizard who is trying to kill them.",
-             "model_output":"Harry Potter, Ron Weasley, and Voldemort are wizards.",
+             "output":"Harry Potter, Ron Weasley, and Voldemort are wizards.",
              "relevancy_score":1}
         ]
 
         for example in examples:
-            score = summarization_scorer.score(example["model_output"], example)
+            score = summarization_scorer.score(example["output"], example)
             print(f"Summarization Score: {score}")
 
     except Exception as e:

@@ -12,8 +12,8 @@ class StringScorer(Scorer):
     """
     target_columns: List[str] = Field(default_factory=list, description="The names of the columns that are used as input to the scorer")
 
-    def score(self, model_output: Any, dataset_row: dict) -> dict:
-        string_in_input = any([model_output.lower() in input.lower() for k, input in dataset_row.items() if k in self.target_columns])
+    def score(self, output: Any, dataset_row: dict) -> dict:
+        string_in_input = any([output.lower() in input.lower() for k, input in dataset_row.items() if k in self.target_columns])
         return {"string_in_input": string_in_input}
 
 class RegexScorer(Scorer):
@@ -27,10 +27,10 @@ class RegexScorer(Scorer):
 
     @weave.op
     def score(
-        self, model_output: Union[dict, str], target: Union[str, list[str], None] = None
+        self, output: Union[dict, str], target: Union[str, list[str], None] = None
     ) -> dict:
-        if isinstance(model_output, str):
-            model_output = {"output": model_output}
+        if isinstance(output, str):
+            output = {"output": output}
 
         # Use target patterns if provided
         patterns = target if target else self.patterns
@@ -48,7 +48,7 @@ class RegexScorer(Scorer):
                 pattern = f"^{pattern}$"
             compiled_patterns.append(re.compile(pattern, flags=flags))
 
-        text_to_search = model_output.get("output") if model_output else ""
+        text_to_search = output.get("output") if output else ""
         if self.ignore_whitespace:
             text_to_search = "".join(text_to_search.split())
 
@@ -68,8 +68,8 @@ class LevenshteinScorer(Scorer):
             raise ValueError("Levenshtein package not found. Please install it with `pip install Levenshtein`")
 
     @weave.op
-    def score(self, model_output: str, target: str) -> dict:
-        distance = distance(model_output, target)
+    def score(self, output: str, target: str) -> dict:
+        distance = distance(output, target)
         return {"levenshtein_distance": distance}
 
 
@@ -82,9 +82,9 @@ if __name__ == "__main__":
     def f(col1, col2): 
         return "Hello"    
 
-    model_output = f(col1="hello", col2="world")
+    output = f(col1="hello", col2="world")
     dataset_row = {"col1": "Hello my name is Morgan", "col2": "I am an engineer"}
-    print(scorer.score(model_output=model_output, dataset_row=dataset_row))
+    print(scorer.score(output=output, dataset_row=dataset_row))
 
     dataset = [{"col1": "Hello my name is Morgan", "col2": "I am an engineer", "target": "Morgan"}, 
                {"col1": "Hello my name is John", "col2": "I am a doctor", "target": "John"}]

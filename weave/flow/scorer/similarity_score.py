@@ -21,18 +21,18 @@ class EmbeddingSimilarityScorer(LLMScorer):
     threshold: float = Field(0.5, description="The threshold for the similarity score")
 
     @weave.op
-    def score(self, model_output: Any, dataset_row: dict) -> Any:
+    def score(self, output: Any, dataset_row: dict) -> Any:
         if self.target_column not in dataset_row:
             raise ValueError(f"Target column {self.target_column} not found in dataset_row")
         
         target = str(dataset_row[self.target_column])  # TODO: handle if it is not a string
         model_embedding, target_embedding = self._compute_embeddings(
-            model_output, target
+            output, target
         )
         return self.cosine_similarity(model_embedding, target_embedding)
 
-    def _compute_embeddings(self, model_output: str, target: str) -> tuple[list[float], list[float]]:
-        embeddings = embed(self.client, self.model_id, [model_output, target])
+    def _compute_embeddings(self, output: str, target: str) -> tuple[list[float], list[float]]:
+        embeddings = embed(self.client, self.model_id, [output, target])
         return embeddings[0], embeddings[1]
 
     def cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
@@ -57,6 +57,6 @@ if __name__ == "__main__":
         )
 
         dataset_row = {"text": "Whales are mammals that live in the ocean."}
-        print(scorer.score(model_output="Dolphins are animals that live in the sea.", dataset_row=dataset_row))
+        print(scorer.score(output="Dolphins are animals that live in the sea.", dataset_row=dataset_row))
     except Exception as e:
         print("Error running script:", e)

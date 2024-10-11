@@ -38,14 +38,14 @@ class MultiTaskBinaryClassificationF1(Scorer):
         return result
 
     @weave.op()
-    def score(self, target: dict, model_output: Optional[dict]) -> dict:
+    def score(self, target: dict, output: Optional[dict]) -> dict:
         result = {}
         for class_name in self.class_names:
             class_label = target.get(class_name)
-            class_model_output = model_output.get(class_name) if model_output else None
+            class_output = output.get(class_name) if output else None
             result[class_name] = {
-                "correct": class_label == class_model_output,
-                "negative": not class_model_output,
+                "correct": class_label == class_output,
+                "negative": not class_output,
             }
         return result
 
