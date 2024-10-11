@@ -110,8 +110,11 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
     nTrials?: number;
     maxConcurrency?: number;
   }) {
+    console.log(
+      `>>> HELLO FROM EVALUATE, with arguments model=${weaveCallableName(model)}, nTrials=${nTrials}, maxConcurrency=${maxConcurrency}`
+    );
     const results: Array<{
-      model_output: any;
+      model_output: M;
       model_success: boolean;
       model_latency: number;
       [key: string]: any;
@@ -139,6 +142,8 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
       datasetExamples = repeatAsyncIterator(this.dataset, nTrials);
     }
 
+    console.log(`>>> datasetExamples`, datasetExamples);
+
     // for await (const { result, nRunning, nDone } of asyncParallelMap(
     for await (const { result, nRunning, nDone } of asyncParallelMap(
       datasetExamples,
@@ -146,7 +151,9 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
       item => [{ model, example: item }],
       maxConcurrency
     )) {
+      console.log(`>>> result`, result);
       const { scores } = result;
+      console.log(`>>> scores`, scores);
       results.push({
         model_success: result.model_success,
         model_output: result.model_output,

@@ -6,7 +6,7 @@ import { isWeaveImage } from './media';
 import { Op, OpRef, ParameterNamesOption, getOpName, getOpWrappedFunction, isOp } from './opType';
 import { Table, TableRef, TableRowRef } from './table';
 import { EndedCallSchemaForInsert, StartedCallSchemaForInsert, Api as TraceServerApi } from './traceServerApi';
-import { packageVersion } from './userAgent';
+import { packageVersion } from './utils/userAgent';
 import { WandbServerApi } from './wandbServerApi';
 import { ObjectRef, WeaveObject, getClassChain } from './weaveObject';
 
