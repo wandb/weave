@@ -1,5 +1,7 @@
 import { uuidv7 } from 'uuidv7';
 
+// This is mostly used for testing
+
 interface Call {
   project_id: string;
   id: string;
