@@ -341,7 +341,7 @@ def call(
 
     call = Call(_op_name="", trace_id="", parent_id=None, project_id="", inputs={})
     func = op.resolve_fn
-
+    is_async = inspect.iscoroutinefunction(func)
     if settings.should_disable_weave():
         res = func(*args, **kwargs)
     elif weave_client_context.get_weave_client() is None:
@@ -350,19 +350,24 @@ def call(
         res = func(*args, **kwargs)
     else:
         try:
-            # This try/except allows us to fail gracefully and
-            # still let the user code continue to execute
+            # Weird consideration: if the user does `op.call` and does not
+            # await the result, then the `started_at` timestamp will be
+            # set before the op itself executes!
             call = _create_call(op, *args, __weave=__weave, **kwargs)
             execute_res = _execute_call(
                 op, call, *args, __should_raise=__should_raise, **kwargs
             )
             return execute_res
         except Exception as e:
+            # This try/except allows us to fail gracefully and
+            # still let the user code continue to execute
             if get_raise_on_captured_errors():
                 raise
             log_once(
                 logger.error,
-                ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
+                (ASYNC_CALL_CREATE_MSG if is_async else CALL_CREATE_MSG).format(
+                    traceback.format_exc()
+                ),
             )
             res = func(*args, **kwargs)
 
