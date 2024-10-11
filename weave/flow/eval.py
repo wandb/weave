@@ -134,27 +134,28 @@ class Evaluation(Object):
             self.name = self.dataset.name + "-evaluation"  # type: ignore
 
     @weave.op()
-    async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
+    async def predict_and_score(
+        self, model: Union[Callable, Model], example: dict
+    ) -> dict:
         if self.preprocess_model_input is None:
             model_input = example
         else:
             model_input = self.preprocess_model_input(example)  # type: ignore
 
         model_self = None
-        model_predict: Op
+        model_predict: Union[Callable, Model, Op]
         if is_op(model):
             model_predict = model
-        else:
+        elif isinstance(model, Model):
             model_self = model
-            model_predict_op = get_infer_method(cast(Model, model))
-            if not is_op(model_predict_op):
-                raise ValueError(INVALID_MODEL_ERROR)
-            model_predict = as_op(model_predict_op)
+            model_predict = get_infer_method(model)
+        else:
+            raise ValueError(INVALID_MODEL_ERROR)
 
         model_predict_fn_name = (
             as_op(model_predict).name
             if is_op(model_predict)
-            else cast(Model, model_predict).__name__
+            else model_predict.__name__
         )
 
         if is_op(model_predict):
@@ -181,6 +182,7 @@ class Evaluation(Object):
             if is_op(model_predict):
                 # I would expect this path to always be hit, but keeping the other
                 # path for backwards compatibility / safety
+                model_predict = as_op(model_predict)
                 if model_self is not None:
                     model_predict_args = {
                         **model_predict_args,
@@ -233,7 +235,7 @@ class Evaluation(Object):
                 score_fn = as_op(score_fn)
                 score_signature = score_fn.signature
             else:
-                raise ValueError(f"Invalid scorer: {scorer}")
+                score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
 
             if "model_output" not in score_arg_names:
@@ -326,7 +328,9 @@ class Evaluation(Object):
 
         return summary
 
-    async def get_eval_results(self, model: Union[Op, Model]) -> EvaluationResults:
+    async def get_eval_results(
+        self, model: Union[Callable, Model]
+    ) -> EvaluationResults:
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
         eval_rows = []
@@ -369,7 +373,7 @@ class Evaluation(Object):
         return EvaluationResults(rows=weave.Table(eval_rows))
 
     @weave.op()
-    async def evaluate(self, model: Union[Op, Model]) -> dict:
+    async def evaluate(self, model: Union[Callable, Model]) -> dict:
         # The need for this pattern is quite unfortunate and highlights a gap in our
         # data model. As a user, I just want to pass a list of data `eval_rows` to
         # summarize. Under the hood, Weave should choose the appropriate storage
