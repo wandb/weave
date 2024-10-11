@@ -254,7 +254,7 @@ const usePaginatedPlots = (
       return barPlotData
         .slice(startIdx, endIdx)
         .map((plot, index) => (
-          <BarPlotBox key={`bar-${startIndex + index}`} plot={plot} />
+          <BarPlotBox key={`bar-${startIdx + index}`} plot={plot} />
         ));
     }
   }, [currentPage, plotsPerPage, filteredData, barPlotData]);
