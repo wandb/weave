@@ -44,7 +44,7 @@ except:
 
 _LLM_CLIENTS = TypeVar(Union[tuple(_LLM_CLIENT_TYPES)])
 
-def instruct_client(client: _LLM_CLIENTS):
+def instructor_client(client: _LLM_CLIENTS):
     client_type = type(client).__name__.lower()
     if "mistral" in client_type:
         return instructor.from_mistral(client)
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     # Mistral example
     MistralClient = import_client("mistral")
     if MistralClient:
-        mistral_client = instruct_client(Mistral(api_key=os.environ.get("MISTRAL_API_KEY")))
+        mistral_client = instructor_client(Mistral(api_key=os.environ.get("MISTRAL_API_KEY")))
         mistral_response = mistral_client.chat.completions.create(
             messages=[{"role": "user", "content": "What is the best French cheese?"}],
             model=MISTRAL_DEFAULT_MODEL,
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     # OpenAI example with system message
     OpenAIClient = import_client("openai")
     if OpenAIClient:
-        openai_client = instruct_client(OpenAIClient(api_key=os.environ.get("OPENAI_API_KEY")))
+        openai_client = instructor_client(OpenAIClient(api_key=os.environ.get("OPENAI_API_KEY")))
         openai_response = openai_client.chat.completions.create(
             messages=[
                 {
@@ -126,7 +126,7 @@ if __name__ == "__main__":
     # Anthropic example with system message
     AnthropicClient = import_client("anthropic")
     if AnthropicClient:
-        anthropic_client = instruct_client(AnthropicClient(api_key=os.environ.get("ANTHROPIC_API_KEY")))
+        anthropic_client = instructor_client(AnthropicClient(api_key=os.environ.get("ANTHROPIC_API_KEY")))
         anthropic_response = anthropic_client.messages.create(
             messages=[
                 {
