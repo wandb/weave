@@ -48,11 +48,13 @@ def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutin
     return asyncio.to_thread(func, *args, **kwargs)
 
 
-def call_op_force_async(func: Op, *args: Any, **kwargs: Any) -> tuple[Coroutine, Call]:
-    res, call = func.call(*args, __should_raise=True, **kwargs)
-    if inspect.iscoroutine(res):
-        return res, call
-    return asyncio.to_thread(lambda: res), call
+def call_op_force_async(
+    func: Op, *args: Any, **kwargs: Any
+) -> Coroutine[Any, Any, tuple[Any, "Call"]]:
+    call_res = func.call(*args, __should_raise=True, **kwargs)
+    if inspect.iscoroutine(call_res):
+        return call_res
+    return asyncio.to_thread(lambda: call_res)
 
 
 class EvaluationResults(Object):
@@ -186,10 +188,9 @@ class Evaluation(Object):
                         **model_predict_args,
                         "self": model_self,
                     }
-                awaitable_model_output, model_call = call_op_force_async(
+                model_output, model_call = await call_op_force_async(
                     model_predict, **model_predict_args
                 )
-                model_output = await awaitable_model_output
             else:
                 # I would not expect this path to be hit, but keeping it for
                 # backwards compatibility / safety
@@ -262,10 +263,9 @@ class Evaluation(Object):
                             **score_args,
                             "self": scorer_self,
                         }
-                    awaitable_result, score_call = call_op_force_async(
+                    result, score_call = await call_op_force_async(
                         score_fn, **score_args
                     )
-                    result = await awaitable_result
                     wc = get_weave_client()
                     if wc:
                         await asyncio.to_thread(

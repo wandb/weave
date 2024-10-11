@@ -241,7 +241,7 @@ def _execute_call(
     *args: Any,
     __should_raise: bool = True,
     **kwargs: Any,
-) -> Any:
+) -> tuple[Union[Any, Coroutine], "Call"]:
     func = __op.resolve_fn
     client = weave_client_context.require_weave_client()
     has_finished = False
@@ -283,34 +283,34 @@ def _execute_call(
             # so we don't put future calls under the old call.
             call_context.pop_call(call.id)
 
-        return res, call
+        return res
 
-    def handle_exception(e: Exception) -> Any:
+    def handle_exception(e: Exception) -> None:
         finish(exception=e)
         if __should_raise:
             raise
-        return None, call
+        return None
 
     if inspect.iscoroutinefunction(func):
 
-        async def _call_async() -> Coroutine[Any, Any, Any]:
+        async def _call_async() -> Any:
             try:
                 res = await func(*args, **kwargs)
             except Exception as e:
-                return handle_exception(e)
+                handle_exception(e)
+                return None
             else:
                 return process(res)
 
-        return _call_async()
+        return _call_async(), call
 
     try:
         res = func(*args, **kwargs)
     except Exception as e:
         handle_exception(e)
+        return None, call
     else:
-        return process(res)
-
-    return None, call
+        return process(res), call
 
 
 def call(
@@ -319,7 +319,7 @@ def call(
     __weave: Optional[WeaveKwargs] = None,
     __should_raise: bool = False,
     **kwargs: Any,
-) -> tuple[Any, "Call"]:
+) -> tuple[Union[Any, Coroutine], "Call"]:
     """
     Executes the op and returns both the result and a Call representing the execution.
 
@@ -336,8 +336,12 @@ def call(
     result, call = add.call(1, 2)
     ```
     """
+    # Import cycle
+    from weave.trace.weave_client import Call
+
     call = Call(_op_name="", trace_id="", parent_id=None, project_id="", inputs={})
     func = op.resolve_fn
+
     if settings.should_disable_weave():
         res = func(*args, **kwargs)
     elif weave_client_context.get_weave_client() is None:
@@ -349,9 +353,10 @@ def call(
             # This try/except allows us to fail gracefully and
             # still let the user code continue to execute
             call = _create_call(op, *args, __weave=__weave, **kwargs)
-            res, _ = _execute_call(
+            execute_res = _execute_call(
                 op, call, *args, __should_raise=__should_raise, **kwargs
             )
+            return execute_res
         except Exception as e:
             if get_raise_on_captured_errors():
                 raise
@@ -485,15 +490,15 @@ def op(
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:
                     # wrapper = cast(Op, wrapper)
-                    res, _ = do_call(wrapper, *args, __should_raise=True, **kwargs)
-                    return await res
+                    return await do_call(wrapper, *args, __should_raise=True, **kwargs)[
+                        0
+                    ]
             else:
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
                     # wrapper = cast(Op, wrapper)
-                    res, _ = do_call(wrapper, *args, __should_raise=True, **kwargs)
-                    return res
+                    return do_call(wrapper, *args, __should_raise=True, **kwargs)[0]
 
             # Tack these helpers on to our wrapper
             wrapper.resolve_fn = func  # type: ignore

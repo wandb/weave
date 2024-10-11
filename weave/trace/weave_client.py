@@ -244,6 +244,13 @@ class Call:
             raise ValueError("Can't get URL for call without ID")
         return urls.redirect_call(entity, project, self.id)
 
+    @property
+    def ref(self) -> CallRef:
+        entity, project = self.project_id.split("/")
+        if not self.id:
+            raise ValueError("Can't get ref for call without ID")
+        return CallRef(entity, project, self.id)
+
     # These are the children if we're using Call at read-time
     def children(self) -> "CallsIter":
         client = weave_client_context.require_weave_client()
