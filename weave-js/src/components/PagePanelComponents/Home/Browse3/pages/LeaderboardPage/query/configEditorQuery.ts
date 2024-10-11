@@ -1,21 +1,30 @@
 /**
- * This file is not performant yet.
+ * This file implements a memoized version of getLeaderboardGroupableData for improved performance.
  */
 
-import {ObjectRef} from '@wandb/weave/react';
 import _ from 'lodash';
 
-import {parseRefMaybe} from '../../../../Browse2/SmallRef';
 import {TraceServerClient} from '../../wfReactInterface/traceServerClient';
 import {projectIdFromParts} from '../../wfReactInterface/tsDataModelHooks';
 import {FilterAndGroupSpec} from '../types/leaderboardConfigType';
-import {
-  getEvaluationObjectsForSpec,
-  getLeaderboardData,
-  getLeaderboardGroupableData,
-} from './leaderboardQuery';
+import {getLeaderboardGroupableData} from './leaderboardQuery';
 
 export type VersionDetails = {digest: string; index: number};
+
+const memoedGetLeaderboardGroupableData = _.memoize(
+  async (
+    client: TraceServerClient,
+    entity: string,
+    project: string,
+    spec: FilterAndGroupSpec = {}
+  ) => {
+    return getLeaderboardGroupableData(client, entity, project, spec);
+  },
+  (client, entity, project, spec) => {
+    // Create a cache key based on the function arguments
+    return JSON.stringify({entity, project, spec});
+  }
+);
 
 export const fetchEvaluationNames = async (
   client: TraceServerClient,
@@ -68,7 +77,7 @@ export const fetchDatasetNamesForSpec = async (
   spec: FilterAndGroupSpec
 ): Promise<string[]> => {
   // This is def a hacky/slow solution, just getting it working.
-  const groupableData = await getLeaderboardGroupableData(
+  const groupableData = await memoedGetLeaderboardGroupableData(
     client,
     entity,
     project,
@@ -83,7 +92,7 @@ export const fetchDatasetVersionsForSpecAndName = async (
   spec: FilterAndGroupSpec,
   name: string
 ): Promise<VersionDetails[]> => {
-  const groupableData = await getLeaderboardGroupableData(
+  const groupableData = await memoedGetLeaderboardGroupableData(
     client,
     entity,
     project,
@@ -97,34 +106,82 @@ export const fetchDatasetVersionsForSpecAndName = async (
 };
 
 export const fetchModelNamesForSpec = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
   spec: FilterAndGroupSpec
 ): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(['M1', 'M2', 'M3']);
+  // This is def a hacky/slow solution, just getting it working.
+  const groupableData = await memoedGetLeaderboardGroupableData(
+    client,
+    entity,
+    project,
+    spec
+  );
+  return _.uniq(groupableData.map(g => g.row.modelName));
 };
 export const fetchModelVersionsForSpecAndName = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
   spec: FilterAndGroupSpec,
   name: string
-): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(['MV1', 'MV2', 'MV3']);
+): Promise<VersionDetails[]> => {
+  // This is def a hacky/slow solution, just getting it working.
+  const groupableData = await memoedGetLeaderboardGroupableData(
+    client,
+    entity,
+    project,
+    spec
+  );
+  return _.uniqBy(
+    groupableData.map(g => ({digest: g.row.modelVersion, index: -1})),
+    o => `${o.digest}-${o.index}`
+  );
 };
 export const fetchScorerNamesForSpec = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
   spec: FilterAndGroupSpec
 ): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(['S1', 'S2', 'S3']);
+  const groupableData = await memoedGetLeaderboardGroupableData(
+    client,
+    entity,
+    project,
+    spec
+  );
+  return _.uniq(groupableData.map(g => g.row.scorerName));
 };
 export const fetchScorerVersionsForSpecAndName = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
   spec: FilterAndGroupSpec,
   name: string
-): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(['SV1', 'SV2', 'SV3']);
+): Promise<VersionDetails[]> => {
+  const groupableData = await memoedGetLeaderboardGroupableData(
+    client,
+    entity,
+    project,
+    spec
+  );
+  return _.uniqBy(
+    groupableData.map(g => ({digest: g.row.scorerVersion, index: -1})),
+    o => `${o.digest}-${o.index}`
+  );
 };
 export const fetchMetricPathsForSpec = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
   spec: FilterAndGroupSpec
 ): Promise<string[]> => {
-  // TODO
-  return Promise.resolve(['MP1', 'MP2', 'MP3']);
+  const groupableData = await memoedGetLeaderboardGroupableData(
+    client,
+    entity,
+    project,
+    spec
+  );
+  return _.uniq(groupableData.map(g => g.row.metricPath));
 };

@@ -151,6 +151,7 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
           <LeaderboardGrid
             entity={entity}
             project={project}
+            config={currentConfig.config.dataSelectionSpec}
             loading={loading}
             data={data}
             onCellClick={handleCellClick}

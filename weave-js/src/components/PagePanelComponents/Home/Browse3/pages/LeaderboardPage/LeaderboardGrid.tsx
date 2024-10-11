@@ -21,10 +21,12 @@ import {
   GroupedLeaderboardModelGroup,
   LeaderboardValueRecord,
 } from './query/leaderboardQuery';
+import {FilterAndGroupSpec} from './types/leaderboardConfigType';
 
 interface LeaderboardGridProps {
   entity: string;
   project: string;
+  config: FilterAndGroupSpec;
   data: GroupedLeaderboardData;
   loading: boolean;
   onCellClick: (record: LeaderboardValueRecord) => void;
@@ -39,6 +41,7 @@ type RowData = {
 export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   entity,
   project,
+  config,
   data,
   loading,
   onCellClick,
@@ -47,16 +50,22 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 
   const getColorForScore = useCallback(
     (datasetGroup, scorerGroup, metricPathGroup, score) => {
+      const shouldMinimize = !!config.datasets
+        ?.find(d => d.name === datasetGroup)
+        ?.scorers?.find(s => s.name === scorerGroup)
+        ?.metrics?.find(m => m.path === metricPathGroup)?.shouldMinimize;
       if (score == null) {
         return 'transparent';
       }
       const {min, max} =
         columnStats.datasetGroups[datasetGroup].scorerGroups[scorerGroup]
           .metricPathGroups[metricPathGroup];
-      const normalizedScore = (score - min) / (max - min);
+      const normalizedScore = shouldMinimize
+        ? (max - score) / (max - min)
+        : (score - min) / (max - min);
       return `hsl(${120 * normalizedScore}, 70%, 85%)`;
     },
-    [columnStats.datasetGroups]
+    [columnStats.datasetGroups, config.datasets]
   );
 
   const rows: RowData[] = useMemo(() => {

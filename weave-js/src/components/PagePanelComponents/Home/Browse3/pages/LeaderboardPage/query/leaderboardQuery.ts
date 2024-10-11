@@ -396,11 +396,7 @@ export const getLeaderboardGroupableData = async (
             (scorer.version === ALL_VALUE ||
               scorer.version === row.scorerVersion)
         );
-      console.log({
-        scorerSpec,
-        dss: datasetSpec.scorers,
-        row,
-      });
+
       if (!scorerSpec) {
         return {include: false, groupableRow};
       }

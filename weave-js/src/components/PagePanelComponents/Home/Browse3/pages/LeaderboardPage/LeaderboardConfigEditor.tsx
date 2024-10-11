@@ -167,7 +167,17 @@ const ConfigEditor: React.FC<{
         datasets={config.datasets}
         updateConfig={updateConfig}
       />
-      <ModelsConfig models={config.models} updateConfig={updateConfig} />
+      <ModelsConfig
+        entity={entity}
+        project={project}
+        parentSpec={{
+          sourceEvaluations: config.sourceEvaluations,
+          datasets: config.datasets,
+          // Purposely exclude models
+        }}
+        models={config.models}
+        updateConfig={updateConfig}
+      />
     </>
   );
 };
@@ -381,7 +391,7 @@ const SourceEvaluationItem: React.FC<{
           <MenuItem value={ALL_VALUE}>All</MenuItem>
           {versions.map(version => (
             <MenuItem key={version.digest} value={version.digest}>
-              v{version.index} ({version.digest.slice(0, 6)})
+              <VersionItem version={version} />
             </MenuItem>
           ))}
         </Select>
@@ -439,7 +449,7 @@ const DatasetsConfig: React.FC<{
             datasets: [
               {
                 name: dataset.name,
-                version: '*',
+                version: ALL_VALUE,
               },
             ],
           }}
@@ -489,8 +499,18 @@ const DatasetItem: React.FC<{
         dataset.name
       ).then(setVersions);
     }
-    fetchScorerNamesForSpec(parentSpec).then(setScorerNames);
-  }, [dataset.name, entity, getTraceServerClient, project, parentSpec]);
+    fetchScorerNamesForSpec(getTraceServerClient(), entity, project, {
+      ...parentSpec,
+      datasets: [dataset],
+    }).then(setScorerNames);
+  }, [
+    dataset.name,
+    entity,
+    getTraceServerClient,
+    project,
+    parentSpec,
+    dataset,
+  ]);
 
   const handleNameChange = (event: SelectChangeEvent<string>) => {
     const newName = event.target.value as string;
@@ -576,7 +596,7 @@ const DatasetItem: React.FC<{
             <MenuItem value={ALL_VALUE}>All</MenuItem>
             {versions.map(version => (
               <MenuItem key={version.digest} value={version.digest}>
-                v{version.index} ({version.digest.slice(0, 6)})
+                <VersionItem version={version} />
               </MenuItem>
             ))}
           </Select>
@@ -598,6 +618,19 @@ const DatasetItem: React.FC<{
       {dataset.scorers?.map((scorer, scorerIndex) => (
         <ScorerItem
           key={scorerIndex}
+          entity={entity}
+          project={project}
+          parentSpec={{
+            sourceEvaluations: parentSpec.sourceEvaluations,
+            datasets: [
+              {
+                ...(parentSpec.datasets?.[0] ?? {
+                  name: ALL_VALUE,
+                  version: ALL_VALUE,
+                }),
+              },
+            ],
+          }}
           scorer={scorer}
           scorerNames={scorerNames}
           updateConfig={updateConfig}
@@ -613,6 +646,9 @@ const DatasetItem: React.FC<{
 };
 
 const ScorerItem: React.FC<{
+  entity: string;
+  project: string;
+  parentSpec: FilterAndGroupSpec;
   scorer: FilterAndGroupDatasetScorerSpec;
   scorerNames: string[];
   updateConfig: (
@@ -620,16 +656,43 @@ const ScorerItem: React.FC<{
   ) => void;
   datasetIndex: number;
   scorerIndex: number;
-}> = ({scorer, scorerNames, updateConfig, datasetIndex, scorerIndex}) => {
-  const [versions, setVersions] = useState<string[]>([]);
+}> = ({
+  entity,
+  project,
+  parentSpec,
+  scorer,
+  scorerNames,
+  updateConfig,
+  datasetIndex,
+  scorerIndex,
+}) => {
+  const getTraceServerClient = useGetTraceServerClientContext();
+  const [versions, setVersions] = useState<VersionDetails[]>([]);
   const [metricPaths, setMetricPaths] = useState<string[]>([]);
 
   useEffect(() => {
     if (scorer.name && scorer.name !== ALL_VALUE) {
-      fetchScorerVersionsForSpecAndName({}, scorer.name).then(setVersions);
+      fetchScorerVersionsForSpecAndName(
+        getTraceServerClient(),
+        entity,
+        project,
+        parentSpec,
+        scorer.name
+      ).then(setVersions);
     }
-    fetchMetricPathsForSpec({}).then(setMetricPaths);
-  }, [scorer.name]);
+    fetchMetricPathsForSpec(getTraceServerClient(), entity, project, {
+      ...parentSpec,
+      datasets: [
+        {
+          ...(parentSpec.datasets?.[0] ?? {
+            name: ALL_VALUE,
+            version: ALL_VALUE,
+          }),
+          scorers: [scorer],
+        },
+      ],
+    }).then(setMetricPaths);
+  }, [entity, getTraceServerClient, parentSpec, project, scorer, scorer.name]);
 
   const handleNameChange = (event: SelectChangeEvent<string>) => {
     const newName = event.target.value as string;
@@ -748,8 +811,8 @@ const ScorerItem: React.FC<{
             disabled={scorer.name === ALL_VALUE}>
             <MenuItem value={ALL_VALUE}>All</MenuItem>
             {versions.map(version => (
-              <MenuItem key={version} value={version}>
-                {version}
+              <MenuItem key={version.digest} value={version.digest}>
+                <VersionItem version={version} />
               </MenuItem>
             ))}
           </Select>
@@ -906,16 +969,25 @@ const MetricItem: React.FC<{
 };
 
 const ModelsConfig: React.FC<{
+  entity: string;
+  project: string;
+  parentSpec: FilterAndGroupSpec;
   models: FilterAndGroupDatasetSpec[] | undefined;
   updateConfig: (
     updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
   ) => void;
-}> = ({models, updateConfig}) => {
+}> = ({entity, project, parentSpec, models, updateConfig}) => {
+  const getTraceServerClient = useGetTraceServerClientContext();
   const [modelNames, setModelNames] = useState<string[]>([]);
 
   useEffect(() => {
-    fetchModelNamesForSpec({}).then(setModelNames);
-  }, []);
+    fetchModelNamesForSpec(
+      getTraceServerClient(),
+      entity,
+      project,
+      parentSpec
+    ).then(setModelNames);
+  }, [entity, project, getTraceServerClient, parentSpec]);
 
   const handleAddModel = () => {
     updateConfig(spec => ({
@@ -935,6 +1007,18 @@ const ModelsConfig: React.FC<{
       {models?.map((model, index) => (
         <ModelItem
           key={index}
+          entity={entity}
+          project={project}
+          parentSpec={{
+            sourceEvaluations: parentSpec.sourceEvaluations,
+            datasets: parentSpec.datasets,
+            models: [
+              {
+                name: model.name,
+                version: ALL_VALUE,
+              },
+            ],
+          }}
           model={model}
           modelNames={modelNames}
           updateConfig={updateConfig}
@@ -949,20 +1033,39 @@ const ModelsConfig: React.FC<{
 };
 
 const ModelItem: React.FC<{
+  entity: string;
+  project: string;
+  parentSpec: FilterAndGroupSpec;
   model: FilterAndGroupDatasetSpec;
   modelNames: string[];
   updateConfig: (
     updater: (spec: FilterAndGroupSpec) => FilterAndGroupSpec
   ) => void;
   index: number;
-}> = ({model, modelNames, updateConfig, index}) => {
-  const [versions, setVersions] = useState<string[]>([]);
+}> = ({
+  entity,
+  project,
+  parentSpec,
+  model,
+  modelNames,
+  updateConfig,
+  index,
+}) => {
+  const getTraceServerClient = useGetTraceServerClientContext();
+
+  const [versions, setVersions] = useState<VersionDetails[]>([]);
 
   useEffect(() => {
     if (model.name && model.name !== ALL_VALUE) {
-      fetchModelVersionsForSpecAndName({}, model.name).then(setVersions);
+      fetchModelVersionsForSpecAndName(
+        getTraceServerClient(),
+        entity,
+        project,
+        parentSpec,
+        model.name
+      ).then(setVersions);
     }
-  }, [model.name]);
+  }, [model.name, entity, project, getTraceServerClient, parentSpec]);
 
   const handleNameChange = (event: SelectChangeEvent<string>) => {
     const newName = event.target.value as string;
@@ -1025,8 +1128,8 @@ const ModelItem: React.FC<{
             disabled={model.name === ALL_VALUE}>
             <MenuItem value={ALL_VALUE}>All</MenuItem>
             {versions.map(version => (
-              <MenuItem key={version} value={version}>
-                {version}
+              <MenuItem key={version.digest} value={version.digest}>
+                <VersionItem version={version} />
               </MenuItem>
             ))}
           </Select>
@@ -1045,5 +1148,15 @@ const ModelItem: React.FC<{
         label="Group All Versions"
       />
     </Box>
+  );
+};
+
+const VersionItem: React.FC<{
+  version: VersionDetails;
+}> = ({version}) => {
+  return (
+    <div>
+      v{version.index} ({version.digest.slice(0, 6)})
+    </div>
   );
 };
