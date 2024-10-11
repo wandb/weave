@@ -1,5 +1,6 @@
-import { op } from '../op';
 import { weaveImage } from '../media';
+import { op } from '../op';
+import { OpOptions } from '../opType';
 
 const openAIStreamReducer = {
   initialState: {
@@ -64,70 +65,64 @@ const openAIStreamReducer = {
 };
 
 export function makeOpenAIChatCompletionsOp(originalCreate: any, name: string) {
-  return op(
-    function (...args: Parameters<typeof originalCreate>) {
-      const [originalParams]: any[] = args;
-      const params = { ...originalParams }; // Create a shallow copy of the params
-
-      if (params.stream) {
-        // Always include usage for internal tracking
-        params.stream_options = {
-          ...params.stream_options,
-          include_usage: true,
-        };
-
-        return originalCreate(params);
-      } else {
-        const result = originalCreate(originalParams);
-        // console.log("result", result, result._thenUnwrap);
-        return result;
-        // return originalCreate(originalParams);
-      }
-    },
-    {
-      name: name,
-      parameterNames: 'useParam0Object',
-      summarize: result => ({
-        usage: {
-          [result.model]: result.usage,
-        },
-      }),
-      streamReducer: openAIStreamReducer,
+  function wrapped(...args: Parameters<typeof originalCreate>) {
+    const [originalParams]: any[] = args;
+    if (originalParams.stream) {
+      return originalCreate({
+        ...originalParams,
+        stream_options: { ...originalParams.stream_options, include_usage: true },
+      });
     }
-  );
+
+    return originalCreate(originalParams);
+  }
+
+  const options: OpOptions<typeof wrapped> = {
+    name: name,
+    parameterNames: 'useParam0Object',
+    summarize: result => ({
+      usage: {
+        [result.model]: result.usage,
+      },
+    }),
+    streamReducer: openAIStreamReducer,
+  };
+
+  return op(wrapped, options);
 }
 
 export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
-  return op(
-    async function (...args: Parameters<typeof originalGenerate>) {
-      const result = await originalGenerate(...args);
+  async function wrapped(...args: Parameters<typeof originalGenerate>) {
+    const result = await originalGenerate(...args);
 
-      // Process the result to convert image data to WeaveImage
-      if (result.data) {
-        result.data = await Promise.all(
-          result.data.map(async (item: any) => {
-            if (item.b64_json) {
-              const buffer = Buffer.from(item.b64_json, 'base64');
-              return weaveImage({ data: buffer, imageType: 'png' });
-            }
-            return item;
-          })
-        );
-      }
-
-      return result;
-    },
-    {
-      name: 'openai.images.generate',
-      summarize: result => ({
-        usage: {
-          'dall-e': {
-            images_generated: result.data.length,
-          },
-        },
-      }),
+    // Process the result to convert image data to WeaveImage
+    if (result.data) {
+      result.data = await Promise.all(
+        result.data.map(async (item: any) => {
+          if (item.b64_json) {
+            const buffer = Buffer.from(item.b64_json, 'base64');
+            return weaveImage({ data: buffer, imageType: 'png' });
+          }
+          return item;
+        })
+      );
     }
-  );
+
+    return result;
+  }
+
+  const options: OpOptions<typeof wrapped> = {
+    name: 'openai.images.generate',
+    summarize: result => ({
+      usage: {
+        'dall-e': {
+          images_generated: result.data.length,
+        },
+      },
+    }),
+  };
+
+  return op(wrapped, options);
 }
 
 interface OpenAIAPI {
