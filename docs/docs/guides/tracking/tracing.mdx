@@ -100,7 +100,7 @@ instance = MyClass()
 print(instance.my_method("World"))
 ```
 
-Sometimes it is useful to get a handle on the `Call` object itself. You can do this by calling the `op.call` method, which returns both the result and the `Call` object. For example:
+Sometimes it is useful to get a handle to the `Call` object itself. You can do this by calling the `op.call` method, which returns both the result and the `Call` object. For example:
 
 ```python showLineNumbers
 result, call = my_function.call("World")
@@ -113,20 +113,8 @@ If your op is a method on a class, you need to pass the instance as the first ar
 :::
 
 ```python showLineNumbers
-import weave
-
-# Initialize Weave Tracing
-weave.init("intro-example")
-
-class MyClass:
-    # Decorate your method
-    @weave.op
-    def my_method(self, name: str):
-        return f"Hello, {name}!"
-
-instance = MyClass()
-
-# Call your method -- Weave will automatically track inputs and outputs
+# Notice that we pass the `instance` as the first argument.
+# highlight-next-line
 print(instance.my_method.call(instance, "World"))
 ```
 
