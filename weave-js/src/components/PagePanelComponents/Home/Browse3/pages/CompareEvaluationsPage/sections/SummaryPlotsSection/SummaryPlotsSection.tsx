@@ -1,15 +1,6 @@
 import {Box} from '@material-ui/core';
-import {Popover} from '@mui/material';
-import {Switch} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
-import {
-  DraggableGrow,
-  DraggableHandle,
-} from '@wandb/weave/components/DraggablePopups';
-import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {maybePluralize} from '@wandb/weave/core/util/string';
-import classNames from 'classnames';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
@@ -27,6 +18,7 @@ import {
   resolveSummaryMetricValueForEvaluateCall,
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
+import {MetricsSelector} from './MetricsSelector';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 
@@ -40,8 +32,8 @@ export const SummaryPlots: React.FC<{
   const {radarData, allMetricNames} = useNormalizedPlotDataFromMetrics(state);
   const {selectedMetrics} = state;
 
+  // Initialize selectedMetrics if null
   useEffect(() => {
-    // If selectedMetrics is null, we should show all metrics
     if (selectedMetrics == null) {
       setSelectedMetrics(
         Object.fromEntries(Array.from(allMetricNames).map(m => [m, true]))
@@ -130,146 +122,6 @@ const SectionHeader: React.FC<{
   </HorizontalBox>
 );
 
-const useFilteredData = (
-  radarData: RadarPlotData,
-  selectedMetrics: Record<string, boolean> | undefined
-) =>
-  useMemo(() => {
-    const data: RadarPlotData = {};
-    for (const [callId, metricBin] of Object.entries(radarData)) {
-      const metrics: {[metric: string]: number} = {};
-      for (const [metric, value] of Object.entries(metricBin.metrics)) {
-        if (selectedMetrics?.[metric]) {
-          metrics[metric] = value;
-        }
-      }
-      if (Object.keys(metrics).length > 0) {
-        data[callId] = {
-          metrics,
-          name: metricBin.name,
-          color: metricBin.color,
-        };
-      }
-    }
-    return data;
-  }, [radarData, selectedMetrics]);
-
-const useBarPlotData = (filteredData: RadarPlotData) =>
-  useMemo(() => {
-    const metrics: {
-      [metric: string]: {
-        callIds: string[];
-        values: number[];
-        name: string;
-        colors: string[];
-      };
-    } = {};
-    for (const [callId, metricBin] of Object.entries(filteredData)) {
-      for (const [metric, value] of Object.entries(metricBin.metrics)) {
-        if (!metrics[metric]) {
-          metrics[metric] = {callIds: [], values: [], name: metric, colors: []};
-        }
-        metrics[metric].callIds.push(callId);
-        metrics[metric].values.push(value);
-        metrics[metric].colors.push(metricBin.color);
-      }
-    }
-
-    return Object.entries(metrics).map(([metric, metricBin]) => {
-      const maxY = Math.max(...metricBin.values) * 1.1;
-      const minY = Math.min(...metricBin.values, 0);
-      const plotlyData: Plotly.Data = {
-        type: 'bar',
-        y: metricBin.values,
-        x: metricBin.callIds,
-        text: metricBin.values.map(value => value.toFixed(3)),
-        textposition: 'outside',
-        textfont: {size: 14, color: 'black'},
-        name: metric,
-        marker: {color: metricBin.colors},
-      };
-      return {plotlyData, yRange: [minY, maxY] as [number, number]};
-    });
-  }, [filteredData]);
-
-const useContainerDimensions = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const [isInitialRender, setIsInitialRender] = useState(true);
-  const [currentPage, setCurrentPage] = useState(0);
-
-  useEffect(() => {
-    const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth);
-      }
-    };
-
-    updateWidth();
-    setIsInitialRender(false);
-
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
-  }, []);
-
-  const plotsPerPage = useMemo(() => {
-    return Math.max(1, Math.floor(containerWidth / PLOT_HEIGHT));
-  }, [containerWidth]);
-
-  return {
-    containerRef,
-    isInitialRender,
-    plotsPerPage,
-    currentPage,
-    setCurrentPage,
-  };
-};
-
-const usePaginatedPlots = (
-  filteredData: RadarPlotData,
-  barPlotData: Array<{plotlyData: Plotly.Data; yRange: [number, number]}>,
-  plotsPerPage: number,
-  currentPage: number
-) => {
-  const radarPlotWidth = 2;
-  const totalBarPlots = barPlotData.length;
-  const totalPlotWidth = radarPlotWidth + totalBarPlots;
-  const totalPages = Math.ceil(totalPlotWidth / plotsPerPage);
-
-  const plotsToShow = useMemo(() => {
-    if (currentPage === 0) {
-      const availableSpace = plotsPerPage - radarPlotWidth;
-      return [
-        <RadarPlotBox key="radar" data={filteredData} />,
-        ...barPlotData
-          .slice(0, availableSpace)
-          .map((plot, index) => (
-            <BarPlotBox key={`bar-${index}`} plot={plot} />
-          )),
-      ];
-    } else {
-      const startIdx =
-        (currentPage - 1) * plotsPerPage + (plotsPerPage - radarPlotWidth);
-      const endIdx = startIdx + plotsPerPage;
-      return barPlotData
-        .slice(startIdx, endIdx)
-        .map((plot, index) => (
-          <BarPlotBox key={`bar-${startIdx + index}`} plot={plot} />
-        ));
-    }
-  }, [currentPage, plotsPerPage, filteredData, barPlotData]);
-
-  const totalPlots = barPlotData.length + 1; // +1 for the radar plot
-  const startIndex =
-    currentPage === 0 ? 1 : Math.min(plotsPerPage + 1, totalPlots);
-  const endIndex =
-    currentPage === 0
-      ? Math.min(plotsToShow.length, totalPlots)
-      : Math.min(startIndex + plotsToShow.length - 1, totalPlots);
-
-  return {plotsToShow, totalPlots, startIndex, endIndex, totalPages};
-};
-
 const RadarPlotBox: React.FC<{data: RadarPlotData}> = ({data}) => (
   <Box
     sx={{
@@ -292,6 +144,7 @@ const BarPlotBox: React.FC<{
       width: PLOT_HEIGHT,
       borderRadius: BOX_RADIUS,
       border: STANDARD_BORDER,
+      // make a bit more space for the title
       paddingTop: PLOT_PADDING - 10,
       paddingBottom: PLOT_PADDING,
       paddingLeft: PLOT_PADDING,
@@ -354,165 +207,150 @@ const PaginationControls: React.FC<{
   </HorizontalBox>
 );
 
-const MetricsSelector: React.FC<{
-  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
-  selectedMetrics: Record<string, boolean> | undefined;
-  allMetrics: string[];
-}> = ({setSelectedMetrics, selectedMetrics, allMetrics}) => {
-  const [search, setSearch] = useState('');
+const useFilteredData = (
+  radarData: RadarPlotData,
+  selectedMetrics: Record<string, boolean> | undefined
+) =>
+  useMemo(() => {
+    const data: RadarPlotData = {};
+    for (const [callId, metricBin] of Object.entries(radarData)) {
+      const metrics: {[metric: string]: number} = {};
+      for (const [metric, value] of Object.entries(metricBin.metrics)) {
+        if (selectedMetrics?.[metric]) {
+          metrics[metric] = value;
+        }
+      }
+      if (Object.keys(metrics).length > 0) {
+        data[callId] = {
+          metrics,
+          name: metricBin.name,
+          color: metricBin.color,
+        };
+      }
+    }
+    return data;
+  }, [radarData, selectedMetrics]);
 
-  const ref = useRef<HTMLDivElement>(null);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const onClick = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(anchorEl ? null : ref.current);
-    setSearch('');
+const useBarPlotData = (filteredData: RadarPlotData) =>
+  useMemo(() => {
+    const metrics: {
+      [metric: string]: {
+        callIds: string[];
+        values: number[];
+        name: string;
+        colors: string[];
+      };
+    } = {};
+
+    // Reorganize data by metric instead of by call
+    for (const [callId, metricBin] of Object.entries(filteredData)) {
+      for (const [metric, value] of Object.entries(metricBin.metrics)) {
+        if (!metrics[metric]) {
+          metrics[metric] = {callIds: [], values: [], name: metric, colors: []};
+        }
+        metrics[metric].callIds.push(callId);
+        metrics[metric].values.push(value);
+        metrics[metric].colors.push(metricBin.color);
+      }
+    }
+
+    // Convert metrics object to Plotly data format
+    return Object.entries(metrics).map(([metric, metricBin]) => {
+      const maxY = Math.max(...metricBin.values) * 1.1;
+      const minY = Math.min(...metricBin.values, 0);
+      const plotlyData: Plotly.Data = {
+        type: 'bar',
+        y: metricBin.values,
+        x: metricBin.callIds,
+        text: metricBin.values.map(value => value.toFixed(3)),
+        textposition: 'outside',
+        textfont: {size: 14, color: 'black'},
+        name: metric,
+        marker: {color: metricBin.colors},
+      };
+      return {plotlyData, yRange: [minY, maxY] as [number, number]};
+    });
+  }, [filteredData]);
+
+const useContainerDimensions = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [isInitialRender, setIsInitialRender] = useState(true);
+  const [currentPage, setCurrentPage] = useState(0);
+
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+
+    updateWidth();
+    setIsInitialRender(false);
+
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
+
+  const plotsPerPage = useMemo(() => {
+    return Math.max(1, Math.floor(containerWidth / PLOT_HEIGHT));
+  }, [containerWidth]);
+
+  return {
+    containerRef,
+    isInitialRender,
+    plotsPerPage,
+    currentPage,
+    setCurrentPage,
   };
-  const open = Boolean(anchorEl);
-  const id = open ? 'simple-popper' : undefined;
+};
 
-  const filteredCols = search
-    ? allMetrics.filter(col => col.toLowerCase().includes(search.toLowerCase()))
-    : allMetrics;
+const usePaginatedPlots = (
+  filteredData: RadarPlotData,
+  barPlotData: Array<{plotlyData: Plotly.Data; yRange: [number, number]}>,
+  plotsPerPage: number,
+  currentPage: number
+) => {
+  const radarPlotWidth = 2;
+  const totalBarPlots = barPlotData.length;
+  const totalPlotWidth = radarPlotWidth + totalBarPlots;
+  const totalPages = Math.ceil(totalPlotWidth / plotsPerPage);
 
-  const shownMetrics = Object.values(selectedMetrics ?? {}).filter(Boolean);
+  const plotsToShow = useMemo(() => {
+    // First page always shows radar plot
+    if (currentPage === 0) {
+      const availableSpace = plotsPerPage - radarPlotWidth;
+      return [
+        <RadarPlotBox key="radar" data={filteredData} />,
+        ...barPlotData
+          .slice(0, availableSpace)
+          .map((plot, index) => (
+            <BarPlotBox key={`bar-${index}`} plot={plot} />
+          )),
+      ];
+    } else {
+      // Subsequent pages show only bar plots
+      const startIdx =
+        (currentPage - 1) * plotsPerPage + (plotsPerPage - radarPlotWidth);
+      const endIdx = startIdx + plotsPerPage;
+      return barPlotData
+        .slice(startIdx, endIdx)
+        .map((plot, index) => (
+          <BarPlotBox key={`bar-${startIdx + index}`} plot={plot} />
+        ));
+    }
+  }, [currentPage, plotsPerPage, filteredData, barPlotData]);
 
-  const numHidden = allMetrics.length - shownMetrics.length;
-  const buttonSuffix = search ? `(${filteredCols.length})` : 'all';
+  // Calculate pagination details
+  const totalPlots = barPlotData.length + 1; // +1 for the radar plot
+  const startIndex =
+    currentPage === 0 ? 1 : Math.min(plotsPerPage + 1, totalPlots);
+  const endIndex =
+    currentPage === 0
+      ? Math.min(plotsToShow.length, totalPlots)
+      : Math.min(startIndex + plotsToShow.length - 1, totalPlots);
 
-  return (
-    <>
-      <span ref={ref}>
-        <Button
-          variant="ghost"
-          icon="column"
-          tooltip="Manage metrics"
-          onClick={onClick}
-        />
-      </span>
-      <Popover
-        id={id}
-        open={open}
-        anchorEl={anchorEl}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'center',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'center',
-        }}
-        slotProps={{
-          paper: {
-            sx: {
-              overflow: 'visible',
-            },
-          },
-        }}
-        onClose={() => setAnchorEl(null)}
-        TransitionComponent={DraggableGrow}>
-        <Tailwind>
-          <div className="min-w-[360px] p-12">
-            <DraggableHandle>
-              <div className="flex items-center pb-8">
-                <div className="flex-auto text-xl font-semibold">
-                  Manage metrics
-                </div>
-                <div className="ml-16 text-moon-500">
-                  {maybePluralize(numHidden, 'hidden column', 's')}
-                </div>
-              </div>
-            </DraggableHandle>
-            <div className="mb-8">
-              <TextField
-                placeholder="Filter columns"
-                autoFocus
-                value={search}
-                onChange={setSearch}
-              />
-            </div>
-            <div className="max-h-[300px] overflow-auto">
-              {Array.from(allMetrics).map((metric: string) => {
-                const value = metric;
-                const idSwitch = `toggle-vis_${value}`;
-                const checked = selectedMetrics?.[metric] ?? false;
-                const label = metric;
-                const disabled = false;
-                if (
-                  search &&
-                  !label.toLowerCase().includes(search.toLowerCase())
-                ) {
-                  return null;
-                }
-                return (
-                  <div key={value}>
-                    <div
-                      className={classNames(
-                        'flex items-center py-2',
-                        disabled ? 'opacity-40' : ''
-                      )}>
-                      <Switch.Root
-                        id={idSwitch}
-                        size="small"
-                        checked={checked}
-                        onCheckedChange={isOn => {
-                          setSelectedMetrics(
-                            isOn
-                              ? {...selectedMetrics, [metric]: true}
-                              : {...selectedMetrics, [metric]: false}
-                          );
-                        }}
-                        disabled={disabled}>
-                        <Switch.Thumb size="small" checked={checked} />
-                      </Switch.Root>
-                      <label
-                        htmlFor={idSwitch}
-                        className={classNames(
-                          'ml-6',
-                          disabled ? '' : 'cursor-pointer'
-                        )}>
-                        {label}
-                      </label>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-8 flex items-center">
-              <Button
-                size="small"
-                variant="quiet"
-                icon="hide-hidden"
-                disabled={filteredCols.length === 0}
-                onClick={() => {
-                  const newModel = {...selectedMetrics};
-                  for (const metric of filteredCols) {
-                    newModel[metric] = false;
-                  }
-                  setSelectedMetrics(newModel);
-                }}>
-                {`Hide ${buttonSuffix}`}
-              </Button>
-              <div className="flex-auto" />
-              <Button
-                size="small"
-                variant="quiet"
-                icon="show-visible"
-                disabled={filteredCols.length === 0}
-                onClick={() => {
-                  const newModel = {...selectedMetrics};
-                  for (const metric of filteredCols) {
-                    newModel[metric] = true;
-                  }
-                  setSelectedMetrics(newModel);
-                }}>
-                {`Show ${buttonSuffix}`}
-              </Button>
-            </div>
-          </div>
-        </Tailwind>
-      </Popover>
-    </>
-  );
+  return {plotsToShow, totalPlots, startIndex, endIndex, totalPages};
 };
 
 const normalizeValues = (values: Array<number | undefined>): number[] => {
