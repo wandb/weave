@@ -12,9 +12,10 @@ import pydantic
 from requests import HTTPError
 
 from weave import version
-from weave.trace import call_context, trace_sentry, urls
-from weave.trace.client_context import weave_client as weave_client_context
+from weave.trace import trace_sentry, urls
 from weave.trace.concurrent.futures import FutureExecutor
+from weave.trace.context import call_context
+from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.object_record import (
