@@ -8,7 +8,7 @@ from weave.flow.scorer.llm_scorer import (
 from weave.flow.scorer.similarity_score import EmbeddingSimilarityScorer
 from weave.flow.scorer.moderation_scorer import OpenAIModerationScorer
 from weave.flow.scorer.pydantic_scorer import PydanticScorer
-from weave.flow.scorer.ragas import (
+from weave.flow.scorer.ragas_scorer import (
     ContextEntityRecallScorer,
     ContextRelevancyScorer,
 )
