@@ -60,37 +60,3 @@ class HallucinationScorer(InstructorLLMScorer):
             max_tokens=self.max_tokens,
         )
         return response
-
-
-if __name__ == "__main__":
-    try:
-        import asyncio
-        import os
-
-        import openai
-
-        import weave
-
-        # weave.init("hallucination-scorer-2")
-
-        openai_client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        scorer = HallucinationScorer(
-            client=openai_client, column_map={"text": "context"}
-        )
-
-        output = "John favorite cheese is camembert"
-        dataset_row = {"text": "John doesn't like cheese"}
-        response = scorer.score(output, context=dataset_row)
-        print(response)
-
-        @weave.op
-        def model():
-            return "John favorite food is apples"
-
-        dataset = [{"text": "John doesn't like cheese"}, {"text": "John likes pizza"}]
-
-        evaluation = weave.Evaluation(dataset=dataset, scorers=[scorer])
-        asyncio.run(evaluation.evaluate(model))
-
-    except Exception as e:
-        print(e)

@@ -15,22 +15,3 @@ def stringify(output: Any) -> str:
         return output.model_dump_json(indent=2)
     else:
         raise ValueError(f"Unsupported model output type: {type(output)}")
-
-
-if __name__ == "__main__":
-    # test
-    output = "hey"
-    print(stringify(output))
-
-    output = [1, 2, 3]
-    print(stringify(output))
-
-    output = {"a": 1, "b": 2}
-    print(stringify(output))
-
-    class TestModel(BaseModel):
-        a: int
-        b: str
-
-    output = TestModel(a=1, b="test")
-    print(stringify(output))

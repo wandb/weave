@@ -10,12 +10,12 @@ from weave.flow.scorer.base_scorer import Scorer
 class StringMatchScorer(Scorer):
     """Scorer that checks if the model output string is found in the search columns of the dataset row."""
 
-    def score(self, output: str, target: str) -> dict:
+    def score(self, output: str, target: str) -> dict:  # type: ignore
         string_in_input = output.lower() in target.lower()
         return {"string_in_input": string_in_input}
 
 
-class RegexScorer(Scorer):
+class RegexScorer(Scorer):  # type: ignore
     patterns: Union[str, list[str]] = Field(
         default_factory=list, description="The patterns or keywords to match"
     )
@@ -49,7 +49,8 @@ class RegexScorer(Scorer):
 
         text_to_search = output.get("output") if output else ""
         if self.ignore_whitespace:
-            text_to_search = "".join(text_to_search.split())
+            if text_to_search:
+                text_to_search = "".join(text_to_search.split())
 
         match_found = any(
             pattern.search(text_to_search) for pattern in compiled_patterns
@@ -64,7 +65,7 @@ class LevenshteinScorer(Scorer):
     )
 
     @model_validator(mode="after")
-    def check_levenshtein(self):
+    def check_levenshtein(self):  # type: ignore
         try:
             from Levenshtein import distance
 
@@ -78,29 +79,3 @@ class LevenshteinScorer(Scorer):
     def score(self, output: str, target: str) -> dict:
         distance = self.distance(output, target)
         return {"levenshtein_distance": distance}
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    match_scorer = StringMatchScorer(column_map={"target": "col1"})
-    levenshtein_scorer = LevenshteinScorer(column_map={"target": "col2"})
-
-    @weave.op
-    def f(col1, col2):
-        return "Hello"
-
-    dataset = [
-        {
-            "col1": "Hello my name is Morgan",
-            "col2": "I am an engineer",
-            "target": "Morgan",
-        },
-        {"col1": "Hello my name is John", "col2": "I am a doctor", "target": "John"},
-    ]
-
-    evaluation = weave.Evaluation(
-        dataset=dataset, scorers=[match_scorer, levenshtein_scorer]
-    )
-
-    eval_out = asyncio.run(evaluation.evaluate(f))

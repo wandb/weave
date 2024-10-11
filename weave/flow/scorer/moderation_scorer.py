@@ -10,7 +10,7 @@ class OpenAIModerationScorer(LLMScorer):
     """Use OpenAI moderation API to check if the model output is safe"""
 
     @field_validator("client")
-    def validate_openai_client(cls, v):
+    def validate_openai_client(cls, v):  # type: ignore
         try:
             from openai import (  # Ensure these are the correct imports
                 AsyncOpenAI,
@@ -31,17 +31,3 @@ class OpenAIModerationScorer(LLMScorer):
         ).results[0]
         categories = {k: v for k, v in response.categories.dict().items() if v}
         return {"flagged": response.flagged, "categories": categories}
-
-
-if __name__ == "__main__":
-    try:
-        import openai
-
-        client = openai.OpenAI()
-        scorer = OpenAIModerationScorer(
-            client=client, model_id="omni-moderation-latest"
-        )
-        print(scorer.score("I should kill someone"))
-    except Exception as e:
-        print("Error:", e)
-        raise e

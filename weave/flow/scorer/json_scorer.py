@@ -7,7 +7,7 @@ from weave.flow.scorer.base_scorer import Scorer
 class JSONScorer(Scorer):
     """Score a JSON string."""
 
-    def score(self, output: Any) -> Any:
+    def score(self, output: Any, **kwargs: Any) -> dict:  # type: ignore
         try:
             result = json.loads(output)
 
@@ -17,12 +17,3 @@ class JSONScorer(Scorer):
         except json.JSONDecodeError:
             pass
         return {"json_valid": False}
-
-
-if __name__ == "__main__":
-    scorer = JSONScorer()
-    print(
-        scorer.score(
-            '{"city": "San Francisco", "country": "USA", "column2": "Santiago"}'
-        )
-    )

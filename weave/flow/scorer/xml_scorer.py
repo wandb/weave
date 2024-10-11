@@ -7,7 +7,7 @@ from weave.flow.scorer.base_scorer import Scorer
 class XMLScorer(Scorer):
     """Score an XML string."""
 
-    def score(self, output: Union[str, dict]) -> dict:
+    def score(self, output: Union[str, dict]) -> dict:  # type: ignore
         if isinstance(output, dict):
             xml_string = output.get("output", "")
         else:
@@ -18,15 +18,3 @@ class XMLScorer(Scorer):
             return {"xml_valid": True}
         except ET.ParseError:
             return {"xml_valid": False}
-
-
-if __name__ == "__main__":
-    scorer = XMLScorer()
-    print(
-        scorer.score(
-            """<xml>
-        <city>San Francisco</city>
-        <country>USA</country>
-    </xml>"""
-        )
-    )

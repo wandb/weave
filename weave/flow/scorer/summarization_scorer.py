@@ -1,5 +1,5 @@
 from textwrap import dedent
-from typing import List
+from typing import Any, List
 
 from pydantic import BaseModel, Field
 
@@ -42,59 +42,13 @@ class SummarizationScorer(InstructorLLMScorer):
         return entities
 
     @weave.op
-    def score(self, input: str, output: str, **kwargs) -> float:
+    def score(self, input: str, output: str, **kwargs: Any) -> dict:
         # Extract entities
         output_entities = self.extract_entities(output)
         input_entities = self.extract_entities(input)
         # Calculate recall
         if not output_entities:
-            return 0.0
+            return {"recall": 0.0}
         matches = set(output_entities) & set(input_entities)
         recall = len(matches) / len(input_entities)
         return {"recall": recall}
-
-
-if __name__ == "__main__":
-    import asyncio
-    import os
-
-    try:
-        from weave.flow.scorer.llm_utils import import_client
-
-        # Instantiate your LLM client
-        OpenAIClient = import_client("openai")
-        if OpenAIClient:
-            llm_client = OpenAIClient(api_key=os.environ["OPENAI_API_KEY"])
-        else:
-            raise ImportError("OpenAI client not available")
-
-        # Instantiate scorers
-        summarization_scorer = SummarizationScorer(
-            client=llm_client, model_id="gpt-4o", column_map={"text": "input"}
-        )
-
-        @weave.op
-        def f(summary: str):
-            return summary
-
-        # Create your dataset of examples
-        examples = [
-            {
-                "text": "Harry Potter is a wizard. He is friends with Ron Weasley. They all go to Hogwarts to learn magic. They have been doing this for years. Their enemy is Voldemort, a dark wizard who is trying to kill them.",
-                "summary": "Harry Potter, Ron Weasley, and Voldemort are wizards.",
-                "relevancy_score": 1,
-            },
-        ]
-        evaluation = weave.Evaluation(dataset=examples, scorers=[summarization_scorer])
-        asyncio.run(evaluation.evaluate(f))
-
-        # good naming:
-        def summarization_scorer2(text: str, output: str):
-            scorer = SummarizationScorer(client=llm_client, model_id="gpt-4o")
-            return scorer.score(input=text, output=output)
-
-        evaluation = weave.Evaluation(dataset=examples, scorers=[summarization_scorer2])
-        asyncio.run(evaluation.evaluate(f))
-
-    except Exception as e:
-        print(f"Error: {e}")

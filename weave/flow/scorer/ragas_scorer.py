@@ -43,12 +43,12 @@ class ContextEntityRecallScorer(InstructorLLMScorer):
         return entities
 
     @weave.op
-    def score(self, output: str, context: str) -> float:
+    def score(self, output: str, context: str) -> dict:
         expected_entities = self.extract_entities(output)
         context_entities = self.extract_entities(context)
         # Calculate recall
         if not expected_entities:
-            return 0.0
+            return {"recall": 0.0}
         matches = set(expected_entities) & set(context_entities)
         recall = len(matches) / len(expected_entities)
         return {"recall": recall}
@@ -77,7 +77,7 @@ class ContextRelevancyScorer(InstructorLLMScorer):
     """)
 
     @weave.op
-    def score(self, output: str, context: str) -> float:
+    def score(self, output: str, context: str) -> dict:
         prompt = self.relevancy_prompt.format(question=output, context=context)
         response = create(
             self.client,
@@ -86,50 +86,3 @@ class ContextRelevancyScorer(InstructorLLMScorer):
             model=self.model_id,
         )
         return {"relevancy_score": response.relevancy_score}
-
-
-if __name__ == "__main__":
-    import os
-
-    try:
-        from weave.flow.scorer.llm_utils import import_client
-
-        # Instantiate your LLM client
-        OpenAIClient = import_client("openai")
-        if OpenAIClient:
-            llm_client = OpenAIClient(api_key=os.environ["OPENAI_API_KEY"])
-        else:
-            raise ImportError("OpenAI client not available")
-
-        # Instantiate scorers
-        context_entity_recall_scorer = ContextEntityRecallScorer(
-            client=llm_client,
-            model_id="gpt-4o",
-        )
-        context_relevancy_scorer = ContextRelevancyScorer(
-            client=llm_client,
-            model_id="gpt-4o",
-        )
-        # Create your dataset of examples
-        examples = [
-            {
-                "question": "What is the capital of France?",
-                "expected": "Paris",
-                "context": "Paris is the capital of France.",
-            },
-            {
-                "question": "Who wrote 'To Kill a Mockingbird'?",
-                "expected": "Harper Lee",
-                "context": "Harper Lee is the author of 'To Kill a Mockingbird'.",
-            },
-            # Add more examples as needed
-        ]
-
-        for example in examples:
-            output = {"answer": example["expected"]}  # Simulate model output
-            score = context_entity_recall_scorer.score(output, example)
-            print(f"Context Entity Recall Score: {score}")
-            score = context_relevancy_scorer.score(output, example)
-            print(f"Context Relevancy Score: {score}")
-    except Exception as e:
-        print(e)

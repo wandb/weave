@@ -42,35 +42,13 @@ class EmbeddingSimilarityScorer(LLMScorer):
         embeddings = embed(self.client, self.model_id, [output, target])
         return embeddings[0], embeddings[1]
 
-    def cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
+    def cosine_similarity(self, vec1: list[float], vec2: list[float]) -> dict:
         """Compute the cosine similarity between two vectors."""
-        vec1 = np.array(vec1)
-        vec2 = np.array(vec2)
-        cosine_sim = np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+        arr1 = np.array(vec1)
+        arr2 = np.array(vec2)
+        cosine_sim = np.dot(arr1, arr2) / (np.linalg.norm(arr1) * np.linalg.norm(arr2))
         # TODO: check if this can be negative
 
         # cast to float
         score = float(cosine_sim)
         return {"similarity_score": score, "is_similar": score >= self.threshold}
-
-
-if __name__ == "__main__":
-    try:
-        import os
-
-        import openai
-
-        client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-        scorer = EmbeddingSimilarityScorer(
-            client=client, model_id="text-embedding-3-small", target_column="text"
-        )
-
-        dataset_row = {"text": "Whales are mammals that live in the ocean."}
-        print(
-            scorer.score(
-                output="Dolphins are animals that live in the sea.",
-                dataset_row=dataset_row,
-            )
-        )
-    except Exception as e:
-        print("Error running script:", e)
