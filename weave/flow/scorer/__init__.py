@@ -1,5 +1,5 @@
 from weave.flow.scorer.base_scorer import Scorer, auto_summarize, get_scorer_attributes
-from weave.flow.scorer.classification import MultiTaskBinaryClassificationF1, transpose
+from weave.flow.scorer.classification_scorer import MultiTaskBinaryClassificationF1, transpose
 from weave.flow.scorer.hallucination_scorer import HallucinationScorer
 from weave.flow.scorer.json_scorer import JSONScorer
 from weave.flow.scorer.llm_scorer import (
@@ -12,7 +12,7 @@ from weave.flow.scorer.ragas_scorer import (
     ContextEntityRecallScorer,
     ContextRelevancyScorer,
 )
-from weave.flow.scorer.regex_scorer import RegexScorer
+from weave.flow.scorer.string_scorer import RegexScorer
 
 __all__ = [
     "Scorer",
