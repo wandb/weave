@@ -1,7 +1,7 @@
 import re
 from typing import Union, List, Any
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 import weave
 from weave.flow.scorer.base_scorer import Scorer
@@ -58,6 +58,19 @@ class RegexScorer(Scorer):
 
         return {"string_match": match_found}
 
+
+class LevenshteinScorer(Scorer):
+    @model_validator(mode='after')
+    def check_levenshtein(self):
+        try:
+            from Levenshtein import distance
+        except ImportError:
+            raise ValueError("Levenshtein package not found. Please install it with `pip install Levenshtein`")
+
+    @weave.op
+    def score(self, model_output: str, target: str) -> dict:
+        distance = distance(model_output, target)
+        return {"levenshtein_distance": distance}
 
 
 if __name__ == "__main__":
