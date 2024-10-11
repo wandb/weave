@@ -212,7 +212,6 @@ class Evaluation(Object):
                 )
 
             if isinstance(example, dict):
-                score_args = {k: v for k, v in example.items() if k in score_arg_names}
                 # If we get a column_map from the scorer, it means that the scorer expects the input to have different names than the dataset columns
                 # So we need to remap the input names to the expected names in the scorer
                 # For instance, if the scorer expects "input" and "target" and we have a dataset with columns "question" and "expected"
@@ -220,9 +219,10 @@ class Evaluation(Object):
                 # and pass those to the scorer
                 # input: is the full row, we have access to it via example
                 # output: is the model output, we have access to it via model_output
-
-                if scorer.column_map is not None:
-                    score_args = {scorer.column_map[k]: v for k, v in score_args.items()}
+                if scorer.column_map is None:
+                    score_args = {k: v for k, v in example.items() if k in score_arg_names}
+                else:
+                    score_args = {scorer.column_map[k]: v for k, v in example.items() if k in score_arg_names}
             else:
                 if len(score_arg_names) == 2:
                     score_args = {score_arg_names[0]: example}
@@ -230,7 +230,7 @@ class Evaluation(Object):
                     raise ValueError(
                         f"{score_fn} expects arguments: {score_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
                     )
-            score_args["model_output"] = model_output
+            score_args["output"] = model_output
 
             try:
                 result = await async_call(score_fn, **score_args)
@@ -244,7 +244,7 @@ class Evaluation(Object):
                     for param in score_signature.parameters.values()
                     if param.default == inspect.Parameter.empty
                 ]
-                required_arg_names.remove("model_output")
+                required_arg_names.remove("output")
 
                 message = textwrap.dedent(
                     f"""
@@ -259,7 +259,7 @@ class Evaluation(Object):
             scores[scorer_name] = result
 
         return {
-            "model_output": model_output,
+            "output": model_output,
             "scores": scores,
             "model_latency": model_latency,
         }
@@ -302,7 +302,7 @@ class Evaluation(Object):
             except Exception as e:
                 print("Predict and score failed")
                 traceback.print_exc()
-                return {"model_output": None, "scores": {}}
+                return {"output": None, "scores": {}}
             return eval_row
 
         n_complete = 0
@@ -320,7 +320,7 @@ class Evaluation(Object):
             #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
             # )
             if eval_row is None:
-                eval_row = {"model_output": None, "scores": {}}
+                eval_row = {"output": None, "scores": {}}
             else:
                 eval_row["scores"] = eval_row.get("scores", {})
             for scorer in self.scorers or []:
