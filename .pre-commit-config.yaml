@@ -1,0 +1,32 @@
+default_stages: [pre-push]
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.8
+    hooks:
+      # Run the linter.
+      - id: ruff
+        types_or: [python, pyi, jupyter]
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^sdks/python/
+      # Run the formatter.
+      - id: ruff-format
+        types_or: [python, pyi, jupyter]
+        files: ^sdks/python/
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: "v1.10.0"
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          [types-pkg-resources==0.1.3, types-all, wandb>=0.15.5]
+        args: ["--config-file=sdks/python/pyproject.toml"]
+        exclude: (.*pyi$)|(tests)
+        files: ^sdks/python/
+  # This is legacy Weave when we were building a notebook product - should be removed
+  - repo: local
+    hooks:
+      - id: jupyter-nb-clear-output
+        name: jupyter-nb-clear-output
+        files: ^examples/.*\.ipynb$
+        language: system
+        entry: jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace
