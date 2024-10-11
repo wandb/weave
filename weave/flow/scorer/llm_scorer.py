@@ -1,16 +1,10 @@
-import json
-from typing import Any, Type
+from typing import Any
 
-import numpy as np
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 
 from weave.flow.scorer.base_scorer import Scorer
-from weave.flow.scorer.llm_utils import embed, instructor_client, OPENAI_DEFAULT_MODEL, _LLM_CLIENT_TYPES
+from weave.flow.scorer.llm_utils import instructor_client, _LLM_CLIENT_TYPES
 
-try:
-    from openai import AsyncOpenAI, OpenAI
-except:
-    pass
 class LLMScorer(Scorer):
     """Score a model output using an LLM"""
 

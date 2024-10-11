@@ -4,7 +4,7 @@ from textwrap import dedent
 
 import weave
 from weave.flow.scorer.llm_scorer import InstructorLLMScorer
-from weave.flow.scorer.llm_utils import instructor_client
+from weave.flow.scorer.llm_utils import create
 
 
 class EntityExtractionResponse(BaseModel):
@@ -28,7 +28,8 @@ class SummarizationScorer(InstructorLLMScorer):
     def extract_entities(self, text: str) -> List[str]:
         # Use LLM to extract entities
         prompt = self.extraction_prompt.format(text=text)
-        response = self.client.chat.completions.create(
+        response = create(
+            self.client,
             messages=[{"role": "user", "content": prompt}],
             response_model=EntityExtractionResponse,
             model=self.model_id,

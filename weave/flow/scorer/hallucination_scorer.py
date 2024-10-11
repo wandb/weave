@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 import weave
 from weave.flow.scorer.utils import stringify
 from weave.flow.scorer.llm_scorer import InstructorLLMScorer
-from weave.flow.scorer.llm_utils import OPENAI_DEFAULT_MODEL
+from weave.flow.scorer.llm_utils import OPENAI_DEFAULT_MODEL, create
 
 
 DEFAULT_SYSTEM_PROMPT =  """You are tasked with auditing AI agents. Your role is to evaluate conversations, ensuring that the agent's responses are plausible, factually accurate, and non-controversial based on the user's input. If the agent chooses to decline providing an answer, this should be regarded as a valid response."""
@@ -41,7 +41,8 @@ class HallucinationScorer(InstructorLLMScorer):
     def score(self, output: str, context: str) -> HallucinationResponse:
 
         output = stringify(output)
-        response = self.client.chat.completions.create(
+        response = create(
+            self.client,
             messages=[
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": self.user_prompt.format(input_data=context, output=output)},

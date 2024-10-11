@@ -54,6 +54,9 @@ def instructor_client(client: _LLM_CLIENTS):
         return instructor.from_anthropic(client)
     else:
         raise ValueError(f"Unsupported client type: {client_type}")
+    
+def create(client: _LLM_CLIENTS, *args, **kwargs):
+    return client.chat.completions.create(*args, **kwargs)
 
 def embed(client: _LLM_CLIENTS, model_id: str, texts: Union[str, List[str]], **kwargs) -> List[List[float]]:
     client_type = type(client).__name__.lower()

@@ -5,14 +5,13 @@ from pydantic import BaseModel, Field
 from textwrap import dedent
 
 import weave
-from weave.flow.scorer.llm_utils import instructor_client
-from weave.flow.scorer.llm_scorer import LLMScorer
-from weave.flow.scorer.similarity_score import EmbeddingSimilarityScorer
+from weave.flow.scorer.llm_utils import instructor_client, create
+from weave.flow.scorer.llm_scorer import InstructorLLMScorer
 
 class EntityExtractionResponse(BaseModel):
     entities: List[str] = Field(description="A list of unique entities extracted from the text")
 
-class ContextEntityRecallScorer(LLMScorer):
+class ContextEntityRecallScorer(InstructorLLMScorer):
     """
     Estimates context recall by extracting entities from the model output 
     and the context, then computes the recall.
@@ -27,9 +26,9 @@ class ContextEntityRecallScorer(LLMScorer):
     
     def extract_entities(self, text: str) -> List[str]:
         # Use LLM to extract entities
-        client = instructor_client(self.client)
         prompt = self.extraction_prompt.format(text=text)
-        response = client.chat.completions.create(
+        response = create(
+            self.client,
             messages=[{"role": "user", "content": prompt}],
             response_model=EntityExtractionResponse,
             model=self.model_id
@@ -52,7 +51,7 @@ class ContextEntityRecallScorer(LLMScorer):
 class RelevancyResponse(BaseModel):
     reasoning: str = Field(description="Think step by step about whether the context is relevant to the question")
     relevancy_score: int = Field(ge=0, le=1, description="The relevancy score of the context to the question (0 for not relevant, 1 for relevant)")
-class ContextRelevancyScorer(LLMScorer):
+class ContextRelevancyScorer(InstructorLLMScorer):
     """Evaluates the relevancy of the provided context to the model output."""
 
     relevancy_prompt: str = dedent("""
@@ -65,9 +64,9 @@ class ContextRelevancyScorer(LLMScorer):
 
     @weave.op
     def score(self, output: str, context: str) -> float:
-        llm = instructor_client(self.client)
         prompt = self.relevancy_prompt.format(question=output, context=context)
-        response = llm.chat.completions.create(
+        response = create(
+            self.client,
             messages=[{"role": "user", "content": prompt}],
             response_model=RelevancyResponse,
             model=self.model_id
