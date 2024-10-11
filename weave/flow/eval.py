@@ -36,15 +36,21 @@ INVALID_MODEL_ERROR = (
 )
 
 
-def async_call(func: Op, *args: Any, **kwargs: Any) -> tuple[Coroutine, Call]:
+def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutine:
     is_async = False
     if is_op(func):
         func = as_op(func)
         is_async = inspect.iscoroutinefunction(func.resolve_fn)
     else:
-        raise ValueError(f"Invalid func: {func}")
-    res, call = func.call(*args, __should_raise=True, **kwargs)
+        is_async = inspect.iscoroutinefunction(func)
     if is_async:
+        return func(*args, **kwargs)  # type: ignore
+    return asyncio.to_thread(func, *args, **kwargs)
+
+
+def call_op_force_async(func: Op, *args: Any, **kwargs: Any) -> tuple[Coroutine, Call]:
+    res, call = func.call(*args, __should_raise=True, **kwargs)
+    if inspect.iscoroutine(res):
         return res, call
     return asyncio.to_thread(lambda: res), call
 
@@ -171,15 +177,23 @@ class Evaluation(Object):
                 )
         try:
             model_start_time = time.time()
-            if model_self is not None:
-                model_predict_args = {
-                    **model_predict_args,
-                    "self": model_self,
-                }
-            awaitable_model_output, model_call = async_call(
-                model_predict, **model_predict_args
-            )
-            model_output = await awaitable_model_output
+            model_call = None
+            if is_op(model_predict):
+                # I would expect this path to always be hit, but keeping the other
+                # path for backwards compatibility / safety
+                if model_self is not None:
+                    model_predict_args = {
+                        **model_predict_args,
+                        "self": model_self,
+                    }
+                awaitable_model_output, model_call = call_op_force_async(
+                    model_predict, **model_predict_args
+                )
+                model_output = await awaitable_model_output
+            else:
+                # I would not expect this path to be hit, but keeping it for
+                # backwards compatibility / safety
+                model_output = await async_call(model_predict, **model_predict_args)
         except OpCallError as e:
             dataset_column_names = list(example.keys())
             dataset_column_names_str = ", ".join(dataset_column_names[:3])
@@ -239,16 +253,27 @@ class Evaluation(Object):
             score_args["model_output"] = model_output
 
             try:
-                if scorer_self is not None:
-                    score_args = {
-                        **score_args,
-                        "self": scorer_self,
-                    }
-                awaitable_result, score_call = async_call(score_fn, **score_args)
-                result = await awaitable_result
-                wc = get_weave_client()
-                if wc:
-                    await asyncio.to_thread(wc._link_score_call, model_call, score_call)
+                if is_op(score_fn) and model_call:
+                    # I would expect this path to always be hit, but keeping the other
+                    # path for backwards compatibility / safety
+                    if scorer_self is not None:
+                        score_args = {
+                            **score_args,
+                            "self": scorer_self,
+                        }
+                    awaitable_result, score_call = call_op_force_async(
+                        score_fn, **score_args
+                    )
+                    result = await awaitable_result
+                    wc = get_weave_client()
+                    if wc:
+                        await asyncio.to_thread(
+                            wc._link_score_call, model_call, score_call
+                        )
+                else:
+                    # I would not expect this path to be hit, but keeping it for
+                    # backwards compatibility / safety
+                    result = await async_call(score_fn, **score_args)
             except OpCallError as e:
                 dataset_column_names = list(example.keys())
                 dataset_column_names_str = ", ".join(dataset_column_names[:3])

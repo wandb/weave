@@ -484,14 +484,14 @@ def op(
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    wrapper = cast(Op, wrapper)
+                    # wrapper = cast(Op, wrapper)
                     res, _ = do_call(wrapper, *args, __should_raise=True, **kwargs)
                     return await res
             else:
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    wrapper = cast(Op, wrapper)
+                    # wrapper = cast(Op, wrapper)
                     res, _ = do_call(wrapper, *args, __should_raise=True, **kwargs)
                     return res
 
