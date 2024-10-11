@@ -7,59 +7,59 @@ import weave
 from weave.trace.weave_client import Call
 
 
-def test_non_async_non_coro(client):
+def test_sync_val(client):
     @weave.op()
-    def non_async_non_coro():
+    def sync_val():
         return 1
 
-    res = non_async_non_coro()
+    res = sync_val()
     assert res == 1
-    res, call = non_async_non_coro.call()
+    res, call = sync_val.call()
     assert isinstance(call, Call)
     assert res == 1
 
 
-def test_non_async_non_coro_method(client):
+def test_sync_val_method(client):
     class TestClass:
         @weave.op()
-        def non_async_non_coro(self):
+        def sync_val(self):
             return 1
 
     test_inst = TestClass()
-    res = test_inst.non_async_non_coro()
+    res = test_inst.sync_val()
     assert res == 1
-    res, call = test_inst.non_async_non_coro.call(test_inst)
+    res, call = test_inst.sync_val.call(test_inst)
     assert isinstance(call, Call)
     assert res == 1
 
 
 @pytest.mark.asyncio
-async def test_non_async_coro(client):
+async def test_sync_coro(client):
     @weave.op()
-    def non_async_coro():
+    def sync_coro():
         return asyncio.to_thread(lambda: 1)
 
-    res = non_async_coro()
+    res = sync_coro()
     assert isinstance(res, Coroutine)
     assert await res == 1
-    res, call = non_async_coro.call()
+    res, call = sync_coro.call()
     assert isinstance(call, Call)
     assert isinstance(res, Coroutine)
     assert await res == 1
 
 
 @pytest.mark.asyncio
-async def test_non_async_coro_method(client):
+async def test_sync_coro_method(client):
     class TestClass:
         @weave.op()
-        def non_async_coro(self):
+        def sync_coro(self):
             return asyncio.to_thread(lambda: 1)
 
     test_inst = TestClass()
-    res = test_inst.non_async_coro()
+    res = test_inst.sync_coro()
     assert isinstance(res, Coroutine)
     assert await res == 1
-    res, call = test_inst.non_async_coro.call(test_inst)
+    res, call = test_inst.sync_coro.call(test_inst)
     assert isinstance(call, Call)
     assert isinstance(res, Coroutine)
     assert await res == 1
@@ -133,58 +133,58 @@ async def test_async_awaited_coro_method(client):
 
 
 @pytest.mark.asyncio
-async def test_async_non_coro(client):
+async def test_async_val(client):
     @weave.op()
-    async def async_non_coro():
+    async def async_val():
         return 1
 
-    res = async_non_coro()
+    res = async_val()
     assert isinstance(res, Coroutine)
     assert await res == 1
-    res, call = await async_non_coro.call()
+    res, call = await async_val.call()
     assert isinstance(call, Call)
     assert res == 1
 
 
 @pytest.mark.asyncio
-async def test_async_non_coro_method(client):
+async def test_async_val_method(client):
     class TestClass:
         @weave.op()
-        async def async_non_coro(self):
+        async def async_val(self):
             return 1
 
     test_inst = TestClass()
-    res = test_inst.async_non_coro()
+    res = test_inst.async_val()
     assert isinstance(res, Coroutine)
     assert await res == 1
-    res, call = await test_inst.async_non_coro.call(test_inst)
+    res, call = await test_inst.async_val.call(test_inst)
     assert isinstance(call, Call)
     assert res == 1
 
 
-def test_non_async_with_exception(client):
+def test_sync_with_exception(client):
     @weave.op()
-    def non_async_with_exception():
+    def sync_with_exception():
         raise ValueError("test")
 
     with pytest.raises(ValueError, match="test"):
-        non_async_with_exception()
-    res, call = non_async_with_exception.call()
+        sync_with_exception()
+    res, call = sync_with_exception.call()
     assert isinstance(call, Call)
     assert call.exception is not None
     assert res == None
 
 
-def test_non_async_with_exception_method(client):
+def test_sync_with_exception_method(client):
     class TestClass:
         @weave.op()
-        def non_async_with_exception(self):
+        def sync_with_exception(self):
             raise ValueError("test")
 
     test_inst = TestClass()
     with pytest.raises(ValueError, match="test"):
-        test_inst.non_async_with_exception()
-    res, call = test_inst.non_async_with_exception.call(test_inst)
+        test_inst.sync_with_exception()
+    res, call = test_inst.sync_with_exception.call(test_inst)
     assert isinstance(call, Call)
     assert call.exception is not None
     assert res == None
