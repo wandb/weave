@@ -1,10 +1,9 @@
-import { WeaveObject, WeaveObjectParameters } from './weaveObject';
-import { Op, getOpName } from './opType';
-import { boundOp } from './op';
-import { Dataset } from './dataset';
-import { isMedia } from './media';
-import { DatasetRow } from './dataset';
 import cliProgress from 'cli-progress';
+import { Dataset, DatasetRow } from './dataset';
+import { isMedia } from './media';
+import { boundOp } from './op';
+import { Op, getOpName } from './opType';
+import { WeaveObject, WeaveObjectParameters } from './weaveObject';
 
 const PROGRESS_BAR = false;
 
