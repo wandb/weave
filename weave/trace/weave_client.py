@@ -1059,7 +1059,7 @@ class WeaveClient:
         return res.results
 
     @trace_sentry.global_trace_sentry.watch()
-    def _link_score_call(self, predict_call: Call, score_call: Call) -> Future[str]:
+    def _send_score_call(self, predict_call: Call, score_call: Call) -> Future[str]:
         """(Private) Adds a score to a call. This is particularly useful
         for adding evaluation metrics to a call.
         """
@@ -1087,6 +1087,7 @@ class WeaveClient:
             scorer_op_ref_uri=scorer_op_ref_uri,
         )
 
+    @trace_sentry.global_trace_sentry.watch()
     def _add_score(
         self,
         *,
