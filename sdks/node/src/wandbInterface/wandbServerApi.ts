@@ -1,4 +1,4 @@
-import { userAgent } from './utils/userAgent';
+import { userAgent } from '../utils/userAgent';
 
 const VIEWER_DEFAULT_ENTITY_QUERY = `
 query DefaultEntity {

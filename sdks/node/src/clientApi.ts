@@ -3,7 +3,7 @@ import { InMemoryTraceServer } from './inMemoryTraceServer';
 import { createFetchWithRetry } from './retry';
 import { getApiKey } from './settings';
 import { ConcurrencyLimiter } from './utils/concurrencyLimit';
-import { WandbServerApi } from './wandbServerApi';
+import { WandbServerApi } from './wandbInterface/wandbServerApi';
 import { CallStackEntry, WeaveClient } from './weaveClient';
 
 // Global client instance

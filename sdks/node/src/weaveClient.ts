@@ -11,7 +11,7 @@ import { isWeaveImage } from './media';
 import { Op, OpRef, ParameterNamesOption, getOpName, getOpWrappedFunction, isOp } from './opType';
 import { Table, TableRef, TableRowRef } from './table';
 import { packageVersion } from './utils/userAgent';
-import { WandbServerApi } from './wandbServerApi';
+import { WandbServerApi } from './wandbInterface/wandbServerApi';
 import { ObjectRef, WeaveObject, getClassChain } from './weaveObject';
 
 export type CallStackEntry = {
