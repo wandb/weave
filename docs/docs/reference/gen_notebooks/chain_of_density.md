@@ -13,7 +13,6 @@ title: Chain of Density Summarization
 
 
 
-<img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 <!--- @wandbcode{cod-notebook} -->
 
 # Summarization using Chain of Density
