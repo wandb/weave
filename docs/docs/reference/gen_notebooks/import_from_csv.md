@@ -13,7 +13,6 @@ title: Log Calls from Existing CSV
 
 
 
-<img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 <!--- @wandbcode{prompt-optim-notebook} -->
 
 # Import Traces from 3rd Party Systems

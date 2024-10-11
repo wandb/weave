@@ -13,7 +13,6 @@ title: Handling and Redacting PII
 
 
 
-<img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 <!--- @wandbcode{cod-notebook} -->
 
 # How to use Weave with PII data:

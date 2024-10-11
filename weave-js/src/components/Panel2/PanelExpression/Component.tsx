@@ -88,7 +88,12 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
                         <PanelContextProvider newVars={newVars}>
                           <WeaveExpression
                             expr={refinedExpression}
-                            setExpression={updateExp}
+                            setExpression={expr => {
+                              updateExp(expr);
+                              recordEvent('SET_EXP', {
+                                exprString: weave.expToString(expr),
+                              });
+                            }}
                             noBox
                             onMount={onMount}
                           />
