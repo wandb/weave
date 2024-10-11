@@ -1,7 +1,7 @@
 .PHONY: docs build
 
 setup-docs-ci:
-	pip install -e . playwright
+	pip install -e . playwright lazydocs
 	playwright install
 
 	cd docs && \
