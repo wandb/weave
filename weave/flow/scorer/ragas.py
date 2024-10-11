@@ -160,14 +160,17 @@ class AnswerCorrectnessScorer(LLMScorer):
 
 if __name__ == "__main__":
     import os
-    import weave
+
+
     try:
         from weave.flow.scorer.lightllm import import_client
 
         # Instantiate your LLM client
         OpenAIClient = import_client("openai")
         if OpenAIClient:
-            llm_client = OpenAIClient(api_key=os.environ["OPENAI_API_KEY"])  # Replace with your API key
+            llm_client = OpenAIClient(
+                api_key=os.environ["OPENAI_API_KEY"]
+            )  # Replace with your API key
         else:
             raise ImportError("OpenAI client not available")
 
@@ -175,8 +178,12 @@ if __name__ == "__main__":
         context_entity_recall_scorer = ContextEntityRecallScorer(
             client=llm_client, model="gpt-4o"
         )
-        context_relevancy_scorer = ContextRelevancyScorer(client=llm_client, model="gpt-4")
-        context_precision_scorer = ContextPrecisionScorer(client=llm_client, model="gpt-4")
+        context_relevancy_scorer = ContextRelevancyScorer(
+            client=llm_client, model="gpt-4"
+        )
+        context_precision_scorer = ContextPrecisionScorer(
+            client=llm_client, model="gpt-4"
+        )
         faithfulness_scorer = FaithfulnessScorer(client=llm_client, model="gpt-4")
         answer_similarity_scorer = AnswerSimilarityScorer(
             client=llm_client, model="text-embedding-ada-002"
@@ -187,8 +194,16 @@ if __name__ == "__main__":
 
         # Create your dataset of examples
         examples = [
-            {"question": "What is the capital of France?", "expected": "Paris", "context": "Paris is the capital of France."},
-            {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee", "context": "Harper Lee is the author of 'To Kill a Mockingbird'."},
+            {
+                "question": "What is the capital of France?",
+                "expected": "Paris",
+                "context": "Paris is the capital of France.",
+            },
+            {
+                "question": "Who wrote 'To Kill a Mockingbird'?",
+                "expected": "Harper Lee",
+                "context": "Harper Lee is the author of 'To Kill a Mockingbird'.",
+            },
             # Add more examples as needed
         ]
 
@@ -205,17 +220,32 @@ if __name__ == "__main__":
             model_output = {"answer": example["expected"]}  # Simulate model output
             for scorer in scorers:
                 if isinstance(scorer, ContextEntityRecallScorer):
-                    score = scorer.score(model_output, example["expected"], example["context"])
+                    score = scorer.score(
+                        model_output, example["expected"], example["context"]
+                    )
                 elif isinstance(scorer, ContextRelevancyScorer):
-                    score = scorer.score(model_output, example["question"], example["context"])
+                    score = scorer.score(
+                        model_output, example["question"], example["context"]
+                    )
                 elif isinstance(scorer, ContextPrecisionScorer):
-                    score = scorer.score(model_output, example["question"], example["expected"], example["context"])
+                    score = scorer.score(
+                        model_output,
+                        example["question"],
+                        example["expected"],
+                        example["context"],
+                    )
                 elif isinstance(scorer, FaithfulnessScorer):
-                    score = scorer.score(model_output, example["expected"], example["context"])
+                    score = scorer.score(
+                        model_output, example["expected"], example["context"]
+                    )
                 elif isinstance(scorer, AnswerSimilarityScorer):
                     score = scorer.score(model_output, example["expected"])
                 elif isinstance(scorer, AnswerCorrectnessScorer):
-                    score = scorer.score(model_output, example["question"], example["expected"])
-                print(f"{scorer.__class__.__name__} score for '{example['question']}': {score}")
+                    score = scorer.score(
+                        model_output, example["question"], example["expected"]
+                    )
+                print(
+                    f"{scorer.__class__.__name__} score for '{example['question']}': {score}"
+                )
     except Exception as e:
         print(e)

@@ -1,12 +1,13 @@
-from pydantic import BaseModel, ValidationError
 from typing import Any, Type
+
+from pydantic import BaseModel, ValidationError
 
 from weave.flow.scorer.base_scorer import Scorer
 
+
 class PydanticScorer(Scorer):
-    """
-    Validate the model output against a pydantic model.
-    """
+    """Validate the model output against a pydantic model."""
+
     model: Type[BaseModel]
 
     def score(self, model_output: Any):
@@ -33,7 +34,7 @@ if __name__ == "__main__":
 
     scorer = PydanticScorer(model=User)
 
-    model_output = "{\"name\": \"John\", \"age\": 30}"
+    model_output = '{"name": "John", "age": 30}'
     print(scorer.score(model_output))
 
     model_output = {"name": "John", "age": 30}

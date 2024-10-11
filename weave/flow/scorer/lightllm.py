@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Union, Any
-
+from typing import Any, Dict, List, Union
 
 OPENAI_DEFAULT_MODEL = "gpt-4o"
 OPENAI_DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
@@ -14,24 +13,28 @@ MISTRAL_DEFAULT_EMBEDDING_MODEL = "mistral-embed"
 _LLM_CLIENT_TYPES = []
 
 try:
-    from openai import OpenAI, AsyncOpenAI
+    from openai import AsyncOpenAI, OpenAI
+
     _LLM_CLIENT_TYPES.append(OpenAI)
     _LLM_CLIENT_TYPES.append(AsyncOpenAI)
 except:
-    pass    
+    pass
 try:
     from anthropic import Anthropic, AsyncAnthropic
+
     _LLM_CLIENT_TYPES.append(Anthropic)
     _LLM_CLIENT_TYPES.append(AsyncAnthropic)
 except:
-    pass    
+    pass
 try:
     from mistralai import Mistral
+
     _LLM_CLIENT_TYPES.append(Mistral)
 except:
-    pass    
+    pass
 
 _LLM_CLIENTS = Union[tuple(_LLM_CLIENT_TYPES)]
+
 
 class BaseLLM(ABC):
     def __init__(self, client: Any, model_id: str):
@@ -54,13 +57,18 @@ class BaseLLM(ABC):
     async def aembed(self, texts: Union[str, List[str]], **kwargs) -> List[List[float]]:
         pass
 
+
 class MistralLLM(BaseLLM):
     def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        response = self.client.chat.complete(model=self.model_id, messages=messages, **kwargs)
+        response = self.client.chat.complete(
+            model=self.model_id, messages=messages, **kwargs
+        )
         return response.choices[0].message.content
 
     async def achat(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        response = await self.client.chat.complete(model=self.model_id, messages=messages, **kwargs)
+        response = await self.client.chat.complete(
+            model=self.model_id, messages=messages, **kwargs
+        )
         return response.choices[0].message.content
 
     def embed(self, texts: Union[str, List[str]], **kwargs) -> List[List[float]]:
@@ -72,16 +80,23 @@ class MistralLLM(BaseLLM):
     async def aembed(self, texts: Union[str, List[str]], **kwargs) -> List[List[float]]:
         if isinstance(texts, str):
             texts = [texts]
-        response = await self.client.embeddings.create(model=self.model_id, inputs=texts)
+        response = await self.client.embeddings.create(
+            model=self.model_id, inputs=texts
+        )
         return [embedding.embedding for embedding in response.data]
+
 
 class OpenAILLM(BaseLLM):
     def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        response = self.client.chat.completions.create(model=self.model_id, messages=messages, **kwargs)
+        response = self.client.chat.completions.create(
+            model=self.model_id, messages=messages, **kwargs
+        )
         return response.choices[0].message.content
 
     async def achat(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        response = await self.client.chat.completions.create(model=self.model_id, messages=messages, **kwargs)
+        response = await self.client.chat.completions.create(
+            model=self.model_id, messages=messages, **kwargs
+        )
         return response.choices[0].message.content
 
     def embed(self, texts: Union[str, List[str]], **kwargs) -> List[List[float]]:
@@ -96,28 +111,33 @@ class OpenAILLM(BaseLLM):
         response = await self.client.embeddings.create(input=texts, model=self.model_id)
         return [data.embedding for data in response.data]
 
+
 class AnthropicLLM(BaseLLM):
     def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        system_message = next((msg['content'] for msg in messages if msg['role'] == 'system'), None)
-        user_messages = [msg for msg in messages if msg['role'] != 'system']
+        system_message = next(
+            (msg["content"] for msg in messages if msg["role"] == "system"), None
+        )
+        user_messages = [msg for msg in messages if msg["role"] != "system"]
         response = self.client.messages.create(
             model=self.model_id,
             messages=user_messages,
             system=system_message,
             max_tokens=2048,
-            **kwargs
+            **kwargs,
         )
         return response.content
 
     async def achat(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        system_message = next((msg['content'] for msg in messages if msg['role'] == 'system'), None)
-        user_messages = [msg for msg in messages if msg['role'] != 'system']
+        system_message = next(
+            (msg["content"] for msg in messages if msg["role"] == "system"), None
+        )
+        user_messages = [msg for msg in messages if msg["role"] != "system"]
         response = await self.client.messages.create(
             model=self.model_id,
             messages=user_messages,
             system=system_message,
             max_tokens=2048,
-            **kwargs
+            **kwargs,
         )
         return response.content
 
@@ -126,6 +146,7 @@ class AnthropicLLM(BaseLLM):
 
     async def aembed(self, texts: Union[str, List[str]], **kwargs) -> List[List[float]]:
         return [[0.0]]  # Anthropic doesn't support embeddings
+
 
 class LLMFactory:
     @staticmethod
@@ -140,32 +161,39 @@ class LLMFactory:
         else:
             raise ValueError(f"Unsupported client type: {client_type}")
 
+
 # Helper function for dynamic imports
 def import_client(provider: str):
     try:
         if provider == "mistral":
             from mistralai import Mistral
+
             return Mistral
         elif provider == "openai":
             from openai import OpenAI
+
             return OpenAI
         elif provider == "anthropic":
             import anthropic
+
             return anthropic.Anthropic
     except ImportError:
         return None
 
+
 # Example usage:
 if __name__ == "__main__":
-    import os
     import asyncio
+    import os
 
     # Mistral example
     MistralClient = import_client("mistral")
     if MistralClient:
         mistral_client = MistralClient(api_key=os.environ.get("MISTRAL_API_KEY"))
         mistral_llm = LLMFactory.create(mistral_client, MISTRAL_DEFAULT_MODEL)
-        mistral_response = mistral_llm.chat([{"role": "user", "content": "What is the best French cheese?"}])
+        mistral_response = mistral_llm.chat(
+            [{"role": "user", "content": "What is the best French cheese?"}]
+        )
         print("Mistral response:", mistral_response)
 
     # OpenAI example with system message
@@ -173,10 +201,18 @@ if __name__ == "__main__":
     if OpenAIClient:
         openai_client = OpenAIClient()
         openai_llm = LLMFactory.create(openai_client, OPENAI_DEFAULT_MODEL)
-        openai_response = openai_llm.chat([
-            {"role": "system", "content": "You are a helpful assistant specialized in writing poetry."},
-            {"role": "user", "content": "Write a haiku about recursion in programming."}
-        ])
+        openai_response = openai_llm.chat(
+            [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant specialized in writing poetry.",
+                },
+                {
+                    "role": "user",
+                    "content": "Write a haiku about recursion in programming.",
+                },
+            ]
+        )
         print("OpenAI response:", openai_response)
 
     # Anthropic example with system message
@@ -184,29 +220,46 @@ if __name__ == "__main__":
     if AnthropicClient:
         anthropic_client = AnthropicClient(api_key=os.environ.get("ANTHROPIC_API_KEY"))
         anthropic_llm = LLMFactory.create(anthropic_client, ANTHROPIC_DEFAULT_MODEL)
-        anthropic_response = anthropic_llm.chat([
-            {"role": "system", "content": "You are Claude, an AI assistant created by Anthropic."},
-            {"role": "user", "content": "Hello, Claude"}
-        ])
+        anthropic_response = anthropic_llm.chat(
+            [
+                {
+                    "role": "system",
+                    "content": "You are Claude, an AI assistant created by Anthropic.",
+                },
+                {"role": "user", "content": "Hello, Claude"},
+            ]
+        )
         print("Anthropic response:", anthropic_response)
 
     # Embedding example
     if MistralClient:
         mistral_embed_client = MistralClient(api_key=os.environ.get("MISTRAL_API_KEY"))
-        mistral_embed_llm = LLMFactory.create(mistral_embed_client, MISTRAL_DEFAULT_EMBEDDING_MODEL)
-        mistral_embeddings = mistral_embed_llm.embed(["Embed this sentence.", "As well as this one."])
+        mistral_embed_llm = LLMFactory.create(
+            mistral_embed_client, MISTRAL_DEFAULT_EMBEDDING_MODEL
+        )
+        mistral_embeddings = mistral_embed_llm.embed(
+            ["Embed this sentence.", "As well as this one."]
+        )
         print("Mistral embeddings:", mistral_embeddings)
 
     # Async example with system message
     async def async_example():
         if OpenAIClient:
             from openai import AsyncOpenAI
+
             openai_async_client = AsyncOpenAI()
-            openai_async_llm = LLMFactory.create(openai_async_client, OPENAI_DEFAULT_MODEL)
-            openai_async_response = await openai_async_llm.achat([
-                {"role": "system", "content": "You are a philosopher AI assistant."},
-                {"role": "user", "content": "What's the meaning of life?"}
-            ])
+            openai_async_llm = LLMFactory.create(
+                openai_async_client, OPENAI_DEFAULT_MODEL
+            )
+            openai_async_response = await openai_async_llm.achat(
+                [
+                    {
+                        "role": "system",
+                        "content": "You are a philosopher AI assistant.",
+                    },
+                    {"role": "user", "content": "What's the meaning of life?"},
+                ]
+            )
             print("OpenAI async response:", openai_async_response)
 
     asyncio.run(async_example())
