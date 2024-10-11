@@ -70,6 +70,7 @@ async def test_async_coro(client):
     @weave.op()
     async def async_coro():
         return asyncio.to_thread(lambda: 1)
+
     res = async_coro()
     assert isinstance(res, Coroutine)
     res2 = await res

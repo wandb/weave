@@ -283,13 +283,13 @@ def _execute_call(
             # so we don't put future calls under the old call.
             call_context.pop_call(call.id)
 
-        return res
+        return res, call
 
     def handle_exception(e: Exception) -> tuple[Any, "Call"]:
         finish(exception=e)
         if __should_raise:
             raise
-        return None
+        return None, call
 
     if inspect.iscoroutinefunction(func):
 
@@ -297,20 +297,20 @@ def _execute_call(
             try:
                 res = await func(*args, **kwargs)
             except Exception as e:
-                handle_exception(e)
-                return None
+                return handle_exception(e)
             else:
                 return process(res)
 
-        return _call_async(), call
+        return _call_async()
 
     try:
         res = func(*args, **kwargs)
     except Exception as e:
         handle_exception(e)
-        return None, call
     else:
-        return process(res), call
+        return process(res)
+
+    return None, call
 
 
 def call(
