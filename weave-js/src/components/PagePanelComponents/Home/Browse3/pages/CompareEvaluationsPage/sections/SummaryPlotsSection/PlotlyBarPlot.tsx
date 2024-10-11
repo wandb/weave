@@ -43,7 +43,7 @@ export const PlotlyBarPlot: React.FC<{
         pad: {t: 0},
       },
     };
-  }, [props.height, props.plotlyData]);
+  }, [props.height, props.plotlyData, props.yRange]);
 
   const plotlyConfig = useMemo(() => {
     return {

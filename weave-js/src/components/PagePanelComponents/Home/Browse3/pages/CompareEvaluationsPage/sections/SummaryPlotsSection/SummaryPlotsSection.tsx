@@ -74,11 +74,7 @@ export const SummaryPlots: React.FC<{
     return data;
   }, [radarData, selectedMetrics]);
 
-  const plotElements = useMemo(() => {
-    const plots = [
-      <PlotlyRadarPlot key="radar" height={PLOT_HEIGHT} data={filteredData} />,
-    ];
-
+  const barPlotData = useMemo(() => {
     // transform the data to be a list of metrics for each callId
     const metrics: {
       [metric: string]: {
@@ -99,6 +95,8 @@ export const SummaryPlots: React.FC<{
       }
     }
 
+    const plotData: Array<{plotlyData: Plotly.Data; yRange: [number, number]}> =
+      [];
     for (const metric of Object.keys(metrics)) {
       const metricBin = metrics[metric];
       // add 10% buffer to display labels on top of bars
@@ -117,17 +115,10 @@ export const SummaryPlots: React.FC<{
         name: metric,
         marker: {color: metricBin.colors},
       };
-      plots.push(
-        <PlotlyBarPlot
-          key={metric}
-          height={PLOT_HEIGHT}
-          plotlyData={plotlyData}
-          yRange={[minY, maxY]}
-        />
-      );
+      plotData.push({plotlyData, yRange: [minY, maxY]});
     }
 
-    return plots;
+    return plotData;
   }, [filteredData]);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -150,12 +141,15 @@ export const SummaryPlots: React.FC<{
   }, []);
 
   const plotsPerPage = useMemo(() => {
-    const includesRadar = plotElements.some(plot => plot.key === 'radar');
-    // radar plot is twice as wide as the others
-    return Math.max(1, Math.floor((containerWidth - (includesRadar ? PLOT_HEIGHT : 0)) / (PLOT_HEIGHT + 20))); // 20px for margin
+    return Math.max(1, Math.floor(containerWidth / PLOT_HEIGHT)); // 20px for margin
   }, [containerWidth]);
   const [currentPage, setCurrentPage] = useState(0);
-  const totalPages = Math.ceil(plotElements.length / plotsPerPage);
+
+  const radarPlotWidth = 2; // Radar plot is twice as wide as a bar plot
+  const totalBarPlots = barPlotData.length;
+  const totalPlotWidth = radarPlotWidth + totalBarPlots;
+  const totalPages = Math.ceil(totalPlotWidth / plotsPerPage);
+
   const handleNextPage = () => {
     setCurrentPage(prevPage => Math.min(prevPage + 1, totalPages - 1));
   };
@@ -163,15 +157,86 @@ export const SummaryPlots: React.FC<{
     setCurrentPage(prevPage => Math.max(prevPage - 1, 0));
   };
 
-  const startIndex = currentPage * plotsPerPage;
-  const endIndex = Math.min(startIndex + plotsPerPage, plotElements.length);
-  const currentPlots = plotElements.slice(startIndex, endIndex);
+  const plotsToShow = useMemo(() => {
+    if (currentPage === 0) {
+      // First page: show radar plot and as many bar plots as will fit
+      const availableSpace = plotsPerPage - radarPlotWidth;
+      return [
+        <Box
+          key="radar"
+          sx={{
+            height: PLOT_HEIGHT,
+            width: PLOT_HEIGHT * 2,
+            borderRadius: BOX_RADIUS,
+            border: STANDARD_BORDER,
+            padding: PLOT_PADDING,
+          }}>
+          <PlotlyRadarPlot height={PLOT_HEIGHT} data={filteredData} />
+        </Box>,
+        ...barPlotData.slice(0, availableSpace).map((plot, index) => (
+          <Box
+            key={`bar-${index}`}
+            sx={{
+              height: PLOT_HEIGHT,
+              width: PLOT_HEIGHT,
+              borderRadius: BOX_RADIUS,
+              border: STANDARD_BORDER,
+              paddingTop: PLOT_PADDING - 10,
+              paddingBottom: PLOT_PADDING,
+              paddingLeft: PLOT_PADDING,
+              paddingRight: PLOT_PADDING,
+            }}>
+            <PlotlyBarPlot
+              height={PLOT_HEIGHT}
+              plotlyData={plot.plotlyData}
+              yRange={plot.yRange}
+            />
+          </Box>
+        )),
+      ];
+    } else {
+      // Subsequent pages: show only bar plots
+      const startIndex2 =
+        (currentPage - 1) * plotsPerPage + (plotsPerPage - radarPlotWidth);
+      const endIndex2 = startIndex2 + plotsPerPage;
+      return barPlotData.slice(startIndex2, endIndex2).map((plot, index) => (
+        <Box
+          key={`bar-${startIndex2 + index}`}
+          sx={{
+            height: PLOT_HEIGHT,
+            width: PLOT_HEIGHT,
+            borderRadius: BOX_RADIUS,
+            border: STANDARD_BORDER,
+            paddingTop: PLOT_PADDING - 10,
+            paddingBottom: PLOT_PADDING,
+            paddingLeft: PLOT_PADDING,
+            paddingRight: PLOT_PADDING,
+          }}>
+          <PlotlyBarPlot
+            height={PLOT_HEIGHT}
+            plotlyData={plot.plotlyData}
+            yRange={plot.yRange}
+          />
+        </Box>
+      ));
+    }
+  }, [currentPage, plotsPerPage, filteredData, barPlotData]);
+
+  const totalPlots = barPlotData.length + 1; // +1 for the radar plot
+
+  const startIndex =
+    currentPage === 0 ? 1 : Math.min(plotsPerPage + 1, totalPlots);
+
+  const endIndex =
+    currentPage === 0
+      ? Math.min(plotsToShow.length, totalPlots)
+      : Math.min(startIndex + plotsToShow.length - 1, totalPlots);
 
   // Render placeholder during initial render
   if (isInitialRender) {
     return <div ref={containerRef} style={{width: '100%', height: '400px'}} />;
   }
-  
+
   return (
     <VerticalBox
       sx={{
@@ -205,26 +270,7 @@ export const SummaryPlots: React.FC<{
         </Box>
       </HorizontalBox>
       <div ref={containerRef} style={{width: '100%'}}>
-        <HorizontalBox
-          sx={{display: 'flex'}}>
-          {currentPlots.map((plot, index) => (
-            <Box
-              key={index}
-              sx={{
-                height: PLOT_HEIGHT,
-                width: plot.key === 'radar' ? PLOT_HEIGHT*2 : PLOT_HEIGHT,
-                borderRadius: BOX_RADIUS,
-                border: STANDARD_BORDER,
-                // Make room for title on top of the plot
-                paddingTop: PLOT_PADDING - 10,
-                paddingBottom: PLOT_PADDING,
-                paddingLeft: PLOT_PADDING,
-                paddingRight: PLOT_PADDING,
-              }}>
-              {plot}
-            </Box>
-          ))}
-        </HorizontalBox>
+        <HorizontalBox sx={{display: 'flex'}}>{plotsToShow}</HorizontalBox>
       </div>
       <HorizontalBox sx={{width: '100%'}}>
         <Box
@@ -244,7 +290,7 @@ export const SummaryPlots: React.FC<{
                 className="rotate-180"
               />
               <span className="mx-2 pb-2 text-sm text-moon-500">
-                {startIndex + 1}-{endIndex} of {plotElements.length}
+                {startIndex}-{endIndex} of {totalPlots}
               </span>
               <Button
                 variant="quiet"
