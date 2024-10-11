@@ -143,14 +143,12 @@ class Evaluation(Object):
             model_input = self.preprocess_model_input(example)  # type: ignore
 
         model_self = None
-        model_predict: Union[Callable, Model, Op]
-        if is_op(model):
+        model_predict: Union[Callable, Model]
+        if callable(model):
             model_predict = model
-        elif isinstance(model, Model):
+        else:
             model_self = model
             model_predict = get_infer_method(model)
-        else:
-            raise ValueError(INVALID_MODEL_ERROR)
 
         model_predict_fn_name = (
             as_op(model_predict).name
@@ -258,6 +256,7 @@ class Evaluation(Object):
                 if is_op(score_fn) and model_call:
                     # I would expect this path to always be hit, but keeping the other
                     # path for backwards compatibility / safety
+                    score_fn = as_op(score_fn)
                     if scorer_self is not None:
                         score_args = {
                             **score_args,
