@@ -7,7 +7,7 @@
   "type": "commonjs",
   "scripts": {
     "test": "jest",
-    "format": "prettier --write \"src/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\"",
     "run": "tsx"
   },
   "repository": {
