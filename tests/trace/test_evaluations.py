@@ -43,7 +43,6 @@ class MyModel(Model):
 
     @weave.op()
     def predict(self, question: str):
-        # Here's where you would add your LLM call and return the output
         return {"generated_text": "Hello, " + question + self.prompt}
 
 
@@ -56,12 +55,12 @@ async def do_quickstart():
     ]
 
     @weave.op()
-    def match_score1(expected: str, model_output: dict) -> dict:
-        return {"match": expected == model_output["generated_text"]}
+    def match_score1(expected: str, output: dict) -> dict:
+        return {"match": expected == output["generated_text"]}
 
     @weave.op()
-    def match_score2(expected: dict, model_output: dict) -> dict:
-        return {"match": expected == model_output["generated_text"]}
+    def match_score2(expected: dict, output: dict) -> dict:
+        return {"match": expected == output["generated_text"]}
 
     model = MyModel(prompt="World")
     evaluation = Evaluation(dataset=examples, scorers=[match_score1, match_score2])
@@ -177,32 +176,32 @@ class SimpleModelWithConfidence(Model):
         return {"response": res["response"], "confidence": 1 / (len(res) + 1)}
 
 
-def score_int(expected: str, model_output: dict) -> int:
+def score_int(expected: str, output: dict) -> int:
     matches = 0
-    for i in range(min(len(expected), len(model_output["response"]))):
-        if expected[i] == model_output["response"][i]:
+    for i in range(min(len(expected), len(output["response"]))):
+        if expected[i] == output["response"][i]:
             matches += 1
     return matches
 
 
-def score_float(expected: str, model_output: dict) -> float:
-    matches = score_int(expected, model_output)
-    return matches / max(len(expected), len(model_output["response"]))
+def score_float(expected: str, output: dict) -> float:
+    matches = score_int(expected, output)
+    return matches / max(len(expected), len(output["response"]))
 
 
-def score_bool(expected: str, model_output: dict) -> bool:
-    return score_float(expected, model_output) == 1.0
+def score_bool(expected: str, output: dict) -> bool:
+    return score_float(expected, output) == 1.0
 
 
-def score_dict(expected: str, model_output: dict) -> dict:
+def score_dict(expected: str, output: dict) -> dict:
     return {
-        "d_int": score_int(expected, model_output),
-        "d_float": score_float(expected, model_output),
-        "d_bool": score_bool(expected, model_output),
+        "d_int": score_int(expected, output),
+        "d_float": score_float(expected, output),
+        "d_bool": score_bool(expected, output),
         "d_nested": {
-            "d_int": score_int(expected, model_output),
-            "d_float": score_float(expected, model_output),
-            "d_bool": score_bool(expected, model_output),
+            "d_int": score_int(expected, output),
+            "d_float": score_float(expected, output),
+            "d_bool": score_bool(expected, output),
         },
         "reason": "This is a test reason",
     }
@@ -210,32 +209,32 @@ def score_dict(expected: str, model_output: dict) -> dict:
 
 class MyIntScorer(weave.Scorer):
     @weave.op()
-    def score(self, expected: str, model_output: dict) -> int:
-        return score_int(expected, model_output)
+    def score(self, expected: str, output: dict) -> int:
+        return score_int(expected, output)
 
 
 class MyFloatScorer(weave.Scorer):
     @weave.op()
-    def score(self, expected: str, model_output: dict) -> float:
-        return score_float(expected, model_output)
+    def score(self, expected: str, output: dict) -> float:
+        return score_float(expected, output)
 
 
 class MyBoolScorer(weave.Scorer):
     @weave.op()
-    def score(self, expected: str, model_output: dict) -> bool:
-        return score_bool(expected, model_output)
+    def score(self, expected: str, output: dict) -> bool:
+        return score_bool(expected, output)
 
 
 class MyDictScorer(weave.Scorer):
     @weave.op()
-    def score(self, expected: str, model_output: dict) -> dict:
-        return score_dict(expected, model_output)
+    def score(self, expected: str, output: dict) -> dict:
+        return score_dict(expected, output)
 
 
 class MyDictScorerWithCustomFloatSummary(weave.Scorer):
     @weave.op()
-    def score(self, expected: str, model_output: dict) -> dict:
-        return score_dict(expected, model_output)
+    def score(self, expected: str, output: dict) -> dict:
+        return score_dict(expected, output)
 
     @weave.op()
     def summarize(self, score_rows: list) -> Optional[dict]:
@@ -245,8 +244,8 @@ class MyDictScorerWithCustomFloatSummary(weave.Scorer):
 
 class MyDictScorerWithCustomBoolSummary(weave.Scorer):
     @weave.op()
-    def score(self, expected: str, model_output: dict) -> dict:
-        return score_dict(expected, model_output)
+    def score(self, expected: str, output: dict) -> dict:
+        return score_dict(expected, output)
 
     @weave.op()
     def summarize(self, score_rows: list) -> Optional[dict]:
@@ -256,8 +255,8 @@ class MyDictScorerWithCustomBoolSummary(weave.Scorer):
 
 class MyDictScorerWithCustomDictSummary(weave.Scorer):
     @weave.op()
-    def score(self, expected: str, model_output: dict) -> dict:
-        return score_dict(expected, model_output)
+    def score(self, expected: str, output: dict) -> dict:
+        return score_dict(expected, output)
 
     @weave.op()
     def summarize(self, score_rows: list) -> Optional[dict]:
@@ -367,7 +366,7 @@ async def test_evaluation_data_topology(client):
 
     # Prediction Section
     confidence = 1 / 4
-    model_output = {
+    output = {
         "response": "A",
         "confidence": confidence,
     }
@@ -406,7 +405,7 @@ async def test_evaluation_data_topology(client):
     }
 
     # Prediction
-    assert predict_call.output == model_output
+    assert predict_call.output == output
     assert predict_call.summary == predict_usage
 
     # Prediction Scores
@@ -429,7 +428,7 @@ async def test_evaluation_data_topology(client):
 
     # Predict And Score Group
     assert predict_and_score_call.output == {
-        "model_output": model_output,
+        "output": output,
         "scores": {
             "score_int": score_int_score,
             "score_float": score_float_score,
@@ -443,7 +442,7 @@ async def test_evaluation_data_topology(client):
     }
 
     # Summary section
-    model_output_summary = {
+    output_summary = {
         "confidence": {"mean": confidence},
     }
     score_int_auto_summary = {"mean": 1.5}
@@ -516,20 +515,20 @@ async def test_evaluation_data_topology(client):
             "MyDictScorerWithCustomBoolSummary": dict_scorer_bool_summary,
             "MyDictScorerWithCustomDictSummary": dict_scorer_dict_summary,
             "model_latency": model_latency,
-            "model_output": model_output_summary,
+            "output": output_summary,
         }
     )
     assert evaluate_call.summary == predict_usage_summary
 
 
 def make_test_eval():
-    def function_score(target: dict, model_output: dict) -> dict:
-        return {"correct": target == model_output}
+    def function_score(expected: str, output: dict) -> dict:
+        return {"correct": expected == output["generated_text"]}
 
     evaluation = weave.Evaluation(
         name="fruit_eval",
         dataset=[
-            {"id": "0", "sentence": "a", "target": "b"},
+            {"id": "0", "sentence": "a", "expected": "b"},
         ],
         scorers=[function_score],
     )
@@ -622,7 +621,7 @@ async def test_eval_is_robust_to_missing_values(client):
     def model_func(model_res) -> dict:
         return resp[model_res]
 
-    def function_score(scorer_res, model_output) -> dict:
+    def function_score(scorer_res, output) -> dict:
         return resp[scorer_res]
 
     evaluation = weave.Evaluation(
@@ -633,7 +632,7 @@ async def test_eval_is_robust_to_missing_values(client):
 
     res = await evaluation.evaluate(model_func)
     assert res == {
-        "model_output": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
+        "output": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
         "function_score": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
         "model_latency": {"mean": pytest.approx(0, abs=1)},
     }
@@ -672,7 +671,7 @@ async def test_eval_with_complex_types(client):
 
         return text
 
-    def function_score(image, dc, model, obj, text, model_output) -> bool:
+    def function_score(image, dc, model, obj, text, output) -> bool:
         assert isinstance(image, Image.Image)
 
         # Note: when we start recursively saving dataset rows, this will
@@ -685,7 +684,7 @@ async def test_eval_with_complex_types(client):
         assert isinstance(model, MyModel)
         assert isinstance(obj, MyObj)
         assert isinstance(text, str)
-        assert isinstance(model_output, str)
+        assert isinstance(output, str)
 
         return True
 
