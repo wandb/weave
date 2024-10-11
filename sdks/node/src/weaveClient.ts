@@ -2,10 +2,14 @@ import { AsyncLocalStorage } from 'async_hooks';
 import { uuidv7 } from 'uuidv7';
 
 import { computeDigest } from './digest';
+import {
+  EndedCallSchemaForInsert,
+  StartedCallSchemaForInsert,
+  Api as TraceServerApi,
+} from './generated/traceServerApi';
 import { isWeaveImage } from './media';
 import { Op, OpRef, ParameterNamesOption, getOpName, getOpWrappedFunction, isOp } from './opType';
 import { Table, TableRef, TableRowRef } from './table';
-import { EndedCallSchemaForInsert, StartedCallSchemaForInsert, Api as TraceServerApi } from './traceServerApi';
 import { packageVersion } from './utils/userAgent';
 import { WandbServerApi } from './wandbServerApi';
 import { ObjectRef, WeaveObject, getClassChain } from './weaveObject';

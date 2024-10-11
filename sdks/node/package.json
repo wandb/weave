@@ -9,7 +9,7 @@
     "test": "jest",
     "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\"",
     "run": "tsx",
-    "generate-api": "swagger-typescript-api -p ./weave.openapi.json -o ./src -n serverApi.ts",
+    "generate-api": "swagger-typescript-api -p ./weave.openapi.json -o ./src/generated -n traceServerApi.ts",
     "dev": "nodemon"
   },
   "repository": {
