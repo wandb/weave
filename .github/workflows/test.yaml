@@ -222,6 +222,7 @@ jobs:
             'mistral0',
             'mistral1',
             'openai',
+            'scorers',
           ]
       fail-fast: false
     services:
