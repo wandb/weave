@@ -8,19 +8,17 @@
     "strict": true,
     "esModuleInterop": true,
     "outDir": "./dist",
+    "paths": {
+      "weave": ["./src"]
+    }
   },
-  "exclude": [
-    "src",
-    "examples",
-    "dist",
-    "node_modules"
-  ],
+  "exclude": ["src", "examples", "dist", "node_modules"],
   "references": [
     {
-      "path": "./src/tsconfig.src.json",
+      "path": "./src/tsconfig.src.json"
     },
     {
-      "path": "./examples/tsconfig.examples.json",
+      "path": "./examples/tsconfig.examples.json"
     }
   ]
 }
