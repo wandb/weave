@@ -14,10 +14,10 @@ export const PlotlyBarPlot: React.FC<{
       height: props.height - 30,
       showlegend: false,
       margin: {
-        l: 0,
+        l: 20,
         r: 0,
         b: 20,
-        t: 20,
+        t: 26,
       },
       bargap: 0.1,
       xaxis: {
@@ -32,15 +32,20 @@ export const PlotlyBarPlot: React.FC<{
         range: props.yRange,
         gridcolor: PLOT_GRID_COLOR,
         linecolor: PLOT_GRID_COLOR,
+        showticklabels: true,
+        tickfont: {
+          size: 10,
+        },
       },
       title: {
+        multiline: true,
         text: props.plotlyData.name ?? '',
-        font: {size: 14},
+        font: {size: 12},
         xref: 'paper',
         x: 0.5,
-        y: 1, // Position at the top
+        y: 1,
         yanchor: 'top',
-        pad: {t: 0},
+        pad: {t: 2},
       },
     };
   }, [props.height, props.plotlyData, props.yRange]);
