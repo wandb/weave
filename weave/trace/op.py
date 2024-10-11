@@ -337,11 +337,11 @@ def call(
     ```
     """
     if inspect.iscoroutinefunction(op.resolve_fn):
-        return do_call_async(
+        return _do_call_async(
             op, *args, __weave=__weave, __should_raise=__should_raise, **kwargs
         )
     else:
-        return do_call(
+        return _do_call(
             op, *args, __weave=__weave, __should_raise=__should_raise, **kwargs
         )
 
@@ -359,7 +359,7 @@ def _placeholder_call() -> "Call":
     )
 
 
-def do_call(
+def _do_call(
     op: Op,
     *args: Any,
     __weave: Optional[WeaveKwargs] = None,
@@ -402,7 +402,7 @@ def do_call(
     return res, call
 
 
-async def do_call_async(
+async def _do_call_async(
     op: Op,
     *args: Any,
     __weave: Optional[WeaveKwargs] = None,
@@ -564,7 +564,7 @@ def op(
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    res, _ = await do_call_async(
+                    res, _ = await _do_call_async(
                         cast(Op, wrapper), *args, __should_raise=True, **kwargs
                     )
                     return res
@@ -572,7 +572,7 @@ def op(
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    res, _ = do_call(
+                    res, _ = _do_call(
                         cast(Op, wrapper), *args, __should_raise=True, **kwargs
                     )
                     return res
