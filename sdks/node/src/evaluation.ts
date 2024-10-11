@@ -34,14 +34,9 @@ function weaveCallableName<T extends (...args: any[]) => any>(callable: WeaveCal
   return callable.id;
 }
 
-async function* repeatAsyncIterator<T>(
-  asyncIterator: AsyncIterable<T>,
-  repeatCount: number
-): AsyncGenerator<T, void, unknown> {
+async function* repeatAsyncIterator<T>(asyncIterator: AsyncIterable<T>, repeatCount: number) {
   for (let i = 0; i < repeatCount; i++) {
-    for await (const item of asyncIterator) {
-      yield item;
-    }
+    yield* asyncIterator;
   }
 }
 
