@@ -3,14 +3,14 @@ from typing import List
 from textwrap import dedent
 
 import weave
-from weave.flow.scorer.llm_scorer import LLMScorer
+from weave.flow.scorer.llm_scorer import InstructorLLMScorer
 from weave.flow.scorer.llm_utils import instructor_client
 
 
 class EntityExtractionResponse(BaseModel):
     entities: List[str] = Field(description="A list of unique entities extracted from the text")
 
-class SummarizationScorer(LLMScorer):
+class SummarizationScorer(InstructorLLMScorer):
     """
     Estimates summary quality by computing the recall of entities in the model output compared to the input.
     """
@@ -21,27 +21,28 @@ class SummarizationScorer(LLMScorer):
     Text: {text}
     Entities:
     """)
-    input_column: str = Field(description="The column in the dataset that contains the input text")
+
+    temperature: float = 0.7
+    max_tokens: int = 1024
     
     def extract_entities(self, text: str) -> List[str]:
         # Use LLM to extract entities
-        client = instructor_client(self.client)
         prompt = self.extraction_prompt.format(text=text)
-        response = client.chat.completions.create(
+        response = self.client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
             response_model=EntityExtractionResponse,
-            model=self.model_id
+            model=self.model_id,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
         )
         entities = [e.strip().lower() for e in response.entities]
         return entities
     
     @weave.op
-    def score(self, output: str, dataset_row: dict) -> float:
+    def score(self, input: str, output: str, **kwargs) -> float:
         # Extract entities
-        if self.input_column not in dataset_row:
-            raise ValueError(f"Answer column {self.input_column} not found in dataset_row")
         output_entities = self.extract_entities(output)
-        input_entities = self.extract_entities(dataset_row[self.input_column])
+        input_entities = self.extract_entities(input)
         # Calculate recall
         if not output_entities:
             return 0.0
@@ -52,7 +53,7 @@ class SummarizationScorer(LLMScorer):
 
 
 if __name__ == "__main__":
-    import os
+    import os, asyncio
 
     try:
         from weave.flow.scorer.llm_utils import import_client
@@ -66,19 +67,30 @@ if __name__ == "__main__":
 
         # Instantiate scorers
         summarization_scorer = SummarizationScorer(
-            client=llm_client, model_id="gpt-4o", input_column="input"
+            client=llm_client, model_id="gpt-4o", column_map={"text": "input"}
         )
+
+        @weave.op
+        def f(summary: str): 
+            return summary
 
         # Create your dataset of examples
         examples = [
-            {"input":"Harry Potter is a wizard. He is friends with Ron Weasley. They all go to Hogwarts to learn magic. They have been doing this for years. Their enemy is Voldemort, a dark wizard who is trying to kill them.",
-             "output":"Harry Potter, Ron Weasley, and Voldemort are wizards.",
-             "relevancy_score":1}
+            {"text":"Harry Potter is a wizard. He is friends with Ron Weasley. They all go to Hogwarts to learn magic. They have been doing this for years. Their enemy is Voldemort, a dark wizard who is trying to kill them.",
+             "summary":"Harry Potter, Ron Weasley, and Voldemort are wizards.",
+             "relevancy_score":1},
         ]
+        evaluation = weave.Evaluation(dataset=examples, scorers=[summarization_scorer])
+        asyncio.run(evaluation.evaluate(f))
 
-        for example in examples:
-            score = summarization_scorer.score(example["output"], example)
-            print(f"Summarization Score: {score}")
+        # good naming:
+        def summarization_scorer2(text: str, output: str):
+            scorer =  SummarizationScorer(client=llm_client, model_id="gpt-4o")
+            return scorer.score(input=text, output=output)
+
+        evaluation = weave.Evaluation(dataset=examples, scorers=[summarization_scorer2])
+        asyncio.run(evaluation.evaluate(f))
+
 
     except Exception as e:
         print(f"Error: {e}")

@@ -15,7 +15,7 @@ class EntityExtractionResponse(BaseModel):
 class ContextEntityRecallScorer(LLMScorer):
     """
     Estimates context recall by extracting entities from the model output 
-    and the expected answer, then computes the recall.
+    and the context, then computes the recall.
     """
 
     extraction_prompt: str = dedent("""
@@ -24,7 +24,6 @@ class ContextEntityRecallScorer(LLMScorer):
     Text: {text}
     Entities:
     """)
-    answer_column: str = Field(description="The column in the dataset that contains the expected answer")
     
     def extract_entities(self, text: str) -> List[str]:
         # Use LLM to extract entities
@@ -40,12 +39,9 @@ class ContextEntityRecallScorer(LLMScorer):
         return entities
     
     @weave.op
-    def score(self, output: str, dataset_row: dict) -> float:
-        # Extract entities
-        if self.answer_column not in dataset_row:
-            raise ValueError(f"Answer column {self.answer_column} not found in dataset_row")
+    def score(self, output: str, context: str) -> float:
         expected_entities = self.extract_entities(output)
-        context_entities = self.extract_entities(dataset_row[self.answer_column])
+        context_entities = self.extract_entities(context)
         # Calculate recall
         if not expected_entities:
             return 0.0
@@ -66,13 +62,9 @@ class ContextRelevancyScorer(LLMScorer):
     Context: {context}
     Relevancy Score (0-1):
     """)
-    context_column: str = Field(description="The column in the dataset that contains the context")
 
     @weave.op
-    def score(self, output: str, dataset_row: dict) -> float:
-        if self.context_column not in dataset_row:
-            raise ValueError(f"Context column {self.context_column} not found in dataset_row")
-        context = dataset_row[self.context_column]
+    def score(self, output: str, context: str) -> float:
         llm = instructor_client(self.client)
         prompt = self.relevancy_prompt.format(question=output, context=context)
         response = llm.chat.completions.create(
@@ -98,11 +90,9 @@ if __name__ == "__main__":
         # Instantiate scorers
         context_entity_recall_scorer = ContextEntityRecallScorer(
             client=llm_client, model_id="gpt-4o",
-            answer_column="expected"
         )
         context_relevancy_scorer = ContextRelevancyScorer(
             client=llm_client, model_id="gpt-4o",
-            context_column="context"
         )
         # Create your dataset of examples
         examples = [

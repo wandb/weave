@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 
 import weave
 from weave.flow.scorer.utils import stringify
-from weave.flow.scorer.llm_scorer import LLMScorer
+from weave.flow.scorer.llm_scorer import InstructorLLMScorer
 from weave.flow.scorer.llm_utils import OPENAI_DEFAULT_MODEL
 
 
@@ -27,7 +27,7 @@ class HallucinationResponse(BaseModel):
     chain_of_thought: str = Field(description="Think step by step about whether the output is a hallucination of the dataset_row")
     is_hallucination: bool = Field(description="Whether the model output is a hallucination of the dataset row")
 
-class HallucinationScorer(LLMScorer):
+class HallucinationScorer(InstructorLLMScorer):
     """
     Scorer that checks if the model output is a hallucination of the dataset row.
     """
@@ -36,19 +36,15 @@ class HallucinationScorer(LLMScorer):
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = 0.7
     max_tokens: int = 4096
-    input_data_columns: list[str] = Field(description="The columns of the input data to use as ground truth")
 
     @weave.op
-    def score(self, output: str, dataset_row: dict) -> HallucinationResponse:
+    def score(self, output: str, context: str) -> HallucinationResponse:
 
         output = stringify(output)
-
-        input_data = {k: stringify(v) for k, v in dataset_row.items() if k in self.input_data_columns}
-
         response = self.client.chat.completions.create(
             messages=[
                 {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": self.user_prompt.format(input_data=input_data, output=output)},
+                {"role": "user", "content": self.user_prompt.format(input_data=context, output=output)},
             ],
             model=self.model_id,
             response_model=HallucinationResponse,
@@ -62,14 +58,14 @@ if __name__ == "__main__":
     try:
         import openai, os, weave, asyncio
 
-        weave.init("hallucination-scorer-2")
+        # weave.init("hallucination-scorer-2")
 
         openai_client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        scorer = HallucinationScorer(client=openai_client, input_data_columns=["text"])
+        scorer = HallucinationScorer(client=openai_client, column_map={"text": "context"})
 
         output = "John favorite cheese is camembert"
         dataset_row = {"text": "John doesn't like cheese"}
-        response = scorer.score(output, dataset_row)
+        response = scorer.score(output, context=dataset_row)
         print(response)
     
         @weave.op

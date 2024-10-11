@@ -219,10 +219,11 @@ class Evaluation(Object):
                 # and pass those to the scorer
                 # input: is the full row, we have access to it via example
                 # output: is the model output, we have access to it via model_output
-                if scorer.column_map is None:
-                    score_args = {k: v for k, v in example.items() if k in score_arg_names}
+                if isinstance(scorer, Scorer) and scorer.column_map is not None:
+                    score_args = {scorer.column_map.get(k, k): v for k, v in example.items() if scorer.column_map.get(k, k) in score_arg_names}
                 else:
-                    score_args = {scorer.column_map[k]: v for k, v in example.items() if k in score_arg_names}
+                    score_args = {k: v for k, v in example.items() if k in score_arg_names}
+
             else:
                 if len(score_arg_names) == 2:
                     score_args = {score_arg_names[0]: example}
