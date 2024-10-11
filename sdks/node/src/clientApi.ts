@@ -1,8 +1,8 @@
 import { Api as TraceServerApi } from './generated/traceServerApi';
 import { InMemoryTraceServer } from './inMemoryTraceServer';
-import { createFetchWithRetry } from './retry';
 import { getApiKey } from './settings';
 import { ConcurrencyLimiter } from './utils/concurrencyLimit';
+import { createFetchWithRetry } from './utils/retry';
 import { WandbServerApi } from './wandbInterface/wandbServerApi';
 import { CallStackEntry, WeaveClient } from './weaveClient';
 
