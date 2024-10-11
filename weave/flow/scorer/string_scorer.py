@@ -76,8 +76,8 @@ class LevenshteinScorer(Scorer):
 if __name__ == "__main__":
     import asyncio
 
-    match_scorer = StringMatchScorer(column_map={"output": "col1"})
-    levenshtein_scorer = LevenshteinScorer(column_map={"output": "col2"})
+    match_scorer = StringMatchScorer(column_map={"target": "col1"})
+    levenshtein_scorer = LevenshteinScorer(column_map={"target": "col2"})
 
     
     @weave.op
