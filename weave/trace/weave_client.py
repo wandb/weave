@@ -6,7 +6,7 @@ import sys
 import typing
 from concurrent.futures import Future
 from functools import lru_cache
-from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Union
+from typing import Any, Callable, Dict, Iterator, Optional, Sequence, TypedDict, Union
 
 import pydantic
 from requests import HTTPError
@@ -25,7 +25,15 @@ from weave.trace.object_record import (
 )
 from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
 from weave.trace.op import op as op_deco
-from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_op_uri
+from weave.trace.refs import (
+    CallRef,
+    ObjectRef,
+    OpRef,
+    Ref,
+    TableRef,
+    parse_op_uri,
+    parse_uri,
+)
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.settings import client_parallelism
@@ -48,6 +56,7 @@ from weave.trace_server.trace_server_interface import (
     CostQueryOutput,
     CostQueryReq,
     EndedCallSchemaForInsert,
+    FeedbackCreateReq,
     FileCreateReq,
     FileCreateRes,
     ObjCreateReq,
@@ -1040,6 +1049,100 @@ class WeaveClient:
             )
         )
         return res.results
+
+    @trace_sentry.global_trace_sentry.watch()
+    def _link_score_call(self, predict_call: Call, score_call: Call) -> str:
+        """(Private) Adds a score to a call. This is particularly useful
+        for adding evaluation metrics to a call.
+        """
+        call_ref = get_ref(predict_call)
+        if call_ref is None:
+            raise ValueError("Predict call must have a ref")
+        call_ref_uri = call_ref.uri()
+        scorer_call_ref = get_ref(score_call)
+        if scorer_call_ref is None:
+            raise ValueError("Score call must have a ref")
+        scorer_call_ref_uri = scorer_call_ref.uri()
+        scorer_op_ref_uri = score_call.op_name
+        scorer_op_ref = parse_uri(scorer_op_ref_uri)
+        if not isinstance(scorer_op_ref, OpRef):
+            raise ValueError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
+        score_name = scorer_op_ref.name
+        score_results = score_call.output
+
+        return self._add_score(
+            call_ref_uri=call_ref_uri,
+            score_name=score_name,
+            score_results=score_results,
+            scorer_call_ref_uri=scorer_call_ref_uri,
+            scorer_op_ref_uri=scorer_op_ref_uri,
+        )
+
+    def _add_score(
+        self,
+        *,
+        call_ref_uri: str,
+        score_name: str,
+        score_results: Any,
+        scorer_call_ref_uri: str,
+        scorer_op_ref_uri: str,
+    ) -> str:  # , supervision: dict):
+        """(Private) Low-level, non object-oriented method for adding a score to a call.
+
+        Outstanding questions:
+        - Should we somehow include supervision (ie. the ground truth) in the payload?
+        - What should the shape of `ScoreTypePayload` be? Maybe we want the results to be top-level?
+        - What should we use for name? A standard "score" or the score name?
+        """
+        # Parse the refs (acts as validation)
+        call_ref = parse_uri(call_ref_uri)
+        if not isinstance(call_ref, CallRef):
+            raise ValueError(f"Invalid call ref: {call_ref_uri}")
+        scorer_call_ref = parse_uri(scorer_call_ref_uri)
+        if not isinstance(scorer_call_ref, CallRef):
+            raise ValueError(f"Invalid scorer call ref: {scorer_call_ref_uri}")
+        scorer_op_ref = parse_uri(scorer_op_ref_uri)
+        if not isinstance(scorer_op_ref, OpRef):
+            raise ValueError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
+
+        # Validate score_name (we might want to relax this in the future)
+        if score_name != scorer_op_ref.name:
+            raise ValueError(
+                f"Score name {score_name} does not match scorer op name {scorer_op_ref.name}"
+            )
+
+        # Prepare the result payload - we purposely do not map to refs here
+        # because we prefer to have the raw data.
+        results_json = to_json(score_results, self._project_id(), self)
+
+        # # Prepare the supervision payload
+        # supervision_json = to_json(map_to_refs(supervision), self._project_id(), self)
+
+        SCORE_TYPE_NAME = "wandb.score.1"
+
+        class ScoreTypePayload(TypedDict):
+            name: str
+            op_ref: str
+            call_ref: str
+            results: dict
+            # supervision: dict
+
+        payload: ScoreTypePayload = {
+            "name": score_name,
+            "op_ref": scorer_op_ref_uri,
+            "call_ref": scorer_call_ref_uri,
+            "results": results_json,
+        }
+
+        freq = FeedbackCreateReq(
+            project_id=self._project_id(),
+            weave_ref=call_ref_uri,
+            feedback_type=SCORE_TYPE_NAME,  # should this be score_name?
+            payload=payload,
+        )
+        response = self.server.feedback_create(freq)
+
+        return response.id
 
     ################# Object Saving ##################
     # `_save_object` is the top level entry point for saving data to the weave server.

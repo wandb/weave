@@ -314,7 +314,11 @@ def _execute_call(
 
 
 def call(
-    op: Op, *args: Any, __weave: Optional[WeaveKwargs] = None, **kwargs: Any
+    op: Op,
+    *args: Any,
+    __weave: Optional[WeaveKwargs] = None,
+    __should_raise: bool = False,
+    **kwargs: Any,
 ) -> tuple[Any, "Call"]:
     """
     Executes the op and returns both the result and a Call representing the execution.
@@ -332,8 +336,35 @@ def call(
     result, call = add.call(1, 2)
     ```
     """
-    c = _create_call(op, *args, __weave=__weave, **kwargs)
-    return _execute_call(op, c, *args, __should_raise=False, **kwargs)
+    call = Call(_op_name="", trace_id="", parent_id=None, project_id="", inputs={})
+    func = op.resolve_fn
+    if settings.should_disable_weave():
+        res = func(*args, **kwargs)
+    elif weave_client_context.get_weave_client() is None:
+        res = func(*args, **kwargs)
+    elif not op._tracing_enabled:
+        res = func(*args, **kwargs)
+    else:
+        try:
+            # This try/except allows us to fail gracefully and
+            # still let the user code continue to execute
+            call = _create_call(op, *args, __weave=__weave, **kwargs)
+            res, _ = _execute_call(
+                op, call, *args, __should_raise=__should_raise, **kwargs
+            )
+        except Exception as e:
+            if get_raise_on_captured_errors():
+                raise
+            log_once(
+                logger.error,
+                ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
+            )
+            res = func(*args, **kwargs)
+
+    return res, call
+
+
+do_call = call
 
 
 def calls(op: Op) -> "CallsIter":
@@ -453,51 +484,15 @@ def op(
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    __weave: Optional[WeaveKwargs] = kwargs.pop(WEAVE_KWARGS_KEY, None)
-                    if settings.should_disable_weave():
-                        return await func(*args, **kwargs)
-                    if weave_client_context.get_weave_client() is None:
-                        return await func(*args, **kwargs)
-                    if not wrapper._tracing_enabled:  # type: ignore
-                        return await func(*args, **kwargs)
-                    try:
-                        # This try/except allows us to fail gracefully and
-                        # still let the user code continue to execute
-                        call = _create_call(wrapper, *args, __weave=__weave, **kwargs)  # type: ignore
-                    except Exception as e:
-                        if get_raise_on_captured_errors():
-                            raise
-                        log_once(
-                            logger.error,
-                            ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
-                        )
-                        return await func(*args, **kwargs)
-                    res, _ = await _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
-                    return res
+                    wrapper = cast(Op, wrapper)
+                    res, _ = do_call(wrapper, *args, __should_raise=True, **kwargs)
+                    return await res
             else:
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    __weave: Optional[WeaveKwargs] = kwargs.pop(WEAVE_KWARGS_KEY, None)
-                    if settings.should_disable_weave():
-                        return func(*args, **kwargs)
-                    if weave_client_context.get_weave_client() is None:
-                        return func(*args, **kwargs)
-                    if not wrapper._tracing_enabled:  # type: ignore
-                        return func(*args, **kwargs)
-                    try:
-                        # This try/except allows us to fail gracefully and
-                        # still let the user code continue to execute
-
-                        call = _create_call(wrapper, *args, __weave=__weave, **kwargs)  # type: ignore
-                    except Exception as e:
-                        if get_raise_on_captured_errors():
-                            raise
-                        log_once(
-                            logger.error, CALL_CREATE_MSG.format(traceback.format_exc())
-                        )
-                        return func(*args, **kwargs)
-                    res, _ = _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
+                    wrapper = cast(Op, wrapper)
+                    res, _ = do_call(wrapper, *args, __should_raise=True, **kwargs)
                     return res
 
             # Tack these helpers on to our wrapper

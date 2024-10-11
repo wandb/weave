@@ -80,7 +80,7 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
 
 def get_scorer_attributes(
     scorer: Union[Callable, Op, Scorer],
-) -> Tuple[str, Callable, Callable]:
+) -> Tuple[str, Op, Op]:
     if weave_isinstance(scorer, Scorer):
         scorer_name = scorer.name
         if scorer_name is None:
