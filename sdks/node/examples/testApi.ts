@@ -1,7 +1,7 @@
 import { OpenAI } from 'openai';
-import { init } from './clientApi';
-import { wrapOpenAI } from './integrations/openai';
-import { op } from './op';
+import { init } from '../src/clientApi';
+import { wrapOpenAI } from '../src/integrations/openai';
+import { op } from '../src/op';
 
 // Initialize the API
 init('shawn/weavejs-test1');
