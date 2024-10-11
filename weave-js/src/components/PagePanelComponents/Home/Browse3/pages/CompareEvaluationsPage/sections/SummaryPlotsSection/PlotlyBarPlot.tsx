@@ -5,28 +5,31 @@ import {PLOT_GRID_COLOR} from '../../ecpConstants';
 
 export const PlotlyBarPlot: React.FC<{
   height: number;
+  yRange: [number, number];
   plotlyData: Plotly.Data;
 }> = props => {
   const divRef = useRef<HTMLDivElement>(null);
   const plotlyLayout: Partial<Plotly.Layout> = useMemo(() => {
     return {
-      height: props.height - 40,
+      height: props.height - 30,
       showlegend: false,
       margin: {
         l: 0,
         r: 0,
         b: 20,
         t: 20,
-        pad: 0,
       },
+      bargap: 0.1,
       xaxis: {
         automargin: true,
         fixedrange: true,
         gridcolor: PLOT_GRID_COLOR,
         linecolor: PLOT_GRID_COLOR,
+        showticklabels: false,
       },
       yaxis: {
         fixedrange: true,
+        range: props.yRange,
         gridcolor: PLOT_GRID_COLOR,
         linecolor: PLOT_GRID_COLOR,
       },
@@ -37,6 +40,7 @@ export const PlotlyBarPlot: React.FC<{
         x: 0.5,
         y: 1, // Position at the top
         yanchor: 'top',
+        pad: {t: 0},
       },
     };
   }, [props.height, props.plotlyData]);

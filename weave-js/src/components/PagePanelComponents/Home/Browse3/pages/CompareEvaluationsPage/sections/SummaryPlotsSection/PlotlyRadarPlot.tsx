@@ -34,9 +34,9 @@ export const PlotlyRadarPlot: React.FC<{
       height: props.height - 40,
       showlegend: false,
       margin: {
-        l: 0,
-        r: 0,
-        b: 20,
+        l: 20,
+        r: 20,
+        b: 30,
         t: 20,
         pad: 0,
       },
