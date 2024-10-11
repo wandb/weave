@@ -1,10 +1,13 @@
-# implememting metrics from ragas: https://github.com/explodinggradients/ragas
+# implementing metrics from ragas: https://github.com/explodinggradients/ragas
 
 from typing import Any, List
-
-from weave.flow.scorer.lightllm import LLMFactory
+from pydantic import BaseModel
+from weave.flow.scorer.llm import instruct_client
 from weave.flow.scorer.llm_scorer import EmbeddingSimilarityScorer, LLMScorer
 
+
+class EntityExtractionResponse(BaseModel):
+    entities: List[str]
 
 class ContextEntityRecallScorer(LLMScorer):
     """
@@ -17,13 +20,15 @@ class ContextEntityRecallScorer(LLMScorer):
 
     Text: {text}
     Entities:
-    """
-
+    """  
     def extract_entities(self, text: str) -> List[str]:
         # Use LLM to extract entities
-        llm = LLMFactory.create(self.client, self.model)
+        llm = instruct_client(self.client)
         prompt = self.extraction_prompt.format(text=text)
-        response = llm.chat(messages=[{"role": "user", "content": prompt}])
+        response = llm.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            response_model=str
+        )
         # Assume entities are returned as a comma-separated list
         entities = [e.strip() for e in response.split(",")]
         return entities
@@ -52,9 +57,12 @@ class ContextRelevancyScorer(LLMScorer):
     """
 
     def score(self, model_output: Any, input_text: str, context: str) -> float:
-        llm = LLMFactory.create(self.client, self.model)
+        llm = instruct_client(self.client)
         prompt = self.relevancy_prompt.format(question=input_text, context=context)
-        response = llm.chat(messages=[{"role": "user", "content": prompt}])
+        response = llm.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            response_model=str
+        )
         # Parse the response to get the relevancy score
         try:
             score = float(response.strip())
@@ -79,11 +87,14 @@ class ContextPrecisionScorer(LLMScorer):
     def score(
         self, model_output: Any, input_text: str, expected: str, context: str
     ) -> float:
-        llm = LLMFactory.create(self.client, self.model)
+        llm = instruct_client(self.client)
         prompt = self.precision_prompt.format(
             question=input_text, answer=expected, context=context
         )
-        response = llm.chat(messages=[{"role": "user", "content": prompt}])
+        response = llm.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            response_model=str
+        )
         # Parse the response to get the verdict
         try:
             verdict = int(response.strip())
@@ -104,10 +115,13 @@ class FaithfulnessScorer(LLMScorer):
     """
 
     def score(self, model_output: Any, expected: str, context: str) -> float:
-        llm = LLMFactory.create(self.client, self.model)
+        llm = instruct_client(self.client)
         answer = model_output.get("answer", "")
         prompt = self.faithfulness_prompt.format(answer=answer, context=context)
-        response = llm.chat(messages=[{"role": "user", "content": prompt}])
+        response = llm.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            response_model=str
+        )
         # Parse the response to get the faithfulness score
         try:
             score = float(response.strip())
@@ -142,14 +156,17 @@ class AnswerCorrectnessScorer(LLMScorer):
     """
 
     def score(self, model_output: Any, input_text: str, expected: str) -> float:
-        llm = LLMFactory.create(self.client, self.model)
+        llm = instruct_client(self.client)
         generated_answer = model_output.get("answer", "")
         prompt = self.correctness_prompt.format(
             question=input_text,
             generated_answer=generated_answer,
             ground_truth=expected,
         )
-        response = llm.chat(messages=[{"role": "user", "content": prompt}])
+        response = llm.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            response_model=str
+        )
         # Parse the response to get the correctness score
         try:
             score = float(response.strip())
@@ -161,16 +178,13 @@ class AnswerCorrectnessScorer(LLMScorer):
 if __name__ == "__main__":
     import os
 
-
     try:
-        from weave.flow.scorer.lightllm import import_client
+        from weave.flow.scorer.llm import import_client
 
         # Instantiate your LLM client
         OpenAIClient = import_client("openai")
         if OpenAIClient:
-            llm_client = OpenAIClient(
-                api_key=os.environ["OPENAI_API_KEY"]
-            )  # Replace with your API key
+            llm_client = OpenAIClient(api_key=os.environ["OPENAI_API_KEY"])
         else:
             raise ImportError("OpenAI client not available")
 
