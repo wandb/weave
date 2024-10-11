@@ -190,7 +190,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
-        return cls(
+        # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
+        # that type checking is applied to the constructor.
+        return ClickHouseTraceServer(
             host=wf_env.wf_clickhouse_host(),
             port=wf_env.wf_clickhouse_port(),
             user=wf_env.wf_clickhouse_user(),
@@ -852,6 +854,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+        rows = list(self.table_query_stream(req))
+        return tsi.TableQueryRes(rows=rows)
+
+    def table_query_stream(
+        self, req: tsi.TableQueryReq
+    ) -> Iterator[tsi.TableRowSchema]:
         conds = []
         pb = ParamBuilder()
         if req.filter:
@@ -872,7 +880,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     direction="ASC" if sort.direction.lower() == "asc" else "DESC",
                 )
                 sort_fields.append(field)
-        rows = self._table_query(
+
+        rows = self._table_query_stream(
             req.project_id,
             req.digest,
             pb,
@@ -881,9 +890,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             limit=req.limit,
             offset=req.offset,
         )
-        return tsi.TableQueryRes(rows=rows)
+        for row in rows:
+            yield row
 
-    def _table_query(
+    def _table_query_stream(
         self,
         project_id: str,
         digest: str,
@@ -895,7 +905,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         sort_fields: Optional[list[OrderField]] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
-    ) -> list[tsi.TableRowSchema]:
+    ) -> Iterator[tsi.TableRowSchema]:
         if not sort_fields:
             sort_fields = [
                 OrderField(
@@ -932,12 +942,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 offset=offset,
             )
 
-        query_result = self.ch_client.query(query, parameters=pb.get_params())
+        res = self._query_stream(query, parameters=pb.get_params())
 
-        return [
-            tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
-            for r in query_result.result_rows
-        ]
+        for row in res:
+            yield tsi.TableRowSchema(digest=row[0], val=json.loads(row[1]))
 
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
         parameters: Dict[str, Any] = {
@@ -1206,7 +1214,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     raise ValueError("Will not resolve cross-project refs.")
                 pb = ParamBuilder()
                 row_digests_name = pb.add_param(row_digests)
-                rows = self._table_query(
+                rows_stream = self._table_query_stream(
                     project_id=project_id_scope,
                     digest=digest,
                     pb=pb,
@@ -1214,6 +1222,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         f"digest IN {{{row_digests_name}: Array(String)}}"
                     ],
                 )
+                rows = list(rows_stream)
                 # Unpack the results into the target rows
                 row_digest_vals = {r.digest: r.val for r in rows}
                 for index, row_digest in index_digests:

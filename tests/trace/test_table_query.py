@@ -1,4 +1,5 @@
 import random
+from typing import Iterator
 
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
@@ -50,6 +51,28 @@ def test_table_query(client: WeaveClient):
 
     result_vals = [r.val for r in res.rows]
     result_digests = [r.digest for r in res.rows]
+
+    assert result_vals == data
+    assert result_digests == row_digests
+
+
+def test_table_query_stream(client: WeaveClient):
+    digest, row_digests, data = generate_table_data(client, 10, 10)
+
+    res = client.server.table_query_stream(
+        tsi.TableQueryReq(
+            project_id=client._project_id(),
+            digest=digest,
+        )
+    )
+
+    assert isinstance(res, Iterator)
+    rows = []
+    for r in res:
+        rows.append(r)
+
+    result_vals = [r.val for r in rows]
+    result_digests = [r.digest for r in rows]
 
     assert result_vals == data
     assert result_digests == row_digests

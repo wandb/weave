@@ -1574,3 +1574,25 @@ def test_recursive_object_deletion(client):
     assert client.get(obj2_ref) == {"b": None}
     # Object2 should store the ref to object2, as instantiated
     assert client.get(obj3_ref) == {"c": obj2}
+
+    
+@pytest.mark.asyncio
+async def test_op_calltime_display_name(client):
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a
+
+    result = my_op(1, __weave={"display_name": "custom_display_name"})
+    calls = list(my_op.calls())
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.display_name == "custom_display_name"
+
+    evaluation = weave.Evaluation(dataset=[{"a": 1}], scorers=[])
+    res = await evaluation.evaluate(
+        my_op, __weave={"display_name": "custom_display_name"}
+    )
+    calls = list(evaluation.evaluate.calls())
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.display_name == "custom_display_name"

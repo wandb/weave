@@ -17,6 +17,7 @@ gha-creds-*.json
 .env
 .ruff_cache
 .pytest_cache
+.coverage
 .nox
 *.log
-weave/file::memory:?cache=shared
+*/file::memory:?cache=shared

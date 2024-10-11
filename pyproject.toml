@@ -65,12 +65,14 @@ litellm = ["litellm>=1.36.1"]
 llamaindex = ["llama-index>=0.10.35"]
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
+notdiamond = ["notdiamond>=0.3.21"]
 openai = ["openai>=1.0.0"]
 modal = ["modal", "python-dotenv"]
 test = [
   "nox",
   "pytest>=8.2.0",
   "pytest-asyncio>=0.23.6",
+  "pytest-cov>=5.0.0",
   "pytest-xdist>=3.1.0",
   "pytest-rerunfailures>=12.0",
   "clickhouse_connect==0.7.0",
@@ -173,7 +175,7 @@ exclude = ["weave_query"]
 [tool.mypy]
 warn_unused_configs = true
 # Note: You have to update .pre-commit-config.yaml too!
-exclude = [".*pyi$", "weave_query", "tests", "examples", "weave/docker"]
+exclude = [".*pyi$", "weave_query", "tests", "examples"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -186,7 +188,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.13-dev0"
+current_version = "0.51.15-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

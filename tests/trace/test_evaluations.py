@@ -148,6 +148,19 @@ async def test_basic_evaluation(client):
     expected_predict_ref = model_obj.val["predict"]
     assert is_op_ref_with_name(expected_predict_ref, "MyModel.predict")
 
+    predict_and_score_calls = [
+        c
+        for (c, d) in flattened_calls
+        if op_name_from_ref(c.op_name) == "Evaluation.predict_and_score"
+    ]
+    assert len(predict_and_score_calls) == 3
+
+    # Assert that all the inputs are unique
+    inputs = set()
+    for call in predict_and_score_calls:
+        inputs.add(call.inputs["example"])
+    assert len(inputs) == 3
+
 
 @weave.op
 def gpt_mocker(question: str):

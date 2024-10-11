@@ -13,7 +13,6 @@ title: Prompt Optimization
 
 
 
-<img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 <!--- @wandbcode{prompt-optim-notebook} -->
 
 # Optimizing LLM Workflows Using DSPy and Weave

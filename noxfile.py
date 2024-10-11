@@ -2,7 +2,15 @@ import nox
 
 nox.options.default_venv_backend = "uv"
 
-SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12"]
+SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
+PY313_INCOMPATIBLE_SHARDS = [
+    "anthropic",
+    "cohere",
+    "dspy",
+    "langchain",
+    "litellm",
+    "notdiamond",
+]
 
 
 @nox.session
@@ -28,10 +36,14 @@ def lint(session):
         "llamaindex",
         "mistral0",
         "mistral1",
+        "notdiamond",
         "openai",
     ],
 )
 def tests(session, shard):
+    if session.python.startswith("3.13") and shard in PY313_INCOMPATIBLE_SHARDS:
+        session.skip(f"Skipping {shard=} as it is not compatible with Python 3.13")
+
     session.install("-e", f".[{shard},test]")
     session.chdir("tests")
 
@@ -60,10 +72,17 @@ def tests(session, shard):
     if shard == "llamaindex":
         session.posargs.insert(0, "-n4")
 
-    session.run("pytest", *session.posargs, *test_dirs, env=env)
+    session.run(
+        "pytest",
+        "--cov=weave",
+        "--cov-report=html",
+        "--cov-branch",
+        *session.posargs,
+        *test_dirs,
+        env=env,
+    )
 
 
 # Configure pytest
-# nox.options.sessions = ["tests", "lint", "integration_tests"]
 nox.options.reuse_existing_virtualenvs = True
 nox.options.stop_on_first_error = True
