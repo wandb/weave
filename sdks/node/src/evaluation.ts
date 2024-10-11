@@ -68,6 +68,8 @@ async function* asyncParallelMap<T, U>(
     const prom = runOne(item);
     itemPromiseMap.set(item, prom);
   }
+
+  // Flush remaining items
   while (itemPromiseMap.size > 0) {
     const done = await Promise.race(itemPromiseMap.values());
     itemPromiseMap.delete(done.item);
