@@ -72,7 +72,15 @@ def tests(session, shard):
     if shard == "llamaindex":
         session.posargs.insert(0, "-n4")
 
-    session.run("pytest", *session.posargs, *test_dirs, env=env)
+    session.run(
+        "pytest",
+        "--cov=weave",
+        "--cov-report=html",
+        "--cov-branch",
+        *session.posargs,
+        *test_dirs,
+        env=env,
+    )
 
 
 # Configure pytest
