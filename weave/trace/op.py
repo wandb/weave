@@ -379,6 +379,8 @@ def do_call(
             # This try/except allows us to fail gracefully and
             # still let the user code continue to execute
             call = _create_call(op, *args, __weave=__weave, **kwargs)
+        except OpCallError as e:
+            raise e
         except Exception as e:
             if get_raise_on_captured_errors():
                 raise
@@ -420,6 +422,8 @@ async def do_call_async(
             # This try/except allows us to fail gracefully and
             # still let the user code continue to execute
             call = _create_call(op, *args, __weave=__weave, **kwargs)
+        except OpCallError as e:
+            raise e
         except Exception as e:
             if get_raise_on_captured_errors():
                 raise
