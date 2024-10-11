@@ -489,16 +489,16 @@ def op(
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    # wrapper = cast(Op, wrapper)
-                    return await do_call(wrapper, *args, __should_raise=True, **kwargs)[
-                        0
-                    ]
+                    return await do_call(
+                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                    )[0]
             else:
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    # wrapper = cast(Op, wrapper)
-                    return do_call(wrapper, *args, __should_raise=True, **kwargs)[0]
+                    return do_call(
+                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                    )[0]
 
             # Tack these helpers on to our wrapper
             wrapper.resolve_fn = func  # type: ignore
