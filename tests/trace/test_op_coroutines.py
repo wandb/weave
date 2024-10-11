@@ -172,7 +172,7 @@ def test_sync_with_exception(client):
     res, call = sync_with_exception.call()
     assert isinstance(call, Call)
     assert call.exception is not None
-    assert res == None
+    assert res is None
 
 
 def test_sync_with_exception_method(client):
@@ -187,7 +187,7 @@ def test_sync_with_exception_method(client):
     res, call = test_inst.sync_with_exception.call(test_inst)
     assert isinstance(call, Call)
     assert call.exception is not None
-    assert res == None
+    assert res is None
 
 
 @pytest.mark.asyncio
@@ -201,7 +201,7 @@ async def test_async_with_exception(client):
     res, call = await async_with_exception.call()
     assert isinstance(call, Call)
     assert call.exception is not None
-    assert res == None
+    assert res is None
 
 
 @pytest.mark.asyncio
@@ -217,4 +217,4 @@ async def test_async_with_exception_method(client):
     res, call = await test_inst.async_with_exception.call(test_inst)
     assert isinstance(call, Call)
     assert call.exception is not None
-    assert res == None
+    assert res is None
