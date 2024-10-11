@@ -1,5 +1,6 @@
 from weave.flow.scorer.json_scorer import JSONScorer
 
+
 def test_json_scorer_valid_json():
     scorer = JSONScorer()
     output = '{"city": "San Francisco", "country": "USA"}'

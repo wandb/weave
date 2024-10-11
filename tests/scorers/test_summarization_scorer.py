@@ -1,6 +1,11 @@
 import pytest
-from weave.flow.scorer.summarization_scorer import SummarizationScorer, EntityExtractionResponse
 from openai import OpenAI
+
+from weave.flow.scorer.summarization_scorer import (
+    EntityExtractionResponse,
+    SummarizationScorer,
+)
+
 
 # Mock the OpenAI client
 class MockOpenAI(OpenAI):

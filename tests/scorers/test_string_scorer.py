@@ -1,8 +1,8 @@
 from weave.flow.scorer.string_scorer import (
-    StringMatchScorer,
-    RegexScorer,
     LevenshteinScorer,
+    StringMatchScorer,
 )
+
 
 def test_string_match_scorer():
     scorer = StringMatchScorer()

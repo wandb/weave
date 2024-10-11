@@ -1,11 +1,13 @@
 import pytest
+from openai import OpenAI
+
 from weave.flow.scorer.ragas_scorer import (
     ContextEntityRecallScorer,
     ContextRelevancyScorer,
     EntityExtractionResponse,
-    RelevancyResponse
+    RelevancyResponse,
 )
-from openai import OpenAI
+
 
 # Mock the OpenAI client
 class MockOpenAI(OpenAI):
@@ -59,4 +61,3 @@ def test_context_relevancy_scorer_score(context_relevancy_scorer):
     assert isinstance(result, dict)
     assert "relevancy_score" in result
     assert result["relevancy_score"] == 1  # Assuming relevancy in mock response
-

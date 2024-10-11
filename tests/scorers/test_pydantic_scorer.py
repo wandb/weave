@@ -1,6 +1,8 @@
 import pytest
 from pydantic import BaseModel
+
 from weave.flow.scorer.pydantic_scorer import PydanticScorer
+
 
 class User(BaseModel):
     name: str

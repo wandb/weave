@@ -1,6 +1,11 @@
 import pytest
-from weave.flow.scorer.hallucination_scorer import HallucinationScorer, HallucinationResponse
 from openai import OpenAI
+
+from weave.flow.scorer.hallucination_scorer import (
+    HallucinationResponse,
+    HallucinationScorer,
+)
+
 
 # Mock the OpenAI client
 class MockOpenAI(OpenAI):
