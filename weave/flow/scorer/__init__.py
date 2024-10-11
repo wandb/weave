@@ -5,6 +5,7 @@ from weave.flow.scorer.json_scorer import JSONScorer
 from weave.flow.scorer.llm_scorer import LLMScorer, EmbeddingSimilarityScorer, OpenAIModerationScorer
 from weave.flow.scorer.pydantic_scorer import PydanticScorer
 from weave.flow.scorer.hallucination import HallucinationScorer
+from weave.flow.scorer.ragas import AnswerCorrectnessScorer, ContextEntityRecallScorer, ContextPrecisionScorer, ContextRelevancyScorer, FaithfulnessScorer, AnswerSimilarityScorer
 
 
 __all__ = [
@@ -12,11 +13,18 @@ __all__ = [
     "auto_summarize",
     "get_scorer_attributes",
     "MultiTaskBinaryClassificationF1",
+    "transpose",
     "RegexScorer",
     "JSONScorer",
     "LLMScorer",
-    "EmbeddingScorer",
+    "EmbeddingSimilarityScorer",
     "OpenAIModerationScorer",
     "PydanticScorer",
     "HallucinationScorer",
+    "AnswerCorrectnessScorer",
+    "ContextEntityRecallScorer",
+    "ContextPrecisionScorer",
+    "ContextRelevancyScorer",
+    "FaithfulnessScorer",
+    "AnswerSimilarityScorer",
 ]
