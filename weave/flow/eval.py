@@ -48,7 +48,7 @@ def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutin
     return asyncio.to_thread(func, *args, **kwargs)
 
 
-def call_op_force_async(
+def async_call_op(
     func: Op, *args: Any, **kwargs: Any
 ) -> Coroutine[Any, Any, tuple[Any, "Call"]]:
     call_res = func.call(*args, __should_raise=True, **kwargs)
@@ -188,7 +188,7 @@ class Evaluation(Object):
                         **model_predict_args,
                         "self": model_self,
                     }
-                model_output, model_call = await call_op_force_async(
+                model_output, model_call = await async_call_op(
                     model_predict, **model_predict_args
                 )
             else:
@@ -263,14 +263,11 @@ class Evaluation(Object):
                             **score_args,
                             "self": scorer_self,
                         }
-                    result, score_call = await call_op_force_async(
-                        score_fn, **score_args
-                    )
+                    result, score_call = await async_call_op(score_fn, **score_args)
                     wc = get_weave_client()
                     if wc:
-                        await asyncio.to_thread(
-                            wc._link_score_call, model_call, score_call
-                        )
+                        wc._link_score_call, model_call, score_call
+
                 else:
                     # I would not expect this path to be hit, but keeping it for
                     # backwards compatibility / safety
