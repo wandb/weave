@@ -688,7 +688,12 @@ const ScorerItem: React.FC<{
             name: ALL_VALUE,
             version: ALL_VALUE,
           }),
-          scorers: [scorer],
+          scorers: [
+            {
+              ...scorer,
+              metrics: [],
+            },
+          ],
         },
       ],
     }).then(setMetricPaths);

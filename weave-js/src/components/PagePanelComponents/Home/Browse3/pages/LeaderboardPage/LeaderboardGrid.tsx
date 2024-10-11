@@ -2,8 +2,8 @@ import {Box} from '@mui/material';
 import {
   GridColDef,
   GridColumnGroup,
-  GridColumnGroupingModel,
-  GridColumnNode,
+  // GridColumnGroupingModel,
+  // GridColumnNode,
   GridLeafColumn,
   GridRenderCellParams,
   GridSortDirection,
@@ -118,7 +118,8 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                 ([metricPathGroupName, metricPathGroup]) => {
                   return {
                     field: `${datasetGroupName}--${scorerGroupName}--${metricPathGroupName}`,
-                    headerName: `${metricPathGroupName.split('.').pop()}`,
+                    headerName: `${metricPathGroupName}`,
+                    // headerName: `${metricPathGroupName.split('.').pop()}`,
                     minWidth: 100,
                     flex: 1,
                     valueGetter: (value: any, row: RowData) => {
@@ -257,43 +258,45 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       }
     );
 
-    let finalGroupingModel: GridColumnGroupingModel = datasetGroups.filter(
-      c => 'groupId' in c
-    ) as GridColumnGroup[];
-    finalGroupingModel = walkGroupingModel(finalGroupingModel, node => {
-      if ('groupId' in node) {
-        if (node.children.length === 1) {
-          if (
-            'groupId' in node.children[0] &&
-            !node.headerName?.includes(':') &&
-            !node.children[0].headerName?.includes(':')
-          ) {
-            const currNode = node;
-            node = node.children[0];
-            node.headerName = currNode.headerName + '.' + node.headerName;
-          } else {
-            // pass
-            // node = node.children[0];
-          }
-        }
-      }
-      return node;
-    }) as GridColumnGroup[];
-    finalGroupingModel = walkGroupingModel(finalGroupingModel, node => {
-      if ('groupId' in node) {
-        node.renderHeaderGroup = params => {
-          const ref = parseRefMaybe(
-            `weave:///${entity}/${project}/object/${node.headerName}` ?? ''
-          );
-          // console.log(node.headerName, ref);
-          if (ref) {
-            return <SmallRef objRef={ref} />;
-          }
-          return <div>{node.headerName}</div>;
-        };
-      }
-      return node;
-    }) as GridColumnGroup[];
+    const finalGroupingModel = datasetGroups;
+
+    // let finalGroupingModel: GridColumnGroupingModel = datasetGroups.filter(
+    //   c => 'groupId' in c
+    // ) as GridColumnGroup[];
+    // finalGroupingModel = walkGroupingModel(finalGroupingModel, node => {
+    //   if ('groupId' in node) {
+    //     if (node.children.length === 1) {
+    //       if (
+    //         'groupId' in node.children[0] &&
+    //         !node.headerName?.includes(':') &&
+    //         !node.children[0].headerName?.includes(':')
+    //       ) {
+    //         const currNode = node;
+    //         node = node.children[0];
+    //         node.headerName = currNode.headerName + '.' + node.headerName;
+    //       } else {
+    //         // pass
+    //         // node = node.children[0];
+    //       }
+    //     }
+    //   }
+    //   return node;
+    // }) as GridColumnGroup[];
+    // finalGroupingModel = walkGroupingModel(finalGroupingModel, node => {
+    //   if ('groupId' in node) {
+    //     node.renderHeaderGroup = params => {
+    //       const ref = parseRefMaybe(
+    //         `weave:///${entity}/${project}/object/${node.headerName}` ?? ''
+    //       );
+    //       // console.log(node.headerName, ref);
+    //       if (ref) {
+    //         return <SmallRef objRef={ref} />;
+    //       }
+    //       return <div>{node.headerName}</div>;
+    //     };
+    //   }
+    //   return node;
+    // }) as GridColumnGroup[];
 
     return finalGroupingModel;
   }, [columnStats.datasetGroups, entity, project]);
@@ -491,17 +494,17 @@ const defaultGetSortComparator =
     return aValue.localeCompare(bValue);
   };
 
-const walkGroupingModel = (
-  nodes: GridColumnNode[],
-  fn: (node: GridColumnNode) => GridColumnNode
-) => {
-  return nodes.map(node => {
-    if ('children' in node) {
-      node.children = walkGroupingModel(node.children, fn);
-    }
-    return fn(node);
-  });
-};
+// const walkGroupingModel = (
+//   nodes: GridColumnNode[],
+//   fn: (node: GridColumnNode) => GridColumnNode
+// ) => {
+//   return nodes.map(node => {
+//     if ('children' in node) {
+//       node.children = walkGroupingModel(node.children, fn);
+//     }
+//     return fn(node);
+//   });
+// };
 
 // // TODO: refactor to accumulate common root columns in a single pass
 //   const splitCommonRootLeafColumns = (columns: GridLeafColumn[], groupIdPrefix: string, depth: number = 0): GridColumnNode[] => {
