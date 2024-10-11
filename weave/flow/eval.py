@@ -204,6 +204,8 @@ class Evaluation(Object):
                 score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
 
+            # TODO: Check for input columns parameters in the signature of the scorer
+
             if "model_output" not in score_arg_names:
                 raise OpCallError(
                     f"Scorer {scorer_name} must have a 'model_output' argument, to receive the output of the model function."
@@ -211,6 +213,7 @@ class Evaluation(Object):
 
             if isinstance(example, dict):
                 score_args = {k: v for k, v in example.items() if k in score_arg_names}
+                score_args.update({"dataset_row": example}) # TODO: investigate deduplication of dataset_row for performance
             else:
                 if len(score_arg_names) == 2:
                     score_args = {score_arg_names[0]: example}
