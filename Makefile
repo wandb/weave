@@ -6,7 +6,7 @@ setup-docs-ci:
 
 	cd docs
 	npm install --global yarn
-	yarn install
+	npm install
 	cd ..
 
 docs: 
