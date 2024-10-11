@@ -129,9 +129,9 @@ export class WeaveClient {
   // be synchronous, so we can guarantee that calling savedWeaveValues
   // immediately makes __savedRef promises available.
 
-  public saveObject(obj: WeaveObject, objId?: string): void {
+  public saveObject(obj: WeaveObject, objId?: string): Promise<ObjectRef> {
     if (obj.__savedRef) {
-      return;
+      return Promise.resolve(obj.__savedRef);
     }
     for (const [key, value] of Object.entries(obj)) {
       this.saveWeaveValues(value);
@@ -168,6 +168,8 @@ export class WeaveClient {
       // console.log(`Saved object: ${ref.ui_url()}`);
       return ref;
     })();
+
+    return obj.__savedRef;
   }
 
   private saveTable(table: Table): void {

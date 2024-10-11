@@ -1,5 +1,5 @@
-import { WeaveObject, WeaveObjectParameters, ObjectRef } from './weaveObject';
 import { Table } from './table';
+import { ObjectRef, WeaveObject, WeaveObjectParameters } from './weaveObject';
 
 interface DatasetParameters<R extends DatasetRow> extends WeaveObjectParameters {
   rows: R[];
@@ -35,9 +35,9 @@ export class Dataset<R extends DatasetRow> extends WeaveObject {
   }
 
   async save(): Promise<ObjectRef> {
-    // Need require because of circular dependency
-    const client = require('./clientApi').globalClient;
-    return client.saveObject(this);
+    // Import here to avoid circular dependency
+    const { globalClient } = await import('./clientApi');
+    return globalClient!.saveObject(this);
   }
 
   get length(): number {
