@@ -76,12 +76,59 @@ def my_function(name: str):
     return f"Hello, {name}!"
 
 # Call your function -- Weave will automatically track inputs and outputs
-print(my_function.call("World"))
+print(my_function("World"))
 ```
+
+This works for both functions as well as methods on classes:
+
+
+```python showLineNumbers
+import weave
+
+# Initialize Weave Tracing
+weave.init("intro-example")
+
+class MyClass:
+    # Decorate your method
+    @weave.op
+    def my_method(self, name: str):
+        return f"Hello, {name}!"
+
+instance = MyClass()
+
+# Call your method -- Weave will automatically track inputs and outputs
+print(instance.my_method("World"))
+```
+
+Sometimes it is useful to get a handle on the `Call` object itself. You can do this by calling the `op.call` method, which returns both the result and the `Call` object. For example:
+
+```python showLineNumbers
+result, call = my_function.call("World")
+```
+
+Then, `call` can be used to set / update / fetch additional properties (most commonly used to get the ID of the call to be used for feedback).
 
 :::note
 If your op is a method on a class, you need to pass the instance as the first argument to the op (see example below).
 :::
+
+```python showLineNumbers
+import weave
+
+# Initialize Weave Tracing
+weave.init("intro-example")
+
+class MyClass:
+    # Decorate your method
+    @weave.op
+    def my_method(self, name: str):
+        return f"Hello, {name}!"
+
+instance = MyClass()
+
+# Call your method -- Weave will automatically track inputs and outputs
+print(instance.my_method.call(instance, "World"))
+```
 
 
 ```python showLineNumbers
@@ -106,7 +153,7 @@ instance.my_method.call(instance, "World")
 
 Sometimes you may want to override the display name of a call. You can achieve this in one of four ways:
 
-0. Change the display name at the time of calling the op:
+1. Change the display name at the time of calling the op:
 
 ```python showLineNumbers
 result = my_function("World", __weave={"display_name": "My Custom Display Name"})
@@ -118,13 +165,13 @@ Using the `__weave` dictionary sets the call display name which will take preced
 
 :::
 
-1. Change the display name on a per-call basis. This uses the [`Op.call`](../../reference/python-sdk/weave/trace/weave.trace.op.md#function-call) method to return a `Call` object, which you can then use to set the display name using [`Call.set_display_name`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-set_display_name).
+2. Change the display name on a per-call basis. This uses the [`Op.call`](../../reference/python-sdk/weave/trace/weave.trace.op.md#function-call) method to return a `Call` object, which you can then use to set the display name using [`Call.set_display_name`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-set_display_name).
 ```python showLineNumbers
 result, call = my_function.call("World")
 call.set_display_name("My Custom Display Name")
 ```
 
-2. Change the display name for all Calls of a given Op:
+3. Change the display name for all Calls of a given Op:
 
 ```python showLineNumbers
 @weave.op(call_display_name="My Custom Display Name")
@@ -132,7 +179,7 @@ def my_function(name: str):
     return f"Hello, {name}!"
 ```
 
-3. The `call_display_name` can also be a function that takes in a `Call` object and returns a string.  The `Call` object will be passed automatically when the function is called, so you can use it to dynamically generate names based on the function's name, call inputs, attributes, etc.
+4. The `call_display_name` can also be a function that takes in a `Call` object and returns a string.  The `Call` object will be passed automatically when the function is called, so you can use it to dynamically generate names based on the function's name, call inputs, attributes, etc.
 
    1. One common use case is just appending a timestamp to the function's name.
 
