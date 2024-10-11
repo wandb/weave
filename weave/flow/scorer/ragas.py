@@ -1,3 +1,5 @@
+# implememting metrics from ragas: https://github.com/explodinggradients/ragas
+
 from typing import Any, List
 
 from weave.flow.scorer.lightllm import LLMFactory
