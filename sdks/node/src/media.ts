@@ -1,11 +1,14 @@
 // Define WeaveImage type
-interface WeaveImage {
-  _weaveType: 'Image';
+type WeaveImageInput = {
   data: Buffer;
   imageType: 'png';
+};
+
+interface WeaveImage extends WeaveImageInput {
+  _weaveType: 'Image';
 }
 
-export function weaveImage({ data, imageType }: { data: Buffer; imageType: 'png' }): WeaveImage {
+export function weaveImage({ data, imageType }: WeaveImageInput): WeaveImage {
   return {
     _weaveType: 'Image',
     data,
