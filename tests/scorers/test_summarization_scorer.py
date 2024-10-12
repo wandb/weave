@@ -7,10 +7,6 @@ from weave.flow.scorer.summarization_scorer import (
 )
 
 
-# Mock the OpenAI client
-class MockOpenAI(OpenAI):
-    pass
-
 # mock the create function
 @pytest.fixture
 def mock_create(monkeypatch):
@@ -22,7 +18,7 @@ def mock_create(monkeypatch):
 
 @pytest.fixture
 def summarization_scorer(mock_create):
-    return SummarizationScorer(client=MockOpenAI(), model_id="gpt-4o", temperature=0.7, max_tokens=1024)
+    return SummarizationScorer(client=OpenAI(api_key="DUMMY_API_KEY"), model_id="gpt-4o", temperature=0.7, max_tokens=1024)
 
 def test_summarization_scorer_initialization(summarization_scorer, mock_create):
     assert isinstance(summarization_scorer, SummarizationScorer)
