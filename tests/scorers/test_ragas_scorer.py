@@ -8,11 +8,6 @@ from weave.flow.scorer.ragas_scorer import (
     RelevancyResponse,
 )
 
-
-# Mock the OpenAI client
-class MockOpenAI(OpenAI):
-    pass
-
 # Mock the create function
 @pytest.fixture
 def mock_create(monkeypatch):
@@ -32,11 +27,11 @@ def mock_create(monkeypatch):
 
 @pytest.fixture
 def context_entity_recall_scorer(mock_create):
-    return ContextEntityRecallScorer(client=MockOpenAI(), model_id="gpt-4o", temperature=0.7, max_tokens=1024)
+    return ContextEntityRecallScorer(client=OpenAI(api_key="DUMMY_API_KEY"), model_id="gpt-4o", temperature=0.7, max_tokens=1024)
 
 @pytest.fixture
 def context_relevancy_scorer(mock_create):
-    return ContextRelevancyScorer(client=MockOpenAI(), model_id="gpt-4o", temperature=0.7, max_tokens=1024)
+    return ContextRelevancyScorer(client=OpenAI(api_key="DUMMY_API_KEY"), model_id="gpt-4o", temperature=0.7, max_tokens=1024)
 
 def test_context_entity_recall_scorer_initialization(context_entity_recall_scorer):
     assert isinstance(context_entity_recall_scorer, ContextEntityRecallScorer)
