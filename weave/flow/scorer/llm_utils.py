@@ -1,7 +1,5 @@
 from typing import TYPE_CHECKING, List, Optional, Union
 
-import instructor
-
 from weave.trace.autopatch import autopatch
 
 autopatch()  # fix instrucor tracing
@@ -19,6 +17,7 @@ MISTRAL_DEFAULT_EMBEDDING_MODEL = "mistral-embed"
 DEFAULT_MAX_TOKENS = 4096
 
 if TYPE_CHECKING:
+    import instructor
     from anthropic import Anthropic, AsyncAnthropic
     from mistralai import Mistral
     from openai import AsyncOpenAI, OpenAI
@@ -28,7 +27,12 @@ else:
     _LLM_CLIENTS = object
 
 
-def instructor_client(client: _LLM_CLIENTS) -> instructor.client:  # type: ignore
+def instructor_client(client: _LLM_CLIENTS) -> "instructor.client":  # type: ignore
+    try:
+        import instructor
+    except ImportError:
+        raise ImportError("We need instructor to use this the LLM-powered scorers")
+
     client_type = type(client).__name__.lower()
     if "mistral" in client_type:
         return instructor.from_mistral(client)
