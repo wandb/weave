@@ -4,7 +4,7 @@ import pytest
 
 import weave
 from weave import Dataset, Evaluation, Model
-from weave.flow.scorer import MultiTaskBinaryClassificationF1
+from weave.scorers import MultiTaskBinaryClassificationF1
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 dataset = Dataset(rows=dataset_rows)

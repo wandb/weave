@@ -1,4 +1,8 @@
-from weave.flow.scorer.base_scorer import Scorer, auto_summarize, get_scorer_attributes
+from weave.flow.scorer.base_scorer import (
+    Scorer,
+    auto_summarize,
+    get_scorer_attributes,
+)
 from weave.flow.scorer.classification_scorer import (
     MultiTaskBinaryClassificationF1,
     transpose,

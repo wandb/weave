@@ -13,7 +13,7 @@ from weave.flow import util
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model, get_infer_method
 from weave.flow.obj import Object
-from weave.flow.scorer import (
+from weave.scorers import (
     Scorer,
     auto_summarize,
     get_scorer_attributes,
