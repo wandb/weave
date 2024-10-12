@@ -15,20 +15,6 @@ from weave.flow.obj import Object
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
 
-from typing import TYPE_CHECKING
-
-# Helper for IDEs
-if TYPE_CHECKING:
-    from weave.flow import scorers
-
-# Lazy import for the scorers module
-def __getattr__(name):
-    if name == "scorers":
-        from weave.flow import scorers
-        globals()["scorers"] = scorers
-        return scorers
-    raise AttributeError(f"module {__name__} has no attribute {name}")
-
 # Special object informing doc generation tooling which symbols
 # to document & to associate with this module.
 __docspec__ = [

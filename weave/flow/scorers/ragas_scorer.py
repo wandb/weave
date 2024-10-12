@@ -6,8 +6,8 @@ from typing import List
 from pydantic import BaseModel, Field
 
 import weave
-from weave.flow.scorer.llm_scorer import InstructorLLMScorer
-from weave.flow.scorer.llm_utils import create
+from weave.flow.scorers.llm_scorer import InstructorLLMScorer
+from weave.flow.scorers.llm_utils import create
 
 
 class EntityExtractionResponse(BaseModel):

@@ -2,8 +2,8 @@ from typing import Any
 
 from pydantic import Field, field_validator
 
-from weave.flow.scorer.base_scorer import Scorer
-from weave.flow.scorer.llm_utils import instructor_client, _LLM_CLIENTS
+from weave.flow.scorers.base_scorer import Scorer
+from weave.flow.scorers.llm_utils import _LLM_CLIENTS_NAMES, instructor_client
 
 
 class LLMScorer(Scorer):
@@ -16,9 +16,10 @@ class LLMScorer(Scorer):
 
     @field_validator("client")
     def validate_client(cls, v):  # type: ignore
-        if not isinstance(v, _LLM_CLIENTS):
+        client_type_name = type(v).__name__
+        if client_type_name not in _LLM_CLIENTS_NAMES:
             raise ValueError(
-                f"Invalid client type. Expected one of {_LLM_CLIENTS}, got {type(v)}"
+                f"Invalid client type. Expected one of {_LLM_CLIENTS_NAMES}, got {client_type_name}"
             )
         return v
 
@@ -39,8 +40,9 @@ class InstructorLLMScorer(Scorer):
 
     @field_validator("client")
     def validate_client(cls, v):  # type: ignore
-        if not isinstance(v, _LLM_CLIENTS):
+        client_type_name = type(v).__name__
+        if client_type_name not in _LLM_CLIENTS_NAMES:
             raise ValueError(
-                f"Invalid client type. Expected one of {_LLM_CLIENTS}, got {type(v)}"
+                f"Invalid client type. Expected one of {_LLM_CLIENTS_NAMES}, got {client_type_name}"
             )
         return instructor_client(v)

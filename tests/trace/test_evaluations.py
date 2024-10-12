@@ -749,17 +749,15 @@ async def test_eval_with_complex_types(client):
     assert "file_content_read" in access_log
 
 
-
 @pytest.mark.asyncio
 async def test_evaluation_with_column_map():
-
     # Define a dummy scorer that uses column_map
     class DummyScorer(Scorer):
         @weave.op()
         def score(self, foo: str, bar: str, output: str, target: str) -> dict:
             # Return whether foo + bar equals output
             return {"match": (foo + bar) == output == target}
-        
+
     # Create the scorer with column_map mapping 'foo'->'col1', 'bar'->'col2'
     dummy_scorer = DummyScorer(column_map={"foo": "col1", "bar": "col2"})
 
@@ -781,12 +779,13 @@ async def test_evaluation_with_column_map():
     eval_out = await evaluation.evaluate(model_function)
 
     # Check that 'DummyScorer' is in the results
-    assert 'DummyScorer' in eval_out
+    assert "DummyScorer" in eval_out
 
     # The expected summary should show that 3 out of 4 predictions matched
     expected_results = {"true_count": 3, "true_fraction": 0.75}
-    assert eval_out['DummyScorer']["match"] == expected_results, "The summary should reflect the correct number of matches"
-
+    assert (
+        eval_out["DummyScorer"]["match"] == expected_results
+    ), "The summary should reflect the correct number of matches"
 
 
 # Define another dummy scorer
@@ -799,16 +798,20 @@ async def test_evaluation_with_multiple_column_maps():
         def score(self, foo: str, bar: str, output: str, target: str) -> dict:
             # Return whether foo + bar equals output
             return {"match": (foo + bar) == output == target}
+
     class AnotherDummyScorer(Scorer):
         @weave.op()
         def score(self, input1: str, input2: str, output: str) -> dict:
             # Return whether input1 == output reversed
             return {"match": input1 == output[::-1]}
+
     # First scorer maps 'foo'->'col1', 'bar'->'col2'
     dummy_scorer = DummyScorer(column_map={"foo": "col1", "bar": "col2"})
 
     # Second scorer maps 'input1'->'col2', 'input2'->'col1'
-    another_dummy_scorer = AnotherDummyScorer(column_map={"input1": "col2", "input2": "col1"})
+    another_dummy_scorer = AnotherDummyScorer(
+        column_map={"input1": "col2", "input2": "col1"}
+    )
 
     @weave.op()
     def model_function(col1, col2):
@@ -821,18 +824,22 @@ async def test_evaluation_with_multiple_column_maps():
         {"col1": "xyz", "col2": "zyx", "target": "zzzzzz"},
     ]
 
-    evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer, another_dummy_scorer])
+    evaluation = Evaluation(
+        dataset=dataset, scorers=[dummy_scorer, another_dummy_scorer]
+    )
 
     # Run the evaluation
     eval_out = await evaluation.evaluate(model_function)
 
     # Check that both scorers are in the results
-    assert 'DummyScorer' in eval_out
-    assert 'AnotherDummyScorer' in eval_out
+    assert "DummyScorer" in eval_out
+    assert "AnotherDummyScorer" in eval_out
 
     # Assertions for the first scorer
-    expected_results_dummy = {"true_count": 1, "true_fraction": 1.0/3}
-    assert eval_out['DummyScorer']["match"] == expected_results_dummy, "All concatenations should match the target"
+    expected_results_dummy = {"true_count": 1, "true_fraction": 1.0 / 3}
+    assert (
+        eval_out["DummyScorer"]["match"] == expected_results_dummy
+    ), "All concatenations should match the target"
 
     # Assertions for the second scorer
     # Since input1 == col2, and output is col1 + col2, we check if col2 == (col1 + col2)[::-1]
@@ -842,4 +849,6 @@ async def test_evaluation_with_multiple_column_maps():
     # Third row: col2 = "zyx", output = "xyzzyx", output[::-1] = "xyzzyx" -> "zyx" == "xyzzyx" is False
     # So all matches are False
     expected_results_another_dummy = {"true_count": 0, "true_fraction": 0.0}
-    assert eval_out['AnotherDummyScorer']["match"] == expected_results_another_dummy, "No matches should be found for AnotherDummyScorer"
+    assert (
+        eval_out["AnotherDummyScorer"]["match"] == expected_results_another_dummy
+    ), "No matches should be found for AnotherDummyScorer"

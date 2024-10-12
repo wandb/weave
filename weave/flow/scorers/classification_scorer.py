@@ -2,7 +2,7 @@ from collections import defaultdict
 from typing import Optional, Tuple
 
 import weave
-from weave.flow.scorer.base_scorer import Scorer
+from weave.flow.scorers.base_scorer import Scorer
 
 
 def p_r_f1(tp: int, fp: int, fn: int) -> Tuple[float, float, float]:

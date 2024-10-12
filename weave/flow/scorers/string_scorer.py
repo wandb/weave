@@ -4,7 +4,7 @@ from typing import Callable, Union
 from pydantic import Field, model_validator
 
 import weave
-from weave.flow.scorer.base_scorer import Scorer
+from weave.flow.scorers.base_scorer import Scorer
 
 
 class StringMatchScorer(Scorer):
@@ -53,7 +53,7 @@ class RegexScorer(Scorer):  # type: ignore
                 text_to_search = "".join(text_to_search.split())
 
         match_found = any(
-            pattern.search(text_to_search) for pattern in compiled_patterns
+            pattern.search(str(text_to_search)) for pattern in compiled_patterns
         )
 
         return {"string_match": match_found}
@@ -70,6 +70,7 @@ class LevenshteinScorer(Scorer):
             from Levenshtein import distance
 
             self.distance = distance
+            return self
         except ImportError:
             raise ValueError(
                 "Levenshtein package not found. Please install it with `pip install Levenshtein`"

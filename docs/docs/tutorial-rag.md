@@ -182,7 +182,7 @@ On a high-level the steps to create custom Scorer are quite simple:
 
 
 ```python
-from weave.flow.scorer import Scorer
+from weave.scorers import Scorer
 from weave import WeaveList
 
 class CorrectnessLLMJudge(Scorer):

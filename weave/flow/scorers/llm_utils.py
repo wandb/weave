@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, List, Optional, Union
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
 from weave.trace.autopatch import autopatch
 
@@ -26,6 +28,14 @@ if TYPE_CHECKING:
 else:
     _LLM_CLIENTS = object
 
+_LLM_CLIENTS_NAMES = (
+    "OpenAI",
+    "AsyncOpenAI",
+    "Anthropic",
+    "AsyncAnthropic",
+    "Mistral",
+)
+
 
 def instructor_client(client: _LLM_CLIENTS) -> "instructor.client":  # type: ignore
     try:
@@ -47,12 +57,12 @@ def instructor_client(client: _LLM_CLIENTS) -> "instructor.client":  # type: ign
         raise ValueError(f"Unsupported client type: {client_type}")
 
 
-def create(client: _LLM_CLIENTS, *args, **kwargs):  # type: ignore
+def create(client: instructor.client, *args, **kwargs) -> Any:  # type: ignore
     return client.chat.completions.create(*args, **kwargs)
 
 
 def embed(
-    client: _LLM_CLIENTS, model_id: str, texts: Union[str, List[str]], **kwargs
+    client: _LLM_CLIENTS, model_id: str, texts: Union[str, List[str]], **kwargs: Any
 ) -> List[List[float]]:  # type: ignore
     client_type = type(client).__name__.lower()
     if "openai" in client_type:
@@ -71,12 +81,15 @@ def import_client(provider: str) -> Optional[_LLM_CLIENTS]:  # type: ignore
     try:
         if provider == "openai":
             from openai import OpenAI
+
             return OpenAI
         elif provider == "anthropic":
             import anthropic
+
             return anthropic.Anthropic
         elif provider == "mistral":
             from mistralai import Mistral
+
             return Mistral
     except ImportError:
         return None

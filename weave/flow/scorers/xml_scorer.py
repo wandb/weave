@@ -1,10 +1,10 @@
 import xml.etree.ElementTree as ET
 from typing import Union
 
-from weave.flow.scorer.base_scorer import Scorer
+from weave.flow.scorers.base_scorer import Scorer
 
 
-class XMLScorer(Scorer):
+class ValidXMLScorer(Scorer):
     """Score an XML string."""
 
     def score(self, output: Union[str, dict]) -> dict:  # type: ignore

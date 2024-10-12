@@ -1,10 +1,10 @@
 import json
 from typing import Any
 
-from weave.flow.scorer.base_scorer import Scorer
+from weave.flow.scorers.base_scorer import Scorer
 
 
-class JSONScorer(Scorer):
+class ValidJSONScorer(Scorer):
     """Score a JSON string."""
 
     def score(self, output: Any, **kwargs: Any) -> dict:  # type: ignore
