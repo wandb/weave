@@ -9,6 +9,7 @@ from PIL import Image
 import weave
 from tests.trace.util import AnyIntMatcher
 from weave import Evaluation, Model
+from weave.trace.weave_client import get_ref
 from weave.trace_server import trace_server_interface as tsi
 
 
@@ -285,6 +286,14 @@ class MyDictScorerWithCustomDictSummary(weave.Scorer):
         }
 
 
+def with_empty_feedback(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        if "weave" not in obj:
+            obj["weave"] = {}
+        obj["weave"]["feedback"] = []
+    return obj
+
+
 @pytest.mark.asyncio
 async def test_evaluation_data_topology(client):
     """We support a number of different types of scorers, and we want to ensure that
@@ -319,6 +328,7 @@ async def test_evaluation_data_topology(client):
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
+            include_feedback=True,
         )
     )
     flattened = flatten_calls(calls.calls)
@@ -420,7 +430,14 @@ async def test_evaluation_data_topology(client):
 
     # Prediction
     assert predict_call.output == model_output
-    assert predict_call.summary == predict_usage
+    summary = {
+        **predict_call.summary,
+        "weave": {
+            **predict_call.summary["weave"],
+            "feedback": [],
+        },
+    }
+    assert summary == with_empty_feedback(predict_usage)
 
     # Prediction Scores
     assert score_int_call.output == score_int_score
@@ -532,7 +549,22 @@ async def test_evaluation_data_topology(client):
             "model_output": model_output_summary,
         }
     )
-    assert evaluate_call.summary == predict_usage_summary
+    assert evaluate_call.summary == with_empty_feedback(predict_usage_summary)
+
+    # Test new Feeedback as Scores
+    predict_calls_simple = [
+        c for c in flat_calls if op_name_from_ref(c.op_name) == "SimpleModel.predict"
+    ]
+    predict_calls_with_confidence = [
+        c
+        for c in flat_calls
+        if op_name_from_ref(c.op_name) == "SimpleModelWithConfidence.predict"
+    ]
+    assert len(predict_calls_simple) == len(predict_calls_with_confidence) == 2
+    assert len(predict_calls_simple[0].summary["weave"]["feedback"]) == 7
+    assert len(predict_calls_simple[1].summary["weave"]["feedback"]) == 7
+    assert len(predict_calls_with_confidence[0].summary["weave"]["feedback"]) == 7
+    assert len(predict_calls_with_confidence[1].summary["weave"]["feedback"]) == 7
 
 
 def make_test_eval():
@@ -747,3 +779,36 @@ async def test_eval_with_complex_types(client):
     assert "table_query" in access_log
     assert "obj_read" in access_log
     assert "file_content_read" in access_log
+
+
+@pytest.mark.asyncio
+async def test_feedback_is_correctly_linked(client):
+    @weave.op
+    def predict(text: str) -> str:
+        return text
+
+    @weave.op
+    def score(text, model_output) -> bool:
+        return text == model_output
+
+    eval = weave.Evaluation(
+        dataset=[{"text": "hello"}],
+        scorers=[score],
+    )
+    res = await eval.evaluate(predict)
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            include_feedback=True,
+            filter=tsi.CallsFilter(op_names=[get_ref(predict).uri()]),
+        )
+    )
+    assert len(calls.calls) == 1
+    assert calls.calls[0].summary["weave"]["feedback"]
+    feedbacks = calls.calls[0].summary["weave"]["feedback"]
+    assert len(feedbacks) == 1
+    feedback = feedbacks[0]
+    assert feedback["feedback_type"] == "wandb.score.1"
+    assert feedback["payload"]["name"] == "score"
+    assert feedback["payload"]["op_ref"] == get_ref(score).uri()
+    assert feedback["payload"]["results"] == True
