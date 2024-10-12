@@ -65,7 +65,7 @@ def tests(session, shard):
         "trace_server": ["trace_server/"],
         "mistral0": ["integrations/mistral/v0/"],
         "mistral1": ["integrations/mistral/v1/"],
-        "scorers": ["flow/"],
+        "scorers": ["scorers/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
