@@ -179,7 +179,12 @@ class ObjSchema(BaseModel):
     created_at: datetime.datetime
     deleted_at: Optional[datetime.datetime] = None
     digest: str
-    version_index: int
+    version_index: int = Field(
+        description="The version number for this object version."
+    )
+    version_count: Optional[int] = Field(
+        default=None, description="The count of total versions of the object."
+    )
     is_latest: int
     kind: str
     base_object_class: Optional[str]
