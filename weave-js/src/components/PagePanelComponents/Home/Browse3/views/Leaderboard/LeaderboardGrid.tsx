@@ -7,6 +7,7 @@ import {
   GridSortDirection,
   GridSortItem,
 } from '@mui/x-data-grid-pro';
+import {Timestamp} from '@wandb/weave/components/Timestamp';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -66,7 +67,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 
   const getColorForScore = useCallback(
     (datasetGroup, scorerGroup, metricPathGroup, score) => {
-      const shouldMinimize = false;
+      const shouldMinimize = ['Avg. Latency'].includes(metricPathGroup);
       if (score == null) {
         return 'transparent';
       }
@@ -149,12 +150,13 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                     getSortComparator: defaultGetSortComparator,
 
                     renderCell: (params: GridRenderCellParams) => {
-                      const value = valueFromRowData(
+                      const record = recordFromRowData(
                         params.row,
                         datasetGroupName,
                         scorerGroupName,
                         metricPathGroupName
                       );
+                      const value = record?.metricValue;
                       let inner: React.ReactNode = value;
                       if (inner == null) {
                         inner = <NotApplicable />;
@@ -164,15 +166,17 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                         } else {
                           inner = `${inner.toFixed(2)}`;
                         }
+                      } else if (value instanceof Date) {
+                        console.log(value.getTime());
+                        return (
+                          <Timestamp
+                            value={value.getTime() / 1000}
+                            format="relative"
+                          />
+                        );
                       } else {
                         inner = JSON.stringify(params.value);
                       }
-                      const record = recordFromRowData(
-                        params.row,
-                        datasetGroupName,
-                        scorerGroupName,
-                        metricPathGroupName
-                      );
                       return (
                         <div
                           style={{
@@ -181,6 +185,9 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
                             backgroundColor: getColorForScore(
                               datasetGroupName,
                               scorerGroupName,
@@ -419,9 +426,8 @@ const getColumnStats = (data: GroupedLeaderboardData): ColumnStats => {
                 if (metricPathGroup.length === 0) {
                   return;
                 }
-                const metricValue = getAggregatedResults(
-                  metricPathGroup
-                ) as number;
+                const metricValue = getAggregatedResults(metricPathGroup)
+                  ?.metricValue as number;
                 if (
                   currScorerGroup.metricPathGroups[metricPathGroupName] == null
                 ) {
@@ -461,34 +467,56 @@ const valueFromRowData = (
   datasetGroupName: string,
   scorerGroupName: string,
   metricPathGroupName: string
-): number | string | boolean | null => {
+): number | string | boolean | null | undefined | Date => {
   return getAggregatedResults(
-    rowData.modelGroup.datasetGroups[datasetGroupName]?.scorerGroups[
-      scorerGroupName
-    ]?.metricPathGroups[metricPathGroupName] ?? []
-  );
+    recordsFromRowData(
+      rowData,
+      datasetGroupName,
+      scorerGroupName,
+      metricPathGroupName
+    )
+  )?.metricValue;
 };
+
 const recordFromRowData = (
   rowData: RowData,
   datasetGroupName: string,
   scorerGroupName: string,
   metricPathGroupName: string
 ): LeaderboardValueRecord | null => {
-  return rowData.modelGroup.datasetGroups[datasetGroupName]?.scorerGroups[
-    scorerGroupName
-  ]?.metricPathGroups[metricPathGroupName]?.[0];
+  return getAggregatedResults(
+    recordsFromRowData(
+      rowData,
+      datasetGroupName,
+      scorerGroupName,
+      metricPathGroupName
+    )
+  );
 };
+
+const recordsFromRowData = (
+  rowData: RowData,
+  datasetGroupName: string,
+  scorerGroupName: string,
+  metricPathGroupName: string
+): LeaderboardValueRecord[] => {
+  return (
+    rowData.modelGroup.datasetGroups[datasetGroupName]?.scorerGroups[
+      scorerGroupName
+    ]?.metricPathGroups[metricPathGroupName] ?? []
+  );
+};
+
 const getAggregatedResults = (
   data: null | LeaderboardValueRecord[]
-): number | string | boolean | null => {
+): LeaderboardValueRecord | null => {
   if (data == null || data.length === 0) {
     return null;
   }
   if (data.length === 1) {
-    return data[0].metricValue;
+    return data[0];
   }
-  return data.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0]
-    .metricValue;
+  return data.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
 };
 
 const defaultGetSortComparator =

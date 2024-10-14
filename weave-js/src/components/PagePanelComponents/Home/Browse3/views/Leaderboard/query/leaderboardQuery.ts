@@ -22,13 +22,14 @@ export type LeaderboardValueRecord = {
   metricType:
     | 'scorerMetric'
     | 'modelLatency'
+    | 'evaluationDate'
     | 'modelCost'
     | 'modelTokens'
     | 'modelErrors';
   scorerName: string; // modelMetrics repeat the type here
   scorerVersion: string; // modelMetrics repeat the type here
   metricPath: string; // modelMetrics repeat the type here
-  metricValue: number | string | boolean | null;
+  metricValue: number | string | boolean | null | Date;
   modelName: string;
   modelVersion: string;
   modelType: 'object' | 'op';
@@ -287,15 +288,30 @@ export const getLeaderboardGroupableData = async (
       const modelLatencyRecord: LeaderboardValueRecord = {
         ...recordPartial,
         metricType: 'modelLatency',
-        scorerName: 'modelLatency',
-        scorerVersion: 'modelLatency',
-        metricPath: 'model_latency.mean',
+        scorerName: 'Summary',
+        scorerVersion: '',
+        metricPath: 'Avg. Latency',
         metricValue: modelLatency,
       };
       data.push(modelLatencyRecord);
     }
 
-    // TODO: add modelCost, modelTokens, modelErrors
+    const evaluationDate = convertISOToDate(call.started_at);
+    if (evaluationDate == null) {
+      console.warn('Skipping model latency', call);
+    } else {
+      const evaluationDateRecord: LeaderboardValueRecord = {
+        ...recordPartial,
+        metricType: 'evaluationDate',
+        scorerName: 'Summary',
+        scorerVersion: '',
+        metricPath: 'Run Date',
+        metricValue: evaluationDate,
+      };
+      data.push(evaluationDateRecord);
+    }
+
+    // TODO: add modelCost/tokens, modelErrors
   });
 
   const filterableGroupableData = data.map(row => {
