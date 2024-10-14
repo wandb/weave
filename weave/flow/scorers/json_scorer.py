@@ -5,7 +5,7 @@ from weave.flow.scorers.base_scorer import Scorer
 
 
 class ValidJSONScorer(Scorer):
-    """Score a JSON string."""
+    """Validate whether a string is valid JSON."""
 
     def score(self, output: Any, **kwargs: Any) -> dict:  # type: ignore
         try:

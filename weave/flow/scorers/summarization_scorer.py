@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 import weave
 from weave.flow.scorers.llm_scorer import InstructorLLMScorer
-from weave.flow.scorers.llm_utils import create
+from weave.flow.scorers.llm_utils import create, OPENAI_DEFAULT_MODEL
 
 DEFAULT_EXTRACTION_SYSTEM_PROMPT = """
 Given a <text>, extract all the unique entities from the text without repetition.
@@ -76,23 +76,49 @@ on the summarization_score."
 
 class SummarizationScorer(InstructorLLMScorer):
     """
-    Estimates summary quality by both:
-    - Calculating the entity density of the summary, similar to how entity density is
-    used in the Chain of Density paper, https://arxiv.org/abs/2309.04269.
-    - Using an LLM to evaluate the summary quality.
+    A Scorer that evaluates the quality of summaries in two ways:
+        - using an LLM to calculate the entity density of the summary, similar to how entity density is
+        used in the Chain of Density paper, https://arxiv.org/abs/2309.04269. This is a rough measure for
+        how information-dense the summary is.
+        - using another LLM evaluator to grade the summary quality from `poor`, `ok`, to `excellent`. These
+        grades are then mapped to numerical scores, {`poor`: 0.0, `ok`: 0.5, `excellent`: 1.0}, in order to
+        be able to calculate an average score across a dataset of summaries if needed.
 
-    column_map: A `scorer parameter name : dataset column name` mapping.
-    
-    This summarization scorer expects the input column in the dataset to be named "input" \
-        and the output column in the dataset to be named "summary".
-        You can specify a different mapping in the `column_map` argument. For example, \
-        if your dataset contains columns "news_article" and "news_summary" then you can \
-        specify `column_map={"input": "news_article", "output": "news_summary"}`.
-    
-    Parameters to the `score` function
-    - input: The text that was to be summarized
-    - output: the summary of the text
+    To customise the LLM evaluator you can customise the `summarization_evaluation_system_prompt`and
+    `summarization_evaluation_prompt` attributes to be tailored your specific definition of what a good summary
+    should look like.
+
+    Note:
+        - This Scorer uses the `InstructorLLMScorer` class to generate structured outputs from the LLM 
+        provider's response; you will have to install the `instructor` python package to use it.
+        - The `score` method expects the input column from the dataset to be named "input". If your dataset
+        column has a different name, you can specify a different mapping using the `column_map` argument in the 
+        init of SummarizationScorer by passing `column_map={"input": "news_article"}`.
+
+    Attributes:
+        extraction_system_prompt (str): System prompt to extract the distinct entities in the input. Customising 
+        this can help ensure that the LLM identifies the `entities` that you care about.
+        extraction_prompt (str): Prompt template for entity extraction; must contain a `{text}` placeholder.
+        summarization_evaluation_system_prompt (str): System prompt defining how to evaluate the quality of a summary.
+            Asks an LLM to grade the summary from `poor`, `ok`, to `excellent` and provide a rationale for the grade.
+        summarization_evaluation_prompt (str): Prompt template for summarization evaluation instruction; must contain 
+            `{input}` and `{summary}` placeholders. 
+        entity_density_threshold (float): Threshold for determining if a summary is sufficiently entity-dense.
+        model_id (str): The LLM model name, depends on the LLM's providers to be used `client` being used.
+        temperature (float): LLM temperature setting.
+        max_tokens (int): Maximum number of tokens in the LLM's response.
+
+    Methods:
+        extract_entities(text: str) -> List[str]:
+            Uses an LLM to extract unique entities from the text.
+
+        evaluate_summary(input: str, summary: str) -> SummarizationEvaluationResponse:
+            Evaluates the quality of a summary using an LLM.
+
+        score(input: str, output: str, **kwargs: Any) -> dict:
+            Calculates summarization score and entity density score for the given input and output.
     """
+
 
     extraction_system_prompt: str = DEFAULT_EXTRACTION_SYSTEM_PROMPT
     extraction_prompt: str = DEFAULT_EXTRACTION_USER_PROMPT
@@ -100,8 +126,8 @@ class SummarizationScorer(InstructorLLMScorer):
         DEFAULT_SUMMARIZATION_EVALUATION_SYSTEM_PROMPT
     )
     summarization_evaluation_prompt: str = DEFAULT_SUMMARIZATION_EVALUATION_USER_PROMPT
-    fast_model_id: str = "gpt-4o-mini"
     entity_density_threshold: float = 0.08
+    model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = 0.7
     max_tokens: int = 1024
 
@@ -115,7 +141,7 @@ class SummarizationScorer(InstructorLLMScorer):
                 {"role": "user", "content": self.extraction_prompt.format(text=text)},
             ],
             response_model=EntityExtractionResponse,
-            model=self.fast_model_id,
+            model=self.model_id,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )
@@ -153,13 +179,11 @@ class SummarizationScorer(InstructorLLMScorer):
 
     @weave.op
     async def score(self, input: str, output: str, **kwargs: Any) -> dict:
-        """
-        - input: the piece of text that was to be summarized
-        - output: the generated summary of the input
-        """
-        extract_task = asyncio.to_thread(self.extract_entities, text=output)
+        extract_task = asyncio.to_thread(
+            self.extract_entities, text=str(output)
+        )
         evaluate_task = asyncio.to_thread(
-            self.evaluate_summary, input=input, summary=output
+            self.evaluate_summary, input=str(input), summary=str(output)
         )
         summary_entities, llm_eval = await asyncio.gather(extract_task, evaluate_task)
 
