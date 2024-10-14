@@ -17,10 +17,8 @@ def gemini_accumulator(
         acc = value
     if not acc._done:
         return value
-    for candidate_idx in range(len(value.candidates)):
-        value_candidate = value.candidates[candidate_idx]
-        for part_idx in range(len(value_candidate.content.parts)):
-            value_part = value_candidate.content.parts[part_idx]
+    for candidate_idx, value_candidate in enumerate(value.candidates):
+        for part_idx, value_part in enumerate(value_candidate.content.parts):
             acc.candidates[candidate_idx].content.parts[
                 part_idx
             ].text += value_part.text
