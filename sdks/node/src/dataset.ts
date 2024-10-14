@@ -46,11 +46,11 @@ export class Dataset<R extends DatasetRow> extends WeaveObject {
 
   async *[Symbol.asyncIterator](): AsyncIterator<any> {
     for (let i = 0; i < this.length; i++) {
-      yield this.row(i);
+      yield this.getRow(i);
     }
   }
 
-  row(index: number): R {
+  getRow(index: number): R {
     const tableRow = this.rows.row(index);
     const datasetRow: R = { ...tableRow, __savedRef: undefined };
     if (this.__savedRef && tableRow.__savedRef) {
