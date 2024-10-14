@@ -188,7 +188,8 @@ export const browse2Context = {
   compareEvaluationsUri: (
     entityName: string,
     projectName: string,
-    evaluationCallIds: string[]
+    evaluationCallIds: string[],
+    metrics: Record<string, boolean> | null
   ) => {
     throw new Error('Not implemented');
   },
@@ -408,14 +409,15 @@ export const browse3ContextGen = (
     compareEvaluationsUri: (
       entityName: string,
       projectName: string,
-      evaluationCallIds: string[]
+      evaluationCallIds: string[],
+      metrics: Record<string, boolean> | null
     ) => {
       return `${projectRoot(
         entityName,
         projectName
       )}/compare-evaluations?evaluationCallIds=${encodeURIComponent(
         JSON.stringify(evaluationCallIds)
-      )}`;
+      )}&metrics=${encodeURIComponent(JSON.stringify(metrics))}`;
     },
   };
   return browse3Context;
@@ -498,7 +500,8 @@ type RouteType = {
   compareEvaluationsUri: (
     entityName: string,
     projectName: string,
-    evaluationCallIds: string[]
+    evaluationCallIds: string[],
+    metrics: Record<string, boolean> | null
   ) => string;
 };
 
