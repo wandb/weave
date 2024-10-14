@@ -26,6 +26,7 @@ jobs:
             revert
             style
             security
+            test
           scopes: |
             ui
             weave
