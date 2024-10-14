@@ -33,7 +33,7 @@ import {useTableStateWithRefinedExpressions} from './tableStateReact';
 export const getColumnCellFormats = (colType: Type): WeaveFormatContextType => {
   const t = nullableTaggableStrip(colType);
   const numberFormat =
-    t === 'number'
+    t === 'number' || t === 'float' || t === 'int'
       ? {
           textAlign: 'right' as const,
           justifyContent: 'normal',
