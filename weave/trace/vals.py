@@ -352,7 +352,7 @@ class WeaveTable(Traceable):
 
         for ndx, row in enumerate(self._prefetched_rows):
             next_id_future = wc.future_executor.defer(
-                lambda: cached_table_ref.row_digests[ndx]
+                lambda ndx_closure=ndx: cached_table_ref.row_digests[ndx_closure]
             )
             new_ref = self.ref.with_item(next_id_future)
             val = self._prefetched_rows[ndx]
