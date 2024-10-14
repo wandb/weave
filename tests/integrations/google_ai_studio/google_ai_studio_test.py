@@ -4,8 +4,8 @@ from typing import Any
 
 import pytest
 
-from weave.trace.weave_client import WeaveClient
 from weave.integrations.integration_utilities import op_name_from_ref
+from weave.trace.weave_client import WeaveClient
 
 
 @pytest.mark.skip_clickhouse_client
