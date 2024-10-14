@@ -1567,9 +1567,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     sort_clauses.append(f"{sort.field} {sort.direction.upper()}")
             if sort_clauses:
                 sort_part = f"ORDER BY {', '.join(sort_clauses)}"
-        elif include_deleted:
-            # If we are including deleted objects, sort the non-deleted first
-            sort_part = "ORDER BY (deleted_at IS NULL) DESC, created_at ASC"
         else:
             sort_part = "ORDER BY created_at ASC"
 
@@ -1624,15 +1621,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         digest,
                         deleted_at,
                         if (kind = 'op', 1, 0) AS is_op,
-                        row_number() OVER (
-                            PARTITION BY project_id, kind, object_id, digest, created_at
-                            ORDER BY (deleted_at IS NULL) ASC, created_at ASC
-                        ) AS rn
                     FROM object_versions
                     WHERE project_id = {{project_id: String}} AND
                         {object_id_conditions_part}
+                    ORDER by created_at DESC
+                    LIMIT 1
                 )
-                WHERE rn = 1
             )
             WHERE {conditions_part} AND
             {deleted_at_condition_part}
