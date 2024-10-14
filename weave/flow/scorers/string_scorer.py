@@ -15,50 +15,6 @@ class StringMatchScorer(Scorer):
         return {"string_in_input": string_in_input}
 
 
-class RegexScorer(Scorer):  # type: ignore
-    patterns: Union[str, list[str]] = Field(
-        default_factory=list, description="The patterns or keywords to match"
-    )
-    ignore_case: bool = True
-    ignore_whitespace: bool = False
-    match_full_string: bool = False  # Match the entire string if True
-    target_column: str = Field(default="target", description="The class name to match")
-
-    @weave.op
-    def score(
-        self, output: Union[dict, str], target: Union[str, list[str], None] = None
-    ) -> dict:
-        if isinstance(output, str):
-            output = {"output": output}
-
-        # Use target patterns if provided
-        patterns = target if target else self.patterns
-        if isinstance(patterns, str):
-            patterns = [patterns]
-
-        flags = re.IGNORECASE if self.ignore_case else 0
-        compiled_patterns = []
-        for pattern in patterns:
-            if not self.use_regex:
-                pattern = re.escape(pattern)
-            if self.ignore_whitespace:
-                pattern = "".join(pattern.split())
-            if self.match_full_string:
-                pattern = f"^{pattern}$"
-            compiled_patterns.append(re.compile(pattern, flags=flags))
-
-        text_to_search = output.get("output") if output else ""
-        if self.ignore_whitespace:
-            if text_to_search:
-                text_to_search = "".join(text_to_search.split())
-
-        match_found = any(
-            pattern.search(str(text_to_search)) for pattern in compiled_patterns
-        )
-
-        return {"string_match": match_found}
-
-
 class LevenshteinScorer(Scorer):
     distance: Callable[[str, str], int] = Field(
         default=None, description="The Levenshtein distance function"
