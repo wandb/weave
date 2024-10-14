@@ -35,20 +35,17 @@ def test_content_generation(client: WeaveClient) -> None:
     model = genai.GenerativeModel("gemini-1.5-flash")
     model.generate_content("Write a story about an AI and magic")
 
-    weave_server_response = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_response.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
 
-    flattened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_response.calls)
-    ]
-    assert flattened_calls_list == [
-        ("google.generativeai.GenerativeModel.generate_content", 0),
-    ]
-    for call in weave_server_response.calls:
-        assert call.exception is None and call.ended_at is not None
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert (
+        op_name_from_ref(call.op_name)
+        == "google.generativeai.GenerativeModel.generate_content"
+    )
+    output = call.output
+    assert output is not None
 
 
 @pytest.mark.skip_clickhouse_client
@@ -63,24 +60,22 @@ def test_content_generation_stream(client: WeaveClient) -> None:
     chunks = [chunk.text for chunk in response]
     assert len(chunks) > 1
 
-    weave_server_response = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
+    calls = list(client.calls())
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert (
+        op_name_from_ref(call.op_name)
+        == "google.generativeai.GenerativeModel.generate_content"
     )
-    assert len(weave_server_response.calls) == 1
-
-    flattened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_response.calls)
-    ]
-    assert flattened_calls_list == [
-        ("google.generativeai.GenerativeModel.generate_content", 0)
-    ]
-    for call in weave_server_response.calls:
-        assert call.exception is None and call.ended_at is not None
+    output = call.output
+    assert output is not None
 
 
+@pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
-def test_content_generation_async(client: WeaveClient) -> None:
+async def test_content_generation_async(client: WeaveClient) -> None:
     import google.generativeai as genai
 
     genai.configure(api_key=os.environ.get("GOOGLE_API_KEY", "DUMMY_API_KEY"))
@@ -91,17 +86,14 @@ def test_content_generation_async(client: WeaveClient) -> None:
 
     asyncio.run(async_generate())
 
-    weave_server_response = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_response.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
 
-    flattened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_response.calls)
-    ]
-    assert flattened_calls_list == [
-        ("google.generativeai.GenerativeModel.generate_content_async", 0),
-    ]
-    for call in weave_server_response.calls:
-        assert call.exception is None and call.ended_at is not None
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert (
+        op_name_from_ref(call.op_name)
+        == "google.generativeai.GenerativeModel.generate_content_async"
+    )
+    output = call.output
+    assert output is not None
