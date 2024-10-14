@@ -1,7 +1,7 @@
 .PHONY: docs build
 
 setup-docs-ci:
-	pip install -e .[docs]
+	cd sdks/python && pip install -e .[docs]
 	playwright install
 
 	cd docs && \

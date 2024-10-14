@@ -82,9 +82,9 @@ jobs:
           CI: 1
           WANDB_ENABLE_TEST_CONTAINER: true
         ports:
-          - '8080:8080'
-          - '8083:8083'
-          - '9015:9015'
+          - "8080:8080"
+          - "8083:8083"
+          - "9015:9015"
         options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
     outputs:
       tests_should_run: ${{ steps.test_check.outputs.tests_should_run }}
@@ -160,7 +160,7 @@ jobs:
       - uses: actions/setup-node@v1
         if: steps.check_run.outputs.should_lint_and_compile == 'true'
         with:
-          node-version: '18.x'
+          node-version: "18.x"
       - name: Run WeaveJS Lint and Compile
         if: steps.check_run.outputs.should_lint_and_compile == 'true'
         run: |
@@ -189,7 +189,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install nox uv
       - name: Run nox
-        run: nox -e lint
+        run: |
+          cd sdks/python
+          nox -e lint
 
   trace-docs:
     name: Trace docs
@@ -213,32 +215,32 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version-major: ['3']
+        python-version-major: ["3"]
         python-version-minor: [
-            '9',
-            '10',
-            '11',
-            '12',
-            '13',
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
             #
           ]
         nox-shard:
           [
-            'trace',
-            'trace_server',
-            'anthropic',
-            'cerebras',
-            'cohere',
-            'dspy',
-            'groq',
-            'instructor',
-            'langchain',
-            'litellm',
-            'llamaindex',
-            'mistral0',
-            'mistral1',
-            'notdiamond',
-            'openai',
+            "trace",
+            "trace_server",
+            "anthropic",
+            "cerebras",
+            "cohere",
+            "dspy",
+            "groq",
+            "instructor",
+            "langchain",
+            "litellm",
+            "llamaindex",
+            "mistral0",
+            "mistral1",
+            "notdiamond",
+            "openai",
           ]
       fail-fast: false
     services:
@@ -251,14 +253,14 @@ jobs:
           CI: 1
           WANDB_ENABLE_TEST_CONTAINER: true
         ports:
-          - '8080:8080'
-          - '8083:8083'
-          - '9015:9015'
+          - "8080:8080"
+          - "8083:8083"
+          - "9015:9015"
         options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
       weave_clickhouse:
         image: clickhouse/clickhouse-server
         ports:
-          - '8123:8123'
+          - "8123:8123"
         options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
     steps:
       - name: Checkout
@@ -279,6 +281,7 @@ jobs:
           WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
+          cd sdks/python
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "weave_client and not skip_clickhouse_client" \
             --weave-server=clickhouse
@@ -290,6 +293,7 @@ jobs:
           WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
+          cd sdks/python
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
