@@ -6,7 +6,7 @@ from weave.flow.scorers.hallucination_scorer import (
     HallucinationResponse,
 )
 from weave.scorers import (
-    HallucinationScorer,
+    HallucinationFreeScorer,
 )
 
 
@@ -31,7 +31,7 @@ def mock_create(monkeypatch):
 
 @pytest.fixture
 def hallucination_scorer(mock_create):
-    return HallucinationScorer(
+    return HallucinationFreeScorer(
         client=OpenAI(api_key="DUMMY_API_KEY"),
         model_id="gpt-4o",
         temperature=0.7,
@@ -40,7 +40,7 @@ def hallucination_scorer(mock_create):
 
 
 def test_hallucination_scorer_initialization(hallucination_scorer):
-    assert isinstance(hallucination_scorer, HallucinationScorer)
+    assert isinstance(hallucination_scorer, HallucinationFreeScorer)
     assert hallucination_scorer.model_id == "gpt-4o"
     assert hallucination_scorer.temperature == 0.7
     assert hallucination_scorer.max_tokens == 4096

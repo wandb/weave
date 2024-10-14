@@ -1,3 +1,4 @@
+import json
 from typing import List
 
 from pydantic import BaseModel, Field
@@ -104,7 +105,7 @@ the <output> contains hallucinations."
     )
 
 
-class HallucinationScorer(InstructorLLMScorer):
+class HallucinationFreeScorer(InstructorLLMScorer):
     """
     A Scorer that uses an LLM to determine if the model output contains any hallucinations
     based on the input data.
@@ -117,7 +118,7 @@ class HallucinationScorer(InstructorLLMScorer):
         - The `score` method expects the input column from the dataset to be named "context". It will use
         this data as the ground-truth to check hallucinations against. If your dataset column has a 
         different name, you can specify a different mapping using the `column_map` argument in the init 
-        of HallucinationScorer by passing `column_map={"context": "context"}`.
+        of HallucinationFreeScorer by passing `column_map={"context": "context"}`.
 
     Attributes:
         system_prompt (str): The prompt describing the task, defines what a "hallucination" is.
@@ -157,4 +158,12 @@ class HallucinationScorer(InstructorLLMScorer):
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )
-        return response
+        hallucination_reasonings = [
+            r.model_dump_json() for r in response.hallucination_reasonings
+        ]
+        return {
+            "hallucination_free": not response.is_hallucination,
+            "conclusion": response.conclusion,
+            "reasonings": json.dumps(hallucination_reasonings),
+            "chain_of_thought": response.chain_of_thought,
+        }

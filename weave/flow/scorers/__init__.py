@@ -7,7 +7,7 @@ from weave.flow.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
     transpose,
 )
-from weave.flow.scorers.hallucination_scorer import HallucinationScorer
+from weave.flow.scorers.hallucination_scorer import HallucinationFreeScorer
 from weave.flow.scorers.json_scorer import ValidJSONScorer
 from weave.flow.scorers.llm_scorer import (
     InstructorLLMScorer,
@@ -33,7 +33,7 @@ __all__ = [
     "ContextRelevancyScorer",
     "EmbeddingSimilarityScorer",
     "get_scorer_attributes",
-    "HallucinationScorer",
+    "HallucinationFreeScorer",
     "InstructorLLMScorer",
     "ValidJSONScorer",
     "LevenshteinScorer",
