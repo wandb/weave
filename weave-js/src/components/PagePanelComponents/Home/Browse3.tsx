@@ -948,16 +948,19 @@ const CompareEvaluationsBinding = () => {
     },
     [history, entity, project, routerContext, selectedMetrics]
   );
-  const setSelectedMetrics = useCallback((newModel: Record<string, boolean>) => {
-    history.push(
-      routerContext.compareEvaluationsUri(
-        entity,
-        project,
-        evaluationCallIds,
-        newModel
-      )
-    );
-  }, [history, entity, project, routerContext, evaluationCallIds, selectedMetrics]);
+  const setSelectedMetrics = useCallback(
+    (newModel: Record<string, boolean>) => {
+      history.push(
+        routerContext.compareEvaluationsUri(
+          entity,
+          project,
+          evaluationCallIds,
+          newModel
+        )
+      );
+    },
+    [history, entity, project, routerContext, evaluationCallIds]
+  );
   return (
     <CompareEvaluationsPage
       entity={entity}
