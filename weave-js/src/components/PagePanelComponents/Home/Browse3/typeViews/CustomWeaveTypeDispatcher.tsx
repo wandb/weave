@@ -1,5 +1,6 @@
 import React from 'react';
 
+import {AudioPlayer} from './Audio/AudioPlayer';
 import {CustomWeaveTypePayload} from './customWeaveType.types';
 import {PILImageImage} from './PIL.Image.Image/PILImageImage';
 
@@ -27,6 +28,9 @@ const customWeaveTypeRegistry: {
 } = {
   'PIL.Image.Image': {
     component: PILImageImage,
+  },
+  'openai._legacy_response.HttpxBinaryResponseContent': {
+    component: AudioPlayer,
   },
 };
 
