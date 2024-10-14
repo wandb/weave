@@ -118,8 +118,8 @@ const rowIsSelected = (
 export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
   const leafDims = useMemo(() => getOrderedCallIds(state), [state]);
   const compositeMetricsMap = useMemo(
-    () => buildCompositeMetricsMap(state.data, 'score'),
-    [state.data]
+    () => buildCompositeMetricsMap(state.data, 'score', state.selectedMetrics),
+    [state.data, state.selectedMetrics]
   );
 
   const flattenedRows = useMemo(() => {

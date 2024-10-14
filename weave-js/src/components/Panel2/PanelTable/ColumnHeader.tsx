@@ -204,7 +204,9 @@ export const ColumnHeader: React.FC<{
       }
 
       if (panelUpdated) {
-        recordEvent('UPDATE_COLUMN_PANEL');
+        recordEvent('UPDATE_COLUMN_PANEL', {
+          exprString: weave.expToString(workingSelectFunction),
+        });
       }
     }
 

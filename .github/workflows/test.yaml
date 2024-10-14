@@ -181,7 +181,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.9
       - name: Install dependencies
@@ -190,6 +190,22 @@ jobs:
           pip install nox uv
       - name: Run nox
         run: nox -e lint
+
+  trace-docs:
+    name: Trace docs
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+      - name: Setup docs
+        run: make setup-docs-ci
+      - name: Run docs
+        run: make docs
 
   trace-tests:
     name: Trace nox tests
@@ -203,6 +219,7 @@ jobs:
             '10',
             '11',
             '12',
+            '13',
             #
           ]
         nox-shard:
@@ -220,6 +237,7 @@ jobs:
             'llamaindex',
             'mistral0',
             'mistral1',
+            'notdiamond',
             'openai',
           ]
       fail-fast: false
@@ -246,7 +264,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
       - name: Install dependencies
@@ -272,7 +290,7 @@ jobs:
           WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -n4
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 

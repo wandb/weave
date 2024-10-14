@@ -16,7 +16,7 @@ from typing import (
     Union,
 )
 
-from weave.trace.context import get_raise_on_captured_errors
+from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.op import FinishCallbackType, Op
 from weave.trace.op_extensions.log_once import log_once
 

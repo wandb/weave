@@ -12,9 +12,10 @@ import pydantic
 from requests import HTTPError
 
 from weave import version
-from weave.trace import call_context, trace_sentry, urls
-from weave.trace.client_context import weave_client as weave_client_context
+from weave.trace import trace_sentry, urls
 from weave.trace.concurrent.futures import FutureExecutor
+from weave.trace.context import call_context
+from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.object_record import (
@@ -714,6 +715,8 @@ class WeaveClient:
         *,
         op: Optional[Op] = None,
     ) -> None:
+        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        call.ended_at = ended_at
         original_output = output
 
         if op is not None and op.postprocess_output:
@@ -770,7 +773,6 @@ class WeaveClient:
             call.exception = exception_str
 
         project_id = self._project_id()
-        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
 
         # The finish handler serves as a last chance for integrations
         # to customize what gets logged for a call.

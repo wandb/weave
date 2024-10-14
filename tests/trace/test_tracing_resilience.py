@@ -13,8 +13,8 @@ import pytest
 
 import weave
 from tests.trace.util import DummyTestException
-from weave.trace import call_context
-from weave.trace.context import raise_on_captured_errors
+from weave.trace.context import call_context
+from weave.trace.context.tests_context import raise_on_captured_errors
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
