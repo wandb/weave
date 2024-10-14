@@ -1,3 +1,4 @@
+import {useDeepMemo} from '@wandb/weave/hookUtils';
 import {useEffect, useState} from 'react';
 
 import {useGetTraceServerClientContext} from '../../../pages/wfReactInterface/traceServerClientContext';
@@ -18,9 +19,10 @@ export const useLeaderboardData = (
     loading: true,
     data: {modelGroups: {}},
   });
+  const deepSpec = useDeepMemo(spec);
   useEffect(() => {
     let mounted = true;
-    getLeaderboardData(getTraceServerClient(), entity, project, spec).then(
+    getLeaderboardData(getTraceServerClient(), entity, project, deepSpec).then(
       data => {
         if (mounted) {
           setState({loading: false, data});
@@ -30,6 +32,6 @@ export const useLeaderboardData = (
     return () => {
       mounted = false;
     };
-  }, [entity, project, getTraceServerClient, spec]);
+  }, [entity, project, getTraceServerClient, deepSpec]);
   return state;
 };

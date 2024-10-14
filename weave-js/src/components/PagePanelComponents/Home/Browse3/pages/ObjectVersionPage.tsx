@@ -25,6 +25,7 @@ import {
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
+import {EvaluationLeaderboardTab} from './LeaderboardTab';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
@@ -122,6 +123,9 @@ const ObjectVersionPageInner: React.FC<{
     if (objectVersion.baseObjectClass === 'Model') {
       return 'Model';
     }
+    if (objectVersion.baseObjectClass === 'Evaluation') {
+      return 'Evaluation';
+    }
     return null;
   }, [objectVersion.baseObjectClass]);
   const refUri = objectVersionKeyToRefUri(objectVersion);
@@ -182,6 +186,7 @@ const ObjectVersionPageInner: React.FC<{
   }, [viewerData]);
 
   const isDataset = baseObjectClass === 'Dataset' && refExtra == null;
+  const isEvaluation = baseObjectClass === 'Evaluation' && refExtra == null;
 
   return (
     <SimplePageLayoutWithHeader
@@ -265,6 +270,21 @@ const ObjectVersionPageInner: React.FC<{
       //   },
       // ]}
       tabs={[
+        ...(isEvaluation
+          ? [
+              {
+                label: 'Leaderboard',
+                content: (
+                  <EvaluationLeaderboardTab
+                    entity={entityName}
+                    project={projectName}
+                    evaluationObjectName={objectName}
+                    evaluationObjectVersion={objectVersion.versionHash}
+                  />
+                ),
+              },
+            ]
+          : []),
         {
           label: isDataset ? 'Rows' : 'Values',
           content: (

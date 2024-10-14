@@ -7,7 +7,6 @@ import {
   GridSortDirection,
   GridSortItem,
 } from '@mui/x-data-grid-pro';
-import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -22,7 +21,7 @@ import {
   LeaderboardValueRecord,
 } from './query/leaderboardQuery';
 
-const USE_COMPARE_EVALUATIONS_PAGE = false;
+const USE_COMPARE_EVALUATIONS_PAGE = true;
 
 interface LeaderboardGridProps {
   entity: string;
@@ -71,9 +70,12 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       if (score == null) {
         return 'transparent';
       }
-      const {min, max} =
+      const {min, max, count} =
         columnStats.datasetGroups[datasetGroup].scorerGroups[scorerGroup]
           .metricPathGroups[metricPathGroup];
+      if (count === 0 || count === 1) {
+        return 'transparent';
+      }
       const normalizedScore = shouldMinimize
         ? (max - score) / (max - min)
         : (score - min) / (max - min);
@@ -241,23 +243,23 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
             Object.entries(scorerGroup.metricPathGroups).forEach(
               ([metricPathGroupName, metricPathGroup]) => {
                 // const prefix = `${datasetGroupName}--${scorerGroupName}--`
-                const metricPathParts = metricPathGroupName.split('.');
-                let targetParentGroup = scorerColGroup;
-                for (let i = 0; i < metricPathParts.length - 2; i++) {
-                  const part = metricPathParts[i];
-                  let existingChild = targetParentGroup.children.find(
-                    child => 'groupId' in child && child.groupId === part
-                  );
-                  if (!existingChild) {
-                    existingChild = {
-                      groupId: part,
-                      headerName: part,
-                      children: [],
-                    };
-                    targetParentGroup.children.push(existingChild);
-                  }
-                  targetParentGroup = existingChild as GridColumnGroup;
-                }
+                // const metricPathParts = metricPathGroupName.split('.');
+                const targetParentGroup = scorerColGroup;
+                // for (let i = 0; i < metricPathParts.length - 2; i++) {
+                //   const part = metricPathParts[i];
+                //   let existingChild = targetParentGroup.children.find(
+                //     child => 'groupId' in child && child.groupId === part
+                //   );
+                //   if (!existingChild) {
+                //     existingChild = {
+                //       groupId: part,
+                //       headerName: part,
+                //       children: [],
+                //     };
+                //     targetParentGroup.children.push(existingChild);
+                //   }
+                //   targetParentGroup = existingChild as GridColumnGroup;
+                // }
                 // const finalPart = metricPathParts[metricPathParts.length - 1];
                 const metricPathColGroup: GridLeafColumn = {
                   field: `${datasetGroupName}--${scorerGroupName}--${metricPathGroupName}`,
@@ -380,6 +382,7 @@ type ColumnStats = {
             [metricPathGroup: string]: {
               min: number;
               max: number;
+              count: number;
             };
           };
         };
@@ -413,30 +416,34 @@ const getColumnStats = (data: GroupedLeaderboardData): ColumnStats => {
               currDatasetGroup.scorerGroups[scorerGroupName];
             Object.entries(scorerGroup.metricPathGroups).forEach(
               ([metricPathGroupName, metricPathGroup]) => {
-                const groupMin = _.min(
-                  metricPathGroup.map(g => g.metricValue)
-                ) as number;
-                const groupMax = _.max(
-                  metricPathGroup.map(g => g.metricValue)
+                if (metricPathGroup.length === 0) {
+                  return;
+                }
+                const metricValue = getAggregatedResults(
+                  metricPathGroup
                 ) as number;
                 if (
                   currScorerGroup.metricPathGroups[metricPathGroupName] == null
                 ) {
                   currScorerGroup.metricPathGroups[metricPathGroupName] = {
-                    min: groupMin,
-                    max: groupMax,
+                    min: metricValue,
+                    max: metricValue,
+                    count: metricPathGroup.length,
                   };
                 } else {
                   currScorerGroup.metricPathGroups[metricPathGroupName].min =
                     Math.min(
                       currScorerGroup.metricPathGroups[metricPathGroupName].min,
-                      groupMin
+                      metricValue
                     );
                   currScorerGroup.metricPathGroups[metricPathGroupName].max =
                     Math.max(
                       currScorerGroup.metricPathGroups[metricPathGroupName].max,
-                      groupMax
+                      metricValue
                     );
+                  currScorerGroup.metricPathGroups[
+                    metricPathGroupName
+                  ].count += 1;
                 }
               }
             );
@@ -551,3 +558,10 @@ const defaultGetSortComparator =
 //       return groupCol;
 //     });
 //   }
+
+
+
+// TODO:
+// Trials Column
+// Cost Column
+// Date column
