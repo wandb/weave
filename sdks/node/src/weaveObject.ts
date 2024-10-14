@@ -12,6 +12,8 @@ export class ObjectRef {
     public digest: string
   ) {}
 
+  // TODO: Add extra
+
   public uri() {
     return `weave:///${this.projectId}/object/${this.objectId}:${this.digest}`;
   }

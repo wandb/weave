@@ -48,6 +48,8 @@ export class OpRef {
     public digest: string
   ) {}
 
+  // TODO: Add extra
+
   public uri() {
     return `weave:///${this.projectId}/op/${this.objectId}:${this.digest}`;
   }
