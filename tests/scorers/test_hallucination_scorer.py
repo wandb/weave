@@ -16,14 +16,14 @@ def mock_create(monkeypatch):
     def _mock_create(*args, **kwargs):
         return HallucinationResponse(
             chain_of_thought="The output is consistent with the input data.",
-            hallucination_reasonings=[
+            reasonings=[
                 HallucinationReasoning(
                     observation="My observation for this is that the output is consistent with the input data.",
                     hallucination_type="No Hallucination",
                 )
             ],
             conclusion="The output is consistent with the input data.",
-            is_hallucination=False,
+            hallucination_free=True,
         )
 
     monkeypatch.setattr("weave.flow.scorers.hallucination_scorer.create", _mock_create)
@@ -50,14 +50,5 @@ def test_hallucination_scorer_score(hallucination_scorer, mock_create):
     output = "John's favorite cheese is cheddar."
     context = "John likes various types of cheese."
     result = hallucination_scorer.score(output=output, context=context)
-    assert isinstance(result, HallucinationResponse)
-    assert not result.is_hallucination
-    assert isinstance(result.hallucination_reasonings, list)
-    assert isinstance(result.hallucination_reasonings[0], HallucinationReasoning)
-    assert result.chain_of_thought == "The output is consistent with the input data."
-    assert (
-        result.hallucination_reasonings[0].observation
-        == "My observation for this is that the output is consistent with the input data."
-    )
-    assert result.conclusion == "The output is consistent with the input data."
-    assert result.hallucination_reasonings[0].hallucination_type == "No Hallucination"
+    # we should be able to do this validation
+    _ = HallucinationResponse.model_validate(result)

@@ -95,13 +95,13 @@ class HallucinationResponse(BaseModel):
         description="Think step by step about whether the <output> contains hallucinations \
 based on the <input_data>."
     )
-    hallucination_reasonings: List[HallucinationReasoning] = Field(
+    reasonings: List[HallucinationReasoning] = Field(
         description="A list of reasoning steps that lead to the conclusion about whether or not\
 the <output> contains hallucinations."
     )
     conclusion: str = Field(description="The conclusion of the analysis.")
-    is_hallucination: bool = Field(
-        description="Whether the <output> contains hallucinations based on the <input_data>."
+    hallucination_free: bool = Field(
+        description="Whether the <output> is free of hallucinations based on the <input_data>. True means it is NOT a hallucination."
     )
 
 
@@ -158,12 +158,4 @@ class HallucinationFreeScorer(InstructorLLMScorer):
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )
-        hallucination_reasonings = [
-            r.model_dump_json() for r in response.hallucination_reasonings
-        ]
-        return {
-            "hallucination_free": not response.is_hallucination,
-            "conclusion": response.conclusion,
-            "reasonings": json.dumps(hallucination_reasonings),
-            "chain_of_thought": response.chain_of_thought,
-        }
+        return response.model_dump()  # Morgan wants this to be a dict
