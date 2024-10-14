@@ -45,6 +45,7 @@ class Object(BaseModel):
         arbitrary_types_allowed=True,
         protected_namespaces=(),
         extra="forbid",
+        # Intended to be used to allow "deprecated" aliases for fields until we fully remove them.
         populate_by_name=True,
     )
 
