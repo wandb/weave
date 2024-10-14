@@ -13,18 +13,18 @@ interface EvaluationParameters<R extends DatasetRow, M> extends WeaveObjectParam
   maxConcurrency?: number;
 }
 
-interface Runnable<T extends (...args: any[]) => any> {
+interface Callable<T extends (...args: any[]) => any> {
   id: string;
-  invoke: (...args: Parameters<T>) => ReturnType<T>;
+  call: (...args: Parameters<T>) => ReturnType<T>;
 }
 
-type WeaveCallable<T extends (...args: any[]) => any> = Op<T> | Runnable<T>;
+type WeaveCallable<T extends (...args: any[]) => any> = Op<T> | Callable<T>;
 
 function callWeaveCallable<T extends (...args: any[]) => any>(callable: WeaveCallable<T>, ...args: Parameters<T>) {
   if (typeof callable === 'function') {
     return callable(...args);
   }
-  return callable.invoke(...args);
+  return callable.call(...args);
 }
 
 function weaveCallableName<T extends (...args: any[]) => any>(callable: WeaveCallable<T>) {
