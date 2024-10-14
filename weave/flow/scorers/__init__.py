@@ -22,7 +22,6 @@ from weave.flow.scorers.ragas_scorer import (
 from weave.flow.scorers.similarity_score import EmbeddingSimilarityScorer
 from weave.flow.scorers.string_scorer import (
     LevenshteinScorer,
-    RegexScorer,
     StringMatchScorer,
 )
 from weave.flow.scorers.summarization_scorer import SummarizationScorer
@@ -42,7 +41,6 @@ __all__ = [
     "MultiTaskBinaryClassificationF1",
     "OpenAIModerationScorer",
     "PydanticScorer",
-    "RegexScorer",
     "Scorer",
     "StringMatchScorer",
     "SummarizationScorer",

@@ -19,26 +19,6 @@ def test_string_match_scorer_false():
     result = scorer.score(output, target)
     assert result["string_in_input"] is False
 
-
-# def test_regex_scorer():
-#     scorer = RegexScorer(patterns="engineer")
-#     output = "I am an engineer"
-#     result = scorer.score(output)
-#     assert result["string_match"] is True
-
-# def test_regex_scorer_case_insensitive():
-#     scorer = RegexScorer(patterns="Engineer", ignore_case=True)
-#     output = "I am an engineer"
-#     result = scorer.score(output)
-#     assert result["string_match"] is True
-
-# def test_regex_scorer_no_match():
-#     scorer = RegexScorer(patterns="doctor")
-#     output = "I am an engineer"
-#     result = scorer.score(output)
-#     assert result["string_match"] is False
-
-
 def test_levenshtein_scorer():
     scorer = LevenshteinScorer()
     output = "Hello"

@@ -23,8 +23,9 @@ if TYPE_CHECKING:
     from anthropic import Anthropic, AsyncAnthropic
     from mistralai import Mistral
     from openai import AsyncOpenAI, OpenAI
+    from google.generativeai import GenerativeModel
 
-    _LLM_CLIENTS = Union[OpenAI, AsyncOpenAI, Anthropic, AsyncAnthropic, Mistral]
+    _LLM_CLIENTS = Union[OpenAI, AsyncOpenAI, Anthropic, AsyncAnthropic, Mistral, GenerativeModel]
 else:
     _LLM_CLIENTS = object
 
@@ -34,6 +35,7 @@ _LLM_CLIENTS_NAMES = (
     "Anthropic",
     "AsyncAnthropic",
     "Mistral",
+    "GenerativeModel",
 )
 
 
@@ -53,6 +55,11 @@ def instructor_client(client: _LLM_CLIENTS) -> "instructor.client":  # type: ign
         return instructor.from_anthropic(client)
     elif "mistral" in client_type:
         return instructor.from_mistral(client)
+    elif "generativemodel" in client_type:
+        return instructor.from_gemini(
+            client=client,
+            mode=instructor.Mode.GEMINI_JSON,
+        )
     else:
         raise ValueError(f"Unsupported client type: {client_type}")
 
@@ -71,7 +78,6 @@ def embed(
     elif "mistral" in client_type:
         response = client.embeddings.create(model=model_id, inputs=texts, **kwargs)  # type: ignore
         return [embedding.embedding for embedding in response.data]
-
     else:
         raise ValueError(f"Unsupported client type: {type(client).__name__.lower()}")
 
@@ -91,5 +97,9 @@ def import_client(provider: str) -> Optional[_LLM_CLIENTS]:  # type: ignore
             from mistralai import Mistral
 
             return Mistral
+        elif provider == "gemini":
+            from google.generativeai import GenerativeModel
+
+            return GenerativeModel
     except ImportError:
         return None
