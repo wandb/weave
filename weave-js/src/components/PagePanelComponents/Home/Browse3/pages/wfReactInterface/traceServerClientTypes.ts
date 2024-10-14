@@ -148,6 +148,8 @@ interface TraceObjectsFilter {
 export type TraceObjQueryReq = {
   project_id: string;
   filter?: TraceObjectsFilter;
+  limit?: number;
+  metadata_only?: boolean;
 };
 
 export interface TraceObjSchema {
@@ -172,6 +174,12 @@ export type TraceObjReadReq = {
 
 export type TraceObjReadRes = {
   obj: TraceObjSchema;
+};
+
+export type TraceObjDeleteReq = {
+  project_id: string;
+  object_id: string;
+  digest: string;
 };
 
 export type TraceRefsReadBatchReq = {
