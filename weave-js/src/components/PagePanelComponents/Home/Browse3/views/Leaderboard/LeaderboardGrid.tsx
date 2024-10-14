@@ -67,6 +67,9 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 
   const getColorForScore = useCallback(
     (datasetGroup, scorerGroup, metricPathGroup, score) => {
+      if (['Trials', 'Run Date'].includes(metricPathGroup)) {
+        return 'transparent';
+      }
       const shouldMinimize = ['Avg. Latency'].includes(metricPathGroup);
       if (score == null) {
         return 'transparent';
@@ -80,7 +83,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       const normalizedScore = shouldMinimize
         ? (max - score) / (max - min)
         : (score - min) / (max - min);
-      return `hsl(${120 * normalizedScore}, 70%, 85%)`;
+      return `hsl(${30 + 100 * normalizedScore}, 70%, 85%)`;
     },
     [columnStats.datasetGroups]
   );
@@ -119,6 +122,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                   alignItems: 'center',
                   justifyContent: 'center',
                   lineHeight: '20px',
+                  marginLeft: '10px',
                 }}>
                 <SmallRef objRef={modelRef} />
               </div>
@@ -167,36 +171,45 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                           inner = `${inner.toFixed(2)}`;
                         }
                       } else if (value instanceof Date) {
-                        console.log(value.getTime());
-                        return (
+                        return (inner = (
                           <Timestamp
                             value={value.getTime() / 1000}
                             format="relative"
                           />
-                        );
+                        ));
                       } else {
                         inner = JSON.stringify(params.value);
                       }
                       return (
                         <div
+                          className="noPad"
                           style={{
                             width: '100%',
                             height: '100%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
                             overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            backgroundColor: getColorForScore(
-                              datasetGroupName,
-                              scorerGroupName,
-                              metricPathGroupName,
-                              value
-                            ),
+                            padding: '2px',
                           }}
                           onClick={() => record && onCellClick(record)}>
-                          {inner}
+                          <div
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              borderRadius: '4px',
+                              backgroundColor: getColorForScore(
+                                datasetGroupName,
+                                scorerGroupName,
+                                metricPathGroupName,
+                                value
+                              ),
+                            }}>
+                            {inner}
+                          </div>
                         </div>
                       );
                     },
@@ -349,6 +362,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         hideFooterSelectedRowCount
         disableMultipleColumnsSorting={false}
         columnHeaderHeight={40}
+        rowHeight={40}
         loading={loading}
         sortModel={sortModel}
         onSortModelChange={setSortModel}
@@ -370,6 +384,9 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           },
           '& .MuiDataGrid-columnHeaders': {
             overflow: 'hidden',
+          },
+          '& [role="gridcell"]': {
+            padding: 0,
           },
         }}
         slots={{
@@ -588,6 +605,4 @@ const defaultGetSortComparator =
 //   }
 
 // TODO:
-// Trials Column
-// Cost Column
 // Date column

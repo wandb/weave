@@ -23,6 +23,7 @@ export type LeaderboardValueRecord = {
     | 'scorerMetric'
     | 'modelLatency'
     | 'evaluationDate'
+    | 'evaluationTrials'
     | 'modelCost'
     | 'modelTokens'
     | 'modelErrors';
@@ -309,6 +310,20 @@ export const getLeaderboardGroupableData = async (
         metricValue: evaluationDate,
       };
       data.push(evaluationDateRecord);
+    }
+
+    if (trials == null) {
+      console.warn('Skipping model latency', call);
+    } else {
+      const trialsRecord: LeaderboardValueRecord = {
+        ...recordPartial,
+        metricType: 'evaluationTrials',
+        scorerName: 'Summary',
+        scorerVersion: '',
+        metricPath: 'Trials',
+        metricValue: trials,
+      };
+      data.push(trialsRecord);
     }
 
     // TODO: add modelCost/tokens, modelErrors
