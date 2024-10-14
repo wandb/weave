@@ -1063,29 +1063,32 @@ class WeaveClient:
         """(Private) Adds a score to a call. This is particularly useful
         for adding evaluation metrics to a call.
         """
-        call_ref = get_ref(predict_call)
-        if call_ref is None:
-            raise ValueError("Predict call must have a ref")
-        call_ref_uri = call_ref.uri()
-        scorer_call_ref = get_ref(score_call)
-        if scorer_call_ref is None:
-            raise ValueError("Score call must have a ref")
-        scorer_call_ref_uri = scorer_call_ref.uri()
-        scorer_op_ref_uri = score_call.op_name
-        scorer_op_ref = parse_uri(scorer_op_ref_uri)
-        if not isinstance(scorer_op_ref, OpRef):
-            raise ValueError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
-        score_name = scorer_op_ref.name
-        score_results = score_call.output
 
-        return self.future_executor.defer(
-            self._add_score,
-            call_ref_uri=call_ref_uri,
-            score_name=score_name,
-            score_results=score_results,
-            scorer_call_ref_uri=scorer_call_ref_uri,
-            scorer_op_ref_uri=scorer_op_ref_uri,
-        )
+        def send_score_call() -> str:
+            call_ref = get_ref(predict_call)
+            if call_ref is None:
+                raise ValueError("Predict call must have a ref")
+            call_ref_uri = call_ref.uri()
+            scorer_call_ref = get_ref(score_call)
+            if scorer_call_ref is None:
+                raise ValueError("Score call must have a ref")
+            scorer_call_ref_uri = scorer_call_ref.uri()
+            scorer_op_ref_uri = score_call.op_name
+            scorer_op_ref = parse_uri(scorer_op_ref_uri)
+            if not isinstance(scorer_op_ref, OpRef):
+                raise ValueError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
+            score_name = scorer_op_ref.name
+            score_results = score_call.output
+
+            return self._add_score(
+                call_ref_uri=call_ref_uri,
+                score_name=score_name,
+                score_results=score_results,
+                scorer_call_ref_uri=scorer_call_ref_uri,
+                scorer_op_ref_uri=scorer_op_ref_uri,
+            )
+
+        return self.future_executor.defer(send_score_call)
 
     @trace_sentry.global_trace_sentry.watch()
     def _add_score(
