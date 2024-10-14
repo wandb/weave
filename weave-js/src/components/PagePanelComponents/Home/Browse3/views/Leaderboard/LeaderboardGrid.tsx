@@ -252,7 +252,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                 const ref = parseRefMaybe(
                   `weave:///${entity}/${project}/op/${scorerGroupName}` ?? ''
                 );
-                // console.log(node.headerName, ref);
                 if (ref) {
                   return <SmallRef objRef={ref} />;
                 }
@@ -260,79 +259,20 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
               },
             };
             datasetColGroup.children.push(scorerColGroup);
-            Object.entries(scorerGroup.metricPathGroups).forEach(
-              ([metricPathGroupName, metricPathGroup]) => {
-                // const prefix = `${datasetGroupName}--${scorerGroupName}--`
-                // const metricPathParts = metricPathGroupName.split('.');
-                const targetParentGroup = scorerColGroup;
-                // for (let i = 0; i < metricPathParts.length - 2; i++) {
-                //   const part = metricPathParts[i];
-                //   let existingChild = targetParentGroup.children.find(
-                //     child => 'groupId' in child && child.groupId === part
-                //   );
-                //   if (!existingChild) {
-                //     existingChild = {
-                //       groupId: part,
-                //       headerName: part,
-                //       children: [],
-                //     };
-                //     targetParentGroup.children.push(existingChild);
-                //   }
-                //   targetParentGroup = existingChild as GridColumnGroup;
-                // }
-                // const finalPart = metricPathParts[metricPathParts.length - 1];
+            Object.keys(scorerGroup.metricPathGroups).forEach(
+              metricPathGroupName => {
                 const metricPathColGroup: GridLeafColumn = {
                   field: `${datasetGroupName}--${scorerGroupName}--${metricPathGroupName}`,
                 };
-                targetParentGroup.children.push(metricPathColGroup);
+                scorerColGroup.children.push(metricPathColGroup);
               }
             );
-
-            // scorerColGroup.children = splitCommonRootLeafColumns(scorerColGroup.children as GridLeafColumn[], scorerColGroup.groupId);
           }
         );
       }
     );
 
     const finalGroupingModel = datasetGroups;
-
-    // let finalGroupingModel: GridColumnGroupingModel = datasetGroups.filter(
-    //   c => 'groupId' in c
-    // ) as GridColumnGroup[];
-    // finalGroupingModel = walkGroupingModel(finalGroupingModel, node => {
-    //   if ('groupId' in node) {
-    //     if (node.children.length === 1) {
-    //       if (
-    //         'groupId' in node.children[0] &&
-    //         !node.headerName?.includes(':') &&
-    //         !node.children[0].headerName?.includes(':')
-    //       ) {
-    //         const currNode = node;
-    //         node = node.children[0];
-    //         node.headerName = currNode.headerName + '.' + node.headerName;
-    //       } else {
-    //         // pass
-    //         // node = node.children[0];
-    //       }
-    //     }
-    //   }
-    //   return node;
-    // }) as GridColumnGroup[];
-    // finalGroupingModel = walkGroupingModel(finalGroupingModel, node => {
-    //   if ('groupId' in node) {
-    //     node.renderHeaderGroup = params => {
-    //       const ref = parseRefMaybe(
-    //         `weave:///${entity}/${project}/object/${node.headerName}` ?? ''
-    //       );
-    //       // console.log(node.headerName, ref);
-    //       if (ref) {
-    //         return <SmallRef objRef={ref} />;
-    //       }
-    //       return <div>{node.headerName}</div>;
-    //     };
-    //   }
-    //   return node;
-    // }) as GridColumnGroup[];
 
     return finalGroupingModel;
   }, [columnStats.datasetGroups, entity, project]);
@@ -559,50 +499,3 @@ const defaultGetSortComparator =
     }
     return aValue.localeCompare(bValue);
   };
-
-// const walkGroupingModel = (
-//   nodes: GridColumnNode[],
-//   fn: (node: GridColumnNode) => GridColumnNode
-// ) => {
-//   return nodes.map(node => {
-//     if ('children' in node) {
-//       node.children = walkGroupingModel(node.children, fn);
-//     }
-//     return fn(node);
-//   });
-// };
-
-// // TODO: refactor to accumulate common root columns in a single pass
-//   const splitCommonRootLeafColumns = (columns: GridLeafColumn[], groupIdPrefix: string, depth: number = 0): GridColumnNode[] => {
-//     if (columns.length < 2) {
-//       return columns;
-//     }
-//     const groups: {[key: string]: GridLeafColumn[]} = {};
-//     columns.forEach(col => {
-//       const key = col.field.split('.')[depth];
-//       if (groups[key] == null) {
-//         groups[key] = [];
-//       }
-//       groups[key].push(col);
-//     });
-
-//     return Object.entries(groups).map(([key, group]) => {
-//       if (group.length === 1) {
-//         return group[0];
-//       }
-//       const newGroupId = `${groupIdPrefix}.${key}`
-
-//       const groupCol: GridColumnGroup = {
-//         groupId: newGroupId,
-//         headerName: key,
-//         renderHeaderGroup: params => {
-//           return <div>{key}</div>
-//         },
-//         children: splitCommonRootLeafColumns(group, newGroupId, depth + 1),
-//       };
-//       return groupCol;
-//     });
-//   }
-
-// TODO:
-// Date column

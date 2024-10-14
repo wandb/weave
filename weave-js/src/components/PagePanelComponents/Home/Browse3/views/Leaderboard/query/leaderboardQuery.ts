@@ -82,17 +82,6 @@ export const getEvaluationObjectsForSpec = async (
   );
   const sourceEvals = atLeastOneStarName ? [] : spec.sourceEvaluations ?? [];
   const evalNames = sourceEvals.map(sourceEvaluation => sourceEvaluation.name);
-  // const fullyQualifiedEvalRefs = sourceEvals.map(sourceEvaluation => {
-  //   return objectVersionKeyToRefUri({
-  //     scheme: 'weave',
-  //     weaveKind: 'object',
-  //     entity,
-  //     project,
-  //     objectId: sourceEvaluation.name,
-  //     versionHash: sourceEvaluation.version,
-  //     path: '',
-  //   });
-  // });
   // get all the evaluations
   const allEvaluationObjectsProm = client.objsQuery({
     project_id: projectIdFromParts({entity, project}),
@@ -375,9 +364,6 @@ export const getLeaderboardGroupableData = async (
     if (spec.datasets.length === 0) {
       return {include: true, groupableRow};
     }
-    // if (spec.datasets.some(dataset => dataset.name === ALL_VALUE)) {
-    //   return {include: true, groupableRow};
-    // }
 
     let datasetSpec = spec.datasets.find(
       dataset =>
