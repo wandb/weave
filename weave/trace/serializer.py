@@ -59,7 +59,7 @@ class Serializer:
         return ser_id
 
 
-SERIALIZERS = []
+SERIALIZERS: list[Serializer] = []
 
 
 def register_serializer(
