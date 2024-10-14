@@ -1782,7 +1782,7 @@ class TestEscapeArtifactPath:
     file_path = "table #3.table.json"
     file_path_with_colon = "(batch: 1) table #3.table.json"
     version = "latest"
-    # version_with_colon = "latest:v0"
+    version_with_colon = "latest:v0"
 
     def test_standard_artifact_path(self):
         """
@@ -1826,16 +1826,16 @@ class TestEscapeArtifactPath:
         uri = artifact_wandb.WeaveWBLoggedArtifactURI.parse(result)
         assert uri.path == self.file_path_with_colon
 
-    # def test_artifact_path_with_version_with_colon_and_file_with_colon(self):
-    #     """
-    #     Artifact path of the form: "<name>:<version>/<path>" should be escaped properly,
-    #     where <version> contains a colon and <path> contains a colon.
-    #     """
-    #     result = wb_util.escape_artifact_path(
-    #         f"{self.wandb_prefix}{self.artifact_name}:{self.version_with_colon}/{self.file_path_with_colon}"
-    #     )
-    #     uri = artifact_wandb.WeaveWBLoggedArtifactURI.parse(result)
-    #     assert uri.path == self.file_path_with_colon
+    def test_artifact_path_with_version_with_colon_and_file_with_colon(self):
+        """
+        Artifact path of the form: "<name>:<version>/<path>" should be escaped properly,
+        where <version> contains a colon and <path> contains a colon.
+        """
+        result = wb_util.escape_artifact_path(
+            f"{self.wandb_prefix}{self.artifact_name}:{self.version_with_colon}/{self.file_path_with_colon}"
+        )
+        uri = artifact_wandb.WeaveWBLoggedArtifactURI.parse(result)
+        assert uri.path == self.file_path_with_colon
 
 
 def _do_test_gql_artifact_dir_path(node):
