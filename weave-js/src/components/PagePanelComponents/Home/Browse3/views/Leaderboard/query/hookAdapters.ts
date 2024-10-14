@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 
-import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
+import {useGetTraceServerClientContext} from '../../../pages/wfReactInterface/traceServerClientContext';
 import {FilterAndGroupSpec} from '../types/leaderboardConfigType';
 import {getLeaderboardData, GroupedLeaderboardData} from './leaderboardQuery';
 

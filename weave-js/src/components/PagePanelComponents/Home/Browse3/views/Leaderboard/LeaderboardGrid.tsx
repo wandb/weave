@@ -2,8 +2,6 @@ import {Box} from '@mui/material';
 import {
   GridColDef,
   GridColumnGroup,
-  // GridColumnGroupingModel,
-  // GridColumnNode,
   GridLeafColumn,
   GridRenderCellParams,
   GridSortDirection,
@@ -11,25 +9,26 @@ import {
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
 import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
+import {useWeaveflowRouteContext} from '../../context';
+import {PaginationButtons} from '../../pages/CallsPage/CallsTableButtons';
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {PaginationButtons} from '../CallsPage/CallsTableButtons';
 import {
   GroupedLeaderboardData,
   GroupedLeaderboardModelGroup,
   LeaderboardValueRecord,
 } from './query/leaderboardQuery';
-import {FilterAndGroupSpec} from './types/leaderboardConfigType';
+
+const USE_COMPARE_EVALUATIONS_PAGE = false;
 
 interface LeaderboardGridProps {
   entity: string;
   project: string;
-  config: FilterAndGroupSpec;
   data: GroupedLeaderboardData;
   loading: boolean;
-  onCellClick: (record: LeaderboardValueRecord) => void;
 }
 
 type RowData = {
@@ -41,19 +40,34 @@ type RowData = {
 export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   entity,
   project,
-  config,
   data,
   loading,
-  onCellClick,
 }) => {
+  const {peekingRouter} = useWeaveflowRouteContext();
+  const history = useHistory();
+  const onCellClick = useCallback(
+    (record: LeaderboardValueRecord) => {
+      const sourceCallId = record.sourceEvaluationCallId;
+      if (sourceCallId) {
+        let to: string;
+        if (USE_COMPARE_EVALUATIONS_PAGE) {
+          to = peekingRouter.compareEvaluationsUri(entity, project, [
+            sourceCallId,
+          ]);
+        } else {
+          to = peekingRouter.callUIUrl(entity, project, '', sourceCallId, null);
+        }
+        history.push(to);
+      }
+    },
+    [entity, history, peekingRouter, project]
+  );
+
   const columnStats = useMemo(() => getColumnStats(data), [data]);
 
   const getColorForScore = useCallback(
     (datasetGroup, scorerGroup, metricPathGroup, score) => {
-      const shouldMinimize = !!config.datasets
-        ?.find(d => d.name === datasetGroup)
-        ?.scorers?.find(s => s.name === scorerGroup)
-        ?.metrics?.find(m => m.path === metricPathGroup)?.shouldMinimize;
+      const shouldMinimize = false;
       if (score == null) {
         return 'transparent';
       }
@@ -65,7 +79,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         : (score - min) / (max - min);
       return `hsl(${120 * normalizedScore}, 70%, 85%)`;
     },
-    [columnStats.datasetGroups, config.datasets]
+    [columnStats.datasetGroups]
   );
 
   const rows: RowData[] = useMemo(() => {
