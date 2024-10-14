@@ -412,12 +412,15 @@ export const browse3ContextGen = (
       evaluationCallIds: string[],
       metrics: Record<string, boolean> | null
     ) => {
+      const metricsPart = metrics
+        ? `&metrics=${encodeURIComponent(JSON.stringify(metrics))}`
+        : '';
       return `${projectRoot(
         entityName,
         projectName
       )}/compare-evaluations?evaluationCallIds=${encodeURIComponent(
         JSON.stringify(evaluationCallIds)
-      )}&metrics=${encodeURIComponent(JSON.stringify(metrics))}`;
+      )}${metricsPart}`;
     },
   };
   return browse3Context;
