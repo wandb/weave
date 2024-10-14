@@ -6,8 +6,6 @@ from weave.trace.autopatch import autopatch
 
 autopatch()  # ensure both weave patching and instructor patching are applied
 
-# TODO: Gemini
-
 OPENAI_DEFAULT_MODEL = "gpt-4o"
 OPENAI_DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 
