@@ -1,4 +1,3 @@
-import * as Sentry from '@sentry/react';
 import {
   callOpVeryUnsafe,
   Client,
@@ -48,6 +47,7 @@ import {
   useState,
 } from 'react';
 
+import {captureAndThrowError} from './common/util/sentry';
 import {WEAVE_REF_PREFIX} from './components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/constants';
 import {PanelCompContext} from './components/Panel2/PanelComp';
 import {usePanelContext} from './components/Panel2/PanelContext';
@@ -352,12 +352,11 @@ export const useNodeValue = <T extends Type>(
     // Just rethrow the error in the render thread so it can be caught
     // by an error boundary.
     if (error != null) {
-      const message =
-        'Node execution failed (useNodeValue): ' + errorToText(error);
-      // console.error(message);
+      const message = `Node execution failed (useNodeValue): ${errorToText(
+        error
+      )}`;
       const err = new UseNodeValueServerExecutionError(message);
-      Sentry.captureException(err, {fingerprint: ['useNodeValue']});
-      throw err;
+      captureAndThrowError(err, {fingerprint: ['useNodeValue']});
     }
     if (isConstNode(node)) {
       if (isFunction(node.type)) {

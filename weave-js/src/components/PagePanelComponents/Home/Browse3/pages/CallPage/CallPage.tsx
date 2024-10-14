@@ -64,6 +64,11 @@ const useCallTabs = (call: CallSchema) => {
                 entity={call.entity}
                 project={call.project}
                 evaluationCallIds={[call.callId]}
+                // Dont persist metric selection in the URL
+                selectedMetrics={{}}
+                setSelectedMetrics={() => {}}
+                // Dont persist changes to evaluationCallIds in the URL
+                onEvaluationCallIdsUpdate={() => {}}
               />
             ),
           },
@@ -110,7 +115,11 @@ const useCallTabs = (call: CallSchema) => {
     },
     {
       label: 'Summary',
-      content: <CallSummary call={call} />,
+      content: (
+        <Tailwind style={{height: '100%', overflow: 'auto'}}>
+          <CallSummary call={call} />
+        </Tailwind>
+      ),
     },
     {
       label: 'Use',

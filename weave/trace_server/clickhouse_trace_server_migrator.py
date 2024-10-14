@@ -5,6 +5,8 @@ import typing
 
 from clickhouse_connect.driver.client import Client as CHClient
 
+from weave.trace_server.costs.insert_costs import insert_costs, should_insert_costs
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,12 +37,16 @@ class ClickHouseTraceServerMigrator:
         )
         if len(migrations_to_apply) == 0:
             logger.info(f"No migrations to apply to `{target_db}`")
+            if should_insert_costs(status["curr_version"], target_version):
+                insert_costs(self.ch_client)
             return
         logger.info(f"Migrations to apply: {migrations_to_apply}")
         if status["curr_version"] == 0:
             self.ch_client.command(f"CREATE DATABASE IF NOT EXISTS {target_db}")
         for target_version, migration_file in migrations_to_apply:
             self._apply_migration(target_db, target_version, migration_file)
+        if should_insert_costs(status["curr_version"], target_version):
+            insert_costs(self.ch_client)
 
     def _initialize_migration_db(self) -> None:
         self.ch_client.command(

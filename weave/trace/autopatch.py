@@ -19,6 +19,7 @@ def autopatch() -> None:
     from weave.integrations.litellm.litellm import litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
     from weave.integrations.mistral import mistral_patcher
+    from weave.integrations.notdiamond.tracing import notdiamond_patcher
     from weave.integrations.openai.openai_sdk import openai_patcher
 
     openai_patcher.attempt_patch()
@@ -33,6 +34,7 @@ def autopatch() -> None:
     cerebras_patcher.attempt_patch()
     cohere_patcher.attempt_patch()
     google_genai_patcher.attempt_patch()
+    notdiamond_patcher.attempt_patch()
 
 
 def reset_autopatch() -> None:
@@ -49,6 +51,7 @@ def reset_autopatch() -> None:
     from weave.integrations.litellm.litellm import litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
     from weave.integrations.mistral import mistral_patcher
+    from weave.integrations.notdiamond.tracing import notdiamond_patcher
     from weave.integrations.openai.openai_sdk import openai_patcher
 
     openai_patcher.undo_patch()
@@ -63,3 +66,4 @@ def reset_autopatch() -> None:
     cerebras_patcher.undo_patch()
     cohere_patcher.undo_patch()
     google_genai_patcher.undo_patch()
+    notdiamond_patcher.undo_patch()

@@ -148,7 +148,7 @@ class ObjectRef(RefWithExtra):
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
         # that should be removed.
-        from weave.trace.client_context.weave_client import get_weave_client
+        from weave.trace.context.weave_client_context import get_weave_client
         from weave.trace.weave_init import init_weave
 
         gc = get_weave_client()
