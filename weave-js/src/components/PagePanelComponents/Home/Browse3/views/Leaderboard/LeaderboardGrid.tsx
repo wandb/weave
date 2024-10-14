@@ -559,8 +559,6 @@ const defaultGetSortComparator =
 //     });
 //   }
 
-
-
 // TODO:
 // Trials Column
 // Cost Column

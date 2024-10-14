@@ -270,7 +270,7 @@ const ObjectVersionPageInner: React.FC<{
       //   },
       // ]}
       tabs={[
-        ...(isEvaluation
+        ...(isEvaluation && showCallsTab
           ? [
               {
                 label: 'Leaderboard',
