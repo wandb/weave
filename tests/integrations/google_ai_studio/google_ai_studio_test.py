@@ -1,30 +1,11 @@
 import asyncio
 import os
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
-
-
-def flatten_calls(
-    calls: list[tsi.CallSchema], parent_id: Optional[str] = None, depth: int = 0
-) -> list:
-    def children_of_parent_id(id: Optional[str]) -> list[tsi.CallSchema]:
-        return [call for call in calls if call.parent_id == id]
-
-    children = children_of_parent_id(parent_id)
-    res = []
-    for child in children:
-        res.append((child, depth))
-        res.extend(flatten_calls(calls, child.id, depth + 1))
-
-    return res
-
-
-def op_name_from_ref(ref: str) -> str:
-    return ref.split("/")[-1].split(":")[0]
+from weave.integrations.integration_utilities import op_name_from_ref
 
 
 @pytest.mark.skip_clickhouse_client
