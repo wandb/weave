@@ -17,18 +17,19 @@ jobs:
         with:
           # Allowed types: See CONTRIBUTING.md
           types: |
+            chore
+            docs
             feat
             fix
+            perf
             refactor
-            docs
-            style
-            chore
             revert
+            style
             security
           scopes: |
+            ui
             weave
             weave_query
-            ui
           wip: false
           requireScope: true
           validateSingleCommit: false
