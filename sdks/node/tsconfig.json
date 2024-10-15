@@ -9,7 +9,7 @@
     "esModuleInterop": true,
     "outDir": "./dist",
     "paths": {
-      "weave": ["./src"]
+      "weave": ["./src/index.ts"]
     }
   },
   "exclude": ["src", "examples", "dist", "node_modules"],

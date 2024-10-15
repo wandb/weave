@@ -35,7 +35,10 @@
       "tsx",
       "json",
       "node"
-    ]
+    ],
+    "moduleNameMapper": {
+      "^weave$": "<rootDir>/src/index.ts"
+    }
   },
   "nodemonConfig": {
     "watch": [
