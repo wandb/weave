@@ -1,5 +1,6 @@
 import atexit
 import logging
+import sys
 import traceback
 import weakref
 from typing import (
@@ -38,9 +39,25 @@ ON_AYIELD_MSG = (
 )
 
 
+if sys.version_info < (3, 10):
+
+    def aiter(obj: AsyncIterator[V]) -> AsyncIterator[V]:
+        return obj.__aiter__()
+
+    async def anext(obj: AsyncIterator[V], default: Optional[V] = None) -> V:
+        try:
+            return await obj.__anext__()
+        except StopAsyncIteration:
+            if default is not None:
+                return default
+            else:
+                raise
+
+
 class _IteratorWrapper(Generic[V]):
     """This class wraps an iterator object allowing hooks to be added to the lifecycle of the iterator. It is likely
-    that this class will be helpful in other contexts and might be moved to a more general location in the future."""
+    that this class will be helpful in other contexts and might be moved to a more general location in the future.
+    """
 
     def __init__(
         self,
@@ -82,9 +99,15 @@ class _IteratorWrapper(Generic[V]):
 
     def __next__(self) -> Generator[None, None, V]:
         if not hasattr(self._iterator_or_ctx_manager, "__next__"):
-            raise TypeError(
-                f"Cannot call next on an iterator of type {type(self._iterator_or_ctx_manager)}"
-            )
+            try:
+                # This is kept as a type ignore because the `google-generativeai` pkg seems
+                # to yield an object that has properties of both value and iterator, but doesn't
+                # seem to pass the isinstance(obj, Iterator) check...
+                self._iterator_or_ctx_manager = iter(self._iterator_or_ctx_manager)  # type: ignore
+            except TypeError:
+                raise TypeError(
+                    f"Cannot call next on an object of type {type(self._iterator_or_ctx_manager)}"
+                )
         try:
             value = next(self._iterator_or_ctx_manager)  # type: ignore
             try:
@@ -114,9 +137,15 @@ class _IteratorWrapper(Generic[V]):
 
     async def __anext__(self) -> Generator[None, None, V]:
         if not hasattr(self._iterator_or_ctx_manager, "__anext__"):
-            raise TypeError(
-                f"Cannot call anext on an iterator of type {type(self._iterator_or_ctx_manager)}"
-            )
+            try:
+                # This is kept as a type ignore because the `google-generativeai` pkg seems
+                # to yield an object that has properties of both value and iterator, but doesn't
+                # seem to pass the isinstance(obj, Iterator) check...
+                self._iterator_or_ctx_manager = aiter(self._iterator_or_ctx_manager)  # type: ignore
+            except TypeError:
+                raise TypeError(
+                    f"Cannot call anext on an object of type {type(self._iterator_or_ctx_manager)}"
+                )
         try:
             value = await self._iterator_or_ctx_manager.__anext__()  # type: ignore
             try:
