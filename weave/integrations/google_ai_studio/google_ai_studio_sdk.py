@@ -1,9 +1,8 @@
 import importlib
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Union
+from typing import Any, Callable, Union
 
-if TYPE_CHECKING:
-    from google.generativeai.types.generation_types import GenerateContentResponse
+from google.generativeai.types.generation_types import GenerateContentResponse
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
@@ -11,18 +10,16 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 
 def gemini_accumulator(
-    acc: Union["GenerateContentResponse", None], value: "GenerateContentResponse"
-) -> "GenerateContentResponse":
+    acc: Union[GenerateContentResponse, None], value: GenerateContentResponse
+) -> GenerateContentResponse:
     if acc is None:
         acc = value
     if not acc._done:
         return value
     if acc != value:
-        for candidate_idx, value_candidate in enumerate(value.candidates):
-            for part_idx, value_part in enumerate(value_candidate.content.parts):
-                acc.candidates[candidate_idx].content.parts[
-                    part_idx
-                ].text += value_part.text
+        for i, value_candidate in enumerate(value.candidates):
+            for j, value_part in enumerate(value_candidate.content.parts):
+                acc.candidates[i].content.parts[j].text += value_part.text
     acc.usage_metadata.prompt_token_count += value.usage_metadata.prompt_token_count
     acc.usage_metadata.candidates_token_count += (
         value.usage_metadata.candidates_token_count
