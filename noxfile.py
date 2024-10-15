@@ -10,6 +10,7 @@ PY313_INCOMPATIBLE_SHARDS = [
     "langchain",
     "litellm",
     "notdiamond",
+    "google_ai_studio",
 ]
 
 
