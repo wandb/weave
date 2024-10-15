@@ -2,7 +2,6 @@
 # We're using "beta.1" to indicate that this is a pre-release version.
 from typing import TypedDict
 
-
 SCORE_TYPE_NAME = "wandb.score.beta.1"
 
 
