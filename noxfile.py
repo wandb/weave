@@ -58,9 +58,9 @@ def tests(session, shard):
             "WEAVE_SERVER_DISABLE_ECOSYSTEM",
         ]
     }
-    # Add the GOOGLE_API_KEY environment variable for the "google" shard
+    # Add the GOOGLE_GENAI_KEY environment variable for the "google" shard
     if shard == "google_ai_studio":
-        env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
+        env["GOOGLE_GENAI_KEY"] = session.env.get("GOOGLE_GENAI_KEY")
 
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {

@@ -12,7 +12,7 @@ from weave.trace.weave_client import WeaveClient
 def test_content_generation(client: WeaveClient) -> None:
     import google.generativeai as genai
 
-    genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
+    genai.configure(api_key=os.environ.get("GOOGLE_GENAI_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
     model.generate_content("Write a story about an AI and magic")
 
@@ -33,7 +33,7 @@ def test_content_generation(client: WeaveClient) -> None:
 def test_content_generation_stream(client: WeaveClient) -> None:
     import google.generativeai as genai
 
-    genai.configure(api_key=os.environ.get("GOOGLE_API_KEY", "DUMMY_API_KEY"))
+    genai.configure(api_key=os.environ.get("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
     response = model.generate_content(
         "Write a story about an AI and magic", stream=True
@@ -59,7 +59,7 @@ def test_content_generation_stream(client: WeaveClient) -> None:
 async def test_content_generation_async(client: WeaveClient) -> None:
     import google.generativeai as genai
 
-    genai.configure(api_key=os.environ.get("GOOGLE_API_KEY", "DUMMY_API_KEY"))
+    genai.configure(api_key=os.environ.get("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
 
     async def async_generate() -> Any:
