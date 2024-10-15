@@ -51,9 +51,12 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       if (sourceCallId) {
         let to: string;
         if (USE_COMPARE_EVALUATIONS_PAGE) {
-          to = peekingRouter.compareEvaluationsUri(entity, project, [
-            sourceCallId,
-          ]);
+          to = peekingRouter.compareEvaluationsUri(
+            entity,
+            project,
+            [sourceCallId],
+            null
+          );
         } else {
           to = peekingRouter.callUIUrl(entity, project, '', sourceCallId, null);
         }

@@ -187,13 +187,10 @@ const ObjectVersionPageInner: React.FC<{
 
   const isDataset = baseObjectClass === 'Dataset' && refExtra == null;
   const isEvaluation = baseObjectClass === 'Evaluation' && refExtra == null;
-  const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0
-  const evalHasCallsLoading = consumingCalls.loading
+  const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
+  const evalHasCallsLoading = consumingCalls.loading;
 
-  if (
-    isEvaluation &&
-    evalHasCallsLoading
-  ) {
+  if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;
   }
 
