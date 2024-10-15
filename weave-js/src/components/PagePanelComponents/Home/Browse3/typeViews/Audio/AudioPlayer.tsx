@@ -1,7 +1,4 @@
-import {
-  MOON_350,
-  TEAL_500,
-} from '@wandb/weave/common/css/color.styles';
+import {MOON_350, TEAL_500} from '@wandb/weave/common/css/color.styles';
 import {formatDurationWithColons} from '@wandb/weave/common/util/time';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
@@ -32,16 +29,39 @@ export const AudioPlayer: FC<{
     }
   }, [audioBinary.result]);
 
-  console.log('audioBinary', audioBinary);
-
   if (audioBinary.loading) {
     return <LoadingDots />;
   } else if (audioBinary.result == null || audioUrl == null) {
     return <span></span>;
   }
 
-  return <MiniAudioViewer audioSrc={audioUrl} height={24} />;
+  const downloadFile = () => {
+    const a = document.createElement('a');
+    a.href = audioUrl;
+    const date = new Date().toISOString().split('T')[0];
+    a.download = `${project}_${date}_audio.wav`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  return (
+    <MiniAudioViewer
+      audioSrc={audioUrl}
+      height={24}
+      downloadFile={downloadFile}
+    />
+  );
 };
+
+const SLIDER_WIDTH_THRESHOLD = 180;
+const MINI_WIDTH_THRESHOLD = 80;
+
+enum ShowMode {
+  Controls = 'controls',
+  Slider = 'slider',
+  Mini = 'mini',
+}
 
 const MiniAudioViewer: FC<{
   audioSrc: string;
@@ -53,14 +73,12 @@ const MiniAudioViewer: FC<{
   
   This component has 3 modes, based on the width of the container. Component
   is responsive to width changes. Modes:
-  - controls: show play/pause, time, and download. ex: (> 0:00/0:05 v)
-  - slider: show play/pause, time, and waveform. ex:   (> 0:01/0:05 --|-----------)
-  - mini: show play/pause and time. ex:                (> 0:01/0:05)
+  - controls: show play/pause, time. ex:                ([>] 0:00/0:05)
+  - slider: show all. ex:                               ([>] 0:01/0:05 --|-----------  [v])
+  - mini: show play/pause ex:                           ([>])
   */
   const measureDivRef = useRef<HTMLDivElement>(null);
-  const [showMode, setShowMode] = useState<'controls' | 'slider' | 'mini'>(
-    'controls'
-  );
+  const [showMode, setShowMode] = useState<ShowMode>(ShowMode.Controls);
 
   const wavesurferRef = useRef<WaveSurfer>();
   const waveformDomRef = useRef<HTMLDivElement>(null);
@@ -125,12 +143,12 @@ const MiniAudioViewer: FC<{
 
   useEffect(() => {
     if (measureDivRef.current) {
-      if (measureDivRef.current.offsetWidth > 250) {
-        setShowMode('slider');
-      } else if (measureDivRef.current.offsetWidth < 50) {
-        setShowMode('mini');
+      if (measureDivRef.current.offsetWidth > SLIDER_WIDTH_THRESHOLD) {
+        setShowMode(ShowMode.Slider);
+      } else if (measureDivRef.current.offsetWidth < MINI_WIDTH_THRESHOLD) {
+        setShowMode(ShowMode.Mini);
       } else {
-        setShowMode('controls');
+        setShowMode(ShowMode.Controls);
       }
     }
   }, [measureDivRef.current?.offsetWidth]);
@@ -140,11 +158,13 @@ const MiniAudioViewer: FC<{
       <div ref={measureDivRef} className="w-full">
         <div
           className={`rounded-2xl bg-moon-150 ${
-            showMode === 'slider' ? 'w-full' : 'w-fit'
+            showMode === ShowMode.Slider ? 'w-full' : 'w-fit'
           }`}>
           <div className="flex w-full items-center">
             <Button
-              className="ml-6 pl-1 pr-1"
+              className={`pl-1 pr-1 ${
+                showMode === ShowMode.Mini ? 'ml-0' : 'ml-6'
+              }`}
               disabled={audioLoading}
               icon={audioPlaying ? 'pause' : 'play'}
               onClick={() => {
@@ -152,16 +172,26 @@ const MiniAudioViewer: FC<{
                   wavesurferRef.current.playPause();
                 }
               }}
-              size="small"
+              size={showMode === ShowMode.Mini ? 'medium' : 'small'}
               variant="ghost"
             />
-            <div className="text-s mx-4">{audioCurrentTimeStr}</div>
+            {showMode !== ShowMode.Mini && (
+              <div
+                className={`text-s pl-4 ${
+                  showMode === ShowMode.Slider ? 'pr-4' : 'pr-10'
+                }`}>
+                {audioCurrentTimeStr}
+              </div>
+            )}
+            {/* Waveform should always be mounted, but hidden when not in slider mode */}
             <div
               ref={waveformDomRef}
-              className={`w-full ${showMode === 'slider' ? 'block' : 'hidden'}`}
+              className={`w-full overflow-hidden ${
+                showMode === ShowMode.Slider ? 'block' : 'hidden'
+              }`}
             />
             <div>
-              {showMode === 'controls' && (
+              {showMode === ShowMode.Slider && downloadFile && (
                 <Button
                   icon="download"
                   onClick={downloadFile}
