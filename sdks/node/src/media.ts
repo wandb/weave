@@ -21,6 +21,8 @@ export function isWeaveImage(value: any): value is WeaveImage {
   return value && value._weaveType === 'Image';
 }
 
-export function isMedia(value: any): value is WeaveImage {
+type WeaveMedia = WeaveImage;
+
+export function isMedia(value: any): value is WeaveMedia {
   return isWeaveImage(value);
 }
