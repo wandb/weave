@@ -8,6 +8,12 @@ from weave.trace.op import Op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.serializer import get_serializer_by_id, get_serializer_for_obj
 
+KNOWN_TYPES = [
+    "PIL.Image.Image",
+    # in future, could generalize as
+    # {target_cls.__module__}.{target_cls.__qualname__}
+]
+
 
 def encode_custom_obj(obj: Any) -> Optional[dict]:
     serializer = get_serializer_for_obj(obj)
@@ -53,7 +59,7 @@ def decode_custom_obj(
     load_instance_op_uri: Optional[str],
 ) -> Any:
     load_instance_op = None
-    if load_instance_op_uri is not None:
+    if weave_type["type"] not in KNOWN_TYPES and load_instance_op_uri is not None:
         ref = parse_uri(load_instance_op_uri)
         if not isinstance(ref, ObjectRef):
             raise ValueError(f"Expected ObjectRef, got {load_instance_op_uri}")
