@@ -1,6 +1,7 @@
 from concurrent.futures import Future
 
 import weave
+from weave.flow.eval import SCORE_TYPE_NAME
 from weave.trace.weave_client import get_ref
 from weave.trace_server import trace_server_interface as tsi
 
@@ -33,7 +34,7 @@ def test_send_score_call(client):
 
     assert len(calls) == 2
     feedback = calls[0].summary["weave"]["feedback"][0]
-    assert feedback["feedback_type"] == "wandb.score.1"
+    assert feedback["feedback_type"] == SCORE_TYPE_NAME
     assert feedback["weave_ref"] == get_ref(call).uri()
     assert feedback["payload"]["name"] == "my_score"
     assert feedback["payload"]["op_ref"] == get_ref(my_score).uri()

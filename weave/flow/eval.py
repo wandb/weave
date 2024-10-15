@@ -3,7 +3,7 @@ import inspect
 import textwrap
 import time
 import traceback
-from typing import Any, Callable, Coroutine, Optional, Union, cast
+from typing import Any, Callable, Coroutine, Optional, TypedDict, Union, cast
 
 from rich import print
 from rich.console import Console
@@ -34,6 +34,18 @@ INVALID_MODEL_ERROR = (
     "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
     + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
 )
+
+# This type is still "Beta" and the underlying payload might change as well.
+# We're using "beta.1" to indicate that this is a pre-release version.
+SCORE_TYPE_NAME = "wandb.score.beta.1"
+
+
+class ScoreTypePayload(TypedDict):
+    name: str
+    op_ref: str
+    call_ref: str
+    results: dict
+    # supervision: dict
 
 
 def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutine:

@@ -6,12 +6,13 @@ import sys
 import typing
 from concurrent.futures import Future
 from functools import lru_cache
-from typing import Any, Callable, Dict, Iterator, Optional, Sequence, TypedDict, Union
+from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Union
 
 import pydantic
 from requests import HTTPError
 
 from weave import version
+from weave.flow.eval import SCORE_TYPE_NAME, ScoreTypePayload
 from weave.trace import trace_sentry, urls
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
@@ -1129,16 +1130,6 @@ class WeaveClient:
         results_json = to_json(score_results, self._project_id(), self)
 
         # # Prepare the supervision payload
-        # supervision_json = to_json(map_to_refs(supervision), self._project_id(), self)
-
-        SCORE_TYPE_NAME = "wandb.score.1"
-
-        class ScoreTypePayload(TypedDict):
-            name: str
-            op_ref: str
-            call_ref: str
-            results: dict
-            # supervision: dict
 
         payload: ScoreTypePayload = {
             "name": score_name,

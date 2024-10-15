@@ -9,6 +9,7 @@ from PIL import Image
 import weave
 from tests.trace.util import AnyIntMatcher
 from weave import Evaluation, Model
+from weave.flow.eval import SCORE_TYPE_NAME
 from weave.trace.weave_client import get_ref
 from weave.trace_server import trace_server_interface as tsi
 
@@ -808,7 +809,7 @@ async def test_feedback_is_correctly_linked(client):
     feedbacks = calls.calls[0].summary["weave"]["feedback"]
     assert len(feedbacks) == 1
     feedback = feedbacks[0]
-    assert feedback["feedback_type"] == "wandb.score.1"
+    assert feedback["feedback_type"] == SCORE_TYPE_NAME
     assert feedback["payload"]["name"] == "score"
     assert feedback["payload"]["op_ref"] == get_ref(score).uri()
     assert feedback["payload"]["results"] == True
