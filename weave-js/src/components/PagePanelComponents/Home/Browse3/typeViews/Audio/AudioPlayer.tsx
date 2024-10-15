@@ -8,6 +8,7 @@ import WaveSurfer from 'wavesurfer.js';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
+import { Slider } from '@wandb/weave/components';
 
 type AudioPlayerTypePayload = CustomWeaveTypePayload<
   'openai._legacy_response.HttpxBinaryResponseContent',
@@ -44,9 +45,11 @@ const MiniAudioViewer: FC<{
   noWaveform?: boolean;
   downloadFile?: () => void;
 }> = ({audioSrc, height, noWaveform, downloadFile}) => {
+
+  const [showSlider, setShowSlider] = useState(false);
+
   const wavesurferRef = useRef<WaveSurfer>();
   const waveformDomRef = useRef<HTMLDivElement>(null);
-
   const [audioLoading, setAudioLoading] = React.useState(true);
   const [audioPlaying, setAudioPlaying] = React.useState(false);
   const [audioTotalTime, setAudioTotalTime] = React.useState<number>();
@@ -106,9 +109,22 @@ const MiniAudioViewer: FC<{
     };
   }, [audioSrc, height]);
 
+  const audioCurrentTimeStr = [audioCurrentTime, audioTotalTime]
+    .map(formatDurationWithColons)
+    .map(x => x.slice(0,1) == '0' ? x.slice(1) : x)
+    .join('/')
+
+  const measureDivRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (measureDivRef.current) {
+      setShowSlider(measureDivRef.current.offsetWidth > 150);
+    }
+  }, [measureDivRef.current?.offsetWidth]);
+
   return (
     <Tailwind>
-      <div>
+      <div ref={measureDivRef} className="w-full">
         {/* container for wavesurfer.js waveform */}
         <div
           className="audio-card-waveform"
@@ -120,9 +136,10 @@ const MiniAudioViewer: FC<{
           }}
           ref={waveformDomRef}
         />
+        <div className={`night-aware rounded-2xl bg-slate-300 p-0 border-2 ${showSlider ? 'w-full' : 'w-fit'}`}>
         <div className="flex w-full items-center gap-4 whitespace-nowrap">
           <Button
-            className="mr-2 pl-1 pr-1"
+            className="pl-1 pr-1 ml-6"
             disabled={audioLoading}
             icon={audioPlaying ? 'pause' : 'play'}
             onClick={() => {
@@ -131,21 +148,29 @@ const MiniAudioViewer: FC<{
               }
             }}
             size="small"
+            variant="ghost"
           />
           <div
-            style={{flex: '1 1 auto', overflow: 'hidden'}}
+            style={{fontSize: '12px'}}
             className="audio-card-time">
-            {[audioCurrentTime, audioTotalTime]
-              .map(formatDurationWithColons)
-              .join('/')}
+            {audioCurrentTimeStr}
           </div>
-          <Button
-            className="flex-0-0-auto"
-            icon="download"
-            onClick={downloadFile}
-            size="small"
-            variant="quiet"
-          />
+          {showSlider && (
+          <div className="w-full">
+            <input id="small-range" className="h-4 outline-none" type="range" min={0} max={audioTotalTime ? audioTotalTime * 100 : 0} value={audioCurrentTime ? audioCurrentTime * 100 : 0} onChange={(e) => {
+              if (wavesurferRef.current) {
+                wavesurferRef.current.seekTo(Number(e.target.value) / 100);
+              }
+            }} />
+          </div>)}
+            <Button
+                icon="download"
+                onClick={downloadFile}
+                size="small"
+                variant="ghost"
+                className="mr-6"
+            />
+        </div>
         </div>
       </div>
     </Tailwind>
