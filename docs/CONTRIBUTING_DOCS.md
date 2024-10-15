@@ -115,7 +115,7 @@ See `docs/scripts/generate_service_api_spec.py` and `./docs/reference/service-ap
 
 Service doc generation loads the `openapi.json` file describing the server, processes it, then uses the `docusaurus-plugin-openapi-docs` plugin to generate markdown files from that specification.
 
-To improve docs, basically follow FastAPI's instructions to create good Swagger docs by adding field-level and endpoint-level documentation using their APIs. Assuming your have made some changes, `docs/scripts/generate_service_api_spec.py` needs a server to point to. You can either deploy to prod, or run the server locally and point to it in `docs/scripts/generate_service_api_spec.py`. From there, `docs/scripts/generate_service_api_spec.py` will download the spec, clean it up, and build the docs!
+To improve docs, basically follow FastAPI's instructions to create good Swagger docs by adding field-level and endpoint-level documentation using their APIs. Assuming you have made some changes, `docs/scripts/generate_service_api_spec.py` needs a server to point to. You can either deploy to prod, or run the server locally and point to it in `docs/scripts/generate_service_api_spec.py`. From there, `docs/scripts/generate_service_api_spec.py` will download the spec, clean it up, and build the docs!
 
 ### Notebook Doc Gen
 
