@@ -1,5 +1,6 @@
 import atexit
 import logging
+import sys
 import traceback
 import weakref
 from typing import (
@@ -36,6 +37,21 @@ ON_YIELD_MSG = "Error capturing value from iterator, call data may be incomplete
 ON_AYIELD_MSG = (
     "Error capturing async value from iterator, call data may be incomplete:\n{}"
 )
+
+
+if sys.version_info < (3, 10):
+
+    def aiter(obj: AsyncIterator[V]) -> AsyncIterator[V]:
+        return obj.__aiter__()
+
+    async def anext(obj: AsyncIterator[V], default: Optional[V] = None) -> V:
+        try:
+            return await obj.__anext__()
+        except StopAsyncIteration:
+            if default is not None:
+                return default
+            else:
+                raise
 
 
 class _IteratorWrapper(Generic[V]):
