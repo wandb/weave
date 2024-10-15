@@ -3,11 +3,10 @@ import os
 import pytest
 
 from weave.integrations.integration_utilities import op_name_from_ref
-from weave.trace.weave_client import WeaveClient
 
 
 @pytest.mark.skip_clickhouse_client
-def test_content_generation(client: WeaveClient) -> None:
+def test_content_generation(client):
     import google.generativeai as genai
 
     genai.configure(api_key=os.environ.get("GOOGLE_GENAI_KEY"))
@@ -28,10 +27,10 @@ def test_content_generation(client: WeaveClient) -> None:
 
 
 @pytest.mark.skip_clickhouse_client
-def test_content_generation_stream(client: WeaveClient) -> None:
+def test_content_generation_stream(client):
     import google.generativeai as genai
 
-    genai.configure(api_key=os.environ.get("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
+    genai.configure(api_key=os.environ.get("GOOGLE_GENAI_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
     response = model.generate_content(
         "Write a story about an AI and magic", stream=True
@@ -54,10 +53,10 @@ def test_content_generation_stream(client: WeaveClient) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
-async def test_content_generation_async(client: WeaveClient) -> None:
+async def test_content_generation_async(client):
     import google.generativeai as genai
 
-    genai.configure(api_key=os.environ.get("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
+    genai.configure(api_key=os.environ.get("GOOGLE_GENAI_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
 
     _ = await model.generate_content_async("Write a story about an AI and magic")
