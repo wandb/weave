@@ -98,15 +98,8 @@ class _IteratorWrapper(Generic[V]):
         return self
 
     def __next__(self) -> Generator[None, None, V]:
-        if not hasattr(self._iterator_or_ctx_manager, "__next__") and isinstance(
-            self._iterator_or_ctx_manager, Iterator
-        ):
-            try:
-                self._iterator_or_ctx_manager = iter(self._iterator_or_ctx_manager)
-            except TypeError:
-                raise TypeError(
-                    f"Cannot call anext on an iterator of type {type(self._iterator_or_ctx_manager)}"
-                )
+        if not hasattr(self._iterator_or_ctx_manager, "__next__"):
+            self._iterator_or_ctx_manager = iter(self._iterator_or_ctx_manager)  # type: ignore
         try:
             value = next(self._iterator_or_ctx_manager)  # type: ignore
             try:
@@ -135,11 +128,9 @@ class _IteratorWrapper(Generic[V]):
         return self
 
     async def __anext__(self) -> Generator[None, None, V]:
-        if not hasattr(self._iterator_or_ctx_manager, "__anext__") and isinstance(
-            self._iterator_or_ctx_manager, AsyncIterator
-        ):
+        if not hasattr(self._iterator_or_ctx_manager, "__anext__"):
             try:
-                self._iterator_or_ctx_manager = aiter(self._iterator_or_ctx_manager)
+                self._iterator_or_ctx_manager = iter(self._iterator_or_ctx_manager)
             except TypeError:
                 raise TypeError(
                     f"Cannot call anext on an iterator of type {type(self._iterator_or_ctx_manager)}"
