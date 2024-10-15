@@ -82,7 +82,9 @@ class _IteratorWrapper(Generic[V]):
         return self
 
     def __next__(self) -> Generator[None, None, V]:
-        if not hasattr(self._iterator_or_ctx_manager, "__next__") and isinstance(self._iterator_or_ctx_manager, Iterator):
+        if not hasattr(self._iterator_or_ctx_manager, "__next__") and isinstance(
+            self._iterator_or_ctx_manager, Iterator
+        ):
             try:
                 self._iterator_or_ctx_manager = iter(self._iterator_or_ctx_manager)
             except TypeError:
@@ -117,7 +119,9 @@ class _IteratorWrapper(Generic[V]):
         return self
 
     async def __anext__(self) -> Generator[None, None, V]:
-        if not hasattr(self._iterator_or_ctx_manager, "__anext__") and isinstance(self._iterator_or_ctx_manager, AsyncIterator):
+        if not hasattr(self._iterator_or_ctx_manager, "__anext__") and isinstance(
+            self._iterator_or_ctx_manager, AsyncIterator
+        ):
             try:
                 self._iterator_or_ctx_manager = aiter(self._iterator_or_ctx_manager)
             except TypeError:
