@@ -231,6 +231,7 @@ jobs:
             'cohere',
             'dspy',
             'groq',
+            'google_ai_studio',
             'instructor',
             'langchain',
             'litellm',
@@ -289,6 +290,7 @@ jobs:
           WB_SERVER_HOST: http://wandbservice
           WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
