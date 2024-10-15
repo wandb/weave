@@ -1,20 +1,20 @@
 """Defines the custom Image weave type."""
 
-from functools import cached_property
 import logging
 import os
+from functools import cached_property
 from io import BufferedReader
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+
 from weave.trace import serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
-
 
 dependencies_met = False
 
 try:
-    from openai._response import StreamedBinaryAPIResponse
     from openai._legacy_response import HttpxBinaryResponseContent
+    from openai._response import StreamedBinaryAPIResponse
 
     dependencies_met = True
 except ImportError:
@@ -24,12 +24,14 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+# TODO: this doesn't work if the stream is closed, as in if the user
+# has already consumed the content of the stream, either writing it
+# to a file or iterating through the bytes. We need to intercept
+# the stream and save it to the artifact in chunks while also piping
+# the data to the client as it comes in.
 def save_stream(
     obj: StreamedBinaryAPIResponse, artifact: MemTraceFilesArtifact, name: str
 ) -> None:
-    # TODO: this doesn't work if the stream is closed, as in if the user
-    # has already consumed the content of the stream, either writing it
-    # to a file or iterating through the bytes
     try:
         with artifact.new_file("audio.wav", binary=True) as f:
             for data in obj.iter_bytes():
@@ -44,6 +46,7 @@ def load_stream(artifact: MemTraceFilesArtifact, name: str) -> BufferedReader:
     return open(path, "rb")
 
 
+# Save the non-stream version of the httpx response
 def save_httpx(
     obj: HttpxBinaryResponseContent, artifact: MemTraceFilesArtifact, name: str
 ) -> None:
@@ -74,6 +77,9 @@ class AudioFile(BaseModel):
         return open(self.path, "rb").read()
 
 
+# We can either automatically convert audio files to this AudioFile
+# type in weave_client.py, which the serializer will pick up, or users
+# will have to manually convert to this type before saving.
 def save_audio_file(obj: AudioFile, artifact: MemTraceFilesArtifact, name: str) -> None:
     # for now only save to wav
     with artifact.new_file("audio.wav", binary=True) as f:
