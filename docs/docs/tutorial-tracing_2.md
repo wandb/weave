@@ -3,7 +3,7 @@
 In the [Track LLM inputs & outputs](/quickstart) tutorial, the basics of tracking the inputs and outputs of your LLMs was covered.
 
 In this tutorial you will learn how to:
-- **Track data** as it flows though your application
+- **Track data** as it flows through your application
 - **Track metadata** at call time
 
 ## Tracking nested function calls
@@ -27,7 +27,7 @@ def extract_dinos(sentence: str) -> dict:
         messages=[
             {
                 "role": "system",
-                "content": """Extract any dinorsaur `name`, their `common_name`, \
+                "content": """Extract any dinosaur `name`, their `common_name`, \
   names and whether its `diet` is a herbivore or carnivore, in JSON format."""
             },
             {
@@ -77,7 +77,7 @@ When you run the above code you will see the the inputs and outputs from the two
 
 ## Tracking metadata
 
-Tracking metadata can be done easily by using the `weave.attributes` context manger and passing it a dictionary of the metadata to track at call time.
+Tracking metadata can be done easily by using the `weave.attributes` context manager and passing it a dictionary of the metadata to track at call time.
 
 Continuing our example from above:
 
