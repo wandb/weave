@@ -9,7 +9,7 @@ from PIL import Image
 import weave
 from tests.trace.util import AnyIntMatcher
 from weave import Evaluation, Model
-from weave.flow.eval import SCORE_TYPE_NAME
+from weave.trace.feedback_types.score import SCORE_TYPE_NAME
 from weave.trace.weave_client import get_ref
 from weave.trace_server import trace_server_interface as tsi
 
