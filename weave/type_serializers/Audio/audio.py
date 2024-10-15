@@ -1,5 +1,3 @@
-"""Defines the custom Image weave type."""
-
 import logging
 import os
 from functools import cached_property
@@ -42,7 +40,6 @@ def save_stream(
 
 def load_stream(artifact: MemTraceFilesArtifact, name: str) -> BufferedReader:
     path = artifact.path("audio.wav")
-    # Stream from artifact?
     return open(path, "rb")
 
 
@@ -88,9 +85,7 @@ def save_audio_file(obj: AudioFile, artifact: MemTraceFilesArtifact, name: str) 
 
 def load_audio_file(artifact: MemTraceFilesArtifact, name: str) -> AudioFile:
     path = artifact.path("audio.wav")
-    return AudioFile(
-        path=path, content_type="audio/wav", content=open(path, "rb").read()
-    )
+    return AudioFile(path=path)
 
 
 def register() -> None:
