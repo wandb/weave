@@ -212,14 +212,12 @@ class Evaluation(Object):
             ):
                 message = textwrap.dedent(
                     f"""
-                    Call error {e}
-
                     Scorer {scorer_name} must have a 'model_output' or 'output' argument, to receive the output of the model function.
                     You can also set the `scorer.column_map` attribute to map dataset columns to the expected parameter names in the scorer.
                     For example, if the scorer expects "input" and "ground_truth" and we have a dataset
                     with columns "question" and "answer", column_map should be defined as follows:
-                    {"input": "question", "ground_truth": "answer"}
-                    scorer.column_map: {scorer.column_map}
+                    {{"input": "question", "ground_truth": "answer"}}
+                    scorer.column_map: {getattr(scorer, 'column_map', None)}
                     score_arg_names: {score_arg_names}
                     example: {example}
                     """

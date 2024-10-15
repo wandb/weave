@@ -1,10 +1,11 @@
 import os
+
 import pytest
-from itertools import product
 
-from pydantic import BaseModel
-
-from weave.flow.scorers.summarization_scorer import SummarizationScorer, SummarizationEvaluationResponse
+from weave.flow.scorers.summarization_scorer import (
+    SummarizationEvaluationResponse,
+    SummarizationScorer,
+)
 
 # Define providers and their models
 TEST_MODELS = {
@@ -13,6 +14,7 @@ TEST_MODELS = {
     "mistral": ["mistral-small-latest", "mistral-large-latest"],
     "gemini": ["gemini-1.5-flash", "gemini-1.5-pro-latest"],
 }
+
 
 def get_client_and_model(provider, model):
     api_key_env_vars = {
@@ -30,27 +32,37 @@ def get_client_and_model(provider, model):
 
     api_key = os.getenv(api_key_env_vars[provider])
     if not api_key:
-        raise EnvironmentError(f"API key for {provider} not found. Please set '{api_key_env_vars[provider]}' environment variable.")
+        raise EnvironmentError(
+            f"API key for {provider} not found. Please set '{api_key_env_vars[provider]}' environment variable."
+        )
 
     if provider == "openai":
         from openai import OpenAI
+
         client = OpenAI(api_key=api_key)
     elif provider == "anthropic":
         from anthropic import Anthropic
+
         client = Anthropic(api_key=api_key)
     elif provider == "mistral":
         from mistralai import Mistral
+
         client = Mistral(api_key=api_key)
     elif provider == "gemini":
         import google.generativeai as genai
+
         genai.configure(api_key=api_key)
         client = genai.GenerativeModel(model_name=model)
         model = "gemini"  # Adjust if necessary
 
     return client, model
 
+
 # Generate test parameters
-test_params = [(provider, model) for provider, models in TEST_MODELS.items() for model in models]
+test_params = [
+    (provider, model) for provider, models in TEST_MODELS.items() for model in models
+]
+
 
 @pytest.mark.parametrize("provider,model", test_params, ids=lambda p: f"{p[0]}:{p[1]}")
 def test_summarization_scorer_evaluate_summary(provider, model):
@@ -58,7 +70,7 @@ def test_summarization_scorer_evaluate_summary(provider, model):
         client, model_id = get_client_and_model(provider, model)
     except (ValueError, EnvironmentError) as e:
         pytest.skip(str(e))
-    
+
     summarization_scorer = SummarizationScorer(
         client=client,
         model_id=model_id,
@@ -68,7 +80,6 @@ def test_summarization_scorer_evaluate_summary(provider, model):
     input_text = "This is the original text."
     summary_text = "This is the summary."
     result = summarization_scorer.evaluate_summary(
-        input=input_text,
-        summary=summary_text
+        input=input_text, summary=summary_text
     )
     assert isinstance(result, SummarizationEvaluationResponse)

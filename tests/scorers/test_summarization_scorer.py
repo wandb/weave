@@ -1,7 +1,7 @@
 import pytest
-import weave
 from openai import OpenAI
 
+import weave
 from weave.flow.scorers.summarization_scorer import (
     EntityExtractionResponse,
     SummarizationEvaluationResponse,
@@ -81,31 +81,34 @@ def test_summarization_scorer_extract_entities(summarization_scorer):
     assert "entity1" in entities
     assert "entity2" in entities
 
+
 @pytest.mark.asyncio
 async def test_evaluate_summary_scorer(summarization_scorer):
-    dataset = [{
-        "input": "This is the original text.",
-        "output": "This is the summary.",
-    },
-    {
-        "input": "This is another original text.",
-        "output": "This is another summary.",
-    }]
+    dataset = [
+        {
+            "input": "This is the original text.",
+            "output": "This is the summary.",
+        },
+        {
+            "input": "This is another original text.",
+            "output": "This is another summary.",
+        },
+    ]
     evaluation = weave.Evaluation(dataset=dataset, scorers=[summarization_scorer])
-    
+
     @weave.op
-    def model(input: str): 
+    def model(input: str):
         return "This is the summary."
-    
+
     result = await evaluation.evaluate(model)
     assert isinstance(result, dict)
-    assert 'SummarizationScorer' in result
-    assert 'entity_density' in result['SummarizationScorer']
-    assert 'is_entity_dense' in result['SummarizationScorer']
-    assert 'summarization_eval_score' in result['SummarizationScorer']
-    assert 'model_latency' in result
+    assert "SummarizationScorer" in result
+    assert "entity_density" in result["SummarizationScorer"]
+    assert "is_entity_dense" in result["SummarizationScorer"]
+    assert "summarization_eval_score" in result["SummarizationScorer"]
+    assert "model_latency" in result
 
-    assert result['SummarizationScorer']['entity_density']['mean'] == pytest.approx(0.5)
-    assert result['SummarizationScorer']['is_entity_dense']['true_count'] == 2
-    assert result['SummarizationScorer']['is_entity_dense']['true_fraction'] == 1.0
-    assert result['SummarizationScorer']['summarization_eval_score']['mean'] == 1.0
+    assert result["SummarizationScorer"]["entity_density"]["mean"] == pytest.approx(0.5)
+    assert result["SummarizationScorer"]["is_entity_dense"]["true_count"] == 2
+    assert result["SummarizationScorer"]["is_entity_dense"]["true_fraction"] == 1.0
+    assert result["SummarizationScorer"]["summarization_eval_score"]["mean"] == 1.0

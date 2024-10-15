@@ -19,6 +19,7 @@ def test_string_match_scorer_false():
     result = scorer.score(output, target)
     assert result["string_in_input"] is False
 
+
 def test_levenshtein_scorer():
     scorer = LevenshteinScorer()
     output = "Hello"
