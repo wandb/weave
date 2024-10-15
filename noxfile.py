@@ -62,8 +62,6 @@ def tests(session, shard):
     if shard == "google_ai_studio":
         env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
 
-    
-
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
         "trace": ["trace/"],
