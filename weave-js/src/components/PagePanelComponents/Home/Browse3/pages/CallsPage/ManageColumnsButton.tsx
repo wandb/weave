@@ -87,12 +87,11 @@ export const ManageColumnsButton = ({
     <>
       <span ref={ref}>
         <Button
-          variant="outline"
+          variant="ghost"
           icon="miller-columns"
           tooltip="Manage columns"
-          onClick={onClick}>
-          Columns
-        </Button>
+          onClick={onClick}
+        />
       </span>
       <Popover
         id={id}
