@@ -1,8 +1,9 @@
 import importlib
 from functools import wraps
-from typing import Any, Callable, Union
+from typing import TYPE_CHECKING, Any, Callable, Union
 
-from google.generativeai.types.generation_types import GenerateContentResponse
+if TYPE_CHECKING:
+    from google.generativeai.types.generation_types import GenerateContentResponse
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
@@ -10,8 +11,8 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 
 def gemini_accumulator(
-    acc: Union[GenerateContentResponse, None], value: GenerateContentResponse
-) -> GenerateContentResponse:
+    acc: Union["GenerateContentResponse", None], value: "GenerateContentResponse"
+) -> "GenerateContentResponse":
     if acc is None:
         acc = value
     if not acc._done:
