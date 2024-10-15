@@ -15,10 +15,15 @@ def test_send_score_call(client):
     def my_score(input_x: int, model_output: int) -> int:
         return {"in_range": input_x < model_output}
 
+    # Invoke the op
     call_res, call = my_op.call(1)
     assert call_res == 2
+
+    # Score the results
     score_res, score_call = my_score.call(1, call_res)
     assert score_res == {"in_range": True}
+
+    # Store the score as feedback on the call
     res_fut = client._send_score_call(call, score_call)
     assert isinstance(res_fut, Future)
     res = res_fut.result()

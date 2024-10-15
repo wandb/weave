@@ -1100,7 +1100,8 @@ class WeaveClient:
         score_results: Any,
         scorer_call_ref_uri: str,
         scorer_op_ref_uri: str,
-    ) -> str:  # , supervision: dict):
+        # , supervision: dict
+    ) -> str:
         """(Private) Low-level, non object-oriented method for adding a score to a call.
 
         Outstanding questions:

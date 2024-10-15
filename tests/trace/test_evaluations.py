@@ -289,9 +289,11 @@ class MyDictScorerWithCustomDictSummary(weave.Scorer):
 
 def with_empty_feedback(obj: Any) -> Any:
     if isinstance(obj, dict):
-        if "weave" not in obj:
-            obj["weave"] = {}
-        obj["weave"]["feedback"] = []
+        new_dict = {**obj}
+        if "weave" not in new_dict:
+            new_dict["weave"] = {}
+        new_dict["weave"] = {**new_dict["weave"], "feedback": []}
+        return new_dict
     return obj
 
 
@@ -431,14 +433,9 @@ async def test_evaluation_data_topology(client):
 
     # Prediction
     assert predict_call.output == model_output
-    summary = {
-        **predict_call.summary,
-        "weave": {
-            **predict_call.summary["weave"],
-            "feedback": [],
-        },
-    }
-    assert summary == with_empty_feedback(predict_usage)
+    assert with_empty_feedback(predict_call.summary) == with_empty_feedback(
+        predict_usage
+    )
 
     # Prediction Scores
     assert score_int_call.output == score_int_score
