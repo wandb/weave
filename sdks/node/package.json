@@ -7,6 +7,7 @@
   "type": "commonjs",
   "scripts": {
     "test": "jest",
+    "watch": "jest --watch",
     "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\"",
     "run": "tsx",
     "generate-api": "swagger-typescript-api -p ./weave.openapi.json -o ./src/generated -n traceServerApi.ts",
