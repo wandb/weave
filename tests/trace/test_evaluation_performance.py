@@ -133,6 +133,7 @@ async def test_evaluation_performance(client: WeaveClient):
             "file_create": 10,  # 4 images, 6 ops
             "call_start": 14,  # Eval, summary, 4 predict and score sequences of 3 calls each
             "call_end": 14,  # Eval, summary, 4 predict and score sequences of 3 calls each
+            "feedback_create": 4,  # 4 predict feedbacks
         }
     )
 

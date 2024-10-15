@@ -5,8 +5,6 @@ from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace_server import sqlite_trace_server
 from weave.trace_server_bindings import remote_http_trace_server
 
-_current_inited_client = None
-
 
 class InitializedClient:
     def __init__(self, client: weave_client.WeaveClient):
@@ -15,6 +13,9 @@ class InitializedClient:
 
     def reset(self) -> None:
         weave_client_context.set_weave_client_global(None)
+
+
+_current_inited_client: typing.Optional[InitializedClient] = None
 
 
 def get_username() -> typing.Optional[str]:
