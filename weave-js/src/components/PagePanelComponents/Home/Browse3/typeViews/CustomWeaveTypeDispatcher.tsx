@@ -32,6 +32,9 @@ const customWeaveTypeRegistry: {
   'openai._legacy_response.HttpxBinaryResponseContent': {
     component: AudioPlayer,
   },
+  'wave.Wave_read': {
+    component: AudioPlayer,
+  },
 };
 
 /**

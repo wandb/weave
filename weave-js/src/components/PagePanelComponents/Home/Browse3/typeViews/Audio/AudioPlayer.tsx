@@ -32,6 +32,8 @@ export const AudioPlayer: FC<{
     }
   }, [audioBinary.result]);
 
+  console.log('audioBinary', audioBinary);
+
   if (audioBinary.loading) {
     return <LoadingDots />;
   } else if (audioBinary.result == null || audioUrl == null) {
