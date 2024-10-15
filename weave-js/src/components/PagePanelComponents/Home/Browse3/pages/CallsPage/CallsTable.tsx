@@ -782,7 +782,12 @@ export const CallsTable: FC<{
             <CompareEvaluationsTableButton
               onClick={() => {
                 history.push(
-                  router.compareEvaluationsUri(entity, project, selectedCalls)
+                  router.compareEvaluationsUri(
+                    entity,
+                    project,
+                    selectedCalls,
+                    null
+                  )
                 );
               }}
               disabled={selectedCalls.length === 0}
