@@ -130,7 +130,7 @@ class _IteratorWrapper(Generic[V]):
     async def __anext__(self) -> Generator[None, None, V]:
         if not hasattr(self._iterator_or_ctx_manager, "__anext__"):
             try:
-                self._iterator_or_ctx_manager = aiter(self._iterator_or_ctx_manager)
+                self._iterator_or_ctx_manager = aiter(self._iterator_or_ctx_manager)  # type: ignore
             except TypeError:
                 raise TypeError(
                     f"Cannot call anext on an iterator of type {type(self._iterator_or_ctx_manager)}"
