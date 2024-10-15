@@ -1,5 +1,5 @@
-import crypto from 'crypto';
 import { Buffer } from 'buffer';
+import crypto from 'crypto';
 
 export function computeDigest(data: Buffer): string {
   // Must match python server algorithm in clickhouse_trace_server_batched.py
@@ -19,19 +19,25 @@ export function encodeNumber(num: number): string {
 }
 
 export function stringifyPythonDumps(obj: any): string {
-  if (obj === null) return 'null';
-  if (typeof obj === 'string') return JSON.stringify(obj);
+  if (obj === null) {
+    return 'null';
+  }
+  if (typeof obj === 'string') {
+    return JSON.stringify(obj);
+  }
   if (typeof obj === 'number' || typeof obj === 'boolean') {
     return String(obj);
   }
   if (Array.isArray(obj)) {
-    return '[' + obj.map(stringifyPythonDumps).join(', ') + ']';
+    const items = obj.map(stringifyPythonDumps).join(', ');
+    return `['${items}']`;
   }
   if (typeof obj === 'object') {
     const pairs = Object.keys(obj)
       .sort()
-      .map(key => JSON.stringify(key) + ': ' + stringifyPythonDumps(obj[key]));
-    return '{' + pairs.join(', ') + '}';
+      .map(key => `${JSON.stringify(key)}: ${stringifyPythonDumps(obj[key])}`)
+      .join(', ');
+    return `{${pairs}}`;
   }
   throw new Error('Unsupported type');
 }
