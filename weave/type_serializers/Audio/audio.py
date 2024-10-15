@@ -1,5 +1,5 @@
-from io import BufferedReader
 import wave
+from io import BufferedReader
 
 from weave.trace import serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
@@ -15,7 +15,7 @@ except ImportError:
 
 
 def save_httpx(
-    obj: HttpxBinaryResponseContent, artifact: MemTraceFilesArtifact, name: str
+    obj: "HttpxBinaryResponseContent", artifact: MemTraceFilesArtifact, name: str
 ) -> None:
     with artifact.new_file("audio.wav", binary=True) as f:
         for data in obj.iter_bytes():
@@ -44,5 +44,8 @@ def load_wave(artifact: MemTraceFilesArtifact, name: str) -> wave.Wave_read:
 
 
 def register() -> None:
-    serializer.register_serializer(HttpxBinaryResponseContent, save_httpx, load_httpx)
+    if dependencies_met:
+        serializer.register_serializer(
+            HttpxBinaryResponseContent, save_httpx, load_httpx
+        )
     serializer.register_serializer(wave.Wave_read, save_wave, load_wave)
