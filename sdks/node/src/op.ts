@@ -6,28 +6,18 @@ export function op<T extends (...args: any[]) => any>(
   fn: T,
   options?: OpOptions<T>
 ): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>> {
-  const fnName = options?.originalFunction?.name || fn.name || 'anonymous';
-  let actualOpName = fnName;
-  const thisArg = options?.bindThis;
-  if (options?.bindThis) {
-    const className = Object.getPrototypeOf(options.bindThis).constructor.name;
-    actualOpName = `${className}.${fnName}`;
-  }
-  if (options?.name) {
-    actualOpName = options.name;
-  }
-
   const opWrapper = async function (...params: Parameters<T>): Promise<ReturnType<T>> {
     if (!globalClient) {
       return await fn(...params);
     }
 
-    const { newStack, currentCall, parentCall } = globalClient.pushNewCall();
+    const { currentCall, parentCall, newStack } = globalClient.pushNewCall();
     const startTime = new Date();
     if (!globalClient.quiet && parentCall == null) {
       console.log(`${TRACE_CALL_EMOJI} https://wandb.ai/${globalClient.projectId}/r/call/${currentCall.callId}`);
     }
     const displayName = options?.callDisplayName ? options.callDisplayName(...params) : undefined;
+    const thisArg = options?.bindThis;
     const startCallPromise = globalClient.startCall(
       opWrapper,
       params,
@@ -87,6 +77,16 @@ export function op<T extends (...args: any[]) => any>(
       // No need to do anything here.
     }
   };
+
+  const fnName = options?.originalFunction?.name || fn.name || 'anonymous';
+  let actualOpName = fnName;
+  if (options?.bindThis) {
+    const className = Object.getPrototypeOf(options.bindThis).constructor.name;
+    actualOpName = `${className}.${fnName}`;
+  }
+  if (options?.name) {
+    actualOpName = options.name;
+  }
 
   opWrapper.__name = actualOpName;
   opWrapper.__isOp = true as true;
