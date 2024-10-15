@@ -5,9 +5,9 @@ from unittest.mock import patch
 import requests
 from pydantic import ValidationError
 
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.trace_server_common import trace_server_interface as tsi
+from weave.trace_server_common.ids import generate_id
 
 
 def generate_start(id) -> tsi.StartedCallSchemaForInsert:
@@ -29,7 +29,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         self.trace_server_url = "http://example.com"
         self.server = RemoteHTTPTraceServer(self.trace_server_url)
 
-    @patch("weave.trace_server.requests.post")
+    @patch("weave.trace_server_bindings.requests.post")
     def test_ok(self, mock_post):
         call_id = generate_id()
         mock_post.return_value = requests.Response()
@@ -41,7 +41,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         self.server.call_start(tsi.CallStartReq(start=start))
         mock_post.assert_called_once()
 
-    @patch("weave.trace_server.requests.post")
+    @patch("weave.trace_server_bindings.requests.post")
     def test_400_500_no_retry(self, mock_post):
         call_id = generate_id()
         resp1 = requests.Response()
@@ -69,7 +69,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         with self.assertRaises(ValidationError):
             self.server.call_start(tsi.CallStartReq(start={"invalid": "broken"}))
 
-    @patch("weave.trace_server.requests.post")
+    @patch("weave.trace_server_bindings.requests.post")
     def test_502_503_504_429_retry(self, mock_post):
         call_id = generate_id()
 
@@ -95,7 +95,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         start = generate_start(call_id)
         self.server.call_start(tsi.CallStartReq(start=start))
 
-    @patch("weave.trace_server.requests.post")
+    @patch("weave.trace_server_bindings.requests.post")
     def test_other_error_retry(self, mock_post):
         call_id = generate_id()
 
