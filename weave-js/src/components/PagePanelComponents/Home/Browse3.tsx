@@ -922,22 +922,12 @@ const OpPageBinding = () => {
 
 const CompareEvaluationsBinding = () => {
   const history = useHistory();
-  const location = useLocation();
+  const routerContext = useWeaveflowCurrentRouteContext();
   const {entity, project} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
   const evaluationCallIds = useMemo(() => {
     return JSON.parse(query.evaluationCallIds);
   }, [query.evaluationCallIds]);
-
-  const onEvaluationCallIdsUpdate = useCallback(
-    (newEvaluationCallIds: string[]) => {
-      const newQuery = new URLSearchParams(location.search);
-      newQuery.set('evaluationCallIds', JSON.stringify(newEvaluationCallIds));
-      history.push({search: newQuery.toString()});
-    },
-    [history, location.search]
-  );
-
   const selectedMetrics: Record<string, boolean> | null = useMemo(() => {
     try {
       return JSON.parse(query.metrics);
@@ -945,11 +935,32 @@ const CompareEvaluationsBinding = () => {
       return null;
     }
   }, [query.metrics]);
-  const setSelectedMetrics = (newModel: Record<string, boolean>) => {
-    const newQuery = new URLSearchParams(location.search);
-    newQuery.set('metrics', JSON.stringify(newModel));
-    history.push({search: newQuery.toString()});
-  };
+  const onEvaluationCallIdsUpdate = useCallback(
+    (newEvaluationCallIds: string[]) => {
+      history.push(
+        routerContext.compareEvaluationsUri(
+          entity,
+          project,
+          newEvaluationCallIds,
+          selectedMetrics
+        )
+      );
+    },
+    [history, entity, project, routerContext, selectedMetrics]
+  );
+  const setSelectedMetrics = useCallback(
+    (newModel: Record<string, boolean>) => {
+      history.push(
+        routerContext.compareEvaluationsUri(
+          entity,
+          project,
+          evaluationCallIds,
+          newModel
+        )
+      );
+    },
+    [history, entity, project, routerContext, evaluationCallIds]
+  );
   return (
     <CompareEvaluationsPage
       entity={entity}
