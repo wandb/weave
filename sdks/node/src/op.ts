@@ -79,14 +79,8 @@ export function op<T extends (...args: any[]) => any>(
   };
 
   const fnName = options?.originalFunction?.name || fn.name || 'anonymous';
-  let actualOpName = fnName;
-  if (options?.bindThis) {
-    const className = Object.getPrototypeOf(options.bindThis).constructor.name;
-    actualOpName = `${className}.${fnName}`;
-  }
-  if (options?.name) {
-    actualOpName = options.name;
-  }
+  const className = options?.bindThis && Object.getPrototypeOf(options.bindThis).constructor.name;
+  const actualOpName = options?.name || (className ? `${className}.${fnName}` : fnName);
 
   opWrapper.__name = actualOpName;
   opWrapper.__isOp = true as true;
