@@ -1,4 +1,7 @@
-import {MOON_900, TEAL_600} from '@wandb/weave/common/css/color.styles';
+import {
+  MOON_350,
+  TEAL_500,
+} from '@wandb/weave/common/css/color.styles';
 import {formatDurationWithColons} from '@wandb/weave/common/util/time';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
@@ -8,7 +11,6 @@ import WaveSurfer from 'wavesurfer.js';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
-import { Slider } from '@wandb/weave/components';
 
 type AudioPlayerTypePayload = CustomWeaveTypePayload<
   'openai._legacy_response.HttpxBinaryResponseContent',
@@ -36,17 +38,27 @@ export const AudioPlayer: FC<{
     return <span></span>;
   }
 
-  return <MiniAudioViewer audioSrc={audioUrl} height={20} noWaveform={true} />;
+  return <MiniAudioViewer audioSrc={audioUrl} height={24} />;
 };
 
 const MiniAudioViewer: FC<{
   audioSrc: string;
   height: number;
-  noWaveform?: boolean;
   downloadFile?: () => void;
-}> = ({audioSrc, height, noWaveform, downloadFile}) => {
-
-  const [showSlider, setShowSlider] = useState(false);
+}> = ({audioSrc, height, downloadFile}) => {
+  /* 
+  Heavily inspired by code in weave-js/src/components/Panel2/AudioViewer.tsx 
+  
+  This component has 3 modes, based on the width of the container. Component
+  is responsive to width changes. Modes:
+  - controls: show play/pause, time, and download. ex: (> 0:00/0:05 v)
+  - slider: show play/pause, time, and waveform. ex:   (> 0:01/0:05 --|-----------)
+  - mini: show play/pause and time. ex:                (> 0:01/0:05)
+  */
+  const measureDivRef = useRef<HTMLDivElement>(null);
+  const [showMode, setShowMode] = useState<'controls' | 'slider' | 'mini'>(
+    'controls'
+  );
 
   const wavesurferRef = useRef<WaveSurfer>();
   const waveformDomRef = useRef<HTMLDivElement>(null);
@@ -57,21 +69,16 @@ const MiniAudioViewer: FC<{
 
   // initializes the wavesurfer.js div and object (used to display waveforms)
   React.useEffect(() => {
-    if (audioSrc) {
-      if (!waveformDomRef.current) {
-        throw Error(
-          'Unexpected dom state AudioCard render should always set the ref'
-        );
-      }
-
+    if (audioSrc && waveformDomRef.current && measureDivRef.current) {
       const wavesurfer = WaveSurfer.create({
         backend: 'WebAudio',
         container: waveformDomRef.current,
-        waveColor: TEAL_600,
-        progressColor: TEAL_600,
-        cursorColor: MOON_900,
+        waveColor: MOON_350,
+        progressColor: TEAL_500,
+        cursorColor: MOON_350,
         responsive: true,
-        height: height,
+        height,
+        barHeight: 1.3, // slightly exaggerated
       });
 
       wavesurferRef.current = wavesurfer;
@@ -107,70 +114,62 @@ const MiniAudioViewer: FC<{
         wavesurferRef.current.destroy();
       }
     };
-  }, [audioSrc, height]);
+  }, [audioSrc, height, measureDivRef.current?.offsetWidth]);
 
   const audioCurrentTimeStr = [audioCurrentTime, audioTotalTime]
     .map(formatDurationWithColons)
-    .map(x => x.slice(0,1) == '0' ? x.slice(1) : x)
-    .join('/')
-
-  const measureDivRef = useRef<HTMLDivElement>(null);
+    .map(x => (x.slice(0, 1) === '0' ? x.slice(1) : x))
+    .join('/');
 
   useEffect(() => {
     if (measureDivRef.current) {
-      setShowSlider(measureDivRef.current.offsetWidth > 150);
+      if (measureDivRef.current.offsetWidth > 250) {
+        setShowMode('slider');
+      } else if (measureDivRef.current.offsetWidth < 50) {
+        setShowMode('mini');
+      } else {
+        setShowMode('controls');
+      }
     }
   }, [measureDivRef.current?.offsetWidth]);
 
   return (
     <Tailwind>
       <div ref={measureDivRef} className="w-full">
-        {/* container for wavesurfer.js waveform */}
         <div
-          className="audio-card-waveform"
-          style={{
-            height: '100%',
-            width: '100%',
-            flex: '1 1 auto',
-            display: noWaveform ? 'none' : 'block',
-          }}
-          ref={waveformDomRef}
-        />
-        <div className={`night-aware rounded-2xl bg-slate-300 p-0 border-2 ${showSlider ? 'w-full' : 'w-fit'}`}>
-        <div className="flex w-full items-center gap-4 whitespace-nowrap">
-          <Button
-            className="pl-1 pr-1 ml-6"
-            disabled={audioLoading}
-            icon={audioPlaying ? 'pause' : 'play'}
-            onClick={() => {
-              if (wavesurferRef.current) {
-                wavesurferRef.current.playPause();
-              }
-            }}
-            size="small"
-            variant="ghost"
-          />
-          <div
-            style={{fontSize: '12px'}}
-            className="audio-card-time">
-            {audioCurrentTimeStr}
-          </div>
-          {showSlider && (
-          <div className="w-full">
-            <input id="small-range" className="h-4 outline-none" type="range" min={0} max={audioTotalTime ? audioTotalTime * 100 : 0} value={audioCurrentTime ? audioCurrentTime * 100 : 0} onChange={(e) => {
-              if (wavesurferRef.current) {
-                wavesurferRef.current.seekTo(Number(e.target.value) / 100);
-              }
-            }} />
-          </div>)}
+          className={`rounded-2xl bg-moon-150 ${
+            showMode === 'slider' ? 'w-full' : 'w-fit'
+          }`}>
+          <div className="flex w-full items-center">
             <Button
-                icon="download"
-                onClick={downloadFile}
-                size="small"
-                variant="ghost"
-                className="mr-6"
+              className="ml-6 pl-1 pr-1"
+              disabled={audioLoading}
+              icon={audioPlaying ? 'pause' : 'play'}
+              onClick={() => {
+                if (wavesurferRef.current) {
+                  wavesurferRef.current.playPause();
+                }
+              }}
+              size="small"
+              variant="ghost"
             />
-        </div>
+            <div className="text-s mx-4">{audioCurrentTimeStr}</div>
+            <div
+              ref={waveformDomRef}
+              className={`w-full ${showMode === 'slider' ? 'block' : 'hidden'}`}
+            />
+            <div>
+              {showMode === 'controls' && (
+                <Button
+                  icon="download"
+                  onClick={downloadFile}
+                  size="small"
+                  variant="ghost"
+                  className="mr-6"
+                />
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </Tailwind>
