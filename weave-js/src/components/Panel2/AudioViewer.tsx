@@ -159,7 +159,6 @@ const AudioViewer = (props: AudioViewerProps) => {
                   wavesurferRef.current.playPause();
                 }
               }}
-              size={controlBarHeight > 20 ? 'small' : 'mini'}
             />
             <div
               style={{flex: '1 1 auto', overflow: 'hidden'}}
