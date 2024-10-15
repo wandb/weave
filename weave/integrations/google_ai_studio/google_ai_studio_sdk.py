@@ -1,6 +1,6 @@
 import importlib
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 def gemini_accumulator(
-    acc: Union["GenerateContentResponse", None], value: "GenerateContentResponse"
+    acc: Optional["GenerateContentResponse"], value: "GenerateContentResponse"
 ) -> "GenerateContentResponse":
     if acc is None:
         acc = value
