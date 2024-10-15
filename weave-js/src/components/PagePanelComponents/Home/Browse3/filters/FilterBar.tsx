@@ -23,6 +23,8 @@ import {FilterRow} from './FilterRow';
 import {FilterTagItem} from './FilterTagItem';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
+import classNames from 'classnames';
+import {twMerge} from 'tailwind-merge';
 
 type FilterBarProps = {
   filterModel: GridFilterModel;
@@ -211,7 +213,10 @@ export const FilterBar = ({
     <>
       <div
         ref={refBar}
-        className="border-box flex h-32 cursor-pointer items-center gap-4 rounded border border-moon-200 px-8 hover:border-teal-500/40"
+        className={twMerge(
+          'border-box mx-1 flex h-32 cursor-pointer items-center gap-4 rounded border border-moon-200 px-8 font-semibold',
+          'hover:mx-0 hover:border-2 hover:border-teal-500/40'
+        )}
         onClick={onClick}>
         <div>
           <IconFilterAlt />

@@ -732,6 +732,15 @@ export const CallsTable: FC<{
               </ListItem>
             </div>
           )}
+          {columnVisibilityModel && setColumnVisibilityModel && (
+            <div className="flex-none">
+              <ManageColumnsButton
+                columnInfo={columns}
+                columnVisibilityModel={columnVisibilityModel}
+                setColumnVisibilityModel={setColumnVisibilityModel}
+              />
+            </div>
+          )}
           {filterModel && setFilterModel && (
             <FilterPanel
               filterModel={filterModel}
@@ -810,7 +819,7 @@ export const CallsTable: FC<{
             </>
           )}
 
-          <div className="flex-none">
+          <div className="flex-none px-4">
             <ExportSelector
               selectedCalls={selectedCalls}
               numTotalCalls={callsTotal}
@@ -829,18 +838,6 @@ export const CallsTable: FC<{
               }}
             />
           </div>
-          {columnVisibilityModel && setColumnVisibilityModel && (
-            <>
-              <ButtonDivider />
-              <div className="flex-none">
-                <ManageColumnsButton
-                  columnInfo={columns}
-                  columnVisibilityModel={columnVisibilityModel}
-                  setColumnVisibilityModel={setColumnVisibilityModel}
-                />
-              </div>
-            </>
-          )}
         </Tailwind>
       }>
       <StyledDataGrid
