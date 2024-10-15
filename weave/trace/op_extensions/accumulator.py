@@ -86,6 +86,7 @@ class _IteratorWrapper(Generic[V]):
             self._iterator_or_ctx_manager = iter(self._iterator_or_ctx_manager)  # type: ignore
         try:
             value = next(self._iterator_or_ctx_manager)  # type: ignore
+            # print(f"{value.candidates[0].content.parts[0].text=}")
             try:
                 # Here we do a try/catch because we don't want to
                 # break the user process if we trip up on processing
