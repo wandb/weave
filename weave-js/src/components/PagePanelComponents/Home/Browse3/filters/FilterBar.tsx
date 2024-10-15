@@ -5,6 +5,7 @@
 import {Popover} from '@mui/material';
 import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
 import React, {useCallback, useRef} from 'react';
+import {twMerge} from 'tailwind-merge';
 
 import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
@@ -23,8 +24,6 @@ import {FilterRow} from './FilterRow';
 import {FilterTagItem} from './FilterTagItem';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
-import classNames from 'classnames';
-import {twMerge} from 'tailwind-merge';
 
 type FilterBarProps = {
   filterModel: GridFilterModel;
