@@ -1,6 +1,6 @@
 import logging
 import typing
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
@@ -74,10 +74,10 @@ def _build_result_from_encoded(
     return result
 
 
-STR_LENGTH_LIMIT = 1000
+MAX_STR_LEN = 1000
 
 
-def stringify(obj: Any, limit: int = STR_LENGTH_LIMIT) -> str:
+def stringify(obj: Any, limit: int = MAX_STR_LEN) -> str:
     """This is a fallback for objects that we don't have a better way to serialize."""
     rep = None
     try:
@@ -118,7 +118,7 @@ def dictify(
         #       maybe we should just return it rather than stringify
         return stringify(obj)
 
-    if isinstance(obj, (int, float, str, bool, type(None))):
+    if is_primitive(obj):
         return obj
     elif isinstance(obj, (list, tuple)):
         return [dictify(v, maxdepth, depth + 1, seen) for v in obj]
@@ -145,12 +145,11 @@ def dictify(
         "qualname": obj.__class__.__qualname__,
         "name": obj.__class__.__name__,
     }
-    if hasattr(obj, "__len__") and hasattr(obj, "__getitem__"):
+    if isinstance(obj, Sequence) and not isinstance(obj, (str, bytes)):
         # Custom list-like object
         try:
-            n = len(obj)
-            for i in range(n):
-                result[i] = dictify(obj[i], maxdepth, depth + 1, seen)
+            for i, item in enumerate(obj):
+                result[i] = dictify(item, maxdepth, depth + 1, seen)
         except Exception:
             raise ValueError("fallback dictify failed")
     else:
@@ -174,13 +173,16 @@ def dictify(
 ALWAYS_STRINGIFY = (logging.Logger,)
 
 
+# Note: Max depth not picked scientifically, just trying to keep things under control.
+DEFAULT_MAX_DICTIFY_DEPTH = 10
+
+
 def fallback_encode(obj: Any) -> Any:
     # TODO: Should we try to compute an object size and skip if too big?
     if isinstance(obj, ALWAYS_STRINGIFY):
         return stringify(obj)
     try:
-        # Note: Max depth not picked scientifically, just trying to keep things under control.
-        return dictify(obj, maxdepth=10)
+        return dictify(obj, maxdepth=DEFAULT_MAX_DICTIFY_DEPTH)
     except Exception:
         return stringify(obj)
 
