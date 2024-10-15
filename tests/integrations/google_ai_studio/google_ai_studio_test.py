@@ -62,10 +62,7 @@ async def test_content_generation_async(client: WeaveClient) -> None:
     genai.configure(api_key=os.environ.get("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
 
-    async def async_generate() -> Any:
-        return await model.generate_content_async("Write a story about an AI and magic")
-
-    asyncio.run(async_generate())
+    _ = await model.generate_content_async("Write a story about an AI and magic")
 
     calls = list(client.calls())
     assert len(calls) == 1
