@@ -14,11 +14,12 @@ def gemini_accumulator(
     acc: Optional["GenerateContentResponse"], value: "GenerateContentResponse"
 ) -> "GenerateContentResponse":
     if acc is None:
-        acc = value
-    if acc != value:
-        for i, value_candidate in enumerate(value.candidates):
-            for j, value_part in enumerate(value_candidate.content.parts):
-                acc.candidates[i].content.parts[j].text += value_part.text
+        return value
+
+    for i, value_candidate in enumerate(value.candidates):
+        for j, value_part in enumerate(value_candidate.content.parts):
+            acc.candidates[i].content.parts[j].text += value_part.text
+
     acc.usage_metadata.prompt_token_count += value.usage_metadata.prompt_token_count
     acc.usage_metadata.candidates_token_count += (
         value.usage_metadata.candidates_token_count
