@@ -2,12 +2,12 @@ import importlib
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Union
 
-if TYPE_CHECKING:
-    from google.generativeai.types.generation_types import GenerateContentResponse
-
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
+
+if TYPE_CHECKING:
+    from google.generativeai.types.generation_types import GenerateContentResponse
 
 
 def gemini_accumulator(
