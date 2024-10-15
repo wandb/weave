@@ -99,10 +99,15 @@ class _IteratorWrapper(Generic[V]):
 
     def __next__(self) -> Generator[None, None, V]:
         if not hasattr(self._iterator_or_ctx_manager, "__next__"):
-            # This is kept as a type ignore because the `google-generativeai` pkg seems
-            # to yield an object that has properties of both value and iterator, but doesn't
-            # seem to pass the isinstance(obj, Iterator) check...
-            self._iterator_or_ctx_manager = iter(self._iterator_or_ctx_manager)  # type: ignore
+            try:
+                # This is kept as a type ignore because the `google-generativeai` pkg seems
+                # to yield an object that has properties of both value and iterator, but doesn't
+                # seem to pass the isinstance(obj, Iterator) check...
+                self._iterator_or_ctx_manager = iter(self._iterator_or_ctx_manager)  # type: ignore
+            except TypeError:
+                raise TypeError(
+                    f"Cannot call next on an object of type {type(self._iterator_or_ctx_manager)}"
+                )
         try:
             value = next(self._iterator_or_ctx_manager)  # type: ignore
             try:
@@ -133,10 +138,13 @@ class _IteratorWrapper(Generic[V]):
     async def __anext__(self) -> Generator[None, None, V]:
         if not hasattr(self._iterator_or_ctx_manager, "__anext__"):
             try:
+                # This is kept as a type ignore because the `google-generativeai` pkg seems
+                # to yield an object that has properties of both value and iterator, but doesn't
+                # seem to pass the isinstance(obj, Iterator) check...
                 self._iterator_or_ctx_manager = aiter(self._iterator_or_ctx_manager)  # type: ignore
             except TypeError:
                 raise TypeError(
-                    f"Cannot call anext on an iterator of type {type(self._iterator_or_ctx_manager)}"
+                    f"Cannot call anext on an object of type {type(self._iterator_or_ctx_manager)}"
                 )
         try:
             value = await self._iterator_or_ctx_manager.__anext__()  # type: ignore
