@@ -46,7 +46,7 @@ async function* asyncParallelMap<T, U>(
   fnParams: (item: T) => any[],
   maxConcurrency: number
 ) {
-  const itemPromiseMap: Map<T, Promise<{ item: T; result: Awaited<U> }>> = new Map();
+  const inProgressTasks: Map<T, Promise<{ item: T; result: Awaited<U> }>> = new Map();
   async function runOne(item: T) {
     return {
       item,
@@ -56,26 +56,26 @@ async function* asyncParallelMap<T, U>(
   }
   let nDone = 0;
   for await (const item of asyncIterator) {
-    if (itemPromiseMap.size >= maxConcurrency) {
-      const done = await Promise.race(itemPromiseMap.values());
-      itemPromiseMap.delete(done.item);
+    if (inProgressTasks.size >= maxConcurrency) {
+      const done = await Promise.race(inProgressTasks.values());
+      inProgressTasks.delete(done.item);
       yield {
         ...done,
-        nRunning: itemPromiseMap.size,
+        nRunning: inProgressTasks.size,
         nDone: ++nDone,
       };
     }
     const prom = runOne(item);
-    itemPromiseMap.set(item, prom);
+    inProgressTasks.set(item, prom);
   }
 
   // Flush remaining items
-  while (itemPromiseMap.size > 0) {
-    const done = await Promise.race(itemPromiseMap.values());
-    itemPromiseMap.delete(done.item);
+  while (inProgressTasks.size > 0) {
+    const done = await Promise.race(inProgressTasks.values());
+    inProgressTasks.delete(done.item);
     yield {
       ...done,
-      nRunning: itemPromiseMap.size,
+      nRunning: inProgressTasks.size,
       nDone: ++nDone,
     };
   }
