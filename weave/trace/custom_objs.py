@@ -60,6 +60,8 @@ def decode_custom_obj(
 ) -> Any:
     if weave_type["type"] in KNOWN_TYPES:
         serializer = get_serializer_by_id(weave_type["type"])
+        if serializer is None:
+            raise ValueError(f"No serializer found for {weave_type}")
         load_instance_op = serializer.load
     elif load_instance_op_uri is not None:
         ref = parse_uri(load_instance_op_uri)
