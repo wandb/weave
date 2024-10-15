@@ -58,8 +58,10 @@ def decode_custom_obj(
     encoded_path_contents: Mapping[str, Union[str, bytes]],
     load_instance_op_uri: Optional[str],
 ) -> Any:
-    load_instance_op = None
-    if weave_type["type"] not in KNOWN_TYPES and load_instance_op_uri is not None:
+    if weave_type["type"] in KNOWN_TYPES:
+        serializer = get_serializer_by_id(weave_type["type"])
+        load_instance_op = serializer.load
+    elif load_instance_op_uri is not None:
         ref = parse_uri(load_instance_op_uri)
         if not isinstance(ref, ObjectRef):
             raise ValueError(f"Expected ObjectRef, got {load_instance_op_uri}")
@@ -69,8 +71,7 @@ def decode_custom_obj(
             raise ValueError(
                 f"Failed to load op needed to decode object of type {weave_type}. See logs above for more information."
             )
-
-    if load_instance_op is None:
+    else:
         serializer = get_serializer_by_id(weave_type["type"])
         if serializer is None:
             raise ValueError(f"No serializer found for {weave_type}")
@@ -79,10 +80,7 @@ def decode_custom_obj(
     # Disables tracing so that calls to loading data itself don't get traced
     load_instance_op._tracing_enabled = False  # type: ignore
 
-    art = MemTraceFilesArtifact(
-        encoded_path_contents,
-        metadata={},
-    )
+    art = MemTraceFilesArtifact(encoded_path_contents, metadata={})
     res = load_instance_op(art, "obj")
     res.art = art
     return res
