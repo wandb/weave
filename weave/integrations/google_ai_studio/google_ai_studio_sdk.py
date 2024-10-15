@@ -15,8 +15,6 @@ def gemini_accumulator(
 ) -> "GenerateContentResponse":
     if acc is None:
         acc = value
-    if not acc._done:
-        return value
     if acc != value:
         for i, value_candidate in enumerate(value.candidates):
             for j, value_part in enumerate(value_candidate.content.parts):
