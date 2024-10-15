@@ -91,10 +91,7 @@ export function op<T extends (...args: any[]) => any>(
 }
 
 export function isOp(fn: any): fn is Op<any> {
-  if (fn == null) {
-    return false;
-  }
-  return fn.__isOp === true;
+  return fn?.__isOp === true;
 }
 
 export function boundOp<T extends (...args: any[]) => any>(bindThis: any, fn: T, options?: OpOptions<T>) {
