@@ -127,7 +127,11 @@ export const isMessage = (message: any): boolean => {
   if (!('content' in message) && !('tool_calls' in message)) {
     return false;
   }
-  if ('content' in message && !isMessageContent(message.content)) {
+  if (
+    'content' in message &&
+    message.content !== null &&
+    !isMessageContent(message.content)
+  ) {
     return false;
   }
   if ('tool_calls' in message && !isToolCalls(message.tool_calls)) {

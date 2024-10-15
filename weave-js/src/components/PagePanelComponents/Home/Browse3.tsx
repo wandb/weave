@@ -14,10 +14,10 @@ import {
   GridColumnVisibilityModel,
   GridFilterModel,
   GridPaginationModel,
-  GridPinnedColumns,
+  GridPinnedColumnFields,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
-import {LicenseInfo} from '@mui/x-license-pro';
+import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
@@ -103,7 +103,7 @@ import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/t
 import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
-  '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
+  'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
 );
 
 type Browse3Params = Partial<Browse3ProjectParams> &
@@ -397,11 +397,7 @@ const MainPeekingLayout: FC = () => {
               <SimplePageLayoutContext.Provider
                 value={{
                   headerSuffix: (
-                    <Box
-                      sx={{
-                        height: '41px',
-                        flex: '0 0 auto',
-                      }}>
+                    <Box sx={{flex: '0 0 auto'}}>
                       <FullPageButton
                         query={query}
                         generalBase={generalBase}
@@ -727,7 +723,7 @@ const CallsPageBinding = () => {
     () => getValidPinModel(query.pin, DEFAULT_PIN_CALLS, ALWAYS_PIN_LEFT_CALLS),
     [query.pin]
   );
-  const setPinModel = (newModel: GridPinnedColumns) => {
+  const setPinModel = (newModel: GridPinnedColumnFields) => {
     const newQuery = new URLSearchParams(location.search);
     newQuery.set(
       'pin',
@@ -925,16 +921,54 @@ const OpPageBinding = () => {
 };
 
 const CompareEvaluationsBinding = () => {
+  const history = useHistory();
+  const routerContext = useWeaveflowCurrentRouteContext();
   const {entity, project} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
   const evaluationCallIds = useMemo(() => {
     return JSON.parse(query.evaluationCallIds);
   }, [query.evaluationCallIds]);
+  const selectedMetrics: Record<string, boolean> | null = useMemo(() => {
+    try {
+      return JSON.parse(query.metrics);
+    } catch (e) {
+      return null;
+    }
+  }, [query.metrics]);
+  const onEvaluationCallIdsUpdate = useCallback(
+    (newEvaluationCallIds: string[]) => {
+      history.push(
+        routerContext.compareEvaluationsUri(
+          entity,
+          project,
+          newEvaluationCallIds,
+          selectedMetrics
+        )
+      );
+    },
+    [history, entity, project, routerContext, selectedMetrics]
+  );
+  const setSelectedMetrics = useCallback(
+    (newModel: Record<string, boolean>) => {
+      history.push(
+        routerContext.compareEvaluationsUri(
+          entity,
+          project,
+          evaluationCallIds,
+          newModel
+        )
+      );
+    },
+    [history, entity, project, routerContext, evaluationCallIds]
+  );
   return (
     <CompareEvaluationsPage
       entity={entity}
       project={project}
       evaluationCallIds={evaluationCallIds}
+      onEvaluationCallIdsUpdate={onEvaluationCallIdsUpdate}
+      selectedMetrics={selectedMetrics}
+      setSelectedMetrics={setSelectedMetrics}
     />
   );
 };

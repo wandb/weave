@@ -8,8 +8,6 @@ from weave.deploy import gcp as google
 from weave.trace import api
 from weave.trace.refs import ObjectRef, parse_uri
 
-# from .model_server import app
-
 # TODO: does this work?
 os.environ["PYTHONUNBUFFERED"] = "1"
 
@@ -18,23 +16,6 @@ os.environ["PYTHONUNBUFFERED"] = "1"
 @click.version_option(version=__version__)
 def cli() -> None:
     pass
-
-
-# Not included for now.
-# @cli.command("ui", help="Start the weave UI.")
-# def start_ui() -> None:
-#     print("Starting server...")
-#     try:
-#         from weave.legacy.weave import server
-#     except ModuleNotFoundError:
-#         print("Run 'pip install weave[engine]' to use the local server.")
-#         sys.exit(1)
-#     serv = server.HttpServer(port=3000)  # type: ignore
-#     serv.start()
-#     print("Server started")
-#     print(f"http://localhost:3000/{BROWSE3_PATH}")
-#     while True:
-#         time.sleep(10)
 
 
 @cli.command(help="Serve weave models.")

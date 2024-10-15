@@ -2,7 +2,7 @@ import base64
 import typing
 import uuid
 
-from . import refs_internal
+from weave.trace_server import refs_internal
 
 
 class CHValidationError(Exception):

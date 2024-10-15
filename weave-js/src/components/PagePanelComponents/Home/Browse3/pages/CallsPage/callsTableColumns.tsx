@@ -12,12 +12,13 @@ import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
+import {TEAL_600} from '../../../../../../common/css/color.styles';
 import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {Reactions} from '../../feedback/Reactions';
-import {CellFilterWrapper} from '../../filters/CellFilterWrapper';
+import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../filters/common';
 import {
   getTokensAndCostFromUsage,
@@ -53,7 +54,8 @@ export const useCallsTableColumns = (
   onCollapse: (col: string) => void,
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
-  onAddFilter?: (field: string, operator: string | null, value: any) => void
+  allowedColumnPatterns?: string[],
+  onAddFilter?: OnAddFilter
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -128,6 +130,7 @@ export const useCallsTableColumns = (
         onExpand,
         columnIsRefExpanded,
         userDefinedColumnWidths,
+        allowedColumnPatterns,
         onAddFilter
       ),
     [
@@ -143,6 +146,7 @@ export const useCallsTableColumns = (
       onExpand,
       columnIsRefExpanded,
       userDefinedColumnWidths,
+      allowedColumnPatterns,
       onAddFilter,
     ]
   );
@@ -167,15 +171,29 @@ function buildCallsTableColumns(
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
   userDefinedColumnWidths: Record<string, number>,
-  onAddFilter?: (field: string, operator: string | null, value: any) => void
+  allowedColumnPatterns?: string[],
+  onAddFilter?: OnAddFilter
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
 } {
   // Filters summary.usage. because we add a derived column for tokens and cost
-  const filteredDynamicColumnNames = allDynamicColumnNames.filter(
-    c => !HIDDEN_DYNAMIC_COLUMN_PREFIXES.some(p => c.startsWith(p + '.'))
-  );
+  // Sort attributes after inputs and outputs.
+  const filteredDynamicColumnNames = allDynamicColumnNames
+    .filter(
+      c => !HIDDEN_DYNAMIC_COLUMN_PREFIXES.some(p => c.startsWith(p + '.'))
+    )
+    .sort((a, b) => {
+      const prefixes = ['inputs.', 'output.', 'attributes.'];
+      const aPrefix =
+        a === 'output' ? 'output.' : prefixes.find(p => a.startsWith(p)) ?? '';
+      const bPrefix =
+        b === 'output' ? 'output.' : prefixes.find(p => b.startsWith(p)) ?? '';
+      if (aPrefix !== bPrefix) {
+        return prefixes.indexOf(aPrefix) - prefixes.indexOf(bPrefix);
+      }
+      return a.localeCompare(b);
+    });
 
   const cols: Array<GridColDef<TraceCallSchema>> = [
     {
@@ -184,8 +202,9 @@ function buildCallsTableColumns(
       minWidth: 100,
       width: 250,
       hideable: false,
-      valueGetter: rowParams => {
-        const op_name = rowParams.row.op_name;
+      display: 'flex',
+      valueGetter: (unused: any, row: any) => {
+        const op_name = row.op_name;
         if (!isWeaveRef(op_name)) {
           return op_name;
         }
@@ -204,6 +223,7 @@ function buildCallsTableColumns(
             callId={rowParams.row.id}
             fullWidth={true}
             preservePath={preservePath}
+            color={TEAL_600}
           />
         );
       },
@@ -237,7 +257,7 @@ function buildCallsTableColumns(
           {
             field: 'derived.op_version',
             headerName: 'Op Version',
-            type: 'number',
+            type: 'number' as const,
             align: 'right' as const,
             disableColumnMenu: true,
             sortable: false,
@@ -269,8 +289,9 @@ function buildCallsTableColumns(
       // disableColumnMenu: true,
       resizable: false,
       width: 59,
-      valueGetter: cellParams => {
-        return traceCallStatusCode(cellParams.row);
+      display: 'flex',
+      valueGetter: (unused: any, row: any) => {
+        return traceCallStatusCode(row);
       },
       renderCell: cellParams => {
         return (
@@ -295,8 +316,8 @@ function buildCallsTableColumns(
     onExpand,
     // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
     key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
-    (key, operator, value) => {
-      onAddFilter?.(key, operator, value);
+    (key, operator, value, rowId) => {
+      onAddFilter?.(key, operator, value, rowId);
     }
   );
   cols.push(...newCols);
@@ -309,6 +330,7 @@ function buildCallsTableColumns(
     align: 'center',
     sortable: false,
     resizable: false,
+    display: 'flex',
     renderCell: cellParams => {
       const userId = cellParams.row.wb_user_id;
       if (userId == null) {
@@ -318,6 +340,7 @@ function buildCallsTableColumns(
         <CellFilterWrapper
           onAddFilter={onAddFilter}
           field="wb_user_id"
+          rowId={cellParams.id.toString()}
           operation="(string): equals"
           value={userId}>
           <UserLink userId={userId} />
@@ -345,6 +368,7 @@ function buildCallsTableColumns(
         <CellFilterWrapper
           onAddFilter={onAddFilter}
           field="started_at"
+          rowId={cellParams.id.toString()}
           operation="(date): after"
           value={filterValue}>
           <Timestamp value={value} format="relative" />
@@ -363,8 +387,8 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
-    valueGetter: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
+    valueGetter: (unused: any, row: any) => {
+      const usage = getUsageFromCellParams(row);
       const {tokensNum} = getTokensAndCostFromUsage(usage);
       return tokensNum;
     },
@@ -384,8 +408,8 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
-    valueGetter: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
+    valueGetter: (unused: any, row: any) => {
+      const usage = getUsageFromCellParams(row);
       const {costNum} = getTokensAndCostFromUsage(usage);
       return costNum;
     },
@@ -405,13 +429,13 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
-    valueGetter: cellParams => {
-      if (traceCallStatusCode(cellParams.row) === 'UNSET') {
+    valueGetter: (unused: any, row: any) => {
+      if (traceCallStatusCode(row) === 'UNSET') {
         // Call is still in progress, latency will be 0.
         // Displaying nothing seems preferable to being misleading.
         return null;
       }
-      return traceCallLatencyS(cellParams.row);
+      return traceCallLatencyS(row);
     },
     renderCell: cellParams => {
       if (traceCallStatusCode(cellParams.row) === 'UNSET') {
@@ -430,7 +454,21 @@ function buildCallsTableColumns(
     }
   });
 
-  return {cols, colGroupingModel: groupingModel};
+  // TODO: It would be better to build up the cols rather than throwing away
+  //       some at the end, but making simpler change for now.
+  let orderedCols = cols;
+  if (allowedColumnPatterns !== undefined) {
+    orderedCols = allowedColumnPatterns.flatMap(shownCol => {
+      if (shownCol.includes('*')) {
+        const regex = new RegExp('^' + shownCol.replace('*', '.*') + '$');
+        return cols.filter(col => regex.test(col.field));
+      } else {
+        return cols.filter(col => col.field === shownCol);
+      }
+    });
+  }
+
+  return {cols: orderedCols, colGroupingModel: groupingModel};
 }
 /**
  * This function maintains an ever-growing list of dynamic column names. It is used to

@@ -1,11 +1,11 @@
 import importlib
-import typing
+from typing import TYPE_CHECKING, Callable, Optional
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from mistralai.models.chat_completion import (
         ChatCompletionResponse,
         ChatCompletionStreamResponse,
@@ -13,7 +13,7 @@ if typing.TYPE_CHECKING:
 
 
 def mistral_accumulator(
-    acc: typing.Optional["ChatCompletionResponse"],
+    acc: Optional["ChatCompletionResponse"],
     value: "ChatCompletionStreamResponse",
 ) -> "ChatCompletionResponse":
     # This import should be safe at this point
@@ -72,7 +72,7 @@ def mistral_accumulator(
     return acc
 
 
-def mistral_stream_wrapper(fn: typing.Callable) -> typing.Callable:
+def mistral_stream_wrapper(fn: Callable) -> Callable:
     op = weave.op()(fn)
     acc_op = add_accumulator(op, lambda inputs: mistral_accumulator)  # type: ignore
     return acc_op

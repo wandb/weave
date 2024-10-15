@@ -18,6 +18,7 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {TEAL_600} from '../../../../../common/css/color.styles';
 import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
@@ -130,7 +131,9 @@ export const FilterableObjectVersionsTable: React.FC<{
         ? [effectiveFilter.objectName]
         : undefined,
       latestOnly: effectivelyLatestOnly,
-    }
+    },
+    undefined,
+    effectivelyLatestOnly // metadata only when getting latest
   );
 
   if (filteredObjectVersions.loading) {
@@ -208,7 +211,9 @@ const ObjectVersionsTable: React.FC<{
   const {cols: columns, groups: columnGroupingModel} = useMemo(() => {
     let groups: GridColumnGroupingModel = [];
     const cols: GridColDef[] = [
-      basicField('object', 'Object', {
+      // This field name chosen to reduce possibility of conflict
+      // with the dynamic fields added below.
+      basicField('weave__object_version_link', 'Object', {
         hideable: false,
         renderCell: cellParams => {
           // Icon to indicate navigation to the object version
@@ -221,6 +226,7 @@ const ObjectVersionsTable: React.FC<{
               version={obj.versionHash}
               versionIndex={obj.versionIndex}
               fullWidth={true}
+              color={TEAL_600}
             />
           );
         },
@@ -274,8 +280,9 @@ const ObjectVersionsTable: React.FC<{
     cols.push(
       basicField('baseObjectClass', 'Category', {
         width: 100,
-        valueGetter: cellParams => {
-          return cellParams.row.obj.baseObjectClass;
+        display: 'flex',
+        valueGetter: (unused: any, row: any) => {
+          return row.obj.baseObjectClass;
         },
         renderCell: cellParams => {
           const category = cellParams.value;
@@ -290,8 +297,8 @@ const ObjectVersionsTable: React.FC<{
     cols.push(
       basicField('createdAtMs', 'Created', {
         width: 100,
-        valueGetter: cellParams => {
-          return cellParams.row.obj.createdAtMs;
+        valueGetter: (unused: any, row: any) => {
+          return row.obj.createdAtMs;
         },
         renderCell: cellParams => {
           const createdAtMs = cellParams.value;
@@ -371,7 +378,6 @@ const ObjectVersionsTable: React.FC<{
       columnHeaderHeight={40}
       rowHeight={38}
       columns={columns}
-      experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
       rowSelectionModel={rowSelectionModel}
       columnGroupingModel={columnGroupingModel}
@@ -394,7 +400,8 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
     {
       objectIds: [obj.objectId],
     },
-    100
+    100,
+    true // metadataOnly
   );
   if (objectVersionsNode.loading) {
     return <LoadingDots />;

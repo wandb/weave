@@ -9,11 +9,14 @@ import * as Colors from '../../../../../../common/css/color.styles';
 import {hexToRGB} from '../../../../../../common/css/utils';
 import {Icon, IconName} from '../../../../../Icon';
 
+type EmptySize = 'small' | 'medium';
+
 export type EmptyProps = {
   icon: IconName;
   heading: string;
   description: string;
   moreInformation: React.ReactNode;
+  size?: EmptySize;
 };
 
 const Container = styled.div`
@@ -32,10 +35,10 @@ const Content = styled.div`
 `;
 Content.displayName = 'S.Content';
 
-const Circle = styled.div`
+const Circle = styled.div<{size: EmptySize}>`
   border-radius: 50%;
-  width: 80px;
-  height: 80px;
+  width: ${props => (props.size === 'small' ? '60px' : '80px')};
+  height: ${props => (props.size === 'small' ? '60px' : '80px')};
   background-color: ${hexToRGB(Colors.TEAL_300, 0.48)};
   display: flex;
   align-items: center;
@@ -44,16 +47,16 @@ const Circle = styled.div`
 `;
 Circle.displayName = 'S.Circle';
 
-const CircleIcon = styled(Icon)`
-  width: 33px;
-  height: 33px;
+const CircleIcon = styled(Icon)<{size: EmptySize}>`
+  width: ${props => (props.size === 'small' ? '25px' : '33px')};
+  height: ${props => (props.size === 'small' ? '25px' : '33px')};
   color: ${Colors.TEAL_600};
 `;
 CircleIcon.displayName = 'S.CircleIcon';
 
-const Heading = styled.div`
+const Heading = styled.div<{size: EmptySize}>`
   font-family: Source Sans Pro;
-  font-size: 24px;
+  font-size: ${props => (props.size === 'small' ? '20px' : '24px')};
   font-weight: 600;
   line-height: 32px;
   text-align: left;
@@ -62,9 +65,9 @@ const Heading = styled.div`
 `;
 Heading.displayName = 'S.Heading';
 
-const Description = styled.div`
+const Description = styled.div<{size: EmptySize}>`
   font-family: Source Sans Pro;
-  font-size: 18px;
+  font-size: ${props => (props.size === 'small' ? '14px' : '18px')};
   font-weight: 400;
   line-height: 25.2px;
   text-align: center;
@@ -73,9 +76,9 @@ const Description = styled.div`
 `;
 Description.displayName = 'S.Description';
 
-const MoreInformation = styled.div`
+const MoreInformation = styled.div<{size: EmptySize}>`
   font-family: Source Sans Pro;
-  font-size: 16px;
+  font-size: ${props => (props.size === 'small' ? '14px' : '16px')};
   font-weight: 400;
   line-height: 22.4px;
   text-align: center;
@@ -88,16 +91,17 @@ export const Empty = ({
   heading,
   description,
   moreInformation,
+  size = 'medium',
 }: EmptyProps) => {
   return (
     <Container>
       <Content>
-        <Circle>
-          <CircleIcon name={icon} />
+        <Circle size={size}>
+          <CircleIcon size={size} name={icon} />
         </Circle>
-        <Heading>{heading}</Heading>
-        <Description>{description}</Description>
-        <MoreInformation>{moreInformation}</MoreInformation>
+        <Heading size={size}>{heading}</Heading>
+        <Description size={size}>{description}</Description>
+        <MoreInformation size={size}>{moreInformation}</MoreInformation>
       </Content>
     </Container>
   );

@@ -1,6 +1,6 @@
 """Alternate boxing implementation for Weave Trace.
 
-This copies many things from weave/legacy/box.py, but it notably
+This copies many things from query service's box.py, but it notably
 does not box None and bool which simplify checks for trace users."""
 
 from __future__ import annotations

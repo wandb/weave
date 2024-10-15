@@ -11,9 +11,14 @@ type PanelStringFormat = {
   spacing?: boolean;
 };
 
+type PanelColumnFormat = {
+  textAlign?: React.CSSProperties['textAlign'];
+};
+
 export type WeaveFormatContextType = {
   numberFormat: PanelNumberFormat;
   stringFormat: PanelStringFormat;
+  columnFormat: PanelColumnFormat;
 };
 
 export const WeaveFormatContext = React.createContext<WeaveFormatContextType>({
@@ -25,5 +30,8 @@ export const WeaveFormatContext = React.createContext<WeaveFormatContextType>({
   },
   stringFormat: {
     spacing: false,
+  },
+  columnFormat: {
+    textAlign: 'center',
   },
 });

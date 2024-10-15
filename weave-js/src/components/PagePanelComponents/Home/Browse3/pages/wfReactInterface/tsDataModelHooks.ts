@@ -554,7 +554,8 @@ const useCallsExport = () => {
       sortBy?: traceServerTypes.SortBy[],
       query?: Query,
       columns?: string[],
-      expandedRefCols?: string[]
+      expandedRefCols?: string[],
+      includeFeedback?: boolean
     ) => {
       const req: traceServerTypes.TraceCallsQueryReq = {
         project_id: projectIdFromParts({entity, project}),
@@ -575,6 +576,7 @@ const useCallsExport = () => {
         query,
         columns: columns ?? undefined,
         expand_columns: expandedRefCols ?? undefined,
+        include_feedback: includeFeedback ?? false,
       };
       return getTsClient().callsStreamDownload(req, contentType);
     },
@@ -751,7 +753,7 @@ const convertTraceServerObjectVersionToOpSchema = (
 
 const useOpVersions = makeTraceServerEndpointHook<
   'objsQuery',
-  [string, string, OpVersionFilter, number?, {skip?: boolean}?],
+  [string, string, OpVersionFilter, number?, boolean?, {skip?: boolean}?],
   OpVersionSchema[]
 >(
   'objsQuery',
@@ -760,17 +762,18 @@ const useOpVersions = makeTraceServerEndpointHook<
     project: string,
     filter: OpVersionFilter,
     limit?: number,
+    metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => ({
     params: {
       project_id: projectIdFromParts({entity, project}),
-      // entity,
-      // project,
       filter: {
         object_ids: filter.opIds,
         latest_only: filter.latestOnly,
         is_op: true,
       },
+      limit,
+      metadata_only: metadataOnly,
     },
     skip: opts?.skip,
   }),
@@ -910,6 +913,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     project: string,
     filter: ObjectVersionFilter,
     limit?: number,
+    metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => ({
     params: {
@@ -920,6 +924,8 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
         latest_only: filter.latestOnly,
         is_op: false,
       },
+      limit,
+      metadata_only: metadataOnly,
     },
     skip: opts?.skip,
   }),
@@ -929,6 +935,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     inputProject,
     filter,
     limit,
+    metadataOnly,
     opts
   ): ObjectVersionSchema[] =>
     res.objs.map(convertTraceServerObjectVersionToSchema)
@@ -956,6 +963,8 @@ const useTableQuery = makeTraceServerEndpointHook<
     string,
     traceServerTypes.TraceTableQueryReq['filter'],
     traceServerTypes.TraceTableQueryReq['limit'],
+    traceServerTypes.TraceTableQueryReq['offset'],
+    traceServerTypes.TraceTableQueryReq['sort_by'],
     {skip?: boolean}?
   ],
   any[]
@@ -966,6 +975,8 @@ const useTableQuery = makeTraceServerEndpointHook<
     digest: traceServerTypes.TraceTableQueryReq['digest'],
     filter: traceServerTypes.TraceTableQueryReq['filter'],
     limit: traceServerTypes.TraceTableQueryReq['limit'],
+    offset: traceServerTypes.TraceTableQueryReq['offset'],
+    sortBy: traceServerTypes.TraceTableQueryReq['sort_by'],
     opts?: {skip?: boolean}
   ) => ({
     params: {
@@ -973,6 +984,8 @@ const useTableQuery = makeTraceServerEndpointHook<
       digest,
       filter,
       limit,
+      offset,
+      sort_by: sortBy,
     },
     skip: opts?.skip,
   }),
@@ -1129,6 +1142,8 @@ const useRefsData = (
     tableUriDigest,
     tableQueryFilter,
     tableQuery?.limit,
+    undefined,
+    undefined,
     {skip: tableRefUris.length === 0 || cachedTableResult != null}
   );
 
@@ -1183,6 +1198,129 @@ const useRefsData = (
     tableRefUris,
     tableRefKey,
   ]);
+};
+
+const useTableRowsQuery = (
+  entity: string,
+  project: string,
+  digest: string,
+  filter?: traceServerTypes.TraceTableQueryReq['filter'],
+  limit?: traceServerTypes.TraceTableQueryReq['limit'],
+  offset?: traceServerTypes.TraceTableQueryReq['offset'],
+  sortBy?: traceServerTypes.TraceTableQueryReq['sort_by'],
+  opts?: {skip?: boolean}
+): Loadable<traceServerTypes.TraceTableQueryRes> => {
+  const getTsClient = useGetTraceServerClientContext();
+  const [queryRes, setQueryRes] =
+    useState<traceServerTypes.TraceTableQueryRes | null>(null);
+  const loadingRef = useRef(false);
+
+  const projectId = projectIdFromParts({entity, project});
+
+  const doFetch = useCallback(() => {
+    if (opts?.skip) {
+      return;
+    }
+    setQueryRes(null);
+    loadingRef.current = true;
+
+    const req: traceServerTypes.TraceTableQueryReq = {
+      project_id: projectId,
+      digest,
+      filter,
+      limit,
+      offset,
+      sort_by: sortBy,
+    };
+
+    getTsClient()
+      .tableQuery(req)
+      .then(res => {
+        loadingRef.current = false;
+        setQueryRes(res);
+      })
+      .catch(err => {
+        loadingRef.current = false;
+        console.error('Error fetching table rows:', err);
+        setQueryRes(null);
+      });
+  }, [
+    getTsClient,
+    projectId,
+    digest,
+    filter,
+    limit,
+    offset,
+    sortBy,
+    opts?.skip,
+  ]);
+
+  useEffect(() => {
+    doFetch();
+  }, [doFetch]);
+
+  return useMemo(() => {
+    if (opts?.skip) {
+      return {loading: false, result: null};
+    }
+    if (queryRes == null || loadingRef.current) {
+      return {loading: true, result: null};
+    }
+    return {loading: false, result: queryRes};
+  }, [queryRes, opts?.skip]);
+};
+
+const useTableQueryStats = (
+  entity: string,
+  project: string,
+  digest: string,
+  opts?: {skip?: boolean}
+): Loadable<traceServerTypes.TraceTableQueryStatsRes> => {
+  const getTsClient = useGetTraceServerClientContext();
+  const [statsRes, setStatsRes] =
+    useState<traceServerTypes.TraceTableQueryStatsRes | null>(null);
+  const loadingRef = useRef(false);
+
+  const projectId = projectIdFromParts({entity, project});
+
+  const doFetch = useCallback(() => {
+    if (opts?.skip) {
+      return;
+    }
+    setStatsRes(null);
+    loadingRef.current = true;
+
+    const req: traceServerTypes.TraceTableQueryStatsReq = {
+      project_id: projectId,
+      digest,
+    };
+
+    getTsClient()
+      .tableQueryStats(req)
+      .then(res => {
+        loadingRef.current = false;
+        setStatsRes(res);
+      })
+      .catch(err => {
+        loadingRef.current = false;
+        console.error('Error fetching table query stats:', err);
+        setStatsRes(null);
+      });
+  }, [getTsClient, projectId, digest, opts?.skip]);
+
+  useEffect(() => {
+    doFetch();
+  }, [doFetch]);
+
+  return useMemo(() => {
+    if (opts?.skip) {
+      return {loading: false, result: null};
+    }
+    if (statsRes == null || loadingRef.current) {
+      return {loading: true, result: null};
+    }
+    return {loading: false, result: statsRes};
+  }, [statsRes, opts?.skip]);
 };
 
 const useApplyMutationsToRef = (): ((
@@ -1527,6 +1665,8 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useApplyMutationsToRef,
   useFeedback,
   useFileContent,
+  useTableRowsQuery,
+  useTableQueryStats,
   derived: {
     useChildCallsForCompare,
     useGetRefsType,

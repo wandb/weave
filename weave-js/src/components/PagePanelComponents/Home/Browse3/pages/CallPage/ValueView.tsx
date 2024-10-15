@@ -42,7 +42,7 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
       }
     }
     if (USE_TABLE_FOR_ARRAYS && data.valueType === 'array') {
-      return <DataTableView data={data.value} />;
+      return <DataTableView data={data.value} autoPageSize={true} />;
     }
     if (data.valueType === 'array' && data.value.length === 0) {
       return <ValueViewPrimitive>Empty List</ValueViewPrimitive>;

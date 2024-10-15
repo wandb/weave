@@ -54,7 +54,8 @@ const useCallTabs = (call: CallSchema) => {
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
   return [
-    ...(isEvaluateOp(call.spanName)
+    // Disabling Evaluation tab until it's better for single evaluation
+    ...(false && isEvaluateOp(call.spanName)
       ? [
           {
             label: 'Evaluation',
@@ -63,6 +64,11 @@ const useCallTabs = (call: CallSchema) => {
                 entity={call.entity}
                 project={call.project}
                 evaluationCallIds={[call.callId]}
+                // Dont persist metric selection in the URL
+                selectedMetrics={{}}
+                setSelectedMetrics={() => {}}
+                // Dont persist changes to evaluationCallIds in the URL
+                onEvaluationCallIdsUpdate={() => {}}
               />
             ),
           },
@@ -109,11 +115,19 @@ const useCallTabs = (call: CallSchema) => {
     },
     {
       label: 'Summary',
-      content: <CallSummary call={call} />,
+      content: (
+        <Tailwind style={{height: '100%', overflow: 'auto'}}>
+          <CallSummary call={call} />
+        </Tailwind>
+      ),
     },
     {
       label: 'Use',
-      content: <TabUseCall call={call} />,
+      content: (
+        <Tailwind>
+          <TabUseCall call={call} />
+        </Tailwind>
+      ),
     },
   ];
 };
@@ -190,10 +204,7 @@ const CallPageInnerVertical: FC<{
   return (
     <SimplePageLayoutWithHeader
       headerExtra={
-        <Box
-          sx={{
-            height: '41px',
-          }}>
+        <Box>
           <Button
             icon="layout-tabs"
             tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
@@ -206,17 +217,21 @@ const CallPageInnerVertical: FC<{
       isSidebarOpen={showTraceTree}
       headerContent={<CallOverview call={currentCall} />}
       leftSidebar={
-        loading ? (
-          <Loading centered />
-        ) : (
-          <CallTraceView
-            call={call}
-            selectedCall={currentCall}
-            rows={rows}
-            forcedExpandKeys={expandKeys}
-            path={path}
-          />
-        )
+        <Tailwind style={{display: 'contents'}}>
+          <div className="h-full bg-moon-50">
+            {loading ? (
+              <Loading centered />
+            ) : (
+              <CallTraceView
+                call={call}
+                selectedCall={currentCall}
+                rows={rows}
+                forcedExpandKeys={expandKeys}
+                path={path}
+              />
+            )}
+          </div>
+        </Tailwind>
       }
       tabs={callTabs}
     />
