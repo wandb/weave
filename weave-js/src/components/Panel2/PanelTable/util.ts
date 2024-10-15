@@ -43,7 +43,10 @@ export const getColumnCellFormats = (colType: Type): WeaveFormatContextType => {
       : {};
   const stringFormat = {spacing: t === 'string'};
   const columnFormat = {
-    textAlign: t === 'number' ? ('right' as const) : ('center' as const),
+    textAlign:
+      t === 'number' || t === 'float' || t === 'int'
+        ? ('right' as const)
+        : ('center' as const),
   };
 
   return {
