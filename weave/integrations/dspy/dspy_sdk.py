@@ -21,8 +21,6 @@ def check_member_function_exists(
     try:
         module = importlib.import_module(base_symbol)
         XYZ = getattr(module, lm_class_name)
-    except ImportError:
-        print(f"{base_symbol} cannot be imported")
     except AttributeError:
         print(f"{lm_class_name} cannot be imported from {base_symbol}")
     else:
@@ -36,32 +34,40 @@ def check_member_function_exists(
 def dspy_get_patched_lm_functions(
     base_symbol: str, lm_class_name: str
 ) -> list[SymbolPatcher]:
-    if hasattr(importlib.import_module(base_symbol), lm_class_name):
-        patched_functions = []
-        if check_member_function_exists(base_symbol, lm_class_name, "basic_request"):
+    try:
+        base_module = importlib.import_module(base_symbol)
+        if hasattr(base_module, lm_class_name):
+            patched_functions = []
+            if check_member_function_exists(
+                base_symbol, lm_class_name, "basic_request"
+            ):
+                patched_functions.append(
+                    SymbolPatcher(
+                        get_base_symbol=lambda: importlib.import_module(base_symbol),
+                        attribute_name=f"{lm_class_name}.basic_request",
+                        make_new_value=dspy_wrapper(
+                            f"dspy.{lm_class_name}.basic_request"
+                        ),
+                    )
+                )
+            if check_member_function_exists(base_symbol, lm_class_name, "request"):
+                patched_functions.append(
+                    SymbolPatcher(
+                        get_base_symbol=lambda: importlib.import_module(base_symbol),
+                        attribute_name=f"{lm_class_name}.request",
+                        make_new_value=dspy_wrapper(f"dspy.{lm_class_name}.request"),
+                    )
+                )
             patched_functions.append(
                 SymbolPatcher(
                     get_base_symbol=lambda: importlib.import_module(base_symbol),
-                    attribute_name=f"{lm_class_name}.basic_request",
-                    make_new_value=dspy_wrapper(f"dspy.{lm_class_name}.basic_request"),
+                    attribute_name=f"{lm_class_name}.__call__",
+                    make_new_value=dspy_wrapper(f"dspy.{lm_class_name}"),
                 )
             )
-        if check_member_function_exists(base_symbol, lm_class_name, "request"):
-            patched_functions.append(
-                SymbolPatcher(
-                    get_base_symbol=lambda: importlib.import_module(base_symbol),
-                    attribute_name=f"{lm_class_name}.request",
-                    make_new_value=dspy_wrapper(f"dspy.{lm_class_name}.request"),
-                )
-            )
-        patched_functions.append(
-            SymbolPatcher(
-                get_base_symbol=lambda: importlib.import_module(base_symbol),
-                attribute_name=f"{lm_class_name}.__call__",
-                make_new_value=dspy_wrapper(f"dspy.{lm_class_name}"),
-            )
-        )
-        return patched_functions
+            return patched_functions
+    except ImportError:
+        pass
     return []
 
 
