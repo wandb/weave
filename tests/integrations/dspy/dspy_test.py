@@ -83,7 +83,7 @@ def test_dspy_lm_api(client: WeaveClient) -> None:
     lm = dspy.LM(
         model="openai/gpt-4o-mini",
         max_tokens=300,
-        api_key=os.environ.get("OPENAI_API_KEY"),
+        api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
         cache=False,
     )
     dspy.configure(lm=lm)
