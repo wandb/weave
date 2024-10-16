@@ -47,9 +47,6 @@ def assert_correct_summary(summary: dict, trace_name: str):
     assert summary["weave"]["latency_ms"] > 0
 
 
-GENERATION_CONFIG = {"seed": 123456}
-
-
 @pytest.mark.retry(max_attempts=5)
 @pytest.mark.skip_clickhouse_client
 def test_content_generation(client):
@@ -57,9 +54,7 @@ def test_content_generation(client):
 
     genai.configure(api_key=os.getenv("GOOGLE_GENAI_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
-    model.generate_content(
-        "Write a story about an AI and magic", generation_config=GENERATION_CONFIG
-    )
+    model.generate_content("Write a story about an AI and magic")
 
     calls = list(client.calls())
     assert len(calls) == 1
@@ -82,9 +77,7 @@ def test_content_generation_stream(client):
     genai.configure(api_key=os.getenv("GOOGLE_GENAI_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
     response = model.generate_content(
-        "Write a story about an AI and magic",
-        stream=True,
-        generation_config=GENERATION_CONFIG,
+        "Write a story about an AI and magic", stream=True
     )
     chunks = [chunk.text for chunk in response]
     assert len(chunks) > 1
@@ -111,10 +104,7 @@ async def test_content_generation_async(client):
     genai.configure(api_key=os.getenv("GOOGLE_GENAI_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
 
-    _ = await model.generate_content_async(
-        "Write a story about an AI and magic",
-        generation_config=GENERATION_CONFIG,
-    )
+    _ = await model.generate_content_async("Write a story about an AI and magic")
 
     calls = list(client.calls())
     assert len(calls) == 1
