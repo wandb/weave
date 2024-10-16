@@ -2,6 +2,11 @@ from typing import Callable
 
 from weave.flow.obj import Object
 
+INFER_METHOD_NAMES = {"predict", "infer", "forward", "invoke"}
+
+
+class MissingInferenceMethodError(Exception): ...
+
 
 class Model(Object):
     """
@@ -15,36 +20,35 @@ class Model(Object):
     prompts or to try the latest LLM and compare predictions across different settings
 
     Examples:
-    ```
-        class YourModel(Model):
-            attribute1: str
-            attribute2: int
 
-            @weave.op()
-            def predict(self, input_data: str) -> dict:
-                # Model logic goes here
-                prediction = self.attribute1 + ' ' + input_data
-                return {'pred': prediction}
+    ```python
+    class YourModel(Model):
+        attribute1: str
+        attribute2: int
+
+        @weave.op()
+        def predict(self, input_data: str) -> dict:
+            # Model logic goes here
+            prediction = self.attribute1 + ' ' + input_data
+            return {'pred': prediction}
     ```
     """
 
     # TODO: should be infer: Callable
 
     def get_infer_method(self) -> Callable:
-        for infer_method_names in ("predict", "infer", "forward"):
-            infer_method = getattr(self, infer_method_names, None)
-            if infer_method:
+        for name in INFER_METHOD_NAMES:
+            if infer_method := getattr(self, name, None):
                 return infer_method
-        raise ValueError(
-            f"Model {self} does not have a predict, infer, or forward method."
+        raise MissingInferenceMethodError(
+            f"Missing a method with name in ({INFER_METHOD_NAMES})"
         )
 
 
 def get_infer_method(model: Model) -> Callable:
-    for infer_method_names in ("predict", "infer", "forward"):
-        infer_method = getattr(model, infer_method_names, None)
-        if infer_method:
+    for name in INFER_METHOD_NAMES:
+        if (infer_method := getattr(model, name, None)) is not None:
             return infer_method
-    raise ValueError(
-        f"Model {model} does not have a predict, infer, or forward method."
+    raise MissingInferenceMethodError(
+        f"Missing a method with name in ({INFER_METHOD_NAMES})"
     )

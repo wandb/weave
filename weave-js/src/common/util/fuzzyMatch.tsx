@@ -196,7 +196,8 @@ export function fuzzyComponentSplit(
 
 export function fuzzyMatchHighlightPieces(
   strPieces: string[],
-  matchStyle: {[key: string]: string} = {fontWeight: 'bold'}
+  matchStyle: {[key: string]: string} = {fontWeight: 'bold'},
+  noHighlight: boolean = false
 ): React.ReactFragment {
   if (strPieces.length === 1) {
     return strPieces[0];
@@ -206,7 +207,10 @@ export function fuzzyMatchHighlightPieces(
         {strPieces.map((s, i) => {
           if (i % 2) {
             return (
-              <span key={i} className="fuzzy-match" style={matchStyle}>
+              <span
+                key={i}
+                className={noHighlight ? '' : 'fuzzy-match'}
+                style={matchStyle}>
                 {s}
               </span>
             );
@@ -227,9 +231,36 @@ export function fuzzyMatchHighlightPieces(
 export function fuzzyMatchHighlight(
   str: string,
   query: string,
+  matchStyle: {[key: string]: string} = {fontWeight: 'bold'},
+  noHighlight: boolean = false
+): React.ReactFragment {
+  return fuzzyMatchHighlightPieces(
+    fuzzyMatchSplit(str, query),
+    matchStyle,
+    noHighlight
+  );
+}
+
+export function regexMatchHighlight(
+  str: string,
+  regex: RegExp | null,
   matchStyle: {[key: string]: string} = {fontWeight: 'bold'}
 ): React.ReactFragment {
-  return fuzzyMatchHighlightPieces(fuzzyMatchSplit(str, query), matchStyle);
+  if (!regex) {
+    return str;
+  }
+  const pieces = [];
+  while (str) {
+    const match = regex.exec(str);
+    if (!match || !match[0]) {
+      pieces.push(str);
+      break;
+    }
+    pieces.push(str.substring(0, match.index));
+    pieces.push(match[0]);
+    str = str.substring(match.index + match[0].length);
+  }
+  return fuzzyMatchHighlightPieces(pieces, matchStyle);
 }
 
 export function preferExactMatch<T>(

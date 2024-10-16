@@ -7,6 +7,7 @@
 
 import {parseRef, WeaveKind} from '../../../../../../react';
 import {WANDB_ARTIFACT_SCHEME} from '../../../common';
+import {isWeaveRef} from '../../filters/common';
 import {
   KNOWN_BASE_OBJECT_CLASSES,
   OP_CATEGORIES,
@@ -27,8 +28,11 @@ import {CallSchema, Loadable} from './wfDataModelHooksInterface';
 
 type RefUri = string;
 
-export const refUriToOpVersionKey = (refUri: RefUri): OpVersionKey => {
+export const refUriToOpVersionKey = (refUri: RefUri): OpVersionKey | null => {
   const refDict = refStringToRefDict(refUri);
+  if (refDict == null) {
+    return null;
+  }
   if (
     refDict.scheme === WANDB_ARTIFACT_REF_PREFIX &&
     (refDict.filePathParts.length !== 1 ||
@@ -52,8 +56,13 @@ export const opVersionKeyToRefUri = (key: OpVersionKey): RefUri => {
   // return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${key.opId}:${key.versionHash}/obj`;
 };
 
-export const refUriToObjectVersionKey = (refUri: RefUri): ObjectVersionKey => {
+export const refUriToObjectVersionKey = (
+  refUri: RefUri
+): ObjectVersionKey | null => {
   const refDict = refStringToRefDict(refUri);
+  if (refDict == null) {
+    return null;
+  }
   if (refDict.scheme === WANDB_ARTIFACT_REF_SCHEME) {
     return {
       scheme: refDict.scheme,
@@ -118,13 +127,13 @@ type WFNaiveRefDict = {
   }>;
 };
 
-export const refStringToRefDict = (uri: string): WFNaiveRefDict => {
+export const refStringToRefDict = (uri: string): WFNaiveRefDict | null => {
   if (uri.startsWith(WANDB_ARTIFACT_REF_PREFIX)) {
     return wandbArtifactRefStringToRefDict(uri);
-  } else if (uri.startsWith(WEAVE_REF_PREFIX)) {
+  } else if (isWeaveRef(uri)) {
     return weaveRefStringToRefDict(uri);
   }
-  throw new Error('Invalid uri: ' + uri);
+  return null;
 };
 
 const wandbArtifactRefStringToRefDict = (uri: string): WFNaiveRefDict => {
@@ -210,8 +219,24 @@ const weaveRefStringToRefDict = (uri: string): WFNaiveRefDict => {
   };
 };
 
+export const fallbackRefName = (legacyRef: string) => {
+  if (legacyRef.startsWith(WEAVE_REF_PREFIX)) {
+    // Small helper from legacy broken refs
+    const parts = legacyRef
+      .replace(WEAVE_REF_PREFIX, '')
+      .split(':')[0]
+      .split('/');
+    return parts[parts.length - 1];
+  }
+  return legacyRef;
+};
+
 export const opVersionRefOpName = (opVersionRef: string) => {
-  return refUriToOpVersionKey(opVersionRef).opId;
+  const res = refUriToOpVersionKey(opVersionRef)?.opId;
+  if (res == null) {
+    return fallbackRefName(opVersionRef);
+  }
+  return res;
 };
 
 // This one is a huge hack b/c it is based on the name. Once this is added to
@@ -223,7 +248,7 @@ export const opVersionRefOpName = (opVersionRef: string) => {
 // caller. The fact that this is imported in the RunsTable is a smell of leaking
 // abstraction.
 export const opVersionRefOpCategory = (opVersionRef: string) => {
-  return opNameToCategory(opVersionRefOpName(opVersionRef));
+  return opNameToCategory(opVersionRefOpName(opVersionRef) ?? '');
 };
 
 export const opNameToCategory = (opName: string): OpCategory | null => {

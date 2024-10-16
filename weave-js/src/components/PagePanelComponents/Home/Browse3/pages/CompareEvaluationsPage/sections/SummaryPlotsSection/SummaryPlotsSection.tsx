@@ -1,6 +1,18 @@
 import {Box} from '@material-ui/core';
-import React, {useMemo} from 'react';
+import {Popover} from '@mui/material';
+import {Switch} from '@wandb/weave/components';
+import {Button} from '@wandb/weave/components/Button';
+import {
+  DraggableGrow,
+  DraggableHandle,
+} from '@wandb/weave/components/DraggablePopups';
+import {TextField} from '@wandb/weave/components/Form/TextField';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {maybePluralize} from '@wandb/weave/core/util/string';
+import classNames from 'classnames';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 
+import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
 import {
   BOX_RADIUS,
   PLOT_HEIGHT,
@@ -9,9 +21,12 @@ import {
   STANDARD_PADDING,
 } from '../../ecpConstants';
 import {getOrderedCallIds} from '../../ecpState';
-import {EvaluationComparisonState} from '../../ecpTypes';
+import {EvaluationComparisonState} from '../../ecpState';
+import {
+  flattenedDimensionPath,
+  resolveSummaryMetricValueForEvaluateCall,
+} from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
-import {buildCompositeComparisonSummaryMetrics} from '../ScorecardSection/summaryMetricUtil';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 
@@ -20,8 +35,44 @@ import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
  */
 export const SummaryPlots: React.FC<{
   state: EvaluationComparisonState;
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
 }> = props => {
-  const plotlyRadarData = useNormalizedPlotDataFromMetrics(props.state);
+  const {radarData, allMetricNames} = useNormalizedPlotDataFromMetrics(
+    props.state
+  );
+  const {selectedMetrics} = props.state;
+  const setSelectedMetrics = props.setSelectedMetrics;
+
+  useEffect(() => {
+    // If selectedMetrics is null, we should show all metrics
+    if (selectedMetrics == null) {
+      setSelectedMetrics(
+        Object.fromEntries(Array.from(allMetricNames).map(m => [m, true]))
+      );
+    }
+  }, [selectedMetrics, setSelectedMetrics, allMetricNames]);
+
+  // filter down the plotlyRadarData to only include the selected metrics, after
+  // computation, to allow quick addition/removal of metrics
+  const filteredPlotlyRadarData = useMemo(() => {
+    const filteredData: RadarPlotData = {};
+    for (const [callId, metricBin] of Object.entries(radarData)) {
+      const metrics: {[metric: string]: number} = {};
+      for (const [metric, value] of Object.entries(metricBin.metrics)) {
+        if (selectedMetrics?.[metric]) {
+          metrics[metric] = value;
+        }
+      }
+      if (Object.keys(metrics).length > 0) {
+        filteredData[callId] = {
+          metrics,
+          name: metricBin.name,
+          color: metricBin.color,
+        };
+      }
+    }
+    return filteredData;
+  }, [radarData, selectedMetrics]);
 
   return (
     <VerticalBox
@@ -44,6 +95,16 @@ export const SummaryPlots: React.FC<{
           }}>
           Summary Metrics
         </Box>
+        <Box sx={{marginLeft: 'auto'}}>
+          <div style={{display: 'flex', alignItems: 'center'}}>
+            <div style={{marginRight: '4px'}}>Configure displayed metrics</div>
+            <MetricsSelector
+              selectedMetrics={selectedMetrics}
+              setSelectedMetrics={setSelectedMetrics}
+              allMetrics={Array.from(allMetricNames)}
+            />
+          </div>
+        </Box>
       </HorizontalBox>
       <HorizontalBox
         sx={{
@@ -59,7 +120,10 @@ export const SummaryPlots: React.FC<{
             alignContent: 'center',
             width: PLOT_HEIGHT,
           }}>
-          <PlotlyRadarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
+          <PlotlyRadarPlot
+            height={PLOT_HEIGHT}
+            data={filteredPlotlyRadarData}
+          />
         </Box>
         <Box
           sx={{
@@ -71,12 +135,174 @@ export const SummaryPlots: React.FC<{
             padding: PLOT_PADDING,
             width: PLOT_HEIGHT,
           }}>
-          <PlotlyBarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
+          <PlotlyBarPlot height={PLOT_HEIGHT} data={filteredPlotlyRadarData} />
         </Box>
       </HorizontalBox>
     </VerticalBox>
   );
 };
+
+const MetricsSelector: React.FC<{
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
+  selectedMetrics: Record<string, boolean> | undefined;
+  allMetrics: string[];
+}> = ({setSelectedMetrics, selectedMetrics, allMetrics}) => {
+  const [search, setSearch] = useState('');
+
+  const ref = useRef<HTMLDivElement>(null);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const onClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(anchorEl ? null : ref.current);
+    setSearch('');
+  };
+  const open = Boolean(anchorEl);
+  const id = open ? 'simple-popper' : undefined;
+
+  const filteredCols = search
+    ? allMetrics.filter(col => col.toLowerCase().includes(search.toLowerCase()))
+    : allMetrics;
+
+  const shownMetrics = Object.values(selectedMetrics ?? {}).filter(Boolean);
+
+  const numHidden = allMetrics.length - shownMetrics.length;
+  const buttonSuffix = search ? `(${filteredCols.length})` : 'all';
+
+  return (
+    <>
+      <span ref={ref}>
+        <Button
+          variant="ghost"
+          icon="column"
+          tooltip="Manage metrics"
+          onClick={onClick}
+        />
+      </span>
+      <Popover
+        id={id}
+        open={open}
+        anchorEl={anchorEl}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'center',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'center',
+        }}
+        slotProps={{
+          paper: {
+            sx: {
+              overflow: 'visible',
+            },
+          },
+        }}
+        onClose={() => setAnchorEl(null)}
+        TransitionComponent={DraggableGrow}>
+        <Tailwind>
+          <div className="min-w-[360px] p-12">
+            <DraggableHandle>
+              <div className="flex items-center pb-8">
+                <div className="flex-auto text-xl font-semibold">
+                  Manage metrics
+                </div>
+                <div className="ml-16 text-moon-500">
+                  {maybePluralize(numHidden, 'hidden column', 's')}
+                </div>
+              </div>
+            </DraggableHandle>
+            <div className="mb-8">
+              <TextField
+                placeholder="Filter columns"
+                autoFocus
+                value={search}
+                onChange={setSearch}
+              />
+            </div>
+            <div className="max-h-[300px] overflow-auto">
+              {Array.from(allMetrics).map((metric: string) => {
+                const value = metric;
+                const idSwitch = `toggle-vis_${value}`;
+                const checked = selectedMetrics?.[metric] ?? false;
+                const label = metric;
+                const disabled = false;
+                if (
+                  search &&
+                  !label.toLowerCase().includes(search.toLowerCase())
+                ) {
+                  return null;
+                }
+                return (
+                  <div key={value}>
+                    <div
+                      className={classNames(
+                        'flex items-center py-2',
+                        disabled ? 'opacity-40' : ''
+                      )}>
+                      <Switch.Root
+                        id={idSwitch}
+                        size="small"
+                        checked={checked}
+                        onCheckedChange={isOn => {
+                          setSelectedMetrics(
+                            isOn
+                              ? {...selectedMetrics, [metric]: true}
+                              : {...selectedMetrics, [metric]: false}
+                          );
+                        }}
+                        disabled={disabled}>
+                        <Switch.Thumb size="small" checked={checked} />
+                      </Switch.Root>
+                      <label
+                        htmlFor={idSwitch}
+                        className={classNames(
+                          'ml-6',
+                          disabled ? '' : 'cursor-pointer'
+                        )}>
+                        {label}
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-8 flex items-center">
+              <Button
+                size="small"
+                variant="quiet"
+                icon="hide-hidden"
+                disabled={filteredCols.length === 0}
+                onClick={() => {
+                  const newModel = {...selectedMetrics};
+                  for (const metric of filteredCols) {
+                    newModel[metric] = false;
+                  }
+                  setSelectedMetrics(newModel);
+                }}>
+                {`Hide ${buttonSuffix}`}
+              </Button>
+              <div className="flex-auto" />
+              <Button
+                size="small"
+                variant="quiet"
+                icon="show-visible"
+                disabled={filteredCols.length === 0}
+                onClick={() => {
+                  const newModel = {...selectedMetrics};
+                  for (const metric of filteredCols) {
+                    newModel[metric] = true;
+                  }
+                  setSelectedMetrics(newModel);
+                }}>
+                {`Show ${buttonSuffix}`}
+              </Button>
+            </div>
+          </div>
+        </Tailwind>
+      </Popover>
+    </>
+  );
+};
+
 const normalizeValues = (values: Array<number | undefined>): number[] => {
   // find the max value
   // find the power of 2 that is greater than the max value
@@ -85,11 +311,12 @@ const normalizeValues = (values: Array<number | undefined>): number[] => {
   const maxPower = Math.ceil(Math.log2(maxVal));
   return values.map(val => (val ? val / 2 ** maxPower : 0));
 };
+
 const useNormalizedPlotDataFromMetrics = (
   state: EvaluationComparisonState
-): RadarPlotData => {
-  const {compositeMetrics} = useMemo(() => {
-    return buildCompositeComparisonSummaryMetrics(state);
+): {radarData: RadarPlotData; allMetricNames: Set<string>} => {
+  const compositeMetrics = useMemo(() => {
+    return buildCompositeMetricsMap(state.data, 'summary');
   }, [state]);
   const callIds = useMemo(() => {
     return getOrderedCallIds(state);
@@ -100,18 +327,38 @@ const useNormalizedPlotDataFromMetrics = (
       .map(scoreGroup => Object.values(scoreGroup.metrics))
       .flat()
       .map(metric => {
-        const keys = Object.keys(metric.evalScores);
-        const values = keys.map(key => metric.evalScores[key]);
+        const values = callIds.map(callId => {
+          const metricDimension = Object.values(metric.scorerRefs).find(
+            scorerRefData => scorerRefData.evalCallIds.includes(callId)
+          )?.metric;
+          if (!metricDimension) {
+            return undefined;
+          }
+          const val = resolveSummaryMetricValueForEvaluateCall(
+            metricDimension,
+            state.data.evaluationCalls[callId]
+          );
+          if (typeof val === 'boolean') {
+            return val ? 1 : 0;
+          } else {
+            return val;
+          }
+        });
         const normalizedValues = normalizeValues(values);
+        const evalScores: {[evalCallId: string]: number | undefined} =
+          Object.fromEntries(
+            callIds.map((key, i) => [key, normalizedValues[i]])
+          );
 
+        const metricLabel = flattenedDimensionPath(
+          Object.values(metric.scorerRefs)[0].metric
+        );
         return {
-          ...metric,
-          evalScores: Object.fromEntries(
-            keys.map((key, i) => [key, normalizedValues[i]])
-          ),
+          metricLabel,
+          evalScores,
         };
       });
-    return Object.fromEntries(
+    const radarData = Object.fromEntries(
       callIds.map(callId => {
         const evalCall = state.data.evaluationCalls[callId];
         return [
@@ -131,5 +378,7 @@ const useNormalizedPlotDataFromMetrics = (
         ];
       })
     );
+    const allMetricNames = new Set(normalizedMetrics.map(m => m.metricLabel));
+    return {radarData, allMetricNames};
   }, [callIds, compositeMetrics, state.data.evaluationCalls]);
 };

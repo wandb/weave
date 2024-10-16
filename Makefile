@@ -1,11 +1,17 @@
-generate_panel_instructions:
-	jupyter nbconvert --to markdown examples/template_instructions/*.ipynb --output-dir weave/panels_py/instructions/
+.PHONY: docs build
 
+setup-docs-ci:
+	pip install -e .[docs]
+	playwright install
 
-.integration-deps: requirements.test.txt requirements.txt
-	pip install -r requirements.test.txt
-	touch .integration-deps
+	cd docs && \
+	npm install --global yarn && \
+	npm install
 
+docs: 
+	cd docs && make generate_all
 
-integration: .integration-deps
-	supervisord -c supervisord.conf
+build:
+	uv build
+
+prepare-release: docs build

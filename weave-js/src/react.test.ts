@@ -34,7 +34,7 @@ describe('parseRef', () => {
     });
     it('parses a ref with spaces in entity', () => {
       const parsed = parseRef(
-        'weave:///Entity%20Name/project/object/artifact-name:artifactversion'
+        'weave:///Entity Name/project/object/artifact-name:artifactversion'
       );
       expect(parsed).toEqual({
         artifactName: 'artifact-name',
@@ -91,20 +91,6 @@ describe('parseRef', () => {
     it('parses a ref with spaces in name and projectName', () => {
       const parsed = parseRef(
         'weave:///entity/project with spaces/object/artifact name with spaces:artifactversion'
-      );
-      expect(parsed).toEqual({
-        artifactName: 'artifact name with spaces',
-        artifactRefExtra: '',
-        artifactVersion: 'artifactversion',
-        entityName: 'entity',
-        projectName: 'project with spaces',
-        scheme: 'weave',
-        weaveKind: 'object',
-      });
-    });
-    it('parses a ref with escaped spaces in name and projectName', () => {
-      const parsed = parseRef(
-        'weave:///entity/project%20with%20spaces/object/artifact%20name%20with%20spaces:artifactversion'
       );
       expect(parsed).toEqual({
         artifactName: 'artifact name with spaces',

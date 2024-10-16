@@ -12,8 +12,9 @@
 import * as Types from '../../../../../../core/model/types';
 import {WeaveKind} from '../../../../../../react';
 import {KNOWN_BASE_OBJECT_CLASSES, OP_CATEGORIES} from './constants';
-import * as traceServerClient from './traceServerClient'; // TODO: This import is not ideal, should delete this whole interface
 import {Query} from './traceServerClientInterface/query'; // TODO: This import is not ideal, should delete this whole interface
+import * as traceServerClientTypes from './traceServerClientTypes'; // TODO: This import is not ideal, should delete this whole interface
+import {ContentType} from './traceServerClientTypes';
 
 export type OpCategory = (typeof OP_CATEGORIES)[number];
 export type KnownBaseObjectClassType =
@@ -47,7 +48,7 @@ export type CallSchema = CallKey & {
   rawFeedback?: any;
   userId: string | null;
   runId: string | null;
-  traceCall?: traceServerClient.TraceCallSchema; // this will eventually be the entire call schema
+  traceCall?: traceServerClientTypes.TraceCallSchema; // this will eventually be the entire call schema
 };
 
 export type CallFilter = {
@@ -156,6 +157,10 @@ export type FeedbackKey = {
   weaveRef: string;
 };
 
+export type Refetchable = {
+  refetch: () => void;
+};
+
 export type WFDataModelHooksInterface = {
   useCall: (key: CallKey | null) => Loadable<CallSchema | null>;
   useCalls: (
@@ -164,18 +169,19 @@ export type WFDataModelHooksInterface = {
     filter: CallFilter,
     limit?: number,
     offset?: number,
-    sortBy?: traceServerClient.SortBy[],
+    sortBy?: traceServerClientTypes.SortBy[],
     query?: Query,
+    columns?: string[],
     expandedRefColumns?: Set<string>,
     opts?: {skip?: boolean; refetchOnDelete?: boolean}
-  ) => Loadable<CallSchema[]>;
+  ) => Loadable<CallSchema[]> & Refetchable;
   useCallsStats: (
     entity: string,
     project: string,
     filter: CallFilter,
     query?: Query,
-    opts?: {skip?: boolean}
-  ) => Loadable<traceServerClient.TraceCallsQueryStatsRes>;
+    opts?: {skip?: boolean; refetchOnDelete?: boolean}
+  ) => Loadable<traceServerClientTypes.TraceCallsQueryStatsRes> & Refetchable;
   useCallsDeleteFunc: () => (
     entity: string,
     project: string,
@@ -187,22 +193,53 @@ export type WFDataModelHooksInterface = {
     callID: string,
     newName: string
   ) => Promise<void>;
+  useCallsExport: () => (
+    entity: string,
+    project: string,
+    contentType: ContentType,
+    filter: CallFilter,
+    limit?: number,
+    offset?: number,
+    sortBy?: traceServerClientTypes.SortBy[],
+    query?: Query,
+    columns?: string[],
+    expandedRefCols?: string[],
+    includeFeedback?: boolean
+  ) => Promise<Blob>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,
     project: string,
     filter: OpVersionFilter,
     limit?: number,
+    metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (
     key: ObjectVersionKey | null
   ) => Loadable<ObjectVersionSchema | null>;
+  useTableRowsQuery: (
+    entity: string,
+    project: string,
+    digest: string,
+    filter?: traceServerClientTypes.TraceTableQueryReq['filter'],
+    limit?: traceServerClientTypes.TraceTableQueryReq['limit'],
+    offset?: traceServerClientTypes.TraceTableQueryReq['offset'],
+    sortBy?: traceServerClientTypes.TraceTableQueryReq['sort_by'],
+    opts?: {skip?: boolean}
+  ) => Loadable<traceServerClientTypes.TraceTableQueryRes>;
+  useTableQueryStats: (
+    entity: string,
+    project: string,
+    digest: string,
+    opts?: {skip?: boolean}
+  ) => Loadable<traceServerClientTypes.TraceTableQueryStatsRes>;
   useRootObjectVersions: (
     entity: string,
     project: string,
     filter: ObjectVersionFilter,
     limit?: number,
+    metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => LoadableWithError<ObjectVersionSchema[]>;
   // `useRefsData` is in beta while we integrate Shawn's new Object DB
@@ -220,8 +257,11 @@ export type WFDataModelHooksInterface = {
     project: string,
     digest: string,
     opts?: {skip?: boolean}
-  ) => Loadable<string>;
-  useFeedback: (key: FeedbackKey | null) => LoadableWithError<any[] | null>;
+  ) => Loadable<ArrayBuffer>;
+  useFeedback: (
+    key: FeedbackKey | null,
+    sortBy?: traceServerClientTypes.SortBy[]
+  ) => LoadableWithError<any[] | null> & Refetchable;
   derived: {
     useChildCallsForCompare: (
       entity: string,

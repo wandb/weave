@@ -1,8 +1,3 @@
----
-sidebar_position: 1
-hide_table_of_contents: true
----
-
 # Anthropic
 
 Weave automatically tracks and logs LLM calls made via the [Anthropic Python library](https://github.com/anthropics/anthropic-sdk-python), after `weave.init()` is called.

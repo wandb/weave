@@ -4,23 +4,29 @@
 
 import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
-import React, {FC, useCallback, useContext} from 'react';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {maybePluralizeWord} from '@wandb/weave/core/util/string';
+import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
+import {AutoSizer} from 'react-virtualized';
 
 import {Button} from '../../../../../Button';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
-import {useEvaluationsFilter} from '../CallsPage/CallsPage';
+import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
+import {useEvaluationsFilter} from '../CallsPage/evaluationsFilter';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
   CompareEvaluationsProvider,
   useCompareEvaluationsState,
 } from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './ecpConstants';
-import {ComparisonDimensionsType} from './ecpTypes';
-import {EvaluationComparisonState} from './ecpTypes';
+import {EvaluationComparisonState} from './ecpState';
+import {ComparisonDimensionsType} from './ecpState';
+import {EvaluationCall} from './ecpTypes';
+import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
 import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCompareSection';
@@ -32,16 +38,47 @@ type CompareEvaluationsPageProps = {
   entity: string;
   project: string;
   evaluationCallIds: string[];
+  onEvaluationCallIdsUpdate: (newEvaluationCallIds: string[]) => void;
+  selectedMetrics: Record<string, boolean> | null;
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
 };
 
 export const CompareEvaluationsPage: React.FC<
   CompareEvaluationsPageProps
 > = props => {
-  const [baselineEvaluationCallId, setBaselineEvaluationCallId] =
-    React.useState(
-      props.evaluationCallIds.length > 0 ? props.evaluationCallIds[0] : null
-    );
+  return (
+    <SimplePageLayout
+      title={
+        props.evaluationCallIds.length === 1
+          ? 'Evaluation Results'
+          : 'Compare Evaluations'
+      }
+      hideTabsIfSingle
+      tabs={[
+        {
+          label: 'All',
+          content: (
+            <CompareEvaluationsPageContent
+              entity={props.entity}
+              project={props.project}
+              evaluationCallIds={props.evaluationCallIds}
+              onEvaluationCallIdsUpdate={props.onEvaluationCallIdsUpdate}
+              selectedMetrics={props.selectedMetrics}
+              setSelectedMetrics={props.setSelectedMetrics}
+            />
+          ),
+        },
+      ]}
+      headerExtra={<HeaderExtra {...props} />}
+    />
+  );
+};
 
+export const CompareEvaluationsPageContent: React.FC<
+  CompareEvaluationsPageProps
+> = props => {
+  const [baselineEvaluationCallId, setBaselineEvaluationCallId] =
+    React.useState<string | null>(null);
   const [comparisonDimensions, setComparisonDimensions] =
     React.useState<ComparisonDimensionsType | null>(null);
 
@@ -67,37 +104,39 @@ export const CompareEvaluationsPage: React.FC<
     [comparisonDimensions]
   );
 
+  React.useEffect(() => {
+    // Only update the baseline if we are switching evaluations, if there
+    // is more than 1, we are in the compare view and baseline is auto set
+    if (props.evaluationCallIds.length === 1) {
+      setBaselineEvaluationCallId(props.evaluationCallIds[0]);
+    }
+  }, [props.evaluationCallIds]);
+
   if (props.evaluationCallIds.length === 0) {
     return <div>No evaluations to compare</div>;
   }
 
   return (
-    <SimplePageLayout
-      title={'Compare Evaluations'}
-      hideTabsIfSingle
-      tabs={[
-        {
-          label: 'All',
-          content: (
-            <CompareEvaluationsProvider
-              entity={props.entity}
-              project={props.project}
-              evaluationCallIds={props.evaluationCallIds}
-              baselineEvaluationCallId={baselineEvaluationCallId ?? undefined}
-              comparisonDimensions={comparisonDimensions ?? undefined}
-              setBaselineEvaluationCallId={setBaselineEvaluationCallId}
-              setComparisonDimensions={
-                setComparisonDimensionsAndClearInputDigest
-              }
-              selectedInputDigest={selectedInputDigest ?? undefined}
-              setSelectedInputDigest={setSelectedInputDigest}>
-              <CompareEvaluationsPageInner />
-            </CompareEvaluationsProvider>
-          ),
-        },
-      ]}
-      headerExtra={<HeaderExtra {...props} />}
-    />
+    <CompareEvaluationsProvider
+      entity={props.entity}
+      project={props.project}
+      selectedMetrics={props.selectedMetrics}
+      setSelectedMetrics={props.setSelectedMetrics}
+      initialEvaluationCallIds={props.evaluationCallIds}
+      baselineEvaluationCallId={baselineEvaluationCallId ?? undefined}
+      comparisonDimensions={comparisonDimensions ?? undefined}
+      onEvaluationCallIdsUpdate={props.onEvaluationCallIdsUpdate}
+      setBaselineEvaluationCallId={setBaselineEvaluationCallId}
+      setComparisonDimensions={setComparisonDimensionsAndClearInputDigest}
+      selectedInputDigest={selectedInputDigest ?? undefined}
+      setSelectedInputDigest={setSelectedInputDigest}>
+      <CustomWeaveTypeProjectContext.Provider
+        value={{entity: props.entity, project: props.project}}>
+        <AutoSizer style={{height: '100%', width: '100%'}}>
+          {({height, width}) => <CompareEvaluationsPageInner height={height} />}
+        </AutoSizer>
+      </CustomWeaveTypeProjectContext.Provider>
+    </CompareEvaluationsProvider>
   );
 };
 
@@ -147,15 +186,17 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
   );
 };
 
-const CompareEvaluationsPageInner: React.FC = props => {
-  const {state} = useCompareEvaluationsState();
+const CompareEvaluationsPageInner: React.FC<{
+  height: number;
+}> = props => {
+  const {state, setSelectedMetrics} = useCompareEvaluationsState();
   const showExampleFilter =
     Object.keys(state.data.evaluationCalls).length === 2;
   const showExamples = Object.keys(state.data.resultRows).length > 0;
   return (
     <Box
       sx={{
-        height: '100%',
+        height: props.height,
         width: '100%',
         overflow: 'auto',
       }}>
@@ -165,13 +206,16 @@ const CompareEvaluationsPageInner: React.FC = props => {
           alignItems: 'flex-start',
           gridGap: STANDARD_PADDING * 2,
         }}>
+        <InvalidEvaluationBanner
+          evaluationCalls={Object.values(state.data.evaluationCalls)}
+        />
         <ComparisonDefinitionSection state={state} />
-        <SummaryPlots state={state} />
+        <SummaryPlots state={state} setSelectedMetrics={setSelectedMetrics} />
         <ScorecardSection state={state} />
         {showExamples ? (
           <>
             {showExampleFilter && <ExampleFilterSection state={state} />}
-            <ResultExplorer state={state} />
+            <ResultExplorer state={state} height={props.height} />
           </>
         ) : (
           <VerticalBox
@@ -201,9 +245,10 @@ const CompareEvaluationsPageInner: React.FC = props => {
   );
 };
 
-const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
-  state,
-}) => {
+const ResultExplorer: React.FC<{
+  state: EvaluationComparisonState;
+  height: number;
+}> = ({state, height}) => {
   return (
     <VerticalBox
       sx={{
@@ -229,11 +274,68 @@ const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
       </HorizontalBox>
       <Box
         sx={{
-          height: 'calc(100vh - 114px)',
+          height,
           overflow: 'auto',
         }}>
         <ExampleCompareSection state={state} />
       </Box>
     </VerticalBox>
+  );
+};
+
+/*
+ * Returns true if the evaluation call has summary metrics.
+ */
+const isValidEval = (evalCall: EvaluationCall) => {
+  return Object.keys(evalCall.summaryMetrics).length > 0;
+};
+
+const InvalidEvaluationBanner: React.FC<{
+  evaluationCalls: EvaluationCall[];
+}> = ({evaluationCalls}) => {
+  const [dismissed, setDismissed] = useState(false);
+  const invalidEvals = useMemo(() => {
+    return Object.values(evaluationCalls)
+      .filter(call => !isValidEval(call))
+      .map(call =>
+        call.name !== EVALUATION_NAME_DEFAULT
+          ? call.name
+          : call.callId.slice(-4)
+      );
+  }, [evaluationCalls]);
+  if (invalidEvals.length === 0 || dismissed) {
+    return null;
+  }
+  return (
+    <Box
+      sx={{
+        width: '100%',
+        paddingLeft: STANDARD_PADDING,
+        paddingRight: STANDARD_PADDING,
+      }}>
+      <Tailwind>
+        <Alert
+          severity="info"
+          classes={{
+            root: 'bg-teal-300/[0.30] text-teal-600',
+            action: 'text-teal-600',
+          }}
+          action={
+            <Button
+              // override the default tailwind classes for text and background hover
+              className="text-override hover:bg-override"
+              variant="ghost"
+              onClick={() => setDismissed(true)}>
+              Dismiss
+            </Button>
+          }>
+          <span style={{fontWeight: 'bold'}}>
+            No summary information found for{' '}
+            {maybePluralizeWord(invalidEvals.length, 'evaluation')}:{' '}
+            {invalidEvals.join(', ')}.
+          </span>
+        </Alert>
+      </Tailwind>
+    </Box>
   );
 };

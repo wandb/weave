@@ -1,0 +1,73 @@
+interactions:
+- request:
+    body: '{"messages":[{"content":"What is the best French cheese?","role":"user"}],"model":"mistral-large-latest","safe_prompt":false,"stream":false,"temperature":0.7,"tool_choice":"auto","top_p":1.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, br
+      connection:
+      - keep-alive
+      content-length:
+      - '191'
+      content-type:
+      - application/json
+      host:
+      - api.mistral.ai
+      user-agent:
+      - mistral-client-python/1.0.0
+    method: POST
+    uri: https://api.mistral.ai/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA22US27kNhCGr1LQJoAhN9zux8S9mxkkSBbJIskuDgxKKkkckywNSbm7Y/gAOcqcYy6Wn5Ta7sbMoh8SWVVf/fV4LnRT7Irbu2qj1sv27sfNZl23q7vtZrtabep2ebPcrNWmKAupPnEdcbfuVVzUYgfDUYvDUe1ZRYaf5bvb1fJmu17flYWVhg2uWx2iV+baKN8xviOHmGx60TWHYvf3c6Fdw4didwMjDkF1XOyeCy8Gv4UKAQ6UyzbiIrvE8LEXCdp1FHum+6KCz/uCfvbs6p7qnjkw6UCfRx2ZwpjR9ROTcg01PLBrAomjgX0QpwxFFSKXpAJ8KFcz9firaK8bpiflNccjSUt8qNkYIMwxwoJ+YQ+36UMt7wkEsnfcwDsH0KmYD6UFOIE/wKPHsbIy0yf23b27d8sFXV39IZ9HbsXHq6sd/dUjB51AAsINZLV5pMqMfEqx9WKzkyBj7BPhhL+gX+MPgR4TC8Eb6QgY5bpjViAog3xao57El5Mm0Fi7SaMn1i4kXzmSFdMsEt5twvuoLNuKfYSK9Lt4C2PNifU9GNpYUuoFeywhum9VzddeQ20kXMseRDmDCT4xzjJ7XfclVWOM7E9cGUuHWTl2n+QIL/seD+1ozJGS43ypE+FjRlwlxA+oVqL7jdV4yGROIJHPfN9igFTjUXmKQm/pAYaC0V0fEQrnqBppN7N9V15udGUYhKnlPFo6w01ywBSpaVgmzHVWUmz8+mVS7rJvrWrmyo5uSH05ev3vpYIgSVXPxe75evKF3uswj2e6TkN6KMlB2gth0azaW+Q+gBRdEfkQR88Zb5P7kCsjmFF3Xtu9Qh8216/JBcvKv1X4DH8GfG8G7XgGSy31JwiOU3Je7c9SOqOeYPNEzqxYIGlaFMxURtwmxK//DaIDhjBV+4OMvpPOzb04jK7DmF4if6Pvd8NPwSCNWN6n+T2fllcgXT+iyQUF6Bhr4ay6P6k6TyLyD6dBTW3cYtfAdHQaE36W3ix9Cni5zbBBpuG3Kg1G8vm6rwbP8Mdp1LEXo4h5qJUxWKcOw/FSFq12OvQP6D4YYGGGKANuGukGL9Xp3j9lMZ72Ld7bIT5EeWSH8+VN8huVeX2zerdKK/i099/eb1cvL/8DGJCk6EgGAAA=
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 8afe342d5c3a11a5-MRS
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 08 Aug 2024 08:40:57 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      access-control-allow-origin:
+      - '*'
+      alt-svc:
+      - h3=":443"; ma=86400
+      ratelimitbysize-limit:
+      - '20000000'
+      ratelimitbysize-query-cost:
+      - '32008'
+      ratelimitbysize-remaining:
+      - '19935984'
+      ratelimitbysize-reset:
+      - '11'
+      x-envoy-upstream-service-time:
+      - '8433'
+      x-kong-proxy-latency:
+      - '2'
+      x-kong-request-id:
+      - 9e878475a74f83234245fc18becec170
+      x-kong-upstream-latency:
+      - '8434'
+      x-ratelimitbysize-limit-minute:
+      - '20000000'
+      x-ratelimitbysize-limit-month:
+      - '200000000000'
+      x-ratelimitbysize-remaining-minute:
+      - '19935984'
+      x-ratelimitbysize-remaining-month:
+      - '199958683436'
+    status:
+      code: 200
+      message: OK
+version: 1

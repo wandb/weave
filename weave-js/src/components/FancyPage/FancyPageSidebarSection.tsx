@@ -136,7 +136,11 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
                 }}>
                 <SidebarButton>
                   <ItemIcon color={colorIconBg}>
-                    <Icon name={item.iconName} color={colorIcon} />
+                    <Icon
+                      name={item.iconName}
+                      color={colorIcon}
+                      role="presentation"
+                    />
                   </ItemIcon>
                   <ItemLabel color={colorText}>{item.name}</ItemLabel>
                 </SidebarButton>
@@ -159,7 +163,11 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
         const button = (
           <SidebarButton>
             <ItemIcon color={colorIconBg}>
-              <Icon name={item.iconName} color={colorIcon} />
+              <Icon
+                name={item.iconName}
+                color={colorIcon}
+                role="presentation"
+              />
             </ItemIcon>
             <ItemLabel color={colorText}>{item.name}</ItemLabel>
           </SidebarButton>

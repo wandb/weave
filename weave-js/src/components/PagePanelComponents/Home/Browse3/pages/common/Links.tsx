@@ -226,6 +226,7 @@ export const OpVersionLink: React.FC<{
   versionIndex: number;
   variant?: LinkVariant;
   fullWidth?: boolean;
+  color?: string;
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
@@ -243,7 +244,10 @@ export const OpVersionLink: React.FC<{
     history.push(to);
   };
   return (
-    <LinkWrapper onClick={onClick} fullWidth={props.fullWidth}>
+    <LinkWrapper
+      onClick={onClick}
+      fullWidth={props.fullWidth}
+      color={props.color}>
       <LinkTruncater fullWidth={props.fullWidth}>
         <Link $variant={props.variant} to={to}>
           {text}
@@ -303,11 +307,23 @@ export const CallLink: React.FC<{
             display: 'flex',
             alignItems: 'center',
             gap: '4px',
-            justifyContent: 'space-between',
+            // allow flex items to shrink below their minimum content size
+            minWidth: 0,
           }}>
           {props.icon}
-          {opName}
-          <Id id={props.callId} type="Call" />
+          <span
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              flexGrow: 1,
+              flexShrink: 1,
+            }}>
+            {opName}
+          </span>
+          <span style={{flexShrink: 0}}>
+            <Id id={props.callId} type="Call" />
+          </span>
         </Link>
       </LinkTruncater>
     </LinkWrapper>

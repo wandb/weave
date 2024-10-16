@@ -430,11 +430,10 @@ const PanelTableInner: React.FC<
           );
         }
       } else {
-        const activeRowForGrouping =
-          {
-            ...config.activeRowForGrouping,
-            [compositeGroupKey]: row,
-          } ?? {};
+        const activeRowForGrouping = {
+          ...config.activeRowForGrouping,
+          [compositeGroupKey]: row,
+        };
         // if row is less than 0, delete the active row
         if (row < 0) {
           delete activeRowForGrouping[compositeGroupKey];
@@ -542,28 +541,33 @@ const PanelTableInner: React.FC<
 
   const headerRendererForColumn = useCallback(
     (colId: string, {headerIndex}: any) => {
+      const columnDef = columnDefinitions[colId];
+      const colType = columnDef.selectFn.type;
+
       return (
-        <ColumnHeader
-          isGroupCol={columnDefinitions[colId].isGrouped}
-          tableState={tableState}
-          inputArrayNode={input}
-          rowsNode={rowsNode}
-          columnName={tableState.columnNames[colId]}
-          selectFunction={tableState.columnSelectFunctions[colId]}
-          colId={colId}
-          panelId={tableState.columns[colId].panelId}
-          config={tableState.columns[colId].panelConfig}
-          panelContext={props.context}
-          updatePanelContext={updateContext}
-          updateTableState={updateTableState}
-          isPinned={config.pinnedColumns?.includes(colId)}
-          setColumnPinState={(pinned: boolean) => {
-            setColumnPinState(colId, pinned);
-          }}
-          simpleTable={props.config.simpleTable}
-          countColumnId={countColumnId}
-          setCountColumnId={setCountColumnId}
-        />
+        <WeaveFormatContext.Provider value={getColumnCellFormats(colType)}>
+          <ColumnHeader
+            isGroupCol={columnDefinitions[colId].isGrouped}
+            tableState={tableState}
+            inputArrayNode={input}
+            rowsNode={rowsNode}
+            columnName={tableState.columnNames[colId]}
+            selectFunction={tableState.columnSelectFunctions[colId]}
+            colId={colId}
+            panelId={tableState.columns[colId].panelId}
+            config={tableState.columns[colId].panelConfig}
+            panelContext={props.context}
+            updatePanelContext={updateContext}
+            updateTableState={updateTableState}
+            isPinned={config.pinnedColumns?.includes(colId)}
+            setColumnPinState={(pinned: boolean) => {
+              setColumnPinState(colId, pinned);
+            }}
+            simpleTable={props.config.simpleTable}
+            countColumnId={countColumnId}
+            setCountColumnId={setCountColumnId}
+          />
+        </WeaveFormatContext.Provider>
       );
     },
     [

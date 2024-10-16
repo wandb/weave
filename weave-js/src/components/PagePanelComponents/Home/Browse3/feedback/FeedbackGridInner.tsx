@@ -5,21 +5,29 @@ import {Timestamp} from '../../../../Timestamp';
 import {UserLink} from '../../../../UserLink';
 import {CellValueString} from '../../Browse2/CellValueString';
 import {CopyableId} from '../pages/common/Id';
-import {Feedback} from '../pages/wfReactInterface/traceServerClient';
+import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {StyledDataGrid} from '../StyledDataGrid';
+import {FeedbackGridActions} from './FeedbackGridActions';
 import {FeedbackTypeChip} from './FeedbackTypeChip';
 
 type FeedbackGridInnerProps = {
   feedback: Feedback[];
+  currentViewerId: string | null;
 };
 
-export const FeedbackGridInner = ({feedback}: FeedbackGridInnerProps) => {
+export const FeedbackGridInner = ({
+  feedback,
+  currentViewerId,
+}: FeedbackGridInnerProps) => {
   const columns: GridColDef[] = [
     {
       field: 'feedback_type',
       headerName: 'Type',
+      display: 'flex',
       renderCell: params => (
-        <FeedbackTypeChip feedbackType={params.row.feedback_type} />
+        <div className="overflow-hidden">
+          <FeedbackTypeChip feedbackType={params.row.feedback_type} />
+        </div>
       ),
     },
     {
@@ -40,6 +48,7 @@ export const FeedbackGridInner = ({feedback}: FeedbackGridInnerProps) => {
     {
       field: 'created_at',
       headerName: 'Timestamp',
+      minWidth: 120,
       width: 120,
       renderCell: params => (
         <Timestamp value={params.row.created_at} format="relative" />
@@ -49,11 +58,13 @@ export const FeedbackGridInner = ({feedback}: FeedbackGridInnerProps) => {
       field: 'id',
       headerName: 'ID',
       width: 50,
+      display: 'flex',
       renderCell: params => <CopyableId id={params.row.id} type="Feedback" />,
     },
     {
       field: 'wb_user_id',
       headerName: 'Creator',
+      minWidth: 150,
       width: 150,
       // Might be confusing to enable as-is, because the user sees name /
       // email but the underlying data is userId.
@@ -68,13 +79,35 @@ export const FeedbackGridInner = ({feedback}: FeedbackGridInnerProps) => {
         ) {
           return params.row.creator;
         }
-        return <UserLink username={params.row.wb_user_id} includeName />;
+        return <UserLink userId={params.row.wb_user_id} includeName />;
+      },
+    },
+    {
+      field: 'actions',
+      headerName: '',
+      width: 50,
+      filterable: false,
+      sortable: false,
+      resizable: false,
+      disableColumnMenu: true,
+      display: 'flex',
+      renderCell: params => {
+        const projectId = params.row.project_id;
+        const feedbackId = params.row.id;
+        const creatorId = params.row.wb_user_id;
+        if (!currentViewerId || creatorId !== currentViewerId) {
+          return null;
+        }
+        return (
+          <FeedbackGridActions projectId={projectId} feedbackId={feedbackId} />
+        );
       },
     },
   ];
   const rows = feedback;
   return (
     <StyledDataGrid
+      autosizeOnMount
       // Start Column Menu
       // ColumnMenu is only needed when we have other actions
       // such as filtering.

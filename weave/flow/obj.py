@@ -1,5 +1,5 @@
-from functools import partial
-from typing import Any, Optional
+import logging
+from typing import Any, Callable, Optional, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -9,11 +9,30 @@ from pydantic import (
     model_validator,
 )
 
-# import pydantic
-from weave.legacy import box
-from weave.trace.op import ObjectRef, Op, call
+from weave.trace.op import ObjectRef, Op
 from weave.trace.vals import WeaveObject, pydantic_getattribute
-from weave.weave_client import get_ref
+from weave.trace.weave_client import get_ref
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+def deprecated_field(new_field_name: str) -> Callable[[Callable[[Any], T]], property]:
+    def decorator(func: Callable[[Any], T]) -> property:
+        warning_msg = f"Use `{new_field_name}` instead of `{func.__name__}`, which is deprecated and will be removed in a future version."
+
+        def getter(self: Any) -> T:
+            logger.warning(warning_msg)
+            return getattr(self, new_field_name)
+
+        def setter(self: Any, value: T) -> None:
+            logger.warning(warning_msg)
+            setattr(self, new_field_name, value)
+
+        return property(fget=getter, fset=setter)
+
+    return decorator
 
 
 class Object(BaseModel):
@@ -26,6 +45,8 @@ class Object(BaseModel):
         arbitrary_types_allowed=True,
         protected_namespaces=(),
         extra="forbid",
+        # Intended to be used to allow "deprecated" aliases for fields until we fully remove them.
+        populate_by_name=True,
     )
 
     __str__ = BaseModel.__repr__
@@ -48,8 +69,6 @@ class Object(BaseModel):
                 if k.startswith("_"):
                     continue
                 val = getattr(v, k)
-                if isinstance(val, box.BoxedNone):
-                    val = None
                 fields[k] = val
 
             # pydantic validation will construct a new pydantic object
@@ -74,17 +93,6 @@ class Object(BaseModel):
 
             return new_obj
         return handler(v)
-
-    def model_post_init(self, __context: Any) -> None:
-        super().model_post_init(__context)
-
-        # This binds the call "method" to the Op instance
-        # - before:  obj.method.call(obj, ...)
-        # - after:   obj.method.call(...)
-        for k in dir(self):
-            if not k.startswith("__") and isinstance(getattr(self, k), Op):
-                op = getattr(self, k)
-                op.__dict__["call"] = partial(call, op, self)
 
 
 # Enable ref tracking for Weave.Object

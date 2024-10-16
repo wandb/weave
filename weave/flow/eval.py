@@ -3,8 +3,7 @@ import inspect
 import textwrap
 import time
 import traceback
-import typing
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Coroutine, Optional, Union, cast
 
 from rich import print
 from rich.console import Console
@@ -21,24 +20,46 @@ from weave.flow.scorer import (
     get_scorer_attributes,
     transpose,
 )
+from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
-from weave.trace.op import Op
+from weave.trace.isinstance import weave_isinstance
+from weave.trace.op import Op, as_op, is_op
+from weave.trace.vals import WeaveObject
+from weave.trace.weave_client import Call, get_ref
 
 console = Console()
 
 
-def async_call(
-    func: typing.Union[Callable, Op], *args: Any, **kwargs: Any
-) -> typing.Coroutine:
+INVALID_MODEL_ERROR = (
+    "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
+    + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
+)
+
+
+def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutine:
     is_async = False
-    if isinstance(func, Op):
+    if is_op(func):
+        func = as_op(func)
         is_async = inspect.iscoroutinefunction(func.resolve_fn)
     else:
         is_async = inspect.iscoroutinefunction(func)
     if is_async:
         return func(*args, **kwargs)  # type: ignore
     return asyncio.to_thread(func, *args, **kwargs)
+
+
+def async_call_op(
+    func: Op, *args: Any, **kwargs: Any
+) -> Coroutine[Any, Any, tuple[Any, "Call"]]:
+    call_res = func.call(*args, __should_raise=True, **kwargs)
+    if inspect.iscoroutine(call_res):
+        return call_res
+    return asyncio.to_thread(lambda: call_res)
+
+
+class EvaluationResults(Object):
+    rows: weave.Table
 
 
 class Evaluation(Object):
@@ -55,7 +76,7 @@ class Evaluation(Object):
 
     Examples:
 
-    ```
+    ```python
     # Collect your examples
     examples = [
         {"question": "What is the capital of France?", "expected": "Paris"},
@@ -100,9 +121,9 @@ class Evaluation(Object):
                 raise ValueError(
                     f"Scorer {scorer.__name__} must be an instance, not a class. Did you forget to instantiate?"
                 )
-            elif callable(scorer) and not isinstance(scorer, Op):
+            elif callable(scorer) and not is_op(scorer):
                 scorer = weave.op()(scorer)
-            elif isinstance(scorer, Op):
+            elif is_op(scorer):
                 pass
             else:
                 raise ValueError(f"Invalid scorer: {scorer}")
@@ -112,30 +133,34 @@ class Evaluation(Object):
         if isinstance(self.dataset, list):
             self.dataset = Dataset(rows=self.dataset)
 
-        if self.name == None and self.dataset.name != None:
+        if self.name is None and self.dataset.name is not None:
             self.name = self.dataset.name + "-evaluation"  # type: ignore
 
     @weave.op()
     async def predict_and_score(
         self, model: Union[Callable, Model], example: dict
     ) -> dict:
-        if self.preprocess_model_input == None:
+        if self.preprocess_model_input is None:
             model_input = example
         else:
             model_input = self.preprocess_model_input(example)  # type: ignore
 
+        model_self = None
+        model_predict: Union[Callable, Model]
         if callable(model):
             model_predict = model
         else:
+            model_self = model
             model_predict = get_infer_method(model)
 
         model_predict_fn_name = (
-            model_predict.name
-            if isinstance(model_predict, Op)
+            as_op(model_predict).name
+            if is_op(model_predict)
             else model_predict.__name__
         )
 
-        if isinstance(model_predict, Op):
+        if is_op(model_predict):
+            model_predict = as_op(model_predict)
             predict_signature = model_predict.signature
         else:
             predict_signature = inspect.signature(model_predict)
@@ -154,7 +179,23 @@ class Evaluation(Object):
                 )
         try:
             model_start_time = time.time()
-            model_output = await async_call(model_predict, **model_predict_args)
+            model_call = None
+            if is_op(model_predict):
+                # I would expect this path to always be hit, but keeping the other
+                # path for backwards compatibility / safety
+                model_predict = as_op(model_predict)
+                if model_self is not None:
+                    model_predict_args = {
+                        **model_predict_args,
+                        "self": model_self,
+                    }
+                model_output, model_call = await async_call_op(
+                    model_predict, **model_predict_args
+                )
+            else:
+                # I would not expect this path to be hit, but keeping it for
+                # backwards compatibility / safety
+                model_output = await async_call(model_predict, **model_predict_args)
         except OpCallError as e:
             dataset_column_names = list(example.keys())
             dataset_column_names_str = ", ".join(dataset_column_names[:3])
@@ -184,10 +225,14 @@ class Evaluation(Object):
         model_latency = time.time() - model_start_time
 
         scores = {}
-        scorers = typing.cast(list[Union[Op, Scorer]], self.scorers or [])
+        scorers = cast(list[Union[Op, Scorer]], self.scorers or [])
         for scorer in scorers:
+            scorer_self = None
+            if weave_isinstance(scorer, Scorer):
+                scorer_self = scorer
             scorer_name, score_fn, _ = get_scorer_attributes(scorer)
-            if isinstance(score_fn, Op):
+            if is_op(score_fn):
+                score_fn = as_op(score_fn)
                 score_signature = score_fn.signature
             else:
                 score_signature = inspect.signature(score_fn)
@@ -210,7 +255,24 @@ class Evaluation(Object):
             score_args["model_output"] = model_output
 
             try:
-                result = await async_call(score_fn, **score_args)
+                if is_op(score_fn) and model_call:
+                    # I would expect this path to always be hit, but keeping the other
+                    # path for backwards compatibility / safety
+                    score_fn = as_op(score_fn)
+                    if scorer_self is not None:
+                        score_args = {
+                            **score_args,
+                            "self": scorer_self,
+                        }
+                    result, score_call = await async_call_op(score_fn, **score_args)
+                    wc = get_weave_client()
+                    if wc:
+                        wc._send_score_call(model_call, score_call)
+
+                else:
+                    # I would not expect this path to be hit, but keeping it for
+                    # backwards compatibility / safety
+                    result = await async_call(score_fn, **score_args)
             except OpCallError as e:
                 dataset_column_names = list(example.keys())
                 dataset_column_names_str = ", ".join(dataset_column_names[:3])
@@ -242,8 +304,9 @@ class Evaluation(Object):
         }
 
     @weave.op()
-    async def summarize(self, eval_table: list) -> dict:
-        cols = transpose(eval_table)
+    async def summarize(self, eval_table: EvaluationResults) -> dict:
+        eval_table_rows = list(eval_table.rows)
+        cols = transpose(eval_table_rows)
         summary = {}
 
         for name, vals in cols.items():
@@ -262,8 +325,11 @@ class Evaluation(Object):
 
         return summary
 
-    @weave.op()
-    async def evaluate(self, model: Union[Callable, Model]) -> dict:
+    async def get_eval_results(
+        self, model: Union[Callable, Model]
+    ) -> EvaluationResults:
+        if not is_valid_model(model):
+            raise ValueError(INVALID_MODEL_ERROR)
         eval_rows = []
 
         async def eval_example(example: dict) -> dict:
@@ -278,27 +344,44 @@ class Evaluation(Object):
             return eval_row
 
         n_complete = 0
-        dataset = typing.cast(Dataset, self.dataset)
+        # with console.status("Evaluating...") as status:
+        dataset = cast(Dataset, self.dataset)
         _rows = dataset.rows
         trial_rows = list(_rows) * self.trials
         with Progress() as progress:
-            task = progress.add_task("Evaluating", total=len(trial_rows))
             async for example, eval_row in util.async_foreach(
                 trial_rows, eval_example, get_weave_parallelism()
             ):
                 n_complete += 1
                 progress.update(task, advance=1)
-                if eval_row == None:
+                # status.update(
+                #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
+                # )
+                if eval_row is None:
                     eval_row = {"model_output": None, "scores": {}}
-                if eval_row["scores"] == None:
-                    eval_row["scores"] = {}
+                else:
+                    eval_row["scores"] = eval_row.get("scores", {})
                 for scorer in self.scorers or []:
                     scorer_name, _, _ = get_scorer_attributes(scorer)
                     if scorer_name not in eval_row["scores"]:
                         eval_row["scores"][scorer_name] = {}
                 eval_rows.append(eval_row)
+        return EvaluationResults(rows=weave.Table(eval_rows))
 
-        summary = await self.summarize(eval_rows)
+    @weave.op()
+    async def evaluate(self, model: Union[Callable, Model]) -> dict:
+        # The need for this pattern is quite unfortunate and highlights a gap in our
+        # data model. As a user, I just want to pass a list of data `eval_rows` to
+        # summarize. Under the hood, Weave should choose the appropriate storage
+        # format (in this case `Table`) and serialize it that way. Right now, it is
+        # just a huge list of dicts. The fact that "as a user" I need to construct
+        # `weave.Table` at all is a leaky abstraction. Moreover, the need to
+        # construct `EvaluationResults` just so that tracing and the UI works is
+        # also bad. In the near-term, this will at least solve the problem of
+        # breaking summarization with big datasets, but this is not the correct
+        # long-term solution.
+        eval_results = await self.get_eval_results(model)
+        summary = await self.summarize(eval_results)
 
         print("Evaluation summary", summary)
 
@@ -315,3 +398,19 @@ def evaluate(
         dataset=dataset, scorers=scores, preprocess_model_input=preprocess_model_input
     )
     return asyncio.run(eval.evaluate(model))
+
+
+def is_valid_model(model: Any) -> bool:
+    return (
+        # Model instances are supported
+        isinstance(model, Model)
+        # Ops are supported
+        or is_op(model)
+        # Saved Models (Objects with predict) are supported
+        or (
+            get_ref(model) is not None
+            and isinstance(model, WeaveObject)
+            and hasattr(model, "predict")
+            and is_op(model.predict)
+        )
+    )

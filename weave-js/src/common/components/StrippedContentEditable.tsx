@@ -70,7 +70,6 @@ const StrippedContentEditable: React.FC<
           });
         }}
         onBlur={e => {
-          props.onChange(unescapeString(e.currentTarget.textContent || ''));
           props.onBlur?.(e);
         }}
       />

@@ -29,11 +29,11 @@ import {WeaveFormatContextType} from '../WeaveFormatContext';
 import * as Table from './tableState';
 import {useTableStateWithRefinedExpressions} from './tableStateReact';
 
-// Formatting for PanelNumbers and PanelStrings inside Tables
+// Formatting for PanelNumber and PanelString headers and values inside Tables
 export const getColumnCellFormats = (colType: Type): WeaveFormatContextType => {
   const t = nullableTaggableStrip(colType);
   const numberFormat =
-    t === 'number'
+    t === 'number' || t === 'float' || t === 'int'
       ? {
           textAlign: 'right' as const,
           justifyContent: 'normal',
@@ -42,9 +42,14 @@ export const getColumnCellFormats = (colType: Type): WeaveFormatContextType => {
         }
       : {};
   const stringFormat = {spacing: t === 'string'};
+  const columnFormat = {
+    textAlign: t === 'number' ? ('right' as const) : ('center' as const),
+  };
+
   return {
     numberFormat,
     stringFormat,
+    columnFormat,
   };
 };
 

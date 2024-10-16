@@ -3,10 +3,8 @@
  * There is a query engine based approach in useViewerUserInfo.ts.
  */
 
-import {gql} from '@apollo/client';
+import {gql, useApolloClient} from '@apollo/client';
 import {useEffect, useState} from 'react';
-
-import {apolloClient} from '../../apollo';
 
 const VIEWER_QUERY = gql`
   query Viewer {
@@ -47,6 +45,8 @@ export const useViewerInfo = (): UserInfoResponse => {
     userInfo: {},
   });
 
+  const apolloClient = useApolloClient();
+
   useEffect(() => {
     let mounted = true;
     apolloClient.query({query: VIEWER_QUERY as any}).then(result => {
@@ -77,7 +77,7 @@ export const useViewerInfo = (): UserInfoResponse => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [apolloClient]);
 
   return response;
 };

@@ -8,6 +8,7 @@ import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
+import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {CallStatusType} from '../common/StatusChip';
@@ -50,6 +51,7 @@ export const CallTraceView: FC<{
       headerName: 'Call Tree',
       headerAlign: 'center',
       flex: 1,
+      display: 'flex',
       renderCell: params => (
         <CustomGridTreeDataGroupingCell
           {...params}
@@ -107,6 +109,15 @@ export const CallTraceView: FC<{
           )
         );
       }
+      userEvents.callTreeCellClicked({
+        callId: rowCall.callId,
+        entity: rowCall.entity,
+        project: rowCall.project,
+        traceId: rowCall.traceId,
+        path: params.row.path,
+        isParentRow: params.row.isParentRow,
+        heirarchyDepth: params.row.hierarchy.length,
+      });
     },
     [
       call.callId,
@@ -166,14 +177,20 @@ export const CallTraceView: FC<{
       fontFamily: 'Source Sans Pro',
       '&>.MuiDataGrid-main': {
         '& div div div div >.MuiDataGrid-cell': {
-          borderBottom: 'none',
+          borderTop: 'none',
         },
         '& div div div div >.MuiDataGrid-cell:focus': {
           outline: 'none',
         },
       },
+      '& .MuiDataGrid-topContainer': {
+        display: 'none',
+      },
       '& .MuiDataGrid-columnHeaders': {
         borderBottom: 'none',
+      },
+      '& .MuiDataGrid-filler': {
+        display: 'none',
       },
       [callClass]: {
         backgroundColor: '#a9edf252',
@@ -334,9 +351,32 @@ export const useCallFlattenedTraceTree = (
   selectedPath: string | null
 ) => {
   const {useCalls} = useWFHooks();
-  const traceCalls = useCalls(call.entity, call.project, {
-    traceId: call.traceId,
-  });
+  const columns = useMemo(
+    () => [
+      'parent_id',
+      'started_at',
+      'ended_at',
+      'display_name',
+      'summary',
+      'exception',
+    ],
+    []
+  );
+  const traceCalls = useCalls(
+    call.entity,
+    call.project,
+    {
+      traceId: call.traceId,
+    },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    columns,
+    undefined,
+    // Refetch the trace tree on delete or rename
+    {refetchOnDelete: true}
+  );
   const traceCallsResult = useMemo(
     () => traceCalls.result ?? [],
     [traceCalls.result]
@@ -443,7 +483,8 @@ export const useCallFlattenedTraceTree = (
     }
 
     if (parentCall) {
-      const siblingCount = childCallLookup[parentCall.callId]?.length - 1 ?? 0;
+      const childrenOfParent = childCallLookup[parentCall.callId];
+      const siblingCount = childrenOfParent ? childrenOfParent.length - 1 : 0;
       if (siblingCount) {
         rows.push({
           id: 'HIDDEN_SIBLING_COUNT',

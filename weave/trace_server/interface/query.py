@@ -26,16 +26,6 @@ import typing
 
 from pydantic import BaseModel, Field
 
-
-class Query(BaseModel):
-    # Here, we use `expr_` to match the MongoDB query language's "aggregation" operator syntax.
-    # This is certainly a subset of the full MongoDB query language, but it is a good starting point.
-    # https://www.mongodb.com/docs/manual/reference/operator/query/expr/#mongodb-query-op.-expr
-    expr_: "Operation" = Field(alias="$expr")
-    # In the future, we could have other top-level Query Operators as described here:
-    # https://www.mongodb.com/docs/manual/reference/operator/query/
-
-
 # Operations: all operations have the form of a single property
 # with the name of the operation suffixed with an underscore.
 # Subset of Mongo _Aggregation_ Operators: https://www.mongodb.com/docs/manual/reference/operator/aggregation/
@@ -121,6 +111,11 @@ class GteOperation(BaseModel):
     gte_: typing.Tuple["Operand", "Operand"] = Field(alias="$gte")
 
 
+# https://www.mongodb.com/docs/manual/reference/operator/aggregation/in/
+class InOperation(BaseModel):
+    in_: typing.Tuple["Operand", list["Operand"]] = Field(alias="$in")
+
+
 # This is not technically in the Mongo spec. Mongo has:
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/regexMatch/,
 # however, rather than support a full regex match right now, we will
@@ -143,6 +138,7 @@ Operation = typing.Union[
     EqOperation,
     GtOperation,
     GteOperation,
+    InOperation,
     ContainsOperation,
 ]
 Operand = typing.Union[
@@ -159,4 +155,14 @@ NotOperation.model_rebuild()
 EqOperation.model_rebuild()
 GtOperation.model_rebuild()
 GteOperation.model_rebuild()
+InOperation.model_rebuild()
 ContainsOperation.model_rebuild()
+
+
+class Query(BaseModel):
+    # Here, we use `expr_` to match the MongoDB query language's "aggregation" operator syntax.
+    # This is certainly a subset of the full MongoDB query language, but it is a good starting point.
+    # https://www.mongodb.com/docs/manual/reference/operator/query/expr/#mongodb-query-op.-expr
+    expr_: Operation = Field(alias="$expr")
+    # In the future, we could have other top-level Query Operators as described here:
+    # https://www.mongodb.com/docs/manual/reference/operator/query/

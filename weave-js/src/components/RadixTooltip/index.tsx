@@ -57,12 +57,13 @@ export const Portal = RadixTooltip.Portal;
  */
 export const Content = React.forwardRef(
   ({className, children, ...props}: RadixTooltip.TooltipContentProps, ref) => (
-    <Tailwind>
+    <Tailwind style={{display: 'contents'}}>
       <RadixTooltip.Content
         className={twMerge(
           'night-aware',
-          'rounded text-sm leading-[140%] shadow-md',
-          'bg-moon-900 p-12 text-moon-200 dark:bg-moon-50 dark:text-moon-800'
+          'z-[999999] rounded text-sm leading-[140%] shadow-md',
+          'bg-moon-900 p-12 text-moon-200 dark:bg-moon-50 dark:text-moon-800',
+          className
         )}
         sideOffset={5}
         {...props}>

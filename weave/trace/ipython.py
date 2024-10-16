@@ -7,6 +7,9 @@ from typing import Callable
 class NotInteractiveEnvironmentError(Exception): ...
 
 
+class ClassNotFoundError(ValueError): ...
+
+
 def is_running_interactively() -> bool:
     """Check if the code is running in an interactive environment."""
     try:
@@ -52,4 +55,4 @@ def get_class_source(cls: Callable) -> str:
     if segment is not None:
         return segment
 
-    raise ValueError(f"Class '{class_name}' not found in the notebook")
+    raise ClassNotFoundError(f"Class '{class_name}' not found in the notebook")

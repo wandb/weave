@@ -1,6 +1,6 @@
 import {GridColumnGroup} from '@mui/x-data-grid-pro';
 
-import {buildTree} from './callsTableBuildTree';
+import {buildTree} from '../common/tabularListViews/buildTree';
 
 describe(`buildTree`, () => {
   it(`correctly converts`, () => {

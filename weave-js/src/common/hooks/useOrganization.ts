@@ -1,7 +1,6 @@
-import {gql} from '@apollo/client';
+import {gql, useApolloClient} from '@apollo/client';
 import {useEffect, useState} from 'react';
 
-import {apolloClient} from '../../apollo';
 import {useIsMounted} from './useIsMounted';
 
 export const ORGANIZATION_QUERY = gql`
@@ -16,12 +15,22 @@ export const ORGANIZATION_QUERY = gql`
   }
 `;
 
-export const useOrgName = ({entityName}: {entityName: string}) => {
+export const useOrgName = ({
+  entityName,
+  skip,
+}: {
+  entityName: string;
+  skip?: boolean;
+}) => {
   const [orgName, setOrgName] = useState<string | null>(null);
   const isMounted = useIsMounted();
+  const apolloClient = useApolloClient();
 
   useEffect(
     () => {
+      if (skip) {
+        return;
+      }
       apolloClient
         .query({
           query: ORGANIZATION_QUERY as any,
@@ -38,7 +47,7 @@ export const useOrgName = ({entityName}: {entityName: string}) => {
         });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [skip]
   );
   if (!orgName) {
     return {loading: true, orgName: ''};

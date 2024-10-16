@@ -46,6 +46,7 @@ export const Checkbox = ({
           'rounded border-[1.5px]  dark:border-moon-250',
           'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
           checked ? 'border-moon-800' : 'border-moon-500',
+          props.disabled && 'opacity-30',
           {
             'h-14 w-14': isSmall,
             'h-18 w-18': isMedium,

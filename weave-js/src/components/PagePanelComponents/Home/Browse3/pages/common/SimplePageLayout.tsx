@@ -1,15 +1,9 @@
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import {Box, ListItemText, MenuList, SxProps, Theme} from '@mui/material';
-// import {Menu} from '@mui/base/Menu';
-import IconButton from '@mui/material/IconButton';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
+import {Box, SxProps, Theme} from '@mui/material';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import _ from 'lodash';
 import React, {
   createContext,
   FC,
-  MouseEvent,
   ReactNode,
   useContext,
   useEffect,
@@ -34,10 +28,6 @@ export const SimplePageLayout: FC<{
   tabs: Array<{
     label: string;
     content: ReactNode;
-  }>;
-  menuItems?: Array<{
-    label: string;
-    onClick: () => void;
   }>;
   leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
@@ -77,8 +67,8 @@ export const SimplePageLayout: FC<{
           zIndex: 1,
           backgroundColor: 'white',
           pb: 0,
-          height: 55, // manual to match sidebar
-
+          height: 44,
+          width: '100%',
           borderBottom: '1px solid #e0e0e0',
           display: 'flex',
           flexDirection: 'row',
@@ -88,11 +78,11 @@ export const SimplePageLayout: FC<{
         }}>
         <Box
           sx={{
-            height: 55, // manual to match sidebar
-            flex: '0 0 55px',
+            height: 44,
+            flex: '1 0 44px',
             display: 'flex',
             flexDirection: 'row',
-            alignItems: 'flex-end',
+            alignItems: 'center',
             gap: 1,
             pl: 2,
             pr: 2,
@@ -100,21 +90,14 @@ export const SimplePageLayout: FC<{
           {simplePageLayoutContextValue.headerPrefix}
           <Box
             sx={{
-              pb: 2,
               fontWeight: 600,
-              fontSize: '1.5rem',
+              fontSize: '1.25rem',
               flex: '1 1 auto',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}>
             {props.title}
-          </Box>
-          <Box
-            sx={{
-              flex: '0 0 auto',
-            }}>
-            {props.menuItems && <ActionMenu menuItems={props.menuItems} />}
           </Box>
           {simplePageLayoutContextValue.headerSuffix}
         </Box>
@@ -176,14 +159,10 @@ export const SimplePageLayout: FC<{
 };
 
 export const SimplePageLayoutWithHeader: FC<{
-  title?: string;
+  title?: ReactNode;
   tabs: Array<{
     label: string;
     content: ReactNode;
-  }>;
-  menuItems?: Array<{
-    label: string;
-    onClick: () => void;
   }>;
   headerExtra?: ReactNode;
   headerContent: ReactNode;
@@ -219,11 +198,12 @@ export const SimplePageLayoutWithHeader: FC<{
       }}>
       <Box
         sx={{
-          height: 55, // manual to match sidebar
-          flex: '0 0 55px',
+          height: 44,
+          width: '100%',
+          flex: '0 0 44px',
           display: 'flex',
           flexDirection: 'row',
-          alignItems: 'flex-end',
+          alignItems: 'center',
           pl: 2,
           pr: 2,
           // merge line
@@ -238,21 +218,14 @@ export const SimplePageLayoutWithHeader: FC<{
         {simplePageLayoutContextValue.headerPrefix}
         <Box
           sx={{
-            pb: 2,
             fontWeight: 600,
-            fontSize: '1.5rem',
+            fontSize: '1.25rem',
             flex: '1 1 auto',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
           }}>
           {props.title}
-        </Box>
-        <Box
-          sx={{
-            flex: '0 0 auto',
-          }}>
-          {props.menuItems && <ActionMenu menuItems={props.menuItems} />}
         </Box>
         {props.headerExtra}
         {simplePageLayoutContextValue.headerSuffix}
@@ -279,20 +252,23 @@ export const SimplePageLayoutWithHeader: FC<{
                   flex: '0 0 auto',
                   width: '100%',
                   overflow: 'auto',
-                  borderBottom: '1px solid #e0e0e0',
-                  p: 1,
+                  pt: 1,
+                  px: 2,
                   alignContent: 'center',
                 }}>
                 {props.headerContent}
               </Box>
               {(!props.hideTabsIfSingle || tabs.length > 1) && (
                 <Tabs.Root
-                  style={{margin: '12px 8px 0 8px'}}
+                  style={{margin: '12px 16px 0 16px'}}
                   value={tabs[tabValue].label}
                   onValueChange={handleTabChange}>
                   <Tabs.List>
                     {tabs.map(tab => (
-                      <Tabs.Trigger key={tab.label} value={tab.label}>
+                      <Tabs.Trigger
+                        key={tab.label}
+                        value={tab.label}
+                        className="h-[30px] text-sm">
                         {tab.label}
                       </Tabs.Trigger>
                     ))}
@@ -312,56 +288,6 @@ export const SimplePageLayoutWithHeader: FC<{
           }
         />
       </div>
-    </Box>
-  );
-};
-
-const ActionMenu: FC<{
-  menuItems: Array<{
-    label: string;
-    onClick: () => void;
-  }>;
-}> = props => {
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const open = Boolean(anchorEl);
-  const handleClick = (event: MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
-
-  return (
-    <Box
-      sx={{
-        height: '41px',
-        flex: '0 0 auto',
-      }}>
-      <IconButton
-        aria-label="more"
-        id="long-button"
-        aria-controls={open ? 'long-menu' : undefined}
-        aria-expanded={open ? 'true' : undefined}
-        aria-haspopup="true"
-        onClick={handleClick}>
-        <MoreVertIcon />
-      </IconButton>
-      <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
-        <Box sx={{width: 320, maxWidth: '100%'}}>
-          <MenuList>
-            {props.menuItems.map((item, i) => (
-              <MenuItem
-                key={i}
-                onClick={() => {
-                  handleClose();
-                  item.onClick();
-                }}>
-                <ListItemText>{item.label}</ListItemText>
-              </MenuItem>
-            ))}
-          </MenuList>
-        </Box>
-      </Menu>
     </Box>
   );
 };

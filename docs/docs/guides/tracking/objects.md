@@ -1,8 +1,3 @@
----
-sidebar_position: 0
-hide_table_of_contents: true
----
-
 # Objects
 
 Weave's serialization layer saves and versions Python objects.

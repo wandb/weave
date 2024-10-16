@@ -1,0 +1,198 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "system", "content": "You are a function calling
+      LLM that uses the data extracted from the get_game_score function to answer
+      questions around NBA game scores. Include the team and their opponent in your
+      response."}, {"role": "user", "content": "What was the score of the Warriors
+      game?"}], "model": "llama3-70b-8192", "max_tokens": 4096, "seed": 42, "tool_choice":
+      "auto", "tools": [{"type": "function", "function": {"name": "get_game_score",
+      "description": "Get the score for a given NBA game", "parameters": {"type":
+      "object", "properties": {"team_name": {"type": "string", "description": "The
+      name of the NBA team (e.g. ''Golden State Warriors'')"}}, "required": ["team_name"]}}}]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '705'
+      content-type:
+      - application/json
+      host:
+      - api.groq.com
+      user-agent:
+      - Groq/Python 0.9.0
+      x-stainless-arch:
+      - x64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - Linux
+      x-stainless-package-version:
+      - 0.9.0
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.10.12
+    method: POST
+    uri: https://api.groq.com/openai/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA1SRS27cMBBE9zmF0WvKEPUd8QI5QBZeeAyiRbU0tPkbkhN4IOjugYyxkuyI6npg
+        dfUKegIB6oJZ2WCKmnfDPGFTqLYbi6ZtmwL5qSsmUuM4zTNOhMDAj++k8gN8Vt4GQ1l7BwxUJMw0
+        geB9xXnL21PPwPqJDAgwBi3WRV+OxYkP1W6/eK0ogXhdQbuJPkGUDCylhAuBWCF6QyAAU9Ipo8vA
+        IHtvpEJjHtjXBmiMHNRV7fN72JH55tQj1PEUKzi0+3ShLBe0JJPykYABxuVmyeUEAtYzZEIrd+8Z
+        xBl+ejORe/qVMdPTC8aofUxn2GDb3jYGxi8h+jGBcDdjGMza6XSRkTDtn/6beHtjcPteLkRvQ5bZ
+        f5BLIIa+Zoem95jlM+dD2/Q1rxn87fkgmv5/+RtqmvJUtntVGc3h5mVVHtrDWnV1V/UnXm8M0j1l
+        snLWbqEYonb7iecg+7bGBknNHTD4lEv01z39V/GRrrLk79Udq/LiqK1+h7Kuh8GFKlwb2LYffwAA
+        AP//AwBxtTTpZAIAAA==
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 8a43c6093bde84aa-BOM
+      Cache-Control:
+      - private, max-age=0, no-store, no-cache, must-revalidate
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 16 Jul 2024 17:39:47 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=yz5IG9JPD.AiK249AT9C4_kZqcQHKlNiOEG9UdLG.s4-1721151587-1.0.1.1-mwReAzw6mhogiMdyzmYxqTPskMlt8n6UifiDN9NrcxMUOBFoI_j15RCzDPUY7jTFYlgPtJ57tsRSwsKhLQrLsA;
+        path=/; expires=Tue, 16-Jul-24 18:09:47 GMT; domain=.groq.com; HttpOnly; Secure;
+        SameSite=None
+      Transfer-Encoding:
+      - chunked
+      alt-svc:
+      - h3=":443"; ma=86400
+      vary:
+      - Origin
+      via:
+      - 1.1 google
+      x-ratelimit-limit-requests:
+      - '50000'
+      x-ratelimit-limit-tokens:
+      - '30000'
+      x-ratelimit-remaining-requests:
+      - '49999'
+      x-ratelimit-remaining-tokens:
+      - '29933'
+      x-ratelimit-reset-requests:
+      - 1.728s
+      x-ratelimit-reset-tokens:
+      - 134ms
+      x-request-id:
+      - req_01j2ya20hne52vp03399np2pq4
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "system", "content": "You are a function calling
+      LLM that uses the data extracted from the get_game_score function to answer
+      questions around NBA game scores. Include the team and their opponent in your
+      response."}, {"role": "user", "content": "What was the score of the Warriors
+      game?"}, {"role": "assistant", "tool_calls": [{"id": "call_9cqc", "function":
+      {"arguments": "{\"team_name\":\"Golden State Warriors\"}", "name": "get_game_score"},
+      "type": "function"}]}, {"tool_call_id": "call_9cqc", "role": "tool", "name":
+      "get_game_score", "content": "{\"game_id\": \"401585601\", \"status\": \"Final\",
+      \"home_team\": \"Los Angeles Lakers\", \"home_team_score\": 121, \"away_team\":
+      \"Golden State Warriors\", \"away_team_score\": 128}"}], "model": "llama3-70b-8192",
+      "seed": 42}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '802'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=yz5IG9JPD.AiK249AT9C4_kZqcQHKlNiOEG9UdLG.s4-1721151587-1.0.1.1-mwReAzw6mhogiMdyzmYxqTPskMlt8n6UifiDN9NrcxMUOBFoI_j15RCzDPUY7jTFYlgPtJ57tsRSwsKhLQrLsA
+      host:
+      - api.groq.com
+      user-agent:
+      - Groq/Python 0.9.0
+      x-stainless-arch:
+      - x64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - Linux
+      x-stainless-package-version:
+      - 0.9.0
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.10.12
+    method: POST
+    uri: https://api.groq.com/openai/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA1SSMY/cIBCF+/wKNDVeGdbYQJcqzXWJlCKKLGyPbXYxcMApt1r5v0deZe+U9s18
+        em+e5g52Ag3jasq4RVe1su1aqeYKZ9NWDXamUvVwrjhv8DwPchxECxTCcMGx/ANPY9iiw2KDBwpj
+        QlNwAs06zphgQnYUtjChAw3Omc2cq64eKskUP9bXYEfMoH/dwfoJ30HXFDbM2SwI+g4pOAQNJmeb
+        i/HlYIIv6A/7HyuSb8FN6Mn3YgqSnyYlG1Im0ZkbTsQsxvpcSFmRvIRMvvoFHWbyYq6YMjF+In+C
+        f4wXsyFhXFaMsxPsFFxYYgpDBu3fnKMwW2/z2ic0OXjQkEuIsP+m8PbMGlPYYulLuKLPRwMd/dDs
+        hqDrU81V3UguxXHGs7YPgtf/y09IKCEYazsKJRTjPh3Up/TclVIo1Qi+U8i3XHDrZ+sXTDHZR2dz
+        7Pl8rod6EB0DCu/9ksLrEf/xCglf+5pd+M1w1ohZLEqVSxlWNl/i9Qb7/uUvAAAA//8DAC5Bzyw0
+        AgAA
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 8a43c60cdda284aa-BOM
+      Cache-Control:
+      - private, max-age=0, no-store, no-cache, must-revalidate
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 16 Jul 2024 17:39:47 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      alt-svc:
+      - h3=":443"; ma=86400
+      vary:
+      - Origin
+      via:
+      - 1.1 google
+      x-ratelimit-limit-requests:
+      - '50000'
+      x-ratelimit-limit-tokens:
+      - '30000'
+      x-ratelimit-remaining-requests:
+      - '49998'
+      x-ratelimit-remaining-tokens:
+      - '29007'
+      x-ratelimit-reset-requests:
+      - 2.862s
+      x-ratelimit-reset-tokens:
+      - 1.986s
+      x-request-id:
+      - req_01j2ya2145f5g99tjtbh1fjpky
+    status:
+      code: 200
+      message: OK
+version: 1

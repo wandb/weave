@@ -1,8 +1,3 @@
----
-sidebar_position: 1
-hide_table_of_contents: true
----
-
 # Cohere
 
 Weave automatically tracks and logs LLM calls made via the [Cohere Python library](https://github.com/cohere-ai/cohere-python) after `weave.init()` is called.

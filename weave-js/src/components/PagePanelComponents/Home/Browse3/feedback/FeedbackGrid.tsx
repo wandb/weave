@@ -1,11 +1,15 @@
 import {Box} from '@mui/material';
 import _ from 'lodash';
-import React from 'react';
+import React, {useEffect} from 'react';
 
+import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
+import {TargetBlank} from '../../../../../common/util/links';
 import {Alert} from '../../../../Alert';
 import {Loading} from '../../../../Loading';
 import {Tailwind} from '../../../../Tailwind';
+import {Empty} from '../pages/common/Empty';
 import {useWFHooks} from '../pages/wfReactInterface/context';
+import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
 import {FeedbackGridInner} from './FeedbackGridInner';
 
 type FeedbackGridProps = {
@@ -21,6 +25,8 @@ export const FeedbackGrid = ({
   weaveRef,
   objectType,
 }: FeedbackGridProps) => {
+  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+
   const {useFeedback} = useWFHooks();
   const query = useFeedback({
     entity,
@@ -28,7 +34,13 @@ export const FeedbackGrid = ({
     weaveRef,
   });
 
-  if (query.loading) {
+  const getTsClient = useGetTraceServerClientContext();
+  useEffect(() => {
+    return getTsClient().registerOnFeedbackListener(weaveRef, query.refetch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (query.loading || loadingUserInfo) {
     return (
       <Box
         sx={{
@@ -50,11 +62,22 @@ export const FeedbackGrid = ({
   }
 
   if (!query.result || !query.result.length) {
-    const obj = objectType ?? 'object';
     return (
-      <div className="m-16 flex flex-col gap-8">
-        <Alert>No feedback added to this {obj}.</Alert>
-      </div>
+      <Empty
+        size="small"
+        icon="add-reaction"
+        heading="No feedback yet"
+        description="You can provide feedback directly within the Weave UI or through the API."
+        moreInformation={
+          <>
+            Learn how to{' '}
+            <TargetBlank href="http://wandb.me/weave_feedback">
+              add feedback
+            </TargetBlank>
+            .
+          </>
+        }
+      />
     );
   }
 
@@ -64,13 +87,17 @@ export const FeedbackGrid = ({
   );
   const paths = Object.keys(grouped).sort();
 
+  const currentViewerId = userInfo ? userInfo.id : null;
   return (
     <Tailwind>
       {paths.map(path => {
         return (
           <div key={path}>
             {path && <div className="text-sm text-moon-500">On {path}</div>}
-            <FeedbackGridInner feedback={grouped[path]} />
+            <FeedbackGridInner
+              feedback={grouped[path]}
+              currentViewerId={currentViewerId}
+            />
           </div>
         );
       })}

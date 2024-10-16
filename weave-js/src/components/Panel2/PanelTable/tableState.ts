@@ -131,7 +131,8 @@ export function emptyTable(): TableState {
 export function initTableWithPickColumns(
   inputArrayNode: Node,
   weave: WeaveInterface,
-  pickColumns?: string[]
+  pickColumns?: string[],
+  columnLimit: number | null = 100
 ) {
   const arrayType = inputArrayNode.type;
   let addCols: AddColumnEntries = [];
@@ -174,8 +175,7 @@ export function initTableWithPickColumns(
         listIndexWithStar,
       });
     }
-    const columns =
-      allColumns.length > 100 ? allColumns.slice(0, 100) : allColumns;
+    const columns = columnLimit ? allColumns.slice(0, columnLimit) : allColumns;
     if (columns.length === 0) {
       // If no columns are provided, at least fill it with a general row column.
       ts = addColumnToTable(ts, varNode(exNode.type, 'row')).table;

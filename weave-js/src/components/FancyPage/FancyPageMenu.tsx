@@ -34,6 +34,7 @@ export const FancyPageMenu = ({
     `@media (max-width:${MEDIUM_BREAKPOINT}px)`
   );
   const menuSide = isHorizontal ? 'bottom' : 'right';
+  const validMenuItems = menuItems.filter(Boolean);
 
   return (
     <DropdownMenu.Root open={isMenuOpen} onOpenChange={setIsMenuOpen}>
@@ -52,7 +53,7 @@ export const FancyPageMenu = ({
           align="end"
           side={menuSide}
           style={STYLE_MENU_CONTENT}>
-          {menuItems.map((menuItem, i) => {
+          {validMenuItems.map((menuItem, i) => {
             if (menuItem.type !== 'button') {
               return null;
             }

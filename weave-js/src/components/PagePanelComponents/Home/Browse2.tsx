@@ -8,7 +8,7 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
-import {LicenseInfo} from '@mui/x-license-pro';
+import {LicenseInfo} from '@mui/x-license';
 import React, {FC} from 'react';
 import {
   BrowserRouter as Router,
@@ -22,12 +22,11 @@ import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {Browse2ObjectPage} from './Browse2/Browse2ObjectPage';
 import {Browse2ObjectTypePage} from './Browse2/Browse2ObjectTypePage';
-import {Browse2ObjectVersionItemPage} from './Browse2/Browse2ObjectVersionItemPage';
 import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
 import {Browse2TracePage} from './Browse2/Browse2TracePage';
 import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
 LicenseInfo.setLicenseKey(
-  '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
+  'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
 );
 
 interface Browse2Params {
@@ -171,10 +170,6 @@ const Browse2Mounted: FC = props => {
           </Route>
           <Route path={`/:entity/:project/trace`}>
             <Browse2TracesPage />
-          </Route>
-          <Route
-            path={`/:entity/:project/:rootType/:objName/:objVersion/:refExtra*`}>
-            <Browse2ObjectVersionItemPage />
           </Route>
           <Route path={`/:entity/:project/:rootType/:objName`}>
             <Browse2ObjectPage />

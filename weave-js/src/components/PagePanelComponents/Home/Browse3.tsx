@@ -1,3 +1,4 @@
+import {ApolloProvider} from '@apollo/client';
 import {Home} from '@mui/icons-material';
 import {
   AppBar,
@@ -9,10 +10,15 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
-import {GridColumnVisibilityModel} from '@mui/x-data-grid-pro';
-import {LicenseInfo} from '@mui/x-license-pro';
-import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
-import {Loading} from '@wandb/weave/components/Loading';
+import {
+  GridColumnVisibilityModel,
+  GridFilterModel,
+  GridPaginationModel,
+  GridPinnedColumnFields,
+  GridSortModel,
+} from '@mui/x-data-grid-pro';
+import {LicenseInfo} from '@mui/x-license';
+import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
 import _ from 'lodash';
@@ -22,6 +28,8 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
+  useState,
 } from 'react';
 import useMousetrap from 'react-hook-mousetrap';
 import {
@@ -39,7 +47,6 @@ import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
-// import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
 import {
   baseContext,
   browse2Context,
@@ -53,10 +60,24 @@ import {
   WeaveflowPeekContext,
 } from './Browse3/context';
 import {FullPageButton} from './Browse3/FullPageButton';
+import {getValidFilterModel} from './Browse3/grid/filters';
+import {
+  DEFAULT_PAGE_SIZE,
+  getValidPaginationModel,
+} from './Browse3/grid/pagination';
+import {getValidPinModel, removeAlwaysLeft} from './Browse3/grid/pin';
+import {getValidSortModel} from './Browse3/grid/sort';
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
+import {
+  ALWAYS_PIN_LEFT_CALLS,
+  DEFAULT_COLUMN_VISIBILITY_CALLS,
+  DEFAULT_FILTER_CALLS,
+  DEFAULT_PIN_CALLS,
+  DEFAULT_SORT_CALLS,
+} from './Browse3/pages/CallsPage/CallsTable';
 import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
@@ -75,15 +96,14 @@ import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
 import {
-  useProjectHasTraceServerData,
   useWFHooks,
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
-import {SIDEBAR_WIDTH, useDrawerResize} from './useDrawerResize';
+import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
-  '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
+  'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
 );
 
 type Browse3Params = Partial<Browse3ProjectParams> &
@@ -145,6 +165,7 @@ const browse3Paths = (projectRoot: string) => [
 export const Browse3: FC<{
   hideHeader?: boolean;
   headerOffset?: number;
+  gorillaApolloEndpoint?: string;
   navigateAwayFromProject?: () => void;
   projectRoot(entityName: string, projectName: string): string;
 }> = props => {
@@ -156,23 +177,29 @@ export const Browse3: FC<{
   //     weaveContext.client.setPolling(previousPolling);
   //   };
   // }, [props.projectRoot, weaveContext]);
+  const apolloClient = useMemo(
+    () => makeGorillaApolloClient(props.gorillaApolloEndpoint),
+    [props.gorillaApolloEndpoint]
+  );
   return (
-    <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
-      <Switch>
-        <Route
-          path={[
-            ...browse3Paths(props.projectRoot(':entity', ':project')),
-            `/${URL_BROWSE3}/:entity`,
-            `/${URL_BROWSE3}`,
-          ]}>
-          <Browse3Mounted
-            hideHeader={props.hideHeader}
-            headerOffset={props.headerOffset}
-            navigateAwayFromProject={props.navigateAwayFromProject}
-          />
-        </Route>
-      </Switch>
-    </Browse3WeaveflowRouteContextProvider>
+    <ApolloProvider client={apolloClient}>
+      <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
+        <Switch>
+          <Route
+            path={[
+              ...browse3Paths(props.projectRoot(':entity', ':project')),
+              `/${URL_BROWSE3}/:entity`,
+              `/${URL_BROWSE3}`,
+            ]}>
+            <Browse3Mounted
+              hideHeader={props.hideHeader}
+              headerOffset={props.headerOffset}
+              navigateAwayFromProject={props.navigateAwayFromProject}
+            />
+          </Route>
+        </Switch>
+      </Browse3WeaveflowRouteContextProvider>
+    </ApolloProvider>
   );
 };
 
@@ -267,7 +294,7 @@ const Browse3Mounted: FC<{
 
 const MainPeekingLayout: FC = () => {
   const {baseRouter} = useWeaveflowRouteContext();
-  const params = useParams<Browse3Params>();
+  const params = useParamsDecoded<Browse3Params>();
   const baseRouterProjectRoot = baseRouter.projectUrl(':entity', ':project');
   const generalProjectRoot = browse2Context.projectUrl(':entity', ':project');
   const query = useURLSearchParamsDict();
@@ -278,9 +305,31 @@ const MainPeekingLayout: FC = () => {
   );
   const targetBase = baseRouter.projectUrl(params.entity!, params.project!);
   const isDrawerOpen = peekLocation != null;
-  const windowSize = useWindowSize();
 
-  const {handleMousedown, drawerWidthPct} = useDrawerResize();
+  const drawerRef = useRef<HTMLDivElement | null>(null);
+  const {handleMousedown, drawerWidthPx} = useDrawerResize(drawerRef);
+
+  // State to track whether the user is currently dragging the drawer resize handle
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Callback function to handle the end of dragging
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+    document.body.style.cursor = '';
+    window.removeEventListener('mouseup', handleDragEnd);
+  }, []);
+
+  // Callback function to handle the start of dragging
+  const handleDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      setIsDragging(true);
+      handleMousedown(e);
+      document.body.style.cursor = 'col-resize';
+      window.addEventListener('mouseup', handleDragEnd);
+    },
+    [handleDragEnd, handleMousedown]
+  );
+
   const closePeek = useClosePeek();
 
   useMousetrap('esc', closePeek);
@@ -304,16 +353,7 @@ const MainPeekingLayout: FC = () => {
             flex: '1 1 40%',
             overflow: 'hidden',
             display: 'flex',
-            // This transition is from the mui drawer component, to keep the main content animation in similar
-            transition: !isDrawerOpen
-              ? 'margin 225ms cubic-bezier(0, 0, 0.2, 1) 0ms'
-              : 'none',
-            marginRight: !isDrawerOpen
-              ? 0
-              : // subtract the sidebar width
-                `${
-                  (drawerWidthPct * (windowSize.width - SIDEBAR_WIDTH)) / 100
-                }px`,
+            marginRight: !isDrawerOpen ? 0 : `${drawerWidthPx}px`,
           }}>
           <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
         </Box>
@@ -324,30 +364,32 @@ const MainPeekingLayout: FC = () => {
           open={isDrawerOpen}
           onClose={closePeek}
           PaperProps={{
+            ref: drawerRef,
             style: {
               overflow: 'hidden',
               display: isDrawerOpen ? 'flex' : 'none',
               zIndex: 1,
-              width: `${drawerWidthPct}%`,
+              width: isDrawerOpen ? `${drawerWidthPx}px` : 0,
               height: '100%',
-              boxShadow: '0px 0px 40px 0px rgba(0, 0, 0, 0.16)',
-              borderLeft: 0,
+              borderLeft: '1px solid #e0e0e0',
               position: 'absolute',
+              pointerEvents: isDragging ? 'none' : 'auto',
             },
           }}
           ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
+            keepMounted: true,
           }}>
           <div
             id="dragger"
-            onMouseDown={handleMousedown}
+            onMouseDown={handleDragStart}
             style={{
               position: 'absolute',
-              inset: '0 auto 0 0',
-              zIndex: 2,
-              backgroundColor: 'transparent',
-              cursor: 'col-resize',
+              top: 0,
+              bottom: 0,
+              left: 0,
               width: '5px',
+              cursor: 'col-resize',
+              zIndex: 2,
             }}
           />
           {peekLocation && (
@@ -355,11 +397,7 @@ const MainPeekingLayout: FC = () => {
               <SimplePageLayoutContext.Provider
                 value={{
                   headerSuffix: (
-                    <Box
-                      sx={{
-                        height: '41px',
-                        flex: '0 0 auto',
-                      }}>
+                    <Box sx={{flex: '0 0 auto'}}>
                       <FullPageButton
                         query={query}
                         generalBase={generalBase}
@@ -389,25 +427,10 @@ const MainPeekingLayout: FC = () => {
 };
 
 const ProjectRedirect: FC = () => {
-  const {entity, project} = useParams<Browse3ProjectMountedParams>();
+  const {entity, project} = useParamsDecoded<Browse3ProjectMountedParams>();
   const {baseRouter} = useWeaveflowRouteContext();
-
-  const projectHasTraceServerData = useProjectHasTraceServerData(
-    entity,
-    project
-  );
-  if (projectHasTraceServerData.loading) {
-    return <Loading centered />;
-  }
-  // TODO: If we have no data, perhaps better to show a quickstart.
-  // const shouldRedirect = projectHasTraceServerData.result;
-  const shouldRedirect = true;
-  if (shouldRedirect) {
-    const url = baseRouter.tracesUIUrl(entity, project);
-    return <Redirect to={url} />;
-  }
-
-  return null;
+  const url = baseRouter.tracesUIUrl(entity, project);
+  return <Redirect to={url} />;
 };
 
 const Browse3ProjectRoot: FC<{
@@ -495,7 +518,7 @@ const Browse3ProjectRoot: FC<{
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const ObjectVersionRoutePageBinding = () => {
-  const params = useParams<Browse3TabItemVersionParams>();
+  const params = useParamsDecoded<Browse3TabItemVersionParams>();
   const query = useURLSearchParamsDict();
 
   const history = useHistory();
@@ -536,7 +559,7 @@ const ObjectVersionRoutePageBinding = () => {
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const OpVersionRoutePageBinding = () => {
-  const params = useParams<Browse3TabItemVersionParams>();
+  const params = useParamsDecoded<Browse3TabItemVersionParams>();
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
   useEffect(() => {
@@ -571,7 +594,7 @@ const useCallPeekRedirect = () => {
   // This is a "hack" since the client doesn't have all the info
   // needed to make a correct peek URL. This allows the client to request
   // such a view and we can redirect to the correct URL.
-  const params = useParams<Browse3TabItemParams>();
+  const params = useParamsDecoded<Browse3TabItemParams>();
   const {baseRouter} = useWeaveflowRouteContext();
   const history = useHistory();
   const {useCall} = useWFHooks();
@@ -616,10 +639,23 @@ const useCallPeekRedirect = () => {
   ]);
 };
 
+const useParamsDecoded = <T extends object>() => {
+  // Handle the case where entity/project (old) have spaces
+  const params = useParams<T>();
+  return useMemo(() => {
+    return Object.fromEntries(
+      Object.entries(params).map(([key, value]) => [
+        key,
+        decodeURIComponent(value),
+      ])
+    );
+  }, [params]);
+};
+
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const CallPageBinding = () => {
   useCallPeekRedirect();
-  const params = useParams<Browse3TabItemParams>();
+  const params = useParamsDecoded<Browse3TabItemParams>();
   const query = useURLSearchParamsDict();
 
   return (
@@ -634,9 +670,9 @@ const CallPageBinding = () => {
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const CallsPageBinding = () => {
-  const {entity, project, tab} = useParams<Browse3TabParams>();
+  const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
-  const filters = useMemo(() => {
+  const initialFilter = useMemo(() => {
     if (tab === 'evaluations') {
       return {
         frozen: true,
@@ -674,7 +710,7 @@ const CallsPageBinding = () => {
     try {
       return JSON.parse(query.cols);
     } catch (e) {
-      return {};
+      return DEFAULT_COLUMN_VISIBILITY_CALLS;
     }
   }, [query.cols]);
   const setColumnVisibilityModel = (newModel: GridColumnVisibilityModel) => {
@@ -683,21 +719,91 @@ const CallsPageBinding = () => {
     history.push({search: newQuery.toString()});
   };
 
+  const pinModel = useMemo(
+    () => getValidPinModel(query.pin, DEFAULT_PIN_CALLS, ALWAYS_PIN_LEFT_CALLS),
+    [query.pin]
+  );
+  const setPinModel = (newModel: GridPinnedColumnFields) => {
+    const newQuery = new URLSearchParams(location.search);
+    newQuery.set(
+      'pin',
+      JSON.stringify(removeAlwaysLeft(newModel, ALWAYS_PIN_LEFT_CALLS))
+    );
+    history.push({search: newQuery.toString()});
+  };
+
+  const filterModel = useMemo(
+    () => getValidFilterModel(query.filters, DEFAULT_FILTER_CALLS),
+    [query.filters]
+  );
+  const setFilterModel = (newModel: GridFilterModel) => {
+    const newQuery = new URLSearchParams(location.search);
+    if (newModel.items.length === 0) {
+      newQuery.delete('filters');
+    } else {
+      newQuery.set('filters', JSON.stringify(newModel));
+    }
+    history.push({search: newQuery.toString()});
+  };
+
+  const sortModel = useMemo(
+    () => getValidSortModel(query.sort, DEFAULT_SORT_CALLS),
+    [query.sort]
+  );
+  const setSortModel = (newModel: GridSortModel) => {
+    const newQuery = new URLSearchParams(location.search);
+    if (newModel.length === 0) {
+      newQuery.delete('sort');
+    } else {
+      newQuery.set('sort', JSON.stringify(newModel));
+    }
+    history.push({search: newQuery.toString()});
+  };
+
+  const paginationModel = useMemo(
+    () => getValidPaginationModel(query.page, query.pageSize),
+    [query.page, query.pageSize]
+  );
+  const setPaginationModel = (newModel: GridPaginationModel) => {
+    const newQuery = new URLSearchParams(location.search);
+    const {page, pageSize} = newModel;
+    // TODO: If we change page size, should we reset page to 0?
+    if (page === 0) {
+      newQuery.delete('page');
+    } else {
+      newQuery.set('page', page.toString());
+    }
+    if (pageSize === DEFAULT_PAGE_SIZE) {
+      newQuery.delete('pageSize');
+    } else {
+      newQuery.set('pageSize', pageSize.toString());
+    }
+    history.push({search: newQuery.toString()});
+  };
+
   return (
     <CallsPage
       entity={entity}
       project={project}
-      initialFilter={filters}
+      initialFilter={initialFilter}
       onFilterUpdate={onFilterUpdate}
       columnVisibilityModel={columnVisibilityModel}
       setColumnVisibilityModel={setColumnVisibilityModel}
+      pinModel={pinModel}
+      setPinModel={setPinModel}
+      filterModel={filterModel}
+      setFilterModel={setFilterModel}
+      sortModel={sortModel}
+      setSortModel={setSortModel}
+      paginationModel={paginationModel}
+      setPaginationModel={setPaginationModel}
     />
   );
 };
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const ObjectVersionsPageBinding = () => {
-  const {entity, project, tab} = useParams<Browse3TabParams>();
+  const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
   const filters: WFHighLevelObjectVersionFilter = useMemo(() => {
     let queryFilter: WFHighLevelObjectVersionFilter = {};
@@ -743,7 +849,7 @@ const ObjectVersionsPageBinding = () => {
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const OpVersionsPageBinding = () => {
-  const params = useParams<Browse3TabParams>();
+  const params = useParamsDecoded<Browse3TabParams>();
 
   const query = useURLSearchParamsDict();
   const filters = useMemo(() => {
@@ -779,7 +885,7 @@ const OpVersionsPageBinding = () => {
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const BoardPageBinding = () => {
-  const params = useParams<Browse3TabItemVersionParams>();
+  const params = useParamsDecoded<Browse3TabItemVersionParams>();
 
   return (
     <BoardPage
@@ -793,7 +899,7 @@ const BoardPageBinding = () => {
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const ObjectPageBinding = () => {
-  const params = useParams<Browse3TabItemVersionParams>();
+  const params = useParamsDecoded<Browse3TabItemVersionParams>();
   return (
     <ObjectPage
       entity={params.entity}
@@ -804,7 +910,7 @@ const ObjectPageBinding = () => {
 };
 
 const OpPageBinding = () => {
-  const params = useParams<Browse3TabItemVersionParams>();
+  const params = useParamsDecoded<Browse3TabItemVersionParams>();
   return (
     <OpPage
       entity={params.entity}
@@ -815,34 +921,72 @@ const OpPageBinding = () => {
 };
 
 const CompareEvaluationsBinding = () => {
-  const {entity, project} = useParams<Browse3TabParams>();
+  const history = useHistory();
+  const routerContext = useWeaveflowCurrentRouteContext();
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
   const evaluationCallIds = useMemo(() => {
     return JSON.parse(query.evaluationCallIds);
   }, [query.evaluationCallIds]);
+  const selectedMetrics: Record<string, boolean> | null = useMemo(() => {
+    try {
+      return JSON.parse(query.metrics);
+    } catch (e) {
+      return null;
+    }
+  }, [query.metrics]);
+  const onEvaluationCallIdsUpdate = useCallback(
+    (newEvaluationCallIds: string[]) => {
+      history.push(
+        routerContext.compareEvaluationsUri(
+          entity,
+          project,
+          newEvaluationCallIds,
+          selectedMetrics
+        )
+      );
+    },
+    [history, entity, project, routerContext, selectedMetrics]
+  );
+  const setSelectedMetrics = useCallback(
+    (newModel: Record<string, boolean>) => {
+      history.push(
+        routerContext.compareEvaluationsUri(
+          entity,
+          project,
+          evaluationCallIds,
+          newModel
+        )
+      );
+    },
+    [history, entity, project, routerContext, evaluationCallIds]
+  );
   return (
     <CompareEvaluationsPage
       entity={entity}
       project={project}
       evaluationCallIds={evaluationCallIds}
+      onEvaluationCallIdsUpdate={onEvaluationCallIdsUpdate}
+      selectedMetrics={selectedMetrics}
+      setSelectedMetrics={setSelectedMetrics}
     />
   );
 };
 
 const OpsPageBinding = () => {
-  const params = useParams<Browse3TabItemParams>();
+  const params = useParamsDecoded<Browse3TabItemParams>();
 
   return <OpsPage entity={params.entity} project={params.project} />;
 };
 
 const BoardsPageBinding = () => {
-  const params = useParams<Browse3TabItemParams>();
+  const params = useParamsDecoded<Browse3TabItemParams>();
 
   return <BoardsPage entity={params.entity} project={params.project} />;
 };
 
 const TablesPageBinding = () => {
-  const params = useParams<Browse3TabItemParams>();
+  const params = useParamsDecoded<Browse3TabItemParams>();
 
   return <TablesPage entity={params.entity} project={params.project} />;
 };
@@ -862,7 +1006,7 @@ const AppBarLink = (props: ComponentProps<typeof RouterLink>) => (
 );
 
 const Browse3Breadcrumbs: FC = props => {
-  const params = useParams<Browse3Params>();
+  const params = useParamsDecoded<Browse3Params>();
   const query = useURLSearchParamsDict();
   const filePathParts = query.path?.split('/') ?? [];
   const refFields = query.extra?.split('/') ?? [];

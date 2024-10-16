@@ -9,9 +9,11 @@ import {ReactComponent as ImportArtifactTypeAlt} from '../../assets/icons/icon-a
 import {ReactComponent as ImportAudioVolume} from '../../assets/icons/icon-audio-volume.svg';
 import {ReactComponent as ImportAutomationRobotArm} from '../../assets/icons/icon-automation-robot-arm.svg';
 import {ReactComponent as ImportBack} from '../../assets/icons/icon-back.svg';
+import {ReactComponent as ImportBaselineAlt} from '../../assets/icons/icon-baseline-alt.svg';
 import {ReactComponent as ImportBellNotifications} from '../../assets/icons/icon-bell-notifications.svg';
 import {ReactComponent as ImportBenchmarkSquare} from '../../assets/icons/icon-benchmark-square.svg';
 import {ReactComponent as ImportBlogReport} from '../../assets/icons/icon-blog-report.svg';
+import {ReactComponent as ImportBokeh} from '../../assets/icons/icon-bokeh.svg';
 import {ReactComponent as ImportBookDictionary} from '../../assets/icons/icon-book-dictionary.svg';
 import {ReactComponent as ImportBoolean} from '../../assets/icons/icon-boolean.svg';
 import {ReactComponent as ImportBoxPlot} from '../../assets/icons/icon-box-plot.svg';
@@ -41,6 +43,9 @@ import {ReactComponent as ImportContentWide} from '../../assets/icons/icon-conte
 import {ReactComponent as ImportContractLeft} from '../../assets/icons/icon-contract-left.svg';
 import {ReactComponent as ImportCopy} from '../../assets/icons/icon-copy.svg';
 import {ReactComponent as ImportCreditCardPayment} from '../../assets/icons/icon-credit-card-payment.svg';
+import {ReactComponent as ImportCropBeginning} from '../../assets/icons/icon-crop-beginning.svg';
+import {ReactComponent as ImportCropEnd} from '../../assets/icons/icon-crop-end.svg';
+import {ReactComponent as ImportCropMiddle} from '../../assets/icons/icon-crop-middle.svg';
 import {ReactComponent as ImportCross} from '../../assets/icons/icon-cross.svg';
 import {ReactComponent as ImportCrownPro} from '../../assets/icons/icon-crown-pro.svg';
 import {ReactComponent as ImportCubeContainer} from '../../assets/icons/icon-cube-container.svg';
@@ -55,6 +60,7 @@ import {ReactComponent as ImportDocument} from '../../assets/icons/icon-document
 import {ReactComponent as ImportDocumentation} from '../../assets/icons/icon-documentation.svg';
 import {ReactComponent as ImportDownload} from '../../assets/icons/icon-download.svg';
 import {ReactComponent as ImportDraft} from '../../assets/icons/icon-draft.svg';
+import {ReactComponent as ImportDragGripHorizontal} from '../../assets/icons/icon-drag-grip-horizontal.svg';
 import {ReactComponent as ImportEducationAcademic} from '../../assets/icons/icon-education-academic.svg';
 import {ReactComponent as ImportEmailAt} from '../../assets/icons/icon-email-at.svg';
 import {ReactComponent as ImportEmailEnvelope} from '../../assets/icons/icon-email-envelope.svg';
@@ -118,11 +124,14 @@ import {ReactComponent as ImportLogOut} from '../../assets/icons/icon-log-out.sv
 import {ReactComponent as ImportLogoColab} from '../../assets/icons/icon-logo-colab.svg';
 import {ReactComponent as ImportMagicWandStar} from '../../assets/icons/icon-magic-wand-star.svg';
 import {ReactComponent as ImportMagicWandStick} from '../../assets/icons/icon-magic-wand-stick.svg';
+import {ReactComponent as ImportMarkdown} from '../../assets/icons/icon-markdown.svg';
 import {ReactComponent as ImportMenu} from '../../assets/icons/icon-menu.svg';
 import {ReactComponent as ImportMicrophoneAudio} from '../../assets/icons/icon-microphone-audio.svg';
+import {ReactComponent as ImportMillerColumns} from '../../assets/icons/icon-miller-columns.svg';
 import {ReactComponent as ImportMinimizeMode} from '../../assets/icons/icon-minimize-mode.svg';
 import {ReactComponent as ImportModel} from '../../assets/icons/icon-model.svg';
 import {ReactComponent as ImportModelOnDark} from '../../assets/icons/icon-model-on-dark.svg';
+import {ReactComponent as ImportMolecule} from '../../assets/icons/icon-molecule.svg';
 import {ReactComponent as ImportMusicAudio} from '../../assets/icons/icon-music-audio.svg';
 import {ReactComponent as ImportNumber} from '../../assets/icons/icon-number.svg';
 import {ReactComponent as ImportOpenNewTab} from '../../assets/icons/icon-open-new-tab.svg';
@@ -135,6 +144,7 @@ import {ReactComponent as ImportPanTool1} from '../../assets/icons/icon-pan-tool
 import {ReactComponent as ImportPanel} from '../../assets/icons/icon-panel.svg';
 import {ReactComponent as ImportPanelAutoGen} from '../../assets/icons/icon-panel-auto-gen.svg';
 import {ReactComponent as ImportPanelManual} from '../../assets/icons/icon-panel-manual.svg';
+import {ReactComponent as ImportParallelCoordinates} from '../../assets/icons/icon-parallel-coordinates.svg';
 import {ReactComponent as ImportParentBackUp} from '../../assets/icons/icon-parent-back-up.svg';
 import {ReactComponent as ImportPause} from '../../assets/icons/icon-pause.svg';
 import {ReactComponent as ImportPaused} from '../../assets/icons/icon-paused.svg';
@@ -142,6 +152,7 @@ import {ReactComponent as ImportPencilEdit} from '../../assets/icons/icon-pencil
 import {ReactComponent as ImportPhoto} from '../../assets/icons/icon-photo.svg';
 import {ReactComponent as ImportPin} from '../../assets/icons/icon-pin.svg';
 import {ReactComponent as ImportPlay} from '../../assets/icons/icon-play.svg';
+import {ReactComponent as ImportPlotly} from '../../assets/icons/icon-plotly.svg';
 import {ReactComponent as ImportPriorityCritical} from '../../assets/icons/icon-priority-critical.svg';
 import {ReactComponent as ImportPriorityHigh} from '../../assets/icons/icon-priority-high.svg';
 import {ReactComponent as ImportPriorityLow} from '../../assets/icons/icon-priority-low.svg';
@@ -215,6 +226,8 @@ import {ReactComponent as ImportTriggerAlt} from '../../assets/icons/icon-trigge
 import {ReactComponent as ImportTwitter} from '../../assets/icons/icon-twitter.svg';
 import {ReactComponent as ImportTypeBoolean} from '../../assets/icons/icon-type-boolean.svg';
 import {ReactComponent as ImportTypeNumber} from '../../assets/icons/icon-type-number.svg';
+import {ReactComponent as ImportTypeNumberAlt} from '../../assets/icons/icon-type-number-alt.svg';
+import {ReactComponent as ImportTypeStringAlt} from '../../assets/icons/icon-type-string-alt.svg';
 import {ReactComponent as ImportTypeStringQuote} from '../../assets/icons/icon-type-string-quote.svg';
 import {ReactComponent as ImportUndeterminateVisibility} from '../../assets/icons/icon-undeterminate-visibility.svg';
 import {ReactComponent as ImportUndo} from '../../assets/icons/icon-undo.svg';
@@ -277,6 +290,9 @@ export const IconAutomationRobotArm = (props: SVGIconProps) => (
 export const IconBack = (props: SVGIconProps) => (
   <ImportBack {...updateIconProps(props)} />
 );
+export const IconBaselineAlt = (props: SVGIconProps) => (
+  <ImportBaselineAlt {...updateIconProps(props)} />
+);
 export const IconBellNotifications = (props: SVGIconProps) => (
   <ImportBellNotifications {...updateIconProps(props)} />
 );
@@ -285,6 +301,9 @@ export const IconBenchmarkSquare = (props: SVGIconProps) => (
 );
 export const IconBlogReport = (props: SVGIconProps) => (
   <ImportBlogReport {...updateIconProps(props)} />
+);
+export const IconBokeh = (props: SVGIconProps) => (
+  <ImportBokeh {...updateIconProps(props)} />
 );
 export const IconBookDictionary = (props: SVGIconProps) => (
   <ImportBookDictionary {...updateIconProps(props)} />
@@ -373,6 +392,15 @@ export const IconCopy = (props: SVGIconProps) => (
 export const IconCreditCardPayment = (props: SVGIconProps) => (
   <ImportCreditCardPayment {...updateIconProps(props)} />
 );
+export const IconCropBeginning = (props: SVGIconProps) => (
+  <ImportCropBeginning {...updateIconProps(props)} />
+);
+export const IconCropEnd = (props: SVGIconProps) => (
+  <ImportCropEnd {...updateIconProps(props)} />
+);
+export const IconCropMiddle = (props: SVGIconProps) => (
+  <ImportCropMiddle {...updateIconProps(props)} />
+);
 export const IconCross = (props: SVGIconProps) => (
   <ImportCross {...updateIconProps(props)} />
 );
@@ -414,6 +442,9 @@ export const IconDownload = (props: SVGIconProps) => (
 );
 export const IconDraft = (props: SVGIconProps) => (
   <ImportDraft {...updateIconProps(props)} />
+);
+export const IconDragGripHorizontal = (props: SVGIconProps) => (
+  <ImportDragGripHorizontal {...updateIconProps(props)} />
 );
 export const IconEducationAcademic = (props: SVGIconProps) => (
   <ImportEducationAcademic {...updateIconProps(props)} />
@@ -604,11 +635,17 @@ export const IconMagicWandStar = (props: SVGIconProps) => (
 export const IconMagicWandStick = (props: SVGIconProps) => (
   <ImportMagicWandStick {...updateIconProps(props)} />
 );
+export const IconMarkdown = (props: SVGIconProps) => (
+  <ImportMarkdown {...updateIconProps(props)} />
+);
 export const IconMenu = (props: SVGIconProps) => (
   <ImportMenu {...updateIconProps(props)} />
 );
 export const IconMicrophoneAudio = (props: SVGIconProps) => (
   <ImportMicrophoneAudio {...updateIconProps(props)} />
+);
+export const IconMillerColumns = (props: SVGIconProps) => (
+  <ImportMillerColumns {...updateIconProps(props)} />
 );
 export const IconMinimizeMode = (props: SVGIconProps) => (
   <ImportMinimizeMode {...updateIconProps(props)} />
@@ -618,6 +655,9 @@ export const IconModel = (props: SVGIconProps) => (
 );
 export const IconModelOnDark = (props: SVGIconProps) => (
   <ImportModelOnDark {...updateIconProps(props)} />
+);
+export const IconMolecule = (props: SVGIconProps) => (
+  <ImportMolecule {...updateIconProps(props)} />
 );
 export const IconMusicAudio = (props: SVGIconProps) => (
   <ImportMusicAudio {...updateIconProps(props)} />
@@ -655,6 +695,9 @@ export const IconPanelAutoGen = (props: SVGIconProps) => (
 export const IconPanelManual = (props: SVGIconProps) => (
   <ImportPanelManual {...updateIconProps(props)} />
 );
+export const IconParallelCoordinates = (props: SVGIconProps) => (
+  <ImportParallelCoordinates {...updateIconProps(props)} />
+);
 export const IconParentBackUp = (props: SVGIconProps) => (
   <ImportParentBackUp {...updateIconProps(props)} />
 );
@@ -675,6 +718,9 @@ export const IconPin = (props: SVGIconProps) => (
 );
 export const IconPlay = (props: SVGIconProps) => (
   <ImportPlay {...updateIconProps(props)} />
+);
+export const IconPlotly = (props: SVGIconProps) => (
+  <ImportPlotly {...updateIconProps(props)} />
 );
 export const IconPriorityCritical = (props: SVGIconProps) => (
   <ImportPriorityCritical {...updateIconProps(props)} />
@@ -895,6 +941,12 @@ export const IconTypeBoolean = (props: SVGIconProps) => (
 export const IconTypeNumber = (props: SVGIconProps) => (
   <ImportTypeNumber {...updateIconProps(props)} />
 );
+export const IconTypeNumberAlt = (props: SVGIconProps) => (
+  <ImportTypeNumberAlt {...updateIconProps(props)} />
+);
+export const IconTypeStringAlt = (props: SVGIconProps) => (
+  <ImportTypeStringAlt {...updateIconProps(props)} />
+);
 export const IconTypeStringQuote = (props: SVGIconProps) => (
   <ImportTypeStringQuote {...updateIconProps(props)} />
 );
@@ -969,9 +1021,11 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'audio-volume': IconAudioVolume,
   'automation-robot-arm': IconAutomationRobotArm,
   back: IconBack,
+  'baseline-alt': IconBaselineAlt,
   'bell-notifications': IconBellNotifications,
   'benchmark-square': IconBenchmarkSquare,
   'blog-report': IconBlogReport,
+  bokeh: IconBokeh,
   'book-dictionary': IconBookDictionary,
   boolean: IconBoolean,
   'box-plot': IconBoxPlot,
@@ -1001,6 +1055,9 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'contract-left': IconContractLeft,
   copy: IconCopy,
   'credit-card-payment': IconCreditCardPayment,
+  'crop-beginning': IconCropBeginning,
+  'crop-end': IconCropEnd,
+  'crop-middle': IconCropMiddle,
   cross: IconCross,
   'crown-pro': IconCrownPro,
   'cube-container': IconCubeContainer,
@@ -1015,6 +1072,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   documentation: IconDocumentation,
   download: IconDownload,
   draft: IconDraft,
+  'drag-grip-horizontal': IconDragGripHorizontal,
   'education-academic': IconEducationAcademic,
   'email-at': IconEmailAt,
   'email-envelope': IconEmailEnvelope,
@@ -1078,11 +1136,14 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'logo-colab': IconLogoColab,
   'magic-wand-star': IconMagicWandStar,
   'magic-wand-stick': IconMagicWandStick,
+  markdown: IconMarkdown,
   menu: IconMenu,
   'microphone-audio': IconMicrophoneAudio,
+  'miller-columns': IconMillerColumns,
   'minimize-mode': IconMinimizeMode,
   model: IconModel,
   'model-on-dark': IconModelOnDark,
+  molecule: IconMolecule,
   'music-audio': IconMusicAudio,
   number: IconNumber,
   'open-new-tab': IconOpenNewTab,
@@ -1095,6 +1156,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   panel: IconPanel,
   'panel-auto-gen': IconPanelAutoGen,
   'panel-manual': IconPanelManual,
+  'parallel-coordinates': IconParallelCoordinates,
   'parent-back-up': IconParentBackUp,
   pause: IconPause,
   paused: IconPaused,
@@ -1102,6 +1164,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   photo: IconPhoto,
   pin: IconPin,
   play: IconPlay,
+  plotly: IconPlotly,
   'priority-critical': IconPriorityCritical,
   'priority-high': IconPriorityHigh,
   'priority-low': IconPriorityLow,
@@ -1175,6 +1238,8 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   twitter: IconTwitter,
   'type-boolean': IconTypeBoolean,
   'type-number': IconTypeNumber,
+  'type-number-alt': IconTypeNumberAlt,
+  'type-string-alt': IconTypeStringAlt,
   'type-string-quote': IconTypeStringQuote,
   'undeterminate-visibility': IconUndeterminateVisibility,
   undo: IconUndo,

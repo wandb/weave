@@ -7,9 +7,8 @@ from pydantic import BaseModel
 
 import weave
 from weave.flow.obj import Object
-from weave.legacy import box
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.op import Op
+from weave.trace.op import Op, as_op, is_op
 
 
 class Scorer(Object):
@@ -45,9 +44,13 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
     if not data:
         return {}
     data = [x for x in data if x is not None]
+
+    if not data:
+        return None
+
     val = data[0]
 
-    if isinstance(val, (bool, box.BoxedBool)):
+    if isinstance(val, bool):
         return {
             "true_count": (true_count := sum(1 for x in data if x)),
             "true_fraction": true_count / len(data),
@@ -56,8 +59,13 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
         return {"mean": np.mean(data).item()}
     elif isinstance(val, dict):
         result = {}
-        for k in val:
-            if (summary := auto_summarize([x[k] for x in data])) is not None:
+        all_keys = set().union(*[x.keys() for x in data if isinstance(x, dict)])
+        for k in all_keys:
+            if (
+                summary := auto_summarize(
+                    [x.get(k) for x in data if isinstance(x, dict)]
+                )
+            ) is not None:
                 if k in summary:
                     result.update(summary)
                 else:
@@ -75,7 +83,7 @@ def get_scorer_attributes(
 ) -> Tuple[str, Callable, Callable]:
     if weave_isinstance(scorer, Scorer):
         scorer_name = scorer.name
-        if scorer_name == None:
+        if scorer_name is None:
             scorer_name = scorer.__class__.__name__
         try:
             score_fn = scorer.score
@@ -85,7 +93,8 @@ def get_scorer_attributes(
                 f"Scorer {scorer_name} must implement score and summarize methods. Did you forget to wrap with @weave.op()?"
             )
     elif callable(scorer):
-        if isinstance(scorer, Op):
+        if is_op(scorer):
+            scorer = as_op(scorer)
             scorer_name = scorer.name
         else:
             scorer_name = scorer.__name__

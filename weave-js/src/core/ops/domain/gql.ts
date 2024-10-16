@@ -1118,6 +1118,18 @@ export const toGqlField = (
     return [gqlObjectField(forwardGraph, forwardOp, 'artifactType')];
   } else if (forwardOp.op.name === 'artifactVersion-isGenerated') {
     return gqlBasicField('isGenerated');
+  } else if (forwardOp.op.name === 'artifactVersion-isLinkedToGlobalRegistry') {
+    return gqlBasicField('isLinkedToGlobalRegistry');
+  } else if (forwardOp.op.name === 'artifactVersion-rawTags') {
+    return [
+      {
+        name: 'tags',
+        fields: gqlBasicField('id')
+          .concat(gqlBasicField('name'))
+          .concat(gqlBasicField('tagCategoryName'))
+          .concat(gqlBasicField('attributes')),
+      },
+    ];
   } else if (forwardOp.op.name === 'artifactVersion-artifactCollections') {
     return [
       {

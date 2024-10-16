@@ -22,17 +22,12 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v1
-        with:
-          node-version: "18.x"
-      - run: |
-          pip install build twine
-          ./build_dist.py
-          if [[ -n "$(git status weave/frontend/sha1.txt --porcelain)" ]]
-          then
-            echo "::error cannot publish release, commited SHA does not match build SHA"
-            exit 1
-          fi
+      - name: Install uv
+        run: |
+          pip install uv
+      - name: Build dist
+        run: |
+          uv build
       - name: upload test distribution
         uses: pypa/gh-action-pypi-publish@release/v1
         if: ${{ inputs.is_test }}

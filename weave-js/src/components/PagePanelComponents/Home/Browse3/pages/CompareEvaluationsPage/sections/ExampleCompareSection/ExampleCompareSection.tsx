@@ -2,7 +2,6 @@ import {Box, Tooltip} from '@material-ui/core';
 import {Circle, WarningAmberOutlined} from '@mui/icons-material';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef} from 'react';
-import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {
@@ -16,33 +15,31 @@ import {Button} from '../../../../../../../Button';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
-import {useWeaveflowRouteContext} from '../../../../context';
+import {isWeaveRef} from '../../../../filters/common';
+import {isCustomWeaveTypePayload} from '../../../../typeViews/customWeaveType.types';
+import {CustomWeaveTypeDispatcher} from '../../../../typeViews/CustomWeaveTypeDispatcher';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {CallLink} from '../../../common/Links';
-import {isRef} from '../../../common/util';
-import {TraceCallSchema} from '../../../wfReactInterface/traceServerClient';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
-import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from '../../ecpConstants';
-import {EvaluationComparisonState} from '../../ecpTypes';
 import {
-  adjustValueForDisplay,
-  dimensionId,
-  dimensionShouldMinimize,
-  dimensionUnit,
-  flattenedDimensionPath,
-} from '../../ecpUtil';
+  buildCompositeMetricsMap,
+  CompositeSummaryMetricGroupForKeyPath,
+  resolvePeerDimension,
+} from '../../compositeMetricsUtil';
+import {DERIVED_SCORER_REF_PLACEHOLDER} from '../../compositeMetricsUtil';
+import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from '../../ecpConstants';
+import {EvaluationComparisonState} from '../../ecpState';
+import {MetricDefinition, MetricValueType} from '../../ecpTypes';
+import {metricDefinitionId} from '../../ecpUtil';
+import {getMetricIds} from '../../ecpUtil';
+import {dimensionUnit, flattenedDimensionPath} from '../../ecpUtil';
+import {usePeekCall} from '../../hooks';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {
   ComparisonPill,
   SCORER_VARIATION_WARNING_EXPLANATION,
   SCORER_VARIATION_WARNING_TITLE,
 } from '../ScorecardSection/ScorecardSection';
-import {
-  buildCompositeComparisonSummaryMetrics,
-  CompositeSummaryMetric,
-  CompositeSummaryScoreGroup,
-  DERIVED_SCORER_REF,
-} from '../ScorecardSection/summaryMetricUtil';
 import {
   PivotedRow,
   useFilteredAggregateRows,
@@ -61,12 +58,14 @@ const PropKey = styled.div`
   text-align: right;
   scrollbar-width: none;
 `;
+PropKey.displayName = 'S.PropKey';
 
 const GridCell = styled.div<{
   colSpan?: number;
   rowSpan?: number;
   button?: boolean;
 }>`
+  font-size: 14px;
   border: 1px solid ${MOON_200};
   grid-column-end: span ${props => props.colSpan || 1};
   grid-row-end: span ${props => props.rowSpan || 1};
@@ -84,6 +83,7 @@ const GridCell = styled.div<{
     }
   `}
 `;
+GridCell.displayName = 'S.GridCell';
 
 const GridCellSubgrid = styled.div<{
   colSpan?: number;
@@ -100,6 +100,7 @@ const GridCellSubgrid = styled.div<{
   grid-template-columns: ${props => props.colsTemp || 'subgrid'};
   overflow: auto;
 `;
+GridCellSubgrid.displayName = 'S.GridCellSubgrid';
 
 const GridContainer = styled.div<{colsTemp: string; rowsTemp: string}>`
   display: grid;
@@ -107,6 +108,7 @@ const GridContainer = styled.div<{colsTemp: string; rowsTemp: string}>`
   grid-template-columns: ${props => props.colsTemp};
   grid-template-rows: ${props => props.rowsTemp};
 `;
+GridContainer.displayName = 'S.GridContainer';
 
 const centeredTextStyleMixin: React.CSSProperties = {
   display: 'flex',
@@ -219,23 +221,21 @@ export const ExampleCompareSection: React.FC<{
     [evalCallId: string]: number;
   }>({});
 
-  const history = useHistory();
-  const {peekingRouter} = useWeaveflowRouteContext();
-
-  const onScorerClick = useCallback(
-    (scorerCall: TraceCallSchema) => {
-      const [entityName, projectName] = scorerCall.project_id.split('/');
-      const callId = scorerCall.id;
-      const to = peekingRouter.callUIUrl(entityName, projectName, '', callId);
-      history.push(to);
-    },
-    [history, peekingRouter]
+  const onScorerClick = usePeekCall(
+    props.state.data.entity,
+    props.state.data.project
   );
 
   const {ref1, ref2} = useLinkHorizontalScroll();
-  const {compositeMetrics, resolvePeerDimension} = useMemo(
-    () => buildCompositeComparisonSummaryMetrics(props.state),
-    [props.state]
+
+  const compositeScoreMetrics = useMemo(
+    () =>
+      buildCompositeMetricsMap(
+        props.state.data,
+        'score',
+        props.state.selectedMetrics
+      ),
+    [props.state.data, props.state.selectedMetrics]
   );
 
   if (target == null) {
@@ -243,32 +243,36 @@ export const ExampleCompareSection: React.FC<{
   }
 
   // This section contains the primary helper variable for laying out the grid
-  const scorerGroupNames = Object.keys(compositeMetrics).filter(
-    k => k !== DERIVED_SCORER_REF
-  );
-
-  const derivedMetrics = Object.values(
-    props.state.data.derivedMetricDimensions
+  const metricGroupNames = Object.keys(compositeScoreMetrics).filter(
+    k => k !== DERIVED_SCORER_REF_PLACEHOLDER
   );
 
   const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
-  const numScorers = scorerGroupNames.length;
   const inputColumnKeys = Object.keys(target.input);
   const numInputProps = inputColumnKeys.length;
   const numOutputKeys = outputColumnKeys.length;
-  const numDerivedMetrics = derivedMetrics.length;
-  const numMetricsPerScorer = [
-    ...scorerGroupNames.map(groupName => {
-      return Object.keys(compositeMetrics[groupName].metrics).length;
-    }),
-    numDerivedMetrics,
-  ];
-  const totalMetrics = _.sum(numMetricsPerScorer);
+
   const numTrials = orderedCallIds.map(leafId => {
     return target.originalRows.filter(row => row.evaluationCallId === leafId)
       .length;
   });
   const numEvals = numTrials.length;
+  // Get derived scores, then filter out any not in the selected metrics
+  const derivedScores = Object.values(
+    getMetricIds(props.state.data, 'score', 'derived')
+  ).filter(
+    score => props.state.selectedMetrics?.[flattenedDimensionPath(score)]
+  );
+
+  const numMetricScorers = metricGroupNames.length;
+  const numDerivedScores = derivedScores.length;
+  const numMetricsPerScorer = [
+    ...metricGroupNames.map(groupName => {
+      return Object.keys(compositeScoreMetrics[groupName].metrics).length;
+    }),
+    numDerivedScores,
+  ];
+  const totalMetrics = _.sum(numMetricsPerScorer);
 
   // This section contains a bunch of helper functions used to lookup
   // data for the grid layout. Originally all this stuff was inlined
@@ -289,7 +293,7 @@ export const ExampleCompareSection: React.FC<{
   const BASELINE_EVAL_INDEX = 0;
 
   const lookupIsDerivedMetric = (scorerIndex: number): boolean => {
-    return scorerIndex === numScorers;
+    return scorerIndex === numMetricScorers;
   };
 
   const lookupTrialsForEval = (evalIndex: number): PivotedRow[] => {
@@ -311,52 +315,57 @@ export const ExampleCompareSection: React.FC<{
     return trialsForThisEval[lookupSelectedTrialIndexForEval(evalIndex)];
   };
 
-  const lookupScoreGroupForScorerIndex = (
-    scorerIndex: number
-  ): CompositeSummaryScoreGroup => {
-    return compositeMetrics[scorerGroupNames[scorerIndex]];
+  const lookupScoreGroupForScorerIndex = (scorerIndex: number) => {
+    return compositeScoreMetrics[metricGroupNames[scorerIndex]];
   };
 
   const lookupScoreGroupMetricsForScorerIndex = (scorerIndex: number) => {
     return lookupScoreGroupForScorerIndex(scorerIndex).metrics;
   };
 
-  const lookupUniqueScorerRefsForScorerIndex = (scorerIndex: number) => {
-    return Array.from(
-      new Set(
-        Object.values(
-          lookupScoreGroupForScorerIndex(scorerIndex).evalCallIdToScorerRef
-        )
-      )
-    );
+  const lookupUniqueScorerRefsForScorerIndex = (
+    scorerIndex: number
+  ): string[] => {
+    return lookupScoreGroupForScorerIndex(scorerIndex).scorerRefs;
   };
 
-  const lookupDimensionsForScorer = (scorerIndex: number) => {
+  const lookupDimensionsForScorer = (
+    scorerIndex: number
+  ): MetricDefinition[] => {
     const isDerivedMetric = lookupIsDerivedMetric(scorerIndex);
-    const lookupAnyDimensionForMetric = (sm: CompositeSummaryMetric) => {
-      return props.state.data.scorerMetricDimensions[
-        Object.values(sm.scorerRefToDimensionId)[0]
-      ];
+    const lookupAnyDimensionForMetric = (
+      sm: CompositeSummaryMetricGroupForKeyPath
+    ) => {
+      return Object.values(sm.scorerRefs)[0].metric;
     };
 
     if (isDerivedMetric) {
-      return derivedMetrics;
+      return derivedScores;
     }
     return Object.values(
       lookupScoreGroupMetricsForScorerIndex(scorerIndex)
     ).map(lookupAnyDimensionForMetric);
   };
 
-  const lookupDimension = (scorerIndex: number, metricIndex: number) => {
+  const lookupDimension = (
+    scorerIndex: number,
+    metricIndex: number
+  ): MetricDefinition => {
     const dimensionsForThisScorer = lookupDimensionsForScorer(scorerIndex);
     return dimensionsForThisScorer[metricIndex];
   };
 
-  const lookupDimensionId = (scorerIndex: number, metricIndex: number) => {
-    return dimensionId(lookupDimension(scorerIndex, metricIndex));
+  const lookupDimensionId = (
+    scorerIndex: number,
+    metricIndex: number
+  ): string => {
+    return metricDefinitionId(lookupDimension(scorerIndex, metricIndex));
   };
 
-  const lookupTargetTrial = (evalIndex: number, trialIndex: number) => {
+  const lookupTargetTrial = (
+    evalIndex: number,
+    trialIndex: number
+  ): PivotedRow => {
     const trialsForThisEval = lookupTrialsForEval(evalIndex);
     return trialsForThisEval[trialIndex];
   };
@@ -366,10 +375,11 @@ export const ExampleCompareSection: React.FC<{
     trialIndex: number,
     scorerIndex: number,
     metricIndex: number
-  ) => {
+  ): MetricValueType | undefined => {
     const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
     const currEvalCallId = orderedCallIds[evalIndex];
     const resolvedScoreId = resolvePeerDimension(
+      compositeScoreMetrics,
       currEvalCallId,
       lookupDimension(scorerIndex, metricIndex)
     );
@@ -378,16 +388,19 @@ export const ExampleCompareSection: React.FC<{
       return undefined;
     }
 
-    return targetTrial.scores[dimensionId(resolvedScoreId)][currEvalCallId];
+    return targetTrial.scores[metricDefinitionId(resolvedScoreId)][
+      currEvalCallId
+    ];
   };
 
   const lookupAggScorerMetricValue = (
     evalIndex: number,
     scorerIndex: number,
     metricIndex: number
-  ) => {
+  ): MetricValueType | undefined => {
     const currEvalCallId = orderedCallIds[evalIndex];
     const resolvedScoreId = resolvePeerDimension(
+      compositeScoreMetrics,
       currEvalCallId,
       lookupDimension(scorerIndex, metricIndex)
     );
@@ -396,10 +409,13 @@ export const ExampleCompareSection: React.FC<{
       return undefined;
     }
 
-    return target.scores[dimensionId(resolvedScoreId)][currEvalCallId];
+    return target.scores[metricDefinitionId(resolvedScoreId)][currEvalCallId];
   };
 
-  const lookupOutputValue = (evalIndex: number, outputPropIndex: number) => {
+  const lookupOutputValue = (
+    evalIndex: number,
+    outputPropIndex: number
+  ): any => {
     const currEvalCallId = orderedCallIds[evalIndex];
     const selectedTrial = lookupSelectedTrialForEval(evalIndex);
 
@@ -536,7 +552,7 @@ export const ExampleCompareSection: React.FC<{
       isBinary
     );
 
-    const lowerIsBetter = dimensionShouldMinimize(dimension);
+    const lowerIsBetter = dimension.shouldMinimize ?? false;
 
     if (summaryMetric == null) {
       return <NotApplicable />;
@@ -602,8 +618,7 @@ export const ExampleCompareSection: React.FC<{
     }
     return () =>
       onScorerClick(
-        targetTrial.predictAndScore.scorerMetrics[scoreId].sourceCall
-          ._rawScoreTraceData
+        targetTrial.predictAndScore.scoreMetrics[scoreId].sourceCallId
       );
   };
 
@@ -940,12 +955,26 @@ const removePrefix = (key: string, prefix: string) => {
 };
 
 const ICValueView: React.FC<{value: any}> = ({value}) => {
+  // We should merge this with ValueView.tsx. Unfortunately,
+  // the styling preferences and sizing differ enough to make
+  // this more challenging than it should be.
+
   let text = '';
   if (value == null) {
     return <NotApplicable />;
   } else if (typeof value === 'object') {
+    if (isCustomWeaveTypePayload(value)) {
+      // This is a bit arbitrary sizing. Just forcing 300px for now. It would be
+      // more ideal if `CustomWeaveTypeDispatcher` had some sort of dynamic sizing
+      // that could be applied here.
+      return (
+        <div style={{width: '100%', height: '300px', overflow: 'hidden'}}>
+          <CustomWeaveTypeDispatcher data={value} />
+        </div>
+      );
+    }
     text = JSON.stringify(value || {}, null, 2);
-  } else if (typeof value === 'string' && isRef(value)) {
+  } else if (typeof value === 'string' && isWeaveRef(value)) {
     return <SmallRef objRef={parseRef(value)} />;
   } else {
     text = value.toString();
@@ -961,11 +990,13 @@ const ICValueView: React.FC<{value: any}> = ({value}) => {
         wordBreak: 'break-all',
         padding: 0,
         margin: 0,
+        fontFamily: 'Inconsolata',
       }}>
       {text}
     </pre>
   );
 };
+
 const trimWhitespace = (str: string) => {
   // Trim leading and trailing whitespace
   return str.replace(/^\s+|\s+$/g, '');
@@ -1015,4 +1046,20 @@ const useLinkHorizontalScroll = () => {
   }, [scroll1Handler, scroll2Handler]);
 
   return {ref1, ref2};
+};
+
+const adjustValueForDisplay = (
+  value: number | boolean | undefined,
+  isBooleanAggregate?: boolean
+): number | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value === 'boolean') {
+    return value ? 100 : 0;
+  } else if (isBooleanAggregate) {
+    return value * 100;
+  } else {
+    return value;
+  }
 };

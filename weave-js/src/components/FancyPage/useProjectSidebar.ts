@@ -9,13 +9,28 @@ export const useProjectSidebar = (
   viewingRestricted: boolean,
   hasModelsData: boolean,
   hasWeaveData: boolean,
-  isLargeWorkspaceModeEnabled: boolean
+  hasTraceBackend: boolean = true,
+  hasModelsAccess: boolean = true
 ): FancyPageSidebarItem[] => {
-  const isNoData = !hasModelsData && !hasWeaveData;
-  const isModelsOnly = hasModelsData && !hasWeaveData;
-  const isWeaveOnly = !hasModelsData && hasWeaveData;
-  const isBothData = hasModelsData && hasWeaveData;
-  const isShowAll = isNoData || isBothData;
+  // Should show models sidebar items if we have models data or if we don't have a trace backend
+  let showModelsSidebarItems = hasModelsData || !hasTraceBackend;
+  // Should show weave sidebar items if we have weave data and we have a trace backend
+  let showWeaveSidebarItems = hasWeaveData && hasTraceBackend;
+
+  let isModelsOnly = showModelsSidebarItems && !showWeaveSidebarItems;
+  let isWeaveOnly = !showModelsSidebarItems && showWeaveSidebarItems;
+
+  if (!hasModelsAccess) {
+    showModelsSidebarItems = false;
+    isModelsOnly = false;
+
+    showWeaveSidebarItems = true;
+    isWeaveOnly = true;
+  }
+
+  const isNoSidebarItems = !showModelsSidebarItems && !showWeaveSidebarItems;
+  const isBothSidebarItems = showModelsSidebarItems && showWeaveSidebarItems;
+  const isShowAll = isNoSidebarItems || isBothSidebarItems;
   return useMemo(() => {
     const allItems = isLoading
       ? []
@@ -48,14 +63,6 @@ export const useProjectSidebar = (
             isShown: !isWeaveOnly,
             isDisabled: viewingRestricted,
             iconName: IconNames.Table,
-          },
-          {
-            type: 'button' as const,
-            name: 'Charts',
-            slug: 'charts',
-            isShown: isLargeWorkspaceModeEnabled && isModelsOnly,
-            isDisabled: viewingRestricted,
-            iconName: IconNames.ChartVerticalBars,
           },
           {
             type: 'button' as const,
@@ -109,7 +116,7 @@ export const useProjectSidebar = (
           //   type: 'button' as const,
           //   name: 'Weave',
           //   slug: 'weave',
-          //   isShown: !hasWeaveData,
+          //   isShown: !showWeaveSidebarItems,
           //   iconName: IconNames.CodeAlt,
           //   isDisabled: viewingRestricted,
           // },
@@ -125,24 +132,30 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
-            name: 'Evaluations',
+            name: 'Traces',
+            slug: 'weave/traces',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.LayoutTabs,
+          },
+          {
+            type: 'button' as const,
+            name: 'Evals',
             slug: 'weave/evaluations',
-            isShown: hasWeaveData || isShowAll,
-            iconName: IconNames.TypeBoolean,
-            // path: baseRouter.callsUIUrl(entity, project, evaluationsFilter),
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.BaselineAlt,
           },
           {
             type: 'button' as const,
             name: 'Models',
             slug: 'weave/models',
-            isShown: hasWeaveData || isShowAll,
+            isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.Model,
           },
           {
             type: 'button' as const,
             name: 'Datasets',
             slug: 'weave/datasets',
-            isShown: hasWeaveData || isShowAll,
+            isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.Table,
           },
           {
@@ -152,17 +165,7 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
-            name: 'Traces',
-            slug: 'weave/traces',
-            isShown: hasWeaveData || isShowAll,
-            iconName: IconNames.LayoutTabs,
-            // path: baseRouter.callsUIUrl(entity, project, {
-            //   traceRootsOnly: true,
-            // }),
-          },
-          {
-            type: 'button' as const,
-            name: 'Operations',
+            name: 'Ops',
             slug: 'weave/operations',
             additionalSlugs: ['weave/op-versions'],
             isShown: isWeaveOnly,
@@ -210,10 +213,9 @@ export const useProjectSidebar = (
     return onlyShownItems;
   }, [
     isLoading,
-    isLargeWorkspaceModeEnabled,
     isModelsOnly,
     isWeaveOnly,
-    hasWeaveData,
+    showWeaveSidebarItems,
     isShowAll,
     viewingRestricted,
   ]);

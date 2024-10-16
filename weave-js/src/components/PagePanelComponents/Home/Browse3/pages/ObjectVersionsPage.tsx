@@ -1,3 +1,14 @@
+/**
+ * This page is the list-view for object versions. When a single object is selected, it
+ * becomes a rich table of versions. It is likely that we will want to outfit it
+ * with features similar to the calls table. For example:
+ * [ ] Add the ability to expand refs
+ * [ ] Paginate & stream responses similar to calls
+ * [ ] Add the ability to sort / filter on values
+ * [ ] Add the ability to sort / filter on expanded values (blocked by general support for expansion operations)
+ * [ ] Add sort / filter state to URL
+ */
+
 import {
   GridColDef,
   GridColumnGroupingModel,
@@ -7,6 +18,7 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {TEAL_600} from '../../../../../common/css/color.styles';
 import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
@@ -23,14 +35,25 @@ import {
 import {ObjectVersionLink, ObjectVersionsLink} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
+import {
+  buildDynamicColumns,
+  prepareFlattenedDataForTable,
+} from './common/tabularListViews/columnBuilder';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {useControllableState, useURLSearchParamsDict} from './util';
+import {OBJECT_ATTR_EDGE_NAME} from './wfReactInterface/constants';
 import {useWFHooks} from './wfReactInterface/context';
+import {
+  isTableRef,
+  makeRefExpandedPayload,
+} from './wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {objectVersionKeyToRefUri} from './wfReactInterface/utilities';
 import {
   KnownBaseObjectClassType,
   ObjectVersionSchema,
 } from './wfReactInterface/wfDataModelHooksInterface';
+
+const DATASET_BASE_OBJECT_CLASS = 'Dataset';
 
 export const ObjectVersionsPage: React.FC<{
   entity: string;
@@ -108,7 +131,9 @@ export const FilterableObjectVersionsTable: React.FC<{
         ? [effectiveFilter.objectName]
         : undefined,
       latestOnly: effectivelyLatestOnly,
-    }
+    },
+    undefined,
+    effectivelyLatestOnly // metadata only when getting latest
   );
 
   if (filteredObjectVersions.loading) {
@@ -126,7 +151,7 @@ export const FilterableObjectVersionsTable: React.FC<{
     const base = props.initialFilter?.baseObjectClass;
     if ('Model' === base) {
       propsEmpty = EMPTY_PROPS_MODEL;
-    } else if ('Dataset' === base) {
+    } else if (DATASET_BASE_OBJECT_CLASS === base) {
       propsEmpty = EMPTY_PROPS_DATASETS;
     }
     return <Empty {...propsEmpty} />;
@@ -153,66 +178,154 @@ const ObjectVersionsTable: React.FC<{
   objectVersions: ObjectVersionSchema[];
   usingLatestFilter?: boolean;
 }> = props => {
+  // `showPropsAsColumns` probably needs to be a bit more robust
+  const showPropsAsColumns = !props.usingLatestFilter;
   const rows: GridRowsProp = useMemo(() => {
+    const vals = props.objectVersions.map(ov => ov.val);
+    const flat = prepareFlattenedDataForTable(vals);
+
     return props.objectVersions.map((ov, i) => {
+      let val = flat[i];
+      if (ov.baseObjectClass === DATASET_BASE_OBJECT_CLASS) {
+        // We don't want to show the rows column for datasets
+        // because it is redundant. Probably want a more generic
+        // solution here in the future. Maybe exclude table refs?
+        val = _.omit(val, 'rows');
+      }
+      // Show name, even though it can be = to object id, consider adding back
+      // val = _.omit(val, 'name');
       return {
-        ...ov,
         id: objectVersionKeyToRefUri(ov),
-        object: `${ov.objectId}:v${ov.versionIndex}`,
-        obj: ov,
+        obj: {
+          ...ov,
+          val,
+        },
       };
     });
   }, [props.objectVersions]);
-  const columns: GridColDef[] = [
-    basicField('object', 'Object', {
-      hideable: false,
-      renderCell: cellParams => {
-        // Icon to indicate navigation to the object version
-        const obj: ObjectVersionSchema = cellParams.row.obj;
-        return (
-          <ObjectVersionLink
-            entityName={obj.entity}
-            projectName={obj.project}
-            objectName={obj.objectId}
-            version={obj.versionHash}
-            versionIndex={obj.versionIndex}
-            fullWidth={true}
-          />
-        );
-      },
-    }),
-    basicField('baseObjectClass', 'Category', {
-      width: 100,
-      renderCell: cellParams => {
-        const category = cellParams.value;
-        if (category === 'Model' || category === 'Dataset') {
-          return <TypeVersionCategoryChip baseObjectClass={category} />;
+
+  // TODO: We should make this page very robust similar to the CallsTable page.
+  // We will want to do nearly all the same things: URL state management,
+  // sorting, filtering, ref expansion, etc... A lot of common logic should be
+  // extracted and shared.
+  const {cols: columns, groups: columnGroupingModel} = useMemo(() => {
+    let groups: GridColumnGroupingModel = [];
+    const cols: GridColDef[] = [
+      // This field name chosen to reduce possibility of conflict
+      // with the dynamic fields added below.
+      basicField('weave__object_version_link', 'Object', {
+        hideable: false,
+        renderCell: cellParams => {
+          // Icon to indicate navigation to the object version
+          const obj: ObjectVersionSchema = cellParams.row.obj;
+          return (
+            <ObjectVersionLink
+              entityName={obj.entity}
+              projectName={obj.project}
+              objectName={obj.objectId}
+              version={obj.versionHash}
+              versionIndex={obj.versionIndex}
+              fullWidth={true}
+              color={TEAL_600}
+            />
+          );
+        },
+      }),
+    ];
+
+    if (showPropsAsColumns) {
+      const dynamicFields: string[] = [];
+      const dynamicFieldSet = new Set<string>();
+      rows.forEach(r => {
+        Object.keys(r.obj.val).forEach(k => {
+          if (!dynamicFieldSet.has(k)) {
+            dynamicFieldSet.add(k);
+            dynamicFields.push(k);
+          }
+        });
+      });
+
+      const {cols: newCols, groupingModel} = buildDynamicColumns<{
+        obj: ObjectVersionSchema;
+      }>(
+        dynamicFields,
+        row => ({
+          entity: row.obj.entity,
+          project: row.obj.project,
+        }),
+        (row, key) => {
+          const obj: ObjectVersionSchema = row.obj;
+          const res = obj.val?.[key];
+          if (isTableRef(res)) {
+            // This whole block is a hack to make the table ref clickable. This
+            // is the same thing that the CallsTable does for expanded fields.
+            // Once we come up with a common pattern for ref expansion, this
+            // will go away.
+            const selfRefUri = objectVersionKeyToRefUri(obj);
+            const targetRefUri =
+              selfRefUri +
+              ('/' +
+                OBJECT_ATTR_EDGE_NAME +
+                '/' +
+                key.split('.').join(OBJECT_ATTR_EDGE_NAME + '/'));
+            return makeRefExpandedPayload(targetRefUri, res);
+          }
+          return res;
         }
-        return null;
-      },
-    }),
-    basicField('createdAtMs', 'Created', {
-      width: 100,
-      renderCell: cellParams => {
-        const createdAtMs = cellParams.value;
-        return <Timestamp value={createdAtMs / 1000} format="relative" />;
-      },
-    }),
-    ...(props.usingLatestFilter
-      ? [
-          basicField('peerVersions', 'Versions', {
-            width: 100,
-            sortable: false,
-            filterable: false,
-            renderCell: cellParams => {
-              const obj: ObjectVersionSchema = cellParams.row.obj;
-              return <PeerVersionsLink obj={obj} />;
-            },
-          }),
-        ]
-      : []),
-  ];
-  const columnGroupingModel: GridColumnGroupingModel = [];
+      );
+      cols.push(...newCols);
+      groups = groupingModel;
+    }
+
+    cols.push(
+      basicField('baseObjectClass', 'Category', {
+        width: 100,
+        display: 'flex',
+        valueGetter: (unused: any, row: any) => {
+          return row.obj.baseObjectClass;
+        },
+        renderCell: cellParams => {
+          const category = cellParams.value;
+          if (
+            category === 'Model' ||
+            category === 'Dataset' ||
+            category === 'Evaluation'
+          ) {
+            return <TypeVersionCategoryChip baseObjectClass={category} />;
+          }
+          return null;
+        },
+      })
+    );
+
+    cols.push(
+      basicField('createdAtMs', 'Created', {
+        width: 100,
+        valueGetter: (unused: any, row: any) => {
+          return row.obj.createdAtMs;
+        },
+        renderCell: cellParams => {
+          const createdAtMs = cellParams.value;
+          return <Timestamp value={createdAtMs / 1000} format="relative" />;
+        },
+      })
+    );
+    if (props.usingLatestFilter) {
+      cols.push(
+        basicField('peerVersions', 'Versions', {
+          width: 100,
+          sortable: false,
+          filterable: false,
+          renderCell: cellParams => {
+            const obj: ObjectVersionSchema = cellParams.row.obj;
+            return <PeerVersionsLink obj={obj} />;
+          },
+        })
+      );
+    }
+
+    return {cols, groups};
+  }, [showPropsAsColumns, props.usingLatestFilter, rows]);
 
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();
@@ -269,7 +382,6 @@ const ObjectVersionsTable: React.FC<{
       columnHeaderHeight={40}
       rowHeight={38}
       columns={columns}
-      experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
       rowSelectionModel={rowSelectionModel}
       columnGroupingModel={columnGroupingModel}
@@ -292,7 +404,8 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
     {
       objectIds: [obj.objectId],
     },
-    100
+    100,
+    true // metadataOnly
   );
   if (objectVersionsNode.loading) {
     return <LoadingDots />;

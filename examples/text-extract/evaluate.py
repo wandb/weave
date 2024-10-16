@@ -1,12 +1,11 @@
-from typing import Any
-
 import asyncio
 import json
 import os
-import re
-import openai
-import weave
+from typing import Any
 
+import openai
+
+import weave
 from weave.flow.scorer import MultiTaskBinaryClassificationF1
 
 

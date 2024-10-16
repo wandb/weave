@@ -241,6 +241,22 @@ export const opArtifactVersionIsGenerated = makeArtifactVersionOp({
   resolver: ({artifactVersion}) => artifactVersion.isGenerated,
 });
 
+export const opArtifactVersionIsLinkedToGlobalRegistry = makeArtifactVersionOp({
+  name: 'artifactVersion-isLinkedToGlobalRegistry',
+  argTypes: artifactVersionArgTypes,
+  description: `Returns if the artifact is linked to a collection in the global registry ${docType(
+    'artifactVersion'
+  )}`,
+  argDescriptions: {
+    artifactVersion: artifactVersionArgDescription,
+  },
+  returnValueDescription: `Returns if the artifact is linked to a collection in the global registry ${docType(
+    'artifactVersion'
+  )}`,
+  returnType: inputTypes => 'boolean',
+  resolver: ({artifactVersion}) => artifactVersion.isLinkedToGlobalRegistry,
+});
+
 const mediaTypeExtensions = BASIC_MEDIA_TYPES.map(mediaType => mediaType.type);
 const isMediaFilePath = (path: string) =>
   mediaTypeExtensions.some(extension => path.endsWith(`.${extension}.json`));
@@ -523,6 +539,26 @@ export const opArtifactVersionAliases = makeArtifactVersionOp({
     (artifactVersion.aliases ?? []).filter(
       (a: any) => a != null && (!hideVersions || !versionRegex.test(a.alias))
     ),
+});
+
+export const opArtifactVersionRawTags = makeArtifactVersionOp({
+  name: 'artifactVersion-rawTags',
+  argTypes: artifactVersionArgTypes,
+  description: `Returns the tags for a ${docType('artifactVersion')}`,
+  argDescriptions: {
+    artifactVersion: artifactVersionArgDescription,
+  },
+  returnValueDescription: `The tags for a ${docType('artifactVersion')}`,
+  returnType: inputTypes =>
+    list(
+      typedDict({
+        id: 'string',
+        name: 'string',
+        tagCategoryName: 'string',
+        attributes: 'string',
+      })
+    ),
+  resolver: ({artifactVersion}) => artifactVersion.tags ?? [],
 });
 
 export const opArtifactVersionLink = makeArtifactVersionOp({

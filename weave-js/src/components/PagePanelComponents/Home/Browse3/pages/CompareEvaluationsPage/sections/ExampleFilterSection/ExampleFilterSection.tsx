@@ -7,21 +7,20 @@ import React, {useCallback, useMemo} from 'react';
 import {MOON_500} from '../../../../../../../../common/css/color.styles';
 import {StyledTextField} from '../../../../StyledTextField';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
+import {
+  buildCompositeMetricsMap,
+  resolvePeerDimension,
+} from '../../compositeMetricsUtil';
 import {PLOT_HEIGHT, STANDARD_PADDING} from '../../ecpConstants';
 import {MAX_PLOT_DOT_SIZE, MIN_PLOT_DOT_SIZE} from '../../ecpConstants';
+import {EvaluationComparisonState} from '../../ecpState';
+import {metricDefinitionId} from '../../ecpUtil';
 import {
-  EvaluationComparisonState,
-  isBinaryScore,
-  isContinuousScore,
-} from '../../ecpTypes';
-import {
-  dimensionId,
   flattenedDimensionPath,
-  resolveDimensionMetricResultForPASCall,
+  resolveScoreMetricResultForPASCall,
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {useFilteredAggregateRows} from '../ExampleCompareSection/exampleCompareSectionUtil';
-import {buildCompositeComparisonSummaryMetrics} from '../ScorecardSection/summaryMetricUtil';
 import {PlotlyScatterPlot, ScatterPlotPoint} from './PlotlyScatterPlot';
 
 const RESULT_FILTER_INSTRUCTIONS =
@@ -99,6 +98,10 @@ const SingleDimensionFilter: React.FC<{
   state: EvaluationComparisonState;
   dimensionIndex: number;
 }> = props => {
+  const compositeMetricsMap = useMemo(() => {
+    return buildCompositeMetricsMap(props.state.data, 'score');
+  }, [props.state.data]);
+
   const {setComparisonDimensions} = useCompareEvaluationsState();
   const baselineCallId = props.state.baselineEvaluationCallId;
   const compareCallId = Object.keys(props.state.data.evaluationCalls).find(
@@ -106,8 +109,11 @@ const SingleDimensionFilter: React.FC<{
   )!;
 
   const targetComparisonDimension =
-    props.state.comparisonDimensions?.[props.dimensionIndex]!;
-  const targetDimension = targetComparisonDimension.dimension;
+    props.state.comparisonDimensions?.[props.dimensionIndex];
+
+  const targetDimension = targetComparisonDimension
+    ? props.state.data.scoreMetrics[targetComparisonDimension.metricId]
+    : undefined;
 
   const xIsPercentage = targetDimension?.scoreType === 'binary';
   const yIsPercentage = targetDimension?.scoreType === 'binary';
@@ -121,16 +127,15 @@ const SingleDimensionFilter: React.FC<{
   }, [filteredRows]);
 
   const data = useMemo(() => {
-    const {resolvePeerDimension} = buildCompositeComparisonSummaryMetrics(
-      props.state
-    );
     const series: Array<ScatterPlotPoint & {count: number}> = [];
     if (targetDimension != null) {
       const baselineTargetDimension = resolvePeerDimension(
+        compositeMetricsMap,
         baselineCallId,
         targetDimension
       );
       const compareTargetDimension = resolvePeerDimension(
+        compositeMetricsMap,
         compareCallId,
         targetDimension
       );
@@ -142,7 +147,7 @@ const SingleDimensionFilter: React.FC<{
           Object.values(
             row.evaluations[baselineCallId]?.predictAndScores ?? {}
           ).forEach(score => {
-            const val = resolveDimensionMetricResultForPASCall(
+            const val = resolveScoreMetricResultForPASCall(
               baselineTargetDimension,
               score
             );
@@ -157,7 +162,7 @@ const SingleDimensionFilter: React.FC<{
           Object.values(
             row.evaluations[compareCallId]?.predictAndScores ?? {}
           ).forEach(score => {
-            const val = resolveDimensionMetricResultForPASCall(
+            const val = resolveScoreMetricResultForPASCall(
               compareTargetDimension,
               score
             );
@@ -223,8 +228,9 @@ const SingleDimensionFilter: React.FC<{
   }, [
     baselineCallId,
     compareCallId,
+    compositeMetricsMap,
     filteredDigest,
-    props.state,
+    props.state.data.resultRows,
     targetDimension,
   ]);
 
@@ -293,53 +299,33 @@ const DimensionPicker: React.FC<{
   state: EvaluationComparisonState;
   dimensionIndex: number;
 }> = props => {
-  const {compositeMetrics: derivedMetrics} = useMemo(
-    () => buildCompositeComparisonSummaryMetrics(props.state),
-    [props.state]
-  );
   const targetComparisonDimension =
-    props.state.comparisonDimensions?.[props.dimensionIndex]!;
+    props.state.comparisonDimensions?.[props.dimensionIndex];
 
-  const currDimension = targetComparisonDimension.dimension;
+  const currDimension = targetComparisonDimension
+    ? props.state.data.scoreMetrics[targetComparisonDimension.metricId]
+    : undefined;
   const {setComparisonDimensions} = useCompareEvaluationsState();
 
-  const dimensionMap = useMemo(() => {
-    return Object.fromEntries(
-      Object.entries(derivedMetrics)
-        .map(([groupName, group]) => {
-          return Object.entries(group.metrics)
-            .map(([metricName, metric]) => {
-              const dimId = Object.values(metric.scorerRefToDimensionId)[0];
-              const dim =
-                props.state.data.derivedMetricDimensions[dimId] ??
-                props.state.data.scorerMetricDimensions[dimId];
-              if (dim) {
-                return [[dimId, dim]];
-              }
-              return [];
-            })
-            .flat();
-        })
-        .flat()
-    );
-  }, [
-    derivedMetrics,
-    props.state.data.derivedMetricDimensions,
-    props.state.data.scorerMetricDimensions,
-  ]);
+  const dimensionMap = props.state.data.scoreMetrics;
 
   return (
-    <FormControl>
+    <FormControl
+      style={{
+        paddingTop: '6px',
+      }}>
       <Autocomplete
         size="small"
         disableClearable
         limitTags={1}
-        value={currDimension ? dimensionId(currDimension) : undefined}
+        value={currDimension ? metricDefinitionId(currDimension) : undefined}
         onChange={(event, newValue) => {
           const res = props.state.comparisonDimensions
             ? [...props.state.comparisonDimensions]
             : [];
-          res[props.dimensionIndex].dimension = dimensionMap[newValue];
+          res[props.dimensionIndex].metricId = metricDefinitionId(
+            dimensionMap[newValue]
+          );
           res[props.dimensionIndex].rangeSelection = undefined;
           setComparisonDimensions(res);
         }}
@@ -358,4 +344,11 @@ const DimensionPicker: React.FC<{
       />
     </FormControl>
   );
+};
+
+const isBinaryScore = (score: any): score is boolean => {
+  return typeof score === 'boolean';
+};
+const isContinuousScore = (score: any): score is number => {
+  return typeof score === 'number';
 };

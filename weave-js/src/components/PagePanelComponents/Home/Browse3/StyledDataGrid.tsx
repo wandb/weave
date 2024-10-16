@@ -9,10 +9,14 @@ import {
   MOON_50,
   MOON_500,
   OBLIVION,
+  RED_300,
   TEAL_300,
   WHITE,
 } from '../../../../common/css/globals.styles';
 import {Loading} from '../../../Loading';
+
+// Class name constants
+export const SELECTED_FOR_DELETION = 'selected-for-deletion';
 
 // TODO: Handle night mode
 const backgroundColorHovered = hexToRGB(OBLIVION, 0.04);
@@ -21,6 +25,7 @@ const backgroundColorHoveredSelected = Color.fromHex(WHITE)
   .blend(Color.fromHex(TEAL_300, 0.32))
   .blend(Color.fromHex(OBLIVION, 0.04))
   .toString();
+const backgroundColorSelectedForDeletion = hexToRGB(RED_300, 0.32);
 
 // Use our custom loading component that matches our palette.
 const LoadingOverlay = () => <Loading centered />;
@@ -41,18 +46,13 @@ export const StyledDataGrid = styled(
 
   fontFamily: 'Source Sans Pro',
 
-  '& .MuiDataGrid-columnHeaders': {
-    backgroundColor: MOON_50,
-    color: MOON_500,
-  },
-
-  '& .MuiDataGrid-pinnedColumnHeaders': {
+  '& .MuiDataGrid-columnHeader': {
     backgroundColor: MOON_50,
     color: MOON_500,
   },
 
   '& .MuiDataGrid-columnHeaderTitle': {
-    fontWeight: 600,
+    fontWeight: 400,
   },
 
   '& .MuiDataGrid-columnHeader:focus, .MuiDataGrid-cell:focus': {
@@ -75,6 +75,12 @@ export const StyledDataGrid = styled(
       backgroundColor: backgroundColorSelected,
       '&.Mui-hovered': {
         backgroundColor: backgroundColorHoveredSelected,
+      },
+    },
+    [`&.${SELECTED_FOR_DELETION}`]: {
+      backgroundColor: backgroundColorSelectedForDeletion,
+      '&.Mui-hovered': {
+        backgroundColor: backgroundColorSelectedForDeletion,
       },
     },
   },

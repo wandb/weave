@@ -4,7 +4,6 @@ import * as path from 'path';
 import {defineConfig} from 'vite';
 import svgr from 'vite-plugin-svgr';
 import react from '@vitejs/plugin-react';
-import blockCjsPlugin from './vite-plugin-block-cjs';
 import fileUrls from './vite-plugin-file-urls';
 import {visualizer} from 'rollup-plugin-visualizer';
 import fs from 'fs';
@@ -84,7 +83,7 @@ export default defineConfig(({mode, command}) => {
     {find: 'unserialize', replacement: 'yields-unserialize'},
   ];
 
-  const plugins: any = [svgr(), blockCjsPlugin, fileUrls];
+  const plugins: any = [svgr(), fileUrls];
 
   // enable the react plugin in dev only, for fast refresh
 
