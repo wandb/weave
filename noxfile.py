@@ -11,6 +11,7 @@ PY313_INCOMPATIBLE_SHARDS = [
     "litellm",
     "notdiamond",
     "google_ai_studio",
+    "scorers",
 ]
 
 
