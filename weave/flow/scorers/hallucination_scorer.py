@@ -1,4 +1,3 @@
-import json
 from typing import List
 
 from pydantic import BaseModel, Field
@@ -111,18 +110,18 @@ class HallucinationFreeScorer(InstructorLLMScorer):
     based on the input data.
 
     Note:
-        - The meaning of "hallucination" can vary from person to person, you will likely want to 
+        - The meaning of "hallucination" can vary from person to person, you will likely want to
         customize the `system_prompt` and `user_prompt` to fit your specific needs.
-        - This Scorer uses the `InstructorLLMScorer` class to generate structured outputs from the LLM 
+        - This Scorer uses the `InstructorLLMScorer` class to generate structured outputs from the LLM
         provider's response; you will have to install the `instructor` python package to use it.
         - The `score` method expects the input column from the dataset to be named "context". It will use
-        this data as the ground-truth to check hallucinations against. If your dataset column has a 
-        different name, you can specify a different mapping using the `column_map` argument in the init 
+        this data as the ground-truth to check hallucinations against. If your dataset column has a
+        different name, you can specify a different mapping using the `column_map` argument in the init
         of HallucinationFreeScorer by passing `column_map={"context": "context"}`.
 
     Attributes:
         system_prompt (str): The prompt describing the task, defines what a "hallucination" is.
-        user_prompt (str): The string template to pass the input and output data. The template must 
+        user_prompt (str): The string template to pass the input and output data. The template must
         contain placeholders for both `{input_data}` and `{output}`.
         model_id (str): The LLM model name, depends on the LLM's providers to be used `client` being used.
         temperature (float): LLM temperature setting.

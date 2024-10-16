@@ -19,11 +19,13 @@ DEFAULT_MAX_TOKENS = 4096
 if TYPE_CHECKING:
     import instructor
     from anthropic import Anthropic, AsyncAnthropic
+    from google.generativeai import GenerativeModel
     from mistralai import Mistral
     from openai import AsyncOpenAI, OpenAI
-    from google.generativeai import GenerativeModel
 
-    _LLM_CLIENTS = Union[OpenAI, AsyncOpenAI, Anthropic, AsyncAnthropic, Mistral, GenerativeModel]
+    _LLM_CLIENTS = Union[
+        OpenAI, AsyncOpenAI, Anthropic, AsyncAnthropic, Mistral, GenerativeModel
+    ]
 else:
     _LLM_CLIENTS = object
 
@@ -62,15 +64,14 @@ def instructor_client(client: _LLM_CLIENTS) -> "instructor.client":  # type: ign
         raise ValueError(f"Unsupported client type: {client_type}")
 
 
-import json
 def create(client: instructor.client, *args, **kwargs) -> Any:  # type: ignore
     # gemini has slightly different argument namings...
     # max_tokens -> max_output_tokens
     if "generativemodel" in type(client.client).__name__.lower():
         max_output_tokens = kwargs.pop("max_tokens")
         temperature = kwargs.pop("temperature", None)
-        _ = kwargs.pop("model") # model is baked in the client
-        kwargs['generation_config'] = dict(
+        _ = kwargs.pop("model")  # model is baked in the client
+        kwargs["generation_config"] = dict(
             max_output_tokens=max_output_tokens,
             temperature=temperature,
         )

@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 import weave
 from weave.flow.scorers.llm_scorer import InstructorLLMScorer
-from weave.flow.scorers.llm_utils import create, OPENAI_DEFAULT_MODEL
+from weave.flow.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create
 
 DEFAULT_EXTRACTION_SYSTEM_PROMPT = """
 Given a <text>, extract all the unique entities from the text without repetition.
@@ -89,20 +89,20 @@ class SummarizationScorer(InstructorLLMScorer):
     should look like.
 
     Note:
-        - This Scorer uses the `InstructorLLMScorer` class to generate structured outputs from the LLM 
+        - This Scorer uses the `InstructorLLMScorer` class to generate structured outputs from the LLM
         provider's response; you will have to install the `instructor` python package to use it.
         - The `score` method expects the input column from the dataset to be named "input". If your dataset
-        column has a different name, you can specify a different mapping using the `column_map` argument in the 
+        column has a different name, you can specify a different mapping using the `column_map` argument in the
         init of SummarizationScorer by passing `column_map={"input": "news_article"}`.
 
     Attributes:
-        extraction_system_prompt (str): System prompt to extract the distinct entities in the input. Customising 
+        extraction_system_prompt (str): System prompt to extract the distinct entities in the input. Customising
         this can help ensure that the LLM identifies the `entities` that you care about.
         extraction_prompt (str): Prompt template for entity extraction; must contain a `{text}` placeholder.
         summarization_evaluation_system_prompt (str): System prompt defining how to evaluate the quality of a summary.
             Asks an LLM to grade the summary from `poor`, `ok`, to `excellent` and provide a rationale for the grade.
-        summarization_evaluation_prompt (str): Prompt template for summarization evaluation instruction; must contain 
-            `{input}` and `{summary}` placeholders. 
+        summarization_evaluation_prompt (str): Prompt template for summarization evaluation instruction; must contain
+            `{input}` and `{summary}` placeholders.
         entity_density_threshold (float): Threshold for determining if a summary is sufficiently entity-dense.
         model_id (str): The LLM model name, depends on the LLM's providers to be used `client` being used.
         temperature (float): LLM temperature setting.
@@ -118,7 +118,6 @@ class SummarizationScorer(InstructorLLMScorer):
         score(input: str, output: str, **kwargs: Any) -> dict:
             Calculates summarization score and entity density score for the given input and output.
     """
-
 
     extraction_system_prompt: str = DEFAULT_EXTRACTION_SYSTEM_PROMPT
     extraction_prompt: str = DEFAULT_EXTRACTION_USER_PROMPT
@@ -179,9 +178,7 @@ class SummarizationScorer(InstructorLLMScorer):
 
     @weave.op
     async def score(self, input: str, output: str, **kwargs: Any) -> dict:
-        extract_task = asyncio.to_thread(
-            self.extract_entities, text=str(output)
-        )
+        extract_task = asyncio.to_thread(self.extract_entities, text=str(output))
         evaluate_task = asyncio.to_thread(
             self.evaluate_summary, input=str(input), summary=str(output)
         )

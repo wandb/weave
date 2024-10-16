@@ -1,5 +1,4 @@
-import re
-from typing import Callable, Union
+from typing import Callable
 
 from pydantic import Field, model_validator
 
