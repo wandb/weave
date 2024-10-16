@@ -27,8 +27,8 @@ export class ConcurrencyLimiter {
           try {
             const result = await asyncFn(...args);
             resolve(result);
-          } catch (error) {
-            reject(error);
+          } catch (e) {
+            reject(e);
           } finally {
             this.activeCount--;
             this.tryExecuteNext();
