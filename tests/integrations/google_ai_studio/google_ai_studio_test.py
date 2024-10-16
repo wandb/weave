@@ -7,6 +7,8 @@ from weave.integrations.integration_utilities import op_name_from_ref
 
 # NOTE: These asserts are slightly more relaxed than other integrations because we can't yet save
 # the output with vcrpy.  When VCR.py supports GRPC, we should add recordings for these tests!
+# NOTE: We have retries because these tests are not deterministic (they use the live Gemini APIs),
+# which can sometimes fail unexpectedly.
 def assert_correct_output_shape(output: dict):
     assert "candidates" in output
     assert isinstance(output["candidates"], list)
@@ -31,6 +33,21 @@ def assert_correct_output_shape(output: dict):
     assert isinstance(output["usage_metadata"]["cached_content_token_count"], int)
 
 
+def assert_correct_summary(summary: dict, trace_name: str):
+    assert "usage" in summary
+    assert "gemini-1.5-flash" in summary["usage"]
+    assert summary["usage"]["gemini-1.5-flash"]["requests"] == 1
+    assert summary["usage"]["gemini-1.5-flash"]["prompt_tokens"] > 0
+    assert summary["usage"]["gemini-1.5-flash"]["completion_tokens"] > 0
+    assert summary["usage"]["gemini-1.5-flash"]["total_tokens"] > 0
+
+    assert "weave" in summary
+    assert summary["weave"]["status"] == "success"
+    assert summary["weave"]["trace_name"] == trace_name
+    assert summary["weave"]["latency_ms"] > 0
+
+
+@pytest.mark.retry(max_attempts=5)
 @pytest.mark.skip_clickhouse_client
 def test_content_generation(client):
     import google.generativeai as genai
@@ -44,15 +61,15 @@ def test_content_generation(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "google.generativeai.GenerativeModel.generate_content"
-    )
-    output = call.output
-    assert output is not None
-    assert_correct_output_shape(output)
+
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "google.generativeai.GenerativeModel.generate_content"
+    assert call.output is not None
+    assert_correct_output_shape(call.output)
+    assert_correct_summary(call.summary, trace_name)
 
 
+@pytest.mark.retry(max_attempts=5)
 @pytest.mark.skip_clickhouse_client
 def test_content_generation_stream(client):
     import google.generativeai as genai
@@ -70,15 +87,15 @@ def test_content_generation_stream(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "google.generativeai.GenerativeModel.generate_content"
-    )
-    output = call.output
-    assert output is not None
-    assert_correct_output_shape(output)
+
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "google.generativeai.GenerativeModel.generate_content"
+    assert call.output is not None
+    assert_correct_output_shape(call.output)
+    assert_correct_summary(call.summary, trace_name)
 
 
+@pytest.mark.retry(max_attempts=5)
 @pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
 async def test_content_generation_async(client):
@@ -94,10 +111,8 @@ async def test_content_generation_async(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "google.generativeai.GenerativeModel.generate_content_async"
-    )
-    output = call.output
-    assert output is not None
-    assert_correct_output_shape(output)
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "google.generativeai.GenerativeModel.generate_content_async"
+    assert call.output is not None
+    assert_correct_output_shape(call.output)
+    assert_correct_summary(call.summary, trace_name)
