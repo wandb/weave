@@ -674,8 +674,14 @@ def test_save_unknown_type(client):
     obj = SomeUnknownThing(3)
     ref = client._save_object(obj, "my-np-array")
     obj2 = client.get(ref)
-    # Expect None for now
-    assert obj2 == repr(obj)
+    assert obj2 == {
+        "__class__": {
+            "module": "test_weave_client",
+            "qualname": "test_save_unknown_type.<locals>.SomeUnknownThing",
+            "name": "SomeUnknownThing",
+        },
+        "a": 3,
+    }
 
 
 def test_save_model(client):
