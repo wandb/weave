@@ -245,13 +245,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Wed, 16 Oct 2024 20:45:25 GMT
+      - Wed, 16 Oct 2024 21:16:33 GMT
       ETag:
       - W/"e46560e7227d4b3208b8ec33f58b897d46b9933b88a1f435e58ad7f3b6768472"
       Expires:
-      - Wed, 16 Oct 2024 20:50:25 GMT
+      - Wed, 16 Oct 2024 21:21:33 GMT
       Source-Age:
-      - '65'
+      - '0'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -261,19 +261,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '1'
+      - '0'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - da73ab1befee9c289b28736033d5c047354c062a
+      - c16a6c7d8d58eac4a10dcdbaa48fc12a5e410fe6
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
       - 5279:1063E3:24A0D5:2D1CB3:670F1EE6
       X-Served-By:
-      - cache-ccu830040-CCU
+      - cache-ccu830048-CCU
       X-Timer:
-      - S1729111525.022147,VS0,VE1
+      - S1729113393.233351,VS0,VE224
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -320,19 +320,19 @@ interactions:
   response:
     body:
       string: !!binary |
-        IagLACC+ry73LNM/zUkP2EWakAIKOpZf7Gt56qbQA1pr4OYxQeY+XySdR702KNCI03RO4/EaLRXq
-        jYy9+xsAVGWkQGkZ+7S1Oto9m+7dX7jzr9PE31b3w8fjc/19464v6oczpjAASJKaU2/JraUYqJUY
-        CPZyOYwzUhjOR8vhcDgdzTeftpKxJgUqrI8mErWVqaLRYDSJBvNouGCAllKl7EjhKQCA39kIoB74
-        PVIYhKtYRoZACvgRQJ1oJgWKnaucj42nEJAoYXdIgU5Ya+nhRD6RxganMILgW1bwksXf2zjNVxLN
-        7mux+Yaitxykg2HOULK2+Kx8CWV5pPj8ESJn1sg7ZniBZo+W0Rj57LmV6Ig/HGtSMCut3eX/4wxp
-        KWwnicPg8WN15Bpv3+zqJwVyXixFa/8HwIue7ZVER8h20lr/5qVh40hhOJOnQbeYAIDRIvHTBRJ7
-        S5NJyMi9lbzj3YFrAKVxWnJmTQ/GoP9zc2mQEEeVKXxAmdiAjafqAhtveWUK7mxX3fB+bt94lGQ8
-        HfOMKfgPDAM=
+        IagLACB+PzXr1VTfU0vekHFI+TIrRuGMGJ5g7Tx1U+gBrTVw85ggc58vks6jXhsUaMRpOqfxeI2W
+        CvVGxt79TACqDSlQXumYN95mW8ejoqrN5HT042b3x+hO6/3B9XD/UfT7haE0AUjm/zmPltxyioFa
+        i4NgL5fD2JBCb9Kf9XqDwWyy+bQRw5YUqPQxG0rW1K7O+t3+MOtOst6UAVpJnXMghZ8JAHzORgD1
+        wO+RQjddxTIyBFLAjwBqxTIpkA6hDlG7SCkgUcLukAIdsrWyhEN5Ra4djmAEwbssEMXo9w0cFSuJ
+        Zvc17d6h6K0AaeGYDSq2Hq91rKAsjxSfP1IUzBZFy4wosBzRMJ6dvC65leiIP6wtKbiFte7y33GG
+        rJS+lXnA4PFjdeQaf7/Z1U8KFKJ4itb+ToDferYXEh0h30rj498oz+wCKfTG8jToFhMA0J8mfrpA
+        Ym9pOEwZub8l7/hw4BpAuc4rNtZ0dwz6PjeXBglxVLvSB5SJTdh4qi6w8beoXcmtb+sb3i/8X+7P
+        DY8GPGZKvhMDAw==
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 8d3ae4853bf648e0-BOM
+      - 8d3b1229ec5af296-BOM
       Connection:
       - keep-alive
       Content-Encoding:
@@ -340,14 +340,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 16 Oct 2024 20:45:28 GMT
+      - Wed, 16 Oct 2024 21:16:37 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=YzQnJl_YDCtpJfxKScJILr29uHjpvzv0guUZ5p8ocj0-1729111528-1.0.1.1-8jbDOlmaDZoqGH3dcbM_j0WQBCuhOx9Hl0xQ4JF_HHudIyr4QRvMqz1tKJ7qzkXiyCIpF0i_s2GdmtoLN33hng;
-        path=/; expires=Wed, 16-Oct-24 21:15:28 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=bWUreDp4uma0eXv8tNpcrXzZqeM7AmONy3wjKDIUhg8-1729113397-1.0.1.1-3CwRNI.Guq5DX4h_aGn8nxCBWHh5SxzlVloyzKV2WGZWMXTSJSEJANbgM5SUjBKYHVU.02NhGSib_pHWemS_oA;
+        path=/; expires=Wed, 16-Oct-24 21:46:37 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=jg8Rtq49ZVQOlfk.Q7XExK9A_Tk7eK6Cmiy6_YBh8V4-1729111528671-0.0.1.1-604800000;
+      - _cfuvid=Q.9ueSsHUvqrohxOGfuc2slkd6skhMWolW5lZTIo3Qc-1729113397977-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -360,7 +360,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '1149'
+      - '903'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -378,7 +378,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_fd0541a61859bb6814aeaba10d8ab51e
+      - req_b2118ffb79c72faf4b109630949275b2
     status:
       code: 200
       message: OK
