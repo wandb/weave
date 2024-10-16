@@ -7,7 +7,7 @@ To iterate on an application, we need a way to evaluate if it's improving. To do
 ## 1. Build a `Model`
 
 `Model`s store and version information about your system, such as prompts, temperatures, and more.
-Weave automatically captures when they are used and update the version when there are changes.
+Weave automatically captures when they are used and updates the version when there are changes.
 
 `Model`s are declared by subclassing `Model` and implementing a `predict` function definition, which takes one example and returns the response.
 
@@ -185,7 +185,7 @@ examples = [
 # If you have already published the Dataset, you can run:
 # dataset = weave.ref('example_labels').get()
 
-# We define a scoring functions to compare our model predictions with a ground truth label.
+# We define a scoring function to compare our model predictions with a ground truth label.
 @weave.op()
 def fruit_name_score(target: dict, model_output: dict) -> dict:
     return {'correct': target['fruit'] == model_output['fruit']}

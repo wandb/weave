@@ -10,6 +10,9 @@ def autopatch() -> None:
     from weave.integrations.cerebras.cerebras_sdk import cerebras_patcher
     from weave.integrations.cohere.cohere_sdk import cohere_patcher
     from weave.integrations.dspy.dspy_sdk import dspy_patcher
+    from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
+        google_genai_patcher,
+    )
     from weave.integrations.groq.groq_sdk import groq_patcher
     from weave.integrations.instructor.instructor_sdk import instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
@@ -30,6 +33,7 @@ def autopatch() -> None:
     dspy_patcher.attempt_patch()
     cerebras_patcher.attempt_patch()
     cohere_patcher.attempt_patch()
+    google_genai_patcher.attempt_patch()
     notdiamond_patcher.attempt_patch()
 
 
@@ -38,6 +42,9 @@ def reset_autopatch() -> None:
     from weave.integrations.cerebras.cerebras_sdk import cerebras_patcher
     from weave.integrations.cohere.cohere_sdk import cohere_patcher
     from weave.integrations.dspy.dspy_sdk import dspy_patcher
+    from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
+        google_genai_patcher,
+    )
     from weave.integrations.groq.groq_sdk import groq_patcher
     from weave.integrations.instructor.instructor_sdk import instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
@@ -58,4 +65,5 @@ def reset_autopatch() -> None:
     dspy_patcher.undo_patch()
     cerebras_patcher.undo_patch()
     cohere_patcher.undo_patch()
+    google_genai_patcher.undo_patch()
     notdiamond_patcher.undo_patch()
