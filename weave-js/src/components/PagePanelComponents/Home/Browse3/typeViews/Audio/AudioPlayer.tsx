@@ -99,6 +99,7 @@ const MiniAudioViewer: FC<{
         responsive: true,
         height,
         barHeight: 1.3, // slightly exaggerated
+        hideScrollbar: true,
       });
 
       wavesurferRef.current = wavesurfer;
