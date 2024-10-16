@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import field_validator
 
@@ -39,10 +39,12 @@ class Dataset(Object):
     ```
     """
 
-    rows: weave.Table
+    rows: Optional[weave.Table] = None
 
     @field_validator("rows", mode="before")
     def convert_to_table(cls, rows: Any) -> weave.Table:
+        if rows is None:
+            rows = []
         if not isinstance(rows, weave.Table):
             table_ref = getattr(rows, "table_ref", None)
             if isinstance(rows, WeaveTable):
@@ -50,8 +52,6 @@ class Dataset(Object):
             rows = weave.Table(rows)
             if table_ref:
                 rows.table_ref = table_ref
-        if len(rows.rows) == 0:
-            raise ValueError("Attempted to construct a Dataset with an empty list.")
         for row in rows.rows:
             if not isinstance(row, dict):
                 raise ValueError(
