@@ -64,7 +64,7 @@ def tests(session, shard):
     # Add the GOOGLE_API_KEY environment variable for the "google" shard
     if shard == "google_ai_studio":
         env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
-    
+
     # we are doing some integration test in test_llm_integrations.py that requires
     # setting some environment variables for the LLM providers
     if shard == "scorers":

@@ -882,6 +882,8 @@ async def test_evaluation_with_multiple_column_maps():
     assert (
         eval_out["AnotherDummyScorer"]["match"] == expected_results_another_dummy
     ), "No matches should be found for AnotherDummyScorer"
+
+
 async def test_feedback_is_correctly_linked(client):
     @weave.op
     def predict(text: str) -> str:
