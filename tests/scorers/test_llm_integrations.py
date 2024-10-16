@@ -21,7 +21,7 @@ def get_client_and_model(provider, model):
         "openai": "OPENAI_API_KEY",
         "anthropic": "ANTHROPIC_API_KEY",
         "mistral": "MISTRAL_API_KEY",
-        "gemini": "GEMINI_API_KEY",
+        "gemini": "GOOGLE_API_KEY",
     }
 
     if provider not in TEST_MODELS:
