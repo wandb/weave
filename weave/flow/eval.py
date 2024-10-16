@@ -349,6 +349,7 @@ class Evaluation(Object):
         _rows = dataset.rows
         trial_rows = list(_rows) * self.trials
         with Progress() as progress:
+            task = progress.add_task("Evaluating", total=len(trial_rows))
             async for example, eval_row in util.async_foreach(
                 trial_rows, eval_example, get_weave_parallelism()
             ):
