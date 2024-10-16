@@ -93,7 +93,7 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
       parameterNames: 'useParam0Object',
       callDisplayName: inputs => `${this.id}_${weaveCallableName(inputs.model)}`,
     });
-    this.predict_and_score = boundOp(this, this.predict_and_score, {
+    this.predictAndScore = boundOp(this, this.predictAndScore, {
       parameterNames: 'useParam0Object',
     });
   }
@@ -138,7 +138,7 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
 
     for await (const { result, nRunning, nDone } of asyncParallelMap(
       datasetExamples,
-      this.predict_and_score,
+      this.predictAndScore,
       item => [{ model, example: item }],
       maxConcurrency
     )) {
@@ -166,7 +166,7 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
     return this.summarizeResults(results);
   }
 
-  async predict_and_score({
+  async predictAndScore({
     model,
     example,
   }: {
