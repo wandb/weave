@@ -84,7 +84,7 @@ class CityVisitRecommender(weave.Model):
 
 weave.init(project_name="google_ai_studio-test")
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
-city_recommender = GroqCityVisitRecommender(model="gemini-1.5-flash")
+city_recommender = CityVisitRecommender(model="gemini-1.5-flash")
 print(city_recommender.predict("New York"))
 print(city_recommender.predict("San Francisco"))
 print(city_recommender.predict("Los Angeles"))
