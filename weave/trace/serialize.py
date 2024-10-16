@@ -1,6 +1,5 @@
-import logging
 import typing
-from typing import Any, Optional
+from typing import Any
 
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
@@ -74,11 +73,10 @@ def _build_result_from_encoded(
     return result
 
 
-STR_LENGTH_LIMIT = 1000
+REP_LIMIT = 1000
 
 
-def stringify(obj: Any, limit: int = STR_LENGTH_LIMIT) -> str:
-    """This is a fallback for objects that we don't have a better way to serialize."""
+def fallback_encode(obj: Any) -> Any:
     rep = None
     try:
         rep = repr(obj)
@@ -88,101 +86,9 @@ def stringify(obj: Any, limit: int = STR_LENGTH_LIMIT) -> str:
         except Exception:
             rep = f"<{type(obj).__name__}: {id(obj)}>"
     if isinstance(rep, str):
-        if len(rep) > limit:
-            rep = rep[: limit - 3] + "..."
+        if len(rep) > REP_LIMIT:
+            rep = rep[:REP_LIMIT] + "..."
     return rep
-
-
-def is_primitive(obj: Any) -> bool:
-    """Check if an object is a known primitive type."""
-    return isinstance(obj, (int, float, str, bool, type(None)))
-
-
-def dictify(
-    obj: Any, maxdepth: int = 0, depth: int = 1, seen: Optional[set[int]] = None
-) -> Any:
-    """Recursively compute a dictionary representation of an object."""
-    if seen is None:
-        seen = set()
-
-    if not is_primitive(obj):
-        obj_id = id(obj)
-        if obj_id in seen:
-            # Avoid infinite recursion with circular references
-            return stringify(obj)
-        else:
-            seen.add(obj_id)
-
-    if maxdepth > 0 and depth > maxdepth:
-        # TODO: If obj at this point is a simple type,
-        #       maybe we should just return it rather than stringify
-        return stringify(obj)
-
-    if isinstance(obj, (int, float, str, bool, type(None))):
-        return obj
-    elif isinstance(obj, (list, tuple)):
-        return [dictify(v, maxdepth, depth + 1, seen) for v in obj]
-    elif isinstance(obj, dict):
-        return {k: dictify(v, maxdepth, depth + 1, seen) for k, v in obj.items()}
-
-    if hasattr(obj, "to_dict"):
-        try:
-            as_dict = obj.to_dict()
-            if isinstance(as_dict, dict):
-                result = {}
-                for k, v in as_dict.items():
-                    if maxdepth == 0 or depth < maxdepth:
-                        result[k] = dictify(v, maxdepth, depth + 1)
-                    else:
-                        result[k] = stringify(v)
-                return result
-        except Exception:
-            raise ValueError("to_dict failed")
-
-    result = {}
-    result["__class__"] = {
-        "module": obj.__class__.__module__,
-        "qualname": obj.__class__.__qualname__,
-        "name": obj.__class__.__name__,
-    }
-    if hasattr(obj, "__len__") and hasattr(obj, "__getitem__"):
-        # Custom list-like object
-        try:
-            n = len(obj)
-            for i in range(n):
-                result[i] = dictify(obj[i], maxdepth, depth + 1, seen)
-        except Exception:
-            raise ValueError("fallback dictify failed")
-    else:
-        for attr in dir(obj):
-            if attr.startswith("_"):
-                continue
-            try:
-                val = getattr(obj, attr)
-                if callable(val):
-                    continue
-                if maxdepth == 0 or depth < maxdepth:
-                    result[attr] = dictify(val, maxdepth, depth + 1, seen)
-                else:
-                    result[attr] = stringify(val)
-            except Exception:
-                raise ValueError("fallback dictify failed")
-    return result
-
-
-# TODO: Investigate why dictifying Logger causes problems
-ALWAYS_STRINGIFY = (logging.Logger,)
-
-
-def fallback_encode(obj: Any) -> Any:
-    # TODO: Should we try to compute an object size and skip if too big?
-    if isinstance(obj, ALWAYS_STRINGIFY):
-        return stringify(obj)
-    try:
-        # Note: Max depth not picked scientifically, just trying to keep things under control.
-        return dictify(obj, maxdepth=10)
-    except Exception:
-        return stringify(obj)
 
 
 def isinstance_namedtuple(obj: Any) -> bool:
