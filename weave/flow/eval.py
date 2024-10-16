@@ -19,11 +19,13 @@ from weave.flow.scorer import (
     get_scorer_attributes,
     transpose,
 )
+from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
+from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, as_op, is_op
 from weave.trace.vals import WeaveObject
-from weave.trace.weave_client import get_ref
+from weave.trace.weave_client import Call, get_ref
 
 console = Console()
 
@@ -44,6 +46,15 @@ def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutin
     if is_async:
         return func(*args, **kwargs)  # type: ignore
     return asyncio.to_thread(func, *args, **kwargs)
+
+
+def async_call_op(
+    func: Op, *args: Any, **kwargs: Any
+) -> Coroutine[Any, Any, tuple[Any, "Call"]]:
+    call_res = func.call(*args, __should_raise=True, **kwargs)
+    if inspect.iscoroutine(call_res):
+        return call_res
+    return asyncio.to_thread(lambda: call_res)
 
 
 class EvaluationResults(Object):
@@ -133,9 +144,12 @@ class Evaluation(Object):
         else:
             model_input = self.preprocess_model_input(example)  # type: ignore
 
+        model_self = None
+        model_predict: Union[Callable, Model]
         if callable(model):
             model_predict = model
         else:
+            model_self = model
             model_predict = get_infer_method(model)
 
         model_predict_fn_name = (
@@ -164,7 +178,23 @@ class Evaluation(Object):
                 )
         try:
             model_start_time = time.time()
-            model_output = await async_call(model_predict, **model_predict_args)
+            model_call = None
+            if is_op(model_predict):
+                # I would expect this path to always be hit, but keeping the other
+                # path for backwards compatibility / safety
+                model_predict = as_op(model_predict)
+                if model_self is not None:
+                    model_predict_args = {
+                        **model_predict_args,
+                        "self": model_self,
+                    }
+                model_output, model_call = await async_call_op(
+                    model_predict, **model_predict_args
+                )
+            else:
+                # I would not expect this path to be hit, but keeping it for
+                # backwards compatibility / safety
+                model_output = await async_call(model_predict, **model_predict_args)
         except OpCallError as e:
             dataset_column_names = list(example.keys())
             dataset_column_names_str = ", ".join(dataset_column_names[:3])
@@ -196,6 +226,9 @@ class Evaluation(Object):
         scores = {}
         scorers = cast(list[Union[Op, Scorer]], self.scorers or [])
         for scorer in scorers:
+            scorer_self = None
+            if weave_isinstance(scorer, Scorer):
+                scorer_self = scorer
             scorer_name, score_fn, _ = get_scorer_attributes(scorer)
             if is_op(score_fn):
                 score_fn = as_op(score_fn)
@@ -221,7 +254,24 @@ class Evaluation(Object):
             score_args["model_output"] = model_output
 
             try:
-                result = await async_call(score_fn, **score_args)
+                if is_op(score_fn) and model_call:
+                    # I would expect this path to always be hit, but keeping the other
+                    # path for backwards compatibility / safety
+                    score_fn = as_op(score_fn)
+                    if scorer_self is not None:
+                        score_args = {
+                            **score_args,
+                            "self": scorer_self,
+                        }
+                    result, score_call = await async_call_op(score_fn, **score_args)
+                    wc = get_weave_client()
+                    if wc:
+                        wc._send_score_call(model_call, score_call)
+
+                else:
+                    # I would not expect this path to be hit, but keeping it for
+                    # backwards compatibility / safety
+                    result = await async_call(score_fn, **score_args)
             except OpCallError as e:
                 dataset_column_names = list(example.keys())
                 dataset_column_names_str = ", ".join(dataset_column_names[:3])
