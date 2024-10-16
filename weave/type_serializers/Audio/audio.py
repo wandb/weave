@@ -1,51 +1,26 @@
 import wave
-from io import BufferedReader
 
 from weave.trace import serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
 
-dependencies_met = False
-
-try:
-    from openai._legacy_response import HttpxBinaryResponseContent
-
-    dependencies_met = True
-except ImportError:
-    pass
+AUDIO_FILE_NAME = "audio.wav"
 
 
-def save_httpx(
-    obj: "HttpxBinaryResponseContent", artifact: MemTraceFilesArtifact, name: str
-) -> None:
-    with artifact.new_file("audio.wav", binary=True) as f:
-        for data in obj.iter_bytes():
-            f.write(data)  # type: ignore
-
-
-def load_httpx(artifact: MemTraceFilesArtifact, name: str) -> BufferedReader:
-    path = artifact.path("audio.wav")
-    return open(path, "rb")
-
-
-def save_wave(obj: wave.Wave_read, artifact: MemTraceFilesArtifact, name: str) -> None:
-    num_frames = obj.getnframes()
-    frames = obj.readframes(num_frames)
-    with artifact.writeable_file_path("audio.wav") as fp:
-        wav_file = wave.Wave_write(fp)
-        wav_file.setnchannels(obj.getnchannels())
-        wav_file.setsampwidth(obj.getsampwidth())
-        wav_file.setframerate(obj.getframerate())
+def save(obj: wave.Wave_read, artifact: MemTraceFilesArtifact, name: str) -> None:
+    frames = obj.readframes(obj.getnframes())
+    params = obj.getparams()
+    with artifact.writeable_file_path(AUDIO_FILE_NAME) as fp:
+        wav_file = wave.open(fp, "wb")
+        wav_file.setparams(params)
         wav_file.writeframes(frames)
+        wav_file.close()
+    obj.rewind()
 
 
-def load_wave(artifact: MemTraceFilesArtifact, name: str) -> wave.Wave_read:
-    path = artifact.path("audio.wav")
+def load(artifact: MemTraceFilesArtifact, name: str) -> wave.Wave_read:
+    path = artifact.path(AUDIO_FILE_NAME)
     return wave.open(path, "rb")
 
 
 def register() -> None:
-    if dependencies_met:
-        serializer.register_serializer(
-            HttpxBinaryResponseContent, save_httpx, load_httpx
-        )
-    serializer.register_serializer(wave.Wave_read, save_wave, load_wave)
+    serializer.register_serializer(wave.Wave_read, save, load)
