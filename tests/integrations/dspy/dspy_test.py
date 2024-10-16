@@ -18,7 +18,7 @@ from weave.trace_server.trace_server_interface import CallsFilter
 def test_dspy_language_models(client: WeaveClient) -> None:
     import dspy
 
-    os.environ["DSP_CACHEBOOL"] = "False"
+    os.environ["DSP_CACHEBOOL"] = "false"
 
     gpt3_turbo = dspy.OpenAI(
         model="gpt-3.5-turbo-1106",
@@ -75,10 +75,55 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
+def test_dspy_lm_api(client: WeaveClient) -> None:
+    import dspy
+
+    os.environ["DSP_CACHEBOOL"] = "false"
+
+    lm = dspy.LM(
+        model="openai/gpt-4o-mini",
+        max_tokens=300,
+        api_key=os.environ.get("OPENAI_API_KEY"),
+        cache=False,
+    )
+    dspy.configure(lm=lm)
+    lm("hello! this is a raw prompt to GPT")
+
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+    assert len(flattened_calls) == 3
+
+    assert flattened_calls_to_names(flattened_calls) == [
+        ("dspy.LM", 0),
+        ("litellm.completion", 1),
+        ("openai.chat.completions.create", 2),
+    ]
+
+    assert calls[0].exception is None and calls[0].ended_at is not None
+    output_0 = calls[0].output
+    assert output_0 is not None
+
+    call_1, _ = flattened_calls[1]
+    assert call_1.exception is None and call_1.ended_at is not None
+    output_1 = call_1.output
+    assert output_1 is not None
+    assert output_1["choices"][0]["message"]["content"] == str(output_0[0])
+
+    call_2, _ = flattened_calls[2]
+    assert call_2.exception is None and call_2.ended_at is not None
+    output_2 = call_2.output
+    assert output_2 is not None
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
 def test_dspy_inline_signatures(client: WeaveClient) -> None:
     import dspy
 
-    os.environ["DSP_CACHEBOOL"] = "False"
+    os.environ["DSP_CACHEBOOL"] = "false"
 
     turbo = dspy.OpenAI(
         model="gpt-3.5-turbo", api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")

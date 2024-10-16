@@ -1,4 +1,5 @@
 import importlib
+import inspect
 from typing import Callable
 
 import weave
@@ -14,31 +15,54 @@ def dspy_wrapper(name: str) -> Callable[[Callable], Callable]:
     return wrapper
 
 
+def check_member_function_exists(
+    base_symbol: str, lm_class_name: str, member_function_name: str
+) -> bool:
+    try:
+        module = importlib.import_module(base_symbol)
+        XYZ = getattr(module, lm_class_name)
+    except ImportError:
+        print(f"{base_symbol} cannot be imported")
+    except AttributeError:
+        print(f"{lm_class_name} cannot be imported from {base_symbol}")
+    else:
+        # Get all functions (methods) of class XYZ
+        methods = inspect.getmembers(XYZ, predicate=inspect.isfunction)
+        method_names = [name for name, _ in methods]
+        return member_function_name in method_names
+    return False
+
+
 def dspy_get_patched_lm_functions(
     base_symbol: str, lm_class_name: str
 ) -> list[SymbolPatcher]:
-    patchable_functional_attributes = [
-        "basic_request",
-        "request",
-        "__call__",
-    ]
-    return [
-        SymbolPatcher(
-            get_base_symbol=lambda: importlib.import_module(base_symbol),
-            attribute_name=f"{lm_class_name}.basic_request",
-            make_new_value=dspy_wrapper(f"dspy.{lm_class_name}.basic_request"),
-        ),
-        SymbolPatcher(
-            get_base_symbol=lambda: importlib.import_module(base_symbol),
-            attribute_name=f"{lm_class_name}.request",
-            make_new_value=dspy_wrapper(f"dspy.{lm_class_name}.request"),
-        ),
-        SymbolPatcher(
-            get_base_symbol=lambda: importlib.import_module(base_symbol),
-            attribute_name=f"{lm_class_name}.__call__",
-            make_new_value=dspy_wrapper(f"dspy.{lm_class_name}"),
-        ),
-    ]
+    if hasattr(importlib.import_module(base_symbol), lm_class_name):
+        patched_functions = []
+        if check_member_function_exists(base_symbol, lm_class_name, "basic_request"):
+            patched_functions.append(
+                SymbolPatcher(
+                    get_base_symbol=lambda: importlib.import_module(base_symbol),
+                    attribute_name=f"{lm_class_name}.basic_request",
+                    make_new_value=dspy_wrapper(f"dspy.{lm_class_name}.basic_request"),
+                )
+            )
+        if check_member_function_exists(base_symbol, lm_class_name, "request"):
+            patched_functions.append(
+                SymbolPatcher(
+                    get_base_symbol=lambda: importlib.import_module(base_symbol),
+                    attribute_name=f"{lm_class_name}.request",
+                    make_new_value=dspy_wrapper(f"dspy.{lm_class_name}.request"),
+                )
+            )
+        patched_functions.append(
+            SymbolPatcher(
+                get_base_symbol=lambda: importlib.import_module(base_symbol),
+                attribute_name=f"{lm_class_name}.__call__",
+                make_new_value=dspy_wrapper(f"dspy.{lm_class_name}"),
+            )
+        )
+        return patched_functions
+    return []
 
 
 patched_functions = [
@@ -157,9 +181,19 @@ patched_functions = [
         attribute_name="LabeledFewShot.compile",
         make_new_value=dspy_wrapper("dspy.teleprompt.LabeledFewShot.compile"),
     ),
+    SymbolPatcher(
+        get_base_symbol=lambda: importlib.import_module("dspy"),
+        attribute_name="LM.inspect_history",
+        make_new_value=dspy_wrapper("dspy.LM.inspect_history"),
+    ),
+    SymbolPatcher(
+        get_base_symbol=lambda: importlib.import_module("dspy"),
+        attribute_name="LM.__call__",
+        make_new_value=dspy_wrapper("dspy.LM"),
+    ),
 ]
 
-# Patch LM classes
+# Patch LM classes (for backwards compatibility with old DSPy versions)
 patched_functions += dspy_get_patched_lm_functions(
     base_symbol="dspy", lm_class_name="AzureOpenAI"
 )
