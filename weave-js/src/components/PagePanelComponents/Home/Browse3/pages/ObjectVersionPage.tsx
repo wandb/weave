@@ -106,16 +106,19 @@ const ObjectVersionPageInner: React.FC<{
   const objectName = objectVersion.objectId;
   const objectVersionIndex = objectVersion.versionIndex;
   const refExtra = objectVersion.refExtra;
-  const objectVersions = useRootObjectVersions(
+  const latestObjectVersion = useRootObjectVersions(
     entityName,
     projectName,
     {
       objectIds: [objectName],
+      latestOnly: true,
     },
-    undefined,
+    1,
     true
   );
-  const objectVersionCount = (objectVersions.result ?? []).length;
+  const objectVersionCount = latestObjectVersion.result?.[0]?.versionIndex
+    ? latestObjectVersion.result?.[0]?.versionIndex + 1
+    : 0;
   const baseObjectClass = useMemo(() => {
     if (objectVersion.baseObjectClass === 'Dataset') {
       return 'Dataset';
@@ -212,7 +215,7 @@ const ObjectVersionPageInner: React.FC<{
             [refExtra ? 'Parent Object' : 'Name']: (
               <>
                 {objectName}{' '}
-                {objectVersions.loading ? (
+                {latestObjectVersion.loading ? (
                   <LoadingDots />
                 ) : (
                   <>
