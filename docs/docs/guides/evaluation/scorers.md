@@ -233,8 +233,6 @@ json_scorer = ValidJSONScorer()
 **Notes:**
 - If the output cannot be parsed as JSON, or if it parses to a data type other than dict or list, it is considered invalid.
 
----
-Please add this section to scorers_2.md under the "Predefined Scorers" heading.
 
 ---
 
