@@ -34,16 +34,10 @@ def gemini_on_finish(
 ) -> None:
     original_model_name = call.inputs["self"].model_name
     model_name = original_model_name.split("/")[-1]
-    usage = {}
-    model_usage = {
-        "requests": 1,
-    }
-    usage[model_name] = model_usage
-    summary_update = {
-        "usage": usage,
-    }
+    usage = {model_name: {"requests": 1}}
+    summary_update = {"usage": usage}
     if output:
-        model_usage.update(
+        usage[model_name].update(
             {
                 "prompt_tokens": output.usage_metadata.prompt_token_count,
                 "completion_tokens": output.usage_metadata.candidates_token_count,
