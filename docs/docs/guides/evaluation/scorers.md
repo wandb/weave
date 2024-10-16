@@ -1,15 +1,16 @@
 # Evaluation Metrics
 
-## Evaluation Metrics in Weave
-In Weave, Scorers are tools that help you evaluate the outputs from your AI system. They take the AI's output, analyze it, and return a dictionary with the results. Scorers can also look at parts of your input data and provide extra information, like explanations of their evaluations.
+## Evaluations in Weave
+In Weave, Scorers are tools that help you evaluate the outputs from your AI system. They take the AI's output, analyze it, and return a dictionary with the results. Scorers can also use other parts of your input data and can also provide extra information, such as explanations of their evaluations.
 
-You use Scorers when creating a `weave.Evaluation object`. There are two main types of Scorers:
+Scorers are passed to a `weave.Evaluation` object during evaluation. There are two types of Scorers:
 
-1. Function-based Scorers: Simple Python functions decorated with @weave.op.
-2. Class-based Scorers: Python classes that inherit from weave.Scorer for more complex evaluations.
+1. **Function-based Scorers:** Simple Python functions decorated with `@weave.op`.
+2. **Class-based Scorers:** Python classes that inherit from `weave.Scorer` for more complex evaluations.
+
 
 ## Function-based Scorers
-These are straightforward functions that return a dictionary. They're great for simple evaluations.
+These are functions, decorated with @weave.op that return a dictionary. They're great for simple evaluations:
 
 ```python
 @weave.op
@@ -22,12 +23,12 @@ eval = weave.Evaluations(..., scorers=[evaluate_uppercase])
 In this example, evaluate_uppercase checks if the text is all uppercase.
 
 ## Class-based Scorers
-For more advanced evaluations, especially when you need to keep track of additional information or make multiple function calls, you can create a Scorer class.
+For more advanced evaluations, especially when you need to keep track of additional scorer metadata, try different scorer prompt or make multiple function calls, you can use the `Scorer` class.
 
 **Requirements:**
-- Inherit from weave.Scorer.
-- Define a score method decorated with @weave.op.
-- The score method must return a dictionary.
+- Inherit from `weave.Scorer`.
+- Define a `score` method decorated with `@weave.op`.
+- The `score` method must return a dictionary.
 
 Example:
 
@@ -52,7 +53,7 @@ eval = weave.Evaluations(..., scorers=[summarization_scorer])
 This class evaluates how good a summary is by comparing it to the original text.
 
 ## How Scorers Work
-### Using Keyword Arguments
+### Keyword Arguments
 Scorers can access both the output from your AI system and the input data.
 
 - **Output:** Include an `output` parameter in your scorer function's signature to access the AI system's output.
@@ -64,7 +65,7 @@ For example, if your dataset has a "news_article" column, you can access it in t
 ### Mapping Column Names
 Sometimes, the scorer's parameter names don't match the column names in your dataset. You can fix this using a `column_map`.
 
-If you're using a class-based scorer, pass a dictionary to the `column_map` attribute when you create the scorer. This dictionary maps your scorer's parameter names to the dataset's column names, in the order: `{scorer keyword argument : dataset column name}`.
+If you're using a class-based scorer, pass a dictionary to the `column_map` attribute when you create the scorer. This dictionary maps your scorer's parameter names to the dataset's column names, in the order: `{scorer keyword argument : dataset column name}`. `column_map` is an attribute of the `Scorer` class.
 
 Example:
 
@@ -94,25 +95,58 @@ scorer = SummarizationScorer(column_map = {"text" : "news_article"})
 Here, the text parameter in the score method will receive data from the `news_article` column.
 
 
-In this case, weave Evaluations will automatically pass the output of the LLM summarization system to the `output` parameter in the `score` function and will also extract the value for the `news_article` key in the input dataset row and pass it to the `text` parameter in the scorer.
+In this case, weave Evaluations will automatically pass the output of the LLM summarization system to the `output` parameter in the `score` function and will extract the value for the `news_article` key in the input dataset row and pass it to the `text` parameter in the scorer.
 
 
-##nExamples of Scorers
+## Predefined Scorers
 
-LLM-Powered Evaluators
+**LLM-evaluators**
+
+The pre-defined scorers that use LLMs support the OpenAI, Anthropic, Google GenerativeAI and MistralAI clients. They also uses weave's `InstructorLLMScorer` class, so you'll need to install the [`instructor`](https://github.com/instructor-ai/instructor) Python package to be able to use them.
 
 ### `HallucinationFreeScorer`
+
 This scorer checks if your AI system's output includes any hallucinations based on the input data.
 
+```python
+from weave.scorers import HallucinationFreeScorer
+
+llm_client = # initialize your LLM client here
+
+scorer = HallucinationFreeScorer(
+    client=llm_client, 
+    model_id="gpt4o"
+)
+```
+
+**Customization:**
+- Customize the `system_prompt` and `user_prompt` attributes of the scorer to define what "hallucination" means for you.
+
 **Notes:**
-- Customize the `system_prompt` and `user_prompt` attributes to define what "hallucination" means for you.
-- This scorer uses the `InstructorLLMScorer` class, so you'll need to install the `instructor` Python package.
 - The `score` method expects an input column named `context`. If your dataset uses a different name, use the `column_map` attribute to map `context` to the dataset column.
 
+---
+
 ## `SummarizationScorer`
+
+Use an LLM to compare a summary to the original text and evaluate the quality of the summary.
+
+```python
+from weave.scorers import SummarizationScorer
+
+llm_client = # initialize your LLM client here
+
+scorer = SummarizationScorer(
+    client=llm_client, 
+    model_id="gpt4o"
+)
+```
+
+**How It Works:**
+
 This scorer evaluates summaries in two ways:
 
-1. **Entity Density:** Checks the ratio of unique entities (like names, places, or things) mentioned in the summary to the total word summary count in order to estimate the "information density" of the summary. Uses an LLM to extract the entities.
+1. **Entity Density:** Checks the ratio of unique entities (like names, places, or things) mentioned in the summary to the total word count in the summary in order to estimate the "information density" of the summary. Uses an LLM to extract the entities. Similar to how entity density is used in the Chain of Density paper, https://arxiv.org/abs/2309.04269
 
 2. **Quality Grading:** Uses an LLM-evaluator to grade the summary as `poor`, `ok`, or `excellent`. These grades are converted to scores (0.0 for poor, 0.5 for ok, and 1.0 for excellent) so you can calculate averages.
 
@@ -124,103 +158,152 @@ This scorer evaluates summaries in two ways:
 - The `score` method expects the original text that was summarized to be present in the `input` column of the dataset. Use the `column_map` class attribute to map `input` to the correct dataset column if needed.
 
 
-TODO:
+---
 
+### `OpenAIModerationScorer`
 
-- Why use Scorers (re-use?) - you want a class not a function
-- Explain columm_map
-    only during Evaluation call
+The `OpenAIModerationScorer` uses OpenAI's Moderation API to check if the AI system's output contains disallowed content, such as hate speech or explicit material.
 
-    output - output of predict
+```python
+from weave.flow.scorers.moderation_scorer import OpenAIModerationScorer
+import openai
 
-    column_map: A `scorer parameter name : dataset column name` mapping.
-    
-    This summarization scorer expects the input column in the dataset to be named "input" \
-        and the output column in the dataset to be named "summary".
-        You can specify a different mapping in the `column_map` argument. For example, \
-        if your dataset contains columns "news_article" and "news_summary" then you can \
-        specify `column_map={"input": "news_article", "output": "news_summary"}`. show explicit mapping in the `score` as an example
+oai_client = OpenAI(api_key=...) # initialize your LLM client here
 
-## LLM-powered Evaluators
-
-### HallucinationFreeScorer
-
-A Scorer that uses an LLM to determine if the model output contains any hallucinations
-based on the input data.
-
-Note:
-    - The meaning of "hallucination" can vary from person to person, you will likely want to 
-    customize the `system_prompt` and `user_prompt` to fit your specific needs.
-    - This Scorer uses the `InstructorLLMScorer` class to generate structured outputs from the LLM 
-    provider's response; you will have to install the `instructor` python package to use it.
-    - The `score` method expects the input column from the dataset to be named "context". It will use
-    this data as the ground-truth to check hallucinations against. If your dataset column has a 
-    different name, you can specify a different mapping using the `column_map` argument in the init 
-    of HallucinationFreeScorer by passing `column_map={"context": "context"}`.
-
-Attributes:
-    system_prompt (str): The prompt describing the task, defines what a "hallucination" is.
-    user_prompt (str): The string template to pass the input and output data. The template must 
-    contain placeholders for both `{input_data}` and `{output}`.
-    model_id (str): The LLM model name, depends on the LLM's providers to be used `client` being used.
-    temperature (float): LLM temperature setting.
-    max_tokens (int): Maximum number of tokens in the LLM's response.
-
-Methods:
-    score(output: str, context: str) -> HallucinationResponse:
-        Analyzes the output to detect hallucinations based on the given context.
-
-### SummarizationScorer
-
-A Scorer that evaluates the quality of summaries in two ways:
-    - using an LLM to calculate the entity density of the summary, similar to how entity density is
-    used in the Chain of Density paper, https://arxiv.org/abs/2309.04269. This is a rough measure for
-    how information-dense the summary is.
-    - using another LLM evaluator to grade the summary quality from `poor`, `ok`, to `excellent`. These
-    grades are then mapped to numerical scores, {`poor`: 0.0, `ok`: 0.5, `excellent`: 1.0}, in order to
-    be able to calculate an average score across a dataset of summaries if needed.
-
-To customise the LLM evaluator you can customise the `summarization_evaluation_system_prompt`and
-`summarization_evaluation_prompt` attributes to be tailored your specific definition of what a good summary
-should look like.
-
-Note:
-    - This Scorer uses the `InstructorLLMScorer` class to generate structured outputs from the LLM 
-    provider's response; you will have to install the `instructor` python package to use it.
-    - The `score` method expects the input column from the dataset to be named "input". If your dataset
-    column has a different name, you can specify a different mapping using the `column_map` argument in the 
-    init of SummarizationScorer by passing `column_map={"input": "news_article"}`.
-
-Attributes:
-    extraction_system_prompt (str): System prompt to extract the distinct entities in the input. Customising 
-    this can help ensure that the LLM identifies the `entities` that you care about.
-    extraction_prompt (str): Prompt template for entity extraction; must contain a `{text}` placeholder.
-    summarization_evaluation_system_prompt (str): System prompt defining how to evaluate the quality of a summary.
-        Asks an LLM to grade the summary from `poor`, `ok`, to `excellent` and provide a rationale for the grade.
-    summarization_evaluation_prompt (str): Prompt template for summarization evaluation instruction; must contain 
-        `{input}` and `{summary}` placeholders. 
-    entity_density_threshold (float): Threshold for determining if a summary is sufficiently entity-dense.
-    model_id (str): The LLM model name, depends on the LLM's providers to be used `client` being used.
-    temperature (float): LLM temperature setting.
-    max_tokens (int): Maximum number of tokens in the LLM's response.
-
-Methods:
-    extract_entities(text: str) -> List[str]:
-        Uses an LLM to extract unique entities from the text.
-
-    evaluate_summary(input: str, summary: str) -> SummarizationEvaluationResponse:
-        Evaluates the quality of a summary using an LLM.
-
-    score(input: str, output: str, **kwargs: Any) -> dict:
-        Calculates summarization score and entity density score for the given input and output.
-
-
-## Programmatic Evaluators
-
-### ValidJSONScorer
-
-Validate whether a string is valid JSON.
-
+scorer = OpenAIModerationScorer(
+    client=oai_client,
+    model_id="text-embedding-3-small"
+)
 ```
-from weave.scorers import ValidJSONScorer
+
+**How It Works:**
+
+- Sends the AI's output to the OpenAI Moderation endpoint and returns a dictionary indicating whether the content is flagged and details about the categories involved.
+
+**Notes:**
+- Requires the `openai` Python package.
+- The client must be an instance of OpenAI's `OpenAI` or `AsyncOpenAI` client.
+
+---
+
+### `EmbeddingSimilarityScorer`
+
+The `EmbeddingSimilarityScorer` computes the cosine similarity between the embeddings of the AI system's output and a target text from your dataset. It's useful for measuring how similar the AI's output is to a reference text.
+
+```python
+from weave.flow.scorers.similarity_score import EmbeddingSimilarityScorer
+
+llm_client = ...  # initialise your LlM client
+
+similarity_scorer = EmbeddingSimilarityScorer(
+    client=llm_client
+    target_column="reference_text",  # the dataset column to compare the output against
+    threshold=0.4  # the cosine similarity threshold to use  
+)
 ```
+
+**Parameters:**
+
+- `target_column`: Name of the dataset column containing the reference text (default is `"text"`).
+- `threshold` (float): Minimum cosine similarity score considered as similar (default is `0.5`).
+
+---
+
+### `ValidJSONScorer`
+
+The ValidJSONScorer checks whether the AI system's output is valid JSON. This scorer is useful when you expect the output to be in JSON format and need to verify its validity.
+
+```python
+from weave.flow.scorers.json_scorer import ValidJSONScorer
+
+json_scorer = ValidJSONScorer()
+```
+
+**Notes:**
+- If the output cannot be parsed as JSON, or if it parses to a data type other than dict or list, it is considered invalid.
+
+---
+Please add this section to scorers_2.md under the "Predefined Scorers" heading.
+
+---
+
+### `ValidXMLScorer`
+
+The `ValidXMLScorer` checks whether the AI system's output is valid XML. This is useful when expecting XML-formatted outputs.
+
+```python
+from weave.flow.scorers.xml_scorer import ValidXMLScorer
+
+xml_scorer = ValidXMLScorer()
+```
+
+---
+
+### `PydanticScorer`
+
+The `PydanticScorer` validates the AI system's output against a Pydantic model to ensure it adheres to a specified schema or data structure.
+
+```python
+from weave.flow.scorers.pydantic_scorer import PydanticScorer
+from pydantic import BaseModel
+
+class FinancialReport(BaseModel):
+    revenue: int
+    year: str
+
+pydantic_scorer = PydanticScorer(model=Person)
+```
+
+---
+
+### RAGAS - `ContextEntityRecallScorer`
+
+The `ContextEntityRecallScorer` estimates context recall by extracting entities from both the AI system's output and the provided context, then computing the recall score. Based on the [RAGAS](https://github.com/explodinggradients/ragas) evaluation library
+
+```python
+from weave.flow.scorers.ragas_scorer import ContextEntityRecallScorer
+
+llm_client = ...  # initialise your LlM client
+
+entity_recall_scorer = ContextEntityRecallScorer(
+    client=llm_client
+    model_id="your-model-id"
+    )
+```
+
+**How It Works:**
+
+- Uses an LLM to extract unique entities from the output and context.
+- Calculates recall as the proportion of entities in the output that are present in the context.
+- Returns a dictionary with the recall score.
+
+**Notes:**
+
+- Expects a `context` column in your dataset, use `column_map` to map `context` to another dataset column if needed.
+
+---
+
+### RAGAS - `ContextRelevancyScorer`
+
+The `ContextRelevancyScorer` evaluates the relevancy of the provided context to the AI system's output. It helps determine if the context used is appropriate for generating the output. Based on the [RAGAS](https://github.com/explodinggradients/ragas) evaluation library.
+
+```python
+from weave.flow.scorers.ragas_scorer import ContextRelevancyScorer
+
+llm_client = ...  # initialise your LlM client
+
+relevancy_scorer = ContextRelevancyScorer(
+    llm_client = ...  # initialise your LlM client
+    model_id="your-model-id"
+    )
+```
+
+**How It Works:**
+
+- Uses an LLM to rate the relevancy of the context to the output on a scale from 0 to 1.
+- Returns a dictionary with the `relevancy_score`.
+
+**Notes:**
+
+- Expects a `context` column in your dataset, use `column_map` to map `context` to another dataset column if needed.
+- Customize the `relevancy_prompt` to define how relevancy is assessed.
