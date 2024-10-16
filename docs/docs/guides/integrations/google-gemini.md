@@ -61,7 +61,7 @@ Organizing experimentation is difficult when there are many moving pieces. By us
 
 In addition to versioning code and capturing inputs/outputs, [`Model`](../core-types/models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](../core-types/evaluations.md)s.
 
-In the example below, you can experiment with `WeaveModel`. Every time you change one of these, you'll get a new _version_ of `WeaveModel`.
+In the example below, you can experiment with `CityVisitRecommender`. Every time you change one of these, you'll get a new _version_ of `CityVisitRecommender`.
 
 ```python
 import os
@@ -69,7 +69,7 @@ import google.generativeai as genai
 import weave
 
 
-class GroqCityVisitRecommender(weave.Model):
+class CityVisitRecommender(weave.Model):
     model: str
 
     @weave.op()
