@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from PIL import Image
 import pytest
+from PIL import Image
 
 import weave
 from weave.trace.weave_client import WeaveClient, get_ref
