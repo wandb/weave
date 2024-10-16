@@ -22,7 +22,9 @@ from weave.trace.feedback_types.score import SCORE_TYPE_NAME, ScoreTypePayload
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
+    protobuf_object_record,
     pydantic_object_record,
+    safe_is_protobuf_instance,
 )
 from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
 from weave.trace.op import op as op_deco
@@ -157,6 +159,9 @@ def map_to_refs(obj: Any) -> Any:
         return obj_record.map_values(map_to_refs)
     elif dataclasses.is_dataclass(obj):
         obj_record = dataclass_object_record(obj)
+        return obj_record.map_values(map_to_refs)
+    elif safe_is_protobuf_instance(obj):
+        obj_record = protobuf_object_record(obj)
         return obj_record.map_values(map_to_refs)
     elif isinstance(obj, Table):
         return obj.ref
