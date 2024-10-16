@@ -11,7 +11,7 @@ def test_content_generation(client):
 
     genai.configure(api_key=os.environ.get("GOOGLE_GENAI_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
-    model.generate_content("Write a story about an AI and magic")
+    model.generate_content("Explain how AI works in simple terms")
 
     calls = list(client.calls())
     assert len(calls) == 1
@@ -33,7 +33,7 @@ def test_content_generation_stream(client):
     genai.configure(api_key=os.environ.get("GOOGLE_GENAI_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
     response = model.generate_content(
-        "Write a story about an AI and magic", stream=True
+        "Explain how AI works in simple terms", stream=True
     )
     chunks = [chunk.text for chunk in response]
     assert len(chunks) > 1
@@ -59,7 +59,7 @@ async def test_content_generation_async(client):
     genai.configure(api_key=os.environ.get("GOOGLE_GENAI_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
 
-    _ = await model.generate_content_async("Write a story about an AI and magic")
+    _ = await model.generate_content_async("Explain how AI works in simple terms")
 
     calls = list(client.calls())
     assert len(calls) == 1
