@@ -28,6 +28,12 @@ jobs:
       - name: Build dist
         run: |
           uv build
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+      - name: Setup docs
+        run: make setup-docs-ci
       - name: Make docs
         run: |
           make docs
