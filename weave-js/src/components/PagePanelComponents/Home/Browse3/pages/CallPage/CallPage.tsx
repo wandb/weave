@@ -28,6 +28,7 @@ import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
+import { EvaluateCallTab } from './EvaluateCallTab/EvaluateCallTab';
 export const CallPage: FC<{
   entity: string;
   project: string;
@@ -56,20 +57,20 @@ const useCallTabs = (call: CallSchema) => {
   const weaveRef = makeRefCall(entity, project, callId);
   return [
     // Disabling Evaluation tab until it's better for single evaluation
-    ...(false && isEvaluateOp(call.spanName)
+    ...(isEvaluateOp(call.spanName)
       ? [
           {
             label: 'Evaluation',
             content: (
-              <CompareEvaluationsPageContent
-                entity={call.entity}
-                project={call.project}
-                evaluationCallIds={[call.callId]}
-                // Dont persist metric selection in the URL
-                selectedMetrics={{}}
-                setSelectedMetrics={() => {}}
-                // Dont persist changes to evaluationCallIds in the URL
-                onEvaluationCallIdsUpdate={() => {}}
+              <EvaluateCallTab
+                // entity={call.entity}
+                // project={call.project}
+                // evaluationCallIds={[call.callId]}
+                // // Dont persist metric selection in the URL
+                // selectedMetrics={{}}
+                // setSelectedMetrics={() => {}}
+                // // Dont persist changes to evaluationCallIds in the URL
+                // onEvaluationCallIdsUpdate={() => {}}
               />
             ),
           },
