@@ -92,7 +92,7 @@ print(city_recommender.predict("Los Angeles"))
 
 ### Serving a Weave Model
 
-Given a weave reference any WeaveModel object, you can spin up a fastapi server and [serve](https://wandb.github.io/weave/guides/tools/serve) it. You can serve your model by using the following command in the terminal:
+Given a weave reference any `weave.Model` object, you can spin up a fastapi server and [serve](https://wandb.github.io/weave/guides/tools/serve) it. You can serve your model by using the following command in the terminal:
 
 ```shell
 weave serve weave:///your_entity/project-name/YourModel:<hash>
