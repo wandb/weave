@@ -272,13 +272,6 @@ class Evaluation(Object):
                 # input: is the full row, we have access to it via example
                 # output: is the model output, we have access to it via model_output
                 if isinstance(scorer, Scorer) and scorer.column_map is not None:
-                    print(
-                        f"scorer.column_map: {scorer.column_map}"
-                    )  # TODO: delete print statement
-                    print(
-                        f"score_arg_names: {score_arg_names}"
-                    )  # TODO: delete print statement
-                    print(f"example: {example}")  # TODO: delete print statement
                     score_args = {
                         arg: example[scorer.column_map.get(arg, arg)]
                         for arg in score_arg_names
