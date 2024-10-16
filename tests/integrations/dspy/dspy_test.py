@@ -106,22 +106,37 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
     call_1, _ = flattened_calls[0]
     assert call_1.exception is None and call_1.ended_at is not None
     output_1 = call_1.output
-    assert (
-        output_1
-        == """Prediction(
-    sentiment='Positive'
-)"""
-    )
-
+    assert output_1 == {
+        "__class__": {
+            "module": "dspy.primitives.prediction",
+            "qualname": "Prediction",
+            "name": "Prediction",
+        },
+        "completions": {
+            "__class__": {
+                "module": "dspy.primitives.prediction",
+                "qualname": "Completions",
+                "name": "Completions",
+            },
+        },
+    }
     call_2, _ = flattened_calls[1]
     assert call_2.exception is None and call_2.ended_at is not None
     output_2 = call_2.output
-    assert (
-        output_2
-        == """Prediction(
-    sentiment='Positive'
-)"""
-    )
+    assert output_2 == {
+        "__class__": {
+            "module": "dspy.primitives.prediction",
+            "qualname": "Prediction",
+            "name": "Prediction",
+        },
+        "completions": {
+            "__class__": {
+                "module": "dspy.primitives.prediction",
+                "qualname": "Completions",
+                "name": "Completions",
+            },
+        },
+    }
 
     call_3, _ = flattened_calls[2]
     assert call_3.exception is None and call_3.ended_at is not None

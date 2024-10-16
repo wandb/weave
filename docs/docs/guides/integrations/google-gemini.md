@@ -61,7 +61,7 @@ Organizing experimentation is difficult when there are many moving pieces. By us
 
 In addition to versioning code and capturing inputs/outputs, [`Model`](../core-types/models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](../core-types/evaluations.md)s.
 
-In the example below, you can experiment with `WeaveModel`. Every time you change one of these, you'll get a new _version_ of `WeaveModel`.
+In the example below, you can experiment with `CityVisitRecommender`. Every time you change one of these, you'll get a new _version_ of `CityVisitRecommender`.
 
 ```python
 import os
@@ -69,7 +69,7 @@ import google.generativeai as genai
 import weave
 
 
-class GroqCityVisitRecommender(weave.Model):
+class CityVisitRecommender(weave.Model):
     model: str
 
     @weave.op()
@@ -84,7 +84,7 @@ class GroqCityVisitRecommender(weave.Model):
 
 weave.init(project_name="google_ai_studio-test")
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
-city_recommender = GroqCityVisitRecommender(model="gemini-1.5-flash")
+city_recommender = CityVisitRecommender(model="gemini-1.5-flash")
 print(city_recommender.predict("New York"))
 print(city_recommender.predict("San Francisco"))
 print(city_recommender.predict("Los Angeles"))
@@ -92,7 +92,7 @@ print(city_recommender.predict("Los Angeles"))
 
 ### Serving a Weave Model
 
-Given a weave reference any WeaveModel object, you can spin up a fastapi server and [serve](https://wandb.github.io/weave/guides/tools/serve) it. You can serve your model by using the following command in the terminal:
+Given a weave reference to any `weave.Model` object, you can spin up a fastapi server and [serve](https://wandb.github.io/weave/guides/tools/serve) it. You can serve your model by using the following command in the terminal:
 
 ```shell
 weave serve weave:///your_entity/project-name/YourModel:<hash>

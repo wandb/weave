@@ -1,5 +1,6 @@
 import {Box} from '@material-ui/core';
-import React, {useMemo, useState} from 'react';
+import {useDeepMemo} from '@wandb/weave/hookUtils';
+import React, {useEffect, useMemo, useState} from 'react';
 
 import {WeaveLoader} from '../../../../../../common/components/WeaveLoader';
 import {LinearProgress} from '../../../../../LinearProgress';
@@ -64,9 +65,14 @@ export const CompareEvaluationsProvider: React.FC<{
   selectedInputDigest,
   children,
 }) => {
+  const initialEvaluationCallIdsMemo = useDeepMemo(initialEvaluationCallIds);
   const [evaluationCallIds, setEvaluationCallIds] = useState(
-    initialEvaluationCallIds
+    initialEvaluationCallIdsMemo
   );
+  useEffect(() => {
+    setEvaluationCallIds(initialEvaluationCallIdsMemo);
+  }, [initialEvaluationCallIdsMemo]);
+
   const initialState = useEvaluationComparisonState(
     entity,
     project,
