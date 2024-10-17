@@ -266,11 +266,7 @@ class Evaluation(Object):
                 # input: is the full row, we have access to it via example
                 # output: is the model output, we have access to it via model_output
                 score_arg_names = [
-                    param
-                    for param in score_arg_names
-                    if (
-                        param != "self"
-                    )
+                    param for param in score_arg_names if (param != "self")
                 ]
                 score_args = {}
 
