@@ -11,7 +11,7 @@ Scorers are passed to a `weave.Evaluation` object during evaluation. There are t
 Scorers must return a dictionary and can return multiple metrics, nested metrics and non-numeric values such as texted returned from a LLM-evaluator about its reasoning.
 
 ## Function-based Scorers
-These are functions, decorated with @weave.op that return a dictionary. They're great for simple evaluations:
+These are functions decorated with `@weave.op` that return a dictionary. They're great for simple evaluations like:
 
 ```python
 @weave.op
