@@ -463,7 +463,7 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route
           path={[
-            `${projectRoot}/:tab(datasets|models|objects)`,
+            `${projectRoot}/:tab(prompts|datasets|models|objects)`,
             `${projectRoot}/object-versions`,
           ]}>
           <ObjectVersionsPageBinding />
@@ -818,12 +818,12 @@ const ObjectVersionsPageBinding = () => {
       }
     }
 
-    // If the tab is models or datasets, set the baseObjectClass filter
-    // directly from the tab
-    if (tab === 'models') {
+    // Set the baseObjectClass filter based on the tab
+    if (tab === 'prompts') {
+      queryFilter.baseObjectClass = 'Prompt';
+    } else if (tab === 'models') {
       queryFilter.baseObjectClass = 'Model';
-    }
-    if (tab === 'datasets') {
+    } else if (tab === 'datasets') {
       queryFilter.baseObjectClass = 'Dataset';
     }
     return queryFilter;

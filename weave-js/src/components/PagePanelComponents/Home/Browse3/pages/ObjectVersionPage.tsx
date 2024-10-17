@@ -29,6 +29,7 @@ import {EvaluationLeaderboardTab} from './LeaderboardTab';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
+import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
 import {useWFHooks} from './wfReactInterface/context';
 import {
   objectVersionKeyToRefUri,
@@ -44,6 +45,7 @@ type ObjectIconProps = {
   baseObjectClass: KnownBaseObjectClassType;
 };
 const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
+  Prompt: 'forum-chat-bubble',
   Model: 'model',
   Dataset: 'table',
   Evaluation: 'benchmark-square',
@@ -117,16 +119,10 @@ const ObjectVersionPageInner: React.FC<{
   );
   const objectVersionCount = (objectVersions.result ?? []).length;
   const baseObjectClass = useMemo(() => {
-    if (objectVersion.baseObjectClass === 'Dataset') {
-      return 'Dataset';
-    }
-    if (objectVersion.baseObjectClass === 'Model') {
-      return 'Model';
-    }
-    if (objectVersion.baseObjectClass === 'Evaluation') {
-      return 'Evaluation';
-    }
-    return null;
+    const s = objectVersion.baseObjectClass;
+    return KNOWN_BASE_OBJECT_CLASSES.includes(s as KnownBaseObjectClassType)
+      ? (s as KnownBaseObjectClassType)
+      : null;
   }, [objectVersion.baseObjectClass]);
   const refUri = objectVersionKeyToRefUri(objectVersion);
 
