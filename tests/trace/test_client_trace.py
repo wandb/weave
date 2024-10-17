@@ -1511,6 +1511,7 @@ def test_unknown_input_and_output_types(client):
     }
     assert inner_res.calls[0].output == repr(res)
 
+
 def test_unknown_attribute(client):
     class MyUnknownClass:
         val: int
