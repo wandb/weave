@@ -3,13 +3,13 @@ from typing import Any
 from pydantic import Field, field_validator
 
 from weave.flow.scorers.base_scorer import Scorer
-from weave.flow.scorers.llm_utils import _LLM_CLIENTS_NAMES, instructor_client
+from weave.flow.scorers.llm_utils import _LLM_CLIENTS_NAMES, instructor_client, _LLM_CLIENTS
 
 
 class LLMScorer(Scorer):
     """Score a model output using an LLM"""
 
-    client: Any = Field(
+    client: _LLM_CLIENTS = Field(
         description="The LLM client to use, has to be instantiated with an api_key"
     )
     model_id: str = Field(description="The model to use")
@@ -27,7 +27,7 @@ class LLMScorer(Scorer):
 class InstructorLLMScorer(Scorer):
     """Score a model output using an LLM"""
 
-    client: Any = Field(
+    client: _LLM_CLIENTS = Field(
         description="The LLM client to use, has to be instantiated with an api_key"
     )
     model_id: str = Field(description="The model to use")
