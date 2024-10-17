@@ -55,7 +55,7 @@ def test_context_entity_recall_scorer_score(context_entity_recall_scorer):
     assert isinstance(result, dict)
     assert "recall" in result
     assert result["recall"] == 1.0  # Assuming full recall in mock response
-    
+
 
 def test_context_relevancy_scorer_score(context_relevancy_scorer):
     output = "What is the capital of France?"
