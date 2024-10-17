@@ -393,8 +393,8 @@ def test_calls_delete_cascade(client):
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 
     @weave.op()
-    async def score(target, output):
-        return target == output
+    async def score(target, model_output):
+        return target == model_output
 
     evaluation = Evaluation(
         name="my-eval",
