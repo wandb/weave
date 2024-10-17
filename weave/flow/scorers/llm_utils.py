@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import TYPE_CHECKING, Any, List, Union
 
 from weave.trace.autopatch import autopatch
 
@@ -90,4 +90,3 @@ def embed(
         return [embedding.embedding for embedding in response.data]
     else:
         raise ValueError(f"Unsupported client type: {type(client).__name__.lower()}")
-    
