@@ -14,25 +14,12 @@ class EmbeddingSimilarityScorer(LLMScorer):
     The threshold is the minimum cosine similarity score that is considered similar.
 
     Args:
-        target_column: The column to compare the model output to. Defaults to "text".
         threshold: The minimum cosine similarity score that is considered similar. Defaults to 0.5
     """
-
-    target_column: str = Field(
-        ..., description="The column to compare the model output to"
-    )
     threshold: float = Field(0.5, description="The threshold for the similarity score")
 
     @weave.op
-    def score(self, output: Any, dataset_row: dict) -> Any:
-        if self.target_column not in dataset_row:
-            raise ValueError(
-                f"Target column {self.target_column} not found in dataset_row"
-            )
-
-        target = str(
-            dataset_row[self.target_column]
-        )  # TODO: handle if it is not a string
+    def score(self, output: str, target: str) -> Any:
         model_embedding, target_embedding = self._compute_embeddings(output, target)
         return self.cosine_similarity(model_embedding, target_embedding)
 

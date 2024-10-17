@@ -19,7 +19,7 @@ from weave.flow.scorers.ragas_scorer import (
     ContextEntityRecallScorer,
     ContextRelevancyScorer,
 )
-from weave.flow.scorers.similarity_score import EmbeddingSimilarityScorer
+from weave.flow.scorers.similarity_scorer import EmbeddingSimilarityScorer
 from weave.flow.scorers.string_scorer import (
     LevenshteinScorer,
     StringMatchScorer,
