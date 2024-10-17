@@ -265,43 +265,70 @@ class Evaluation(Object):
                 #
                 # input: is the full row, we have access to it via example
                 # output: is the model output, we have access to it via model_output
-                if isinstance(scorer, Scorer) and scorer.column_map is not None:
-                    score_args = {}
-                    for arg in score_arg_names:
-                        # Testing scorer to column_map logic
-                        # Check column_map validity, if column_map contains the scorer args
-                        if arg not in scorer.column_map:
-                            message = textwrap.dedent(
-                            f"""
-                            Scorer {scorer_name} expects argument {arg} to be in `scorer.column_map` keys.
-                            Available scorer keyword argument names: {score_arg_names}
-                            scorer.column_map keys: {scorer.column_map.keys()}
+                score_arg_names = [
+                    param
+                    for param in score_arg_names
+                    if (
+                        param != "self"
+                        and param != "output"
+                        and param != "model_output"
+                    )
+                ]
+                score_args = {}
 
-                            Hint: 
-                            - column_map should follow the format: {{scorer arg name: dataset column name}}
-                            - Check if your scorer.column_map keys and values are not reversed. 
-                            """
-                            )   
+                if isinstance(scorer, Scorer) and scorer.column_map is not None:
+                    # Ensure that all keys in column_map are in score_arg_names
+                    for key in scorer.column_map.keys():
+                        if key not in score_arg_names:
+                            message = textwrap.dedent(
+                                f"""
+                                    You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
+
+                                    The `column_map` contains a key `{key}` which is not in the scorer's argument names.
+                                    Scorer argument names: {score_arg_names}
+
+                                    Hint:
+                                    - Ensure that the keys in `column_map` match the scorer's parameter names.
+                                    """
+                            )
                             raise ValueError(message)
 
-                        # Try to map scorer arg to dataset columm, testing dataset to column_map logic
-                        example_column_name = scorer.column_map.get(arg)
-                        if example_column_name in example:
-                            score_args[arg] = example[example_column_name]
+                    for arg in score_arg_names:
+                        if arg in example:
+                            score_args[arg] = example[arg]
+                        elif arg in scorer.column_map:
+                            dataset_column_name = scorer.column_map[arg]
+                            if dataset_column_name in example:
+                                score_args[arg] = example[dataset_column_name]
+                            else:
+                                message = textwrap.dedent(
+                                    f"""
+                                        You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
+
+                                        You are mapping `{dataset_column_name}`->`{arg}`, but `{dataset_column_name}` 
+                                        is not found in the dataset columns.
+                                        
+                                        Available dataset columns: {list(example.keys())}
+
+                                        Hint:
+                                        - Ensure that `column_map` maps scorer parameter names to existing dataset column names.
+                                        """
+                                )
+                                raise ValueError(message)
                         else:
                             message = textwrap.dedent(
-                            f"""
-                            There is an issue with `scorer.column_map`: {scorer.column_map}.
-                            
-                            The value for column_map key: {arg} is {example_column_name} but 
-                            {example_column_name} is not found in the dataset columns.
-                            
-                            Available dataset columns: {example.keys()}
+                                f"""
+                                    You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
 
-                            Hint: 
-                            - column_map should follow the format: {{scorer arg name: dataset column name}} 
-                            """
-                            )   
+                                    Scorer argument `{arg}` is not found in the dataset columns and is not mapped in `column_map`.
+                                    
+                                    Available dataset columns: {list(example.keys())}
+                                    `column_map`: {scorer.column_map}
+
+                                    Hint:
+                                    - Either provide `{arg}` directly in the dataset, or map it via `column_map`.
+                                    """
+                            )
                             raise ValueError(message)
                 else:
                     score_args = {

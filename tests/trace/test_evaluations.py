@@ -818,9 +818,60 @@ async def test_evaluation_with_column_map():
     ), "The summary should reflect the correct number of matches"
 
 
+@pytest.mark.asyncio
+async def test_evaluation_with_wrong_column_map():
+    # Define a dummy scorer that uses column_map
+    class DummyScorer(Scorer):
+        @weave.op()
+        def score(self, foo: str, bar: str, output: str, target: str) -> dict:
+            # Return whether foo + bar equals output
+            return {"match": (foo + bar) == output == target}
+
+    @weave.op()
+    def model_function(col1, col2):
+        # For testing, return the concatenation of col1 and col2
+        return col1 + col2
+
+    dataset = [
+        {"col1": "Hello", "col2": "World", "target": "HelloWorld"},  # True
+        {"col1": "Hi", "col2": "There", "target": "HiThere"},  # True
+        {"col1": "Good", "col2": "Morning", "target": "GoodMorning"},  # True
+        {"col1": "Bad", "col2": "Evening", "target": "GoodEvening"},  # False
+    ]
+
+    # Test that the column map is correctly used
+    dummy_scorer = DummyScorer(column_map={"foo": "col1", "bar": "col2"})
+    evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
+    eval_out = await evaluation.evaluate(model_function)
+    assert "DummyScorer" in eval_out
+    assert eval_out["DummyScorer"]["match"] == {"true_count": 3, "true_fraction": 0.75}
+
+    with pytest.raises(ValueError) as excinfo:
+        # Create the scorer with column_map mapping 'foo'->'col1', 'bar'->'col3'
+        # this is wrong because col3 does not exist
+        dummy_scorer = DummyScorer(column_map={"foo": "col1", "bar": "col3"})
+        evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
+        await evaluation.predict_and_score(model_function, dataset[0])
+        assert "which is not in the scorer's argument names" in str(excinfo.value)
+
+    with pytest.raises(ValueError) as excinfo:
+        # Create the scorer with column_map missing a column
+        dummy_scorer = DummyScorer(column_map={"foo": "col1"})
+        evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
+        await evaluation.predict_and_score(model_function, dataset[0])
+        assert "is not found in the dataset columns" in str(excinfo.value)
+
+    with pytest.raises(ValueError) as excinfo:
+        # Create the scorer with wrong argument name
+        dummy_scorer = DummyScorer(column_map={"jeez": "col1"})
+        evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
+        await evaluation.predict_and_score(model_function, dataset[0])
+        assert "is not found in the dataset columns and is not mapped" in str(
+            excinfo.value
+        )
+
+
 # Define another dummy scorer
-
-
 @pytest.mark.asyncio
 async def test_evaluation_with_multiple_column_maps():
     class DummyScorer(Scorer):
