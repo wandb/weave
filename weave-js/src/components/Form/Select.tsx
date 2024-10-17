@@ -20,13 +20,14 @@ import {
   TEAL_600,
 } from '@wandb/weave/common/css/globals.styles';
 import {Icon} from '@wandb/weave/components/Icon';
-import React from 'react';
+import React, {forwardRef} from 'react';
 import ReactSelect, {
   components,
   DropdownIndicatorProps,
   GroupBase,
   GroupHeadingProps,
   Props,
+  SelectInstance,
   StylesConfig,
 } from 'react-select';
 import AsyncSelect, {AsyncProps} from 'react-select/async';
@@ -90,12 +91,18 @@ const CLEAR_INDICATOR_PADDING: Record<SelectSize, number> = {
   large: 8,
   variable: 2,
 } as const;
+type OptionType = {
+  value: string;
+  label: React.JSX.Element | string;
+};
 
 export type AdditionalProps = {
   size?: SelectSize;
   errorState?: boolean;
   groupDivider?: boolean;
   cursor?: string;
+  // selectRef: React.MutableRefObject<SelectInstance<OptionType, false> | null>;
+  // ref?: React.RefObject<SelectInstance<OptionType, false>>;
 };
 
 // Toggle icon when open
@@ -289,6 +296,38 @@ const getStyles = <
 };
 
 // See: https://react-select.com/typescript
+export const SelectWithRef = forwardRef<
+  SelectInstance<any, false>, // Define the instance type using OptionType
+  Props<any, false, GroupBase<any>> & AdditionalProps // Define the props type using OptionType
+>(
+  // Declare `OptionType` as a generic parameter for the component
+  <Option,>(
+    props: Props<Option, false, GroupBase<Option>> & AdditionalProps,
+    ref: React.ForwardedRef<SelectInstance<Option, false>>
+  ) => {
+    const styles: StylesConfig<Option, false, GroupBase<Option>> = getStyles(
+      props
+    );
+    const size = props.size ?? 'medium';
+    const showDivider = props.groupDivider ?? false;
+    const GroupHeading = getGroupHeading<Option, false, GroupBase<Option>>(
+      size,
+      showDivider
+    );
+
+    return (
+      <ReactSelect<Option, false, GroupBase<Option>>
+        {...props}
+        ref={ref} // Forward the ref here
+        components={Object.assign(
+          {DropdownIndicator, GroupHeading},
+          props.components
+        )}
+        styles={styles}
+      />
+    );
+  }
+);
 export const Select = <
   Option,
   IsMulti extends boolean = false,
