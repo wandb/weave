@@ -270,8 +270,6 @@ class Evaluation(Object):
                     for param in score_arg_names
                     if (
                         param != "self"
-                        and param != "output"
-                        and param != "model_output"
                     )
                 ]
                 score_args = {}
@@ -294,6 +292,8 @@ class Evaluation(Object):
                             raise ValueError(message)
 
                     for arg in score_arg_names:
+                        if arg == "output" or arg == "model_output":
+                            continue
                         if arg in example:
                             score_args[arg] = example[arg]
                         elif arg in scorer.column_map:
