@@ -3,6 +3,10 @@ from weave.flow.scorers.base_scorer import (
     auto_summarize,
     get_scorer_attributes,
 )
+from weave.flow.scorers.llm_utils import (
+    create,
+    embed,
+)
 from weave.flow.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
     transpose,
@@ -29,6 +33,8 @@ from weave.flow.scorers.xml_scorer import ValidXMLScorer
 
 __all__ = [
     "auto_summarize",
+    "create",
+    "embed",
     "ContextEntityRecallScorer",
     "ContextRelevancyScorer",
     "EmbeddingSimilarityScorer",
