@@ -1,7 +1,6 @@
 # implementing metrics from ragas: https://github.com/explodinggradients/ragas
 
 from textwrap import dedent
-from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -11,7 +10,7 @@ from weave.flow.scorers.llm_utils import create
 
 
 class EntityExtractionResponse(BaseModel):
-    entities: List[str] = Field(
+    entities: list[str] = Field(
         description="A list of unique entities extracted from the text"
     )
 
@@ -29,7 +28,7 @@ class ContextEntityRecallScorer(InstructorLLMScorer):
     Entities:
     """)
 
-    def extract_entities(self, text: str) -> List[str]:
+    def extract_entities(self, text: str) -> list[str]:
         # Use LLM to extract entities
         prompt = self.extraction_prompt.format(text=text)
         response = create(
