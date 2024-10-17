@@ -10,10 +10,11 @@ class ValidJSONScorer(Scorer):
     def score(self, output: Any) -> dict:  # type: ignore
         try:
             result = json.loads(output)
-
-            if isinstance(result, dict) or isinstance(result, list):
-                return {"json_valid": True}
-
         except json.JSONDecodeError:
-            pass
-        return {"json_valid": False}
+            return {"json_valid": False}
+        
+        if isinstance(result, dict) or isinstance(result, list):
+            return {"json_valid": True}
+        else:
+            return {"json_valid": False}
+            
