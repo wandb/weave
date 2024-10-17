@@ -242,7 +242,20 @@ const fetchEvaluationComparisonData = async (
     // Add the user-defined scores
     evalObj.scorerRefs.forEach(scorerRef => {
       const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
-      const score = output[scorerKey];
+      // TODO: REMOVE when sanitized scorer names have been released
+      // this is a hack to support previous unsanitized scorer names
+      // that have spaces.
+      let score = output[scorerKey];
+      if (score == null && scorerKey.includes('-')) {
+        // no score found, '-' means we probably sanitized an illegal character
+        const foundScorerNameMaybe = fuzzyMatchScorerName(
+          Object.keys(output),
+          scorerKey
+        );
+        if (foundScorerNameMaybe != null) {
+          score = output[foundScorerNameMaybe];
+        }
+      }
       const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
         if (isBinarySummaryScore(scoreVal)) {
           const metricDimension: MetricDefinition = {
@@ -726,3 +739,13 @@ type EvaluationEvaluateCallSchema = TraceCallSchema & {
   };
 };
 type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;
+
+function fuzzyMatchScorerName(
+  scoreNames: string[],
+  possibleScorerName: string
+) {
+  // anytime we see a '-' in possibleScorerName, it can be any illegal character
+  // in score names. Use a regex to find matches, and return the first match.
+  const regex = new RegExp(possibleScorerName.replace(/-/g, '.'));
+  return scoreNames.find(name => regex.test(name));
+}

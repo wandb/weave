@@ -9,6 +9,7 @@ import weave
 from weave.flow.obj import Object
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, as_op, is_op
+from weave.trace.weave_client import sanitize_object_name
 
 
 class Scorer(Object):
@@ -102,6 +103,11 @@ def get_scorer_attributes(
         summarize_fn = auto_summarize  # type: ignore
     else:
         raise ValueError(f"Unknown scorer type: {scorer}")
+
+    if not scorer_name:
+        raise ValueError("Scorer name is required")
+    scorer_name = sanitize_object_name(scorer_name)
+
     return (scorer_name, score_fn, summarize_fn)  # type: ignore
 
 
