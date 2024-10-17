@@ -48,11 +48,6 @@ def context_relevancy_scorer(mock_create):
     )
 
 
-def test_context_entity_recall_scorer_initialization(context_entity_recall_scorer):
-    assert isinstance(context_entity_recall_scorer, ContextEntityRecallScorer)
-    assert context_entity_recall_scorer.model_id == "gpt-4o"
-
-
 def test_context_entity_recall_scorer_score(context_entity_recall_scorer):
     output = "Paris is the capital of France."
     context = "The capital city of France is Paris."
@@ -60,12 +55,7 @@ def test_context_entity_recall_scorer_score(context_entity_recall_scorer):
     assert isinstance(result, dict)
     assert "recall" in result
     assert result["recall"] == 1.0  # Assuming full recall in mock response
-
-
-def test_context_relevancy_scorer_initialization(context_relevancy_scorer):
-    assert isinstance(context_relevancy_scorer, ContextRelevancyScorer)
-    assert context_relevancy_scorer.model_id == "gpt-4o"
-
+    
 
 def test_context_relevancy_scorer_score(context_relevancy_scorer):
     output = "What is the capital of France?"

@@ -22,8 +22,6 @@ def mock_create(monkeypatch):
                 think_step_by_step="This is some reasoning.",
                 summarization_evaluation="excellent",
             )
-        else:
-            return None
 
     # Patch the 'create' function wherever it is called
     monkeypatch.setattr("weave.flow.scorers.summarization_scorer.create", _mock_create)
