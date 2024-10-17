@@ -1,7 +1,7 @@
 # Evaluation Metrics
 
 ## Evaluations in Weave
-In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics They take the AI's output, analyze it, and return a dictionary with the results. Scorers can use your input data as a reference if needed and can also output extra information, such as explanations or reasonings from the evaluation.
+In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics. They take the AI's output, analyze it, and return a dictionary of results. Scorers can use your input data as reference if needed and can also output extra information, such as explanations or reasonings from the evaluation.
 
 Scorers are passed to a `weave.Evaluation` object during evaluation. There are two types of Scorers in weave:
 
