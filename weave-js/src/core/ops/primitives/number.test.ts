@@ -7,7 +7,7 @@ import {
   taggedValue,
 } from '../../model';
 import {testClient} from '../../testUtil';
-import {opNumberFloor} from './number';
+import {opNumberFloor, opNumberToTimestamp} from './number';
 
 describe('number ops', () => {
   describe('floor', () => {
@@ -86,6 +86,44 @@ describe('number ops', () => {
         ]),
       });
       expect(await client.query(expr)).toEqual([1, null, 2]);
+    });
+  });
+
+  describe('timestamp', () => {
+    it('handles a unix timestamp in miliseconds', async () => {
+      const client = await testClient();
+      const expr = opNumberToTimestamp({val: constNumber(1729000000000)});
+      expect(await client.query(expr)).toEqual(1729000000000);
+    });
+
+    it('handles a unix timestamp in microseconds by converting to ms', async () => {
+      const client = await testClient();
+      const expr = opNumberToTimestamp({
+        val: constNumber(1729000000000 * 1000 * 1000),
+      });
+      expect(await client.query(expr)).toEqual(1729000000000);
+    });
+
+    it('handles a unix timestamp in nanoseconds by converting to ms', async () => {
+      const client = await testClient();
+      const expr = opNumberToTimestamp({
+        val: constNumber(1729000000000 * 1000 * 1000 * 1000),
+      });
+      expect(await client.query(expr)).toEqual(1729000000000);
+    });
+
+    it('handles negative numbers', async () => {
+      const client = await testClient();
+      const expr = opNumberToTimestamp({
+        val: constNumber(-1 * 1729000000000 * 1000 * 1000 * 1000),
+      });
+      expect(await client.query(expr)).toEqual(-1729000000000);
+    });
+
+    it('handles a unix timestamp in seconds by doing nothing', async () => {
+      const client = await testClient();
+      const expr = opNumberToTimestamp({val: constNumber(1729000000)});
+      expect(await client.query(expr)).toEqual(1729000000);
     });
   });
 });
