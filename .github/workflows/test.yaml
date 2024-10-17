@@ -191,6 +191,13 @@ jobs:
       - name: Run nox
         run: nox -e lint
 
+  spellcheck:
+    name: Spellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: typos-action
+        uses: crate-ci/typos@v1.26.0
+
   trace-docs:
     name: Trace docs
     timeout-minutes: 10
