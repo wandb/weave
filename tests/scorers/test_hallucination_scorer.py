@@ -69,21 +69,29 @@ async def test_hallucination_scorer_eval(hallucination_scorer):
         scorers=[hallucination_scorer],
     )
     result = await evaluation.evaluate(model)
-    assert result['HallucinationFreeScorer']["hallucination_free"]["true_count"] == 2
-    assert result['HallucinationFreeScorer']["hallucination_free"]["true_fraction"] == 1.0
+    assert result["HallucinationFreeScorer"]["hallucination_free"]["true_count"] == 2
+    assert (
+        result["HallucinationFreeScorer"]["hallucination_free"]["true_fraction"] == 1.0
+    )
 
 
 @pytest.mark.asyncio
 async def test_hallucination_scorer_eval2(hallucination_scorer):
     dataset = [
-        {"input": "John likes various types of cheese.", "other_col": "John's favorite cheese is cheddar."},
-        {"input": "Pepe likes various types of cheese.", "other_col": "Pepe's favorite cheese is gouda."},
+        {
+            "input": "John likes various types of cheese.",
+            "other_col": "John's favorite cheese is cheddar.",
+        },
+        {
+            "input": "Pepe likes various types of cheese.",
+            "other_col": "Pepe's favorite cheese is gouda.",
+        },
     ]
 
     @weave.op
     def model(input):
         return "The person's favorite cheese is cheddar."
-    
+
     hallucination_scorer.column_map = {"context": "input", "output": "other_col"}
 
     evaluation = weave.Evaluation(
@@ -91,5 +99,7 @@ async def test_hallucination_scorer_eval2(hallucination_scorer):
         scorers=[hallucination_scorer],
     )
     result = await evaluation.evaluate(model)
-    assert result['HallucinationFreeScorer']["hallucination_free"]["true_count"] == 2
-    assert result['HallucinationFreeScorer']["hallucination_free"]["true_fraction"] == 1.0
+    assert result["HallucinationFreeScorer"]["hallucination_free"]["true_count"] == 2
+    assert (
+        result["HallucinationFreeScorer"]["hallucination_free"]["true_fraction"] == 1.0
+    )

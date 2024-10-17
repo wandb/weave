@@ -16,6 +16,7 @@ class EmbeddingSimilarityScorer(LLMScorer):
     Args:
         threshold: The minimum cosine similarity score that is considered similar. Defaults to 0.5
     """
+
     threshold: float = Field(0.5, description="The threshold for the similarity score")
 
     @weave.op

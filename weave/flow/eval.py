@@ -245,7 +245,7 @@ class Evaluation(Object):
             ):
                 message = textwrap.dedent(
                     f"""
-                    Scorer {scorer_name} must have an `output` or `model_output` argument, to receive the 
+                    Scorer {scorer_name} must have an `output` or `model_output` argument, to receive the
                     output of the model function.
                     """
                 )
@@ -305,7 +305,7 @@ class Evaluation(Object):
                                     f"""
                                         You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
 
-                                        You are mapping `{dataset_column_name}`->`{arg}`, but `{dataset_column_name}` 
+                                        You are mapping `{dataset_column_name}`->`{arg}`, but `{dataset_column_name}`
                                         is not found in the dataset columns.
                                         
                                         Available dataset columns: {list(example.keys())}
@@ -379,7 +379,7 @@ class Evaluation(Object):
                     f"""
                     Call error: {e}
 
-                                        If using the `Scorer` weave class, you can set the `scorer.column_map` 
+                                        If using the `Scorer` weave class, you can set the `scorer.column_map`
                     attribute to map scorer parameter names to dataset columns.
                     
                     For example, if the scorer expects "output", "input" and "ground_truth" and we have a dataset

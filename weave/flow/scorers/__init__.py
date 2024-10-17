@@ -3,10 +3,6 @@ from weave.flow.scorers.base_scorer import (
     auto_summarize,
     get_scorer_attributes,
 )
-from weave.flow.scorers.llm_utils import (
-    create,
-    embed,
-)
 from weave.flow.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
     transpose,
@@ -16,6 +12,10 @@ from weave.flow.scorers.json_scorer import ValidJSONScorer
 from weave.flow.scorers.llm_scorer import (
     InstructorLLMScorer,
     LLMScorer,
+)
+from weave.flow.scorers.llm_utils import (
+    create,
+    embed,
 )
 from weave.flow.scorers.moderation_scorer import OpenAIModerationScorer
 from weave.flow.scorers.pydantic_scorer import PydanticScorer
