@@ -1,3 +1,6 @@
+---
+title: Use an LLM to tag and caption images
+---
 
 
 :::tip[This is a notebook]
@@ -9,7 +12,10 @@
 :::
 
 
-# Using GPT-4o mini to tag & caption images
+
+<!--- @wandbcode{cod-notebook} -->
+
+# Use an LLM to tag & caption images
 
 This notebook explores how to leverage the vision capabilities of the GPT-4* models (for example `gpt-4o`, `gpt-4o-mini` or `gpt-4-turbo`) to tag & caption images. 
 
