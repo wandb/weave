@@ -84,4 +84,4 @@ class ContextRelevancyScorer(InstructorLLMScorer):
             response_model=RelevancyResponse,
             model=self.model_id,
         )
-        return {"relevancy_score": response.relevancy_score}
+        return response.model_dump()

@@ -17,9 +17,9 @@ def mock_create(monkeypatch):
     def _mock_create(*args, **kwargs):
         # Retrieve the response_model to return appropriate mock responses
         response_model = kwargs.get("response_model")
-        if isinstance(response_model, EntityExtractionResponse):
+        if response_model is EntityExtractionResponse:
             return EntityExtractionResponse(entities=["Paris"])
-        elif isinstance(response_model, RelevancyResponse):
+        elif response_model is RelevancyResponse:
             return RelevancyResponse(
                 reasoning="The context directly answers the question.",
                 relevancy_score=1,
