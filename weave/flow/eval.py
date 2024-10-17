@@ -305,7 +305,7 @@ class Evaluation(Object):
                                     f"""
                                         You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
 
-                                        You are mapping `{dataset_column_name}`->`{arg}`, but `{dataset_column_name}`
+                                        You are mapping `{arg}`<-`{dataset_column_name}`, but `{dataset_column_name}`
                                         is not found in the dataset columns.
                                         
                                         Available dataset columns: {list(example.keys())}
