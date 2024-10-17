@@ -2,9 +2,10 @@ from typing import Any, Iterable, Optional, Union
 
 from pydantic import Field, field_validator
 
-import weave
 from weave.flow.obj import Object
 from weave.flow.util import map_nested_dict
+from weave.trace.op import Op
+from weave.trace.table import Table
 from weave.trace.weave_client import Call
 
 
@@ -40,16 +41,14 @@ class Dataset(Object):
     ```
     """
 
-    rows: Union[weave.Table, Iterable[dict]] = Field(
-        default_factory=lambda: weave.Table(rows=[])
-    )
+    rows: Union[Table, Iterable[dict]] = Field(default_factory=lambda: Table(rows=[]))
 
     @field_validator("rows", mode="before")
-    def convert_to_table(cls, rows: Any) -> weave.Table:
+    def convert_to_table(cls, rows: Any) -> Table:
         if rows is None:
-            return weave.Table(rows=[])
+            return Table(rows=[])
 
-        if isinstance(rows, weave.Table):
+        if isinstance(rows, Table):
             return rows
 
         if isinstance(rows, Iterable):
@@ -58,7 +57,7 @@ class Dataset(Object):
                 if not isinstance(row, dict):
                     raise ValueError(f"Expected dict, got {type(row)}")
                 lst.append(row)
-            return weave.Table(rows=lst)
+            return Table(rows=lst)
 
         raise ValueError(f"Cannot convert `{type(rows)}` to weave.Table")
 
@@ -90,14 +89,11 @@ def add_calls_to_dataset(
         dataset = Dataset()
 
     if not dataset.rows:
-        dataset = Dataset(rows=weave.Table(rows=calls_as_dicts))
+        dataset = Dataset(rows=Table(rows=calls_as_dicts))
     else:
-        dataset = Dataset(rows=weave.Table(rows=dataset.rows.rows + calls_as_dicts))
+        dataset = Dataset(rows=Table(rows=dataset.rows.rows + calls_as_dicts))
 
     return dataset
 
 
-def register_mapping(
-    dataset: weave.Dataset, op: weave.Op, mapping: dict[str, str]
-) -> None:
-    weave.publish
+def register_mapping(dataset: Dataset, op: Op, mapping: dict[str, str]) -> None: ...
