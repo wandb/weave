@@ -1,14 +1,10 @@
 import {Box} from '@mui/material';
 import {GridColDef, GridRenderCellParams} from '@mui/x-data-grid-pro';
-import {
-  FORMAT_NUMBER_NO_DECIMALS,
-  formatTokenCost,
-  getLLMTotalTokenCost,
-} from '@wandb/weave/util/llmTokenCosts';
 import React from 'react';
 
-import {StyledDataGrid} from '../../StyledDataGrid';
-import {UsageData} from './TraceUsageStats';
+import {StyledDataGrid} from '../../../StyledDataGrid';
+import {LLMCostSchema} from '../../wfReactInterface/traceServerClientTypes';
+import {FORMAT_NUMBER_NO_DECIMALS, formatTokenCost} from './costUtils';
 
 const renderNumberCell = (params: GridRenderCellParams) => (
   <Box sx={{textAlign: 'right', width: '100%'}}>
@@ -59,31 +55,30 @@ const columns: GridColDef[] = [
   },
 ];
 
-export const CostTable = ({usage}: {usage: {[key: string]: UsageData}}) => {
-  const usageData = Object.entries(usage ?? {}).map(([k, v]) => {
-    const promptTokens = v.input_tokens ?? v.prompt_tokens;
-    const completionTokens = v.output_tokens ?? v.completion_tokens;
+const sumCostDataForCostTable = (costs: {[key: string]: LLMCostSchema}) => {
+  const costData: any[] = Object.entries(costs ?? {}).map(([k, v]) => {
+    const promptTokens = v.input_tokens ?? v.prompt_tokens ?? 0;
+    const completionTokens = v.output_tokens ?? v.completion_tokens ?? 0;
     return {
       id: k,
       ...v,
       prompt_tokens: promptTokens,
       completion_tokens: completionTokens,
-      total_tokens: v.total_tokens || promptTokens + completionTokens,
-      cost: getLLMTotalTokenCost(k, promptTokens, completionTokens),
+      total_tokens: promptTokens + completionTokens,
+      cost:
+        (v.completion_tokens_total_cost ?? 0) +
+        (v.prompt_tokens_total_cost ?? 0),
     };
   });
 
   // if more than one model is used, add a row for the total usage
-  if (usageData.length > 1) {
-    const totalUsage = usageData.reduce(
+  if (costData.length > 1) {
+    const totalUsage = costData.reduce(
       (acc, curr) => {
-        const promptTokens = curr.input_tokens ?? curr.prompt_tokens;
-        const completionTokens = curr.output_tokens ?? curr.completion_tokens;
         acc.requests += curr.requests;
-        acc.prompt_tokens += promptTokens;
-        acc.completion_tokens += completionTokens;
-        acc.total_tokens +=
-          curr.total_tokens || promptTokens + completionTokens;
+        acc.prompt_tokens += curr.prompt_tokens;
+        acc.completion_tokens += curr.completion_tokens;
+        acc.total_tokens += curr.total_tokens;
         acc.cost += curr.cost;
         return acc;
       },
@@ -96,11 +91,17 @@ export const CostTable = ({usage}: {usage: {[key: string]: UsageData}}) => {
       }
     );
 
-    usageData.push({
+    costData.push({
       id: 'Total',
       ...totalUsage,
     });
   }
+
+  return costData;
+};
+
+export const CostTable = ({costs}: {costs: {[key: string]: LLMCostSchema}}) => {
+  const costData = sumCostDataForCostTable(costs);
 
   return (
     <StyledDataGrid
@@ -127,7 +128,7 @@ export const CostTable = ({usage}: {usage: {[key: string]: UsageData}}) => {
       disableColumnPinning={false}
       columnHeaderHeight={38}
       columns={columns}
-      rows={usageData}
+      rows={costData}
       rowHeight={38}
       rowSelection={false}
       keepBorders={true}
