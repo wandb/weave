@@ -99,7 +99,7 @@ based on the <input_data>."
 the <output> contains hallucinations."
     )
     conclusion: str = Field(description="The conclusion of the analysis.")
-    hallucination_free: bool = Field(
+    has_hallucination: bool = Field(
         description="Whether the <output> is free of hallucinations based on the <input_data>. True means it is NOT a hallucination."
     )
 

@@ -24,7 +24,7 @@ def mock_create(monkeypatch):
                 )
             ],
             conclusion="The output is consistent with the input data.",
-            hallucination_free=True,
+            has_hallucination=True,
         )
 
     monkeypatch.setattr("weave.flow.scorers.hallucination_scorer.create", _mock_create)
@@ -47,7 +47,7 @@ def test_hallucination_scorer_score(hallucination_scorer, mock_create):
     # we should be able to do this validation
     _ = HallucinationResponse.model_validate(result)
 
-    assert result["hallucination_free"] == True
+    assert result["has_hallucination"] == True
     assert result["conclusion"] == "The output is consistent with the input data."
     assert len(result["reasonings"]) == 1
     assert result["reasonings"][0]["hallucination_type"] == "No Hallucination"
@@ -69,9 +69,9 @@ async def test_hallucination_scorer_eval(hallucination_scorer):
         scorers=[hallucination_scorer],
     )
     result = await evaluation.evaluate(model)
-    assert result["HallucinationFreeScorer"]["hallucination_free"]["true_count"] == 2
+    assert result["HallucinationFreeScorer"]["has_hallucination"]["true_count"] == 2
     assert (
-        result["HallucinationFreeScorer"]["hallucination_free"]["true_fraction"] == 1.0
+        result["HallucinationFreeScorer"]["has_hallucination"]["true_fraction"] == 1.0
     )
 
 
@@ -99,7 +99,7 @@ async def test_hallucination_scorer_eval2(hallucination_scorer):
         scorers=[hallucination_scorer],
     )
     result = await evaluation.evaluate(model)
-    assert result["HallucinationFreeScorer"]["hallucination_free"]["true_count"] == 2
+    assert result["HallucinationFreeScorer"]["has_hallucination"]["true_count"] == 2
     assert (
-        result["HallucinationFreeScorer"]["hallucination_free"]["true_fraction"] == 1.0
+        result["HallucinationFreeScorer"]["has_hallucination"]["true_fraction"] == 1.0
     )
