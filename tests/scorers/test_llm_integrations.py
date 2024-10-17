@@ -67,7 +67,7 @@ test_params = [
 @pytest.mark.parametrize("provider,model", test_params, ids=lambda p: f"{p[0]}:{p[1]}")
 def test_summarization_scorer_evaluate_summary(provider, model):
     client, model_id = get_client_and_model(provider, model)
-        
+
     summarization_scorer = SummarizationScorer(
         client=client,
         model_id=model_id,

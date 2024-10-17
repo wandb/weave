@@ -24,8 +24,6 @@ def mock_create(monkeypatch):
                 reasoning="The context directly answers the question.",
                 relevancy_score=1,
             )
-        else:
-            return None
 
     monkeypatch.setattr("weave.flow.scorers.ragas_scorer.create", _mock_create)
 
