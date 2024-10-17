@@ -1,10 +1,11 @@
-from typing import Any
+from typing import Any, Iterable, Optional, Union
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
 import weave
 from weave.flow.obj import Object
-from weave.trace.vals import WeaveTable
+from weave.flow.util import map_nested_dict
+from weave.trace.weave_client import Call
 
 
 def short_str(obj: Any, limit: int = 25) -> str:
@@ -39,29 +40,64 @@ class Dataset(Object):
     ```
     """
 
-    rows: weave.Table
+    rows: Union[weave.Table, Iterable[dict]] = Field(
+        default_factory=lambda: weave.Table(rows=[])
+    )
 
     @field_validator("rows", mode="before")
     def convert_to_table(cls, rows: Any) -> weave.Table:
-        if not isinstance(rows, weave.Table):
-            table_ref = getattr(rows, "table_ref", None)
-            if isinstance(rows, WeaveTable):
-                rows = list(rows)
-            rows = weave.Table(rows)
-            if table_ref:
-                rows.table_ref = table_ref
-        if len(rows.rows) == 0:
-            raise ValueError("Attempted to construct a Dataset with an empty list.")
-        for row in rows.rows:
-            if not isinstance(row, dict):
-                raise ValueError(
-                    "Attempted to construct a Dataset with a non-dict object. Found type: "
-                    + str(type(row))
-                    + " of row: "
-                    + short_str(row)
-                )
-            if len(row) == 0:
-                raise ValueError(
-                    "Attempted to construct a Dataset row with an empty dict."
-                )
-        return rows
+        if rows is None:
+            return weave.Table(rows=[])
+
+        if isinstance(rows, weave.Table):
+            return rows
+
+        if isinstance(rows, Iterable):
+            lst = []
+            for row in rows:
+                if not isinstance(row, dict):
+                    raise ValueError(f"Expected dict, got {type(row)}")
+                lst.append(row)
+            return weave.Table(rows=lst)
+
+        raise ValueError(f"Cannot convert `{type(rows)}` to weave.Table")
+
+
+def prep_for_dataset(
+    call: Call, column_mapping: Optional[dict[str, str]] = None
+) -> dict:
+    d = call.to_dict()
+
+    # TODO: hack to resolve op binding issue
+    if "self" in d.get("inputs", {}):
+        del d["inputs"]["self"]
+
+    if column_mapping:
+        d = map_nested_dict(d, column_mapping)
+
+    return d
+
+
+def add_calls_to_dataset(
+    calls: list[Call],
+    dataset: Optional[Dataset] = None,
+    *,
+    dataset_mapping: Optional[dict[str, str]] = None,
+) -> Dataset:
+    calls_as_dicts = [prep_for_dataset(c, dataset_mapping) for c in calls]
+
+    if dataset is None:
+        dataset = Dataset()
+
+    if not dataset.rows:
+        dataset = Dataset(rows=weave.Table(rows=calls_as_dicts))
+    else:
+        dataset = Dataset(rows=weave.Table(rows=dataset.rows.rows + calls_as_dicts))
+
+    return dataset
+
+
+def register_mapping(
+    dataset: weave.Dataset, op: weave.Op, mapping: dict[str, str]
+) -> None:
+    weave.publish

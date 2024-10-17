@@ -24,6 +24,7 @@ def lint(session):
 @nox.parametrize(
     "shard",
     [
+        "custom",  # for when you want to run your own tests
         "trace",
         "trace_server",
         "anthropic",
@@ -65,6 +66,7 @@ def tests(session, shard):
 
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
+        "custom": [],
         "trace": ["trace/"],
         "trace_server": ["trace_server/"],
         "mistral0": ["integrations/mistral/v0/"],

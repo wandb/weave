@@ -295,6 +295,14 @@ class Call:
     def remove_display_name(self) -> None:
         self.set_display_name(None)
 
+    def to_dict(self) -> dict:
+        d = {}
+        for field in dataclasses.fields(self):
+            if not field.name.startswith("_"):
+                d[field.name] = getattr(self, field.name)
+        d["op_name"] = self.op_name
+        return d
+
 
 class CallsIter:
     server: TraceServerInterface

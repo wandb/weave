@@ -70,3 +70,40 @@ async def run_in_process_with_timeout(
         raise ValueError(
             "Unhandled exception in subprocess. Exitcode: " + str(process.exitcode)
         )
+
+
+def map_nested_dict(input_dict: dict, mapping: dict, separator: str = ".") -> dict:
+    """
+    Maps a deeply nested dictionary to another deeply nested dictionary based on a given mapping.
+
+    Args:
+    input_dict (dict): The input dictionary to be mapped.
+    mapping (dict): A dictionary specifying the mapping from input keys to output keys.
+                    Keys in this dict can be separated strings to indicate nested paths.
+    separator (str): The character used to separate nested keys. Defaults to '.'.
+
+    Returns:
+    dict: The mapped dictionary.
+    """
+
+    def get_nested_value(d: dict, path: str) -> Any:
+        for key in path.split(separator):
+            if isinstance(d, dict) and key in d:
+                d = d[key]
+            else:
+                return None
+        return d
+
+    def set_nested_value(d: dict, path: str, value: Any) -> None:
+        keys = path.split(separator)
+        for key in keys[:-1]:
+            d = d.setdefault(key, {})
+        d[keys[-1]] = value
+
+    result: dict[str, Any] = {}
+    for input_path, output_path in mapping.items():
+        value = get_nested_value(input_dict, input_path)
+        if value is not None:
+            set_nested_value(result, output_path, value)
+
+    return result
