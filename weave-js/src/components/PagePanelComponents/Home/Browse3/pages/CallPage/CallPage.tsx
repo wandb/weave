@@ -11,6 +11,7 @@ import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {NotFoundPanel} from '../../NotFoundPanel';
+import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {
@@ -22,7 +23,7 @@ import {TabUseCall} from '../TabUseCall';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {CallChat, isCallChat} from './CallChat';
+import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
@@ -64,6 +65,11 @@ const useCallTabs = (call: CallSchema) => {
                 entity={call.entity}
                 project={call.project}
                 evaluationCallIds={[call.callId]}
+                // Dont persist metric selection in the URL
+                selectedMetrics={{}}
+                setSelectedMetrics={() => {}}
+                // Dont persist changes to evaluationCallIds in the URL
+                onEvaluationCallIdsUpdate={() => {}}
               />
             ),
           },
@@ -110,7 +116,11 @@ const useCallTabs = (call: CallSchema) => {
     },
     {
       label: 'Summary',
-      content: <CallSummary call={call} />,
+      content: (
+        <Tailwind style={{height: '100%', overflow: 'auto'}}>
+          <CallSummary call={call} />
+        </Tailwind>
+      ),
     },
     {
       label: 'Use',

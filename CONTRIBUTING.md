@@ -15,7 +15,7 @@
 ## Issues
 1. Check the [issues](https://github.com/wandb/weave/issues) and [PRs](https://github.com/wandb/weave/pulls) to see if the feature/bug has already been requested/fixed. If not, [open an issue](https://github.com/wandb/weave/issues/new/choose). This helps us keep track of feature requests and bugs!
 2. If you're having issues, the best way we can help is when you can share a reproducible example.
-   1. In general, it's helpful use this format:
+   1. In general, it's helpful to use this format:
       ```
       <short description of the issue>
       <link to your project>

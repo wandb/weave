@@ -33,7 +33,8 @@ export const useCallsForQuery = (
   gridFilter: GridFilterModel,
   gridSort: GridSortModel,
   gridPage: GridPaginationModel,
-  expandedColumns: Set<string>
+  expandedColumns: Set<string>,
+  columns?: string[]
 ): {
   costsLoading: boolean;
   result: CallSchema[];
@@ -58,7 +59,7 @@ export const useCallsForQuery = (
     offset,
     sortBy,
     filterBy,
-    undefined,
+    columns,
     expandedColumns,
     {
       refetchOnDelete: true,

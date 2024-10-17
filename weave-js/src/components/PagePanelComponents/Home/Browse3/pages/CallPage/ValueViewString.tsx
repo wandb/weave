@@ -7,7 +7,6 @@ import {toast} from '../../../../../../common/components/elements/Toast';
 import Markdown from '../../../../../../common/components/Markdown';
 import {MOON_150} from '../../../../../../common/css/color.styles';
 import {TargetBlank} from '../../../../../../common/util/links';
-import {isLikelyMarkdown} from '../../../../../../util/markdown';
 import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
@@ -75,9 +74,13 @@ PreserveWrapping.displayName = 'S.PreserveWrapping';
 
 const getDefaultFormat = (value: string): Format => {
   // TODO: Add JSON detection.
-  if (isLikelyMarkdown(value)) {
-    return 'Markdown';
-  }
+  // We previously would autoselect the markdown renderer if the string appeared
+  // to have markdown content. Unfortunately, our markdown renderer can hang
+  // for several seconds on large strings and was particularly a problem when
+  // the user would do something like expand all inputs. Rendering the markdown
+  // is nice for cases like embedded code or images, so it would be nice to revisit
+  // this if we can fix the issue with the renderer somehow. Leaving this function
+  // in the code for that reason.
   return 'Text';
 };
 

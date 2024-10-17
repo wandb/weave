@@ -1,4 +1,5 @@
-from typing import Any, Optional
+import logging
+from typing import Any, Callable, Optional, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -12,6 +13,27 @@ from weave.trace.op import ObjectRef, Op
 from weave.trace.vals import WeaveObject, pydantic_getattribute
 from weave.trace.weave_client import get_ref
 
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+def deprecated_field(new_field_name: str) -> Callable[[Callable[[Any], T]], property]:
+    def decorator(func: Callable[[Any], T]) -> property:
+        warning_msg = f"Use `{new_field_name}` instead of `{func.__name__}`, which is deprecated and will be removed in a future version."
+
+        def getter(self: Any) -> T:
+            logger.warning(warning_msg)
+            return getattr(self, new_field_name)
+
+        def setter(self: Any, value: T) -> None:
+            logger.warning(warning_msg)
+            setattr(self, new_field_name, value)
+
+        return property(fget=getter, fset=setter)
+
+    return decorator
+
 
 class Object(BaseModel):
     name: Optional[str] = None
@@ -23,6 +45,8 @@ class Object(BaseModel):
         arbitrary_types_allowed=True,
         protected_namespaces=(),
         extra="forbid",
+        # Intended to be used to allow "deprecated" aliases for fields until we fully remove them.
+        populate_by_name=True,
     )
 
     __str__ = BaseModel.__repr__

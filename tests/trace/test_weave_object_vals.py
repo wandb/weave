@@ -1,4 +1,5 @@
 import weave
+from weave.trace.context.weave_client_context import set_weave_client_global
 from weave.trace.vals import WeaveObject
 
 
@@ -31,6 +32,6 @@ def test_weaveobject_access_after_init_termination(client):
     # simulate a situation where the client is closed
     # but a reference to a trace object still exists.
 
-    weave.trace.client_context.weave_client.set_weave_client_global(None)
+    set_weave_client_global(None)
 
     assert my_obj.val == 1
