@@ -139,6 +139,13 @@ def openai_accumulator(
         """Once the first_chunk is set (acc), take the next chunk and append the message content
         to the message content of acc or first_chunk.
         """
+        if (
+            not hasattr(chunk, "choices")
+            or not chunk.choices
+            or len(chunk.choices) == 0
+        ):
+            return acc_choices
+
         for chunk_choice in chunk.choices:
             for i in range(chunk_choice.index + 1 - len(acc_choices)):
                 acc_choices.append(
@@ -256,7 +263,7 @@ def openai_accumulator(
     )
 
     # add usage info
-    if len(value.choices) == 0 and value.usage:
+    if value.choices and len(value.choices) == 0 and value.usage:
         acc.usage = value.usage
         if skip_last:
             raise StopIteration(acc)
