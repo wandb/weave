@@ -277,6 +277,12 @@ def should_use_accumulator(inputs: dict) -> bool:
     )
 
 
+def process_inputs(*args: Any, **kwargs: Any) -> tuple[Any, Any]:
+    if len(args) == 1 and isinstance(args[0], weave.Prompt):
+        return [], args[0].to_dict()
+    return args, kwargs
+
+
 def create_wrapper_sync(
     name: str,
 ) -> Callable[[Callable], Callable]:
@@ -301,6 +307,7 @@ def create_wrapper_sync(
 
         op = weave.op()(_add_stream_options(fn))
         op.name = name  # type: ignore
+        op._set_on_execute_handler(process_inputs)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
@@ -338,6 +345,7 @@ def create_wrapper_async(
 
         op = weave.op()(_add_stream_options(fn))
         op.name = name  # type: ignore
+        op._set_on_execute_handler(process_inputs)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(

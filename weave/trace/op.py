@@ -84,6 +84,7 @@ def print_call_link(call: "Call") -> None:
         print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
+OnExecuteHandlerType = Callable[[Any, Any], tuple[Any, Any]]
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
 OnOutputHandlerType = Callable[[Any, FinishCallbackType, Dict], Any]
 # Call, original function output, exception if occurred
@@ -155,6 +156,10 @@ class Op(Protocol):
     call: Callable[..., Any]
     calls: Callable[..., "CallsIter"]
 
+    # Handler for modifying inputs before the call is made
+    _set_on_execute_handler: Callable[[OnExecuteHandlerType], None]
+    _on_execute_handler: Optional[OnExecuteHandlerType]
+
     # not sure if this is the best place for this, but kept for compat
     _set_on_output_handler: Callable[[OnOutputHandlerType], None]
     _on_output_handler: Optional[OnOutputHandlerType]
@@ -173,6 +178,12 @@ class Op(Protocol):
     # should consider a more user-friendly API (perhaps a setter/getter) & whether
     # it disables child ops as well.
     _tracing_enabled: bool
+
+
+def _set_on_execute_handler(func: Op, on_execute: OnExecuteHandlerType) -> None:
+    if func._on_execute_handler is not None:
+        raise ValueError("Cannot set on_execute_handler multiple times")
+    func._on_execute_handler = on_execute
 
 
 def _set_on_output_handler(func: Op, on_output: OnOutputHandlerType) -> None:
@@ -235,6 +246,13 @@ def _create_call(
     )
 
 
+def _prep_args(__op: Op, *args: Any, **kwargs: Any) -> tuple[Any, Any]:
+    """Allow Ops to override the arguments passed to the underlying function."""
+    if __op._on_execute_handler:
+        return __op._on_execute_handler(*args, **kwargs)
+    return args, kwargs
+
+
 def _execute_call(
     __op: Op,
     call: Any,
@@ -291,11 +309,12 @@ def _execute_call(
             raise
         return None, call
 
+    prepped_args, prepped_kwargs = _prep_args(__op, *args, **kwargs)
     if inspect.iscoroutinefunction(func):
 
         async def _call_async() -> tuple[Any, "Call"]:
             try:
-                res = await func(*args, **kwargs)
+                res = await func(*prepped_args, **prepped_kwargs)
             except Exception as e:
                 return handle_exception(e)
             else:
@@ -304,7 +323,7 @@ def _execute_call(
         return _call_async()
 
     try:
-        res = func(*args, **kwargs)
+        res = func(*prepped_args, **prepped_kwargs)
     except Exception as e:
         handle_exception(e)
     else:
@@ -599,6 +618,9 @@ def op(
 
             wrapper.__call__ = wrapper  # type: ignore
             wrapper.__self__ = wrapper  # type: ignore
+
+            wrapper._set_on_execute_handler = partial(_set_on_execute_handler, wrapper)  # type: ignore
+            wrapper._on_execute_handler = None  # type: ignore
 
             wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
             wrapper._on_output_handler = None  # type: ignore
