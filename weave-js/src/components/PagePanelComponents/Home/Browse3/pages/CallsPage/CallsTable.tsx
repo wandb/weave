@@ -661,6 +661,7 @@ export const CallsTable: FC<{
         pb: 1,
         display: hideControls ? 'none' : 'flex',
         alignItems: 'center',
+        pr: '12px',
       }}
       filterListItems={
         <Tailwind style={{display: 'contents'}}>
