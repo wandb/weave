@@ -1,4 +1,4 @@
-# Not Diamond ¬◇
+# Not Diamond
 
 When building complex LLM workflows users may need to prompt different models according to accuracy,
 cost, or call latency. Users can use [Not Diamond][nd] to route prompts in these workflows to the
@@ -9,7 +9,7 @@ right model for their needs, helping maximize accuracy while saving on model cos
 Make sure you have [created an account][account] and [generated an API key][keys], then add your API
 key to your env as `NOTDIAMOND_API_KEY`.
 
-![[Create an API key](imgs/notdiamond/api-keys.png)]
+![Create an API key](imgs/notdiamond/api-keys.png)
 
 From here, you can
 
