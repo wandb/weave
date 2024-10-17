@@ -242,7 +242,11 @@ const fetchEvaluationComparisonData = async (
     // Add the user-defined scores
     evalObj.scorerRefs.forEach(scorerRef => {
       const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
-      const score = output[scorerKey];
+      let score = output[scorerKey];
+      if (score == null && scorerKey.includes('-')) {
+        const keyWithSpaces = scorerKey.replace('-', ' ');
+        score = output[keyWithSpaces];
+      }
       const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
         if (isBinarySummaryScore(scoreVal)) {
           const metricDimension: MetricDefinition = {
