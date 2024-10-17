@@ -90,26 +90,4 @@ def embed(
         return [embedding.embedding for embedding in response.data]
     else:
         raise ValueError(f"Unsupported client type: {type(client).__name__.lower()}")
-
-
-# Helper function for dynamic imports
-def import_client(provider: str) -> Optional[_LLM_CLIENTS]:  # type: ignore
-    try:
-        if provider == "openai":
-            from openai import OpenAI
-
-            return OpenAI
-        elif provider == "anthropic":
-            import anthropic
-
-            return anthropic.Anthropic
-        elif provider == "mistral":
-            from mistralai import Mistral
-
-            return Mistral
-        elif provider == "gemini":
-            from google.generativeai import GenerativeModel
-
-            return GenerativeModel
-    except ImportError:
-        return None
+    
