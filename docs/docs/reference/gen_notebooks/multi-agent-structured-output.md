@@ -15,7 +15,7 @@ multi-agent-structured-output
 
 
 
-<!--- @wandbcode{prompt-optim-notebook} -->
+<!--- @wandbcode{multi-agent-structured-output} -->
 
 # Structured Outputs for Multi-Agent Systems
 
@@ -27,7 +27,9 @@ The use of structured outputs in a multi-agent system enhances communication by 
 
 This tutorial demonstrates how we can utilize structured outputs in multi-agent system and trace them with [Weave](../../introduction.md).
 
+:::tip
 This cookbook is based on [sample code from OpenAI's structured outputs](https://cookbook.openai.com/examples/structured_outputs_multi_agent), with some modifications added for improved visualization using Weave.
+:::
 
 ## Installing the Dependencies
 
