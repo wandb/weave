@@ -130,3 +130,8 @@ def set_call_stack(
         yield stack
     finally:
         _call_stack.reset(token)
+
+
+call_attributes: contextvars.ContextVar[typing.Dict[str, typing.Any]] = (
+    contextvars.ContextVar("call_attributes", default={})
+)

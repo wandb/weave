@@ -24,6 +24,8 @@ export type EvaluationComparisonState = {
   comparisonDimensions?: ComparisonDimensionsType;
   // The current digest which is in view
   selectedInputDigest?: string;
+  // The selected metrics to display
+  selectedMetrics?: Record<string, boolean>;
 };
 
 export type ComparisonDimensionsType = Array<{
@@ -43,7 +45,8 @@ export const useEvaluationComparisonState = (
   evaluationCallIds: string[],
   baselineEvaluationCallId?: string,
   comparisonDimensions?: ComparisonDimensionsType,
-  selectedInputDigest?: string
+  selectedInputDigest?: string,
+  selectedMetrics?: Record<string, boolean>
 ): Loadable<EvaluationComparisonState> => {
   const data = useEvaluationComparisonData(entity, project, evaluationCallIds);
 
@@ -93,6 +96,7 @@ export const useEvaluationComparisonState = (
           baselineEvaluationCallId ?? evaluationCallIds[0],
         comparisonDimensions: newComparisonDimensions,
         selectedInputDigest,
+        selectedMetrics,
       },
     };
   }, [
@@ -102,6 +106,7 @@ export const useEvaluationComparisonState = (
     evaluationCallIds,
     comparisonDimensions,
     selectedInputDigest,
+    selectedMetrics,
   ]);
 
   return value;

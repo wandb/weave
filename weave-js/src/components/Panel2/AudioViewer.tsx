@@ -172,9 +172,10 @@ const AudioViewer = (props: AudioViewerProps) => {
                 style={{
                   background: globals.white,
                   width: '100%',
-                  overflow: 'hidden',
+                  overflowX: 'auto',
+                  overflowY: 'hidden',
                   display: 'flex',
-                  justifyContent: 'center',
+                  justifyContent: 'left',
                   flex: '1 1',
                 }}>
                 {

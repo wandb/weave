@@ -23,6 +23,10 @@ from tests.trace.util import (
 )
 from weave import Thread, ThreadPoolExecutor
 from weave.trace import weave_client
+from weave.trace.context.weave_client_context import (
+    get_weave_client,
+    set_weave_client_global,
+)
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
@@ -1473,25 +1477,23 @@ def test_named_reuse(client):
 
 
 def test_unknown_input_and_output_types(client):
-    class MyUnserializableClassA:
+    class MyUnknownClassA:
         a_val: float
 
         def __init__(self, a_val) -> None:
             self.a_val = a_val
 
-    class MyUnserializableClassB:
+    class MyUnknownClassB:
         b_val: float
 
         def __init__(self, b_val) -> None:
             self.b_val = b_val
 
     @weave.op()
-    def op_with_unknown_types(
-        a: MyUnserializableClassA, b: float
-    ) -> MyUnserializableClassB:
-        return MyUnserializableClassB(a.a_val + b)
+    def op_with_unknown_types(a: MyUnknownClassA, b: float) -> MyUnknownClassB:
+        return MyUnknownClassB(a.a_val + b)
 
-    a = MyUnserializableClassA(3)
+    a = MyUnknownClassA(3)
     res = op_with_unknown_types(a, 0.14)
 
     assert res.b_val == 3.14
@@ -1511,18 +1513,18 @@ def test_unknown_input_and_output_types(client):
 
 
 def test_unknown_attribute(client):
-    class MyUnserializableClass:
+    class MyUnknownClass:
         val: int
 
         def __init__(self, a_val) -> None:
             self.a_val = a_val
 
     class MySerializableClass(weave.Object):
-        obj: MyUnserializableClass
+        obj: MyUnknownClass
 
-    a_obj = MyUnserializableClass(1)
+    a_obj = MyUnknownClass(1)
     a = MySerializableClass(obj=a_obj)
-    b_obj = MyUnserializableClass(2)
+    b_obj = MyUnknownClass(2)
     b = MySerializableClass(obj=b_obj)
 
     ref_a = weave.publish(a)
@@ -1537,12 +1539,12 @@ def test_unknown_attribute(client):
 
 @contextmanager
 def _no_graph_client():
-    client = weave.trace.client_context.weave_client.get_weave_client()
-    weave.trace.client_context.weave_client.set_weave_client_global(None)
+    client = get_weave_client()
+    set_weave_client_global(None)
     try:
         yield
     finally:
-        weave.trace.client_context.weave_client.set_weave_client_global(client)
+        set_weave_client_global(client)
 
 
 @contextmanager
@@ -2980,7 +2982,7 @@ def test_weave_finish_unsets_client(client):
     def foo():
         return 1
 
-    weave.trace.client_context.weave_client.set_weave_client_global(None)
+    set_weave_client_global(None)
     weave.trace.weave_init._current_inited_client = (
         weave.trace.weave_init.InitializedClient(client)
     )

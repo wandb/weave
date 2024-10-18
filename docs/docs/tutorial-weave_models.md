@@ -117,7 +117,7 @@ new_dinos = weave.ref("weave:///morgan/jurassic-park/object/ExtractDinos:ey4udBU
 # set the client to the openai client again
 new_dinos.client = client
 
-new_sentence = """I also saw a Ankylosaurus grazing on giant ferns"""
+new_sentence = """I also saw an Ankylosaurus grazing on giant ferns"""
 new_result = new_dinos.invoke(new_sentence)
 print(new_result)
 ```

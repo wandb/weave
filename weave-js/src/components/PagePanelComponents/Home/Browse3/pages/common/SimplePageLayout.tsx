@@ -68,7 +68,8 @@ export const SimplePageLayout: FC<{
           backgroundColor: 'white',
           pb: 0,
           height: 44,
-
+          width: '100%',
+          borderBottom: '1px solid #e0e0e0',
           display: 'flex',
           flexDirection: 'row',
           alignItems: 'center',
@@ -78,7 +79,7 @@ export const SimplePageLayout: FC<{
         <Box
           sx={{
             height: 44,
-            flex: '0 0 44px',
+            flex: '1 0 44px',
             display: 'flex',
             flexDirection: 'row',
             alignItems: 'center',
@@ -198,6 +199,7 @@ export const SimplePageLayoutWithHeader: FC<{
       <Box
         sx={{
           height: 44,
+          width: '100%',
           flex: '0 0 44px',
           display: 'flex',
           flexDirection: 'row',

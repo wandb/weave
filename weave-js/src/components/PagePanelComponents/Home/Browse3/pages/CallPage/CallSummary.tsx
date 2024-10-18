@@ -1,4 +1,3 @@
-import {Divider} from '@mui/material';
 import _ from 'lodash';
 import React from 'react';
 
@@ -32,7 +31,22 @@ export const CallSummary: React.FC<{
   );
 
   return (
-    <div style={{padding: 8, overflow: 'auto'}}>
+    <div className="overflow-auto px-16 pt-12">
+      {span.summary.usage && (
+        <div className="mb-16">
+          {/* This styling is similar to what is is SimpleKeyValueTable */}
+          <p
+            className="mb-10"
+            style={{
+              fontWeight: 600,
+              marginRight: 10,
+              paddingRight: 10,
+            }}>
+            Usage
+          </p>
+          <CostTable usage={span.summary.usage as {[key: string]: UsageData}} />
+        </div>
+      )}
       <SimpleKeyValueTable
         data={{
           Operation:
@@ -63,25 +77,6 @@ export const CallSummary: React.FC<{
           ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
         }}
       />
-      {span.summary.usage && (
-        <>
-          <Divider sx={{marginY: '16px'}} />
-          <div>
-            {/* This styling is similar to what is is SimpleKeyValueTable */}
-            <p
-              style={{
-                fontWeight: 600,
-                marginRight: 10,
-                paddingRight: 10,
-              }}>
-              Usage
-            </p>
-            <CostTable
-              usage={span.summary.usage as {[key: string]: UsageData}}
-            />
-          </div>
-        </>
-      )}
     </div>
   );
 };

@@ -286,7 +286,11 @@ const ObjectVersionsTable: React.FC<{
         },
         renderCell: cellParams => {
           const category = cellParams.value;
-          if (category === 'Model' || category === 'Dataset') {
+          if (
+            category === 'Model' ||
+            category === 'Dataset' ||
+            category === 'Evaluation'
+          ) {
             return <TypeVersionCategoryChip baseObjectClass={category} />;
           }
           return null;

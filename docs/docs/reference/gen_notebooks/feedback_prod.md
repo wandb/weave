@@ -13,7 +13,6 @@ title: Log Feedback from Production
 
 
 
-<img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 <!--- @wandbcode{feedback-colab} -->
 
 
