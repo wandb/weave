@@ -133,17 +133,15 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
-            name: 'Leaderboard',
-            slug: 'weave/leaderboards',
-            isShown: showWeaveSidebarItems || isShowAll,
-            iconName: IconNames.BenchmarkSquare,
-          },
-          {
-            type: 'button' as const,
             name: 'Traces',
             slug: 'weave/traces',
             isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.LayoutTabs,
+          },
+          {
+            type: 'divider' as const,
+            key: 'dividerWithinWeave',
+            isShown: isWeaveOnly,
           },
           {
             type: 'button' as const,
@@ -151,6 +149,18 @@ export const useProjectSidebar = (
             slug: 'weave/evaluations',
             isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.BaselineAlt,
+          },
+          {
+            type: 'button' as const,
+            name: 'Leads',
+            slug: 'weave/leaderboards',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.BenchmarkSquare,
+          },
+          {
+            type: 'divider' as const,
+            key: 'dividerWithinWeave',
+            isShown: isWeaveOnly,
           },
           {
             type: 'button' as const,
