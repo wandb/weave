@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 import weave
 from weave.trace.refs import OpRef
-from weave.trace.weave_client import Call, WeaveClient, get_ref
+from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server.trace_server_interface import CallsFilter
 
 
@@ -15,7 +15,7 @@ class LeaderboardColumn(BaseModel):
     summary_metric_path_parts: list[str] = field(default_factory=list)
     should_minimize: Optional[bool] = None
 
-class LeaderboardSpec(weave.Object):
+class Leaderboard(weave.Object):
     columns: list[LeaderboardColumn]
 
 class LeaderboardModelEvaluationResult(BaseModel):
@@ -30,7 +30,7 @@ class LeaderboardModelResult(BaseModel):
     column_scores: list[ModelScoresForColumn]
 
 
-def get_leaderboard_results(spec: LeaderboardSpec, client: WeaveClient) -> list[LeaderboardModelResult]:
+def get_leaderboard_results(spec: Leaderboard, client: WeaveClient) -> list[LeaderboardModelResult]:
     entity, project = client._project_id().split("/")
     calls = client.get_calls(filter=CallsFilter(
         op_names=[OpRef(
@@ -41,19 +41,6 @@ def get_leaderboard_results(spec: LeaderboardSpec, client: WeaveClient) -> list[
         ).uri()],
         input_refs=[c.evaluation_object_ref for c  in spec.columns]
     ))
-    def get_scores(call: Call) -> list[float]:
-        res = []
-        for c in spec.columns:
-            val = call.output.get(c.scorer_name)
-            for part in c.summary_metric_path_parts:
-                if isinstance(val, dict):
-                    val = val.get(part)
-                elif isinstance(val, list):
-                    val = val[int(part)]
-                else:
-                    break
-            res.append(val)
-        return res
     
     res_map: dict[str, LeaderboardModelResult] = {}
     for call in calls:

@@ -1,14 +1,25 @@
-import { Box } from '@material-ui/core';
-import { Button } from '@wandb/weave/components/Button/Button';
-import React, { FC } from 'react';
+import {Box} from '@material-ui/core';
+import {Button} from '@wandb/weave/components/Button/Button';
+import React, {FC, useCallback} from 'react';
+import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
+import {useWeaveflowRouteContext} from '../../context';
+import {StyledDataGrid} from '../../StyledDataGrid';
+import {CallsTable} from '../CallsPage/CallsTable';
+import {useEvaluationsFilter} from '../CallsPage/evaluationsFilter';
 import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
   EMPTY_PROPS_LEADERBOARDS,
 } from '../common/EmptyContent';
 import {SimplePageLayout} from '../common/SimplePageLayout';
+import {
+  FilterableObjectVersionsTable,
+  ObjectVersionsTable,
+} from '../ObjectVersionsPage';
+import {useWFHooks} from '../wfReactInterface/context';
+import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const LeaderboardListingPage: React.FC<{
   entity: string;
@@ -24,7 +35,7 @@ export const LeaderboardListingPage: React.FC<{
           content: <LeaderboardListingPageInner {...props} />,
         },
       ]}
-      headerExtra={<CreateLeaderboardButton/>}
+      headerExtra={<CreateLeaderboardButton />}
     />
   );
 };
@@ -33,111 +44,116 @@ export const LeaderboardListingPageInner: React.FC<{
   entity: string;
   project: string;
 }> = props => {
-  const customLeaderboards = [
-    {
-      name: 'Weather_genApp_experts',
-      description: 'This is the description',
-      modelsEvaluated: '16',
-    },
-    {
-      name: 'TidePressure_modeling_team',
-      description: 'This is the description',
-      modelsEvaluated: '30',
-    },
-    {
-      name: 'ClimateModel_genApp_experts',
-      description: 'This is the description',
-      modelsEvaluated: '15',
-    },
-    {
-      name: 'OceanCurrent_analysis_team',
-      description: 'This is the description',
-      modelsEvaluated: '70',
-    },
-    {
-      name: 'Windflow_projection_experts',
-      description: 'This is the description',
-      modelsEvaluated: '82',
-    },
-    {
-      name: 'AtmoMetrics_analysis_team',
-      description: 'This is the description',
-      modelsEvaluated: '40',
-    },
-    {
-      name: 'HydroFluor_research_specialists',
-      description: 'This is the description',
-      modelsEvaluated: '202',
-    },
-  ];
+  // const customLeaderboards = [
+  //   {
+  //     name: 'Weather_genApp_experts',
+  //     description: 'This is the description',
+  //     modelsEvaluated: '16',
+  //   },
+  //   {
+  //     name: 'TidePressure_modeling_team',
+  //     description: 'This is the description',
+  //     modelsEvaluated: '30',
+  //   },
+  //   {
+  //     name: 'ClimateModel_genApp_experts',
+  //     description: 'This is the description',
+  //     modelsEvaluated: '15',
+  //   },
+  //   {
+  //     name: 'OceanCurrent_analysis_team',
+  //     description: 'This is the description',
+  //     modelsEvaluated: '70',
+  //   },
+  //   {
+  //     name: 'Windflow_projection_experts',
+  //     description: 'This is the description',
+  //     modelsEvaluated: '82',
+  //   },
+  //   {
+  //     name: 'AtmoMetrics_analysis_team',
+  //     description: 'This is the description',
+  //     modelsEvaluated: '40',
+  //   },
+  //   {
+  //     name: 'HydroFluor_research_specialists',
+  //     description: 'This is the description',
+  //     modelsEvaluated: '202',
+  //   },
+  // ];
 
-  const evalBoards = [
-    {
-      name: 'Weather_genApp_experts',
-      description: 'This is the description',
-      modelsEvaluated: '16',
-    },
-    {
-      name: 'TidePressure_modeling_team',
-      description: 'This is the description',
-      modelsEvaluated: '30',
-    },
-    {
-      name: 'ClimateModel_genApp_experts',
-      description: 'This is the description',
-      modelsEvaluated: '15',
-    },
-    {
-      name: 'OceanCurrent_analysis_team',
-      description: 'This is the description',
-      modelsEvaluated: '70',
-    },
-    {
-      name: 'Windflow_projection_experts',
-      description: 'This is the description',
-      modelsEvaluated: '82',
-    },
-    {
-      name: 'AtmoMetrics_analysis_team',
-      description: 'This is the description',
-      modelsEvaluated: '40',
-    },
-    {
-      name: 'HydroFluor_research_specialists',
-      description: 'This is the description',
-      modelsEvaluated: '202',
-    },
-  ];
+  // const evalBoards = [
+  //   {
+  //     name: 'Weather_genApp_experts',
+  //     description: 'This is the description',
+  //     modelsEvaluated: '16',
+  //   },
+  //   {
+  //     name: 'TidePressure_modeling_team',
+  //     description: 'This is the description',
+  //     modelsEvaluated: '30',
+  //   },
+  //   {
+  //     name: 'ClimateModel_genApp_experts',
+  //     description: 'This is the description',
+  //     modelsEvaluated: '15',
+  //   },
+  //   {
+  //     name: 'OceanCurrent_analysis_team',
+  //     description: 'This is the description',
+  //     modelsEvaluated: '70',
+  //   },
+  //   {
+  //     name: 'Windflow_projection_experts',
+  //     description: 'This is the description',
+  //     modelsEvaluated: '82',
+  //   },
+  //   {
+  //     name: 'AtmoMetrics_analysis_team',
+  //     description: 'This is the description',
+  //     modelsEvaluated: '40',
+  //   },
+  //   {
+  //     name: 'HydroFluor_research_specialists',
+  //     description: 'This is the description',
+  //     modelsEvaluated: '202',
+  //   },
+  // ];
 
-  const hasCustomLeaderboards = customLeaderboards.length > 0;
-  const hasEvalLeaderboards = evalBoards.length > 0;
-  const allEmpty = !hasCustomLeaderboards && !hasEvalLeaderboards;
+  // const hasCustomLeaderboards = customLeaderboards.length > 0;
+  // const hasEvalLeaderboards = evalBoards.length > 0;
+  // const allEmpty = !hasCustomLeaderboards && !hasEvalLeaderboards;
+  const evaluationsFilter = useEvaluationsFilter(props.entity, props.project);
 
-  return allEmpty ? (
-    <Empty {...EMPTY_PROPS_EVALUATIONS} />
-  ) : (
+  return (
     <Container>
       <Section>
-        <SectionTitle>Custom Leaderboards ({customLeaderboards.length})</SectionTitle>
-        {!hasCustomLeaderboards ? (
-          <Empty {...EMPTY_PROPS_LEADERBOARDS} />
-        ) : (
-          <QueueGrid>
-            {customLeaderboards.map(queue => (
-              <QueueCard key={queue.name}>
-                <LeaderboardName>{queue.name}</LeaderboardName>
-                <LeaderboardDescription>{queue.description}</LeaderboardDescription>
-                <ModelCount>
-                  {queue.modelsEvaluated} models
-                </ModelCount>
-              </QueueCard>
-            ))}
-          </QueueGrid>
-        )}
+        {/* <SectionTitle>Leaderboards</SectionTitle> */}
+        <LeaderboardTable entity={props.entity} project={props.project} />
+        {/* // <QueueGrid>
+          //   {customLeaderboards.map(queue => (
+          //     <QueueCard key={queue.name}>
+          //       <LeaderboardName>{queue.name}</LeaderboardName>
+          //       <LeaderboardDescription>{queue.description}</LeaderboardDescription>
+          //       <ModelCount>
+          //         {queue.modelsEvaluated} models
+          //       </ModelCount>
+          //     </QueueCard>
+          //   ))}
+          // </QueueGrid>
+        )} */}
       </Section>
       <Section>
-        <SectionTitle>Evaluation Leaderboards ({evalBoards.length})</SectionTitle>
-        <QueueGrid>
+        <SectionTitle>Recent Evaluations</SectionTitle>
+        {/* <CallsTable 
+            entity={props.entity}
+            project={props.project}
+            frozenFilter={evaluationsFilter}
+            // hideControls
+            // hideOpSelector
+            allowedColumnPatterns={['status','inputs.self', 'inputs.model', 'output.*']}
+          /> */}
+        {/* <QueueGrid>
           {evalBoards.map(queue => (
             <QueueCard key={queue.name}>
               <LeaderboardName>{queue.name}</LeaderboardName>
@@ -147,23 +163,22 @@ export const LeaderboardListingPageInner: React.FC<{
               </ModelCount>
             </QueueCard>
           ))}
-        </QueueGrid>
+        </QueueGrid> */}
       </Section>
     </Container>
   );
 };
 
 const Container = styled.div`
-  padding: 16px;
+  // padding: 16px;
   width: 100%;
   height: 100%;
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 `;
 
-
-
-const CreateLeaderboardButton: FC = (
-) => {
+const CreateLeaderboardButton: FC = () => {
   return (
     <Box
       sx={{
@@ -186,10 +201,11 @@ const CreateLeaderboardButton: FC = (
   );
 };
 
-
 const Section = styled.div`
   margin-top: 0px;
   margin-bottom: 30px;
+  flex: 1;
+  overflow: hidden;
 `;
 
 const SectionTitle = styled.h2`
@@ -197,43 +213,42 @@ const SectionTitle = styled.h2`
   margin-bottom: 10px;
 `;
 
-const QueueGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 24px;
-`;
+const LeaderboardTable: React.FC<{
+  entity: string;
+  project: string;
+}> = props => {
+  const history = useHistory();
+  const {peekingRouter} = useWeaveflowRouteContext();
+  const {useRootObjectVersions} = useWFHooks();
+  const leaderboardObjectVersions = useRootObjectVersions(
+    props.entity,
+    props.project,
+    {
+      baseObjectClasses: ['Leaderboard'],
+      latestOnly: true,
+    }
+  );
+  const onClick = useCallback(
+    (obj: ObjectVersionSchema) => {
+      const to = peekingRouter.leaderboardsUIUrl(
+        props.entity,
+        props.project,
+        obj.objectId
+      );
+      history.push(to);
+    },
+    [history, peekingRouter, props.entity, props.project]
+  );
 
-const QueueCard = styled.div`
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 20px;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  background-color: #fff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-
-  &:hover {
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    border-color: #00A4B8;
-  }
-`;
-
-const LeaderboardName = styled.h3`
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0 0 12px 0;
-  color: #00A4B8;
-`;
-
-const LeaderboardDescription = styled.p`
-  font-size: 14px;
-  color: #666;
-  margin: 0 0 16px 0;
-  line-height: 1.4;
-`;
-
-const ModelCount = styled.div`
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-`;
+  return (
+    <ObjectVersionsTable
+      objectVersions={leaderboardObjectVersions.result ?? []}
+      objectTitle="Name"
+      hidePropsAsColumns
+      hidePeerVersionsColumn
+      hideCategoryColumn
+      hideVersionSuffix
+      onRowClick={onClick}
+    />
+  );
+};

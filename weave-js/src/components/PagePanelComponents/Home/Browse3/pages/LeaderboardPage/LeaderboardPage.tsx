@@ -103,7 +103,7 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
               alignItems: 'center',
             }}>
             <EditableMarkdown
-              value={description}
+              value={props.leaderboardName + '\n' + description}
               onChange={setDescription}
               placeholder={DEFAULT_DESCRIPTION}
             />

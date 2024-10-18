@@ -5,8 +5,8 @@ from weave.flow import leaderboard
 from weave.trace.weave_client import get_ref
 
 
-def test_emptyleaderboard(client):
-    spec = leaderboard.LeaderboardSpec(
+def test_leaderboard_empty(client):
+    spec = leaderboard.Leaderboard(
         name="Test Leaderboard",
         description="This is a test leaderboard",
         columns=[
@@ -63,7 +63,7 @@ async def do_evaluations():
 async def test_leaderboard_with_results(client):
     evaluation_obj_1, evaluation_obj_2, simple_model, static_model, bad_model = await do_evaluations()
 
-    spec = leaderboard.LeaderboardSpec(
+    spec = leaderboard.Leaderboard(
         name="Test Leaderboard",
         description="This is a test leaderboard",
         columns=[
@@ -75,12 +75,17 @@ async def test_leaderboard_with_results(client):
         ]
     )
 
+    ref = weave.publish(spec)
+
+    # TODO: this is not working
+    # spec = ref.get()
+
     results = leaderboard.get_leaderboard_results(spec, client)
     assert len(results) == 1
     assert results[0].model_ref == get_ref(simple_model).uri()
     assert results[0].column_scores[0].scores[0].value == 1.0
 
-    spec = leaderboard.LeaderboardSpec(
+    spec = leaderboard.Leaderboard(
         name="Test Leaderboard",
         description="This is a test leaderboard",
         columns=[
