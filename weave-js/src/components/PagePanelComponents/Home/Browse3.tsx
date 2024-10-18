@@ -986,7 +986,6 @@ const CompareEvaluationsBinding = () => {
 const LeaderboardPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
   const {entity, project, itemName: leaderboardName} = params;
-  console.log({params, leaderboardName});
   if (!leaderboardName) {
     return <LeaderboardListingPage entity={entity} project={project} />;
   }

@@ -15,9 +15,8 @@ type LeaderboardPageProps = {
 };
 
 export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
-  return <>{props.leaderboardName}</>;
   return (
-    <LeaderboardPageContent entity={props.entity} project={props.project} />
+    <LeaderboardPageContent {...props} />
   );
 };
 
