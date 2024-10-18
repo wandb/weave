@@ -73,7 +73,10 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       if (['Trials', 'Run Date'].includes(metricPathGroup)) {
         return 'transparent';
       }
-      const shouldMinimize = ['Avg. Latency'].includes(metricPathGroup);
+      const shouldMinimize =
+        ['Avg. Latency'].includes(metricPathGroup) ||
+        columnStats.datasetGroups[datasetGroup].scorerGroups[scorerGroup]
+          .metricPathGroups[metricPathGroup].shouldMinimize;
       if (score == null) {
         return 'transparent';
       }
@@ -111,8 +114,23 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         minWidth: 150,
         flex: 1,
         renderCell: (params: GridRenderCellParams) => {
+          let isOp = false;
+          try {
+            isOp =
+              Object.values(
+                Object.values(
+                  Object.values(
+                    (params.row as RowData).modelGroup.datasetGroups
+                  )[0].scorerGroups
+                )[0].metricPathGroups
+              )[0][0].modelType === 'op';
+          } catch (e) {
+            console.log(e);
+          }
           const modelRef = parseRefMaybe(
-            `weave:///${entity}/${project}/object/${params.value}` ?? ''
+            `weave:///${entity}/${project}/${isOp ? 'op' : 'object'}/${
+              params.value
+            }` ?? ''
           );
           if (modelRef) {
             return (
@@ -350,6 +368,7 @@ type ColumnStats = {
               min: number;
               max: number;
               count: number;
+              shouldMinimize: boolean;
             };
           };
         };
@@ -395,6 +414,7 @@ const getColumnStats = (data: GroupedLeaderboardData): ColumnStats => {
                     min: metricValue,
                     max: metricValue,
                     count: metricPathGroup.length,
+                    shouldMinimize: metricPathGroup[0].shouldMinimize ?? false,
                   };
                 } else {
                   currScorerGroup.metricPathGroups[metricPathGroupName].min =
@@ -505,7 +525,5 @@ const defaultGetSortComparator =
 
 /**
 TODO:
-* [ ] Support shouldMinimize
 * [ ] When models are Ops, their link is not quite right
-* [ ] There is a not a perfect mapping of the data model (we over select with the current js impl.)
  */

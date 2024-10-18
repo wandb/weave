@@ -14,6 +14,8 @@ import {ObjectVersionsTable} from '../ObjectVersionsPage';
 import {useWFHooks} from '../wfReactInterface/context';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
+const SHOW_LEADERBOARD_OBJECTS = false;
+
 const Container = styled.div`
   width: 100%;
   height: 100%;
@@ -34,7 +36,7 @@ export const LeaderboardListingPage: React.FC<{
           content: <LeaderboardListingPageInner {...props} />,
         },
       ]}
-      headerExtra={<CreateLeaderboardButton />}
+      headerExtra={SHOW_LEADERBOARD_OBJECTS && <CreateLeaderboardButton />}
     />
   );
 };

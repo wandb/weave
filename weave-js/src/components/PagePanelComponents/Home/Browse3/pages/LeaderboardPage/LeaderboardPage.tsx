@@ -2,21 +2,15 @@ import {Box} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {Loading} from '@wandb/weave/components/Loading';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useState} from 'react';
 
-import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {LeaderboardGrid} from '../../views/Leaderboard/LeaderboardGrid';
-import {useLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
-import {
-  FilterAndGroupSourceEvaluationSpec,
-  FilterAndGroupSpec,
-  LeaderboardConfigType,
-} from '../../views/Leaderboard/types/leaderboardConfigType';
+import {usePythonLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
+import {PythonLeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
-import {EditableMarkdown, StyledReactMarkdown} from './EditableMarkdown';
-import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
+import {StyledReactMarkdown} from './EditableMarkdown';
 
 type LeaderboardPageProps = {
   entity: string;
@@ -38,31 +32,6 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
       ]}
     />
   );
-};
-
-const DEFAULT_DESCRIPTION = `# Leaderboard`;
-
-const usePersistedLeaderboardConfig = () => {
-  const [configPersisted, setConfigPersisted] = useState<LeaderboardConfigType>(
-    {
-      version: 1,
-      config: {description: '', dataSelectionSpec: {}},
-    }
-  );
-
-  const [config, setConfigLocal] =
-    useState<LeaderboardConfigType>(configPersisted);
-
-  const persistConfig = useCallback(() => {
-    setConfigPersisted(config);
-    // persistLeaderboardConfig(config);
-  }, [config]);
-
-  const cancelChanges = useCallback(() => {
-    setConfigLocal(configPersisted);
-  }, [configPersisted]);
-
-  return {config, setConfigLocal, persistConfig, cancelChanges};
 };
 
 export const LeaderboardPageContent: React.FC<
@@ -114,38 +83,19 @@ export const LeaderboardPageContent: React.FC<
 
 export const LeaderboardPageContentInner: React.FC<
   LeaderboardPageProps & {setName: (name: string) => void} & {
-    leaderboardVal: LeaderboardVal;
+    leaderboardVal: PythonLeaderboardObjectVal;
   }
 > = props => {
   useEffect(() => {
     props.setName(props.leaderboardVal.name);
   }, [props]);
 
-  // const [showConfig, setShowConfig] = useState(false);
-
-  // const {
-  //   config: currentConfig,
-  //   setConfigLocal,
-  //   persistConfig,
-  //   cancelChanges,
-  // } = usePersistedLeaderboardConfig();
-  // const setDescription = useCallback(
-  //   (newDescription: string) => {
-  //     setConfigLocal(newConfig => ({
-  //       ...newConfig,
-  //       config: {...newConfig.config, description: newDescription},
-  //     }));
-  //     persistConfig();
-  //   },
-  //   [setConfigLocal, persistConfig]
-  // );
-
-  const spec = useMemo(() => {
-    return convertLeaderboardValToFilterAndGroupSpec(props.leaderboardVal);
-  }, [props.leaderboardVal]);
-
   const description = props.leaderboardVal.description;
-  const {loading, data} = useLeaderboardData(props.entity, props.project, spec);
+  const {loading, data} = usePythonLeaderboardData(
+    props.entity,
+    props.project,
+    props.leaderboardVal
+  );
 
   return (
     <Box display="flex" flexDirection="row" height="100%" flexGrow={1}>
@@ -178,23 +128,7 @@ export const LeaderboardPageContentInner: React.FC<
             {description && (
               <StyledReactMarkdown>{description}</StyledReactMarkdown>
             )}
-            {/* <EditableMarkdown
-              value={props.leaderboardName + '\n' + description}
-              onChange={setDescription}
-              placeholder={DEFAULT_DESCRIPTION}
-            /> */}
           </Box>
-          {/* <div
-            style={{
-              display: showConfig ? 'none' : 'block',
-              // paddingRight: '12px',
-              // paddingTop: '12px',
-            }}>
-            <ToggleLeaderboardConfig
-              isOpen={showConfig}
-              onClick={() => setShowConfig(c => !c)}
-            />
-          </div> */}
         </Box>
         <Box flexGrow={1} display="flex" flexDirection="row" overflow="hidden">
           <LeaderboardGrid
@@ -205,24 +139,6 @@ export const LeaderboardPageContentInner: React.FC<
           />
         </Box>
       </Box>
-      {/* {showConfig && (
-        <Box flex={1} width="35%" height="100%" overflow="hidden">
-          <LeaderboardConfigEditor
-            entity={entity}
-            project={project}
-            config={currentConfig}
-            onCancel={() => {
-              cancelChanges();
-              setShowConfig(false);
-            }}
-            onPersist={() => {
-              persistConfig();
-              setShowConfig(false);
-            }}
-            setConfig={setConfigLocal}
-          />
-        </Box>
-      )} */}
     </Box>
   );
 };
@@ -249,18 +165,9 @@ export const ToggleLeaderboardConfig: React.FC<{
   );
 };
 
-type LeaderboardVal = {
-  name: string;
-  description: string;
-  columns: Array<{
-    evaluation_object_ref: string;
-    scorer_name: string;
-    should_minimize?: boolean;
-    summary_metric_path_parts: string[];
-  }>;
-};
-
-const parseLeaderboardVal = (leaderboardVal: any): LeaderboardVal | null => {
+const parseLeaderboardVal = (
+  leaderboardVal: any
+): PythonLeaderboardObjectVal | null => {
   if (typeof leaderboardVal !== 'object' || leaderboardVal == null) {
     return null;
   }
@@ -311,60 +218,11 @@ const parseLeaderboardVal = (leaderboardVal: any): LeaderboardVal | null => {
         summary_metric_path_parts: summaryMetricParts,
       };
     })
-    .filter(column => column != null) as LeaderboardVal['columns'];
+    .filter(column => column != null) as PythonLeaderboardObjectVal['columns'];
 
   return {
     name,
     description,
     columns: finalColumns,
-  };
-};
-
-/**
- * Note: this is a breidge between the python type and the js type.
- */
-const convertLeaderboardValToFilterAndGroupSpec = (
-  leaderboardVal: LeaderboardVal
-): FilterAndGroupSpec => {
-  const allEvaluations = new Set<string>();
-  leaderboardVal.columns.forEach(column => {
-    allEvaluations.add(column.evaluation_object_ref);
-  });
-  const sourceEvaluations = Array.from(allEvaluations)
-    .map(evaluation => {
-      const evalRef = parseRefMaybe(evaluation);
-      if (evalRef == null) {
-        return null;
-      }
-      return {
-        name: evalRef.artifactName,
-        version: evalRef.artifactVersion,
-      };
-    })
-    .filter(
-      evaluation => evaluation != null
-    ) as FilterAndGroupSourceEvaluationSpec[];
-
-  const scorers = leaderboardVal.columns.map(column => {
-    return {
-      name: column.scorer_name,
-      version: '*',
-      metrics: [
-        {
-          path: column.summary_metric_path_parts.join('.'),
-          shouldMinimize: column.should_minimize,
-        },
-      ],
-    };
-  });
-  return {
-    sourceEvaluations,
-    datasets: [
-      {
-        name: '*',
-        version: '*',
-        scorers,
-      },
-    ],
   };
 };

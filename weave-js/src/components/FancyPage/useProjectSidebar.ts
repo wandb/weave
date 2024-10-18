@@ -154,7 +154,7 @@ export const useProjectSidebar = (
             type: 'button' as const,
             name: 'Leads',
             slug: 'weave/leaderboards',
-            isShown: showWeaveSidebarItems || isShowAll,
+            isShown: isWeaveOnly,
             iconName: IconNames.BenchmarkSquare,
           },
           {
@@ -204,7 +204,7 @@ export const useProjectSidebar = (
             key: 'moreWeave',
             isShown: isShowAll,
             // iconName: IconNames.OverflowHorizontal,
-            menu: ['weave/operations', 'weave/objects'],
+            menu: ['weave/leaderboards', 'weave/operations', 'weave/objects'],
           },
         ];
 
