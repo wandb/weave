@@ -125,11 +125,11 @@ export const LeaderboardListingPageInner: React.FC<{
           <QueueGrid>
             {customLeaderboards.map(queue => (
               <QueueCard key={queue.name}>
-                <QueueName>{queue.name}</QueueName>
-                <QueueDescription>{queue.description}</QueueDescription>
-                <TracesCount>
-                  {queue.modelsEvaluated} Models Evaluated
-                </TracesCount>
+                <LeaderboardName>{queue.name}</LeaderboardName>
+                <LeaderboardDescription>{queue.description}</LeaderboardDescription>
+                <ModelCount>
+                  {queue.modelsEvaluated} models
+                </ModelCount>
               </QueueCard>
             ))}
           </QueueGrid>
@@ -140,11 +140,11 @@ export const LeaderboardListingPageInner: React.FC<{
         <QueueGrid>
           {evalBoards.map(queue => (
             <QueueCard key={queue.name}>
-              <QueueName>{queue.name}</QueueName>
-              <QueueDescription>{queue.description}</QueueDescription>
-              <TracesCount>
-                {queue.modelsEvaluated} Models Evaluated
-              </TracesCount>
+              <LeaderboardName>{queue.name}</LeaderboardName>
+              <LeaderboardDescription>{queue.description}</LeaderboardDescription>
+              <ModelCount>
+                {queue.modelsEvaluated} models
+              </ModelCount>
             </QueueCard>
           ))}
         </QueueGrid>
@@ -154,20 +154,12 @@ export const LeaderboardListingPageInner: React.FC<{
 };
 
 const Container = styled.div`
-  padding: 20px;
+  padding: 16px;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
 `;
 
-const Header = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-`;
-
-const Title = styled.h1`
-  font-size: 24px;
-  margin: 0;
-`;
 
 
 const CreateLeaderboardButton: FC = (
@@ -194,25 +186,10 @@ const CreateLeaderboardButton: FC = (
   );
 };
 
-const WelcomeMessage = styled.div`
-  background-color: #f0f0f0;
-  padding: 10px;
-  border-radius: 4px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-`;
-
-const DismissButton = styled.button`
-  background: none;
-  border: none;
-  color: #00a4b8;
-  cursor: pointer;
-`;
 
 const Section = styled.div`
-  margin-bottom: 20px;
+  margin-top: 0px;
+  margin-bottom: 30px;
 `;
 
 const SectionTitle = styled.h2`
@@ -222,38 +199,41 @@ const SectionTitle = styled.h2`
 
 const QueueGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
 `;
 
 const QueueCard = styled.div`
   border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  padding: 15px;
-`;
-
-const QueueName = styled.h3`
-  font-size: 16px;
-  margin: 0 0 10px 0;
-`;
-
-const ReviewButton = styled.button`
-  background-color: #ffa500;
-  color: white;
-  border: none;
-  padding: 5px 10px;
-  border-radius: 4px;
+  border-radius: 8px;
+  padding: 20px;
+  transition: all 0.3s ease;
   cursor: pointer;
-  float: right;
+  background-color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+
+  &:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-color: #00A4B8;
+  }
 `;
 
-const QueueDescription = styled.p`
+const LeaderboardName = styled.h3`
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: #00A4B8;
+`;
+
+const LeaderboardDescription = styled.p`
   font-size: 14px;
   color: #666;
-  margin: 0 0 10px 0;
+  margin: 0 0 16px 0;
+  line-height: 1.4;
 `;
 
-const TracesCount = styled.div`
-  font-size: 24px;
-  font-weight: bold;
+const ModelCount = styled.div`
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
 `;
