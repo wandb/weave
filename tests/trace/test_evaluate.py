@@ -4,14 +4,14 @@ import pytest
 
 import weave
 from weave import Dataset, Evaluation, Model
-from weave.flow.scorer import MultiTaskBinaryClassificationF1
+from weave.scorers import MultiTaskBinaryClassificationF1
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 dataset = Dataset(rows=dataset_rows)
 
 
 expected_eval_result = {
-    "model_output": {"mean": 9.5},
+    "output": {"mean": 9.5},
     "score": {"true_count": 1, "true_fraction": 0.5},
     "model_latency": {"mean": pytest.approx(0, abs=1)},
 }
@@ -24,8 +24,8 @@ class EvalModel(Model):
 
 
 @weave.op()
-def score(target, model_output):
-    return target == model_output
+def score(target, output):
+    return target == output
 
 
 @weave.op()
@@ -57,7 +57,7 @@ def test_predict_can_receive_other_params(client):
     )
     result = asyncio.run(evaluation.evaluate(model_predict))
     assert result == {
-        "model_output": {"mean": 18.5},
+        "output": {"mean": 18.5},
         "score": {"true_count": 0, "true_fraction": 0.0},
         "model_latency": {
             "mean": pytest.approx(0, abs=1),
@@ -111,8 +111,8 @@ def test_evaluate_other_model_method_names():
 def test_score_as_class(client):
     class MyScorer(weave.Scorer):
         @weave.op()
-        def score(self, target, model_output):
-            return target == model_output
+        def score(self, target, output):
+            return target == output
 
     evaluation = Evaluation(
         dataset=dataset_rows,
@@ -121,7 +121,7 @@ def test_score_as_class(client):
     model = EvalModel()
     result = asyncio.run(evaluation.evaluate(model))
     assert result == {
-        "model_output": {"mean": 9.5},
+        "output": {"mean": 9.5},
         "MyScorer": {"true_count": 1, "true_fraction": 0.5},
         "model_latency": {
             "mean": pytest.approx(0, abs=1),
@@ -137,8 +137,8 @@ def test_score_with_custom_summarize(client):
             return {"awesome": 3}
 
         @weave.op()
-        def score(self, target, model_output):
-            return target == model_output
+        def score(self, target, output):
+            return target == output
 
     evaluation = Evaluation(
         dataset=dataset_rows,
@@ -147,7 +147,7 @@ def test_score_with_custom_summarize(client):
     model = EvalModel()
     result = asyncio.run(evaluation.evaluate(model))
     assert result == {
-        "model_output": {"mean": 9.5},
+        "output": {"mean": 9.5},
         "MyScorer": {"awesome": 3},
         "model_latency": {
             "mean": pytest.approx(0, abs=1),
@@ -167,7 +167,7 @@ def test_multiclass_f1_score(client):
 
     result = asyncio.run(evaluation.evaluate(return_pred))
     assert result == {
-        "model_output": {
+        "output": {
             "a": {"true_count": 1, "true_fraction": 1.0},
             "b": {"true_count": 0, "true_fraction": 0.0},
         },

@@ -94,7 +94,7 @@ Here `sentence` is passed to the model's predict function, and `target` is used 
 
 ```python
 import weave
-from weave.flow.scorer import MultiTaskBinaryClassificationF1
+from weave.scorers import MultiTaskBinaryClassificationF1
 
 weave.init('intro-example')
 
@@ -132,7 +132,7 @@ import asyncio
 # highlight-next-line
 import weave
 # highlight-next-line
-from weave.flow.scorer import MultiTaskBinaryClassificationF1
+from weave.scorers import MultiTaskBinaryClassificationF1
 import openai
 
 # We create a model class with one predict function.

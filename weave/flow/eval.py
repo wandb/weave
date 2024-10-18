@@ -13,7 +13,7 @@ from weave.flow import util
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model, get_infer_method
 from weave.flow.obj import Object
-from weave.flow.scorer import (
+from weave.scorers import (
     Scorer,
     auto_summarize,
     get_scorer_attributes,
@@ -223,7 +223,7 @@ class Evaluation(Object):
             model_output = None
         model_latency = time.time() - model_start_time
 
-        scores = {}
+        scores = {}  # TODO: Consider moving scorer setup and checks out of `predict_and_score`
         scorers = cast(list[Union[Op, Scorer]], self.scorers or [])
         for scorer in scorers:
             scorer_self = None
@@ -237,13 +237,100 @@ class Evaluation(Object):
                 score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
 
-            if "model_output" not in score_arg_names:
-                raise OpCallError(
-                    f"Scorer {scorer_name} must have a 'model_output' argument, to receive the output of the model function."
+            # TODO: Check for input columns parameters in the signature of the scorer
+
+            if (
+                "model_output" not in score_arg_names
+                and "output" not in score_arg_names
+            ):
+                message = textwrap.dedent(
+                    f"""
+                    Scorer {scorer_name} must have an `output` or `model_output` argument, to receive the
+                    output of the model function.
+                    """
                 )
+                raise OpCallError(message)
 
             if isinstance(example, dict):
-                score_args = {k: v for k, v in example.items() if k in score_arg_names}
+                # The keys of `score_args` must match the parameter names of the scorer's `score` method.
+                # If scorer.column_map is set, then user is indicating that the dataset column(s)
+                # being passed to the scorer have different names to the scorer's parameter names.
+                # So we need to remap the dataset columns to the expected parameter names in the scorer,
+                #
+                # column_map k:v pairs must be structured as `scorer param name : dataset column name`
+                #
+                # For instance, if the scorer expects "input" and "ground_truth" and we have a dataset
+                # with columns "question" and "answer", column_map should be defined as follows:
+                # {"input": "question", "ground_truth": "answer"}
+                #
+                # input: is the full row, we have access to it via example
+                # output: is the model output, we have access to it via model_output
+                score_arg_names = [
+                    param for param in score_arg_names if (param != "self")
+                ]
+                score_args = {}
+
+                if isinstance(scorer, Scorer) and scorer.column_map is not None:
+                    # Ensure that all keys in column_map are in score_arg_names
+                    for key in scorer.column_map.keys():
+                        if key not in score_arg_names:
+                            message = textwrap.dedent(
+                                f"""
+                                    You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
+
+                                    The `column_map` contains a key `{key}` which is not in the scorer's argument names.
+                                    Scorer argument names: {score_arg_names}
+
+                                    Hint:
+                                    - Ensure that the keys in `column_map` match the scorer's parameter names.
+                                    """
+                            )
+                            raise ValueError(message)
+
+                    for arg in score_arg_names:
+                        if arg == "output" or arg == "model_output":
+                            continue
+                        if arg in example:
+                            score_args[arg] = example[arg]
+                        elif arg in scorer.column_map:
+                            dataset_column_name = scorer.column_map[arg]
+                            if dataset_column_name in example:
+                                score_args[arg] = example[dataset_column_name]
+                            else:
+                                message = textwrap.dedent(
+                                    f"""
+                                        You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
+
+                                        You are mapping `{arg}` to `{dataset_column_name}`, but `{dataset_column_name}`
+                                        was not found in the dataset columns.
+                                        
+                                        Available dataset columns: {list(example.keys())}
+
+                                        Hint:
+                                        - Ensure that `column_map` maps scorer parameter names to existing dataset column names.
+                                        """
+                                )
+                                raise ValueError(message)
+                        else:
+                            message = textwrap.dedent(
+                                f"""
+                                    You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
+
+                                    Scorer argument `{arg}` is not found in the dataset columns and is not mapped in `column_map`.
+                                    
+                                    Available dataset columns: {list(example.keys())}
+                                    `column_map`: {scorer.column_map}
+
+                                    Hint:
+                                    - Either provide `{arg}` directly in the dataset, or map it via `column_map`.
+                                    """
+                            )
+                            raise ValueError(message)
+                else:
+                    score_args = {
+                        k: v for k, v in example.items() if k in score_arg_names
+                    }
+
             else:
                 if len(score_arg_names) == 2:
                     score_args = {score_arg_names[0]: example}
@@ -251,7 +338,7 @@ class Evaluation(Object):
                     raise ValueError(
                         f"{score_fn} expects arguments: {score_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
                     )
-            score_args["model_output"] = model_output
+            score_args["output"] = model_output
 
             try:
                 if is_op(score_fn) and model_call:
@@ -282,11 +369,22 @@ class Evaluation(Object):
                     for param in score_signature.parameters.values()
                     if param.default == inspect.Parameter.empty
                 ]
-                required_arg_names.remove("model_output")
+                required_arg_names.remove("output")
 
                 message = textwrap.dedent(
                     f"""
                     Call error: {e}
+
+                                        If using the `Scorer` weave class, you can set the `scorer.column_map`
+                    attribute to map scorer parameter names to dataset columns.
+                    
+                    For example, if the scorer expects "output", "input" and "ground_truth" and we have a dataset
+                    with columns "question" and "answer", `column_map` can be used to map the non-output parameter to like so:
+                    {{"input": "question", "ground_truth": "answer"}}
+                    
+                    scorer argument names: {score_arg_names}
+                    dataset keys: {example.keys()}
+                    scorer.column_map: {getattr(scorer, 'column_map', None)}
 
                     Options for resolving:
                     a. change {scorer_name} argument names to match a subset of dataset column names ({dataset_column_names_str})
@@ -297,7 +395,7 @@ class Evaluation(Object):
             scores[scorer_name] = result
 
         return {
-            "model_output": model_output,
+            "output": model_output,
             "scores": scores,
             "model_latency": model_latency,
         }
@@ -341,7 +439,7 @@ class Evaluation(Object):
             except Exception as e:
                 print("Predict and score failed")
                 traceback.print_exc()
-                return {"model_output": None, "scores": {}}
+                return {"output": None, "scores": {}}
             return eval_row
 
         n_complete = 0
@@ -358,7 +456,7 @@ class Evaluation(Object):
             #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
             # )
             if eval_row is None:
-                eval_row = {"model_output": None, "scores": {}}
+                eval_row = {"output": None, "scores": {}}
             else:
                 eval_row["scores"] = eval_row.get("scores", {})
             for scorer in self.scorers or []:
