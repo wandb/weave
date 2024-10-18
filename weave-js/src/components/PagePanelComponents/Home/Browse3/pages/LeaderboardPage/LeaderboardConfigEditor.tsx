@@ -16,6 +16,15 @@ import {
 import IconButton from '@mui/material/IconButton';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {
+  ALL_VALUE,
+  FilterAndGroupDatasetScorerMetricSpec,
+  FilterAndGroupDatasetScorerSpec,
+  FilterAndGroupDatasetSpec,
+  FilterAndGroupSourceEvaluationSpec,
+  FilterAndGroupSpec,
+  LeaderboardConfigType,
+} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {
   fetchDatasetNamesForSpec,
@@ -29,15 +38,6 @@ import {
   fetchScorerVersionsForSpecAndName,
   VersionDetails,
 } from './query/configEditorQuery';
-import {
-  ALL_VALUE,
-  FilterAndGroupDatasetScorerMetricSpec,
-  FilterAndGroupDatasetScorerSpec,
-  FilterAndGroupDatasetSpec,
-  FilterAndGroupSourceEvaluationSpec,
-  FilterAndGroupSpec,
-  LeaderboardConfigType,
-} from './types/leaderboardConfigType';
 
 export const LeaderboardConfigEditor: React.FC<{
   entity: string;

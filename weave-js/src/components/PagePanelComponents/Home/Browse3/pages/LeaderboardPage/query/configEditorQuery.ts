@@ -4,10 +4,10 @@
 
 import _ from 'lodash';
 
+import {getLeaderboardGroupableData} from '../../../views/Leaderboard/query/leaderboardQuery';
+import {FilterAndGroupSpec} from '../../../views/Leaderboard/types/leaderboardConfigType';
 import {TraceServerClient} from '../../wfReactInterface/traceServerClient';
 import {projectIdFromParts} from '../../wfReactInterface/tsDataModelHooks';
-import {FilterAndGroupSpec} from '../types/leaderboardConfigType';
-import {getLeaderboardGroupableData} from './leaderboardQuery';
 
 export type VersionDetails = {digest: string; index: number};
 

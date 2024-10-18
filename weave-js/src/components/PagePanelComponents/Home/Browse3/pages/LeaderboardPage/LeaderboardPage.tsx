@@ -1,17 +1,12 @@
 import {Alert, Box, Typography} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import React, {useCallback, useState} from 'react';
-import {useHistory} from 'react-router-dom';
 
-import {useWeaveflowRouteContext} from '../../context';
+import {LeaderboardGrid} from '../../views/Leaderboard/LeaderboardGrid';
+import {useLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
+import {LeaderboardConfigType} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {EditableMarkdown} from './EditableMarkdown';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
-import {LeaderboardGrid} from './LeaderboardGrid';
-import {useLeaderboardData} from './query/hookAdapters';
-import {LeaderboardValueRecord} from './query/leaderboardQuery';
-import {LeaderboardConfigType} from './types/leaderboardConfigType';
-
-const USE_COMPARE_EVALUATIONS_PAGE = false;
 
 type LeaderboardPageProps = {
   entity: string;
@@ -52,9 +47,6 @@ const usePersistedLeaderboardConfig = () => {
 export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
   const {entity, project} = props;
 
-  const {peekingRouter} = useWeaveflowRouteContext();
-  const history = useHistory();
-
   const [showConfig, setShowConfig] = useState(false);
 
   const {
@@ -80,21 +72,6 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
     project,
     currentConfig.config.dataSelectionSpec
   );
-
-  const handleCellClick = (record: LeaderboardValueRecord) => {
-    const sourceCallId = record.sourceEvaluationCallId;
-    if (sourceCallId) {
-      let to: string;
-      if (USE_COMPARE_EVALUATIONS_PAGE) {
-        to = peekingRouter.compareEvaluationsUri(entity, project, [
-          sourceCallId,
-        ]);
-      } else {
-        to = peekingRouter.callUIUrl(entity, project, '', sourceCallId, null);
-      }
-      history.push(to);
-    }
-  };
 
   const [showingAlert, setShowingAlert] = useState(true);
 
@@ -151,10 +128,8 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
           <LeaderboardGrid
             entity={entity}
             project={project}
-            config={currentConfig.config.dataSelectionSpec}
             loading={loading}
             data={data}
-            onCellClick={handleCellClick}
           />
         </Box>
       </Box>
