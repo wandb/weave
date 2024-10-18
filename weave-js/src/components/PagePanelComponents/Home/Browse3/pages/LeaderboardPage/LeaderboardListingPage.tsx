@@ -1,28 +1,22 @@
 import {Box} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button/Button';
+import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
+import {Loading} from '@wandb/weave/components/Loading';
 import React, {FC, useCallback} from 'react';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {useWeaveflowRouteContext} from '../../context';
+import {Empty} from '../common/Empty';
+import {EMPTY_PROPS_LEADERBOARDS} from '../common/EmptyContent';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {ObjectVersionsTable} from '../ObjectVersionsPage';
 import {useWFHooks} from '../wfReactInterface/context';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 const Container = styled.div`
-  // padding: 16px;
   width: 100%;
   height: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-`;
-
-const Section = styled.div`
-  margin-top: 0px;
-  margin-bottom: 30px;
-  flex: 1;
   overflow: hidden;
 `;
 
@@ -51,9 +45,7 @@ export const LeaderboardListingPageInner: React.FC<{
 }> = props => {
   return (
     <Container>
-      <Section>
-        <LeaderboardTable entity={props.entity} project={props.project} />
-      </Section>
+      <LeaderboardTable entity={props.entity} project={props.project} />
     </Container>
   );
 };
@@ -107,6 +99,19 @@ const LeaderboardTable: React.FC<{
     },
     [history, peekingRouter, props.entity, props.project]
   );
+
+  if (leaderboardObjectVersions.loading) {
+    return <Loading centered />;
+  }
+  if (leaderboardObjectVersions.error) {
+    return <ErrorPanel />;
+  }
+
+  const objectVersions = leaderboardObjectVersions.result ?? [];
+  const isEmpty = objectVersions.length === 0;
+  if (isEmpty) {
+    return <Empty {...EMPTY_PROPS_LEADERBOARDS} />;
+  }
 
   return (
     <ObjectVersionsTable

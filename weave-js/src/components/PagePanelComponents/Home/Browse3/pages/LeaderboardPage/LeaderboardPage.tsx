@@ -1,10 +1,13 @@
-import {Alert, Box, Typography} from '@mui/material';
+import {Box} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import React, {useCallback, useState} from 'react';
 
 import {LeaderboardGrid} from '../../views/Leaderboard/LeaderboardGrid';
 import {useLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
 import {LeaderboardConfigType} from '../../views/Leaderboard/types/leaderboardConfigType';
+import {
+  SimplePageLayout,
+} from '../common/SimplePageLayout';
 import {EditableMarkdown} from './EditableMarkdown';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
 
@@ -15,7 +18,18 @@ type LeaderboardPageProps = {
 };
 
 export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
-  return <LeaderboardPageContent {...props} />;
+  return (
+    <SimplePageLayout
+      title={props.leaderboardName}
+      hideTabsIfSingle
+      tabs={[
+        {
+          label: 'Leaderboard',
+          content: <LeaderboardPageContent {...props} />,
+        },
+      ]}
+    />
+  );
 };
 
 const DEFAULT_DESCRIPTION = `# Leaderboard`;
@@ -72,8 +86,6 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
     currentConfig.config.dataSelectionSpec
   );
 
-  const [showingAlert, setShowingAlert] = useState(true);
-
   return (
     <Box display="flex" flexDirection="row" height="100%" flexGrow={1}>
       <Box
@@ -120,9 +132,6 @@ export const LeaderboardPageContent: React.FC<LeaderboardPageProps> = props => {
             />
           </div>
         </Box>
-        {showingAlert && (
-          <UnlistedAlert onClose={() => setShowingAlert(false)} />
-        )}
         <Box flexGrow={1} display="flex" flexDirection="row" overflow="hidden">
           <LeaderboardGrid
             entity={entity}
@@ -175,17 +184,3 @@ export const ToggleLeaderboardConfig: React.FC<{
     </Box>
   );
 };
-
-const UnlistedAlert: React.FC<{onClose: () => void}> = ({onClose}) => {
-  return (
-    <Alert severity="info" onClose={onClose}>
-      <Typography variant="body1">
-        You have found an internal, unlisted beta page! Please expect bugs and
-        incomplete features. Permilinks & saving state are not yet supported
-      </Typography>
-    </Alert>
-  );
-};
-
-// TODO:
-// * [ ] Edit panel revisions
