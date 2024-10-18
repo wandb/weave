@@ -2,7 +2,10 @@ import React from 'react';
 import styled from 'styled-components';
 
 import {Empty} from '../common/Empty';
-import {EMPTY_PROPS_EVALUATIONS} from '../common/EmptyContent';
+import {
+  EMPTY_PROPS_EVALUATIONS,
+  EMPTY_PROPS_LEADERBOARDS,
+} from '../common/EmptyContent';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 
 export const LeaderboardListingPage: React.FC<{
@@ -103,24 +106,34 @@ export const LeaderboardListingPageInner: React.FC<{
     },
   ];
 
-  return (
+  const hasCustomLeaderboards = customLeaderboards.length > 0;
+  const hasEvalLeaderboards = evalBoards.length > 0;
+  const allEmpty = !hasCustomLeaderboards && !hasEvalLeaderboards;
+
+  return allEmpty ? (
+    <Empty {...EMPTY_PROPS_EVALUATIONS} />
+  ) : (
     <Container>
       <Section>
-        <SectionTitle>Custom Leaderboards</SectionTitle>
-        <QueueGrid>
-          {customLeaderboards.map(queue => (
-            <QueueCard key={queue.name}>
-              <QueueName>{queue.name}</QueueName>
-              <QueueDescription>{queue.description}</QueueDescription>
-              <TracesCount>
-                {queue.modelsEvaluated} Models Evaluated
-              </TracesCount>
-            </QueueCard>
-          ))}
-        </QueueGrid>
+        <SectionTitle>Custom Leaderboards ({customLeaderboards.length})</SectionTitle>
+        {!hasCustomLeaderboards ? (
+          <Empty {...EMPTY_PROPS_LEADERBOARDS} />
+        ) : (
+          <QueueGrid>
+            {customLeaderboards.map(queue => (
+              <QueueCard key={queue.name}>
+                <QueueName>{queue.name}</QueueName>
+                <QueueDescription>{queue.description}</QueueDescription>
+                <TracesCount>
+                  {queue.modelsEvaluated} Models Evaluated
+                </TracesCount>
+              </QueueCard>
+            ))}
+          </QueueGrid>
+        )}
       </Section>
       <Section>
-        <SectionTitle>Evaluation Leaderboards</SectionTitle>
+        <SectionTitle>Evaluation Leaderboards ({evalBoards.length})</SectionTitle>
         <QueueGrid>
           {evalBoards.map(queue => (
             <QueueCard key={queue.name}>
@@ -225,7 +238,3 @@ const TracesCount = styled.div`
   font-size: 24px;
   font-weight: bold;
 `;
-
-const NoEvaluations = () => {
-  return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
-};
