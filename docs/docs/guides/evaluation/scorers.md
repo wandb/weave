@@ -196,7 +196,7 @@ This scorer evaluates summaries in two ways:
 The `OpenAIModerationScorer` uses OpenAI's Moderation API to check if the AI system's output contains disallowed content, such as hate speech or explicit material.
 
 ```python
-from weave.flow.scorers.moderation_scorer import OpenAIModerationScorer
+from weave.scorers import OpenAIModerationScorer
 import openai
 
 oai_client = OpenAI(api_key=...) # initialize your LLM client here
@@ -222,7 +222,7 @@ scorer = OpenAIModerationScorer(
 The `EmbeddingSimilarityScorer` computes the cosine similarity between the embeddings of the AI system's output and a target text from your dataset. It's useful for measuring how similar the AI's output is to a reference text.
 
 ```python
-from weave.flow.scorers.similarity_score import EmbeddingSimilarityScorer
+from weave.scorers import EmbeddingSimilarityScorer
 
 llm_client = ...  # initialise your LlM client
 
@@ -235,8 +235,13 @@ similarity_scorer = EmbeddingSimilarityScorer(
 
 **Parameters:**
 
-- `target_column`: Name of the dataset column containing the reference text (default is `"text"`).
-- `threshold` (float): Minimum cosine similarity score considered as similar (default is `0.5`).
+- `target`: This scorer expects a `target` column in your dataset, it will calculate the cosine similarity of the embeddings of the `target` column to the AI system output. If your dataset doesn't contain a column called `target` you can use the scorers `column_map` attribute to map `target` to the appropriate column name in your dataset. See the Column Mapping section for more.
+- `threshold` (float): Minimum cosine similarity score to be considered as "similar" (default is `0.5`). Cosine similarity can range from -1 to 1:
+    - 1 indicates identical direction.
+    - 0 indicates orthogonal vectors.
+    - -1 indicates opposite direction.
+
+`threshold` should in a range between -1 and 1. The cosine similarity between the embedding of the AI system output and the `target`  correct threshold to set can fluctuate quite a lot depending on your use case, we advise exploring different thresholds
 
 ---
 
@@ -245,7 +250,7 @@ similarity_scorer = EmbeddingSimilarityScorer(
 The ValidJSONScorer checks whether the AI system's output is valid JSON. This scorer is useful when you expect the output to be in JSON format and need to verify its validity.
 
 ```python
-from weave.flow.scorers.json_scorer import ValidJSONScorer
+from weave.scorers import ValidJSONScorer
 
 json_scorer = ValidJSONScorer()
 ```
@@ -261,7 +266,7 @@ json_scorer = ValidJSONScorer()
 The `ValidXMLScorer` checks whether the AI system's output is valid XML. This is useful when expecting XML-formatted outputs.
 
 ```python
-from weave.flow.scorers.xml_scorer import ValidXMLScorer
+from weave.scorers import ValidXMLScorer
 
 xml_scorer = ValidXMLScorer()
 ```
@@ -273,7 +278,7 @@ xml_scorer = ValidXMLScorer()
 The `PydanticScorer` validates the AI system's output against a Pydantic model to ensure it adheres to a specified schema or data structure.
 
 ```python
-from weave.flow.scorers.pydantic_scorer import PydanticScorer
+from weave.scorers import PydanticScorer
 from pydantic import BaseModel
 
 class FinancialReport(BaseModel):
@@ -290,7 +295,7 @@ pydantic_scorer = PydanticScorer(model=Person)
 The `ContextEntityRecallScorer` estimates context recall by extracting entities from both the AI system's output and the provided context, then computing the recall score. Based on the [RAGAS](https://github.com/explodinggradients/ragas) evaluation library
 
 ```python
-from weave.flow.scorers.ragas_scorer import ContextEntityRecallScorer
+from weave.scorers import ContextEntityRecallScorer
 
 llm_client = ...  # initialise your LlM client
 
@@ -317,7 +322,7 @@ entity_recall_scorer = ContextEntityRecallScorer(
 The `ContextRelevancyScorer` evaluates the relevancy of the provided context to the AI system's output. It helps determine if the context used is appropriate for generating the output. Based on the [RAGAS](https://github.com/explodinggradients/ragas) evaluation library.
 
 ```python
-from weave.flow.scorers.ragas_scorer import ContextRelevancyScorer
+from weave.scorers import ContextRelevancyScorer
 
 llm_client = ...  # initialise your LlM client
 

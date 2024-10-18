@@ -21,6 +21,7 @@ class EmbeddingSimilarityScorer(LLMScorer):
 
     @weave.op
     def score(self, output: str, target: str) -> Any:
+        assert self.threshold >= -1 and self.threshold <= 1, "`threshold` should be between -1 and 1"
         model_embedding, target_embedding = self._compute_embeddings(output, target)
         return self.cosine_similarity(model_embedding, target_embedding)
 
@@ -35,8 +36,5 @@ class EmbeddingSimilarityScorer(LLMScorer):
         arr1 = np.array(vec1)
         arr2 = np.array(vec2)
         cosine_sim = np.dot(arr1, arr2) / (np.linalg.norm(arr1) * np.linalg.norm(arr2))
-        # TODO: check if this can be negative
-
-        # cast to float
-        score = float(cosine_sim)
-        return {"similarity_score": score, "is_similar": score >= self.threshold}
+        cosine_sim = float(cosine_sim)
+        return {"similarity_score": cosine_sim, "is_similar": cosine_sim >= self.threshold}
