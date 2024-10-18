@@ -55,15 +55,26 @@ def get_leaderboard_results(
     res_map: dict[str, LeaderboardModelResult] = {}
     for call in calls:
         # Frustrating that we have to get the ref like this (such a waste of network calls)
-        model_ref = get_ref(call.inputs["model"]).uri()
-        if model_ref not in res_map:
-            res_map[model_ref] = LeaderboardModelResult(
-                model_ref=model_ref,
+        call_ref = get_ref(call)
+        if call_ref is None:
+            continue
+        call_ref_uri = call_ref.uri()
+
+        model_ref = get_ref(call.inputs["model"])
+        if model_ref is None:
+            continue
+        model_ref_uri = model_ref.uri()
+        if model_ref_uri not in res_map:
+            res_map[model_ref_uri] = LeaderboardModelResult(
+                model_ref=model_ref_uri,
                 column_scores=[ModelScoresForColumn(scores=[]) for _ in spec.columns],
             )
         for col_idx, c in enumerate(spec.columns):
-            eval_obj_ref = get_ref(call.inputs["self"]).uri()
-            if c.evaluation_object_ref != eval_obj_ref:
+            eval_obj_ref = get_ref(call.inputs["self"])
+            if eval_obj_ref is None:
+                continue
+            eval_obj_ref_uri = eval_obj_ref.uri()
+            if c.evaluation_object_ref != eval_obj_ref_uri:
                 continue
             val = call.output.get(c.scorer_name)
             for part in c.summary_metric_path_parts:
@@ -73,9 +84,9 @@ def get_leaderboard_results(
                     val = val[int(part)]
                 else:
                     break
-            res_map[model_ref].column_scores[col_idx].scores.append(
+            res_map[model_ref_uri].column_scores[col_idx].scores.append(
                 LeaderboardModelEvaluationResult(
-                    evaluate_call_ref=get_ref(call).uri(), value=val
+                    evaluate_call_ref=call_ref_uri, value=val
                 )
             )
     return list(res_map.values())
