@@ -152,7 +152,7 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
-            name: 'Leads',
+            name: 'Leaders',
             slug: 'weave/leaderboards',
             isShown: isWeaveOnly,
             iconName: IconNames.BenchmarkSquare,

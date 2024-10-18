@@ -106,31 +106,28 @@ export const LeaderboardPageContentInner: React.FC<
         height="100%"
         minWidth="50%">
         <Box
-          flex={1}
           display="flex"
           flexDirection="row"
           maxHeight="35%"
           width="100%"
           sx={{
+            flex: '1 1 auto',
             alignItems: 'flex-start',
             padding: '12px 16px',
             gap: '12px',
+            overflowY: 'auto',
           }}>
-          <Box
-            flexShrink={0}
-            flexGrow={1}
-            sx={{
-              overflow: 'auto',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'flex-start',
-            }}>
-            {description && (
-              <StyledReactMarkdown>{description}</StyledReactMarkdown>
-            )}
-          </Box>
+          {description && (
+            <StyledReactMarkdown>{description}</StyledReactMarkdown>
+          )}
         </Box>
-        <Box flexGrow={1} display="flex" flexDirection="row" overflow="hidden">
+        <Box
+          display="flex"
+          flexDirection="row"
+          overflow="hidden"
+          sx={{
+            flex: '1 1 auto',
+          }}>
           <LeaderboardGrid
             entity={props.entity}
             project={props.project}

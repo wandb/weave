@@ -19,14 +19,29 @@ export const StyledReactMarkdown = styled(ReactMarkdown)`
   > *:first-child {
     margin-top: 0;
   }
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
+  h1 {
+    font-weight: 600;
+    font-size: 1.2rem;
+  }
+  h2 {
+    font-weight: 600;
+    font-size: 1.15rem;
+  }
+  h3 {
+    font-weight: 600;
+    font-size: 1.1rem;
+  }
+  h4 {
+    font-weight: 600;
+    font-size: 1.05rem;
+  }
+  h5 {
+    font-weight: 600;
+    font-size: 1rem;
+  }
   h6 {
     font-weight: 600;
-    font-size: 1.25rem;
+    font-size: 1rem;
   }
 `;
 
