@@ -502,3 +502,10 @@ const defaultGetSortComparator =
     }
     return aValue.localeCompare(bValue);
   };
+
+/**
+TODO:
+* [ ] Support shouldMinimize
+* [ ] When models are Ops, their link is not quite right
+* [ ] There is a not a perfect mapping of the data model (we over select with the current js impl.)
+ */

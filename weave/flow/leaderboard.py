@@ -15,39 +15,52 @@ class LeaderboardColumn(BaseModel):
     summary_metric_path_parts: list[str] = field(default_factory=list)
     should_minimize: Optional[bool] = None
 
+
 class Leaderboard(weave.Object):
     columns: list[LeaderboardColumn]
+
 
 class LeaderboardModelEvaluationResult(BaseModel):
     evaluate_call_ref: str
     value: Any
 
+
 class ModelScoresForColumn(BaseModel):
     scores: list[LeaderboardModelEvaluationResult]
+
 
 class LeaderboardModelResult(BaseModel):
     model_ref: str
     column_scores: list[ModelScoresForColumn]
 
 
-def get_leaderboard_results(spec: Leaderboard, client: WeaveClient) -> list[LeaderboardModelResult]:
+def get_leaderboard_results(
+    spec: Leaderboard, client: WeaveClient
+) -> list[LeaderboardModelResult]:
     entity, project = client._project_id().split("/")
-    calls = client.get_calls(filter=CallsFilter(
-        op_names=[OpRef(
-            entity=entity,
-            project=project,
-            name="Evaluation.evaluate",
-            _digest="*"
-        ).uri()],
-        input_refs=[c.evaluation_object_ref for c  in spec.columns]
-    ))
-    
+    calls = client.get_calls(
+        filter=CallsFilter(
+            op_names=[
+                OpRef(
+                    entity=entity,
+                    project=project,
+                    name="Evaluation.evaluate",
+                    _digest="*",
+                ).uri()
+            ],
+            input_refs=[c.evaluation_object_ref for c in spec.columns],
+        )
+    )
+
     res_map: dict[str, LeaderboardModelResult] = {}
     for call in calls:
         # Frustrating that we have to get the ref like this (such a waste of network calls)
         model_ref = get_ref(call.inputs["model"]).uri()
         if model_ref not in res_map:
-            res_map[model_ref] = LeaderboardModelResult(model_ref=model_ref, column_scores=[ModelScoresForColumn(scores=[]) for _ in spec.columns])
+            res_map[model_ref] = LeaderboardModelResult(
+                model_ref=model_ref,
+                column_scores=[ModelScoresForColumn(scores=[]) for _ in spec.columns],
+            )
         for col_idx, c in enumerate(spec.columns):
             eval_obj_ref = get_ref(call.inputs["self"]).uri()
             if c.evaluation_object_ref != eval_obj_ref:
@@ -60,8 +73,9 @@ def get_leaderboard_results(spec: Leaderboard, client: WeaveClient) -> list[Lead
                     val = val[int(part)]
                 else:
                     break
-            res_map[model_ref].column_scores[col_idx].scores.append(LeaderboardModelEvaluationResult(
-                evaluate_call_ref=get_ref(call).uri(),
-                value=val
-            ))
+            res_map[model_ref].column_scores[col_idx].scores.append(
+                LeaderboardModelEvaluationResult(
+                    evaluate_call_ref=get_ref(call).uri(), value=val
+                )
+            )
     return list(res_map.values())

@@ -15,7 +15,7 @@ def test_leaderboard_empty(client):
                 scorer_name="test_scorer_name",
                 summary_metric_path="test_summary_metric_path",
             )
-        ]
+        ],
     )
 
     results = leaderboard.get_leaderboard_results(spec, client)
@@ -26,45 +26,52 @@ async def do_evaluations():
     @weave.op
     def my_scorer(target, model_output):
         return target == model_output
-    
+
     evaluation_obj_1 = weave.Evaluation(
         name="test_evaluation_name",
-        dataset=[{'input': 1, 'target': 1}],
-        scorers=[my_scorer]
+        dataset=[{"input": 1, "target": 1}],
+        scorers=[my_scorer],
     )
 
     @weave.op
     def simple_model(input):
         return input
-    
+
     await evaluation_obj_1.evaluate(simple_model)
 
     evaluation_obj_2 = weave.Evaluation(
         name="test_evaluation_name",
-        dataset=[{'input': 1, 'target': 1}, {'input': 2, 'target': 2}],
-        scorers=[my_scorer]
+        dataset=[{"input": 1, "target": 1}, {"input": 2, "target": 2}],
+        scorers=[my_scorer],
     )
 
     @weave.op
     def static_model(input):
         return 1
-    
+
     @weave.op
     def bad_model(input):
         return input + 1
-    
+
     await evaluation_obj_2.evaluate(simple_model)
     await evaluation_obj_2.evaluate(static_model)
     await evaluation_obj_2.evaluate(bad_model)
 
     return evaluation_obj_1, evaluation_obj_2, simple_model, static_model, bad_model
-    
+
+
 @pytest.mark.asyncio
 async def test_leaderboard_with_results(client):
-    evaluation_obj_1, evaluation_obj_2, simple_model, static_model, bad_model = await do_evaluations()
+    (
+        evaluation_obj_1,
+        evaluation_obj_2,
+        simple_model,
+        static_model,
+        bad_model,
+    ) = await do_evaluations()
 
     spec = leaderboard.Leaderboard(
-        name="Test Leaderboard",
+        name="Simple Leaderboard",
         description="This is a test leaderboard",
         columns=[
             leaderboard.LeaderboardColumn(
@@ -72,7 +79,7 @@ async def test_leaderboard_with_results(client):
                 scorer_name="my_scorer",
                 summary_metric_path_parts=["true_fraction"],
             )
-        ]
+        ],
     )
 
     ref = weave.publish(spec)
@@ -86,7 +93,7 @@ async def test_leaderboard_with_results(client):
     assert results[0].column_scores[0].scores[0].value == 1.0
 
     spec = leaderboard.Leaderboard(
-        name="Test Leaderboard",
+        name="Complex Leaderboard",
         description="This is a test leaderboard",
         columns=[
             leaderboard.LeaderboardColumn(
@@ -103,9 +110,14 @@ async def test_leaderboard_with_results(client):
                 evaluation_object_ref=get_ref(evaluation_obj_1).uri(),
                 scorer_name="my_scorer",
                 summary_metric_path_parts=["true_fraction"],
-            )
-        ]
+            ),
+        ],
     )
+
+    ref = weave.publish(spec)
+
+    # TODO: this is not working
+    # spec = ref.get()
 
     results = leaderboard.get_leaderboard_results(spec, client)
     assert len(results) == 3

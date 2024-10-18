@@ -15,7 +15,7 @@ interface EditableMarkdownProps {
   placeholder: string;
 }
 
-const StyledReactMarkdown = styled(ReactMarkdown)`
+export const StyledReactMarkdown = styled(ReactMarkdown)`
   > *:first-child {
     margin-top: 0;
   }
