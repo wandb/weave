@@ -1,5 +1,11 @@
 """Defines the custom Image weave type."""
 
+import logging
+from functools import cached_property
+from typing import Optional
+
+from pydantic import BaseModel
+
 from weave.trace import serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
 
@@ -11,6 +17,9 @@ try:
     dependencies_met = True
 except ImportError:
     pass
+
+
+logger = logging.getLogger(__name__)
 
 
 def save(obj: "Image.Image", artifact: MemTraceFilesArtifact, name: str) -> None:
@@ -42,3 +51,29 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> "Image.Image":
 def register() -> None:
     if dependencies_met:
         serializer.register_serializer(Image.Image, save, load)
+
+
+class PathImage(BaseModel):
+    path: str
+    is_local: bool
+
+    @cached_property
+    def img(self) -> Optional[Image.Image]:
+        if not dependencies_met:
+            logger.error("Failed to load image: PIL is not installed")
+            return None
+
+        if self.is_local:
+            try:
+                return Image.open(self.path)
+            except Exception as e:
+                logger.error(f"Failed to open local image file: {self.path}. {e}")
+                return None
+        else:
+            try:
+                import requests
+
+                return Image.open(requests.get(self.path).raw)
+            except Exception as e:
+                logger.error(f"Failed to load remote image file: {self.path}. {e}")
+                return None
