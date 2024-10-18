@@ -8,7 +8,7 @@ Scorers are passed to a `weave.Evaluation` object during evaluation. There are t
 1. **Function-based Scorers:** Simple Python functions decorated with `@weave.op`.
 2. **Class-based Scorers:** Python classes that inherit from `weave.Scorer` for more complex evaluations.
 
-Scorers must return a dictionary and can return multiple metrics, nested metrics and non-numeric values such as texted returned from a LLM-evaluator about its reasoning.
+Scorers must return a dictionary and can return multiple metrics, nested metrics and non-numeric values such as text returned from a LLM-evaluator about its reasoning.
 
 ## Function-based Scorers
 These are functions decorated with `@weave.op` that return a dictionary. They're great for simple evaluations like:
@@ -16,7 +16,7 @@ These are functions decorated with `@weave.op` that return a dictionary. They're
 ```python
 @weave.op
 def evaluate_uppercase(text: str):
-    return  {"text_is_uppercase": text.isupper()}
+    return {"text_is_uppercase": text.isupper()}
 
 eval = weave.Evaluations(..., scorers=[evaluate_uppercase])
 ```
@@ -24,12 +24,12 @@ eval = weave.Evaluations(..., scorers=[evaluate_uppercase])
 When the evaluation is run, `evaluate_uppercase` checks if the text is all uppercase.
 
 ## Class-based Scorers
-For more advanced evaluations, especially when you need to keep track of additional scorer metadata, try different prompts for your LLM-evaluators or make multiple function calls, you can use the `Scorer` class.
+For more advanced evaluations, especially when you need to keep track of additional scorer metadata, try different prompts for your LLM-evaluators, or make multiple function calls, you can use the `Scorer` class.
 
 **Requirements:**
-- Inherit from `weave.Scorer`.
-- Define a `score` method decorated with `@weave.op`.
-- The `score` method must return a dictionary.
+1. Inherit from `weave.Scorer`.
+2. Define a `score` method decorated with `@weave.op`.
+3. The `score` method must return a dictionary.
 
 Example:
 
@@ -116,7 +116,7 @@ class SummarizationScorer(Scorer)
         ...  # evaluate the quality of the summary
 
 # create a scorer with a column mapping the `text` parameter to the `news_article` data column
-scorer = SummarizationScorer(column_map = {"text" : "news_article"})
+scorer = SummarizationScorer(column_map={"text" : "news_article"})
 ```
 Here, the `text` parameter in the score method will receive data from the `news_article` column.
 
@@ -133,7 +133,7 @@ pip install weave[scorers]
 
 **LLM-evaluators**
 
-The pre-defined scorers that use LLMs support the OpenAI, Anthropic, Google GenerativeAI and MistralAI clients. They also uses weave's `InstructorLLMScorer` class, so you'll need to install the [`instructor`](https://github.com/instructor-ai/instructor) Python package to be able to use them.
+The pre-defined scorers that use LLMs support the OpenAI, Anthropic, Google GenerativeAI and MistralAI clients. They also use `weave`'s `InstructorLLMScorer` class, so you'll need to install the [`instructor`](https://github.com/instructor-ai/instructor) Python package to be able to use them.  You can get all necessary dependencies with `pip install "weave[scorers]"`
 
 ### `HallucinationFreeScorer`
 
