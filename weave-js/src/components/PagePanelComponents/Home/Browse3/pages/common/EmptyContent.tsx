@@ -43,6 +43,22 @@ export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
   ),
 };
 
+export const EMPTY_PROPS_PROMPTS: EmptyProps = {
+  icon: 'forum-chat-bubble' as const,
+  heading: 'No prompts yet',
+  description:
+    'You can use prompts to try different instructions for your LLM, tracking edits and their impact on performance.',
+  moreInformation: (
+    <>
+      Learn{' '}
+      <TargetBlank href="http://wandb.me/weave_prompts">
+        prompt basics
+      </TargetBlank>
+      .
+    </>
+  ),
+};
+
 export const EMPTY_PROPS_MODEL: EmptyProps = {
   icon: 'model' as const,
   heading: 'No models yet',
