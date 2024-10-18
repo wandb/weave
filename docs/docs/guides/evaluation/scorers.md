@@ -18,7 +18,7 @@ These are functions decorated with `@weave.op` that return a dictionary. They're
 def evaluate_uppercase(text: str):
     return {"text_is_uppercase": text.isupper()}
 
-eval = weave.Evaluations(..., scorers=[evaluate_uppercase])
+my_eval = weave.Evaluations(..., scorers=[evaluate_uppercase])
 ```
 
 When the evaluation is run, `evaluate_uppercase` checks if the text is all uppercase.
