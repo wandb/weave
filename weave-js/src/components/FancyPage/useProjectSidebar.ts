@@ -135,7 +135,7 @@ export const useProjectSidebar = (
             type: 'button' as const,
             name: 'Leaderboard',
             slug: 'weave/leaderboards',
-            isShown: (showWeaveSidebarItems || isShowAll),
+            isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.BenchmarkSquare,
           },
           {
@@ -225,7 +225,6 @@ export const useProjectSidebar = (
     isWeaveOnly,
     viewingRestricted,
     isModelsOnly,
-    viewerIsAdmin,
     showWeaveSidebarItems,
   ]);
 };

@@ -82,6 +82,7 @@ import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
+import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
 import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
@@ -102,7 +103,6 @@ import {
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
 import {useDrawerResize} from './useDrawerResize';
-import { LeaderboardListingPage } from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
 
 LicenseInfo.setLicenseKey(
   'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
@@ -495,7 +495,11 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
         </Route>
-        <Route path={`${projectRoot}/:tab(leaderboards)`}>
+        <Route
+          path={[
+            `${projectRoot}/leaderboards/:itemName`,
+            `${projectRoot}/leaderboards`,
+          ]}>
           <LeaderboardPageBinding />
         </Route>
         {/* BOARDS */}
@@ -980,11 +984,19 @@ const CompareEvaluationsBinding = () => {
 };
 
 const LeaderboardPageBinding = () => {
-  const {entity, project, itemName: leaderboardName} = useParamsDecoded<Browse3TabItemParams>();
+  const params = useParamsDecoded<Browse3TabItemParams>();
+  const {entity, project, itemName: leaderboardName} = params;
+  console.log({params, leaderboardName});
   if (!leaderboardName) {
     return <LeaderboardListingPage entity={entity} project={project} />;
   }
-  return <LeaderboardPage entity={entity} project={project} leaderboardName={leaderboardName/>;
+  return (
+    <LeaderboardPage
+      entity={entity}
+      project={project}
+      leaderboardName={leaderboardName}
+    />
+  );
 };
 
 const OpsPageBinding = () => {
