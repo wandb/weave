@@ -1776,16 +1776,66 @@ def test_is_valid_version_string():
     for v in ["v01", "v0009"]:
         assert not artifact_wandb.is_valid_version_index(v)
 
+class TestEscapeArtifactPath:
+    wandb_prefix = "wandb-client-artifact://"
+    artifact_name = "12347187287418787843872388177814"
+    file_path = "table #3.table.json"
+    file_path_with_colon = "(batch: 1) table #3.table.json"
+    version = "latest"
+    version_with_colon = "latest:v0"
 
-def test_artifact_path_character_escaping():
-    name = 12347187287418787843872388177814
-    path = "table #3.table.json"
-    result = wb_util.escape_artifact_path(
-        f"wandb-client-artifact://{name}:latest/{path}"
-    )
-    uri = artifact_wandb.WeaveWBLoggedArtifactURI.parse(result)
+    def test_standard_artifact_path(self):
+        """
+        Artifact path of the form: "<name>:<version>/<path>" should be escaped properly.
+        """
+        result = wb_util.escape_artifact_path(
+            f"{self.wandb_prefix}{self.artifact_name}:{self.version}/{self.file_path}"
+        )
+        uri = artifact_wandb.WeaveWBLoggedArtifactURI.parse(result)
+        assert uri.path == self.file_path
 
-    assert uri.path == path
+    def test_artifact_path_with_no_version(self):
+        """
+        Artifact path of the form: "<name>/<path>" should be escaped properly.
+        """
+        result = wb_util.escape_artifact_path(
+            f"{self.wandb_prefix}{self.artifact_name}/{self.file_path}"
+        )
+        uri = artifact_wandb.WeaveWBLoggedArtifactURI.parse(result)
+        assert uri.path == self.file_path
+
+    def test_artifact_path_with_version_and_file_with_colon(self):
+        """
+        Artifact path of the form: "<name>:<version>/<path>" should be escaped properly,
+        where <path> contains a colon.
+        """
+        result = wb_util.escape_artifact_path(
+            f"{self.wandb_prefix}{self.artifact_name}:{self.version}/{self.file_path_with_colon}"
+        )
+        uri = artifact_wandb.WeaveWBLoggedArtifactURI.parse(result)
+        assert uri.path == self.file_path_with_colon
+
+    def test_artifact_path_with_no_version_and_file_with_colon(self):
+        """
+        Artifact path of the form: "<name>/<path>" should be escaped properly,
+        where <path> contains a colon.
+        """
+        result = wb_util.escape_artifact_path(
+            f"{self.wandb_prefix}{self.artifact_name}/{self.file_path_with_colon}"
+        )
+        uri = artifact_wandb.WeaveWBLoggedArtifactURI.parse(result)
+        assert uri.path == self.file_path_with_colon
+
+    def test_artifact_path_with_version_with_colon_and_file_with_colon(self):
+        """
+        Artifact path of the form: "<name>:<version>/<path>" should be escaped properly,
+        where <version> contains a colon and <path> contains a colon.
+        """
+        result = wb_util.escape_artifact_path(
+            f"{self.wandb_prefix}{self.artifact_name}:{self.version_with_colon}/{self.file_path_with_colon}"
+        )
+        uri = artifact_wandb.WeaveWBLoggedArtifactURI.parse(result)
+        assert uri.path == self.file_path_with_colon
 
 
 def _do_test_gql_artifact_dir_path(node):
