@@ -236,12 +236,12 @@ similarity_scorer = EmbeddingSimilarityScorer(
 **Parameters:**
 
 - `target`: This scorer expects a `target` column in your dataset, it will calculate the cosine similarity of the embeddings of the `target` column to the AI system output. If your dataset doesn't contain a column called `target` you can use the scorers `column_map` attribute to map `target` to the appropriate column name in your dataset. See the Column Mapping section for more.
-- `threshold` (float): Minimum cosine similarity score to be considered as "similar" (default is `0.5`). Cosine similarity can range from -1 to 1:
+- `threshold` (float): The minimum cosine similarity score between the embedding of the AI system output and the embdedding of the `target`, above which the 2 samples are considered "similar", (defaults to `0.5`). `threshold` can be in a range from -1 to 1:
     - 1 indicates identical direction.
     - 0 indicates orthogonal vectors.
     - -1 indicates opposite direction.
 
-`threshold` should in a range between -1 and 1. The cosine similarity between the embedding of the AI system output and the `target`  correct threshold to set can fluctuate quite a lot depending on your use case, we advise exploring different thresholds
+The correct cosine similarity threshold to set can fluctuate quite a lot depending on your use case, we advise exploring different thresholds.
 
 ---
 
@@ -307,8 +307,8 @@ entity_recall_scorer = ContextEntityRecallScorer(
 
 **How It Works:**
 
-- Uses an LLM to extract unique entities from the output and context.
-- Calculates recall as the proportion of entities in the output that are present in the context.
+- Uses an LLM to extract unique entities from the output and context and calculates recall.
+- **Recall** indicates the proportion of important entities from the context that are captured in the output, helping to assess the model's effectiveness in retrieving relevant information. 
 - Returns a dictionary with the recall score.
 
 **Notes:**
