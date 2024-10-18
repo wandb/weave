@@ -11,9 +11,11 @@ import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
 type LeaderboardPageProps = {
   entity: string;
   project: string;
+  leaderboardName: string;
 };
 
 export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
+  return <>{props.leaderboardName}</>;
   return (
     <LeaderboardPageContent entity={props.entity} project={props.project} />
   );
