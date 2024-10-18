@@ -31,6 +31,7 @@ export const useProjectSidebar = (
   const isNoSidebarItems = !showModelsSidebarItems && !showWeaveSidebarItems;
   const isBothSidebarItems = showModelsSidebarItems && showWeaveSidebarItems;
   const isShowAll = isNoSidebarItems || isBothSidebarItems;
+
   return useMemo(() => {
     const allItems = isLoading
       ? []
@@ -138,11 +139,28 @@ export const useProjectSidebar = (
             iconName: IconNames.LayoutTabs,
           },
           {
+            type: 'divider' as const,
+            key: 'dividerWithinWeave',
+            isShown: isWeaveOnly,
+          },
+          {
             type: 'button' as const,
             name: 'Evals',
             slug: 'weave/evaluations',
             isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.BaselineAlt,
+          },
+          {
+            type: 'button' as const,
+            name: 'Leads',
+            slug: 'weave/leaderboards',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.BenchmarkSquare,
+          },
+          {
+            type: 'divider' as const,
+            key: 'dividerWithinWeave',
+            isShown: isWeaveOnly,
           },
           {
             type: 'button' as const,
@@ -213,10 +231,10 @@ export const useProjectSidebar = (
     return onlyShownItems;
   }, [
     isLoading,
-    isModelsOnly,
-    isWeaveOnly,
-    showWeaveSidebarItems,
     isShowAll,
+    isWeaveOnly,
     viewingRestricted,
+    isModelsOnly,
+    showWeaveSidebarItems,
   ]);
 };
