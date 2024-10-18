@@ -1,4 +1,6 @@
-import React from 'react';
+import { Box } from '@material-ui/core';
+import { Button } from '@wandb/weave/components/Button/Button';
+import React, { FC } from 'react';
 import styled from 'styled-components';
 
 import {Empty} from '../common/Empty';
@@ -22,6 +24,7 @@ export const LeaderboardListingPage: React.FC<{
           content: <LeaderboardListingPageInner {...props} />,
         },
       ]}
+      headerExtra={<CreateLeaderboardButton/>}
     />
   );
 };
@@ -166,14 +169,30 @@ const Title = styled.h1`
   margin: 0;
 `;
 
-const CreateQueueButton = styled.button`
-  background-color: #00a4b8;
-  color: white;
-  border: none;
-  padding: 10px 15px;
-  border-radius: 4px;
-  cursor: pointer;
-`;
+
+const CreateLeaderboardButton: FC = (
+) => {
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      <Button
+        className="mx-16"
+        style={{
+          marginLeft: '0px',
+        }}
+        size="medium"
+        variant="secondary"
+        onClick={console.log}
+        icon="add-new">
+        Create Leaderboard
+      </Button>
+    </Box>
+  );
+};
 
 const WelcomeMessage = styled.div`
   background-color: #f0f0f0;
