@@ -10,7 +10,6 @@ from functools import lru_cache
 from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Union
 
 import pydantic
-import requests
 from requests import HTTPError
 
 from weave import version
@@ -1578,14 +1577,6 @@ image_suffix = r".*\.(png|jpg|jpeg|gif|tiff)"
 local_image_pattern = re.compile(rf"^{image_suffix}$", re.IGNORECASE)
 remote_image_pattern = re.compile(rf"https://.*\.{image_suffix}", re.IGNORECASE)
 
-pil_package_available = False
-try:
-    from PIL import Image
-
-    pil_package_available = True
-except ImportError:
-    pass
-
 
 def convert_paths_to_images(obj: str) -> typing.Union[str, PathImage]:
     """Load or download paths to images as PathImage objects.
@@ -1593,21 +1584,10 @@ def convert_paths_to_images(obj: str) -> typing.Union[str, PathImage]:
     If the path is a local image, open it and return a PathImage object.
     If the path is a remote image, download it and return a PathImage object.
     """
-    if not pil_package_available:
-        return obj
-
     if remote_image_pattern.match(obj):
-        try:
-            # Load the image from remote resource
-            img = requests.get(obj, stream=True).raw
-            return PathImage(img=Image.open(img), path=obj)
-        except Exception as e:
-            logger.warning(f"Failed to load remote image file: {obj}. {e}")
+        return PathImage(path=obj, is_local=False)
     elif local_image_pattern.match(obj):
-        try:
-            return PathImage(img=Image.open(obj), path=obj)
-        except Exception as e:
-            logger.warning(f"Failed to open image file: {obj}. {e}")
+        return PathImage(path=obj, is_local=True)
 
     return obj
 
