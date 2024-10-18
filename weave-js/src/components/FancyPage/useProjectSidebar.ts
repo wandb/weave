@@ -140,7 +140,7 @@ export const useProjectSidebar = (
           },
           {
             type: 'divider' as const,
-            key: 'dividerWithinWeave',
+            key: 'dividerWithinWeave-1',
             isShown: isWeaveOnly,
           },
           {
@@ -159,7 +159,7 @@ export const useProjectSidebar = (
           },
           {
             type: 'divider' as const,
-            key: 'dividerWithinWeave',
+            key: 'dividerWithinWeave-2',
             isShown: isWeaveOnly,
           },
           {
@@ -178,7 +178,7 @@ export const useProjectSidebar = (
           },
           {
             type: 'divider' as const,
-            key: 'dividerWithinWeave',
+            key: 'dividerWithinWeave-3',
             isShown: isWeaveOnly,
           },
           {

@@ -6,9 +6,39 @@ from weave.trace.weave_client import get_ref
 
 
 def test_leaderboard_empty(client):
+    evaluation_obj_1 = weave.Evaluation(
+        name="test_evaluation_name",
+        dataset=[{"input": -1, "target": -1}],
+        scorers=[],
+    )
+
+    weave.publish(evaluation_obj_1)
+
     spec = leaderboard.Leaderboard(
-        name="Test Leaderboard",
-        description="This is a test leaderboard",
+        name="Empty Leaderboard",
+        description="""This is an empty leaderboard""",
+        columns=[
+            leaderboard.LeaderboardColumn(
+                evaluation_object_ref=get_ref(evaluation_obj_1).uri(),
+                scorer_name="test_scorer_name",
+                summary_metric_path="test_summary_metric_path",
+            )
+        ],
+    )
+
+    ref = weave.publish(spec)
+
+    # TODO: this is not working
+    # spec = ref.get()
+
+    results = leaderboard.get_leaderboard_results(spec, client)
+    assert len(results) == 0
+
+
+def test_leaderboard_mis_configured(client):
+    spec = leaderboard.Leaderboard(
+        name="Misconfigured Leaderboard",
+        description="""This is a misconfigured leaderboard""",
         columns=[
             leaderboard.LeaderboardColumn(
                 evaluation_object_ref="test_evaluation_object_ref",
@@ -17,6 +47,11 @@ def test_leaderboard_empty(client):
             )
         ],
     )
+
+    ref = weave.publish(spec)
+
+    # TODO: this is not working
+    # spec = ref.get()
 
     results = leaderboard.get_leaderboard_results(spec, client)
     assert len(results) == 0
@@ -72,7 +107,7 @@ async def test_leaderboard_with_results(client):
 
     spec = leaderboard.Leaderboard(
         name="Simple Leaderboard",
-        description="This is a test leaderboard",
+        description="""This is a simple leaderboard""",
         columns=[
             leaderboard.LeaderboardColumn(
                 evaluation_object_ref=get_ref(evaluation_obj_1).uri(),
@@ -94,7 +129,24 @@ async def test_leaderboard_with_results(client):
 
     spec = leaderboard.Leaderboard(
         name="Complex Leaderboard",
-        description="This is a test leaderboard",
+        description="""
+This leaderboard has multiple columns
+
+### Columns
+
+1. Column 1:
+    - Evaluation Object: test_evaluation_object_ref
+    - Scorer Name: test_scorer_name
+    - Summary Metric Path: test_summary_metric_path
+2. Column 2:
+    - Evaluation Object: test_evaluation_object_ref
+    - Scorer Name: test_scorer_name
+    - Summary Metric Path: test_summary_metric_path
+3. Column 3:
+    - Evaluation Object: test_evaluation_object_ref
+    - Scorer Name: test_scorer_name
+    - Summary Metric Path: test_summary_metric_path
+""",
         columns=[
             leaderboard.LeaderboardColumn(
                 evaluation_object_ref=get_ref(evaluation_obj_2).uri(),

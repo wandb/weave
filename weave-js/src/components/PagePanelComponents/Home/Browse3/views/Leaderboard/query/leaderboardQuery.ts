@@ -542,7 +542,11 @@ const getPythonLeaderboardGroupableData = async (
 ): Promise<GroupableLeaderboardValueRecord[]> => {
   const evalObjectRefs = _.uniq(
     val.columns.map(col => col.evaluation_object_ref)
-  );
+  ).filter(ref => parseRefMaybe(ref)?.scheme === 'weave');
+
+  if (evalObjectRefs.length === 0) {
+    return [];
+  }
 
   const evalObjectRefsValsProm = client.readBatch({refs: evalObjectRefs});
 
