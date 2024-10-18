@@ -1,11 +1,9 @@
 import typing
 
 from weave.trace import autopatch, errors, init_message, trace_sentry, weave_client
-from weave.trace.client_context import weave_client as weave_client_context
+from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace_server import sqlite_trace_server
 from weave.trace_server_bindings import remote_http_trace_server
-
-_current_inited_client = None
 
 
 class InitializedClient:
@@ -15,6 +13,9 @@ class InitializedClient:
 
     def reset(self) -> None:
         weave_client_context.set_weave_client_global(None)
+
+
+_current_inited_client: typing.Optional[InitializedClient] = None
 
 
 def get_username() -> typing.Optional[str]:
@@ -99,7 +100,7 @@ def init_weave(
         api_key = wandb_context.api_key
 
     remote_server = init_weave_get_server(api_key)
-    # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+    # from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
     # server = ClickHouseTraceServer(host="localhost")
     client = weave_client.WeaveClient(
@@ -110,7 +111,7 @@ def init_weave(
 
     _current_inited_client = InitializedClient(client)
     # entity_name, project_name = get_entity_project_from_project_name(project_name)
-    # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+    # from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
     # client = weave_client.WeaveClient(ClickHouseTraceServer(host="localhost"))
 

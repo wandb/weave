@@ -14,19 +14,29 @@ import requests
 from requests import HTTPError
 
 from weave import version
-from weave.trace import call_context, trace_sentry, urls
-from weave.trace.client_context import weave_client as weave_client_context
+from weave.trace import trace_sentry, urls
 from weave.trace.concurrent.futures import FutureExecutor
+from weave.trace.context import call_context
+from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
+from weave.trace.feedback_types.score import SCORE_TYPE_NAME, ScoreTypePayload
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
     pydantic_object_record,
 )
-from weave.trace.op import Op, is_op, maybe_unbind_method
+from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
 from weave.trace.op import op as op_deco
-from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_op_uri
+from weave.trace.refs import (
+    CallRef,
+    ObjectRef,
+    OpRef,
+    Ref,
+    TableRef,
+    parse_op_uri,
+    parse_uri,
+)
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.settings import client_parallelism, should_convert_paths_to_images
@@ -49,6 +59,7 @@ from weave.trace_server.trace_server_interface import (
     CostQueryOutput,
     CostQueryReq,
     EndedCallSchemaForInsert,
+    FeedbackCreateReq,
     FileCreateReq,
     FileCreateRes,
     ObjCreateReq,
@@ -239,6 +250,13 @@ class Call:
         if not self.id:
             raise ValueError("Can't get URL for call without ID")
         return urls.redirect_call(entity, project, self.id)
+
+    @property
+    def ref(self) -> CallRef:
+        entity, project = self.project_id.split("/")
+        if not self.id:
+            raise ValueError("Can't get ref for call without ID")
+        return CallRef(entity, project, self.id)
 
     # These are the children if we're using Call at read-time
     def children(self) -> "CallsIter":
@@ -724,25 +742,26 @@ class WeaveClient:
         output: Any = None,
         exception: Optional[BaseException] = None,
         *,
-        postprocess_output: Optional[Callable[..., Any]] = None,
+        op: Optional[Op] = None,
     ) -> None:
+        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        call.ended_at = ended_at
+
         parse_obj_functions: list[Callable] = []
         if should_convert_paths_to_images():
             parse_obj_functions.append(convert_paths_to_images)
 
         output = parse_obj(output, parse_obj_functions)
-        self._save_nested_objects(output)
         original_output = output
 
         # user controlled postprocessing of output
-        if postprocess_output:
-            postprocessed_output = postprocess_output(original_output)
+        if op is not None and op.postprocess_output:
+            postprocessed_output = op.postprocess_output(original_output)
         else:
             postprocessed_output = original_output
-        self._save_nested_objects(postprocessed_output)
 
-        output = map_to_refs(postprocessed_output)
-        call.output = output
+        self._save_nested_objects(postprocessed_output)
+        call.output = map_to_refs(postprocessed_output)
 
         # Summary handling
         summary = {}
@@ -769,6 +788,20 @@ class WeaveClient:
                 summary["usage"] = {}
                 summary["usage"][model] = {"requests": 1, **usage}
 
+        # JR Oct 24 - This descendants stats code has been commented out since
+        # it entered the code base. A screenshot of the non-ideal UI that the
+        # comment refers to is available in the description of that PR:
+        # https://github.com/wandb/weave/pull/1414
+        # These should probably be added under the "weave" key in the summary.
+        # ---
+        # Descendent error tracking disabled til we fix UI
+        # Add this call's summary after logging the call, so that only
+        # descendents are included in what we log
+        # summary.setdefault("descendants", {}).setdefault(
+        #     call.op_name, {"successes": 0, "errors": 0}
+        # )["successes"] += 1
+        call.summary = summary
+
         # Exception Handling
         exception_str: Optional[str] = None
         if exception:
@@ -776,10 +809,14 @@ class WeaveClient:
             call.exception = exception_str
 
         project_id = self._project_id()
-        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
+
+        # The finish handler serves as a last chance for integrations
+        # to customize what gets logged for a call.
+        if op is not None and op._on_finish_handler:
+            op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
-            output_json = to_json(output, project_id, self)
+            output_json = to_json(call.output, project_id, self)
             self.server.call_end(
                 CallEndReq(
                     end=EndedCallSchemaForInsert(
@@ -795,13 +832,6 @@ class WeaveClient:
 
         self.future_executor.defer(send_end_call)
 
-        # Descendent error tracking disabled til we fix UI
-        # Add this call's summary after logging the call, so that only
-        # descendents are included in what we log
-        # summary.setdefault("descendants", {}).setdefault(
-        #     call.op_name, {"successes": 0, "errors": 0}
-        # )["successes"] += 1
-        call.summary = summary
         call_context.pop_call(call.id)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1047,6 +1077,96 @@ class WeaveClient:
             )
         )
         return res.results
+
+    @trace_sentry.global_trace_sentry.watch()
+    def _send_score_call(self, predict_call: Call, score_call: Call) -> Future[str]:
+        """(Private) Adds a score to a call. This is particularly useful
+        for adding evaluation metrics to a call.
+        """
+
+        def send_score_call() -> str:
+            call_ref = get_ref(predict_call)
+            if call_ref is None:
+                raise ValueError("Predict call must have a ref")
+            call_ref_uri = call_ref.uri()
+            scorer_call_ref = get_ref(score_call)
+            if scorer_call_ref is None:
+                raise ValueError("Score call must have a ref")
+            scorer_call_ref_uri = scorer_call_ref.uri()
+            scorer_op_ref_uri = score_call.op_name
+            scorer_op_ref = parse_uri(scorer_op_ref_uri)
+            if not isinstance(scorer_op_ref, OpRef):
+                raise ValueError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
+            score_name = scorer_op_ref.name
+            score_results = score_call.output
+
+            return self._add_score(
+                call_ref_uri=call_ref_uri,
+                score_name=score_name,
+                score_results=score_results,
+                scorer_call_ref_uri=scorer_call_ref_uri,
+                scorer_op_ref_uri=scorer_op_ref_uri,
+            )
+
+        return self.future_executor.defer(send_score_call)
+
+    @trace_sentry.global_trace_sentry.watch()
+    def _add_score(
+        self,
+        *,
+        call_ref_uri: str,
+        score_name: str,
+        score_results: Any,
+        scorer_call_ref_uri: str,
+        scorer_op_ref_uri: str,
+        # , supervision: dict
+    ) -> str:
+        """(Private) Low-level, non object-oriented method for adding a score to a call.
+
+        Outstanding questions:
+        - Should we somehow include supervision (ie. the ground truth) in the payload?
+        - What should the shape of `ScoreTypePayload` be? Maybe we want the results to be top-level?
+        - What should we use for name? A standard "score" or the score name?
+        """
+        # Parse the refs (acts as validation)
+        call_ref = parse_uri(call_ref_uri)
+        if not isinstance(call_ref, CallRef):
+            raise ValueError(f"Invalid call ref: {call_ref_uri}")
+        scorer_call_ref = parse_uri(scorer_call_ref_uri)
+        if not isinstance(scorer_call_ref, CallRef):
+            raise ValueError(f"Invalid scorer call ref: {scorer_call_ref_uri}")
+        scorer_op_ref = parse_uri(scorer_op_ref_uri)
+        if not isinstance(scorer_op_ref, OpRef):
+            raise ValueError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
+
+        # Validate score_name (we might want to relax this in the future)
+        if score_name != scorer_op_ref.name:
+            raise ValueError(
+                f"Score name {score_name} does not match scorer op name {scorer_op_ref.name}"
+            )
+
+        # Prepare the result payload - we purposely do not map to refs here
+        # because we prefer to have the raw data.
+        results_json = to_json(score_results, self._project_id(), self)
+
+        # # Prepare the supervision payload
+
+        payload: ScoreTypePayload = {
+            "name": score_name,
+            "op_ref": scorer_op_ref_uri,
+            "call_ref": scorer_call_ref_uri,
+            "results": results_json,
+        }
+
+        freq = FeedbackCreateReq(
+            project_id=self._project_id(),
+            weave_ref=call_ref_uri,
+            feedback_type=SCORE_TYPE_NAME,  # should this be score_name?
+            payload=payload,
+        )
+        response = self.server.feedback_create(freq)
+
+        return response.id
 
     ################# Object Saving ##################
     # `_save_object` is the top level entry point for saving data to the weave server.
@@ -1414,6 +1534,7 @@ def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
 
     op_fn.__name__ = name
     op = op_deco(op_fn)
+    op = as_op(op)
     op.name = name
     return op
 

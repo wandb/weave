@@ -2,7 +2,16 @@ import nox
 
 nox.options.default_venv_backend = "uv"
 
-SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12"]
+SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
+PY313_INCOMPATIBLE_SHARDS = [
+    "anthropic",
+    "cohere",
+    "dspy",
+    "langchain",
+    "litellm",
+    "notdiamond",
+    "google_ai_studio",
+]
 
 
 @nox.session
@@ -21,6 +30,7 @@ def lint(session):
         "cerebras",
         "cohere",
         "dspy",
+        "google_ai_studio",
         "groq",
         "instructor",
         "langchain",
@@ -28,12 +38,16 @@ def lint(session):
         "llamaindex",
         "mistral0",
         "mistral1",
+        "notdiamond",
         "openai",
     ],
 )
 def tests(session, shard):
+    if session.python.startswith("3.13") and shard in PY313_INCOMPATIBLE_SHARDS:
+        session.skip(f"Skipping {shard=} as it is not compatible with Python 3.13")
+
     session.install("-e", f".[{shard},test]")
-    session.chdir("weave")
+    session.chdir("tests")
 
     env = {
         k: session.env.get(k)
@@ -45,10 +59,13 @@ def tests(session, shard):
             "WEAVE_SERVER_DISABLE_ECOSYSTEM",
         ]
     }
+    # Add the GOOGLE_API_KEY environment variable for the "google" shard
+    if shard == "google_ai_studio":
+        env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
 
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
-        "trace": ["tests/trace/", "trace/"],
+        "trace": ["trace/"],
         "trace_server": ["trace_server/"],
         "mistral0": ["integrations/mistral/v0/"],
         "mistral1": ["integrations/mistral/v1/"],
@@ -60,10 +77,17 @@ def tests(session, shard):
     if shard == "llamaindex":
         session.posargs.insert(0, "-n4")
 
-    session.run("pytest", *session.posargs, *test_dirs, env=env)
+    session.run(
+        "pytest",
+        "--cov=weave",
+        "--cov-report=html",
+        "--cov-branch",
+        *session.posargs,
+        *test_dirs,
+        env=env,
+    )
 
 
 # Configure pytest
-# nox.options.sessions = ["tests", "lint", "integration_tests"]
 nox.options.reuse_existing_virtualenvs = True
 nox.options.stop_on_first_error = True

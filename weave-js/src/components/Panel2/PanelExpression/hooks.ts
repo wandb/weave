@@ -471,6 +471,7 @@ export function usePanelExpressionState(props: PanelExpressionProps) {
 
   const applyEditingConfig = useCallback(() => {
     recordEvent('EDITING_CONFIG_UPDATE');
+
     updateConfig({
       exp: editingExp,
       panelInputType: calledExpanded.type,
@@ -667,6 +668,7 @@ export function usePanelExpressionState(props: PanelExpressionProps) {
   const exprAndPanelLocked = !!props.config?.exprAndPanelLocked;
 
   const toggleExprLock = useCallback(() => {
+    recordEvent(exprAndPanelLocked ? 'UNFREEZE_EXP' : 'FREEZE_EXP');
     updateConfig({exprAndPanelLocked: !exprAndPanelLocked});
   }, [updateConfig, exprAndPanelLocked]);
 

@@ -1,4 +1,5 @@
-import React from 'react';
+import Prism from 'prismjs';
+import React, {useEffect, useRef} from 'react';
 
 import {Alert} from '../../../../../Alert';
 import {ToolCall} from './types';
@@ -8,6 +9,13 @@ type OneToolCallProps = {
 };
 
 const OneToolCall = ({toolCall}: OneToolCallProps) => {
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (ref.current) {
+      Prism.highlightElement(ref.current!);
+    }
+  });
+
   const {function: toolCallFunction} = toolCall;
   const {name, arguments: args} = toolCallFunction;
   let parsedArgs: any = null;
@@ -21,9 +29,14 @@ const OneToolCall = ({toolCall}: OneToolCallProps) => {
     // The model does not always generate valid JSON
     return <Alert severity="error">Invalid JSON: {args}</Alert>;
   }
+
   return (
-    <code className="whitespace-pre text-xs">
-      {name}({parsedArgs})
+    <code className="whitespace-pre-wrap font-['Inconsolata'] text-sm">
+      {name}(
+      <span ref={ref} className="language-json">
+        {parsedArgs}
+      </span>
+      )
     </code>
   );
 };

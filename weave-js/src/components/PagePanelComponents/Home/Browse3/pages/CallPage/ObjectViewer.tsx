@@ -6,6 +6,7 @@ import {
   GridRowHeightParams,
   GridRowId,
 } from '@mui/x-data-grid-pro';
+import {Button} from '@wandb/weave/components/Button';
 import _ from 'lodash';
 import React, {
   Dispatch,
@@ -38,7 +39,13 @@ import {
   getKnownImageDictContexts,
   isKnownImageDictFormat,
 } from './objectViewerUtilities';
-import {mapObject, ObjectPath, traverse, TraverseContext} from './traverse';
+import {
+  getValueType,
+  mapObject,
+  ObjectPath,
+  traverse,
+  TraverseContext,
+} from './traverse';
 import {ValueView} from './ValueView';
 
 type Data = Record<string, any> | any[];
@@ -64,7 +71,12 @@ const getRefs = (data: Data): string[] => {
 
 type RefValues = Record<string, any>; // ref URI to value
 
+type TruncatedStore = {[key: string]: {values: any; index: number}};
+
 const RESOVLED_REF_KEY = '_ref';
+
+export const ARRAY_TRUNCATION_LENGTH = 50;
+const TRUNCATION_KEY = '__weave_array_truncated__';
 
 // This is a general purpose object viewer that can be used to view any object.
 export const ObjectViewer = ({
@@ -76,8 +88,13 @@ export const ObjectViewer = ({
 }: ObjectViewerProps) => {
   const {useRefsData} = useWFHooks();
 
+  // `truncatedData` holds the data with all arrays truncated to ARRAY_TRUNCATION_LENGTH, unless we have specifically added more rows to the array
+  // `truncatedStore` is used to store the additional rows that we can add to the array when the user clicks "Show more"
+  const {truncatedData, truncatedStore, setTruncatedData, setTruncatedStore} =
+    useTruncatedData(data);
+
   // `resolvedData` holds ref-resolved data.
-  const [resolvedData, setResolvedData] = useState<Data>(data);
+  const [resolvedData, setResolvedData] = useState<Data>(truncatedData);
 
   // `dataRefs` are the refs contained in the data, filtered to only include expandable refs.
   const dataRefs = useMemo(() => getRefs(data).filter(isExpandableRef), [data]);
@@ -158,7 +175,7 @@ export const ObjectViewer = ({
       }
       refValues[r] = val;
     }
-    let resolved = data;
+    let resolved = truncatedData;
     let dirty = true;
     const mapper = (context: TraverseContext) => {
       if (
@@ -177,7 +194,7 @@ export const ObjectViewer = ({
       resolved = mapObject(resolved, mapper);
     }
     setResolvedData(resolved);
-  }, [data, refs, refsData.loading, refsData.result]);
+  }, [data, refs, refsData.loading, refsData.result, truncatedData]);
 
   // `rows` are the data-grid friendly rows that we will render. This method traverses
   // the data, hiding certain keys and adding loader rows for expandable refs.
@@ -297,6 +314,19 @@ export const ObjectViewer = ({
         display: 'flex',
         sortable: false,
         renderCell: ({row}) => {
+          const isTruncated = row?.value?.[TRUNCATION_KEY];
+          const parentPath = row?.parent?.path?.toString() ?? '';
+          if (isTruncated && truncatedStore[parentPath]) {
+            return (
+              <ShowMoreButtons
+                parentPath={parentPath}
+                truncatedData={truncatedData}
+                truncatedStore={truncatedStore}
+                setTruncatedData={setTruncatedData}
+                setTruncatedStore={setTruncatedStore}
+              />
+            );
+          }
           if (row.isCode) {
             return (
               <Box
@@ -337,7 +367,15 @@ export const ObjectViewer = ({
         },
       },
     ];
-  }, [currentRefContext, expandedRefs, isExpanded]);
+  }, [
+    currentRefContext,
+    expandedRefs,
+    isExpanded,
+    truncatedData,
+    truncatedStore,
+    setTruncatedData,
+    setTruncatedStore,
+  ]);
 
   // Here, we setup the `Path` column which acts as a grouping column. This
   // column is responsible for showing the expand/collapse icons and handling
@@ -351,6 +389,11 @@ export const ObjectViewer = ({
       hideDescendantCount: true,
       renderCell: params => {
         const refToExpand = params.row.value;
+        const isTruncated = params.row?.value?.[TRUNCATION_KEY];
+        if (isTruncated) {
+          return null;
+        }
+
         return (
           <ObjectViewerGroupingCell
             {...params}
@@ -498,4 +541,158 @@ const buildBaseRef = (
     });
   }
   return baseRef;
+};
+
+// This function traverses the data and truncates the current node if it is an array and the length is greater than ARRAY_TRUNCATION_LENGTH(50)
+const traverseAndTruncate = (data: Data): any => {
+  const result = getValueType(data) === 'array' ? [] : {};
+
+  const store: TruncatedStore = {};
+  traverse(data, (context: TraverseContext) => {
+    let value = context.value;
+
+    // Truncates the value if it is an array and the length is greater than ARRAY_TRUNCATION_LENGTH
+    if (Array.isArray(value) && value.length > ARRAY_TRUNCATION_LENGTH) {
+      // Stores the truncated values in the store
+      store[context.path.toString()] = {
+        values: value.slice(ARRAY_TRUNCATION_LENGTH),
+        index: ARRAY_TRUNCATION_LENGTH,
+      };
+
+      // Truncates and sets the value to ARRAY_TRUNCATION_LENGTH
+      value = [
+        ...value.slice(0, ARRAY_TRUNCATION_LENGTH),
+        {
+          [TRUNCATION_KEY]: true,
+        },
+      ];
+      context.value = value;
+    }
+
+    // Passes the value to the result
+    if (context.depth === 0) {
+      // For the root object, we just want to assign the value to the result
+      if (Array.isArray(result)) {
+        result.push(...value);
+      } else {
+        Object.assign(result, value);
+      }
+    } else {
+      // For all other objects, we want to assign the value to the result
+      context.path.set(result, value);
+    }
+  });
+  return {store, result};
+};
+
+// This function updates the truncatedData from the truncatedStore, adding more data to the truncatedData array, based on the parentID and truncatedCount
+const updateTruncatedDataFromStore = (
+  key: string,
+  truncatedData: Data,
+  truncatedStore: TruncatedStore,
+  truncatedCount: number = ARRAY_TRUNCATION_LENGTH
+) => {
+  const store = {
+    ...truncatedStore,
+  };
+
+  const newData = mapObject(truncatedData, (context: TraverseContext) => {
+    // If the path is the key, we need to show more data
+    if (context.path.toString() === key) {
+      const storeValue = truncatedStore[key].values;
+      // Depending on the length of the store value, we either add truncatedCount more, or the rest of the values
+      if (storeValue.length > truncatedCount) {
+        // Remove the truncated indicator
+        context.value.pop();
+        // Add the new values and truncated indicator
+        context.value.push(...storeValue.slice(0, truncatedCount));
+        context.value.push({
+          [TRUNCATION_KEY]: true,
+        });
+        // Update the store
+        store[key] = {
+          values: storeValue.slice(truncatedCount),
+          index: store[key].index + truncatedCount,
+        };
+      } else {
+        // Remove the truncated indicator
+        context.value.pop();
+        // Add the new values
+        context.value.push(...storeValue);
+        // Update the store
+        delete store[key];
+      }
+    }
+    return context.value;
+  });
+  return {newData, store};
+};
+
+const ShowMoreButtons = ({
+  parentPath,
+  truncatedData,
+  truncatedStore,
+  setTruncatedData,
+  setTruncatedStore,
+}: {
+  parentPath: string;
+  truncatedData: Data;
+  truncatedStore: TruncatedStore;
+  setTruncatedData: (data: Data) => void;
+  setTruncatedStore: (store: TruncatedStore) => void;
+}) => {
+  const truncatedCount = truncatedStore[parentPath]?.values.length ?? 0;
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        width: '100%',
+        justifyContent: 'flex-end',
+        gap: 1,
+      }}>
+      {truncatedCount > ARRAY_TRUNCATION_LENGTH && (
+        <Button
+          variant="quiet"
+          onClick={() => {
+            const {newData, store} = updateTruncatedDataFromStore(
+              parentPath,
+              truncatedData,
+              truncatedStore,
+              ARRAY_TRUNCATION_LENGTH
+            );
+            setTruncatedData(newData);
+            setTruncatedStore(store);
+          }}>
+          {`Show ${ARRAY_TRUNCATION_LENGTH} more rows`}
+        </Button>
+      )}
+      <Button
+        variant="quiet"
+        onClick={() => {
+          const {newData, store} = updateTruncatedDataFromStore(
+            parentPath,
+            truncatedData,
+            truncatedStore,
+            truncatedCount
+          );
+          setTruncatedData(newData);
+          setTruncatedStore(store);
+        }}>
+        {`Show ${truncatedCount} more rows`}
+      </Button>
+    </Box>
+  );
+};
+
+const useTruncatedData = (data: Data) => {
+  const [truncatedData, setTruncatedData] = useState<Data>(data);
+  const [truncatedStore, setTruncatedStore] = useState<TruncatedStore>({});
+
+  useEffect(() => {
+    const {store, result} = traverseAndTruncate(data);
+    setTruncatedData(result);
+    setTruncatedStore(store);
+  }, [data]);
+
+  return {truncatedData, truncatedStore, setTruncatedData, setTruncatedStore};
 };

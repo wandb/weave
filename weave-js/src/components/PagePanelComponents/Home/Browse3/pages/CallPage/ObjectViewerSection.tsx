@@ -23,6 +23,8 @@ import {ObjectViewer} from './ObjectViewer';
 import {getValueType, traverse} from './traverse';
 import {ValueView} from './ValueView';
 
+const EXPANDED_IDS_LENGTH = 200;
+
 type Data = Record<string, any>;
 
 type ObjectViewerSectionProps = {
@@ -156,7 +158,13 @@ const ObjectViewerSectionNonEmpty = ({
       setTreeExpanded(true);
     }
     setMode('expanded');
-    setExpandedIds(getGroupIds());
+    if (getGroupIds().length > EXPANDED_IDS_LENGTH) {
+      setExpandedIds(
+        getGroupIds().slice(0, expandedIds.length + EXPANDED_IDS_LENGTH)
+      );
+    } else {
+      setExpandedIds(getGroupIds());
+    }
   };
 
   // On first render and when data changes, recompute expansion state
@@ -187,7 +195,7 @@ const ObjectViewerSectionNonEmpty = ({
           icon="expand-uncollapse"
           active={mode === 'expanded'}
           onClick={onClickExpanded}
-          tooltip="View expanded"
+          tooltip={`Expand next ${EXPANDED_IDS_LENGTH} rows`}
         />
         <Button
           variant="quiet"

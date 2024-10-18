@@ -16,22 +16,26 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
+    TypedDict,
     Union,
     cast,
     overload,
     runtime_checkable,
 )
 
-from weave.trace import box, call_context, settings
-from weave.trace.client_context import weave_client as weave_client_context
-from weave.trace.context import call_attributes, get_raise_on_captured_errors
+from weave.trace import box, settings
+from weave.trace.constants import TRACE_CALL_EMOJI
+from weave.trace.context import call_context
+from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.context.call_context import call_attributes
+from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.errors import OpCallError
 from weave.trace.op_extensions.log_once import log_once
 from weave.trace.refs import ObjectRef
 
 logger = logging.getLogger(__name__)
 
-from .constants import TRACE_CALL_EMOJI
+WEAVE_KWARGS_KEY = "__weave"
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import Call, CallsIter
@@ -82,6 +86,8 @@ def print_call_link(call: "Call") -> None:
 
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
 OnOutputHandlerType = Callable[[Any, FinishCallbackType, Dict], Any]
+# Call, original function output, exception if occurred
+OnFinishHandlerType = Callable[["Call", Any, Optional[BaseException]], None]
 
 
 def value_is_sentinel(param: Any) -> bool:
@@ -112,6 +118,10 @@ def _apply_fn_defaults_to_inputs(
             elif param.kind == inspect.Parameter.VAR_KEYWORD:
                 inputs[param_name] = dict()
     return inputs
+
+
+class WeaveKwargs(TypedDict):
+    display_name: Optional[str]
 
 
 @runtime_checkable
@@ -149,6 +159,9 @@ class Op(Protocol):
     _set_on_output_handler: Callable[[OnOutputHandlerType], None]
     _on_output_handler: Optional[OnOutputHandlerType]
 
+    _set_on_finish_handler: Callable[[OnFinishHandlerType], None]
+    _on_finish_handler: Optional[OnFinishHandlerType]
+
     __call__: Callable[..., Any]
     __self__: Any
 
@@ -168,6 +181,12 @@ def _set_on_output_handler(func: Op, on_output: OnOutputHandlerType) -> None:
     func._on_output_handler = on_output
 
 
+def _set_on_finish_handler(func: Op, on_finish: OnFinishHandlerType) -> None:
+    if func._on_finish_handler is not None:
+        raise ValueError("Cannot set on_finish_handler multiple times")
+    func._on_finish_handler = on_finish
+
+
 def _is_unbound_method(func: Callable) -> bool:
     """Check if a function is a function defined on a class (an "unbound" method)
 
@@ -184,7 +203,9 @@ def _is_unbound_method(func: Callable) -> bool:
     return bool(is_method)
 
 
-def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
+def _create_call(
+    func: Op, *args: Any, __weave: Optional[WeaveKwargs] = None, **kwargs: Any
+) -> "Call":
     client = weave_client_context.require_weave_client()
 
     try:
@@ -197,6 +218,8 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
     if "api_key" in inputs_with_defaults:
         inputs_with_defaults["api_key"] = "REDACTED"
 
+    call_time_display_name = __weave.get("display_name") if __weave else None
+
     # If/When we do memoization, this would be a good spot
 
     parent_call = call_context.get_current_call()
@@ -206,7 +229,8 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
         func,
         inputs_with_defaults,
         parent_call,
-        display_name=func.call_display_name,
+        # Very important for `call_time_display_name` to take precedence over `func.call_display_name`
+        display_name=call_time_display_name or func.call_display_name,
         attributes=attributes,
     )
 
@@ -217,7 +241,7 @@ def _execute_call(
     *args: Any,
     __should_raise: bool = True,
     **kwargs: Any,
-) -> Any:
+) -> Union[tuple[Any, "Call"], Coroutine[Any, Any, tuple[Any, "Call"]]]:
     func = __op.resolve_fn
     client = weave_client_context.require_weave_client()
     has_finished = False
@@ -231,7 +255,7 @@ def _execute_call(
             call,
             output,
             exception,
-            postprocess_output=__op.postprocess_output,
+            op=__op,
         )
         if not call_context.get_current_call():
             print_call_link(call)
@@ -242,7 +266,7 @@ def _execute_call(
         finish(output)
         return output
 
-    def process(res: Any) -> Any:
+    def process(res: Any) -> tuple[Any, "Call"]:
         res = box.box(res)
         try:
             # Here we do a try/catch because we don't want to
@@ -261,7 +285,7 @@ def _execute_call(
 
         return res, call
 
-    def handle_exception(e: Exception) -> Any:
+    def handle_exception(e: Exception) -> tuple[Any, "Call"]:
         finish(exception=e)
         if __should_raise:
             raise
@@ -269,7 +293,7 @@ def _execute_call(
 
     if inspect.iscoroutinefunction(func):
 
-        async def _call_async() -> Coroutine[Any, Any, Any]:
+        async def _call_async() -> tuple[Any, "Call"]:
             try:
                 res = await func(*args, **kwargs)
             except Exception as e:
@@ -289,7 +313,13 @@ def _execute_call(
     return None, call
 
 
-def call(op: Op, *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
+def call(
+    op: Op,
+    *args: Any,
+    __weave: Optional[WeaveKwargs] = None,
+    __should_raise: bool = False,
+    **kwargs: Any,
+) -> Union[tuple[Any, "Call"], Coroutine[Any, Any, tuple[Any, "Call"]]]:
     """
     Executes the op and returns both the result and a Call representing the execution.
 
@@ -306,8 +336,115 @@ def call(op: Op, *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
     result, call = add.call(1, 2)
     ```
     """
-    c = _create_call(op, *args, **kwargs)
-    return _execute_call(op, c, *args, __should_raise=False, **kwargs)
+    if inspect.iscoroutinefunction(op.resolve_fn):
+        return _do_call_async(
+            op, *args, __weave=__weave, __should_raise=__should_raise, **kwargs
+        )
+    else:
+        return _do_call(
+            op, *args, __weave=__weave, __should_raise=__should_raise, **kwargs
+        )
+
+
+def _placeholder_call() -> "Call":
+    # Import here to avoid circular dependency
+    from weave.trace.weave_client import Call
+
+    return Call(
+        _op_name="",
+        trace_id="",
+        project_id="",
+        parent_id=None,
+        inputs={},
+    )
+
+
+def _do_call(
+    op: Op,
+    *args: Any,
+    __weave: Optional[WeaveKwargs] = None,
+    __should_raise: bool = False,
+    **kwargs: Any,
+) -> tuple[Any, "Call"]:
+    func = op.resolve_fn
+    call = _placeholder_call()
+    if settings.should_disable_weave():
+        res = func(*args, **kwargs)
+    elif weave_client_context.get_weave_client() is None:
+        res = func(*args, **kwargs)
+    elif not op._tracing_enabled:
+        res = func(*args, **kwargs)
+    else:
+        try:
+            # This try/except allows us to fail gracefully and
+            # still let the user code continue to execute
+            call = _create_call(op, *args, __weave=__weave, **kwargs)
+        except OpCallError as e:
+            raise e
+        except Exception as e:
+            if get_raise_on_captured_errors():
+                raise
+            log_once(
+                logger.error,
+                CALL_CREATE_MSG.format(traceback.format_exc()),
+            )
+            res = func(*args, **kwargs)
+        else:
+            execute_result = _execute_call(
+                op, call, *args, __should_raise=__should_raise, **kwargs
+            )
+            if inspect.iscoroutine(execute_result):
+                raise Exception(
+                    "Internal error: Expected `_execute_call` to return a sync result"
+                )
+            execute_result = cast(tuple[Any, "Call"], execute_result)
+            res, call = execute_result
+    return res, call
+
+
+async def _do_call_async(
+    op: Op,
+    *args: Any,
+    __weave: Optional[WeaveKwargs] = None,
+    __should_raise: bool = False,
+    **kwargs: Any,
+) -> tuple[Any, "Call"]:
+    func = op.resolve_fn
+    call = _placeholder_call()
+    if settings.should_disable_weave():
+        res = await func(*args, **kwargs)
+    elif weave_client_context.get_weave_client() is None:
+        res = await func(*args, **kwargs)
+    elif not op._tracing_enabled:
+        res = await func(*args, **kwargs)
+    else:
+        try:
+            # This try/except allows us to fail gracefully and
+            # still let the user code continue to execute
+            call = _create_call(op, *args, __weave=__weave, **kwargs)
+        except OpCallError as e:
+            raise e
+        except Exception as e:
+            if get_raise_on_captured_errors():
+                raise
+            log_once(
+                logger.error,
+                ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
+            )
+            res = await func(*args, **kwargs)
+        else:
+            execute_result = _execute_call(
+                op, call, *args, __should_raise=__should_raise, **kwargs
+            )
+            if not inspect.iscoroutine(execute_result):
+                raise Exception(
+                    "Internal error: Expected `_execute_call` to return a coroutine"
+                )
+            execute_result = cast(
+                Coroutine[Any, Any, tuple[Any, "Call"]], execute_result
+            )
+            res, call = await execute_result
+    return res, call
 
 
 def calls(op: Op) -> "CallsIter":
@@ -331,78 +468,40 @@ def calls(op: Op) -> "CallsIter":
     return client._op_calls(op)
 
 
-# Legacy decos
-@overload
-def op(name: Any) -> Any: ...
-@overload
-def op(input_type: Any, output_type: Any) -> Any: ...
-@overload
-def op(name: Any, input_type: Any, output_type: Any) -> Any: ...
-@overload
-def op(name: Any, output_type: Any) -> Any: ...
-@overload
-def op(name: Any, input_type: Any, output_type: Any, render_info: Any) -> Any: ...
-@overload
-def op(name: Any, input_type: Any, output_type: Any, pure: Any) -> Any: ...
-@overload
-def op(name: Any, input_type: Any, output_type: Any, hidden: Any) -> Any: ...
+CallDisplayNameFunc = Callable[["Call"], str]
+PostprocessInputsFunc = Callable[[dict[str, Any]], dict[str, Any]]
+PostprocessOutputFunc = Callable[..., Any]
+
+
 @overload
 def op(
-    input_type: Any = None,
-    output_type: Any = None,
-    refine_output_type: Any = None,
-    name: Any = None,
-    setter: Any = None,
-    render_info: Any = None,
-    hidden: Any = None,
-    pure: Any = None,
-    _op_def_class: Any = None,
-    plugins: Any = None,
-    mutation: Any = None,
-    weavify: Any = None,
-) -> Any: ...
-
-
-# Modern decos
-@overload
-def op(func: Any) -> Op: ...
+    func: Callable,
+    *,
+    name: Optional[str] = None,
+    call_display_name: Optional[Union[str, CallDisplayNameFunc]] = None,
+    postprocess_inputs: Optional[PostprocessInputsFunc] = None,
+    postprocess_output: Optional[PostprocessOutputFunc] = None,
+) -> Op: ...
 
 
 @overload
 def op(
     *,
-    call_display_name: Union[str, Callable[["Call"], str]],
-) -> Callable[[Any], Op]:
-    """Use call_display_name to set the display name of the traced call.
-
-    When set as a callable, the callable must take in a Call object
-    (which can have attributes like op_name, trace_id, etc.) and return
-    the string to be used as the display name of the traced call."""
-    ...
+    name: Optional[str] = None,
+    call_display_name: Optional[Union[str, CallDisplayNameFunc]] = None,
+    postprocess_inputs: Optional[PostprocessInputsFunc] = None,
+    postprocess_output: Optional[PostprocessOutputFunc] = None,
+) -> Callable[[Callable], Op]: ...
 
 
-@overload
-def op(*, name: str) -> Callable[[Any], Op]:  # type: ignore
-    """Use name to set the name of the op itself."""
-    ...
-
-
-@overload
 def op(
+    func: Optional[Callable] = None,
     *,
-    postprocess_inputs: Callable[[dict[str, Any]], dict[str, Any]],
-    postprocess_output: Callable[..., Any],
-) -> Any:
-    """
-    Modify the inputs and outputs of an op before sending data to weave.
-
-    This does not modify inputs or outputs at function call time, only when
-    the data is sent to weave.
-    """
-    ...
-
-
-def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
+    name: Optional[str] = None,
+    call_display_name: Optional[Union[str, CallDisplayNameFunc]] = None,
+    postprocess_inputs: Optional[PostprocessInputsFunc] = None,
+    postprocess_output: Optional[PostprocessOutputFunc] = None,
+) -> Union[Callable[[Any], Op], Op]:
     """
     A decorator to weave op-ify a function or method.  Works for both sync and async.
 
@@ -413,8 +512,30 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
     not decorated.
 
 
-    Example usage:
+    Args:
+        func (Optional[Callable]): The function to be decorated. If None, the decorator
+            is being called with parameters.
+        name (Optional[str]): Custom name for the op. If None, the function's name is used.
+        call_display_name (Optional[Union[str, Callable[["Call"], str]]]): Custom display name
+            for the call in the Weave UI. Can be a string or a function that takes a Call
+            object and returns a string.  When a function is passed, it can use any attributes
+            of the Call object (e.g. `op_name`, `trace_id`, etc.) to generate a custom display name.
+        postprocess_inputs (Optional[Callable[[dict[str, Any]], dict[str, Any]]]): A function
+            to process the inputs after they've been captured but before they're logged.  This
+            does not affect the actual inputs passed to the function, only the displayed inputs.
+        postprocess_output (Optional[Callable[..., Any]]): A function to process the output
+            after it's been returned from the function but before it's logged.  This does not
+            affect the actual output of the function, only the displayed output.
 
+    Returns:
+        Union[Callable[[Any], Op], Op]: If called without arguments, returns a decorator.
+        If called with a function, returns the decorated function as an Op.
+
+    Raises:
+        ValueError: If the decorated object is not a function or method.
+
+
+    Example usage:
     ```python
     import weave
     weave.init("my-project")
@@ -443,48 +564,17 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    if settings.should_disable_weave():
-                        return await func(*args, **kwargs)
-                    if weave_client_context.get_weave_client() is None:
-                        return await func(*args, **kwargs)
-                    if not wrapper._tracing_enabled:  # type: ignore
-                        return await func(*args, **kwargs)
-                    try:
-                        # This try/except allows us to fail gracefully and
-                        # still let the user code continue to execute
-                        call = _create_call(wrapper, *args, **kwargs)  # type: ignore
-                    except Exception as e:
-                        if get_raise_on_captured_errors():
-                            raise
-                        log_once(
-                            logger.error,
-                            ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
-                        )
-                        return await func(*args, **kwargs)
-                    res, _ = await _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
+                    res, _ = await _do_call_async(
+                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                    )
                     return res
             else:
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    if settings.should_disable_weave():
-                        return func(*args, **kwargs)
-                    if weave_client_context.get_weave_client() is None:
-                        return func(*args, **kwargs)
-                    if not wrapper._tracing_enabled:  # type: ignore
-                        return func(*args, **kwargs)
-                    try:
-                        # This try/except allows us to fail gracefully and
-                        # still let the user code continue to execute
-                        call = _create_call(wrapper, *args, **kwargs)  # type: ignore
-                    except Exception as e:
-                        if get_raise_on_captured_errors():
-                            raise
-                        log_once(
-                            logger.error, CALL_CREATE_MSG.format(traceback.format_exc())
-                        )
-                        return func(*args, **kwargs)
-                    res, _ = _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
+                    res, _ = _do_call(
+                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                    )
                     return res
 
             # Tack these helpers on to our wrapper
@@ -497,12 +587,12 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
             # this is noisy for us, so we strip it out
             inferred_name = inferred_name.split(".<locals>.")[-1]
 
-            wrapper.name = kwargs.get("name", inferred_name)  # type: ignore
+            wrapper.name = name or inferred_name  # type: ignore
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
 
-            wrapper.postprocess_inputs = kwargs.get("postprocess_inputs")  # type: ignore
-            wrapper.postprocess_output = kwargs.get("postprocess_output")  # type: ignore
+            wrapper.postprocess_inputs = postprocess_inputs  # type: ignore
+            wrapper.postprocess_output = postprocess_output  # type: ignore
 
             wrapper.call = partial(call, wrapper)  # type: ignore
             wrapper.calls = partial(calls, wrapper)  # type: ignore
@@ -513,24 +603,26 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
             wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
             wrapper._on_output_handler = None  # type: ignore
 
+            wrapper._set_on_finish_handler = partial(_set_on_finish_handler, wrapper)  # type: ignore
+            wrapper._on_finish_handler = None  # type: ignore
+
             wrapper._tracing_enabled = True  # type: ignore
 
-            if callable(call_name_func := kwargs.get("call_display_name", "")):
-                params = inspect.signature(call_name_func).parameters
+            if callable(call_display_name):
+                params = inspect.signature(call_display_name).parameters
                 if len(params) != 1:
                     raise DisplayNameFuncError(
                         "`call_display_name` function must take exactly 1 argument (the Call object)"
                     )
-            wrapper.call_display_name = call_name_func  # type: ignore
+            wrapper.call_display_name = call_display_name  # type: ignore
 
             return cast(Op, wrapper)
 
         return create_wrapper(func)
 
-    if len(args) == 1 and len(kwargs) == 0 and callable(func := args[0]):
-        return op_deco(func)
-
-    return op_deco
+    if func is None:
+        return op_deco
+    return op_deco(func)
 
 
 def maybe_bind_method(func: Callable, self: Any = None) -> Union[Callable, MethodType]:

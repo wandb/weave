@@ -3,7 +3,7 @@ import urllib
 from concurrent.futures import Future
 from typing import Any, Optional, Union, cast
 
-from ..trace_server import refs_internal
+from weave.trace_server import refs_internal
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
@@ -148,7 +148,7 @@ class ObjectRef(RefWithExtra):
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
         # that should be removed.
-        from weave.trace.client_context.weave_client import get_weave_client
+        from weave.trace.context.weave_client_context import get_weave_client
         from weave.trace.weave_init import init_weave
 
         gc = get_weave_client()

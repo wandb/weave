@@ -36,28 +36,22 @@ dynamic = ["version"]
 dependencies = [
   "pydantic>=2.0.0",
   "wandb>=0.17.1",
-  "analytics-python>=1.2.9", # Segment logging
-  "python-dateutil>=2.8.2",  # For ISO date parsing
   "packaging>=21.0",         # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0", # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
   "emoji>=2.12.1",           # For emoji shortcode support in Feedback
   "uuid-utils>=0.9.0",       # Used for ID generation - remove once python's built-in uuid supports UUIDv7
-  "numpy>1.21.0",            # Used in box.py (should be made optional)
+  "numpy>1.21.0",            # Used in box.py and scorer.py (should be made optional)
   "rich",                    # Used for special formatting of tables (should be made optional)
-
-  # dependencies for remaining legacy code.  Remove when possible
-  "httpx",
-  "aiohttp",
-  "gql",
-  "requests_toolbelt",
+  "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
 ]
 
 [project.optional-dependencies]
-trace_server = []
+docs = ["playwright", "lazydocs", "nbformat", "nbconvert"]
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
-dspy = ["dspy>=0.1.5"]
+dspy = ["dspy>=0.1.5", "litellm<=1.49.1"]
+google_ai_studio = ["google-generativeai>=0.8.3"]
 groq = ["groq>=0.9.0"]
 instructor = ["instructor>=1.4.3"]
 langchain = [
@@ -72,12 +66,14 @@ litellm = ["litellm>=1.36.1"]
 llamaindex = ["llama-index>=0.10.35"]
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
+notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]
 modal = ["modal", "python-dotenv"]
 test = [
   "nox",
   "pytest>=8.2.0",
   "pytest-asyncio>=0.23.6",
+  "pytest-cov>=5.0.0",
   "pytest-xdist>=3.1.0",
   "pytest-rerunfailures>=12.0",
   "clickhouse_connect==0.7.0",
@@ -85,14 +81,15 @@ test = [
   "sqlparse==0.5.0",
 
   # Integration Tests
-  "pytest-recording==0.13.1",
-  "vcrpy==6.0.1",
+  "pytest-recording>=0.13.2",
+  "vcrpy>=6.0.1",
 
   # serving tests
   "flask",
   "uvicorn>=0.27.0",
   "pillow",
   "filelock",
+  "httpx",
 ]
 
 [project.scripts]
@@ -107,14 +104,24 @@ Changes = "https://github.com/wandb/weave/releases"
 Twitter = "https://twitter.com/weights_biases"
 
 [build-system]
-requires = ["setuptools>=42", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.setuptools]
-packages = ["weave"]
+[tool.hatch.version]
+path = "weave/version.py"
 
-[tool.setuptools.dynamic]
-version = { attr = "weave.version.VERSION" }
+[tool.hatch.build]
+include = ["weave"]
+exclude = [
+  "weave_query",
+  "weave-js",
+  "examples",
+  "tests",
+  "docs",
+  "dev_docs",
+  "weave/clear_cache.py",
+]
+
 
 [tool.pytest.ini_options]
 filterwarnings = [
@@ -148,6 +155,7 @@ select = [
   "W291",   # https://docs.astral.sh/ruff/rules/trailing-whitespace/
   "W391",   # https://docs.astral.sh/ruff/rules/too-many-newlines-at-end-of-file/
   "F401",   # https://docs.astral.sh/ruff/rules/unused-import/
+  "TID252", # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
 ]
 ignore = [
   # we use Google style
@@ -160,11 +168,6 @@ exclude = ["weave_query"]
 [tool.ruff.lint.isort]
 known-third-party = ["wandb", "weave_query"]
 
-[tool.ruff.lint.per-file-ignores]
-"weave/tests/*" = ["F401"]
-"weave/weave_server.py" = ["F401"]
-
-
 [tool.ruff]
 line-length = 88
 show-fixes = true
@@ -172,13 +175,8 @@ exclude = ["weave_query"]
 
 [tool.mypy]
 warn_unused_configs = true
-exclude = [
-  "weave_query",
-  "weave/tests",
-  "weave/trace/tests",
-  "weave/trace_server/tests",
-  "examples",
-]
+# Note: You have to update .pre-commit-config.yaml too!
+exclude = [".*pyi$", "weave_query", "tests", "examples"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -191,7 +189,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.13-dev0"
+current_version = "0.51.18-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

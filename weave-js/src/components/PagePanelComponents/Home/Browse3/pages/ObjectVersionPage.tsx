@@ -25,6 +25,7 @@ import {
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
+import {EvaluationLeaderboardTab} from './LeaderboardTab';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
@@ -45,6 +46,7 @@ type ObjectIconProps = {
 const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Model: 'model',
   Dataset: 'table',
+  Evaluation: 'benchmark-square',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
@@ -121,6 +123,9 @@ const ObjectVersionPageInner: React.FC<{
     if (objectVersion.baseObjectClass === 'Model') {
       return 'Model';
     }
+    if (objectVersion.baseObjectClass === 'Evaluation') {
+      return 'Evaluation';
+    }
     return null;
   }, [objectVersion.baseObjectClass]);
   const refUri = objectVersionKeyToRefUri(objectVersion);
@@ -179,6 +184,15 @@ const ObjectVersionPageInner: React.FC<{
     }
     return viewerData;
   }, [viewerData]);
+
+  const isDataset = baseObjectClass === 'Dataset' && refExtra == null;
+  const isEvaluation = baseObjectClass === 'Evaluation' && refExtra == null;
+  const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
+  const evalHasCallsLoading = consumingCalls.loading;
+
+  if (isEvaluation && evalHasCallsLoading) {
+    return <CenteredAnimatedLoader />;
+  }
 
   return (
     <SimplePageLayoutWithHeader
@@ -262,10 +276,25 @@ const ObjectVersionPageInner: React.FC<{
       //   },
       // ]}
       tabs={[
+        ...(isEvaluation && evalHasCalls
+          ? [
+              {
+                label: 'Leaderboard',
+                content: (
+                  <EvaluationLeaderboardTab
+                    entity={entityName}
+                    project={projectName}
+                    evaluationObjectName={objectName}
+                    evaluationObjectVersion={objectVersion.versionHash}
+                  />
+                ),
+              },
+            ]
+          : []),
         {
-          label: 'Values',
+          label: isDataset ? 'Rows' : 'Values',
           content: (
-            <ScrollableTabContent>
+            <ScrollableTabContent sx={isDataset ? {p: 0} : {}}>
               <Box
                 sx={{
                   flex: '0 0 auto',

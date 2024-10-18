@@ -1,10 +1,8 @@
 import re
 import typing
 
-from weave.trace_server import refs_internal
-
-from . import validation_util
-from .errors import InvalidRequest
+from weave.trace_server import refs_internal, validation_util
+from weave.trace_server.errors import InvalidRequest
 
 # Temporary flag to disable database-side validation of object ids.
 # We want to enable this be default, but we need to wait until >95% of users

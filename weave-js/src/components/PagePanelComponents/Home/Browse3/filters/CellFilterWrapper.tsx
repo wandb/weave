@@ -5,12 +5,19 @@
 
 import React from 'react';
 
+export type OnAddFilter = (
+  field: string,
+  operator: string | null,
+  value: any,
+  rowId: string
+) => void;
 type CellFilterWrapperProps = {
   children: React.ReactNode;
-  onAddFilter?: (key: string, operation: string | null, value: any) => void;
+  onAddFilter?: OnAddFilter;
   field: string;
   operation: string | null;
   value: any;
+  rowId: string;
   style?: React.CSSProperties;
 };
 
@@ -20,6 +27,7 @@ export const CellFilterWrapper = ({
   field,
   operation,
   value,
+  rowId,
   style,
 }: CellFilterWrapperProps) => {
   const onClickCapture = onAddFilter
@@ -28,7 +36,7 @@ export const CellFilterWrapper = ({
         if (e.altKey) {
           e.stopPropagation();
           e.preventDefault();
-          onAddFilter(field, operation, value);
+          onAddFilter(field, operation, value, rowId);
         }
       }
     : undefined;

@@ -211,7 +211,7 @@ export const FilterBar = ({
     <>
       <div
         ref={refBar}
-        className="flex cursor-pointer items-center gap-4 rounded px-8 py-4 outline outline-moon-250 hover:outline-2 hover:outline-teal-500/40"
+        className="border-box flex h-32 cursor-pointer items-center gap-4 rounded border border-moon-200 px-8 hover:border-teal-500/40"
         onClick={onClick}>
         <div>
           <IconFilterAlt />

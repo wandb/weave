@@ -3,7 +3,7 @@ import typing
 
 from pydantic import BaseModel, Field, field_validator
 
-from . import validation
+from weave.trace_server import validation
 
 
 class CallStartCHInsertable(BaseModel):

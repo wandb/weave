@@ -41,11 +41,19 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
         console.error('Expected ref, found', innerRef, typeof innerRef);
       }
     }
+    if (data.valueType === 'object' && '__class__' in data.value) {
+      const cls = data.value.__class__;
+      let clsName = cls.name;
+      if (cls.module) {
+        clsName = cls.module + '.' + clsName;
+      }
+      return <ValueViewPrimitive>{clsName}</ValueViewPrimitive>;
+    }
     if (USE_TABLE_FOR_ARRAYS && data.valueType === 'array') {
-      return <DataTableView data={data.value} />;
+      return <DataTableView data={data.value} autoPageSize={true} />;
     }
     if (data.valueType === 'array' && data.value.length === 0) {
-      return <ValueViewPrimitive>Empty List</ValueViewPrimitive>;
+      return <ValueViewPrimitive>Empty list</ValueViewPrimitive>;
     }
     return null;
   }
@@ -87,7 +95,7 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
 
   if (data.valueType === 'array') {
     if (data.value.length === 0) {
-      return <ValueViewPrimitive>Empty List</ValueViewPrimitive>;
+      return <ValueViewPrimitive>Empty list</ValueViewPrimitive>;
     }
     // Compared to toString this keeps the square brackets.
     return <div>{JSON.stringify(data.value)}</div>;

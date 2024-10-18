@@ -7,7 +7,7 @@
 #
 # Try setting http.TRACE=True when you run this.
 #
-# Run from repo root with: `python -m weave.test_scripts.wandb_artifact_perf`
+# Run from repo root with: `python -m weave_query.scripts.wandb_artifact_perf`
 
 import asyncio
 import cProfile
