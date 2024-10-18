@@ -1,54 +1,134 @@
 import React from 'react';
 import styled from 'styled-components';
 
-import { Empty } from '../common/Empty';
-import { EMPTY_PROPS_EVALUATIONS } from '../common/EmptyContent';
+import {Empty} from '../common/Empty';
+import {EMPTY_PROPS_EVALUATIONS} from '../common/EmptyContent';
+import {SimplePageLayout} from '../common/SimplePageLayout';
 
 export const LeaderboardListingPage: React.FC<{
   entity: string;
   project: string;
-}> = ({entity, project}) => {
-  const annotationQueues = [
-    { name: 'Weather_genApp_experts', description: 'This is the description', traces: '16/45', needsReview: true },
-    { name: 'TidePressure_modeling_team', description: 'This is the description', traces: '30/62', needsReview: true },
-    { name: 'ClimateModel_genApp_experts', description: 'This is the description', traces: '15', needsReview: false },
-    { name: 'OceanCurrent_analysis_team', description: 'This is the description', traces: '70', needsReview: false },
-    { name: 'Windflow_projection_experts', description: 'This is the description', traces: '82', needsReview: false },
-    { name: 'AtmoMetrics_analysis_team', description: 'This is the description', traces: '40', needsReview: false },
-    { name: 'HydroFluor_research_specialists', description: 'This is the description', traces: '202', needsReview: false },
+}> = props => {
+  return (
+    <SimplePageLayout
+      title={`Leaderboards`}
+      hideTabsIfSingle
+      tabs={[
+        {
+          label: 'All',
+          content: <LeaderboardListingPageInner {...props} />,
+        },
+      ]}
+    />
+  );
+};
+
+export const LeaderboardListingPageInner: React.FC<{
+  entity: string;
+  project: string;
+}> = props => {
+  const customLeaderboards = [
+    {
+      name: 'Weather_genApp_experts',
+      description: 'This is the description',
+      modelsEvaluated: '16',
+    },
+    {
+      name: 'TidePressure_modeling_team',
+      description: 'This is the description',
+      modelsEvaluated: '30',
+    },
+    {
+      name: 'ClimateModel_genApp_experts',
+      description: 'This is the description',
+      modelsEvaluated: '15',
+    },
+    {
+      name: 'OceanCurrent_analysis_team',
+      description: 'This is the description',
+      modelsEvaluated: '70',
+    },
+    {
+      name: 'Windflow_projection_experts',
+      description: 'This is the description',
+      modelsEvaluated: '82',
+    },
+    {
+      name: 'AtmoMetrics_analysis_team',
+      description: 'This is the description',
+      modelsEvaluated: '40',
+    },
+    {
+      name: 'HydroFluor_research_specialists',
+      description: 'This is the description',
+      modelsEvaluated: '202',
+    },
+  ];
+
+  const evalBoards = [
+    {
+      name: 'Weather_genApp_experts',
+      description: 'This is the description',
+      modelsEvaluated: '16',
+    },
+    {
+      name: 'TidePressure_modeling_team',
+      description: 'This is the description',
+      modelsEvaluated: '30',
+    },
+    {
+      name: 'ClimateModel_genApp_experts',
+      description: 'This is the description',
+      modelsEvaluated: '15',
+    },
+    {
+      name: 'OceanCurrent_analysis_team',
+      description: 'This is the description',
+      modelsEvaluated: '70',
+    },
+    {
+      name: 'Windflow_projection_experts',
+      description: 'This is the description',
+      modelsEvaluated: '82',
+    },
+    {
+      name: 'AtmoMetrics_analysis_team',
+      description: 'This is the description',
+      modelsEvaluated: '40',
+    },
+    {
+      name: 'HydroFluor_research_specialists',
+      description: 'This is the description',
+      modelsEvaluated: '202',
+    },
   ];
 
   return (
     <Container>
-      <Header>
-        <Title>Annotation queues</Title>
-        <CreateQueueButton>+ Create queue</CreateQueueButton>
-      </Header>
-      <WelcomeMessage>
-        Welcome to annotation queues
-        <DismissButton>Dismiss</DismissButton>
-      </WelcomeMessage>
       <Section>
-        <SectionTitle>Needs review (2)</SectionTitle>
+        <SectionTitle>Custom Leaderboards</SectionTitle>
         <QueueGrid>
-          {annotationQueues.filter(queue => queue.needsReview).map(queue => (
+          {customLeaderboards.map(queue => (
             <QueueCard key={queue.name}>
               <QueueName>{queue.name}</QueueName>
-              <ReviewButton>Review</ReviewButton>
               <QueueDescription>{queue.description}</QueueDescription>
-              <TracesCount>{queue.traces} Traces</TracesCount>
+              <TracesCount>
+                {queue.modelsEvaluated} Models Evaluated
+              </TracesCount>
             </QueueCard>
           ))}
         </QueueGrid>
       </Section>
       <Section>
-        <SectionTitle>Up to date (5)</SectionTitle>
+        <SectionTitle>Evaluation Leaderboards</SectionTitle>
         <QueueGrid>
-          {annotationQueues.filter(queue => !queue.needsReview).map(queue => (
+          {evalBoards.map(queue => (
             <QueueCard key={queue.name}>
               <QueueName>{queue.name}</QueueName>
               <QueueDescription>{queue.description}</QueueDescription>
-              <TracesCount>{queue.traces} Traces</TracesCount>
+              <TracesCount>
+                {queue.modelsEvaluated} Models Evaluated
+              </TracesCount>
             </QueueCard>
           ))}
         </QueueGrid>
@@ -74,7 +154,7 @@ const Title = styled.h1`
 `;
 
 const CreateQueueButton = styled.button`
-  background-color: #00A4B8;
+  background-color: #00a4b8;
   color: white;
   border: none;
   padding: 10px 15px;
@@ -95,7 +175,7 @@ const WelcomeMessage = styled.div`
 const DismissButton = styled.button`
   background: none;
   border: none;
-  color: #00A4B8;
+  color: #00a4b8;
   cursor: pointer;
 `;
 
@@ -126,7 +206,7 @@ const QueueName = styled.h3`
 `;
 
 const ReviewButton = styled.button`
-  background-color: #FFA500;
+  background-color: #ffa500;
   color: white;
   border: none;
   padding: 5px 10px;

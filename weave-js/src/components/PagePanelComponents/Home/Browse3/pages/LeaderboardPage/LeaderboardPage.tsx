@@ -15,9 +15,7 @@ type LeaderboardPageProps = {
 };
 
 export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
-  return (
-    <LeaderboardPageContent {...props} />
-  );
+  return <LeaderboardPageContent {...props} />;
 };
 
 const DEFAULT_DESCRIPTION = `# Leaderboard`;
