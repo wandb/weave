@@ -4,7 +4,7 @@ Weave supports logging and displaying multiple first class media types. Log imag
 
 ## Images
 
-Here is an example of logging an image with the OpenAI DALL-E API.
+Logging type: `PIL.Image`. Here is an example of logging an image with the OpenAI DALL-E API:
 
 ```python
 import weave
@@ -28,6 +28,8 @@ def generate_image(prompt: str) -> Image:
     image_url = response.data[0].url
     image_response = requests.get(image_url, stream=True)
     image = Image.open(image_response.raw)
+
+    # return an Image.Image object to be logged as an image
     return image
 
 generate_image("a cat with a pumpkin hat")
@@ -39,7 +41,7 @@ This image will be logged to weave and automatically displayed in the UI. The fo
 
 ## Audio
 
-Here is an example of logging an audio file using openai's speech generation API.
+Logging type: `wave.Wave_read`. Here is an example of logging an audio file using openai's speech generation API.
 
 ```python
 import weave
@@ -61,11 +63,12 @@ def make_audio_file_streaming(text: str) -> wave.Wave_read:
     ) as res:
         res.stream_to_file("output.wav")
 
+    # return a wave.Wave_read object to be logged as audio
     return wave.open("output.wav")
 
 make_audio_file_streaming("Hello, how are you?")
 ```
 
-This audio will be logged to weave and automatically displayed in the UI, with an audio player. The player can be expanded to view the raw audio waveform.
+This audio will be logged to weave and automatically displayed in the UI, with an audio player. The player can be expanded to view the raw audio waveform, in addition to a download button.
 
 ![Screenshot of audio trace view](imgs/audio-trace.png)
