@@ -28,9 +28,6 @@ jobs:
       - name: Build dist
         run: |
           uv build
-      - name: Make docs
-        run: |
-          make docs
       - name: upload test distribution
         uses: pypa/gh-action-pypi-publish@release/v1
         if: ${{ inputs.is_test }}
