@@ -41,14 +41,32 @@ We need the following libraries for this tutorial:
 !pip install -qU openai weave 
 ```
 
-Since we'll be using [OpenAI API](https://openai.com/index/openai-api/), we will also need an OpenAI API key. You can [sign up](https://platform.openai.com/signup) on the OpenAI platform to get your own API key.
+We set `WANDB_API_KEY` in our env so that we may easily login with wandb.login() (this should be given to the colab as a secret).
+
+We set the project in W&B we want to log this into in `name_of_wandb_project`.
+
+**NOTE**: `name_of_wandb_project` may also be in the format of `{team_name}/{project_name}` to specify a team to log the traces into.
+We then fetch a weave client by calling weave.init()
+
+
+Since we'll be using [OpenAI API](https://openai.com/index/openai-api/), we will also need an OpenAI API key. You can [sign up](https://platform.openai.com/signup) on the OpenAI platform to get your own API key. (this should be given to the colab as a secret too.)
+
 
 ```python
 import os
-from getpass import getpass
+from google.colab import userdata
 
-api_key = getpass("Enter you OpenAI API key: ")
-os.environ["OPENAI_API_KEY"] = api_key
+from openai import OpenAI
+import weave
+import wandb
+
+os.environ["WANDB_API_KEY"] = userdata.get("WANDB_API_KEY")
+os.environ["WANDB_API_KEY"] = userdata.get("OPENAI_API_KEY")
+
+wandb.login()
+name_of_wandb_project = "multi-agent-structured-output"
+weave.init(name_of_wandb_project)
+
 client = OpenAI()
 MODEL = "gpt-4o-2024-08-06"
 ```
