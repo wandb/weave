@@ -636,6 +636,7 @@ By clicking on a line, we can see the intermediate processes that were executed 
 
 ![](../../media/multi-agent-structured-output/3.png)
 
+Please take a closer look at how tracing is handled in Weave!
 
 ## Conclusion
 
