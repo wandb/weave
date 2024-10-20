@@ -1,4 +1,4 @@
-import { globalClient } from './clientApi';
+import { getGlobalClient } from './clientApi';
 import { TRACE_CALL_EMOJI } from './constants';
 import { Op, OpOptions } from './opType';
 
@@ -7,18 +7,20 @@ export function op<T extends (...args: any[]) => any>(
   options?: OpOptions<T>
 ): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>> {
   const opWrapper = async function (...params: Parameters<T>): Promise<ReturnType<T>> {
-    if (!globalClient) {
+    const client = getGlobalClient();
+
+    if (!client) {
       return await fn(...params);
     }
 
-    const { currentCall, parentCall, newStack } = globalClient.pushNewCall();
+    const { currentCall, parentCall, newStack } = client.pushNewCall();
     const startTime = new Date();
-    if (!globalClient.quiet && parentCall == null) {
-      console.log(`${TRACE_CALL_EMOJI} https://wandb.ai/${globalClient.projectId}/r/call/${currentCall.callId}`);
+    if (!client.quiet && parentCall == null) {
+      console.log(`${TRACE_CALL_EMOJI} https://wandb.ai/${client.projectId}/r/call/${currentCall.callId}`);
     }
     const displayName = options?.callDisplayName ? options.callDisplayName(...params) : undefined;
     const thisArg = options?.bindThis;
-    const startCallPromise = globalClient.startCall(
+    const startCallPromise = client.startCall(
       opWrapper,
       params,
       options?.parameterNames,
@@ -30,7 +32,7 @@ export function op<T extends (...args: any[]) => any>(
     );
 
     try {
-      let result = await globalClient.runWithCallStack(newStack, async () => {
+      let result = await client.runWithCallStack(newStack, async () => {
         return await fn(...params);
       });
 
@@ -46,17 +48,10 @@ export function op<T extends (...args: any[]) => any>(
                 yield chunk;
               }
             } finally {
-              if (globalClient) {
+              if (client) {
                 // Check if globalClient still exists
                 const endTime = new Date();
-                await globalClient.finishCall(
-                  state,
-                  currentCall,
-                  parentCall,
-                  options?.summarize,
-                  endTime,
-                  startCallPromise
-                );
+                await client.finishCall(state, currentCall, parentCall, options?.summarize, endTime, startCallPromise);
               }
             }
           },
@@ -65,13 +60,13 @@ export function op<T extends (...args: any[]) => any>(
         return wrappedIterator as unknown as ReturnType<T>;
       } else {
         const endTime = new Date();
-        globalClient.finishCall(result, currentCall, parentCall, options?.summarize, endTime, startCallPromise);
+        client.finishCall(result, currentCall, parentCall, options?.summarize, endTime, startCallPromise);
         return result;
       }
     } catch (error) {
       // console.error(`Op ${actualOpName} failed:`, error);
       const endTime = new Date();
-      globalClient.finishCallWithException(error, currentCall, parentCall, endTime, startCallPromise);
+      client.finishCallWithException(error, currentCall, parentCall, endTime, startCallPromise);
       throw error;
     } finally {
       // No need to do anything here.
