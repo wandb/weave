@@ -1,7 +1,7 @@
-import { stringifyPythonDumps, encodeNumber } from '../digest';
+import { stringifyPythonDumps } from '../digest';
 
 describe('stringifyPythonDumps', () => {
-  test('Basic types', () => {
+  test('Basic types', async () => {
     const testData1 = {
       a: 1,
       b: ['a', 'b', 'd,e', ["f',j,y"]],
@@ -13,7 +13,7 @@ describe('stringifyPythonDumps', () => {
     expect(stringifyPythonDumps(testData1)).toBe(expected1);
   });
 
-  test('Special numbers', () => {
+  test('Special numbers', async () => {
     const testData2 = {
       int_max: 9007199254740991, // Max safe integer in JS
       int_min: -9007199254740991, // Min safe integer in JS
@@ -28,7 +28,7 @@ describe('stringifyPythonDumps', () => {
     expect(stringifyPythonDumps(testData2)).toBe(expected2);
   });
 
-  test('Special values', () => {
+  test('Special values', async () => {
     const testData3 = {
       null: null,
       bool_true: true,
@@ -40,7 +40,7 @@ describe('stringifyPythonDumps', () => {
     expect(stringifyPythonDumps(testData3)).toBe(expected3);
   });
 
-  test('Unicode and escaping', () => {
+  test('Unicode and escaping', async () => {
     const testData4 = {
       unicode: 'こんにちは',
       escape_chars: '\b\f\n\r\t',
@@ -52,7 +52,7 @@ describe('stringifyPythonDumps', () => {
     expect(stringifyPythonDumps(testData4)).toBe(expected4);
   });
 
-  test('Nested structures', () => {
+  test('Nested structures', async () => {
     const testData5 = {
       nested: {
         list: [1, [2, [3, [4]]]],
@@ -63,13 +63,13 @@ describe('stringifyPythonDumps', () => {
     expect(stringifyPythonDumps(testData5)).toBe(expected5);
   });
 
-  test('Array of mixed types', () => {
+  test('Array of mixed types', async () => {
     const testData6 = [1, 'two', 3, [4, 5], { six: 6 }, null, true, false];
     const expected6 = '[1, "two", 3, [4, 5], {"six": 6}, null, true, false]';
     expect(stringifyPythonDumps(testData6)).toBe(expected6);
   });
 
-  test('Empty string keys and values', () => {
+  test('Empty string keys and values', async () => {
     const testData7 = { '': 'empty_key', empty_value: '' };
     const expected7 = '{"": "empty_key", "empty_value": ""}';
     expect(stringifyPythonDumps(testData7)).toBe(expected7);
@@ -77,13 +77,13 @@ describe('stringifyPythonDumps', () => {
 
   // TODO: This is a generated test that fails. I didn't look into what the behavior should actually
   // be, because we're not using stringifyPythonDumps anywhere yet.
-  test.skip('Non-string keys', () => {
+  test.skip('Non-string keys', async () => {
     const testData8 = { 1: 'one', 2.0: 'two', true: 'true' };
     const expected8 = '{"1": "true", "2.0": "two"}';
     expect(stringifyPythonDumps(testData8)).toBe(expected8);
   });
 
-  test('Special characters in strings', () => {
+  test('Special characters in strings', async () => {
     const testData9 = {
       control_chars: '\u0000\u0001\u0002\u0003',
       emoji: '😀🌍🚀',
