@@ -29,15 +29,14 @@ export function stringifyPythonDumps(obj: any): string {
     return String(obj);
   }
   if (Array.isArray(obj)) {
-    const items = obj.map(stringifyPythonDumps).join(', ');
-    return `['${items}']`;
+    const items = obj.map(stringifyPythonDumps);
+    return '[' + items.join(', ') + ']';
   }
   if (typeof obj === 'object') {
     const pairs = Object.keys(obj)
       .sort()
-      .map(key => `${JSON.stringify(key)}: ${stringifyPythonDumps(obj[key])}`)
-      .join(', ');
-    return `{${pairs}}`;
+      .map(key => JSON.stringify(key) + ': ' + stringifyPythonDumps(obj[key]));
+    return '{' + pairs.join(', ') + '}';
   }
   throw new Error('Unsupported type');
 }
