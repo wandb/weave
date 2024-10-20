@@ -42,7 +42,9 @@
     },
     "collectCoverage": true,
     "coveragePathIgnorePatterns": [
-      "<rootDir>/src/generated"
+      "<rootDir>/src/generated",
+      "<rootDir>/src/utils/userAgent.ts",
+      "<rootDir>/src/inMemoryTraceServer.ts"
     ],
     "coverageDirectory": "coverage",
     "coverageReporters": [
