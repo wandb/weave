@@ -1,5 +1,4 @@
 import { Api as TraceServerApi } from './generated/traceServerApi';
-import { InMemoryTraceServer } from './inMemoryTraceServer';
 import { ConcurrencyLimiter } from './utils/concurrencyLimit';
 import { createFetchWithRetry } from './utils/retry';
 import { getApiKey } from './wandb/settings';
@@ -47,29 +46,22 @@ export async function init(projectName: string): Promise<WeaveClient> {
       customFetch: concurrencyLimitedFetch,
     });
 
-    globalClient = new WeaveClient(traceServerApi, wandbServerApi, projectId);
+    const client = new WeaveClient(traceServerApi, wandbServerApi, projectId);
+    setGlobalClient(client);
     console.log(`Initializing project: ${projectId}`);
-    return globalClient;
+    return client;
   } catch (error) {
     console.error('Error during initialization:', error);
     throw error;
   }
 }
 
-export function initWithCustomTraceServer(projectName: string, customTraceServer: InMemoryTraceServer) {
-  globalClient = new WeaveClient(
-    customTraceServer as unknown as TraceServerApi<any>,
-    {} as WandbServerApi, // Placeholder, as we don't use WandbServerApi in this case
-    projectName,
-    true
-  );
-}
-
 export function requireCurrentCallStackEntry(): CallStackEntry {
-  if (!globalClient) {
+  const client = getGlobalClient();
+  if (!client) {
     throw new Error('Weave client not initialized');
   }
-  const callStackEntry = globalClient.getCallStack().peek();
+  const callStackEntry = client.getCallStack().peek();
   if (!callStackEntry) {
     throw new Error('No current call stack entry');
   }
@@ -79,4 +71,15 @@ export function requireCurrentCallStackEntry(): CallStackEntry {
 export function requireCurrentChildSummary(): { [key: string]: any } {
   const callStackEntry = requireCurrentCallStackEntry();
   return callStackEntry.childSummary;
+}
+
+export function getGlobalClient(): WeaveClient {
+  if (!globalClient) {
+    throw new Error('Weave client not initialized');
+  }
+  return globalClient;
+}
+
+export function setGlobalClient(client: WeaveClient) {
+  globalClient = client;
 }
