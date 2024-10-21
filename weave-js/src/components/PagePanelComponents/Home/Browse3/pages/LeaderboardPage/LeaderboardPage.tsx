@@ -1,9 +1,18 @@
 import {Box} from '@mui/material';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
+import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {Loading} from '@wandb/weave/components/Loading';
-import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
+import _ from 'lodash';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import {WeaveflowPeekContext} from '../../context';
 import {NotFoundPanel} from '../../NotFoundPanel';
@@ -27,6 +36,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   const [name, setName] = useState(props.leaderboardName);
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const [isEditing, setIsEditing] = useState(false);
+  const {isEditor} = useIsEditor(props.entity);
   return (
     <SimplePageLayout
       title={name}
@@ -46,7 +56,8 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
       ]}
       headerExtra={
         !isPeeking &&
-        !isEditing && (
+        !isEditing &&
+        isEditor && (
           <EditLeaderboardButton
             isEditing={isEditing}
             setIsEditing={setIsEditing}
@@ -127,7 +138,12 @@ const useUpdateLeaderboard = (
       obj: {
         project_id: projectIdFromParts({entity, project}),
         object_id: objectId,
-        val: leaderboardVal,
+        val: {
+          _type: 'Leaderboard',
+          _class_name: 'Leaderboard',
+          _bases: ['Object', 'BaseModel'],
+          ...leaderboardVal,
+        },
       },
     });
   };
@@ -144,11 +160,6 @@ export const LeaderboardPageContentInner: React.FC<
     leaderboardVal: PythonLeaderboardObjectVal;
   }
 > = props => {
-  useEffect(() => {
-    props.setName(props.leaderboardVal.name);
-  }, [props]);
-
-  const description = props.leaderboardVal.description;
   const updateLeaderboard = useUpdateLeaderboard(
     props.entity,
     props.project,
@@ -157,6 +168,9 @@ export const LeaderboardPageContentInner: React.FC<
   const [workingLeaderboardValCopy, setWorkingLeaderboardValCopy] = useState(
     props.leaderboardVal
   );
+  useEffect(() => {
+    props.setName(workingLeaderboardValCopy.name);
+  }, [props, workingLeaderboardValCopy.name]);
   const {loading, data} = usePythonLeaderboardData(
     props.entity,
     props.project,
@@ -185,6 +199,9 @@ export const LeaderboardPageContentInner: React.FC<
         }
       });
   }, [props, updateLeaderboard, workingLeaderboardValCopy]);
+  const isDirty = useMemo(() => {
+    return !_.isEqual(props.leaderboardVal, workingLeaderboardValCopy);
+  }, [props.leaderboardVal, workingLeaderboardValCopy]);
 
   return (
     <Box display="flex" flexDirection="row" height="100%" flexGrow={1}>
@@ -206,8 +223,10 @@ export const LeaderboardPageContentInner: React.FC<
             gap: '12px',
             overflowY: 'auto',
           }}>
-          {description && (
-            <StyledReactMarkdown>{description}</StyledReactMarkdown>
+          {workingLeaderboardValCopy.description && (
+            <StyledReactMarkdown>
+              {workingLeaderboardValCopy.description}
+            </StyledReactMarkdown>
           )}
         </Box>
         <Box
@@ -237,7 +256,8 @@ export const LeaderboardPageContentInner: React.FC<
           }}>
           <LeaderboardConfigEditor
             saving={saving}
-            leaderboardVal={props.leaderboardVal}
+            isDirty={isDirty}
+            leaderboardVal={workingLeaderboardValCopy}
             setWorkingCopy={setWorkingLeaderboardValCopy}
             discardChanges={discardChanges}
             commitChanges={commitChanges}
@@ -356,4 +376,22 @@ const EditLeaderboardButton: FC<{
       </Button>
     </Box>
   );
+};
+
+const useIsEditor = (entity: string) => {
+  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+  return useMemo(() => {
+    if (loadingUserInfo) {
+      return {
+        loading: true,
+        isEditor: false,
+      };
+    }
+    const viewer = userInfo ? userInfo.id : null;
+
+    return {
+      loading: false,
+      isEditor: viewer && userInfo?.teams.includes(entity),
+    };
+  }, [entity, loadingUserInfo, userInfo]);
 };
