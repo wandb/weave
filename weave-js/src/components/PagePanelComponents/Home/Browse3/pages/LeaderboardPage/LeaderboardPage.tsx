@@ -2,8 +2,9 @@ import {Box} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {Loading} from '@wandb/weave/components/Loading';
-import React, {useEffect, useState} from 'react';
+import React, {FC, useContext, useEffect, useState} from 'react';
 
+import { WeaveflowPeekContext } from '../../context';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {LeaderboardGrid} from '../../views/Leaderboard/LeaderboardGrid';
 import {usePythonLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
@@ -20,6 +21,7 @@ type LeaderboardPageProps = {
 
 export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   const [name, setName] = useState(props.leaderboardName);
+  const {isPeeking} = useContext(WeaveflowPeekContext);
   return (
     <SimplePageLayout
       title={name}
@@ -30,6 +32,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
           content: <LeaderboardPageContent {...props} setName={setName} />,
         },
       ]}
+      headerExtra={!isPeeking && <EditLeaderboardButton />}
     />
   );
 };
@@ -222,4 +225,28 @@ const parseLeaderboardVal = (
     description,
     columns: finalColumns,
   };
+};
+
+
+const EditLeaderboardButton: FC = () => {
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      <Button
+        className="mx-16"
+        style={{
+          marginLeft: '0px',
+        }}
+        size="medium"
+        variant="secondary"
+        onClick={() => console.log('edit leaderboard')}
+        icon='pencil-edit'>
+        Edit
+      </Button>
+    </Box>
+  );
 };
