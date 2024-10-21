@@ -15,6 +15,7 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {StyledReactMarkdown} from './EditableMarkdown';
+import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
 
 type LeaderboardPageProps = {
   entity: string;
@@ -245,16 +246,6 @@ export const LeaderboardPageContentInner: React.FC<
       )}
     </Box>
   );
-};
-
-const LeaderboardConfigEditor: React.FC<{
-  leaderboardVal: PythonLeaderboardObjectVal;
-  saving: boolean;
-  setWorkingCopy: (leaderboardVal: PythonLeaderboardObjectVal) => void;
-  discardChanges: () => void;
-  commitChanges: () => void;
-}> = ({leaderboardVal, setWorkingCopy, discardChanges, commitChanges}) => {
-  return <Box>Config Editor</Box>;
 };
 
 export const ToggleLeaderboardConfig: React.FC<{
