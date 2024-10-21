@@ -227,7 +227,10 @@ export class DirectTraceServerClient {
   }
 
   public objCreate(req: TraceObjCreateReq): Promise<TraceObjCreateRes> {
-    return this.makeRequest<TraceObjCreateReq, TraceObjCreateRes>('/obj/create', req);
+    return this.makeRequest<TraceObjCreateReq, TraceObjCreateRes>(
+      '/obj/create',
+      req
+    );
   }
 
   public readBatch(req: TraceRefsReadBatchReq): Promise<TraceRefsReadBatchRes> {

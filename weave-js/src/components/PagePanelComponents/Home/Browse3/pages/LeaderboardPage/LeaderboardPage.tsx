@@ -1,16 +1,19 @@
 import {Box} from '@mui/material';
+import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {Loading} from '@wandb/weave/components/Loading';
-import React, {FC, useContext, useEffect, useState} from 'react';
+import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
 
-import { WeaveflowPeekContext } from '../../context';
+import {WeaveflowPeekContext} from '../../context';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {LeaderboardGrid} from '../../views/Leaderboard/LeaderboardGrid';
 import {usePythonLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
 import {PythonLeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {StyledReactMarkdown} from './EditableMarkdown';
 
 type LeaderboardPageProps = {
@@ -22,6 +25,7 @@ type LeaderboardPageProps = {
 export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   const [name, setName] = useState(props.leaderboardName);
   const {isPeeking} = useContext(WeaveflowPeekContext);
+  const [isEditing, setIsEditing] = useState(false);
   return (
     <SimplePageLayout
       title={name}
@@ -29,16 +33,35 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
       tabs={[
         {
           label: 'Leaderboard',
-          content: <LeaderboardPageContent {...props} setName={setName} />,
+          content: (
+            <LeaderboardPageContent
+              {...props}
+              setName={setName}
+              isEditing={isEditing}
+              setIsEditing={setIsEditing}
+            />
+          ),
         },
       ]}
-      headerExtra={!isPeeking && <EditLeaderboardButton />}
+      headerExtra={
+        !isPeeking &&
+        !isEditing && (
+          <EditLeaderboardButton
+            isEditing={isEditing}
+            setIsEditing={setIsEditing}
+          />
+        )
+      }
     />
   );
 };
 
 export const LeaderboardPageContent: React.FC<
-  LeaderboardPageProps & {setName: (name: string) => void}
+  LeaderboardPageProps & {
+    setName: (name: string) => void;
+    isEditing: boolean;
+    setIsEditing: (isEditing: boolean) => void;
+  }
 > = props => {
   const {useRootObjectVersions} = useWFHooks();
   const {entity, project} = props;
@@ -80,12 +103,43 @@ export const LeaderboardPageContent: React.FC<
   }
 
   return (
-    <LeaderboardPageContentInner {...props} leaderboardVal={leaderboardVal} />
+    <LeaderboardPageContentInner
+      {...props}
+      leaderboardVal={leaderboardVal}
+      setIsEditing={props.setIsEditing}
+    />
   );
 };
 
+const useUpdateLeaderboard = (
+  entity: string,
+  project: string,
+  objectId: string
+) => {
+  const getTsClient = useGetTraceServerClientContext();
+  const client = getTsClient();
+
+  const updateLeaderboard = async (
+    leaderboardVal: PythonLeaderboardObjectVal
+  ) => {
+    return await client.objCreate({
+      obj: {
+        project_id: projectIdFromParts({entity, project}),
+        object_id: objectId,
+        val: leaderboardVal,
+      },
+    });
+  };
+
+  return updateLeaderboard;
+};
+
 export const LeaderboardPageContentInner: React.FC<
-  LeaderboardPageProps & {setName: (name: string) => void} & {
+  LeaderboardPageProps & {
+    setName: (name: string) => void;
+    isEditing: boolean;
+    setIsEditing: (isEditing: boolean) => void;
+  } & {
     leaderboardVal: PythonLeaderboardObjectVal;
   }
 > = props => {
@@ -94,11 +148,42 @@ export const LeaderboardPageContentInner: React.FC<
   }, [props]);
 
   const description = props.leaderboardVal.description;
+  const updateLeaderboard = useUpdateLeaderboard(
+    props.entity,
+    props.project,
+    props.leaderboardName
+  );
+  const [workingLeaderboardValCopy, setWorkingLeaderboardValCopy] = useState(
+    props.leaderboardVal
+  );
   const {loading, data} = usePythonLeaderboardData(
     props.entity,
     props.project,
-    props.leaderboardVal
+    workingLeaderboardValCopy
   );
+  const [saving, setSaving] = useState(false);
+  const discardChanges = useCallback(() => {
+    setWorkingLeaderboardValCopy(props.leaderboardVal);
+    props.setIsEditing(false);
+  }, [props]);
+  const commitChanges = useCallback(() => {
+    const mounted = true;
+    setSaving(true);
+    updateLeaderboard(workingLeaderboardValCopy)
+      .then(() => {
+        if (mounted) {
+          props.setIsEditing(false);
+          setSaving(false);
+        }
+      })
+      .catch(e => {
+        console.error(e);
+        if (mounted) {
+          setWorkingLeaderboardValCopy(props.leaderboardVal);
+          setSaving(false);
+        }
+      });
+  }, [props, updateLeaderboard, workingLeaderboardValCopy]);
 
   return (
     <Box display="flex" flexDirection="row" height="100%" flexGrow={1}>
@@ -139,8 +224,37 @@ export const LeaderboardPageContentInner: React.FC<
           />
         </Box>
       </Box>
+      {props.isEditing && (
+        <Box
+          flex={1}
+          display="flex"
+          flexDirection="column"
+          height="100%"
+          minWidth="50%"
+          sx={{
+            borderLeft: `1px solid ${MOON_250}`,
+          }}>
+          <LeaderboardConfigEditor
+            saving={saving}
+            leaderboardVal={props.leaderboardVal}
+            setWorkingCopy={setWorkingLeaderboardValCopy}
+            discardChanges={discardChanges}
+            commitChanges={commitChanges}
+          />
+        </Box>
+      )}
     </Box>
   );
+};
+
+const LeaderboardConfigEditor: React.FC<{
+  leaderboardVal: PythonLeaderboardObjectVal;
+  saving: boolean;
+  setWorkingCopy: (leaderboardVal: PythonLeaderboardObjectVal) => void;
+  discardChanges: () => void;
+  commitChanges: () => void;
+}> = ({leaderboardVal, setWorkingCopy, discardChanges, commitChanges}) => {
+  return <Box>Config Editor</Box>;
 };
 
 export const ToggleLeaderboardConfig: React.FC<{
@@ -227,8 +341,10 @@ const parseLeaderboardVal = (
   };
 };
 
-
-const EditLeaderboardButton: FC = () => {
+const EditLeaderboardButton: FC<{
+  isEditing: boolean;
+  setIsEditing: (isEditing: boolean) => void;
+}> = ({isEditing, setIsEditing}) => {
   return (
     <Box
       sx={{
@@ -243,9 +359,9 @@ const EditLeaderboardButton: FC = () => {
         }}
         size="medium"
         variant="secondary"
-        onClick={() => console.log('edit leaderboard')}
-        icon='pencil-edit'>
-        Edit
+        onClick={() => setIsEditing(!isEditing)}
+        icon={isEditing ? 'close' : 'pencil-edit'}>
+        {isEditing ? 'Discard Changes' : 'Edit'}
       </Button>
     </Box>
   );

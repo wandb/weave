@@ -183,8 +183,8 @@ export type TraceObjCreateReq = {
     project_id: string;
     object_id: string;
     val: any;
-  }
-}
+  };
+};
 
 export type TraceObjCreateRes = {
   digest: string;
