@@ -237,8 +237,6 @@ class Evaluation(Object):
                 score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
 
-            # TODO: Check for input columns parameters in the signature of the scorer
-
             if (
                 "model_output" not in score_arg_names
                 and "output" not in score_arg_names
