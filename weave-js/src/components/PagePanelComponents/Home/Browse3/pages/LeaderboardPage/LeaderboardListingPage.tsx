@@ -15,6 +15,7 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {useIsEditor} from './LeaderboardPage';
 
 const Container = styled.div`
   width: 100%;
@@ -26,6 +27,7 @@ export const LeaderboardListingPage: React.FC<{
   entity: string;
   project: string;
 }> = props => {
+  const {isEditor} = useIsEditor(props.entity);
   return (
     <SimplePageLayout
       title={`Leaderboards`}
@@ -37,10 +39,12 @@ export const LeaderboardListingPage: React.FC<{
         },
       ]}
       headerExtra={
-        <CreateLeaderboardButton
-          entity={props.entity}
-          project={props.project}
-        />
+        isEditor && (
+          <CreateLeaderboardButton
+            entity={props.entity}
+            project={props.project}
+          />
+        )
       }
     />
   );

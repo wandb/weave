@@ -410,7 +410,7 @@ const EditLeaderboardButton: FC<{
   );
 };
 
-const useIsEditor = (entity: string) => {
+export const useIsEditor = (entity: string) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   return useMemo(() => {
     if (loadingUserInfo) {
