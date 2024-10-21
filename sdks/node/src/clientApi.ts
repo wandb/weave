@@ -22,15 +22,14 @@ export async function init({
   host = 'https://api.wandb.ai',
   apiKey = getApiKey(),
 }: InitOptions): Promise<WeaveClient> {
-  const headers: Record<string, string> = {
+  const headers = {
     'User-Agent': `W&B Internal JS Client ${process.env.VERSION || 'unknown'}`,
     Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
   };
 
   try {
     const wandbServerApi = new WandbServerApi(host, apiKey);
-    const defaultEntityName = await wandbServerApi.defaultEntityName();
-    const entityName = entity ?? defaultEntityName;
+    const entityName = entity ?? (await wandbServerApi.defaultEntityName());
     const projectId = `${entityName}/${project}`;
 
     const retryFetch = createFetchWithRetry({
@@ -51,9 +50,7 @@ export async function init({
 
     const traceServerApi = new TraceServerApi({
       baseUrl: 'https://trace.wandb.ai',
-      baseApiParams: {
-        headers: headers,
-      },
+      baseApiParams: { headers },
       customFetch: concurrencyLimitedFetch,
     });
 
