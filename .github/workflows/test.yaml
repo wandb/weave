@@ -240,7 +240,7 @@ jobs:
             'mistral1',
             'notdiamond',
             'openai',
-            'scorers',
+            'scorers_integrations',
           ]
       fail-fast: false
     services:
