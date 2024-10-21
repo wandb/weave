@@ -77,7 +77,7 @@ import {
   PaginationButtons,
   RefreshButton,
 } from './CallsTableButtons';
-import {useCallsTableColumns} from './callsTableColumns';
+import {feedbackColName, useCallsTableColumns} from './callsTableColumns';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {getEffectiveFilter} from './callsTableFilter';
 import {useOpVersionOptions} from './callsTableFilter';
@@ -332,6 +332,9 @@ export const CallsTable: FC<{
     [callsResult, columnIsRefExpanded, expandedRefCols]
   );
 
+  // Do structured feedback stuff
+  const structuredFeedbackOptions = useStructuredFeedbackOptions(entity, project);
+
   const onAddFilter: OnAddFilter | undefined =
     filterModel && setFilterModel
       ? (field: string, operator: string | null, value: any, rowId: string) => {
@@ -374,7 +377,8 @@ export const CallsTable: FC<{
     columnIsRefExpanded,
     allowedColumnPatterns,
     onAddFilter,
-    calls.costsLoading
+    calls.costsLoading,
+    structuredFeedbackOptions
   );
 
   // This contains columns which are suitable for selection and raw data
@@ -445,6 +449,21 @@ export const CallsTable: FC<{
         : null,
     [effectiveFilter.parentId, parentIdOptions]
   );
+
+  useEffect(() => {
+    if (pinModel != null &&  setPinModel != null && structuredFeedbackOptions != null && structuredFeedbackOptions.types.length > 0) {
+      // do structured feedback stuff
+      const feedbackCols = structuredFeedbackOptions.types.map(feedbackCol => feedbackColName(feedbackCol));
+      // right pin feedback when we have a parent id
+      const currentLeft = pinModel?.left ?? [];
+      if (!currentLeft.find(col => feedbackCols.includes(col))) {
+        setPinModel({
+          ...pinModel,
+          left: [...currentLeft, ...feedbackCols],
+        });
+      }
+    }
+  }, [selectedParentId, structuredFeedbackOptions, pinModel, setPinModel]);
 
   // DataGrid Model Management
   const pinModelResolved = pinModel ?? DEFAULT_PIN_CALLS;
@@ -1022,3 +1041,25 @@ function prepareFlattenedCallDataForTable(
 ): FlattenedCallData[] {
   return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
 }
+
+const useStructuredFeedbackOptions = (entity: string, project: string) => {
+
+  const {useRootObjectVersions} = useWFHooks();
+
+  const filteredObjectVersions = useRootObjectVersions(
+    entity,
+    project,
+    {
+      baseObjectClasses: ['StructuredFeedback'],
+      latestOnly: true,
+    },
+    undefined,
+  );
+
+  return useMemo(() => {
+    if (filteredObjectVersions.loading || filteredObjectVersions.result == null || filteredObjectVersions.result.length === 0) {
+      return null;
+    }
+    return filteredObjectVersions.result[0].val;
+  }, [filteredObjectVersions.loading, filteredObjectVersions.result]);
+};

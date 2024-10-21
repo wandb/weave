@@ -23,6 +23,8 @@ import {
   FeedbackPurgeRes,
   FeedbackQueryReq,
   FeedbackQueryRes,
+  ObjCreateReq,
+  ObjCreateRes,
   TraceCallReadReq,
   TraceCallReadRes,
   TraceCallSchema,
@@ -266,6 +268,10 @@ export class DirectTraceServerClient {
       '/feedback/purge',
       req
     );
+  }
+
+  public objCreate(req: ObjCreateReq): Promise<ObjCreateRes> {
+    return this.makeRequest<ObjCreateReq, ObjCreateRes>('/obj/create', req);
   }
 
   public fileContent(

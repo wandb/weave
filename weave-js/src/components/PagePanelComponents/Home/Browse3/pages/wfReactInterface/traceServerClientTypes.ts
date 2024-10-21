@@ -229,6 +229,17 @@ export type TraceObjReadRes = {
   obj: TraceObjSchema;
 };
 
+export type ObjCreateReq = {
+  project_id: string;
+  object_id: string;
+  val: any;
+};
+
+export type ObjCreateRes = {
+  digest: string;
+};
+
+
 export type TraceRefsReadBatchReq = {
   refs: string[];
 };

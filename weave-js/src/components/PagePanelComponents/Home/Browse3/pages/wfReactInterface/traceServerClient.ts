@@ -5,6 +5,8 @@ import {
   FeedbackCreateRes,
   FeedbackPurgeReq,
   FeedbackPurgeRes,
+  ObjCreateReq,
+  ObjCreateRes,
   TraceCallsDeleteReq,
   TraceCallUpdateReq,
   TraceRefsReadBatchReq,
@@ -111,6 +113,10 @@ export class TraceServerClient extends DirectTraceServerClient {
       return purgeRes;
     });
     return res;
+  }
+
+  public objCreate(req: ObjCreateReq): Promise<ObjCreateRes> {
+    return super.objCreate(req);
   }
 
   public readBatch(req: TraceRefsReadBatchReq): Promise<TraceRefsReadBatchRes> {
