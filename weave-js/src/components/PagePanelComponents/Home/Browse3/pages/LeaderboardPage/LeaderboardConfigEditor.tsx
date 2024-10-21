@@ -3,7 +3,6 @@ import {
   Button,
   Checkbox,
   FormControlLabel,
-  Grid,
   IconButton,
   MenuItem,
   Select,
@@ -220,106 +219,114 @@ const ColumnEditor: React.FC<{
   );
 
   return (
-    <Grid container spacing={2} alignItems="center" style={{marginBottom: 8}}>
-      <Grid item xs={12} sm={3}>
-        <Select
-          fullWidth
-          value={column.evaluation_object_ref}
-          onChange={e =>
-            handleColumnChange(index, 'evaluation_object_ref', e.target.value)
-          }
-          displayEmpty
-          margin="dense">
-          <MenuItem value="">
-            <em>Select Evaluation Object</em>
-          </MenuItem>
-          {evalObjs.map(obj => (
-            <MenuItem key={obj.ref} value={obj.ref}>
-              {`${obj.name}:v${obj.versionIndex} (${obj.digest.slice(0, 6)})`}
+    <Box
+      display="flex"
+      flexWrap="wrap"
+      alignItems="center"
+      mb={2}
+      p={2}
+      border={1}
+      borderColor="divider"
+      borderRadius={4}>
+      <Box flexGrow={1} display="flex" flexWrap="wrap" alignItems="center">
+        <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
+          <Select
+            fullWidth
+            value={column.evaluation_object_ref}
+            onChange={e =>
+              handleColumnChange(index, 'evaluation_object_ref', e.target.value)
+            }
+            displayEmpty
+            margin="dense">
+            <MenuItem value="">
+              <em>Select Evaluation Object</em>
             </MenuItem>
-          ))}
-        </Select>
-      </Grid>
-      <Grid item xs={12} sm={3}>
-        <Select
-          fullWidth
-          value={column.scorer_name}
-          onChange={e =>
-            handleColumnChange(index, 'scorer_name', e.target.value)
-          }
-          displayEmpty
-          margin="dense"
-          disabled={!column.evaluation_object_ref}>
-          <MenuItem value="">
-            <em>Select Scorer</em>
-          </MenuItem>
-          {scorers.map(scorer => (
-            <MenuItem key={scorer} value={scorer}>
-              {scorer}
-            </MenuItem>
-          ))}
-        </Select>
-      </Grid>
-      <Grid item xs={12} sm={3}>
-        <Select
-          fullWidth
-          value={column.summary_metric_path_parts.join('.')}
-          onChange={e =>
-            handleColumnChange(
-              index,
-              'summary_metric_path_parts',
-              (e.target.value as string).split('.')
-            )
-          }
-          displayEmpty
-          margin="dense"
-          disabled={!column.evaluation_object_ref || !column.scorer_name}>
-          <MenuItem value="">
-            <em>Select Metric Path</em>
-          </MenuItem>
-          {metrics.map(path => (
-            <MenuItem key={path} value={path}>
-              {path}
-            </MenuItem>
-          ))}
-        </Select>
-      </Grid>
-      <Grid item xs={6} sm={2}>
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={column.should_minimize}
-              onChange={e =>
-                handleColumnChange(index, 'should_minimize', e.target.checked)
-              }
-            />
-          }
-          label="Minimize"
-        />
-      </Grid>
-      <Grid item xs={6} sm={1}>
-        <Box display="flex" justifyContent="flex-end">
-          <IconButton
-            size="small"
-            onClick={() => moveColumn(index, index - 1)}
-            disabled={index === 0}>
-            <MoveUpIcon />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => moveColumn(index, index + 1)}
-            disabled={index === totalColumns - 1}>
-            <MoveDownIcon />
-          </IconButton>
-          <IconButton size="small" onClick={() => cloneColumn(index)}>
-            <CloneIcon />
-          </IconButton>
-          <IconButton size="small" onClick={() => removeColumn(index)}>
-            <DeleteIcon />
-          </IconButton>
+            {evalObjs.map(obj => (
+              <MenuItem key={obj.ref} value={obj.ref}>
+                {`${obj.name}:v${obj.versionIndex} (${obj.digest.slice(0, 6)})`}
+              </MenuItem>
+            ))}
+          </Select>
         </Box>
-      </Grid>
-    </Grid>
+        <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
+          <Select
+            fullWidth
+            value={column.scorer_name}
+            onChange={e =>
+              handleColumnChange(index, 'scorer_name', e.target.value)
+            }
+            displayEmpty
+            margin="dense"
+            disabled={!column.evaluation_object_ref}>
+            <MenuItem value="">
+              <em>Select Scorer</em>
+            </MenuItem>
+            {scorers.map(scorer => (
+              <MenuItem key={scorer} value={scorer}>
+                {scorer}
+              </MenuItem>
+            ))}
+          </Select>
+        </Box>
+        <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
+          <Select
+            fullWidth
+            value={column.summary_metric_path_parts.join('.')}
+            onChange={e =>
+              handleColumnChange(
+                index,
+                'summary_metric_path_parts',
+                (e.target.value as string).split('.')
+              )
+            }
+            displayEmpty
+            margin="dense"
+            disabled={!column.evaluation_object_ref || !column.scorer_name}>
+            <MenuItem value="">
+              <em>Select Metric Path</em>
+            </MenuItem>
+            {metrics.map(path => (
+              <MenuItem key={path} value={path}>
+                {path}
+              </MenuItem>
+            ))}
+          </Select>
+        </Box>
+        <Box display="flex" alignItems="center" mb={2} mr={2}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={column.should_minimize}
+                onChange={e =>
+                  handleColumnChange(index, 'should_minimize', e.target.checked)
+                }
+              />
+            }
+            label="Minimize"
+          />
+        </Box>
+      </Box>
+      <Box display="flex" justifyContent="flex-end" mb={2}>
+        <IconButton
+          size="small"
+          onClick={() => moveColumn(index, index - 1)}
+          disabled={index === 0}>
+          <MoveUpIcon />
+        </IconButton>
+        <IconButton
+          size="small"
+          onClick={() => moveColumn(index, index + 1)}
+          disabled={index === totalColumns - 1}>
+          <MoveDownIcon />
+        </IconButton>
+        <IconButton size="small" onClick={() => cloneColumn(index)}>
+          <CloneIcon />
+        </IconButton>
+        <IconButton size="small" onClick={() => removeColumn(index)}>
+          <DeleteIcon />
+        </IconButton>
+      </Box>
+    </Box>
   );
 };
 
@@ -484,5 +491,3 @@ const useMetrics = (
 
 // TODO:
 // - [ ] Create new leaderboard
-// - [ ] flip the default sort for minimization if it is first
-// - [ ] Ordering of the columns should respect the columns in config (due to grouping) - maybe we should allow splitting of groups?

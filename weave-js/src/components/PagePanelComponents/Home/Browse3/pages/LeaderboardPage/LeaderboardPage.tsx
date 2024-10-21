@@ -16,7 +16,10 @@ import React, {
 
 import {WeaveflowPeekContext} from '../../context';
 import {NotFoundPanel} from '../../NotFoundPanel';
-import {LeaderboardGrid} from '../../views/Leaderboard/LeaderboardGrid';
+import {
+  LeaderboardColumnOrderType,
+  LeaderboardGrid,
+} from '../../views/Leaderboard/LeaderboardGrid';
 import {usePythonLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
 import {PythonLeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {SimplePageLayout} from '../common/SimplePageLayout';
@@ -209,20 +212,19 @@ export const LeaderboardPageContentInner: React.FC<
         const scorerGroup =
           evalData[col.evaluation_object_ref]?.scorers[col.scorer_name];
         const metricGroup = col.summary_metric_path_parts.join('.');
-        console.log({datasetGroup, scorerGroup, metricGroup});
+
         if (datasetGroup && scorerGroup && metricGroup) {
           return {
             datasetGroup,
             scorerGroup,
             metricGroup,
+            minimize: col.should_minimize ?? false,
           };
         }
         return null;
       })
-      .filter(c => c != null);
+      .filter(c => c != null) as LeaderboardColumnOrderType;
   }, [workingLeaderboardValCopy, evalData]);
-
-  console.log({columnOrder});
 
   return (
     <Box display="flex" flexDirection="row" height="100%" flexGrow={1}>

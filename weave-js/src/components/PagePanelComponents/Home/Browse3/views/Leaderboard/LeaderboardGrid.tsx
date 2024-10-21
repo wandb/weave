@@ -23,16 +23,17 @@ import {
 } from './query/leaderboardQuery';
 
 const USE_COMPARE_EVALUATIONS_PAGE = true;
-
+export type LeaderboardColumnOrderType = Array<{
+  datasetGroup: string;
+  scorerGroup: string;
+  metricGroup: string;
+  minimize: boolean;
+}>;
 interface LeaderboardGridProps {
   entity: string;
   project: string;
   data: GroupedLeaderboardData;
-  columnOrder?: Array<{
-    datasetGroup: string;
-    scorerGroup: string;
-    metricGroup: string;
-  }>;
+  columnOrder?: LeaderboardColumnOrderType;
   loading: boolean;
 }
 
@@ -308,12 +309,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 
   const [sortModel, setSortModel] = useState<GridSortItem[]>([]);
 
-  useEffect(() => {
-    if (sortModel.length === 0 && columns.length > 1 && !loading) {
-      setSortModel([{field: columns[1].field, sort: 'desc'}]);
-    }
-  }, [columns, loading, sortModel]);
-
   const orderedColumns = useMemo(() => {
     if (!columnOrder) {
       return columns;
@@ -327,6 +322,23 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       );
     });
   }, [columns, columnOrder]);
+
+  const defaultSortModel: GridSortItem[] = useMemo(() => {
+    if (!columnOrder) {
+      return columns.map(c => ({field: c.field, sort: 'desc'}));
+    } else {
+      return columnOrder.map(c => ({
+        field: `${c.datasetGroup}--${c.scorerGroup}--${c.metricGroup}`,
+        sort: c.minimize ? 'asc' : 'desc',
+      }));
+    }
+  }, [columnOrder, columns]);
+
+  useEffect(() => {
+    if (columns.length > 1 && !loading) {
+      setSortModel(defaultSortModel);
+    }
+  }, [columns, defaultSortModel, loading]);
 
   return (
     <Box
@@ -545,4 +557,3 @@ const defaultGetSortComparator =
     }
     return aValue.localeCompare(bValue);
   };
-
