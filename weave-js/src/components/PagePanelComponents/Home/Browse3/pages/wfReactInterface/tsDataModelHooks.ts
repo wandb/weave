@@ -252,6 +252,7 @@ const useCallsNoExpansion = (
   const deepFilter = useDeepMemo(filter);
 
   const doFetch = useCallback(() => {
+    // probably here
     if (opts?.skip) {
       return;
     }
@@ -382,7 +383,9 @@ const useCalls = (
   expandedRefColumns?: Set<string>,
   opts?: {skip?: boolean; refetchOnDelete?: boolean; includeCosts?: boolean}
 ): Loadable<CallSchema[]> & Refetchable => {
+  console.log('here', columns);
   const calls = useCallsNoExpansion(
+    // here
     entity,
     project,
     filter,
@@ -1028,7 +1031,7 @@ const useChildCallsForCompare = (
     undefined,
     undefined,
     undefined,
-    undefined,
+    ['latency'],
     undefined,
     {skip: skipParent}
   );
@@ -1051,7 +1054,7 @@ const useChildCallsForCompare = (
     undefined,
     undefined,
     undefined,
-    undefined,
+    ['latency'],
     undefined,
     {skip: skipChild}
   );

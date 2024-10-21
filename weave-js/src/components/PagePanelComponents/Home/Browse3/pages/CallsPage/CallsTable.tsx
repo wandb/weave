@@ -377,6 +377,8 @@ export const CallsTable: FC<{
     calls.costsLoading
   );
 
+  console.log(columns);
+
   // This contains columns which are suitable for selection and raw data
   // entry. Notably, not children of expanded refs.
   const filterFriendlyColumnInfo = useMemo(() => {

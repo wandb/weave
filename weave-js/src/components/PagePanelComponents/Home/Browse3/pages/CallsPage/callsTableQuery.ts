@@ -51,7 +51,7 @@ export const useCallsForQuery = (
     gridFilter,
     gridSort
   );
-
+  console.log('columns', columns);
   const calls = useCalls(
     entity,
     project,
@@ -105,7 +105,7 @@ export const useCallsForQuery = (
       includeCosts: true,
     }
   );
-
+  console.log(costs);
   const costResults = useMemo(() => {
     return costs.result ?? [];
   }, [costs]);
