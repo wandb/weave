@@ -493,8 +493,11 @@ export const getPythonLeaderboardData = async (
   entity: string,
   project: string,
   val: PythonLeaderboardObjectVal
-): Promise<GroupedLeaderboardData> => {
-  const groupableData = await getPythonLeaderboardGroupableData(
+): Promise<{
+  finalData: GroupedLeaderboardData;
+  evalData: PythonLeaderboardEvalData;
+}> => {
+  const {groupableData, evalData} = await getPythonLeaderboardGroupableData(
     client,
     entity,
     project,
@@ -531,7 +534,16 @@ export const getPythonLeaderboardData = async (
     ),
   };
 
-  return finalData;
+  return {finalData, evalData};
+};
+
+export type PythonLeaderboardEvalData = {
+  [evalRefUri: string]: {
+    datasetGroup: string;
+    scorers: {
+      [scorerName: string]: string;
+    };
+  };
 };
 
 const getPythonLeaderboardGroupableData = async (
@@ -539,13 +551,16 @@ const getPythonLeaderboardGroupableData = async (
   entity: string,
   project: string,
   val: PythonLeaderboardObjectVal
-): Promise<GroupableLeaderboardValueRecord[]> => {
+): Promise<{
+  groupableData: GroupableLeaderboardValueRecord[];
+  evalData: PythonLeaderboardEvalData;
+}> => {
   const evalObjectRefs = _.uniq(
     val.columns.map(col => col.evaluation_object_ref)
   ).filter(ref => parseRefMaybe(ref)?.scheme === 'weave');
 
   if (evalObjectRefs.length === 0) {
-    return [];
+    return {groupableData: [], evalData: {}};
   }
 
   const evalObjectRefsValsProm = client.readBatch({refs: evalObjectRefs});
@@ -572,6 +587,7 @@ const getPythonLeaderboardGroupableData = async (
   const allEvaluationCallsRes = await allEvaluationCallsProm;
 
   const data: GroupableLeaderboardValueRecord[] = [];
+  const evalData: PythonLeaderboardEvalData = {};
   allEvaluationCallsRes.calls.forEach(call => {
     val.columns.forEach(col => {
       const evalObjRefUri = call.inputs.self;
@@ -617,10 +633,13 @@ const getPythonLeaderboardGroupableData = async (
             value = (value as any)[part];
           }
         });
+        const modelGroup = `${modelRef.artifactName}:${modelRef.artifactVersion}`;
+        const datasetGroup = `${datasetRef.artifactName}:${datasetRef.artifactVersion}`;
+        const scorerGroup = `${scorerRef.artifactName}:${scorerRef.artifactVersion}`;
         const row: GroupableLeaderboardValueRecord = {
-          modelGroup: `${modelRef.artifactName}:${modelRef.artifactVersion}`,
-          datasetGroup: `${datasetRef.artifactName}:${datasetRef.artifactVersion}`,
-          scorerGroup: `${scorerRef.artifactName}:${scorerRef.artifactVersion}`,
+          modelGroup,
+          datasetGroup,
+          scorerGroup,
           metricPathGroup: col.summary_metric_path_parts.join('.'),
           sortKey: -convertISOToDate(call.started_at).getTime(),
           row: {
@@ -642,9 +661,17 @@ const getPythonLeaderboardGroupableData = async (
           },
         };
         data.push(row);
+        if (!(col.evaluation_object_ref in evalData)) {
+          evalData[col.evaluation_object_ref] = {
+            datasetGroup,
+            scorers: {},
+          };
+        }
+        evalData[col.evaluation_object_ref].scorers[scorerRef.artifactName] =
+          scorerGroup;
       }
     });
   });
 
-  return data;
+  return {groupableData: data, evalData};
 };

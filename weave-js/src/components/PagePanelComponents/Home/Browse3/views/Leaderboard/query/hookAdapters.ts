@@ -10,6 +10,7 @@ import {
   getLeaderboardData,
   getPythonLeaderboardData,
   GroupedLeaderboardData,
+  PythonLeaderboardEvalData,
 } from './leaderboardQuery';
 
 type LeaderboardDataState = {
@@ -48,11 +49,14 @@ export const usePythonLeaderboardData = (
   entity: string,
   project: string,
   val: PythonLeaderboardObjectVal
-): LeaderboardDataState => {
+): LeaderboardDataState & {evalData: PythonLeaderboardEvalData} => {
   const getTraceServerClient = useGetTraceServerClientContext();
-  const [state, setState] = useState<LeaderboardDataState>({
+  const [state, setState] = useState<
+    LeaderboardDataState & {evalData: PythonLeaderboardEvalData}
+  >({
     loading: true,
     data: {modelGroups: {}},
+    evalData: {},
   });
   const deepVal = useDeepMemo(val);
   useEffect(() => {
@@ -64,7 +68,11 @@ export const usePythonLeaderboardData = (
       deepVal
     ).then(data => {
       if (mounted) {
-        setState({loading: false, data});
+        setState({
+          loading: false,
+          data: data.finalData,
+          evalData: data.evalData,
+        });
       }
     });
     return () => {

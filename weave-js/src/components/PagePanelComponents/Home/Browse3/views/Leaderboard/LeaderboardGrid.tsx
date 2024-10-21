@@ -28,6 +28,11 @@ interface LeaderboardGridProps {
   entity: string;
   project: string;
   data: GroupedLeaderboardData;
+  columnOrder?: Array<{
+    datasetGroup: string;
+    scorerGroup: string;
+    metricGroup: string;
+  }>;
   loading: boolean;
 }
 
@@ -42,6 +47,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   project,
   data,
   loading,
+  columnOrder,
 }) => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const history = useHistory();
@@ -251,6 +257,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         const datasetColGroup: GridColumnGroup = {
           groupId: datasetGroupName,
           headerName: datasetGroupName,
+          freeReordering: true,
           children: [],
           renderHeaderGroup: params => {
             const ref = parseRefMaybe(
@@ -268,6 +275,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
             const scorerColGroup: GridColumnGroup = {
               groupId: `${datasetGroupName}--${scorerGroupName}`,
               headerName: scorerGroupName,
+              freeReordering: true,
               children: [],
               renderHeaderGroup: params => {
                 const ref = parseRefMaybe(
@@ -306,6 +314,20 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     }
   }, [columns, loading, sortModel]);
 
+  const orderedColumns = useMemo(() => {
+    if (!columnOrder) {
+      return columns;
+    }
+    const columnOrderKeys = columnOrder.map(
+      c => `${c.datasetGroup}--${c.scorerGroup}--${c.metricGroup}`
+    );
+    return columns.sort((a, b) => {
+      return (
+        columnOrderKeys.indexOf(a.field) - columnOrderKeys.indexOf(b.field)
+      );
+    });
+  }, [columns, columnOrder]);
+
   return (
     <Box
       sx={{
@@ -317,9 +339,10 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       }}>
       <StyledDataGrid
         rows={rows}
-        columns={columns}
+        columns={orderedColumns}
         columnGroupingModel={groupingModel}
         disableRowSelectionOnClick
+        disableColumnReorder
         hideFooterSelectedRowCount
         disableMultipleColumnsSorting={false}
         columnHeaderHeight={40}
@@ -523,7 +546,3 @@ const defaultGetSortComparator =
     return aValue.localeCompare(bValue);
   };
 
-/**
-TODO:
-* [ ] When models are Ops, their link is not quite right
- */

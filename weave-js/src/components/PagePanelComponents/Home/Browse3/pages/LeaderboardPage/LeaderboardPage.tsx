@@ -171,7 +171,7 @@ export const LeaderboardPageContentInner: React.FC<
   useEffect(() => {
     props.setName(workingLeaderboardValCopy.name);
   }, [props, workingLeaderboardValCopy.name]);
-  const {loading, data} = usePythonLeaderboardData(
+  const {loading, data, evalData} = usePythonLeaderboardData(
     props.entity,
     props.project,
     workingLeaderboardValCopy
@@ -202,6 +202,27 @@ export const LeaderboardPageContentInner: React.FC<
   const isDirty = useMemo(() => {
     return !_.isEqual(props.leaderboardVal, workingLeaderboardValCopy);
   }, [props.leaderboardVal, workingLeaderboardValCopy]);
+  const columnOrder = useMemo(() => {
+    return workingLeaderboardValCopy.columns
+      .map(col => {
+        const datasetGroup = evalData[col.evaluation_object_ref]?.datasetGroup;
+        const scorerGroup =
+          evalData[col.evaluation_object_ref]?.scorers[col.scorer_name];
+        const metricGroup = col.summary_metric_path_parts.join('.');
+        console.log({datasetGroup, scorerGroup, metricGroup});
+        if (datasetGroup && scorerGroup && metricGroup) {
+          return {
+            datasetGroup,
+            scorerGroup,
+            metricGroup,
+          };
+        }
+        return null;
+      })
+      .filter(c => c != null);
+  }, [workingLeaderboardValCopy, evalData]);
+
+  console.log({columnOrder});
 
   return (
     <Box display="flex" flexDirection="row" height="100%" flexGrow={1}>
@@ -241,6 +262,7 @@ export const LeaderboardPageContentInner: React.FC<
             project={props.project}
             loading={loading}
             data={data}
+            columnOrder={columnOrder}
           />
         </Box>
       </Box>
