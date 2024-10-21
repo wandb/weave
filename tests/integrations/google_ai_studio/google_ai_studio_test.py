@@ -119,3 +119,34 @@ async def test_content_generation_async(client):
     # TODO: Re-enable after dictify is fixed
     # assert_correct_output_shape(call.output)
     # assert_correct_summary(call.summary, trace_name)
+
+
+@pytest.mark.retry(max_attempts=5)
+@pytest.mark.skip_clickhouse_client
+def test_send_message(client):
+    import google.generativeai as genai
+
+    genai.configure(api_key=os.getenv("GOOGLE_GENAI_KEY"))
+    model = genai.GenerativeModel(model_name="gemini-1.5-pro", tools="code_execution")
+    chat = model.start_chat()
+    chat.send_message(
+        (
+            "What is the sum of the first 50 prime numbers? "
+            "Generate and run code for the calculation, and make sure you get all 50."
+        )
+    )
+
+    calls = list(client.calls())
+    assert len(calls) == 2
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "google.generativeai.ChatSession.send_message"
+    assert call.output is not None
+
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "google.generativeai.GenerativeModel.generate_content"
+    assert call.output is not None
