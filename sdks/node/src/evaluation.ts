@@ -1,13 +1,10 @@
 import cliProgress from 'cli-progress';
 import { Dataset, DatasetRow } from './dataset';
+import { ColumnMapping, mapArgs } from './fn';
 import { isMedia } from './media';
 import { boundOp } from './op';
 import { Op, getOpName } from './opType';
 import { WeaveObject, WeaveObjectParameters } from './weaveObject';
-
-export type ColumnMapping = { [key: string]: string };
-type Row = { [key: string]: any };
-type ArgsObject = { [key: string]: any };
 
 const PROGRESS_BAR = false;
 
@@ -277,60 +274,4 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
     }
     return {};
   }
-}
-
-export function getFunctionArguments(fn: Function): ArgsObject {
-  // This naive impl works for basic funcs, arrows, and methods.  It doesn't work yet for
-  // destructuring or rest params
-  const match = fn.toString().match(/\(([^)]*)\)/); // Find the function signature
-  if (!match) {
-    return {};
-  }
-
-  const argsString = match[1].replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, ''); // Strip out comments
-  const args = argsString
-    .split(',')
-    .map(arg => arg.trim())
-    .filter(arg => arg !== '');
-
-  return args.reduce(
-    (acc, v) => {
-      if (v.startsWith('...')) {
-        acc[v.slice(3)] = '...rest';
-      } else {
-        const [name, defaultValue] = v.split('=').map(s => s.trim());
-        acc[name] = defaultValue;
-      }
-      return acc;
-    },
-    {} as Record<string, string | undefined>
-  );
-}
-
-function mapArgs(row: Row, mapping: ColumnMapping): Row {
-  return Object.fromEntries(Object.entries(row).map(([k, v]) => [mapping[k] || k, v]));
-}
-
-function prepareArgsForFn(args: ArgsObject, fn: Function): ArgsObject {
-  const fnArgs = getFunctionArguments(fn);
-  const preparedArgs: ArgsObject = {};
-
-  for (const [argName, defaultValue] of Object.entries(fnArgs)) {
-    if (argName in args) {
-      preparedArgs[argName] = args[argName];
-    } else if (defaultValue != null) {
-      preparedArgs[argName] = defaultValue;
-    } else {
-      throw new Error(`Missing required argument: ${argName}`);
-    }
-  }
-  return preparedArgs;
-}
-
-export function invoke(fn: Function, args: ArgsObject, mapping: ColumnMapping | null) {
-  if (mapping) {
-    args = mapArgs(args, mapping);
-  }
-  const orderedArgs = prepareArgsForFn(args, fn);
-  return fn(...Object.values(orderedArgs));
 }

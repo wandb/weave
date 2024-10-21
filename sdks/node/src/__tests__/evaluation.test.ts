@@ -1,5 +1,6 @@
 import { Dataset } from '../dataset';
-import { ColumnMapping, Evaluation } from '../evaluation';
+import { Evaluation } from '../evaluation';
+import { ColumnMapping } from '../fn';
 import { op } from '../op';
 
 const createMockDataset = () =>
