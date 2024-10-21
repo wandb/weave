@@ -69,6 +69,7 @@ mistral1 = ["mistralai>=1.0.0"]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]
 modal = ["modal", "python-dotenv"]
+vertexai = ["vertexai>=1.70.0"]
 test = [
   "nox",
   "pytest>=8.2.0",

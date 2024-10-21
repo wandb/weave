@@ -40,6 +40,7 @@ def lint(session):
         "mistral1",
         "notdiamond",
         "openai",
+        "vertexai",
     ],
 )
 def tests(session, shard):

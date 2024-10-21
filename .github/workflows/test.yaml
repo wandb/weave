@@ -240,6 +240,7 @@ jobs:
             'mistral1',
             'notdiamond',
             'openai',
+            'vertexai',
           ]
       fail-fast: false
     services:
