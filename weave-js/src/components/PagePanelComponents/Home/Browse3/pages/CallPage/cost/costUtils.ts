@@ -2,6 +2,7 @@ import {
   LLMCostSchema,
   LLMUsageSchema,
 } from '../../wfReactInterface/traceServerClientTypes';
+import {CallSchema} from '../../wfReactInterface/wfDataModelHooksInterface';
 import {DEFAULT_COST_DATA, isCostDataKey, isUsageDataKey} from './costTypes';
 
 const COST_PARAM_PREFIX = 'summary.weave.costs.';
@@ -84,4 +85,25 @@ export const formatTokenCost = (cost: number): string => {
     return '$<0.01';
   }
   return `$${cost.toFixed(2)}`;
+};
+
+// TODO(Josiah): this is here because sometimes the cost query is not returning all the ids I believe for unfinished calls,
+// to get this cost uptake out, this function can be removed, once that is fixed
+export const addCostsToCallResults = (
+  callResults: CallSchema[],
+  costResults: CallSchema[]
+) => {
+  const costDict = costResults.reduce((acc, cost) => {
+    if (cost.callId) {
+      acc[cost.callId] = cost;
+    }
+    return acc;
+  }, {} as Record<string, CallSchema>);
+
+  return callResults.map(call => {
+    if (call.callId && costDict[call.callId]) {
+      return {...call, ...costDict[call.callId]};
+    }
+    return call;
+  });
 };

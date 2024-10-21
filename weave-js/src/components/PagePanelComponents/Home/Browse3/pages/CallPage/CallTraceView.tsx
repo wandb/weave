@@ -17,6 +17,7 @@ import {
   CallFilter,
   CallSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
+import {addCostsToCallResults} from './cost';
 import {CustomGridTreeDataGroupingCell} from './CustomGridTreeDataGroupingCell';
 import {scorePathSimilarity, updatePath} from './pathPreservation';
 
@@ -419,7 +420,10 @@ export const useCallFlattenedTraceTree = (
   }, [costs.result]);
 
   const traceCallMap = useMemo(() => {
-    const result = costResult.length > 0 ? costResult : traceCallsResult;
+    const result =
+      costResult.length > 0
+        ? addCostsToCallResults(traceCallsResult, costResult)
+        : traceCallsResult;
     return _.keyBy(result, 'callId');
   }, [costResult, traceCallsResult]);
 

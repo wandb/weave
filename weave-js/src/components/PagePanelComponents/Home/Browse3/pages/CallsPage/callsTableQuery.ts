@@ -7,6 +7,7 @@ import {useCallback, useMemo} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {isValuelessOperator} from '../../filters/common';
+import {addCostsToCallResults} from '../CallPage/cost';
 import {operationConverter} from '../common/tabularListViews/operators';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
@@ -110,8 +111,9 @@ export const useCallsForQuery = (
   }, [costs]);
   const refetch = useCallback(() => {
     calls.refetch();
+    costs.refetch();
     callsStats.refetch();
-  }, [calls, callsStats]);
+  }, [calls, callsStats, costs]);
 
   return useMemo(() => {
     return {
@@ -121,7 +123,7 @@ export const useCallsForQuery = (
       result: calls.loading
         ? []
         : costResults.length > 0
-        ? costResults
+        ? addCostsToCallResults(callResults, costResults)
         : callResults,
       total,
       refetch,
