@@ -479,6 +479,14 @@
       "created_at": "2024-10-17T09:33:21Z",
       "repoId": 650377372,
       "pullRequestNo": 2728
+    },
+    {
+      "name": "harukatab",
+      "id": 69057500,
+      "comment_id": 2427811995,
+      "created_at": "2024-10-21T21:53:34Z",
+      "repoId": 650377372,
+      "pullRequestNo": 2747
     }
   ]
 }
