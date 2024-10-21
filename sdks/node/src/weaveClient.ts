@@ -9,6 +9,7 @@ import {
 } from './generated/traceServerApi';
 import { isWeaveImage } from './media';
 import { Op, OpRef, ParameterNamesOption, getOpName, getOpWrappedFunction, isOp } from './opType';
+import { Settings } from './settings';
 import { Table, TableRef, TableRowRef } from './table';
 import { packageVersion } from './utils/userAgent';
 import { WandbServerApi } from './wandb/wandbServerApi';
@@ -55,27 +56,17 @@ type CallEndParams = EndedCallSchemaForInsert;
 
 export class WeaveClient {
   private stackContext = new AsyncLocalStorage<CallStack>();
-  public traceServerApi: TraceServerApi<any>;
-  private wandbServerApi: WandbServerApi;
   private callQueue: Array<{ mode: 'start' | 'end'; data: any }> = [];
   private batchProcessTimeout: NodeJS.Timeout | null = null;
   private isBatchProcessing: boolean = false;
   private readonly BATCH_INTERVAL: number = 200;
 
-  public projectId: string;
-  public quiet: boolean = false;
-
   constructor(
-    traceServerApi: TraceServerApi<any>,
-    wandbServerApi: WandbServerApi,
-    projectId: string,
-    quiet: boolean = false
-  ) {
-    this.traceServerApi = traceServerApi;
-    this.wandbServerApi = wandbServerApi;
-    this.projectId = projectId;
-    this.quiet = quiet;
-  }
+    public traceServerApi: TraceServerApi<any>,
+    public projectId: string,
+    public settings: Settings = new Settings(),
+    private wandbServerApi: WandbServerApi
+  ) {}
 
   private scheduleBatchProcessing() {
     if (this.batchProcessTimeout || this.isBatchProcessing) return;

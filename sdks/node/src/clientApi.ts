@@ -73,10 +73,7 @@ export function requireCurrentChildSummary(): { [key: string]: any } {
   return callStackEntry.childSummary;
 }
 
-export function getGlobalClient(): WeaveClient {
-  if (!globalClient) {
-    throw new Error('Weave client not initialized');
-  }
+export function getGlobalClient(): WeaveClient | null {
   return globalClient;
 }
 
