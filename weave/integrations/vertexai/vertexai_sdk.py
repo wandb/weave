@@ -1,10 +1,10 @@
 import importlib
 from functools import wraps
-from typing import Any, Callable, Optional, TYPE_CHECKING
-import weave
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
-from weave.trace.op_extensions.accumulator import add_accumulator
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
+import weave
+from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from vertexai.generative_models import GenerationResponse
@@ -13,10 +13,12 @@ if TYPE_CHECKING:
 def vertexai_accumulator(
     acc: Optional["GenerationResponse"], value: "GenerationResponse"
 ) -> "GenerationResponse":
-    from vertexai.generative_models import GenerationResponse
     from google.cloud.aiplatform_v1beta1.types import content as gapic_content_types
-    from google.cloud.aiplatform_v1beta1.types import prediction_service as gapic_prediction_service_types
-    
+    from google.cloud.aiplatform_v1beta1.types import (
+        prediction_service as gapic_prediction_service_types,
+    )
+    from vertexai.generative_models import GenerationResponse
+
     if acc is None:
         return value
 
@@ -32,7 +34,9 @@ def vertexai_accumulator(
         )
         candidate = gapic_content_types.Candidate(content=content)
         candidates.append(candidate)
-    accumulated_response = gapic_prediction_service_types.GenerateContentResponse(candidates=candidates)
+    accumulated_response = gapic_prediction_service_types.GenerateContentResponse(
+        candidates=candidates
+    )
     acc = GenerationResponse._from_gapic(accumulated_response)
 
     acc.usage_metadata.prompt_token_count += value.usage_metadata.prompt_token_count
@@ -84,9 +88,7 @@ vertexai_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("vertexai.generative_models"),
             "GenerativeModel.generate_content",
-            vertexai_wrapper_sync(
-                name="vertexai.GenerativeModel.generate_content"
-            ),
+            vertexai_wrapper_sync(name="vertexai.GenerativeModel.generate_content"),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("vertexai.generative_models"),
