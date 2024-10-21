@@ -97,8 +97,21 @@ import nltk
 nltk.download('punkt')  # Download NLTK data for sentence tokenization
 
 ```
+Loading Hallucination detection model (HHEM-2.1):
 
-Loading Hallucination detection model:
+HHEM-2.1-Open is an open-source model designed to detect hallucinations in large language models (LLMs). It is particularly effective in retrieval-augmented generation (RAG) workflows, where an LLM summarizes facts, and the goal is to assess the factual consistency of the summary.
+
+While we are using HHEM-2.1-Open for this demonstration, there are also other models available that can suit different needs and contexts. Here are a couple of examples:
+
+- [**PHI 3.5 Hallucination Judge**](https://huggingface.co/grounded-ai/phi3.5-hallucination-judge)
+- [**XLM-RoBERTa-XL Hallucination Detector**](https://huggingface.co/bond005/xlm-roberta-xl-hallucination-detector)
+
+These are just a few of the many available models—you can explore others on platforms like Hugging Face.
+
+Additionally, you could opt for the LLM-as-Judge approach, where you prompt your preferred LLM to evaluate whether the response from a previous LLM aligns with the provided facts or context. This method gives you the flexibility to adapt the evaluation process according to your preferences and the available models.
+
+In summary, HHEM-2.1-Open was chosen for this demonstration due to its efficiency: it requires less than 600MB of RAM (32-bit precision) and processes 2k-token inputs in approximately 1.5 seconds on a modern x86 CPU. However, you are encouraged to experiment with other models to find the best fit for your needs.
+
 
 ```python
 %%capture
@@ -129,7 +142,7 @@ embedding_model = OpenAIEmbedding(model="text-embedding-ada-002")
 
 ## 📥 Download and Load Documents
 
-We'll download a PDF document from a URL and create an index using LlamaIndex. Please note taht this can be your own vector database with your data indexed for your RAG Chatbot.
+We'll download a PDF document from a URL and create an index using LlamaIndex. Please note that this can be your own vector database with your data indexed for your RAG Chatbot.
 
 ```python
 
@@ -252,9 +265,6 @@ def check_statement_hallucination(context: str, statement: str) -> Dict[str, Any
     '''
     Detects hallucination in the answer using the provided context and model answer.
     '''
-
-    #statements = sent_tokenize(statement)
-    #pairs = [(context, statement) for statement in statements]
     pairs = [(context, statement)]
 
 
@@ -402,6 +412,9 @@ for model_name in model_names:
     print(f"Completed evaluation with model: {model_name}\n")
 
 ```
+
+![](../../media/hallucination/eval.png)
+
 
 ## 📌 Conclusion
 
