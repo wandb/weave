@@ -12,7 +12,7 @@ def mock_embed(monkeypatch):
     def _mock_embed(*args, **kwargs):
         import random
 
-        return [[random.random(), random.random()] for _ in range(2)]
+        return [[random.random() for _ in range(1024)] for _ in range(2)]
 
     monkeypatch.setattr("weave.flow.scorers.similarity_scorer.embed", _mock_embed)
 
