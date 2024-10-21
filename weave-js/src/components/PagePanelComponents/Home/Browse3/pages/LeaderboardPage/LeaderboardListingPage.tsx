@@ -12,6 +12,8 @@ import {EMPTY_PROPS_LEADERBOARDS} from '../common/EmptyContent';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {ObjectVersionsTable} from '../ObjectVersionsPage';
 import {useWFHooks} from '../wfReactInterface/context';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 const Container = styled.div`
@@ -34,7 +36,12 @@ export const LeaderboardListingPage: React.FC<{
           content: <LeaderboardListingPageInner {...props} />,
         },
       ]}
-      headerExtra={<CreateLeaderboardButton />}
+      headerExtra={
+        <CreateLeaderboardButton
+          entity={props.entity}
+          project={props.project}
+        />
+      }
     />
   );
 };
@@ -50,7 +57,15 @@ export const LeaderboardListingPageInner: React.FC<{
   );
 };
 
-const CreateLeaderboardButton: FC = () => {
+const CreateLeaderboardButton: FC<{
+  entity: string;
+  project: string;
+}> = props => {
+  const createLeaderboard = useCreateLeaderboard(props.entity, props.project);
+  const navigateToLeaderboard = useNavigateToLeaderboard(
+    props.entity,
+    props.project
+  );
   return (
     <Box
       sx={{
@@ -65,7 +80,9 @@ const CreateLeaderboardButton: FC = () => {
         }}
         size="medium"
         variant="secondary"
-        onClick={() => console.log('create leaderboard')}
+        onClick={() => {
+          createLeaderboard().then(navigateToLeaderboard);
+        }}
         icon="add-new">
         Create Leaderboard
       </Button>
@@ -124,4 +141,45 @@ const LeaderboardTable: React.FC<{
       onRowClick={onClick}
     />
   );
+};
+
+const useCreateLeaderboard = (entity: string, project: string) => {
+  const getTsClient = useGetTraceServerClientContext();
+  const client = getTsClient();
+
+  const createLeaderboard = async () => {
+    const objectId = `leaderboard-${new Date()
+      .toISOString()
+      .replace(/[:.]/g, '-')}`;
+    await client.objCreate({
+      obj: {
+        project_id: projectIdFromParts({entity, project}),
+        object_id: objectId,
+        val: {
+          _type: 'Leaderboard',
+          _class_name: 'Leaderboard',
+          _bases: ['Object', 'BaseModel'],
+          name: objectId,
+          description: '',
+          columns: [],
+        },
+      },
+    });
+    return objectId;
+  };
+
+  return createLeaderboard;
+};
+
+const useNavigateToLeaderboard = (entity: string, project: string) => {
+  const history = useHistory();
+  const {baseRouter} = useWeaveflowRouteContext();
+  const navigateToLeaderboard = useCallback(
+    (objectId: string) => {
+      const to = baseRouter.leaderboardsUIUrl(entity, project, objectId, true);
+      history.push(to);
+    },
+    [history, baseRouter, entity, project]
+  );
+  return navigateToLeaderboard;
 };

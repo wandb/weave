@@ -488,6 +488,3 @@ const useMetrics = (
 
   return metrics;
 };
-
-// TODO:
-// - [ ] Create new leaderboard

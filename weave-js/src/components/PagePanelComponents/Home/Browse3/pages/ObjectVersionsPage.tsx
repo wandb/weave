@@ -234,9 +234,14 @@ export const ObjectVersionsTable: React.FC<{
           // Icon to indicate navigation to the object version
           const obj: ObjectVersionSchema = cellParams.row.obj;
           if (props.onRowClick) {
-            const text = props.hideVersionSuffix
+            let text = props.hideVersionSuffix
               ? obj.objectId
               : objectVersionText(obj.objectId, obj.versionIndex);
+
+            // Maybe this should be conditional?
+            if (obj.val.name) {
+              text = obj.val.name;
+            }
 
             return (
               <CustomLink text={text} onClick={() => props.onRowClick?.(obj)} />

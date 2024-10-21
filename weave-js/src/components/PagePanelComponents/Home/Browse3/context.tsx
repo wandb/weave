@@ -196,7 +196,8 @@ export const browse2Context = {
   leaderboardsUIUrl: (
     entityName: string,
     projectName: string,
-    leaderboardName?: string
+    leaderboardName?: string,
+    edit?: boolean
   ) => {
     throw new Error('Not implemented');
   },
@@ -432,11 +433,12 @@ export const browse3ContextGen = (
     leaderboardsUIUrl: (
       entityName: string,
       projectName: string,
-      leaderboardName?: string
+      leaderboardName?: string,
+      edit?: boolean
     ) => {
       return `${projectRoot(entityName, projectName)}/leaderboards${
         leaderboardName ? `/${leaderboardName}` : ''
-      }`;
+      }${edit ? '?edit=true' : ''}`;
     },
   };
   return browse3Context;
@@ -525,7 +527,8 @@ type RouteType = {
   leaderboardsUIUrl: (
     entityName: string,
     projectName: string,
-    leaderboardName?: string
+    leaderboardName?: string,
+    edit?: boolean
   ) => string;
 };
 

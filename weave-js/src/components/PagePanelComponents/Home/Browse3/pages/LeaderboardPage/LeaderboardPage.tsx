@@ -33,13 +33,19 @@ type LeaderboardPageProps = {
   entity: string;
   project: string;
   leaderboardName: string;
+  openEditorOnMount?: boolean;
 };
 
 export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   const [name, setName] = useState(props.leaderboardName);
   const {isPeeking} = useContext(WeaveflowPeekContext);
-  const [isEditing, setIsEditing] = useState(false);
   const {isEditor} = useIsEditor(props.entity);
+  const [isEditing, setIsEditing] = useState(false);
+  useEffect(() => {
+    if (isEditor && props.openEditorOnMount) {
+      setIsEditing(true);
+    }
+  }, [isEditor, props.openEditorOnMount]);
   return (
     <SimplePageLayout
       title={name}

@@ -986,6 +986,8 @@ const CompareEvaluationsBinding = () => {
 const LeaderboardPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
   const {entity, project, itemName: leaderboardName} = params;
+  const query = useURLSearchParamsDict();
+  const edit = query.edit === 'true';
   if (!leaderboardName) {
     return <LeaderboardListingPage entity={entity} project={project} />;
   }
@@ -994,6 +996,7 @@ const LeaderboardPageBinding = () => {
       entity={entity}
       project={project}
       leaderboardName={leaderboardName}
+      openEditorOnMount={edit}
     />
   );
 };
