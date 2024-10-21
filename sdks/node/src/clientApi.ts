@@ -5,13 +5,23 @@ import { getApiKey } from './wandb/settings';
 import { WandbServerApi } from './wandb/wandbServerApi';
 import { CallStackEntry, WeaveClient } from './weaveClient';
 
+export interface InitOptions {
+  project: string;
+  entity?: string;
+  projectName?: string;
+  host?: string;
+  apiKey?: string;
+}
+
 // Global client instance
 export let globalClient: WeaveClient | null = null;
 
-export async function init(projectName: string): Promise<WeaveClient> {
-  const host = 'https://api.wandb.ai';
-  const apiKey = getApiKey();
-
+export async function init({
+  project,
+  entity,
+  host = 'https://api.wandb.ai',
+  apiKey = getApiKey(),
+}: InitOptions): Promise<WeaveClient> {
   const headers: Record<string, string> = {
     'User-Agent': `W&B Internal JS Client ${process.env.VERSION || 'unknown'}`,
     Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
@@ -20,7 +30,8 @@ export async function init(projectName: string): Promise<WeaveClient> {
   try {
     const wandbServerApi = new WandbServerApi(host, apiKey);
     const defaultEntityName = await wandbServerApi.defaultEntityName();
-    const projectId = `${defaultEntityName}/${projectName}`;
+    const entityName = entity ?? defaultEntityName;
+    const projectId = `${entityName}/${project}`;
 
     const retryFetch = createFetchWithRetry({
       baseDelay: 1000,
