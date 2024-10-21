@@ -11,7 +11,6 @@ PY313_INCOMPATIBLE_SHARDS = [
     "litellm",
     "notdiamond",
     "google_ai_studio",
-    "scorers",
     "scorers_test",
 ]
 
@@ -42,7 +41,6 @@ def lint(session):
         "mistral1",
         "notdiamond",
         "openai",
-        "scorers",
         "scorers_test",
     ],
 )
