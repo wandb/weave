@@ -63,9 +63,9 @@ export class WeaveClient {
 
   constructor(
     public traceServerApi: TraceServerApi<any>,
+    private wandbServerApi: WandbServerApi,
     public projectId: string,
-    public settings: Settings = new Settings(),
-    private wandbServerApi: WandbServerApi
+    public settings: Settings = new Settings()
   ) {}
 
   private scheduleBatchProcessing() {

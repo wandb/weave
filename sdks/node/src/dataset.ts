@@ -1,4 +1,4 @@
-import { getGlobalClient } from './clientApi';
+import { requireGlobalClient } from './clientApi';
 import { Table } from './table';
 import { ObjectRef, WeaveObject, WeaveObjectParameters } from './weaveObject';
 
@@ -36,8 +36,7 @@ export class Dataset<R extends DatasetRow> extends WeaveObject {
   }
 
   async save(): Promise<ObjectRef> {
-    // Import here to avoid circular dependency
-    return getGlobalClient().saveObject(this);
+    return requireGlobalClient().saveObject(this);
   }
 
   get length(): number {

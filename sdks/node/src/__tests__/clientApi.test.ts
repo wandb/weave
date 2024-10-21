@@ -1,4 +1,4 @@
-import { getGlobalClient, init } from '../clientApi';
+import { init, requireGlobalClient } from '../clientApi';
 import { getApiKey } from '../wandb/settings';
 import { WandbServerApi } from '../wandb/wandbServerApi';
 
@@ -18,7 +18,7 @@ describe('Client API', () => {
     }));
 
     const client = await init('test-project');
-    const gottenClient = getGlobalClient();
+    const gottenClient = requireGlobalClient();
 
     expect(gottenClient).toBeDefined();
     expect(gottenClient).toBe(client);

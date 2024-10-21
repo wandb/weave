@@ -77,6 +77,14 @@ export function getGlobalClient(): WeaveClient | null {
   return globalClient;
 }
 
+export function requireGlobalClient(): WeaveClient {
+  const client = getGlobalClient();
+  if (!client) {
+    throw new Error('Weave client not initialized');
+  }
+  return client;
+}
+
 export function setGlobalClient(client: WeaveClient) {
   globalClient = client;
 }
