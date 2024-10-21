@@ -7,6 +7,7 @@ import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CostTable} from './cost';
+import numeral from 'numeral';
 
 const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = [
   'latency_s',
@@ -33,6 +34,14 @@ export const CallSummary: React.FC<{
     )
   );
   const costData = call.traceCall?.summary?.weave?.costs;
+
+  const inputBytes = call.traceCall?.inputs
+    ? JSON.stringify(call.traceCall?.inputs).length
+    : 0;
+  const outputBytes = call.traceCall?.output
+    ? JSON.stringify(call.traceCall?.output).length
+    : 0;
+  const totalBytesStored = inputBytes + outputBytes;
 
   return (
     <div className="overflow-auto px-16 pt-12">
@@ -75,6 +84,7 @@ export const CallSummary: React.FC<{
                 Latency: span.summary.latency_s.toFixed(3) + 's',
               }
             : {}),
+          'Bytes stored': numeral(totalBytesStored).format('0.0b'),
           ...(Object.keys(attributes).length > 0
             ? {Attributes: attributes}
             : {}),

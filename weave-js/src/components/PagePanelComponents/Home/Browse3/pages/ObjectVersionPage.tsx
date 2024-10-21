@@ -39,6 +39,7 @@ import {
   KnownBaseObjectClassType,
   ObjectVersionSchema,
 } from './wfReactInterface/wfDataModelHooksInterface';
+import numeral from 'numeral';
 
 type ObjectIconProps = {
   baseObjectClass: KnownBaseObjectClassType;
@@ -194,6 +195,10 @@ const ObjectVersionPageInner: React.FC<{
     return <CenteredAnimatedLoader />;
   }
 
+  const bytesStored = data.result?.[0]
+    ? JSON.stringify(data.result?.[0]).length
+    : 0;
+
   return (
     <SimplePageLayoutWithHeader
       title={
@@ -238,6 +243,15 @@ const ObjectVersionPageInner: React.FC<{
                   Subpath: refExtra,
                 }
               : {}),
+            'Bytes stored': (
+              <>
+                {data.loading ? (
+                  <LoadingDots />
+                ) : (
+                  numeral(bytesStored).format('0.0b')
+                )}
+              </>
+            ),
             // 'Type Version': (
             //   <TypeVersionLink
             //     entityName={entityName}
