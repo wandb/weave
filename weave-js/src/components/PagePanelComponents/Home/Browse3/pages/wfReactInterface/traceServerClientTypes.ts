@@ -104,11 +104,11 @@ export type SortBy = {field: string; direction: 'asc' | 'desc'};
 export type TraceCallsQueryReq = {
   project_id: string;
   filter?: TraceCallsFilter;
-  limit?: number;
+  limit?: number; // change limit and offset based on range needed
   offset?: number;
   sort_by?: SortBy[];
   query?: Query;
-  columns?: string[];
+  columns?: string[]; // request columns needed : status, started_at, etc.
   expand_columns?: string[];
   include_costs?: boolean;
   include_feedback?: boolean;
