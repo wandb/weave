@@ -71,7 +71,7 @@
 
 import _ from 'lodash';
 import {sum} from 'lodash';
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 
 import {WB_RUN_COLORS} from '../../../../../../common/css/color.styles';
 import {useDeepMemo} from '../../../../../../hookUtils';
@@ -107,6 +107,8 @@ export const useEvaluationComparisonData = (
   const getTraceServerClient = useGetTraceServerClientContext();
   const [data, setData] = useState<EvaluationComparisonData | null>(null);
   const evaluationCallIdsMemo = useDeepMemo(evaluationCallIds);
+  const evaluationCallIdsRef = useRef(evaluationCallIdsMemo);
+
   useEffect(() => {
     setData(null);
     let mounted = true;
@@ -117,6 +119,7 @@ export const useEvaluationComparisonData = (
       evaluationCallIdsMemo
     ).then(dataRes => {
       if (mounted) {
+        evaluationCallIdsRef.current = evaluationCallIdsMemo;
         setData(dataRes);
       }
     });
@@ -126,11 +129,14 @@ export const useEvaluationComparisonData = (
   }, [entity, evaluationCallIdsMemo, project, getTraceServerClient]);
 
   return useMemo(() => {
-    if (data == null) {
+    if (
+      data == null ||
+      evaluationCallIdsRef.current !== evaluationCallIdsMemo
+    ) {
       return {loading: true, result: null};
     }
     return {loading: false, result: data};
-  }, [data]);
+  }, [data, evaluationCallIdsMemo]);
 };
 
 /**
