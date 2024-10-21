@@ -24,11 +24,7 @@ import {PythonLeaderboardObjectVal} from '../../views/Leaderboard/types/leaderbo
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {TraceObjSchema} from '../wfReactInterface/traceServerClientTypes';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
-
-// Placeholder data for dropdowns
-// const evaluationNames = ['Evaluation1', 'Evaluation2', 'Evaluation3'];
-const scorerNames = ['Scorer1', 'Scorer2', 'Scorer3'];
-const metricPaths = ['Metric1', 'Metric2', 'Metric3'];
+import { parseRefMaybe } from '../../../Browse2/SmallRef';
 
 export const LeaderboardConfigEditor: React.FC<{
   entity: string;
@@ -62,6 +58,15 @@ export const LeaderboardConfigEditor: React.FC<{
   const handleColumnChange = (index: number, field: string, value: any) => {
     const newColumns = [...leaderboardVal.columns];
     newColumns[index] = {...newColumns[index], [field]: value};
+    
+    // Reset dependent fields when changing evaluation_object_ref or scorer_name
+    if (field === 'evaluation_object_ref') {
+      newColumns[index].scorer_name = '';
+      newColumns[index].summary_metric_path_parts = [];
+    } else if (field === 'scorer_name') {
+      newColumns[index].summary_metric_path_parts = [];
+    }
+    
     setWorkingCopy({...leaderboardVal, columns: newColumns});
   };
 
@@ -129,122 +134,19 @@ export const LeaderboardConfigEditor: React.FC<{
           Columns
         </Typography>
         {leaderboardVal.columns.map((column, index) => (
-          <Grid
-            container
-            spacing={2}
+          <ColumnEditor
             key={index}
-            alignItems="center"
-            style={{marginBottom: 8}}>
-            <Grid item xs={12} sm={3}>
-              <Select
-                fullWidth
-                value={column.evaluation_object_ref}
-                onChange={e =>
-                  handleColumnChange(
-                    index,
-                    'evaluation_object_ref',
-                    e.target.value
-                  )
-                }
-                displayEmpty
-                margin="dense">
-                <MenuItem value="">
-                  <em>Select Evaluation Object</em>
-                </MenuItem>
-                {evalObjs.map(obj => (
-                  <MenuItem key={obj.ref} value={obj.ref}>
-                    {`${obj.name}:v${obj.versionIndex} (${obj.digest.slice(
-                      0,
-                      6
-                    )})`}
-                  </MenuItem>
-                ))}
-              </Select>
-            </Grid>
-            <Grid item xs={12} sm={3}>
-              <Select
-                fullWidth
-                value={column.scorer_name}
-                onChange={e =>
-                  handleColumnChange(index, 'scorer_name', e.target.value)
-                }
-                displayEmpty
-                margin="dense">
-                <MenuItem value="">
-                  <em>Select Scorer</em>
-                </MenuItem>
-                {scorerNames.map(scorer => (
-                  <MenuItem key={scorer} value={scorer}>
-                    {scorer}
-                  </MenuItem>
-                ))}
-              </Select>
-            </Grid>
-            <Grid item xs={12} sm={3}>
-              <Select
-                fullWidth
-                multiple
-                value={column.summary_metric_path_parts}
-                onChange={e =>
-                  handleColumnChange(
-                    index,
-                    'summary_metric_path_parts',
-                    e.target.value
-                  )
-                }
-                renderValue={selected => (selected as string[]).join(' > ')}
-                displayEmpty
-                margin="dense">
-                <MenuItem value="">
-                  <em>Select Metric Path</em>
-                </MenuItem>
-                {metricPaths.map(path => (
-                  <MenuItem key={path} value={path}>
-                    {path}
-                  </MenuItem>
-                ))}
-              </Select>
-            </Grid>
-            <Grid item xs={6} sm={2}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={column.should_minimize}
-                    onChange={e =>
-                      handleColumnChange(
-                        index,
-                        'should_minimize',
-                        e.target.checked
-                      )
-                    }
-                  />
-                }
-                label="Minimize"
-              />
-            </Grid>
-            <Grid item xs={6} sm={1}>
-              <Box display="flex" justifyContent="flex-end">
-                <IconButton
-                  size="small"
-                  onClick={() => moveColumn(index, index - 1)}
-                  disabled={index === 0}>
-                  <MoveUpIcon />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  onClick={() => moveColumn(index, index + 1)}
-                  disabled={index === leaderboardVal.columns.length - 1}>
-                  <MoveDownIcon />
-                </IconButton>
-                <IconButton size="small" onClick={() => cloneColumn(index)}>
-                  <CloneIcon />
-                </IconButton>
-                <IconButton size="small" onClick={() => removeColumn(index)}>
-                  <DeleteIcon />
-                </IconButton>
-              </Box>
-            </Grid>
-          </Grid>
+            column={column}
+            index={index}
+            evalObjs={evalObjs}
+            entity={entity}
+            project={project}
+            handleColumnChange={handleColumnChange}
+            moveColumn={moveColumn}
+            cloneColumn={cloneColumn}
+            removeColumn={removeColumn}
+            totalColumns={leaderboardVal.columns.length}
+          />
         ))}
         <Button startIcon={<AddIcon />} onClick={addColumn}>
           Add Column
@@ -280,6 +182,134 @@ export const LeaderboardConfigEditor: React.FC<{
   );
 };
 
+const ColumnEditor: React.FC<{
+  column: PythonLeaderboardObjectVal['columns'][0];
+  index: number;
+  evalObjs: EvaluationHelperObj[];
+  entity: string;
+  project: string;
+  handleColumnChange: (index: number, field: string, value: any) => void;
+  moveColumn: (fromIndex: number, toIndex: number) => void;
+  cloneColumn: (index: number) => void;
+  removeColumn: (index: number) => void;
+  totalColumns: number;
+}> = ({
+  column,
+  index,
+  evalObjs,
+  entity,
+  project,
+  handleColumnChange,
+  moveColumn,
+  cloneColumn,
+  removeColumn,
+  totalColumns,
+}) => {
+  const scorers = useScorers(entity, project, column.evaluation_object_ref);
+  const metrics = useMetrics(entity, project, column.evaluation_object_ref, column.scorer_name);
+
+  return (
+    <Grid container spacing={2} alignItems="center" style={{marginBottom: 8}}>
+      <Grid item xs={12} sm={3}>
+        <Select
+          fullWidth
+          value={column.evaluation_object_ref}
+          onChange={e =>
+            handleColumnChange(index, 'evaluation_object_ref', e.target.value)
+          }
+          displayEmpty
+          margin="dense">
+          <MenuItem value="">
+            <em>Select Evaluation Object</em>
+          </MenuItem>
+          {evalObjs.map(obj => (
+            <MenuItem key={obj.ref} value={obj.ref}>
+              {`${obj.name}:v${obj.versionIndex} (${obj.digest.slice(0, 6)})`}
+            </MenuItem>
+          ))}
+        </Select>
+      </Grid>
+      <Grid item xs={12} sm={3}>
+        <Select
+          fullWidth
+          value={column.scorer_name}
+          onChange={e =>
+            handleColumnChange(index, 'scorer_name', e.target.value)
+          }
+          displayEmpty
+          margin="dense"
+          disabled={!column.evaluation_object_ref}>
+          <MenuItem value="">
+            <em>Select Scorer</em>
+          </MenuItem>
+          {scorers.map(scorer => (
+            <MenuItem key={scorer} value={scorer}>
+              {scorer}
+            </MenuItem>
+          ))}
+        </Select>
+      </Grid>
+      <Grid item xs={12} sm={3}>
+        <Select
+          fullWidth
+          multiple
+          value={column.summary_metric_path_parts}
+          onChange={e =>
+            handleColumnChange(index, 'summary_metric_path_parts', e.target.value)
+          }
+          renderValue={selected => (selected as string[]).join(' > ')}
+          displayEmpty
+          margin="dense"
+          disabled={!column.evaluation_object_ref || !column.scorer_name}>
+          <MenuItem value="">
+            <em>Select Metric Path</em>
+          </MenuItem>
+          {metrics.map(path => (
+            <MenuItem key={path} value={path}>
+              {path}
+            </MenuItem>
+          ))}
+        </Select>
+      </Grid>
+      <Grid item xs={6} sm={2}>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={column.should_minimize}
+              onChange={e =>
+                handleColumnChange(index, 'should_minimize', e.target.checked)
+              }
+            />
+          }
+          label="Minimize"
+        />
+      </Grid>
+      <Grid item xs={6} sm={1}>
+        <Box display="flex" justifyContent="flex-end">
+          <IconButton
+            size="small"
+            onClick={() => moveColumn(index, index - 1)}
+            disabled={index === 0}>
+            <MoveUpIcon />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => moveColumn(index, index + 1)}
+            disabled={index === totalColumns - 1}>
+            <MoveDownIcon />
+          </IconButton>
+          <IconButton size="small" onClick={() => cloneColumn(index)}>
+            <CloneIcon />
+          </IconButton>
+          <IconButton size="small" onClick={() => removeColumn(index)}>
+            <DeleteIcon />
+          </IconButton>
+        </Box>
+      </Grid>
+    </Grid>
+  );
+};
+
 type EvaluationHelperObj = {
   obj: TraceObjSchema;
   ref: string;
@@ -303,7 +333,6 @@ const useEvaluationObjects = (
         filter: {
           base_object_classes: ['Evaluation'],
           is_op: false,
-          // latest_only: true,
         },
         metadata_only: true,
         sort_by: [{field: 'created_at', direction: 'desc'}],
@@ -335,3 +364,81 @@ const useEvaluationObjects = (
   }, [client, entity, project]);
   return evalObjs;
 };
+
+const useScorers = (
+  entity: string,
+  project: string,
+  evaluationObjectRef: string
+): string[] => {
+  const getClient = useGetTraceServerClientContext();
+  const client = getClient();
+  const [scorers, setScorers] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!evaluationObjectRef) {
+      setScorers([]);
+      return;
+    }
+
+    let mounted = true;
+    client
+      .readBatch({refs: [evaluationObjectRef]})
+      .then(res => {
+        console.log(res);
+        if (mounted) {
+          setScorers((res.vals[0].scorers ?? []).map((scorer: string) => parseRefMaybe(scorer)?.artifactName).filter(Boolean) as string[]);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [client, entity, project, evaluationObjectRef]);
+
+  return scorers;
+};
+
+const useMetrics = (
+  entity: string,
+  project: string,
+  evaluationObjectRef: string,
+  scorerName: string
+): string[] => {
+  const getClient = useGetTraceServerClientContext();
+  const client = getClient();
+  const [metrics, setMetrics] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!evaluationObjectRef || !scorerName) {
+      setMetrics([]);
+      return;
+    }
+
+    let mounted = true;
+    // TODO: Implement the actual API call to fetch metrics for the given evaluation object and scorer
+    // This is a placeholder implementation
+    // client
+    //   .someOtherApiCall(evaluationObjectRef, scorerName)
+    //   .then(res => {
+    //     if (mounted) {
+    //       setMetrics(res.metrics);
+    //     }
+    //   });
+
+    return () => {
+      mounted = false;
+    };
+  }, [client, entity, project, evaluationObjectRef, scorerName]);
+
+  return metrics;
+};
+
+
+
+// TODO:
+// - [ ] Create new leaderboard
+// - [ ] Wire up metric path dropdowns
+// - [ ] flip the default sort for minimization if it is first
+// - [ ] Ordering of the columns should respect the columns in config (due to grouping) - maybe we should allow splitting of groups?
+// - [ ] Handle non-leaf metric names?
+
