@@ -191,13 +191,14 @@ const ObjectVersionPageInner: React.FC<{
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
 
+  const bytesStored = useMemo(
+    () => (data.result?.[0] ? JSON.stringify(data.result?.[0]).length : 0),
+    [data.result]
+  );
+
   if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;
   }
-
-  const bytesStored = data.result?.[0]
-    ? JSON.stringify(data.result?.[0]).length
-    : 0;
 
   return (
     <SimplePageLayoutWithHeader

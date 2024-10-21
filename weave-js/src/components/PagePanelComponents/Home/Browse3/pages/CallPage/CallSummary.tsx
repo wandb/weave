@@ -1,6 +1,6 @@
 import _ from 'lodash';
 import numeral from 'numeral';
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import {Timestamp} from '../../../../../Timestamp';
 import {UserLink} from '../../../../../UserLink';
@@ -35,12 +35,20 @@ export const CallSummary: React.FC<{
   );
   const costData = call.traceCall?.summary?.weave?.costs;
 
-  const inputBytes = call.traceCall?.inputs
-    ? JSON.stringify(call.traceCall?.inputs).length
-    : 0;
-  const outputBytes = call.traceCall?.output
-    ? JSON.stringify(call.traceCall?.output).length
-    : 0;
+  const inputBytes = useMemo(
+    () =>
+      call.traceCall?.inputs
+        ? JSON.stringify(call.traceCall?.inputs).length
+        : 0,
+    [call.traceCall?.inputs]
+  );
+  const outputBytes = useMemo(
+    () =>
+      call.traceCall?.output
+        ? JSON.stringify(call.traceCall?.output).length
+        : 0,
+    [call.traceCall?.output]
+  );
   const totalBytesStored = inputBytes + outputBytes;
 
   return (
