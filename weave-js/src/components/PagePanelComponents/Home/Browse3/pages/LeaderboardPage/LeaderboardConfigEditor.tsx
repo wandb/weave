@@ -20,11 +20,17 @@ import {
 import {refUri} from '@wandb/weave/react';
 import React, {useEffect, useState} from 'react';
 
-import {PythonLeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
+import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
+import {parseRefMaybe} from '../../../Browse2/SmallRef';
+import {
+  ALL_VALUE,
+  PythonLeaderboardObjectVal,
+} from '../../views/Leaderboard/types/leaderboardConfigType';
+import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {TraceObjSchema} from '../wfReactInterface/traceServerClientTypes';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
-import { parseRefMaybe } from '../../../Browse2/SmallRef';
+import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
 
 export const LeaderboardConfigEditor: React.FC<{
   entity: string;
@@ -58,7 +64,7 @@ export const LeaderboardConfigEditor: React.FC<{
   const handleColumnChange = (index: number, field: string, value: any) => {
     const newColumns = [...leaderboardVal.columns];
     newColumns[index] = {...newColumns[index], [field]: value};
-    
+
     // Reset dependent fields when changing evaluation_object_ref or scorer_name
     if (field === 'evaluation_object_ref') {
       newColumns[index].scorer_name = '';
@@ -66,7 +72,7 @@ export const LeaderboardConfigEditor: React.FC<{
     } else if (field === 'scorer_name') {
       newColumns[index].summary_metric_path_parts = [];
     }
-    
+
     setWorkingCopy({...leaderboardVal, columns: newColumns});
   };
 
@@ -206,7 +212,12 @@ const ColumnEditor: React.FC<{
   totalColumns,
 }) => {
   const scorers = useScorers(entity, project, column.evaluation_object_ref);
-  const metrics = useMetrics(entity, project, column.evaluation_object_ref, column.scorer_name);
+  const metrics = useMetrics(
+    entity,
+    project,
+    column.evaluation_object_ref,
+    column.scorer_name
+  );
 
   return (
     <Grid container spacing={2} alignItems="center" style={{marginBottom: 8}}>
@@ -252,12 +263,14 @@ const ColumnEditor: React.FC<{
       <Grid item xs={12} sm={3}>
         <Select
           fullWidth
-          multiple
-          value={column.summary_metric_path_parts}
+          value={column.summary_metric_path_parts.join('.')}
           onChange={e =>
-            handleColumnChange(index, 'summary_metric_path_parts', e.target.value)
+            handleColumnChange(
+              index,
+              'summary_metric_path_parts',
+              (e.target.value as string).split('.')
+            )
           }
-          renderValue={selected => (selected as string[]).join(' > ')}
           displayEmpty
           margin="dense"
           disabled={!column.evaluation_object_ref || !column.scorer_name}>
@@ -381,14 +394,16 @@ const useScorers = (
     }
 
     let mounted = true;
-    client
-      .readBatch({refs: [evaluationObjectRef]})
-      .then(res => {
-        console.log(res);
-        if (mounted) {
-          setScorers((res.vals[0].scorers ?? []).map((scorer: string) => parseRefMaybe(scorer)?.artifactName).filter(Boolean) as string[]);
-        }
-      });
+    client.readBatch({refs: [evaluationObjectRef]}).then(res => {
+      console.log(res);
+      if (mounted) {
+        setScorers(
+          (res.vals[0].scorers ?? [])
+            .map((scorer: string) => parseRefMaybe(scorer)?.artifactName)
+            .filter(Boolean) as string[]
+        );
+      }
+    });
 
     return () => {
       mounted = false;
@@ -417,13 +432,47 @@ const useMetrics = (
     let mounted = true;
     // TODO: Implement the actual API call to fetch metrics for the given evaluation object and scorer
     // This is a placeholder implementation
-    // client
-    //   .someOtherApiCall(evaluationObjectRef, scorerName)
-    //   .then(res => {
-    //     if (mounted) {
-    //       setMetrics(res.metrics);
-    //     }
-    //   });
+    client
+      .callsStreamQuery({
+        project_id: projectIdFromParts({entity, project}),
+        filter: {
+          op_names: [
+            opVersionKeyToRefUri({
+              entity,
+              project,
+              opId: EVALUATE_OP_NAME_POST_PYDANTIC,
+              versionHash: ALL_VALUE,
+            }),
+          ],
+          input_refs: [evaluationObjectRef],
+        },
+        limit: 1,
+      })
+      .then(res => {
+        if (mounted) {
+          const calls = res.calls;
+          if (calls.length === 0) {
+            setMetrics([]);
+          } else {
+            const output = calls[0].output ?? {};
+            if (
+              typeof output === 'object' &&
+              output != null &&
+              scorerName in output
+            ) {
+              setMetrics(
+                Object.keys(
+                  flattenObjectPreservingWeaveTypes(
+                    (output as Record<string, any>)[scorerName]
+                  )
+                )
+              );
+            } else {
+              setMetrics([]);
+            }
+          }
+        }
+      });
 
     return () => {
       mounted = false;
@@ -433,12 +482,7 @@ const useMetrics = (
   return metrics;
 };
 
-
-
 // TODO:
 // - [ ] Create new leaderboard
-// - [ ] Wire up metric path dropdowns
 // - [ ] flip the default sort for minimization if it is first
 // - [ ] Ordering of the columns should respect the columns in config (due to grouping) - maybe we should allow splitting of groups?
-// - [ ] Handle non-leaf metric names?
-
