@@ -211,24 +211,24 @@ export const LeaderboardPageContentInner: React.FC<
         flexDirection="column"
         height="100%"
         minWidth="50%">
-        <Box
-          display="flex"
-          flexDirection="row"
-          maxHeight="35%"
-          width="100%"
-          sx={{
-            flex: '1 1 auto',
-            alignItems: 'flex-start',
-            padding: '12px 16px',
-            gap: '12px',
-            overflowY: 'auto',
-          }}>
-          {workingLeaderboardValCopy.description && (
+        {workingLeaderboardValCopy.description && (
+          <Box
+            display="flex"
+            flexDirection="row"
+            maxHeight="35%"
+            width="100%"
+            sx={{
+              flex: '1 1 auto',
+              alignItems: 'flex-start',
+              padding: '12px 16px',
+              gap: '12px',
+              overflowY: 'auto',
+            }}>
             <StyledReactMarkdown>
               {workingLeaderboardValCopy.description}
             </StyledReactMarkdown>
-          )}
-        </Box>
+          </Box>
+        )}
         <Box
           display="flex"
           flexDirection="row"
@@ -255,6 +255,8 @@ export const LeaderboardPageContentInner: React.FC<
             borderLeft: `1px solid ${MOON_250}`,
           }}>
           <LeaderboardConfigEditor
+            entity={props.entity}
+            project={props.project}
             saving={saving}
             isDirty={isDirty}
             leaderboardVal={workingLeaderboardValCopy}

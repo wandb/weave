@@ -17,16 +17,22 @@ import {
   Delete as DeleteIcon,
   FileCopy as CloneIcon,
 } from '@material-ui/icons';
-import React from 'react';
+import {refUri} from '@wandb/weave/react';
+import React, {useEffect, useState} from 'react';
 
 import {PythonLeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import {TraceObjSchema} from '../wfReactInterface/traceServerClientTypes';
+import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 
 // Placeholder data for dropdowns
-const evaluationObjects = ['Evaluation1', 'Evaluation2', 'Evaluation3'];
+// const evaluationNames = ['Evaluation1', 'Evaluation2', 'Evaluation3'];
 const scorerNames = ['Scorer1', 'Scorer2', 'Scorer3'];
 const metricPaths = ['Metric1', 'Metric2', 'Metric3'];
 
 export const LeaderboardConfigEditor: React.FC<{
+  entity: string;
+  project: string;
   leaderboardVal: PythonLeaderboardObjectVal;
   saving: boolean;
   isDirty: boolean;
@@ -34,6 +40,8 @@ export const LeaderboardConfigEditor: React.FC<{
   discardChanges: () => void;
   commitChanges: () => void;
 }> = ({
+  entity,
+  project,
   leaderboardVal,
   saving,
   isDirty,
@@ -90,6 +98,8 @@ export const LeaderboardConfigEditor: React.FC<{
     setWorkingCopy({...leaderboardVal, columns: newColumns});
   };
 
+  const evalObjs = useEvaluationObjects(entity, project);
+
   return (
     <Box display="flex" flexDirection="column" height="100%" width="100%">
       <Box flexGrow={1} overflow="auto" p={2}>
@@ -111,8 +121,9 @@ export const LeaderboardConfigEditor: React.FC<{
           onChange={handleDescriptionChange}
           margin="normal"
           multiline
-          rows={6}
-          InputProps={{style: {fontFamily: 'monospace', minHeight: '120px'}}}
+          minRows={1}
+          maxRows={10}
+          InputProps={{style: {fontFamily: 'monospace', fontSize: '14px'}}}
         />
         <Typography variant="h6" gutterBottom style={{marginTop: 16}}>
           Columns
@@ -140,9 +151,12 @@ export const LeaderboardConfigEditor: React.FC<{
                 <MenuItem value="">
                   <em>Select Evaluation Object</em>
                 </MenuItem>
-                {evaluationObjects.map(obj => (
-                  <MenuItem key={obj} value={obj}>
-                    {obj}
+                {evalObjs.map(obj => (
+                  <MenuItem key={obj.ref} value={obj.ref}>
+                    {`${obj.name}:v${obj.versionIndex} (${obj.digest.slice(
+                      0,
+                      6
+                    )})`}
                   </MenuItem>
                 ))}
               </Select>
@@ -264,4 +278,60 @@ export const LeaderboardConfigEditor: React.FC<{
       </Box>
     </Box>
   );
+};
+
+type EvaluationHelperObj = {
+  obj: TraceObjSchema;
+  ref: string;
+  name: string;
+  versionIndex: number;
+  digest: string;
+};
+
+const useEvaluationObjects = (
+  entity: string,
+  project: string
+): EvaluationHelperObj[] => {
+  const getClient = useGetTraceServerClientContext();
+  const client = getClient();
+  const [evalObjs, setEvalObjs] = useState<EvaluationHelperObj[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    client
+      .objsQuery({
+        project_id: projectIdFromParts({entity, project}),
+        filter: {
+          base_object_classes: ['Evaluation'],
+          is_op: false,
+          // latest_only: true,
+        },
+        metadata_only: true,
+        sort_by: [{field: 'created_at', direction: 'desc'}],
+      })
+      .then(res => {
+        if (mounted) {
+          setEvalObjs(
+            res.objs.map(obj => ({
+              obj,
+              ref: refUri({
+                scheme: 'weave',
+                entityName: entity,
+                projectName: project,
+                weaveKind: 'object',
+                artifactName: obj.object_id,
+                artifactVersion: obj.digest,
+              }),
+              name: obj.object_id,
+              versionIndex: obj.version_index,
+              digest: obj.digest,
+            }))
+          );
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [client, entity, project]);
+  return evalObjs;
 };
