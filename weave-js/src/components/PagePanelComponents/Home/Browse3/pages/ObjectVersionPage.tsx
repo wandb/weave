@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
+import numeral from 'numeral';
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
@@ -39,7 +40,6 @@ import {
   KnownBaseObjectClassType,
   ObjectVersionSchema,
 } from './wfReactInterface/wfDataModelHooksInterface';
-import numeral from 'numeral';
 
 type ObjectIconProps = {
   baseObjectClass: KnownBaseObjectClassType;

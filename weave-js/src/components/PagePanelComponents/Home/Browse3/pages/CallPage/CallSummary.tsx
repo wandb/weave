@@ -1,4 +1,5 @@
 import _ from 'lodash';
+import numeral from 'numeral';
 import React from 'react';
 
 import {Timestamp} from '../../../../../Timestamp';
@@ -7,7 +8,6 @@ import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CostTable} from './cost';
-import numeral from 'numeral';
 
 const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = [
   'latency_s',
