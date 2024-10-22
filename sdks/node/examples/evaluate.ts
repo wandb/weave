@@ -2,7 +2,8 @@ import 'source-map-support/register';
 import { Dataset, Evaluation, init, op } from 'weave';
 
 async function main() {
-  await init('weavejsdev-eval6');
+  await init({ project: 'weavejsdev-eval6' });
+
   const ds = new Dataset({
     id: 'My Dataset',
     description: 'This is a dataset',
