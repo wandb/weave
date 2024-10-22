@@ -250,10 +250,10 @@ class Evaluation(Object):
                 raise OpCallError(message)
 
             if isinstance(example, dict):
-                # The keys of `score_args` must match the parameter names of the scorer's `score` method.
+                # The keys of `score_args` must match the argument names of the scorer's `score` method.
                 # If scorer.column_map is set, then user is indicating that the dataset column(s)
-                # being passed to the scorer have different names to the scorer's parameter names.
-                # So we need to remap the dataset columns to the expected parameter names in the scorer,
+                # being passed to the scorer have different names to the `score` functions' argument names.
+                # So we need to remap the dataset columns to the expected argument names in the scorer,
                 #
                 # column_map k:v pairs must be structured as `scorer param name : dataset column name`
                 #
@@ -276,11 +276,11 @@ class Evaluation(Object):
                                 f"""
                                     You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
 
-                                    The `column_map` contains a key `{key}` which is not in the scorer's argument names.
-                                    Scorer argument names: {score_arg_names}
+                                    The `column_map` contains a key, `{key}`, which is not in the `score` methods' argument names.
+                                    `score` methods' argument names: {score_arg_names}
 
                                     Hint:
-                                    - Ensure that the keys in `column_map` match the scorer's parameter names.
+                                    - Ensure that the keys in `column_map` match the scorer's argument names.
                                     """
                             )
                             raise ValueError(message)
@@ -305,7 +305,7 @@ class Evaluation(Object):
                                         Available dataset columns: {list(example.keys())}
 
                                         Hint:
-                                        - Ensure that `column_map` maps scorer parameter names to existing dataset column names.
+                                        - Ensure that `column_map` maps the `score` methods' argument names to existing dataset column names.
                                         """
                                 )
                                 raise ValueError(message)
@@ -314,13 +314,16 @@ class Evaluation(Object):
                                 f"""
                                     You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
 
-                                    Scorer argument `{arg}` is not found in the dataset columns and is not mapped in `column_map`.
+                                    `score` method argument `{arg}` is not found in the dataset columns and is not mapped in `column_map`.
                                     
                                     Available dataset columns: {list(example.keys())}
                                     `column_map`: {scorer.column_map}
 
                                     Hint:
-                                    - Either provide `{arg}` directly in the dataset, or map it via `column_map`.
+                                    Either:
+                                    - map the argument name to the dataset column using the scorers `column_map` attribute, in the form {{score_arg_name : dataset_column_name}} or
+                                    - rename a column in the dataset to `{arg}` or
+                                    - re-name the `{arg}` argument in your `score` method to match a dataset column name
                                     """
                             )
                             raise ValueError(message)
