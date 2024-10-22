@@ -1,5 +1,7 @@
 import { isOp } from './op';
 
+export interface Callable {}
+
 export interface WeaveObjectParameters {
   id?: string;
   description?: string;

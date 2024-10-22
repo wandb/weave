@@ -1,0 +1,35 @@
+import { init } from '../clientApi';
+import { CallableObject } from '../fn';
+import { boundOp } from '../op';
+import { WeaveObjectParameters } from '../weaveObject';
+
+interface ParametrizedFunctionOptions extends WeaveObjectParameters {
+  magicNumber?: number;
+}
+
+class ParametrizedFunction extends CallableObject<{ input: number }, { output: number }> {
+  private magicNumber: number;
+
+  constructor(options: ParametrizedFunctionOptions = {}) {
+    super(options);
+    this.magicNumber = options.magicNumber ?? 42;
+
+    this.run = boundOp(this, this.run, {
+      parameterNames: ['input'],
+    });
+  }
+
+  async run(input: { input: number }): Promise<{ output: number }> {
+    return { output: input.input + this.magicNumber };
+  }
+}
+
+describe('Fn', () => {
+  test('use fn', async () => {
+    const client = await init({ project: 'test-project' });
+
+    const fn = new ParametrizedFunction({ magicNumber: 7 });
+    const res = await fn.run({ input: 1 });
+    expect(res).toEqual({ output: 8 });
+  });
+});

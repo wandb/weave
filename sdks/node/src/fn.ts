@@ -1,19 +1,14 @@
-import { boundOp } from './op';
 import { WeaveObject } from './weaveObject';
 
 export type ColumnMapping = { [key: string]: string };
 export type ArgsObject = { [key: string]: any };
 export type Row = { [key: string]: any };
 
-export interface Fn<I, O> {
-  id: string;
-  description: string;
-  invoke: (input: I) => Promise<O>;
-  trials: (n: number, input: I) => Promise<O[]>;
-  // map: (over: I[]) => O[]
+export interface Callable<I, O> {
+  run: (input: I) => Promise<O>;
 }
-export type FnInputs<T extends Fn<any, any>> = T extends Fn<infer I, any> ? I : never;
-export type FnOutput<T extends Fn<any, any>> = T extends Fn<any, infer O> ? O : never;
+export type FnInputs<T extends Callable<any, any>> = T extends Callable<infer I, any> ? I : never;
+export type FnOutput<T extends Callable<any, any>> = T extends Callable<any, infer O> ? O : never;
 
 export interface FuncOptions {
   id?: string;
@@ -21,33 +16,45 @@ export interface FuncOptions {
   parameterNames?: { [funcName: string]: string[] };
 }
 
-// In python this is currently called `Model`
-export abstract class Func<I, O> extends WeaveObject implements Fn<I, O> {
-  constructor({ id, description, parameterNames }: FuncOptions = {}) {
-    super({ id, description });
-
-    const trialsParams = parameterNames?.trials ?? Object.keys(inferFunctionArguments(this.trials));
-    this.trials = boundOp(this, this.trials, { parameterNames: trialsParams });
-
-    const invokeParams = parameterNames?.invoke ?? Object.keys(inferFunctionArguments(this.invoke));
-    this.invoke = boundOp(this, this.invoke, { parameterNames: invokeParams });
-  }
-
-  get description() {
-    return this._baseParameters.description ?? '';
-  }
-
-  // default impl, there may be better impls depending on the fn
-  trials(n: number, input: I): Promise<O[]> {
-    return Promise.all(
-      Array(n)
-        .fill(null)
-        .map(() => this.invoke(input))
-    );
-  }
-
-  abstract invoke(input: I): Promise<O>;
+// or "Function"
+export abstract class CallableObject<I, O> extends WeaveObject implements Callable<I, O> {
+  abstract run(input: I): Promise<O>;
 }
+
+// userland
+class MyFunc extends CallableObject<number, number> {
+  async run(input: number): Promise<number> {
+    return input + 1;
+  }
+}
+
+// In python this is currently called `Model`
+// export abstract class Func<I, O> extends WeaveObject implements Callable<I, O> {
+//   constructor({ id, description, parameterNames }: FuncOptions = {}) {
+//     super({ id, description });
+
+//     const trialsParams = parameterNames?.trials ?? Object.keys(inferFunctionArguments(this.trials));
+//     this.trials = boundOp(this, this.trials, { parameterNames: trialsParams });
+
+//     const invokeParams = parameterNames?.invoke ?? Object.keys(inferFunctionArguments(this.invoke));
+//     this.invoke = boundOp(this, this.invoke, { parameterNames: invokeParams });
+//   }
+
+//   get description() {
+//     return this._baseParameters.description ?? '';
+//   }
+
+//   // default impl, there may be better impls depending on the fn
+//   trials(n: number, input: I): Promise<O[]> {
+//     return Promise.all(
+//       Array(n)
+//         .fill(null)
+//         .map(() => this.invoke(input))
+//     );
+//   }
+
+//   abstract invoke(input: I): Promise<O>;
+// }
 
 export function invoke(fn: Function, args: ArgsObject, mapping?: ColumnMapping) {
   if (mapping) {
