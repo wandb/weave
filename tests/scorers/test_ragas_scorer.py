@@ -1,13 +1,13 @@
 import pytest
 from openai import OpenAI
 
-from weave.scorers.ragas_scorer import (
-    EntityExtractionResponse,
-    RelevancyResponse,
-)
 from weave.scorers import (
     ContextEntityRecallScorer,
     ContextRelevancyScorer,
+)
+from weave.scorers.ragas_scorer import (
+    EntityExtractionResponse,
+    RelevancyResponse,
 )
 
 

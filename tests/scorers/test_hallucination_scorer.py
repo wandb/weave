@@ -2,12 +2,12 @@ import pytest
 from openai import OpenAI
 
 import weave
+from weave.scorers import (
+    HallucinationFreeScorer,
+)
 from weave.scorers.hallucination_scorer import (
     HallucinationReasoning,
     HallucinationResponse,
-)
-from weave.scorers import (
-    HallucinationFreeScorer,
 )
 
 

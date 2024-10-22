@@ -2,12 +2,12 @@ import pytest
 from openai import OpenAI
 
 import weave
+from weave.scorers import (
+    SummarizationScorer,
+)
 from weave.scorers.summarization_scorer import (
     EntityExtractionResponse,
     SummarizationEvaluationResponse,
-)
-from weave.scorers import (
-    SummarizationScorer,
 )
 
 
