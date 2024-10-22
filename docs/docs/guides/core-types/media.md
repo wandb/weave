@@ -72,3 +72,5 @@ make_audio_file_streaming("Hello, how are you?")
 This audio will be logged to weave and automatically displayed in the UI, with an audio player. The player can be expanded to view the raw audio waveform, in addition to a download button.
 
 ![Screenshot of audio trace view](imgs/audio-trace.png)
+
+Try our cookbook for [Audio Logging](/reference/gen_notebooks/audio_with_weave) or <a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./notebooks/audio_with_weave.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>. The cookbook also includes an advanced example of a Real Time Audio API based assistant integrated with Weave.
