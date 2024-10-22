@@ -236,6 +236,15 @@ class CallsDeleteRes(BaseModel):
     pass
 
 
+class CallsLLMReq(BaseModel):
+    project_id: str
+    secret_name: str # TODO: base on model name
+    # model_name: str
+    # messages: List[str]
+
+class CallsLLMRes(BaseModel):
+    pass
+
 class CallsFilter(BaseModel):
     op_names: Optional[List[str]] = None
     input_refs: Optional[List[str]] = None
@@ -837,3 +846,6 @@ class TraceServerInterface(Protocol):
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
+
+    # Calls LLM API
+    def calls_llm(self, req: CallsLLMReq) -> CallsLLMRes: ...
