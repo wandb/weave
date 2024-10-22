@@ -30,6 +30,7 @@ import logging
 import threading
 from collections import defaultdict
 from contextlib import contextmanager
+from functools import partial
 from typing import (
     Any,
     Dict,
@@ -48,6 +49,7 @@ import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
+from pydantic import BaseModel
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
@@ -1388,7 +1390,95 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def execute_batch_action(
         self, req: tsi.ExecuteBatchActionReq
     ) -> tsi.ExecuteBatchActionRes:
-        pass
+        if req.mapping.action.action.action_type != "builtin":
+            raise InvalidRequest(
+                "Only builtin actions are supported for batch execution"
+            )
+
+        if req.mapping.action.action.name != "openai_completion":
+            raise InvalidRequest(
+                "Only openai_completion is supported for batch execution"
+            )
+
+        if req.mapping.action.action.digest != "*":
+            raise InvalidRequest("Digest must be '*' for batch execution")
+
+        # Step 1: Get all the calls in the batch
+        calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(
+                    call_ids=req.call_ids,
+                    op_names=[
+                        ri.InternalOpRef(
+                            project_id=req.project_id,
+                            name=req.mapping.op_name,
+                            version=req.mapping.op_digest,
+                        ).uri(),
+                    ],
+                ),
+            )
+        )
+
+        # Normally we would dispatch here, but just hard coding for now
+        # We should do some validation here
+        config = req.mapping.action.config
+        model = config["model"]
+        system_prompt = config["system_prompt"]
+        response_format = config["response_format"]
+        action_name = req.mapping.action.action.name
+
+        mapping = req.mapping.input_mapping
+
+        # Step 2: For Each call, execute the action: (this needs a lot of safety checks)
+        for call in calls:
+            args = {}
+            for input_name, call_selector in mapping.items():
+                call_selector_parts = call_selector.split(".")
+                val = call
+                for part in call_selector_parts:
+                    if isinstance(val, dict):
+                        val = val[part]
+                    elif isinstance(val, list):
+                        val = val[int(part)]
+                    elif isinstance(val, BaseModel):
+                        val = getattr(val, part)
+                    else:
+                        raise InvalidRequest(f"Invalid call selector: {call_selector}")
+                args[input_name] = val
+
+            from openai import OpenAI
+
+            client = OpenAI()
+            # Silly hack to get around issue in tests:
+            create = client.chat.completions.create
+            if hasattr(create, "resolve_fn"):
+                create = partial(create.resolve_fn, self=client.chat.completions)
+            completion = create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": json.dumps(args)},
+                ],
+                response_format=response_format,
+            )
+            self.feedback_create(
+                tsi.FeedbackCreateReq(
+                    project_id=req.project_id,
+                    weave_ref=ri.InternalCallRef(
+                        project_id=req.project_id,
+                        id=call.id,
+                    ).uri(),
+                    feedback_type="wandb.score.beta.1",
+                    wb_user_id="ACTIONS_BOT", # - THIS IS NOT GOOD!
+                    payload={
+                        "name": action_name,
+                        "action_ref": "",
+                        "call_ref": "",
+                        "results": json.loads(completion.choices[0].message.content),
+                    },
+                )
+            )
 
     # Private Methods
     @property

@@ -798,6 +798,7 @@ class CostPurgeRes(BaseModel):
 
 
 class ExecuteBatchActionReq(BaseModel):
+    project_id: str
     call_ids: list[str]
     mapping: ActionOpMapping
 

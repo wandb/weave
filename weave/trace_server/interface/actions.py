@@ -17,22 +17,26 @@ class BuiltinAction(BaseModel):
 
 
 class ActionWithConfig(BaseModel):
+    name: str
     action: BuiltinAction
     config: dict
+
 
 # # Future
 # class OpAction(Action):
 #     action_type: Literal["op"]
 #     op: Op
 
+
 class ActionOpMapping(BaseModel):
     action: ActionWithConfig
     op_name: str
     op_digest: str
-    input_mapping: dict[str, str] # Input field name -> Call selector
+    input_mapping: dict[str, str]  # Input field name -> Call selector
+
 
 class ActionFilterTrigger(BaseModel):
-    attribute_filter: dict[str, str] # Could the CallFilter.
+    attribute_filter: dict[str, str]  # Could the CallFilter.
     sample_rate: float
     mapping: ActionOpMapping
     config: dict
