@@ -1,4 +1,4 @@
-import { WeaveObject } from './weaveObject';
+import { WeaveObject, WeaveObjectParameters } from './weaveObject';
 
 export type ColumnMapping = { [key: string]: string };
 export type ArgsObject = { [key: string]: any };
@@ -10,51 +10,28 @@ export interface Callable<I, O> {
 export type FnInputs<T extends Callable<any, any>> = T extends Callable<infer I, any> ? I : never;
 export type FnOutput<T extends Callable<any, any>> = T extends Callable<any, infer O> ? O : never;
 
-export interface FuncOptions {
-  id?: string;
-  description?: string;
-  parameterNames?: { [funcName: string]: string[] };
-}
-
 // or "Function"
 export abstract class CallableObject<I, O> extends WeaveObject implements Callable<I, O> {
   abstract run(input: I): Promise<O>;
 }
 
 // userland
-class MyFunc extends CallableObject<number, number> {
-  async run(input: number): Promise<number> {
-    return input + 1;
-  }
+interface MyFuncOptions extends WeaveObjectParameters {
+  magicNumber?: number;
 }
 
-// In python this is currently called `Model`
-// export abstract class Func<I, O> extends WeaveObject implements Callable<I, O> {
-//   constructor({ id, description, parameterNames }: FuncOptions = {}) {
-//     super({ id, description });
+class MyFunc extends CallableObject<number, number> {
+  private magicNumber: number;
 
-//     const trialsParams = parameterNames?.trials ?? Object.keys(inferFunctionArguments(this.trials));
-//     this.trials = boundOp(this, this.trials, { parameterNames: trialsParams });
+  constructor(options: MyFuncOptions = {}) {
+    super(options);
+    this.magicNumber = options.magicNumber ?? 42;
+  }
 
-//     const invokeParams = parameterNames?.invoke ?? Object.keys(inferFunctionArguments(this.invoke));
-//     this.invoke = boundOp(this, this.invoke, { parameterNames: invokeParams });
-//   }
-
-//   get description() {
-//     return this._baseParameters.description ?? '';
-//   }
-
-//   // default impl, there may be better impls depending on the fn
-//   trials(n: number, input: I): Promise<O[]> {
-//     return Promise.all(
-//       Array(n)
-//         .fill(null)
-//         .map(() => this.invoke(input))
-//     );
-//   }
-
-//   abstract invoke(input: I): Promise<O>;
-// }
+  async run(input: number): Promise<number> {
+    return input + this.magicNumber;
+  }
+}
 
 export function invoke(fn: Function, args: ArgsObject, mapping?: ColumnMapping) {
   if (mapping) {
