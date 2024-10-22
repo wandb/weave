@@ -51,7 +51,6 @@ from IPython.display import display
 from openai import OpenAI
 
 import weave
-
 ```
 
 ## Audio Streaming and Storage Example
@@ -125,7 +124,6 @@ def prompt_endpoint_and_log_trace(system_prompt=None, user_prompt=None):
 
     # Return the file to Weave op
     return wave.open("output.wav", "rb")
-
 ```
 
 ## Testing
@@ -148,7 +146,6 @@ prompt_endpoint_and_log_trace(
 
 # Display the updated audio stream
 display(Audio("output.wav", rate=SAMPLE_RATE, autoplay=True))
-
 ```
 
 # Advanced Usage: Real Time Audio API with Weave
@@ -850,7 +847,6 @@ def parse_server_event(event_data: dict) -> ServerEvent:
         return model_class(**event_data)
     except ValidationError as e:
         raise ValueError(f"Failed to parse event of type {event_type}: {str(e)}")
-
 ```
 
 
@@ -1112,7 +1108,6 @@ class RTAudioModel(weave.Model):
             self.ws.close()
 
         self.user_wav_writer.close()
-
 ```
 
 ## Audio recorder
