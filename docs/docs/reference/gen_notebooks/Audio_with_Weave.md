@@ -136,6 +136,7 @@ display(Audio('output.wav', rate=SAMPLE_RATE, autoplay=True))
 ```
 
 # Advanced Usage: Real Time Audio API with Weave
+<img src="https://i.imgur.com/ZiW3IVu.png" style="width:100%;height:auto;"/>
 <details>
 <summary> (Advanced) Real Time Audio API with Weave </summary>
 OpenAI's real time API is a highly functional and reliable conversational API for building real time audio and text assistants.
@@ -147,7 +148,7 @@ Please note:
 - We implement the complete OAI Real Time API schema in Pydantic for greater legibility.
 - The `enable_audio_playback` toggle will cause playback of assistant outputted audio. Please note that **headphones are required if this is enabled**, as echo detection requires a highly complex implementation.
 
-<img src="https://i.imgur.com/ZiW3IVu.png" style="width:100%;height:auto;"/>
+
 
 ## Requirements Setup
 
@@ -963,3 +964,6 @@ if realtime_model.ws and realtime_model.ws.connected:
 else:
     print("WebSocket connection failed. Please check your API key and internet connection.")
 ```
+
+
+</details>
