@@ -87,7 +87,7 @@ import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
-import { AddStructuredFeedbackColumnButton } from '../../feedback/StructuredFeedback/AddColumnButton';
+import { AddStructuredFeedbackColumnButton, AddStructuredFeedbackColumnModal } from '../../feedback/StructuredFeedback/AddColumnButton';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -675,7 +675,7 @@ export const CallsTable: FC<{
     [callsLoading, setPaginationModel]
   );
 
-  const [showAddStructuredFeedbackColumnButton, setShowAddStructuredFeedbackColumnButton] = useState(false);
+  const [structuredFeedbackModalOpen, setStructuredFeedbackModalOpen] = useState(false);
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
@@ -865,12 +865,13 @@ export const CallsTable: FC<{
                   columnInfo={columns}
                   columnVisibilityModel={columnVisibilityModel}
                   setColumnVisibilityModel={setColumnVisibilityModel}
-                  onAddColumn={() => setShowAddStructuredFeedbackColumnButton(true)}
+                  onAddColumn={() => setStructuredFeedbackModalOpen(true)}
                 />
-                {showAddStructuredFeedbackColumnButton && (
-                  <AddStructuredFeedbackColumnButton
+                {structuredFeedbackModalOpen && (
+                  <AddStructuredFeedbackColumnModal
                     entity={entity}
                     project={project}
+                    onClose={() => setStructuredFeedbackModalOpen(false)}
                   />
                 )}
               </div>

@@ -31,7 +31,7 @@ type StructuredFeedback = {
 }
 
 
-export const AddStructuredFeedbackColumnButton = ({ entity, project }: { entity: string, project: string }) => {
+export const AddStructuredFeedbackColumnModal = ({ entity, project, onClose }: { entity: string, project: string, onClose: () => void }) => {
 
     const [open, setOpen] = useState(true);
     const [exampleRangeFeedbackColumn, setExampleRangeFeedbackColumn] = useState<RangeFeedbackColumn>(
@@ -62,7 +62,6 @@ export const AddStructuredFeedbackColumnButton = ({ entity, project }: { entity:
         if (!feedbackType) {
             return;
         }
-        console.log("feedbackType", feedbackType);
         const value: StructuredFeedback = {
             _bases: ["StructuredFeedback", "Object", "BaseModel"],
             _class_name: "StructuredFeedback",
@@ -76,6 +75,7 @@ export const AddStructuredFeedbackColumnButton = ({ entity, project }: { entity:
         console.log("CREATING", req);
         tsClient.objCreate(req).then(() => {
             setOpen(false);
+            onClose();
         }).catch((e) => {
             console.error("Error creating structured feedback", e);
         });
@@ -86,6 +86,7 @@ export const AddStructuredFeedbackColumnButton = ({ entity, project }: { entity:
       open={open}
       onClose={() => {
         setOpen(false);
+        onClose();
       }}
       maxWidth="xs"
       fullWidth>

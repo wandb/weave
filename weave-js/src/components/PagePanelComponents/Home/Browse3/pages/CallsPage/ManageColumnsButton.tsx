@@ -214,7 +214,7 @@ export const ManageColumnsButton = ({
                   setAnchorEl(anchorEl ? null : ref.current);
                   onAddColumn();
                 }}>
-                Add column
+                Edit feedback cols
               </Button>
             </div>
           </div>
