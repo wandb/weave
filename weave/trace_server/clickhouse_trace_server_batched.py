@@ -53,6 +53,8 @@ from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.action_queue import ActionQueue, RedisActionQueue
+from weave.trace_server.actions import TABLE_ACTIONS
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -172,6 +174,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         user: str = "default",
         password: str = "",
         database: str = "default",
+        action_queue_addr: Optional[str] = None,
         use_async_insert: bool = False,
     ):
         super().__init__()
@@ -184,6 +187,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._flush_immediately = True
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
+        self._action_queue_addr = action_queue_addr
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -1385,10 +1389,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
 
-        def actions_execute_batch(
-            self, req: tsi.ActionsExecuteBatchReq
-        ) -> tsi.ActionsExecuteBatchRes:
-            return tsi.ActionsExecuteBatchRes(id=generate_id())
+    def actions_execute_batch(
+        self, req: tsi.ActionsExecuteBatchReq
+    ) -> tsi.ActionsExecuteBatchRes:
+        # NOTE: Clients should try to generate their own ids, and retry using the same IDs in case of failures.
+        # That way we can avoid unnecessary duplicates if the server fails after inserting the batch into CH
+        # but before inserting into the action queue.
+        rows: list[Row] = [
+            {
+                "project_id": req.project_id,
+                "call_id": call_id,
+                "id": req.id or generate_id(),
+                "rule_matched": req.rule_matched,
+                "effect": req.effect,
+                "created_at": datetime.datetime.now(ZoneInfo("UTC")),
+            }
+            for call_id in req.call_ids
+        ]
+        prepared = TABLE_ACTIONS.insert(rows).prepare(database_type="clickhouse")
+        self._insert(TABLE_ACTIONS.name, prepared.data, prepared.column_names)
+        try:
+            # TODO push all rows instead of one at a time
+            self.action_queue_client.push(req.model_dump())
+            return tsi.ActionsExecuteBatchRes(req.id)
+        except Exception as e:
+            logger.error(f"Error executing batch action: {str(e)}")
+            raise InvalidRequest("Failed to execute batch action") from e
 
     # Private Methods
     @property
@@ -1396,6 +1422,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not hasattr(self._thread_local, "ch_client"):
             self._thread_local.ch_client = self._mint_client()
         return self._thread_local.ch_client
+
+    @property
+    def action_queue_client(self) -> ActionQueue:
+        if not hasattr(self._thread_local, "action_queue_client"):
+            self._thread_local.action_queue_client = RedisActionQueue()
+        return self._thread_local.action_queue_client
 
     def _mint_client(self) -> CHClient:
         client = clickhouse_connect.get_client(

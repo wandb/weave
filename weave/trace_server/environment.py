@@ -24,3 +24,8 @@ def wf_clickhouse_pass() -> str:
 def wf_clickhouse_database() -> str:
     """The name of the clickhouse database."""
     return os.environ.get("WF_CLICKHOUSE_DATABASE", "default")
+
+
+def wf_action_queue() -> str:
+    """The host of the action queue."""
+    return os.environ.get("WF_ACTION_QUEUE", "localhost")

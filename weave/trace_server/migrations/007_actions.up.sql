@@ -1,4 +1,4 @@
-CREATE TABLE matched_traces_parts (
+CREATE TABLE actions_parts (
     project_id String,
     call_id String,
     id String,
@@ -14,7 +14,7 @@ CREATE TABLE matched_traces_parts (
 ORDER BY (project_id, call_id, id);
 -- Add TTL?
 
-CREATE TABLE matched_traces_merged (
+CREATE TABLE actions_merged (
     project_id String,
     call_id String,
     id String,
@@ -30,8 +30,8 @@ CREATE TABLE matched_traces_merged (
 ORDER BY (project_id, call_id, id);
 -- Add TTL?
 
-CREATE MATERIALIZED VIEW matched_traces_view
-TO matched_traces_merged
+CREATE MATERIALIZED VIEW actions_view
+TO actions_merged
 AS
 SELECT
     project_id,
@@ -42,5 +42,5 @@ SELECT
     maxSimpleState(created_at) AS created_at,
     maxSimpleState(finished_at) AS finished_at,
     maxSimpleState(failed_at) AS failed_at
-FROM matched_traces_parts
+FROM actions_parts
 GROUP BY project_id, call_id, id;
