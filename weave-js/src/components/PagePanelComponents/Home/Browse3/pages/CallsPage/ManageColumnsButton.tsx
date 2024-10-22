@@ -118,7 +118,7 @@ export const ManageColumnsButton = ({
           <div className="min-w-[360px] p-12">
             <DraggableHandle>
               <div className="flex items-center pb-8">
-                <div className="flex-auto text-xl font-semibold">
+                <div className="flex-auto text-xl font-semibold text-moon-700">
                   Manage columns
                 </div>
                 <div className="ml-16 text-moon-500">
@@ -167,7 +167,7 @@ export const ManageColumnsButton = ({
                       <label
                         htmlFor={idSwitch}
                         className={classNames(
-                          'ml-6',
+                          'ml-6 text-moon-800',
                           disabled ? '' : 'cursor-pointer'
                         )}>
                         {label}
