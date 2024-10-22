@@ -77,7 +77,9 @@ def test_dspy_language_models(client: WeaveClient) -> None:
 )
 def test_dspy_lm_api(client: WeaveClient) -> None:
     import dspy
+    import litellm
 
+    litellm.set_verbose = True
     os.environ["DSP_CACHEBOOL"] = "false"
 
     lm = dspy.LM(

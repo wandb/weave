@@ -247,13 +247,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Tue, 22 Oct 2024 14:24:53 GMT
+      - Tue, 22 Oct 2024 14:31:50 GMT
       ETag:
       - W/"471a96ccfd8169f7314df3531fa05192d88c5132f3773af262d3277950d0800f"
       Expires:
-      - Tue, 22 Oct 2024 14:29:53 GMT
+      - Tue, 22 Oct 2024 14:36:50 GMT
       Source-Age:
-      - '282'
+      - '70'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -263,19 +263,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '9'
+      - '1'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - a1665fcbee14c0db783780c6ca3d6bc36907af42
+      - 5f4e2a9d181cb36ef5bce561ca607462c65d7bd4
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
       - 2F64:2E8F7E:3FB51F:51013C:6716C58A
       X-Served-By:
-      - cache-maa10238-MAA
+      - cache-maa10240-MAA
       X-Timer:
-      - S1729607094.612639,VS0,VE0
+      - S1729607511.747508,VS0,VE1
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -322,18 +322,19 @@ interactions:
   response:
     body:
       string: !!binary |
-        IVgLACD+/3TvzjLdvjlp5DtVX02IE+FxAr/1o5tCD2iLBjZ5TJA5LFwiCUSdvgYacZjqmThOodus
-        bmre/RUA6YIkKG+UzwfbhwfXB3OVzNVJYb/uh5vHs9jX9nC5vLytfhQFAiDO2jL3lmLziIGt2UDo
-        zeVQWZBEskhX83gRr+aTTwcuyp4kqLY+nHI4aKPDNE6nYbwIk6UHsGGdl44kngQA/PZWANXAn5BE
-        HIzSExkaSeBHAI3clyRByjntvDKeAkBFwk5Jgs7LvucNnPMncmVwASMA37yG50J97+GiGqkUu8+E
-        +ZxK5yD2d/AIz1bn0AaDNkWAqix7VGNZwjNqVJxtLKFS/X5e9SRh1n0/J/9zyvVc25Ezh2GNasZN
-        3t7nmiYJcp4tWYb/Anjhbr6mQ4XsyIP1b5670jiSSOahJrRjFQBKZ5UPFqgYHk2TwKN4k7ebOu7P
-        KFd5UxYhl7FIryVuqxuc4kqbeuHEExdESVISuHirtKnL0Y56N+8r+zZdpnmaqkWWk/gXAw==
+        IagLACB+P1V3LdP3zVJcOimlbh2jU4kRxxM46VM3hR7QWgM3jwky9/ki6TzqtUGBRpymcxqP12ip
+        UG9k7N3fBKA6JwUylY6m8Tbbvdg9OHu4PLw+WDzoLx3r/Y+bo8vzj/tpMW4pTQCSxTubaMmtpRio
+        tTgI9nI5jHNS6E8H80lvOu4PN582krMlBSp9zEaSNbWrs0FvMMp606w/Y4BWUhsOpPCYAMDvbARQ
+        D/weKfTSVSwjQyAF/AigViyTAukQ6hC1i5QCEiXsDinQCVsrHZzIJ4x2OIURBN+yQpRcf2/jtFhJ
+        NLuvafcNRW8FSAvHnKNi6/FZxwrK8kjx+SNFwWxRtMyIAssRDWPp5LPjVqIj/rC2pOBW1rrL/8cZ
+        slL6VhYBg8eP1ZFrvH6zq58UKETxFK39nwDPerZXEh0h30rj42uUJbtACv2JPA26xQQADGaJny6Q
+        2FsajVJG7rXkHR8OXAPIaFNxbk33xqD/c3NpkBBHtSt9QJnYhI2n6gIbr0XtSm59W9/wfuFfR7OB
+        GQz0dGEo+U8MAw==
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 8d6a275f1daa7edc-MAA
+      - 8d6a318e3ed7a92c-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -341,14 +342,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Tue, 22 Oct 2024 14:24:57 GMT
+      - Tue, 22 Oct 2024 14:31:54 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=21H9C7jLKvI2rS3fmbzsof85K_Qaxmqzk_NRQ5.xqXk-1729607097-1.0.1.1-iCItaoLFZHgOjvuc3t078gNasu5UJUyzzEMutQXDemJ5Zm8uszPIYO5jl5rKdrrOUwmkm5gdsI54oPW5LDFl4A;
-        path=/; expires=Tue, 22-Oct-24 14:54:57 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=ycQLnHjbFE8Dh43e2iiRuxYQ9Gq3WEgN9DcLzH3467Y-1729607514-1.0.1.1-7e1T.pF8f9_NqkicQXQ2wsMesXlXRQ2i6tUwFUCc0RWumqmVvDnU32GGLliZwI530ygBGPFHEIpuPue2GlDD8g;
+        path=/; expires=Tue, 22-Oct-24 15:01:54 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=2tBZIwyywybbS0eYRJimeTg1Cuu4FRQCQRvyT7tCrXk-1729607097575-0.0.1.1-604800000;
+      - _cfuvid=6jIHnJdTKCH66GHjsBNCwR921fuCVH2xt8vQQuV_QeQ-1729607514154-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -361,7 +362,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '757'
+      - '573'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -379,7 +380,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_883d4e7b2fe20bc46e72c14e56501bab
+      - req_e945a1b6f94873d61da33ec5d9ea1a94
     status:
       code: 200
       message: OK
