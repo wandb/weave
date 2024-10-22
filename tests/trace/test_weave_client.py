@@ -1532,7 +1532,7 @@ async def test_op_calltime_display_name(client):
 
 
 def test_op_save_with_global_df(client):
-    df = pd.DataFrame({"a": [1, 2, 3]})
+    df = pd.DataFrame({"a": ["a", "b", "c"]})
 
     @weave.op()
     def my_op(a: int) -> int:
@@ -1541,10 +1541,10 @@ def test_op_save_with_global_df(client):
         df.loc[df.index[0], "a"] = a
         return prev_val
 
-    res = my_op(1)
-    assert res == 1
-    assert df.loc[df.index[0], "a"] == 1
+    res = my_op("d")
+    assert res == "a"
+    assert df.loc[df.index[0], "a"] == "d"
 
     call = list(my_op.calls())[0]
-    assert call.summary["inputs"] == {"a": 1}
-    assert call.summary["outputs"] == {"prev_val": 1}
+    assert call.inputs == {"a": "d"}
+    assert call.output == "a"
