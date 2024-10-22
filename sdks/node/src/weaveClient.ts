@@ -7,7 +7,7 @@ import {
   StartedCallSchemaForInsert,
   Api as TraceServerApi,
 } from './generated/traceServerApi';
-import { isWeaveImage } from './media';
+import { isWeaveAudio, isWeaveImage } from './media';
 import { Op, OpRef, ParameterNamesOption, getOpName, getOpWrappedFunction, isOp } from './opType';
 import { Settings } from './settings';
 import { Table, TableRef, TableRowRef } from './table';
@@ -224,6 +224,7 @@ export class WeaveClient {
     } else if (val instanceof Table) {
       this.saveTable(val);
     } else if (isWeaveImage(val)) {
+    } else if (isWeaveAudio(val)) {
     } else if (isOp(val)) {
       this.saveOp(val);
     } else if (typeof val === 'object' && val !== null) {
@@ -267,6 +268,11 @@ export class WeaveClient {
     return this.serializedFileBlob('PIL.Image.Image', 'image.png', blob);
   }
 
+  private async serializedAudio(audioData: Buffer, audioType: 'wav'): Promise<any> {
+    const blob = new Blob([audioData], { type: `audio/${audioType}` });
+    return this.serializedFileBlob('wave.Wave_read', 'audio.wav', blob);
+  }
+
   /**
    * Get the serialized value of a Weave value, by recursively
    * resolving any __savedRef promises to their uri().
@@ -281,6 +287,8 @@ export class WeaveClient {
       return (await val.__savedRef).uri();
     } else if (isWeaveImage(val)) {
       return await this.serializedImage(val.data, val.imageType);
+    } else if (isWeaveAudio(val)) {
+      return await this.serializedAudio(val.data, val.audioType);
     } else if (val instanceof WeaveObject) {
       throw new Error('Programming error:  WeaveObject not saved');
     } else if (val instanceof Table) {

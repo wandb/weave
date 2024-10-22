@@ -21,8 +21,29 @@ export function isWeaveImage(value: any): value is WeaveImage {
   return value && value._weaveType === 'Image';
 }
 
-type WeaveMedia = WeaveImage;
+type WeaveAudioInput = {
+  data: Buffer;
+  audioType: 'wav';
+};
+
+interface WeaveAudio extends WeaveAudioInput {
+  _weaveType: 'Audio';
+}
+
+export function weaveAudio({ data, audioType }: WeaveAudioInput): WeaveAudio {
+  return {
+    _weaveType: 'Audio',
+    data,
+    audioType,
+  };
+}
+
+export function isWeaveAudio(value: any): value is WeaveAudio {
+  return value && value._weaveType === 'Audio';
+}
+
+type WeaveMedia = WeaveImage | WeaveAudio;
 
 export function isMedia(value: any): value is WeaveMedia {
-  return isWeaveImage(value);
+  return isWeaveImage(value) || isWeaveAudio(value);
 }
