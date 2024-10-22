@@ -13,9 +13,12 @@
     - [Deprecating features](#deprecating-features)
 
 ## Issues
+
 1. Check the [issues](https://github.com/wandb/weave/issues) and [PRs](https://github.com/wandb/weave/pulls) to see if the feature/bug has already been requested/fixed. If not, [open an issue](https://github.com/wandb/weave/issues/new/choose). This helps us keep track of feature requests and bugs!
 2. If you're having issues, the best way we can help is when you can share a reproducible example.
+
    1. In general, it's helpful to use this format:
+
       ```
       <short description of the issue>
       <link to your project>
@@ -25,16 +28,18 @@
 
       <any other info you think is relevant>
       ```
-   2. For SDK issues, a reproducible script like [example_error_script.py](examples/contributing/example_error_script.py) is helpful.  We use `uv` which can run the script with the dependencies included.  If you know the dependencies, you can add them to the script.  [See the `uv` docs for more details](https://docs.astral.sh/uv/guides/scripts/).
+
+   2. For SDK issues, a reproducible script like [example_error_script.py](examples/contributing/example_error_script.py) is helpful. We use `uv` which can run the script with the dependencies included. If you know the dependencies, you can add them to the script. [See the `uv` docs for more details](https://docs.astral.sh/uv/guides/scripts/).
 
 ## PRs
+
 1. If you are a first-time contributor, welcome! To get started, make a fork and point to the main `weave` repo:
    ```sh
    git clone https://github.com/<your-username>/weave.git
    cd weave
    git remote add upstream https://github.com/wandb/weave.git
    ```
-3. Build!
+2. Build!
    1. Keep your fork up to date with the main `weave` repo:
       ```sh
       git checkout master
@@ -50,7 +55,9 @@
       git commit -m "feat(integrations): Add new integration for <your-package>"
       git push origin <your-username>/<your-branch>
       ```
-   4. Open a PR!
+   4. Open a PR! If you're a first-time contributor:
+      - Read the [CLA Document](https://github.com/wandb/weave/blob/master/dev_docs/cla.md).
+      - In your PR, leave a comment with: "I have read the CLA Document and I hereby sign the CLA"
 
 ### Conventional Commits
 
@@ -160,6 +167,14 @@ Tests are split up into shards, which include:
 1. `trace` -- all of the trace SDK tests
 2. `trace_server` -- tests for trace server backend
 3. various integrations, like `openai`, `instructor`, etc -- these envs are isolated to simplify testing
+
+Running your own test script is easy. Use the following environment variables to send traces to different environments.
+
+```sh
+WANDB_BASE_URL=https://api.wandb.test WF_TRACE_SERVER_URL=http://127.0.01:6345 ./train.py     # for dev
+WANDB_BASE_URL=https://api.qa.wandb.ai WF_TRACE_SERVER_URL=https://weave-trace.qa.wandb.ai ./train.py    # for QA
+WANDB_BASE_URL=https://api.wandb.ai WF_TRACE_SERVER_URL="https://trace.wandb.ai" ./train.py       # for beta & prod
+```
 
 ### Deprecating features
 
