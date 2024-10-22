@@ -2,9 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-
-class JSONSchema(BaseModel):
-    schema: dict
+# class JSONSchema(BaseModel):
+#     schema: dict
 
 
 # This is only here for completeness, I think we are going to hardcode a list for now so they don't need to exist in every project

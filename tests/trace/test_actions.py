@@ -1,6 +1,6 @@
 import os
 
-from litellm import OpenAI
+from openai import OpenAI
 
 import weave
 from weave.flow import action_objects
@@ -40,6 +40,7 @@ def test_action_create(client: WeaveClient):
             name="openai_completion",
         ),
         config={
+            "model": "gpt-4o-mini",
             "system_prompt": "Given the following prompt and response, determine if the name was extracted correctly.",
             "response_format": {
                 "type": "json_schema",
@@ -61,15 +62,15 @@ def test_action_create(client: WeaveClient):
         op_name=get_ref(extract_name).name,
         op_digest=get_ref(extract_name).digest,
         input_mapping={
-            "inputs.user_input": "prompt",
-            "output": "response",
+            "prompt": "inputs.user_input",
+            "response": "output",
         },
     )
     weave.publish(mapping)
-
-    res = client.server.execute_batch_action(
-        req=tsi.ExecuteBatchActionReq(call_ids=[call.id], mapping=mapping)
+    req = tsi.ExecuteBatchActionReq(
+        project_id=client._project_id(), call_ids=[call.id], mapping=mapping
     )
+    res = client.server.execute_batch_action(req=req)
 
     gotten_call = client.server.calls_query(
         req=tsi.CallsQueryReq(

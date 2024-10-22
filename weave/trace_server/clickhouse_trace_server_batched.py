@@ -1426,7 +1426,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         model = config["model"]
         system_prompt = config["system_prompt"]
         response_format = config["response_format"]
-        action_name = req.mapping.action.action.name
+        action_name = req.mapping.action.name
 
         mapping = req.mapping.input_mapping
 
@@ -1470,7 +1470,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         id=call.id,
                     ).uri(),
                     feedback_type="wandb.score.beta.1",
-                    wb_user_id="ACTIONS_BOT", # - THIS IS NOT GOOD!
+                    wb_user_id="ACTIONS_BOT",  # - THIS IS NOT GOOD!
                     payload={
                         "name": action_name,
                         "action_ref": "",
