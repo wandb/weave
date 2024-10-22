@@ -1,4 +1,4 @@
-import React, { SyntheticEvent, useState } from 'react';
+import React, { SyntheticEvent, useEffect, useState } from 'react';
 import { useWFHooks } from '../../pages/wfReactInterface/context';
 import { useGetTraceServerClientContext } from '../../pages/wfReactInterface/traceServerClientContext';
 import { LoadingDots } from '@wandb/weave/components/LoadingDots';
@@ -18,10 +18,12 @@ export const StructuredFeedbackColumn = ({structuredFeedbackOptions, callId, wea
         },
     );
 
+    const [currentFeedbackId, setCurrentFeedbackId] = useState<string | null>(null);
+    const [foundValue, setFoundValue] = useState<string | null>(null);
     const getTsClient = useGetTraceServerClientContext();
 
-    const onAddFeedback = (value: string) => {
-        console.log("onAddFeedback", value);
+    const onAddFeedback = (value: string, currentFeedbackId: string | null): boolean => {
+        console.log("onAddFeedback", value, currentFeedbackId);
         const req = {
           project_id: `${entity}/${project}`,
           weave_ref: weaveRef,
@@ -30,32 +32,75 @@ export const StructuredFeedbackColumn = ({structuredFeedbackOptions, callId, wea
           payload: {value},
           sort_by: [{"created_at": "desc"}]
         };
-        getTsClient().feedbackCreate(req);
+        if (currentFeedbackId) {
+            const replaceReq = {...req, feedback_id: currentFeedbackId};
+            getTsClient().feedbackReplace(replaceReq).then((res) => {
+                console.log("feedback replaced", res);
+                if (res.reason) {
+                    console.error("feedback replace failed", res.reason);
+                }
+                if (res.id) {
+                    setCurrentFeedbackId(res.id);
+                    return true;
+                }
+                return false;
+            });
+        } else {
+            getTsClient().feedbackCreate(req).then((res) => {
+                console.log("feedback created", res);
+                if (res.id) {
+                    setCurrentFeedbackId(res.id);
+                    return true;
+                }
+                return false;
+            });
+        }
       };
 
-    const foundValue = query?.result?.find((feedback: any) => feedback.feedback_type === 'wandb.structuredFeedback.1')?.payload?.value;
+    useEffect(() => {
+        if (query?.loading) {
+            return;
+        }
+        const currFeedback = query.result?.find((feedback: any) => feedback.feedback_type === 'wandb.structuredFeedback.1');
+        if (!currFeedback) {
+            return
+        }
+        setCurrentFeedbackId(currFeedback.id);
+        setFoundValue(currFeedback?.payload?.value ?? null);
+    }, [query?.result, query?.loading, setCurrentFeedbackId, setFoundValue]);
 
     if (query?.loading) {
         return <LoadingDots />;
     }
      
     if (structuredFeedbackOptions.type === 'RangeFeedback') {
-        return <RangeFeedbackColumn min={structuredFeedbackOptions.min} max={structuredFeedbackOptions.max} onAddFeedback={onAddFeedback} defaultValue={foundValue}/>;
+        return <RangeFeedbackColumn min={structuredFeedbackOptions.min} max={structuredFeedbackOptions.max} onAddFeedback={onAddFeedback} defaultValue={foundValue} currentFeedbackId={currentFeedbackId}/>;
     } else if (structuredFeedbackOptions.type === 'CategoricalFeedback') {
-        return <CategoricalFeedbackColumn options={structuredFeedbackOptions.options} onAddFeedback={onAddFeedback} defaultValue={foundValue ?? undefined}/>;
+        return <CategoricalFeedbackColumn options={structuredFeedbackOptions.options} onAddFeedback={onAddFeedback} defaultValue={foundValue} currentFeedbackId={currentFeedbackId}/>;
     }
   return <div>unknown feedback type</div>;
 };
 
 
-export const RangeFeedbackColumn = ({min, max, onAddFeedback, defaultValue}: {min: number, max: number, onAddFeedback?: (value: string) => void, defaultValue: string | null}) => {
+export const RangeFeedbackColumn = (
+    {min, max, onAddFeedback, defaultValue, currentFeedbackId}: 
+    {
+        min: number,
+        max: number, 
+        onAddFeedback?: (value: string, currentFeedbackId: string | null) => boolean, 
+        defaultValue: string | null,
+        currentFeedbackId: string | null
+    }
+) => {
 
     const [value, setValue] = useState(defaultValue ?? min);
 
     const onValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         //Todo debounce this
-        setValue(e.target.value);
-        onAddFeedback?.(e.target.value);
+        const success = onAddFeedback?.(e.target.value, currentFeedbackId);
+        if (success) {
+            setValue(e.target.value);
+        }
     }
     
     return (
@@ -84,24 +129,30 @@ export const RangeFeedbackColumn = ({min, max, onAddFeedback, defaultValue}: {mi
     );
 }
 
-export const CategoricalFeedbackColumn = ({options, onAddFeedback, defaultValue}: {options: string[], onAddFeedback?: (value: string) => void, defaultValue: string | null}) => {
+export const CategoricalFeedbackColumn = ({options, onAddFeedback, defaultValue, currentFeedbackId}: {options: string[], onAddFeedback?: (value: string, currentFeedbackId: string | null) => void, defaultValue: string | null, currentFeedbackId: string | null}) => {
     let foundValue = defaultValue;
     if (defaultValue && !options.includes(defaultValue)) {
         console.log("structured column version mismatch, option not found", defaultValue, options);
         foundValue = null;
     }
     
-    const [value, setValue] = useState<string>(foundValue ?? '');
+    const [value, setValue] = useState<string>('');
+
+    useEffect(() => {
+        if (foundValue) {
+            setValue(foundValue);
+        }
+    }, [foundValue]);
 
     const onValueChange = (e: SyntheticEvent<HTMLSelectElement>) => {
         const val = (e.target as HTMLSelectElement).value;
         if (val) {
             setValue(val);
-            onAddFeedback?.(val);
+            onAddFeedback?.(val, currentFeedbackId);
         } else {
             // handle delete req?
             setValue(val);
-            onAddFeedback?.(val);
+            onAddFeedback?.(val, currentFeedbackId);
         }
     }
 

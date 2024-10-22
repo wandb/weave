@@ -1,6 +1,8 @@
-from weave.flow.obj import Object
-from pydantic import BaseModel
 from typing import Optional
+
+from pydantic import BaseModel
+
+from weave.flow.obj import Object
 
 
 class FeedbackType(BaseModel):

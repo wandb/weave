@@ -1382,8 +1382,34 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query = query.project_id(req.project_id)
         query = query.where(req.query)
         prepared = query.prepare(database_type="clickhouse")
-        self.ch_client.query(prepared.sql, prepared.parameters)
-        return tsi.FeedbackPurgeRes()
+        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        return tsi.FeedbackPurgeRes(num_deleted=query_result.row_count)
+
+    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+        # To replace, first purge, then if successful, create.
+        purge_request = tsi.FeedbackPurgeReq(
+            project_id=req.project_id,
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "id"},
+                        {"$literal": req.feedback_id},
+                    ],
+                }
+            },
+        )
+        purge_result = self.feedback_purge(purge_request)
+        if purge_result.num_deleted == 0:
+            raise InvalidRequest(f"Failed to purge feedback with id {req.feedback_id}")
+        if purge_result.num_deleted > 1:
+            raise InvalidRequest(
+                f"Purged more than one feedback with id {req.feedback_id}"
+            )
+
+        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
+        create_result = self.feedback_create(create_req)
+
+        return tsi.FeedbackReplaceRes(**create_result.model_dump())
 
     # Private Methods
     @property

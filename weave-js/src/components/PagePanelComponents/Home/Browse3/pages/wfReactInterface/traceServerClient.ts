@@ -5,6 +5,8 @@ import {
   FeedbackCreateRes,
   FeedbackPurgeReq,
   FeedbackPurgeRes,
+  FeedbackReplaceReq,
+  FeedbackReplaceRes,
   ObjCreateReq,
   ObjCreateRes,
   TraceCallsDeleteReq,
@@ -111,6 +113,12 @@ export class TraceServerClient extends DirectTraceServerClient {
         listeners.forEach(listener => listener());
       }
       return purgeRes;
+    });
+    return res;
+  }
+  public feedbackReplace(req: FeedbackReplaceReq): Promise<FeedbackReplaceRes> {
+    const res = super.feedbackReplace(req).then(replaceRes => {
+      return replaceRes;
     });
     return res;
   }
