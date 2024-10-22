@@ -1,44 +1,33 @@
+import pytest
+
 from weave.scorers import (
     LevenshteinScorer,
     StringMatchScorer,
 )
 
 
-def test_string_match_scorer():
+@pytest.mark.parametrize(
+    "output, target, expected_result",
+    [
+        ("Morgan", "Hello my name is Morgan", True),
+        ("Alice", "Hello my name is Bob", False),
+    ],
+)
+def test_string_match_scorer(output, target, expected_result):
     scorer = StringMatchScorer()
-    output = "Morgan"
-    target = "Hello my name is Morgan"
     result = scorer.score(output, target)
-    assert result["string_in_input"] is True
+    assert result["string_in_input"] is expected_result
 
 
-def test_string_match_scorer_false():
-    scorer = StringMatchScorer()
-    output = "Alice"
-    target = "Hello my name is Bob"
-    result = scorer.score(output, target)
-    assert result["string_in_input"] is False
-
-
-def test_levenshtein_scorer():
+@pytest.mark.parametrize(
+    "output, target, expected_distance",
+    [
+        ("Hello", "Hallo", 1),
+        ("Hello", "Hello", 0),
+        ("Hello", "World", 4),
+    ],
+)
+def test_levenshtein_scorer(output, target, expected_distance):
     scorer = LevenshteinScorer()
-    output = "Hello"
-    target = "Hallo"
     result = scorer.score(output, target)
-    assert result["levenshtein_distance"] == 1
-
-
-def test_levenshtein_scorer_same_strings():
-    scorer = LevenshteinScorer()
-    output = "Hello"
-    target = "Hello"
-    result = scorer.score(output, target)
-    assert result["levenshtein_distance"] == 0
-
-
-def test_levenshtein_scorer_completely_different():
-    scorer = LevenshteinScorer()
-    output = "Hello"
-    target = "World"
-    result = scorer.score(output, target)
-    assert result["levenshtein_distance"] == 4
+    assert result["levenshtein_distance"] == expected_distance
