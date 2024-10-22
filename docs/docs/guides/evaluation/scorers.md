@@ -10,7 +10,8 @@ Scorers are passed to a `weave.Evaluation` object during evaluation. There are t
 
 Scorers must return a dictionary and can return multiple metrics, nested metrics and non-numeric values such as text returned from a LLM-evaluator about its reasoning.
 
-## Function-based Scorers
+## Create your own Scorers
+### Function-based Scorers
 These are functions decorated with `@weave.op` that return a dictionary. They're great for simple evaluations like:
 
 ```python
@@ -23,7 +24,7 @@ my_eval = weave.Evaluations(..., scorers=[evaluate_uppercase])
 
 When the evaluation is run, `evaluate_uppercase` checks if the text is all uppercase.
 
-## Class-based Scorers
+### Class-based Scorers
 For more advanced evaluations, especially when you need to keep track of additional scorer metadata, try different prompts for your LLM-evaluators, or make multiple function calls, you can use the `Scorer` class.
 
 **Requirements:**
