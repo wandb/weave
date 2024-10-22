@@ -1395,26 +1395,47 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # NOTE: Clients should try to generate their own ids, and retry using the same IDs in case of failures.
         # That way we can avoid unnecessary duplicates if the server fails after inserting the batch into CH
         # but before inserting into the action queue.
+        id = req.id or generate_id()
         rows: list[Row] = [
             {
                 "project_id": req.project_id,
                 "call_id": call_id,
-                "id": req.id or generate_id(),
+                "id": req.id or id,
                 "rule_matched": req.rule_matched,
                 "effect": req.effect,
                 "created_at": datetime.datetime.now(ZoneInfo("UTC")),
             }
             for call_id in req.call_ids
         ]
-        prepared = TABLE_ACTIONS.insert(rows).prepare(database_type="clickhouse")
+        prepared = TABLE_ACTIONS.insertMany(rows).prepare(database_type="clickhouse")
         self._insert(TABLE_ACTIONS.name, prepared.data, prepared.column_names)
         try:
             # TODO push all rows instead of one at a time
             self.action_queue_client.push(req.model_dump())
-            return tsi.ActionsExecuteBatchRes(req.id)
+            return tsi.ActionsExecuteBatchRes(
+                project_id=req.project_id, call_ids=req.call_ids, id=id
+            )
         except Exception as e:
             logger.error(f"Error executing batch action: {str(e)}")
             raise InvalidRequest("Failed to execute batch action") from e
+
+    def actions_ack_batch(self, req: tsi.ActionsAckBatchReq) -> tsi.ActionsAckBatchRes:
+        received_at = datetime.datetime.now(ZoneInfo("UTC"))
+        rows: list[Row] = [
+            {
+                "project_id": req.project_id,
+                "call_id": call_id,
+                "id": req.id,
+                "finished_at": received_at if req.succeeded else None,
+                "failed_at": received_at if not req.succeeded else None,
+            }
+            for call_id in req.call_ids
+        ]
+        prepared = TABLE_ACTIONS.insertMany(rows).prepare(database_type="clickhouse")
+        self._insert(TABLE_ACTIONS.name, prepared.data, prepared.column_names)
+        return tsi.ActionsAckBatchRes(
+            project_id=req.project_id, call_ids=req.call_ids, id=req.id
+        )
 
     # Private Methods
     @property

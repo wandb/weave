@@ -162,6 +162,12 @@ class Table:
             ins.row(row)
         return ins
 
+    def insertMany(self, rows: list[Row]) -> "Insert":
+        ins = Insert(self)
+        for row in rows:
+            ins.row(row)
+        return ins
+
     def purge(self) -> "Select":
         return Select(self, action="DELETE")
 

@@ -695,10 +695,26 @@ class ActionsExecuteBatchReq(BaseModel):
     project_id: str
     call_ids: list[str]
     id: Optional[str] = None
-    action: dict[str, Any]
+    rule_matched: Optional[str] = None
+    effect: Optional[str] = None
 
 
 class ActionsExecuteBatchRes(BaseModel):
+    project_id: str
+    call_ids: list[str]
+    id: str
+
+
+class ActionsAckBatchReq(BaseModel):
+    project_id: str
+    call_ids: list[str]
+    id: str
+    succeeded: bool
+
+
+class ActionsAckBatchRes(BaseModel):
+    project_id: str
+    call_ids: list[str]
     id: str
 
 
@@ -853,3 +869,4 @@ class TraceServerInterface(Protocol):
     def actions_execute_batch(
         self, req: ActionsExecuteBatchReq
     ) -> ActionsExecuteBatchRes: ...
+    def actions_ack_batch(self, req: ActionsAckBatchReq) -> ActionsAckBatchRes: ...

@@ -1046,7 +1046,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:
-        return tsi.ActionsExecuteBatchRes()
+        raise NotImplementedError(
+            "actions_execute_batch is not implemented for SQLite trace server"
+        )
+
+    def actions_ack_batch(self, req: tsi.ActionsAckBatchReq) -> tsi.ActionsAckBatchRes:
+        raise NotImplementedError(
+            "actions_ack_batch is not implemented for SQLite trace server"
+        )
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)

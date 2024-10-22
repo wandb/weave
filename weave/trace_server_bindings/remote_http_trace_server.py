@@ -540,6 +540,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             tsi.ActionsExecuteBatchRes,
         )
 
+    def actions_ack_batch(self, req: tsi.ActionsAckBatchReq) -> tsi.ActionsAckBatchRes:
+        return self._generic_request(
+            "/actions/ack_batch", req, tsi.ActionsAckBatchReq, tsi.ActionsAckBatchRes
+        )
+
     # Cost API
     def cost_query(
         self, req: Union[tsi.CostQueryReq, dict[str, Any]]
