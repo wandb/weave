@@ -4,6 +4,7 @@ import json
 import platform
 import sys
 
+import pandas as pd
 import pydantic
 import pytest
 import requests
@@ -1528,3 +1529,22 @@ async def test_op_calltime_display_name(client):
     assert len(calls) == 1
     call = calls[0]
     assert call.display_name == "custom_display_name"
+
+
+def test_op_save_with_global_df(client):
+    df = pd.DataFrame({"a": [1, 2, 3]})
+
+    @weave.op()
+    def my_op(a: int) -> int:
+        # modify the global df
+        prev_val = df.loc[df.index[0], "a"]
+        df.loc[df.index[0], "a"] = a
+        return prev_val
+
+    res = my_op(1)
+    assert res == 1
+    assert df.loc[df.index[0], "a"] == 1
+
+    call = list(my_op.calls())[0]
+    assert call.summary["inputs"] == {"a": 1}
+    assert call.summary["outputs"] == {"prev_val": 1}
