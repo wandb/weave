@@ -1082,14 +1082,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.FileContentReadRes(content=query_result[0])
 
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
-        raise NotImplementedError(
-            "cost_create is not implemented for SQLite trace server"
-        )
+        print("COST CREATE is not implemented for local sqlite", req)
+        return tsi.CostCreateRes()
 
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
-        raise NotImplementedError(
-            "cost_query is not implemented for SQLite trace server"
-        )
+        print("COST QUERY is not implemented for local sqlite", req)
+        return tsi.CostQueryRes()
 
     def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
         print("COST PURGE is not implemented for local sqlite", req)
