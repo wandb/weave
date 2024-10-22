@@ -43,7 +43,7 @@ import {
 } from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
-import { StructuredFeedbackColumn } from '../../feedback/StructuredFeedback';
+import { StructuredFeedbackColumn } from '../../feedback/StructuredFeedback/StructuredFeedback';
 
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.weave'];
 

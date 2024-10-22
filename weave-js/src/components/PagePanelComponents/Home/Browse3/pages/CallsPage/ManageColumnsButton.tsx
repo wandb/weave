@@ -20,12 +20,14 @@ type ManageColumnsButtonProps = {
   columnInfo: ColumnInfo;
   columnVisibilityModel: GridColumnVisibilityModel;
   setColumnVisibilityModel: (model: GridColumnVisibilityModel) => void;
+  onAddColumn: () => void;
 };
 
 export const ManageColumnsButton = ({
   columnInfo,
   columnVisibilityModel,
   setColumnVisibilityModel,
+  onAddColumn,
 }: ManageColumnsButtonProps) => {
   const [search, setSearch] = useState('');
   const lowerSearch = search.toLowerCase();
@@ -141,6 +143,7 @@ export const ManageColumnsButton = ({
                 const checked = columnVisibilityModel[col.field] ?? true;
                 const label = col.headerName ?? value;
                 const disabled = !(col.hideable ?? true);
+                const feedbackCol = col.field.startsWith('feedback.');
                 if (
                   search &&
                   !label.toLowerCase().includes(search.toLowerCase())
@@ -172,6 +175,14 @@ export const ManageColumnsButton = ({
                         )}>
                         {label}
                       </label>
+                      {feedbackCol && (
+                        <>
+                          <div className="flex-auto" />
+                          <div className="mr-6 text-moon-500 italic overflow-hidden">
+                            feedback
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 );
@@ -186,7 +197,6 @@ export const ManageColumnsButton = ({
                 onClick={onHideAll}>
                 {`Hide ${buttonSuffix}`}
               </Button>
-              <div className="flex-auto" />
               <Button
                 size="small"
                 variant="quiet"
@@ -194,6 +204,17 @@ export const ManageColumnsButton = ({
                 disabled={numToggleable === 0}
                 onClick={onShowAll}>
                 {`Show ${buttonSuffix}`}
+              </Button>
+              <div className="flex-auto" />
+              <Button
+                size="small"
+                variant="ghost"
+                icon="settings"
+                onClick={() => {
+                  setAnchorEl(anchorEl ? null : ref.current);
+                  onAddColumn();
+                }}>
+                Add column
               </Button>
             </div>
           </div>

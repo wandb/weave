@@ -87,6 +87,7 @@ import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
+import { AddStructuredFeedbackColumnButton } from '../../feedback/StructuredFeedback/AddColumnButton';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -674,6 +675,8 @@ export const CallsTable: FC<{
     [callsLoading, setPaginationModel]
   );
 
+  const [showAddStructuredFeedbackColumnButton, setShowAddStructuredFeedbackColumnButton] = useState(false);
+
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
@@ -862,7 +865,14 @@ export const CallsTable: FC<{
                   columnInfo={columns}
                   columnVisibilityModel={columnVisibilityModel}
                   setColumnVisibilityModel={setColumnVisibilityModel}
+                  onAddColumn={() => setShowAddStructuredFeedbackColumnButton(true)}
                 />
+                {showAddStructuredFeedbackColumnButton && (
+                  <AddStructuredFeedbackColumnButton
+                    entity={entity}
+                    project={project}
+                  />
+                )}
               </div>
             </>
           )}
@@ -1046,7 +1056,7 @@ const useStructuredFeedbackOptions = (entity: string, project: string) => {
 
   const {useRootObjectVersions} = useWFHooks();
 
-  const filteredObjectVersions = useRootObjectVersions(
+  const feedbackObjects = useRootObjectVersions(
     entity,
     project,
     {
@@ -1057,9 +1067,10 @@ const useStructuredFeedbackOptions = (entity: string, project: string) => {
   );
 
   return useMemo(() => {
-    if (filteredObjectVersions.loading || filteredObjectVersions.result == null || filteredObjectVersions.result.length === 0) {
+    if (feedbackObjects.loading || feedbackObjects.result == null || feedbackObjects.result.length === 0) {
       return null;
     }
-    return filteredObjectVersions.result[0].val;
-  }, [filteredObjectVersions.loading, filteredObjectVersions.result]);
+    const latest = feedbackObjects.result?.sort((a, b) => a.createdAtMs - b.createdAtMs).pop();
+    return latest?.val;
+  }, [feedbackObjects.loading, feedbackObjects.result]);
 };

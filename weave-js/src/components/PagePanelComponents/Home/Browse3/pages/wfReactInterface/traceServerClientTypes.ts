@@ -230,9 +230,11 @@ export type TraceObjReadRes = {
 };
 
 export type ObjCreateReq = {
-  project_id: string;
-  object_id: string;
-  val: any;
+  obj: {
+    project_id: string;
+    object_id: string;
+    val: any;
+  }
 };
 
 export type ObjCreateRes = {

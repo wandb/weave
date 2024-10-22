@@ -1,6 +1,6 @@
 import React, { SyntheticEvent, useState } from 'react';
-import { useWFHooks } from '../pages/wfReactInterface/context';
-import { useGetTraceServerClientContext } from '../pages/wfReactInterface/traceServerClientContext';
+import { useWFHooks } from '../../pages/wfReactInterface/context';
+import { useGetTraceServerClientContext } from '../../pages/wfReactInterface/traceServerClientContext';
 import { LoadingDots } from '@wandb/weave/components/LoadingDots';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
 import { DropdownProps } from 'semantic-ui-react';
@@ -28,6 +28,7 @@ export const StructuredFeedbackColumn = ({structuredFeedbackOptions, callId, wea
           creator: null,
           feedback_type: 'wandb.structuredFeedback.1',
           payload: {value},
+          sort_by: [{"created_at": "desc"}]
         };
         getTsClient().feedbackCreate(req);
       };
@@ -37,66 +38,84 @@ export const StructuredFeedbackColumn = ({structuredFeedbackOptions, callId, wea
     if (query?.loading) {
         return <LoadingDots />;
     }
-
-    console.log("foundValue", foundValue);
      
     if (structuredFeedbackOptions.type === 'RangeFeedback') {
-        return <RangeFeedbackColumn structuredFeedbackOptions={structuredFeedbackOptions} onAddFeedback={onAddFeedback} defaultValue={foundValue}/>;
+        return <RangeFeedbackColumn min={structuredFeedbackOptions.min} max={structuredFeedbackOptions.max} onAddFeedback={onAddFeedback} defaultValue={foundValue}/>;
     } else if (structuredFeedbackOptions.type === 'CategoricalFeedback') {
-        return <CategoricalFeedbackColumn structuredFeedbackOptions={structuredFeedbackOptions} onAddFeedback={onAddFeedback} defaultValue={foundValue ?? undefined}/>;
+        return <CategoricalFeedbackColumn options={structuredFeedbackOptions.options} onAddFeedback={onAddFeedback} defaultValue={foundValue ?? undefined}/>;
     }
   return <div>unknown feedback type</div>;
 };
 
 
-const RangeFeedbackColumn = ({structuredFeedbackOptions, onAddFeedback, defaultValue}: {structuredFeedbackOptions: any, onAddFeedback: (value: string) => void, defaultValue: string | null}) => {
+export const RangeFeedbackColumn = ({min, max, onAddFeedback, defaultValue}: {min: number, max: number, onAddFeedback?: (value: string) => void, defaultValue: string | null}) => {
 
-    const [value, setValue] = useState(defaultValue ?? structuredFeedbackOptions.min);
+    const [value, setValue] = useState(defaultValue ?? min);
 
     const onValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         //Todo debounce this
         setValue(e.target.value);
-        onAddFeedback(e.target.value);
+        onAddFeedback?.(e.target.value);
     }
     
     return (
-    <div>
-        <input 
+    <Tailwind>
+        <div className="flex">
+            <span className="text-moon-500 mr-4">{min}</span>
+            <input 
+                type="range" 
+                min={min} 
+                max={max}
+                step={(max - min) / 100}
+                value={value} 
+                onChange={onValueChange} 
+            />
+            <span className="text-moon-500 ml-4">{max}</span>
+        </div>
+        {/* <input 
             type="range" 
-            min={structuredFeedbackOptions.min} 
-            max={structuredFeedbackOptions.max}
-            step={(structuredFeedbackOptions.max - structuredFeedbackOptions.min) / 100}
+            min={min} 
+            max={max}
+            step={(max - min) / 100}
             value={value} 
             onChange={onValueChange} 
-        />
-    </div>
+        /> */}
+    </Tailwind>
     );
 }
 
-const CategoricalFeedbackColumn = ({structuredFeedbackOptions, onAddFeedback, defaultValue}: {structuredFeedbackOptions: any, onAddFeedback: (value: string) => void, defaultValue: string | null}) => {
-    const [value, setValue] = useState<string>(defaultValue ?? '');
+export const CategoricalFeedbackColumn = ({options, onAddFeedback, defaultValue}: {options: string[], onAddFeedback?: (value: string) => void, defaultValue: string | null}) => {
+    let foundValue = defaultValue;
+    if (defaultValue && !options.includes(defaultValue)) {
+        console.log("structured column version mismatch, option not found", defaultValue, options);
+        foundValue = null;
+    }
+    
+    const [value, setValue] = useState<string>(foundValue ?? '');
 
     const onValueChange = (e: SyntheticEvent<HTMLSelectElement>) => {
         const val = (e.target as HTMLSelectElement).value;
         if (val) {
             setValue(val);
-            onAddFeedback(val);
+            onAddFeedback?.(val);
         } else {
             // handle delete req?
+            setValue(val);
+            onAddFeedback?.(val);
         }
     }
 
-    const options = structuredFeedbackOptions.options.map((option: string) => ({
+    const dropdownOptions = options.map((option: string) => ({
         text: option,
         value: option,
     }));
-    options.push({text: '', value: ''});
+    dropdownOptions.push({text: '', value: ''});
 
     return (
         <Tailwind>
             <div className="flex flex-col justify-center items-center bg-moon-100">
                 <select onChange={onValueChange} value={value} className='w-full bg-moon-100'>
-                    {options.map((option: any) => (
+                    {dropdownOptions.map((option: any) => (
                         <option key={option.value} value={option.value}>{option.text}</option>
                     ))}
                 </select>
