@@ -1,5 +1,6 @@
 import _ from 'lodash';
-import React from 'react';
+import numeral from 'numeral';
+import React, {useMemo} from 'react';
 
 import {Timestamp} from '../../../../../Timestamp';
 import {UserLink} from '../../../../../UserLink';
@@ -33,6 +34,22 @@ export const CallSummary: React.FC<{
     )
   );
   const costData = call.traceCall?.summary?.weave?.costs;
+
+  const inputBytes = useMemo(
+    () =>
+      call.traceCall?.inputs
+        ? JSON.stringify(call.traceCall?.inputs).length
+        : 0,
+    [call.traceCall?.inputs]
+  );
+  const outputBytes = useMemo(
+    () =>
+      call.traceCall?.output
+        ? JSON.stringify(call.traceCall?.output).length
+        : 0,
+    [call.traceCall?.output]
+  );
+  const totalBytesStored = inputBytes + outputBytes;
 
   return (
     <div className="overflow-auto px-16 pt-12">
@@ -75,6 +92,7 @@ export const CallSummary: React.FC<{
                 Latency: span.summary.latency_s.toFixed(3) + 's',
               }
             : {}),
+          'Bytes stored': numeral(totalBytesStored).format('0.0b'),
           ...(Object.keys(attributes).length > 0
             ? {Attributes: attributes}
             : {}),
