@@ -18,6 +18,7 @@ import {opVersionRefOpName} from '../wfReactInterface/utilities';
 import {CallsTable} from './CallsTable';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
+import {CallsCharts} from './CallsCharts';
 
 const HeaderExtras = () => {
   const {renderExtras} = React.useContext(WeaveHeaderExtrasContext);
@@ -51,7 +52,7 @@ export const CallsPage: FC<{
     props.initialFilter ?? {},
     props.onFilterUpdate
   );
-
+  console.log('HERE', props.filterModel, filter);
   const isEvaluationTable = useCurrentFilterIsEvaluationsFilter(
     filter,
     props.entity,
@@ -70,6 +71,8 @@ export const CallsPage: FC<{
     }
     return 'Traces';
   }, [filter.opVersionRefs, isEvaluationTable]);
+  console.log('marie', props.filterModel);
+  console.log('sweet', props, filter);
 
   return (
     <WeaveHeaderExtrasProvider>
@@ -80,30 +83,39 @@ export const CallsPage: FC<{
           {
             label: 'All',
             content: (
-              <CallsTable
-                {...props}
-                // CPR (Tim): Applying "hide controls" when the filter is frozen is pretty crude.
-                // We will likely need finer-grained control over the filter enablement states
-                // rather than just a boolean flag. Note: "frozen === hideControls" at the moment.
-                // In fact, it probably should be used to determine if the filter should be applied
-                // to the frozenFilter prop. Furthermore, "frozen" is only used when showing the
-                // evaluations table. So, in this case, I think we should really just remove the
-                // `frozen` property completely and have a top-level evaluations tab that hides controls.
-                hideControls={filter.frozen && !isEvaluationTable}
-                hideOpSelector={isEvaluationTable}
-                initialFilter={filter}
-                onFilterUpdate={setFilter}
-                columnVisibilityModel={props.columnVisibilityModel}
-                setColumnVisibilityModel={props.setColumnVisibilityModel}
-                pinModel={props.pinModel}
-                setPinModel={props.setPinModel}
-                filterModel={props.filterModel}
-                setFilterModel={props.setFilterModel}
-                sortModel={props.sortModel}
-                setSortModel={props.setSortModel}
-                paginationModel={props.paginationModel}
-                setPaginationModel={props.setPaginationModel}
-              />
+              <>
+                <CallsCharts
+                  // filter={filter}
+                  entity={props.entity}
+                  project={props.project}
+                  filterModel={props.filterModel}
+                  // setFilterModel={props.setFilterModel}
+                />
+                <CallsTable
+                  {...props}
+                  // CPR (Tim): Applying "hide controls" when the filter is frozen is pretty crude.
+                  // We will likely need finer-grained control over the filter enablement states
+                  // rather than just a boolean flag. Note: "frozen === hideControls" at the moment.
+                  // In fact, it probably should be used to determine if the filter should be applied
+                  // to the frozenFilter prop. Furthermore, "frozen" is only used when showing the
+                  // evaluations table. So, in this case, I think we should really just remove the
+                  // `frozen` property completely and have a top-level evaluations tab that hides controls.
+                  hideControls={filter.frozen && !isEvaluationTable}
+                  hideOpSelector={isEvaluationTable}
+                  initialFilter={filter}
+                  onFilterUpdate={setFilter}
+                  columnVisibilityModel={props.columnVisibilityModel}
+                  setColumnVisibilityModel={props.setColumnVisibilityModel}
+                  pinModel={props.pinModel}
+                  setPinModel={props.setPinModel}
+                  filterModel={props.filterModel}
+                  setFilterModel={props.setFilterModel}
+                  sortModel={props.sortModel}
+                  setSortModel={props.setSortModel}
+                  paginationModel={props.paginationModel}
+                  setPaginationModel={props.setPaginationModel}
+                />
+              </>
             ),
           },
         ]}

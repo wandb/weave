@@ -371,7 +371,8 @@ const useCallsNoExpansion = (
   }, [opts?.skip, callRes, columns, refetch, entity, project]);
 };
 
-const useCalls = (
+export const useCalls = (
+  // here! use Calls
   entity: string,
   project: string,
   filter: CallFilter,
@@ -404,7 +405,7 @@ const useCalls = (
     calls,
     expandedRefColumns
   );
-
+  console.log('calls:', calls, 'expandedCalls:', expandedCalls);
   const loading = calls.loading || isExpanding;
   return useMemo(() => {
     return {

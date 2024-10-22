@@ -66,7 +66,7 @@ export const useCallsForQuery = (
       refetchOnDelete: true,
     }
   );
-
+  console.log('Mefilter', filter, gridFilter);
   const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
     refetchOnDelete: true,
   });
@@ -105,7 +105,111 @@ export const useCallsForQuery = (
       includeCosts: true,
     }
   );
-  console.log(costs);
+  console.log('filter:', costs);
+  const costResults = useMemo(() => {
+    return costs.result ?? [];
+  }, [costs]);
+  const refetch = useCallback(() => {
+    calls.refetch();
+    costs.refetch();
+    callsStats.refetch();
+  }, [calls, callsStats, costs]);
+
+  return useMemo(() => {
+    return {
+      costsLoading: costs.loading,
+      loading: calls.loading,
+      // Return faster calls query results until cost query finishes
+      result: calls.loading
+        ? []
+        : costResults.length > 0
+        ? addCostsToCallResults(callResults, costResults)
+        : callResults,
+      total,
+      refetch,
+    };
+  }, [callResults, calls.loading, total, costs.loading, costResults, refetch]);
+};
+
+export const useCallsForQueryCharts = (
+  entity: string,
+  project: string,
+  filter: WFHighLevelCallFilter,
+  gridFilter: GridFilterModel,
+  gridSort: GridSortModel,
+  expandedColumns: Set<string>,
+  columns?: string[]
+): {
+  costsLoading: boolean;
+  result: CallSchema[];
+  loading: boolean;
+  total: number;
+  refetch: () => void;
+} => {
+  const {useCalls, useCallsStats} = useWFHooks();
+  const offset = 10;
+  const limit = 100;
+  const {sortBy, lowLevelFilter, filterBy} = useFilterSortby(
+    filter,
+    gridFilter,
+    gridSort
+  );
+  console.log('banana', filter, gridFilter);
+  console.log('columns', columns);
+  const calls = useCalls(
+    entity,
+    project,
+    lowLevelFilter,
+    limit,
+    offset,
+    sortBy,
+    filterBy,
+    columns,
+    expandedColumns,
+    {
+      refetchOnDelete: true,
+    }
+  );
+  console.log('Me', calls);
+  const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
+    refetchOnDelete: true,
+  });
+
+  const callResults = useMemo(() => {
+    return calls.result ?? [];
+  }, [calls]);
+
+  const total = useMemo(() => {
+    if (callsStats.loading || callsStats.result == null) {
+      return offset + callResults.length;
+    } else {
+      return callsStats.result.count;
+    }
+  }, [callResults.length, callsStats.loading, callsStats.result, offset]);
+
+  const costFilter: CallFilter = useMemo(
+    () => ({
+      callIds: calls.result?.map(call => call.traceCall?.id || '') || [],
+    }),
+    [calls.result]
+  );
+
+  const costs = useCalls(
+    entity,
+    project,
+    costFilter,
+    limit,
+    undefined,
+    sortBy,
+    undefined,
+    undefined,
+    expandedColumns,
+    {
+      skip: calls.loading,
+      includeCosts: true,
+    }
+  );
+  console.log('costs:', costs);
   const costResults = useMemo(() => {
     return costs.result ?? [];
   }, [costs]);

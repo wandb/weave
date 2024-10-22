@@ -47,6 +47,7 @@ import {OpVersionIndexText} from './OpVersionIndexText';
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.weave'];
 
 export const useCallsTableColumns = (
+  // here?
   entity: string,
   project: string,
   effectiveFilter: WFHighLevelCallFilter,
@@ -423,6 +424,7 @@ function buildCallsTableColumns(
         return <LoadingDots />;
       }
       const {cost, costToolTipContent} = getCostsFromCellParams(cellParams.row);
+      console.log('row', cellParams.row, cost);
       return (
         <Tooltip trigger={<div>{cost}</div>} content={costToolTipContent} />
       );
