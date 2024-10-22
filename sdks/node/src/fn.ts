@@ -15,25 +15,41 @@ export interface Fn<I, O> {
 export type FnInputs<T extends Fn<any, any>> = T extends Fn<infer I, any> ? I : never;
 export type FnOutput<T extends Fn<any, any>> = T extends Fn<any, infer O> ? O : never;
 
+export interface FuncOptions {
+  id?: string;
+  description?: string;
+  parameterNames?: { [funcName: string]: string[] };
+}
+
 // In python this is currently called `Model`
-export abstract class BaseFn<I, O> extends WeaveObject implements Fn<I, O> {
-  constructor({ id, description }: { id?: string; description?: string } = {}) {
+export abstract class Func<I, O> extends WeaveObject implements Fn<I, O> {
+  constructor({ id, description, parameterNames }: FuncOptions = {}) {
     super({ id, description });
-    this.trials = boundOp(this, this.trials, {
-      parameterNames: ['n', 'input'],
-    });
-    this.invoke = boundOp(this, this.invoke, { parameterNames: ['input'] });
+
+    const trialsParams = parameterNames?.trials ?? Object.keys(inferFunctionArguments(this.trials));
+    this.trials = boundOp(this, this.trials, { parameterNames: trialsParams });
+
+    const invokeParams = parameterNames?.invoke ?? Object.keys(inferFunctionArguments(this.invoke));
+    this.invoke = boundOp(this, this.invoke, { parameterNames: invokeParams });
   }
 
   get description() {
     return this._baseParameters.description ?? '';
   }
 
+  // default impl, there may be better impls depending on the fn
+  trials(n: number, input: I): Promise<O[]> {
+    return Promise.all(
+      Array(n)
+        .fill(null)
+        .map(() => this.invoke(input))
+    );
+  }
+
   abstract invoke(input: I): Promise<O>;
-  abstract trials(n: number, input: I): Promise<O[]>;
 }
 
-export function invoke(fn: Function, args: ArgsObject, mapping: ColumnMapping | null) {
+export function invoke(fn: Function, args: ArgsObject, mapping?: ColumnMapping) {
   if (mapping) {
     args = mapArgs(args, mapping);
   }
@@ -42,7 +58,7 @@ export function invoke(fn: Function, args: ArgsObject, mapping: ColumnMapping | 
 }
 
 export function prepareArgsForFn(args: ArgsObject, fn: Function): ArgsObject {
-  const fnArgs = getFunctionArguments(fn);
+  const fnArgs = inferFunctionArguments(fn);
   const preparedArgs: ArgsObject = {};
 
   for (const [argName, defaultValue] of Object.entries(fnArgs)) {
@@ -61,7 +77,7 @@ export function mapArgs(row: Row, mapping: ColumnMapping): Row {
   return Object.fromEntries(Object.entries(row).map(([k, v]) => [mapping[k] || k, v]));
 }
 
-export function getFunctionArguments(fn: Function): ArgsObject {
+export function inferFunctionArguments(fn: Function): ArgsObject {
   // This naive impl works for basic funcs, arrows, and methods.  It doesn't work yet for
   // destructuring or rest params
   const match = fn.toString().match(/\(([^)]*)\)/); // Find the function signature

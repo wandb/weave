@@ -1,4 +1,4 @@
-import { getFunctionArguments, invoke } from '../fn';
+import { inferFunctionArguments, invoke } from '../fn';
 
 function example(a: number, b: number, c: number) {
   return a * b + c;
@@ -229,13 +229,13 @@ describe('Function parsing', () => {
       test.skip(name, () => {});
     } else {
       test(name, () => {
-        const args = getFunctionArguments(func);
+        const args = inferFunctionArguments(func);
         expect(args).toEqual(expectedArgs);
       });
     }
   });
   test.skip('basic rest', () => {
-    const args = getFunctionArguments(basicRest);
+    const args = inferFunctionArguments(basicRest);
     expect(args).toEqual({ a: undefined, b: undefined, rest: '[]' });
   });
 });
