@@ -477,6 +477,7 @@ def create_client(request) -> weave_init.InitializedClient:
     server: tsi.TraceServerInterface
     entity = "shawn"
     project = "test-project"
+    weave_server_flag = "clickhouse"
     if weave_server_flag == "sqlite":
         sqlite_server = sqlite_trace_server.SqliteTraceServer(
             "file::memory:?cache=shared"
@@ -500,7 +501,7 @@ def create_client(request) -> weave_init.InitializedClient:
         )
         server = remote_server
     elif weave_server_flag == ("prod"):
-        inited_client = weave_init.init_weave("dev_testing")
+        inited_client = weave_init.init_weave("dev_testing_evals_3")
 
     if inited_client is None:
         client = TestOnlyFlushingWeaveClient(

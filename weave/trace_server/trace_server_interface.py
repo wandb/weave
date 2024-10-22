@@ -5,6 +5,7 @@ from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Union
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
 
+from weave.trace_server.interface.actions import ActionOpMapping
 from weave.trace_server.interface.query import Query
 
 WB_USER_ID_DESCRIPTION = (
@@ -796,6 +797,15 @@ class CostPurgeRes(BaseModel):
     pass
 
 
+class ExecuteBatchActionReq(BaseModel):
+    call_ids: list[str]
+    mapping: ActionOpMapping
+
+
+class ExecuteBatchActionRes(BaseModel):
+    pass
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -837,3 +847,12 @@ class TraceServerInterface(Protocol):
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
+
+    # Action API
+    def execute_batch_action(
+        self, req: ExecuteBatchActionReq
+    ) -> ExecuteBatchActionRes: ...
+
+    # def action_create(self, req: ActionCreateReq) -> ActionCreateRes: ...
+    # def action_read(self, req: ActionReadReq) -> ActionReadRes: ...
+    # def actions_list(self) -> list[Action]: ...

@@ -1385,6 +1385,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
 
+    def execute_batch_action(
+        self, req: tsi.ExecuteBatchActionReq
+    ) -> tsi.ExecuteBatchActionRes:
+        pass
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
@@ -1948,7 +1953,7 @@ def _process_parameters(
 
 
 def get_type(val: Any) -> str:
-    if val == None:
+    if val is None:
         return "none"
     elif isinstance(val, dict):
         if "_type" in val:
