@@ -3,7 +3,7 @@ from typing import Callable
 from pydantic import Field, model_validator
 
 import weave
-from weave.flow.scorers.base_scorer import Scorer
+from weave.scorers.base_scorer import Scorer
 
 
 class StringMatchScorer(Scorer):

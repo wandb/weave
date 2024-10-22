@@ -2,7 +2,7 @@ import pytest
 from openai import OpenAI
 
 import weave
-from weave.flow.scorers.hallucination_scorer import (
+from weave.scorers.hallucination_scorer import (
     HallucinationReasoning,
     HallucinationResponse,
 )
@@ -27,7 +27,7 @@ def mock_create(monkeypatch):
             has_hallucination=True,
         )
 
-    monkeypatch.setattr("weave.flow.scorers.hallucination_scorer.create", _mock_create)
+    monkeypatch.setattr("weave.scorers.hallucination_scorer.create", _mock_create)
 
 
 @pytest.fixture

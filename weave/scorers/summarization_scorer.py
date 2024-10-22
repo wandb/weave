@@ -4,8 +4,8 @@ from typing import Any, List, Literal
 from pydantic import BaseModel, Field
 
 import weave
-from weave.flow.scorers.llm_scorer import InstructorLLMScorer
-from weave.flow.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create
+from weave.scorers.llm_scorer import InstructorLLMScorer
+from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create
 
 DEFAULT_EXTRACTION_SYSTEM_PROMPT = """
 Given a <text>, extract all the unique entities from the text without repetition.

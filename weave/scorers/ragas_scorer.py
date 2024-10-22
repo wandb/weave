@@ -5,8 +5,8 @@ from textwrap import dedent
 from pydantic import BaseModel, Field
 
 import weave
-from weave.flow.scorers.llm_scorer import InstructorLLMScorer
-from weave.flow.scorers.llm_utils import create
+from weave.scorers.llm_scorer import InstructorLLMScorer
+from weave.scorers.llm_utils import create
 
 
 class EntityExtractionResponse(BaseModel):

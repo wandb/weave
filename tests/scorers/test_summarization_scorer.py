@@ -2,7 +2,7 @@ import pytest
 from openai import OpenAI
 
 import weave
-from weave.flow.scorers.summarization_scorer import (
+from weave.scorers.summarization_scorer import (
     EntityExtractionResponse,
     SummarizationEvaluationResponse,
 )
@@ -24,7 +24,7 @@ def mock_create(monkeypatch):
             )
 
     # Patch the 'create' function wherever it is called
-    monkeypatch.setattr("weave.flow.scorers.summarization_scorer.create", _mock_create)
+    monkeypatch.setattr("weave.scorers.summarization_scorer.create", _mock_create)
 
 
 @pytest.fixture

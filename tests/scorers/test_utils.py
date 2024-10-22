@@ -1,4 +1,4 @@
-from weave.flow.scorers.utils import stringify
+from weave.scorers.utils import stringify
 
 
 def test_stringify():

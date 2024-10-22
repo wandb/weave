@@ -1,7 +1,7 @@
 from pydantic import Field, field_validator
 
-from weave.flow.scorers.base_scorer import Scorer
-from weave.flow.scorers.llm_utils import (
+from weave.scorers.base_scorer import Scorer
+from weave.scorers.llm_utils import (
     _LLM_CLIENTS,
     _LLM_CLIENTS_NAMES,
     instructor_client,

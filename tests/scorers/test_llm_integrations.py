@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from weave.flow.scorers.summarization_scorer import (
+from weave.scorers.summarization_scorer import (
     SummarizationEvaluationResponse,
     SummarizationScorer,
 )

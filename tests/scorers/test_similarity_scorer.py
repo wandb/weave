@@ -2,8 +2,8 @@ import pytest
 from openai import OpenAI
 
 import weave
-from weave.flow.scorers.llm_utils import OPENAI_DEFAULT_EMBEDDING_MODEL
-from weave.flow.scorers.similarity_scorer import EmbeddingSimilarityScorer
+from weave.scorers.llm_utils import OPENAI_DEFAULT_EMBEDDING_MODEL
+from weave.scorers.similarity_scorer import EmbeddingSimilarityScorer
 
 
 # mock the create function
@@ -14,7 +14,7 @@ def mock_embed(monkeypatch):
 
         return [[random.random() for _ in range(1024)] for _ in range(2)]
 
-    monkeypatch.setattr("weave.flow.scorers.similarity_scorer.embed", _mock_embed)
+    monkeypatch.setattr("weave.scorers.similarity_scorer.embed", _mock_embed)
 
 
 @pytest.fixture

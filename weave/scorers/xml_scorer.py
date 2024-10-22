@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ET
 from typing import Union
 
-from weave.flow.scorers.base_scorer import Scorer
+from weave.scorers.base_scorer import Scorer
 
 
 class ValidXMLScorer(Scorer):

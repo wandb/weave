@@ -3,7 +3,7 @@ from typing import Any
 from pydantic import field_validator
 
 import weave
-from weave.flow.scorers.llm_scorer import LLMScorer
+from weave.scorers.llm_scorer import LLMScorer
 
 
 class OpenAIModerationScorer(LLMScorer):

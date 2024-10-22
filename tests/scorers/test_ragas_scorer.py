@@ -1,7 +1,7 @@
 import pytest
 from openai import OpenAI
 
-from weave.flow.scorers.ragas_scorer import (
+from weave.scorers.ragas_scorer import (
     EntityExtractionResponse,
     RelevancyResponse,
 )
@@ -25,7 +25,7 @@ def mock_create(monkeypatch):
                 relevancy_score=1,
             )
 
-    monkeypatch.setattr("weave.flow.scorers.ragas_scorer.create", _mock_create)
+    monkeypatch.setattr("weave.scorers.ragas_scorer.create", _mock_create)
 
 
 @pytest.fixture

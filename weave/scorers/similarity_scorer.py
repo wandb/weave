@@ -4,8 +4,8 @@ import numpy as np
 from pydantic import Field
 
 import weave
-from weave.flow.scorers.llm_scorer import LLMScorer
-from weave.flow.scorers.llm_utils import embed
+from weave.scorers.llm_scorer import LLMScorer
+from weave.scorers.llm_utils import embed
 
 
 class EmbeddingSimilarityScorer(LLMScorer):
