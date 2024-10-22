@@ -80,6 +80,13 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.ids import generate_id
+from weave.trace_server.interface.collections.collection import (
+    make_python_object_from_dict,
+)
+from weave.trace_server.interface.feedback_types.action_feedback_type import (
+    ACTION_FEEDBACK_TYPE_NAME,
+    ActionFeedback,
+)
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -568,16 +575,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        json_val = json.dumps(req.obj.val)
-        digest = str_digest(json_val)
-
         req_obj = req.obj
+        dict_val = req_obj.val
+
+        from weave.trace_server.interface.collections.collection_registry import (
+            collections,
+        )
+
+        if req.collection_name:
+            for cr in collections:
+                if cr.name == req.collection_name:
+                    dict_val = make_python_object_from_dict(
+                        "Leaderboard",
+                        "Leaderboard",
+                        ["Object", "BaseModel"],
+                        dict_val,
+                    )
+                    break
+
+        json_val = json.dumps(dict_val)
+        digest = str_digest(json_val)
         ch_obj = ObjCHInsertable(
             project_id=req_obj.project_id,
             object_id=req_obj.object_id,
-            kind=get_kind(req.obj.val),
-            base_object_class=get_base_object_class(req.obj.val),
-            refs=extract_refs_from_values(req.obj.val),
+            kind=get_kind(req_obj.val),
+            base_object_class=get_base_object_class(req_obj.val),
+            refs=extract_refs_from_values(req_obj.val),
             val_dump=json_val,
             digest=digest,
         )
@@ -1320,8 +1343,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req)
 
+        feedback_type = req.feedback_type
+        res_payload = req.payload
+        # move to top of file
+        from weave.trace_server.interface.feedback_types.feedback_type_registry import (
+            feedback_types,
+        )
+
+        for ft in feedback_types:
+            if ft.name == feedback_type:
+                res_payload = ft.payload_spec.model_validate(res_payload).model_dump()
+                break
+
         # Augment emoji with alias.
-        res_payload = {}
         if req.feedback_type == "wandb.reaction.1":
             em = req.payload["emoji"]
             if emoji.emoji_count(em) != 1:
@@ -1390,17 +1424,56 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def execute_batch_action(
         self, req: tsi.ExecuteBatchActionReq
     ) -> tsi.ExecuteBatchActionRes:
-        if req.mapping.action.action.action_type != "builtin":
+        if req.mapping is None and req.mapping_ref is None:
+            raise InvalidRequest("Either mapping or mapping_ref must be provided")
+
+        mapping: tsi.ActionOpMapping
+        mapping_ref: str
+        if req.mapping is not None:
+            mapping = req.mapping
+            digest = self.obj_create(
+                tsi.ObjCreateReq(
+                    obj=tsi.ObjSchemaForInsert(
+                        project_id=req.project_id,
+                        object_id=mapping.action.name,
+                        val=mapping.model_dump(),
+                    )
+                )
+            ).digest
+            mapping_ref = ri.InternalObjectRef(
+                project_id=req.project_id,
+                name=mapping.action.name,
+                version=digest,
+            ).uri()
+        elif req.mapping_ref is not None:
+            mapping_ref = req.mapping_ref
+            mapping_val_res = self.refs_read_batch(
+                tsi.RefsReadBatchReq(refs=[req.mapping_ref])
+            )
+            mapping_val = mapping_val_res.vals[0]
+            maybe_action = mapping_val.get("action")
+            if isinstance(maybe_action, dict):
+                action_dict = maybe_action
+            elif isinstance(maybe_action, str):
+                action_dict_res = self.refs_read_batch(
+                    tsi.RefsReadBatchReq(refs=[req.mapping_ref])
+                )
+                action_dict = action_dict_res.vals[0]
+
+            mapping_val["action"] = action_dict
+            mapping = tsi.ActionOpMapping.model_validate(mapping_val)
+
+        if mapping_val.action.action.action_type != "builtin":
             raise InvalidRequest(
                 "Only builtin actions are supported for batch execution"
             )
 
-        if req.mapping.action.action.name != "openai_completion":
+        if mapping_val.action.action.name != "openai_completion":
             raise InvalidRequest(
                 "Only openai_completion is supported for batch execution"
             )
 
-        if req.mapping.action.action.digest != "*":
+        if mapping_val.action.action.digest != "*":
             raise InvalidRequest("Digest must be '*' for batch execution")
 
         # Step 1: Get all the calls in the batch
@@ -1412,8 +1485,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     op_names=[
                         ri.InternalOpRef(
                             project_id=req.project_id,
-                            name=req.mapping.op_name,
-                            version=req.mapping.op_digest,
+                            name=mapping_val.op_name,
+                            version=mapping_val.op_digest,
                         ).uri(),
                     ],
                 ),
@@ -1422,13 +1495,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Normally we would dispatch here, but just hard coding for now
         # We should do some validation here
-        config = req.mapping.action.config
+        config = mapping_val.action.config
         model = config["model"]
         system_prompt = config["system_prompt"]
         response_format = config["response_format"]
-        action_name = req.mapping.action.name
+        action_name = mapping_val.action.name
 
-        mapping = req.mapping.input_mapping
+        mapping = mapping_val.input_mapping
 
         # Step 2: For Each call, execute the action: (this needs a lot of safety checks)
         for call in calls:
@@ -1469,14 +1542,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         project_id=req.project_id,
                         id=call.id,
                     ).uri(),
-                    feedback_type="wandb.score.beta.1",
+                    feedback_type=ACTION_FEEDBACK_TYPE_NAME,
                     wb_user_id="ACTIONS_BOT",  # - THIS IS NOT GOOD!
-                    payload={
-                        "name": action_name,
-                        "action_ref": "",
-                        "call_ref": "",
-                        "results": json.loads(completion.choices[0].message.content),
-                    },
+                    payload=ActionFeedback(
+                        name=action_name,
+                        mapping_ref=mapping_ref,
+                        results=json.loads(completion.choices[0].message.content),
+                    ),
                 )
             )
 

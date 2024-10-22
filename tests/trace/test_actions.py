@@ -3,11 +3,11 @@ import os
 from openai import OpenAI
 
 import weave
-from weave.flow import action_objects
+from weave.collection_objects import action_objects
 from weave.trace.feedback_types.score import SCORE_TYPE_NAME
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.interface import actions
+from weave.trace_server.interface.collections import action_collection
 
 
 def test_action_create(client: WeaveClient):
@@ -36,7 +36,7 @@ def test_action_create(client: WeaveClient):
 
     action = action_objects.ActionWithConfig(
         name="is_name_extracted",
-        action=actions.BuiltinAction(
+        action=action_collection._BuiltinAction(
             name="openai_completion",
         ),
         config={
@@ -57,6 +57,7 @@ def test_action_create(client: WeaveClient):
             },
         },
     )
+    weave.publish(action)
     mapping = action_objects.ActionOpMapping(
         action=action,
         op_name=get_ref(extract_name).name,
@@ -89,7 +90,6 @@ def test_action_create(client: WeaveClient):
     )  # Should this be something else? Need to decide before checking this into master.
     assert feedback["payload"]["name"] == "is_name_extracted"
     assert feedback["payload"]["action_ref"] == get_ref(action).uri()
-    assert feedback["payload"]["call_ref"] == "WHAT SHOULD THIS BE?"
     assert feedback["payload"]["results"] == {"is_extracted": True}
 
 
