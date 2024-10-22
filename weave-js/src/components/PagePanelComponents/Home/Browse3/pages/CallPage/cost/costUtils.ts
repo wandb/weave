@@ -79,6 +79,7 @@ export const formatTokenCount = (num: number): string => {
 };
 
 export const formatTokenCost = (cost: number): string => {
+  console.log('FORMAT');
   if (cost === 0) {
     return '$0.00';
   } else if (cost < 0.01) {

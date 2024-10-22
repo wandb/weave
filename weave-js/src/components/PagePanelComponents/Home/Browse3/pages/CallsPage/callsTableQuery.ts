@@ -51,6 +51,7 @@ export const useCallsForQuery = (
     gridFilter,
     gridSort
   );
+  console.log(columns);
   const calls = useCalls(
     entity,
     project,
@@ -106,6 +107,7 @@ export const useCallsForQuery = (
   const costResults = useMemo(() => {
     return costs.result ?? [];
   }, [costs]);
+
   const refetch = useCallback(() => {
     calls.refetch();
     costs.refetch();
@@ -133,7 +135,7 @@ export const useCallsForQueryCharts = (
   project: string,
   filter: WFHighLevelCallFilter,
   gridFilter: GridFilterModel,
-  columns: string[],
+  columns?: string[],
   expandedColumns?: Set<string>,
   gridSort?: GridSortModel
 ): {
@@ -144,8 +146,8 @@ export const useCallsForQueryCharts = (
   refetch: () => void;
 } => {
   const {useCalls, useCallsStats} = useWFHooks();
-  const offset = 10;
-  const limit = 100;
+  const offset = 0;
+  const limit = 2;
   const {sortBy, lowLevelFilter, filterBy} = useFilterSortby(
     filter,
     gridFilter,
@@ -165,6 +167,8 @@ export const useCallsForQueryCharts = (
       refetchOnDelete: true,
     }
   );
+  console.log(calls);
+
   const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
     refetchOnDelete: true,
   });
@@ -172,7 +176,6 @@ export const useCallsForQueryCharts = (
   const callResults = useMemo(() => {
     return calls.result ?? [];
   }, [calls]);
-
   const total = useMemo(() => {
     if (callsStats.loading || callsStats.result == null) {
       return offset + callResults.length;

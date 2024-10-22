@@ -90,7 +90,7 @@ export const CallsPage: FC<{
                   entity={props.entity}
                   project={props.project}
                   filter={memoizedFilter}
-                  // filterModel={props.filterModel}
+                  filterModelProp={props.filterModel}
                   // setFilterModel={props.setFilterModel}
                 />
                 <CallsTable
