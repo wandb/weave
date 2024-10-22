@@ -101,7 +101,7 @@ from typing import Dict
 
 # A dataset with news articles to be summarised
 dataset = [
-    {"news_article": "The news today was great...", "date": "2030-04-20", "source": "Bright Sky Network"}
+    {"news_article": "The news today was great...", "date": "2030-04-20", "source": "Bright Sky Network"},
     ...
 ]
 
