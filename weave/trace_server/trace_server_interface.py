@@ -691,6 +691,17 @@ class FeedbackPurgeRes(BaseModel):
     pass
 
 
+class ActionsExecuteBatchReq(BaseModel):
+    project_id: str
+    call_ids: list[str]
+    id: Optional[str] = None
+    action: dict[str, Any]
+
+
+class ActionsExecuteBatchRes(BaseModel):
+    id: str
+
+
 class FileCreateReq(BaseModel):
     project_id: str
     name: str
@@ -837,3 +848,8 @@ class TraceServerInterface(Protocol):
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
+
+    # Action API
+    def actions_execute_batch(
+        self, req: ActionsExecuteBatchReq
+    ) -> ActionsExecuteBatchRes: ...

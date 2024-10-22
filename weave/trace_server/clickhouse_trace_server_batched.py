@@ -29,13 +29,12 @@ import json
 import logging
 import threading
 from collections import defaultdict
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from typing import (
     Any,
     Dict,
-    Iterator,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Union,
@@ -135,7 +134,7 @@ all_call_insert_columns = list(
     CallStartCHInsertable.model_fields.keys()
     | CallEndCHInsertable.model_fields.keys()
     | CallDeleteCHInsertable.model_fields.keys()
-    | CallUpdateCHInsertable.model_fields.keys()
+    | CallUpdateCHInsertable.model_fields.keys(),
 )
 
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
@@ -229,9 +228,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
+
         # as enforcing business rules and defaults
         ch_call = _end_call_for_insert_to_ch_insertable_end_call(req.end)
-
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
         self._insert_call(ch_call)
@@ -248,7 +247,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 ),
                 limit=1,
                 include_costs=req.include_costs,
-            )
+            ),
         )
         try:
             _call = next(res)
@@ -287,7 +286,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         cq = CallsQuery(
-            project_id=req.project_id, include_costs=req.include_costs or False
+            project_id=req.project_id,
+            include_costs=req.include_costs or False,
         )
         columns = all_call_select_columns
         if req.columns:
@@ -335,7 +335,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not req.expand_columns and not req.include_feedback:
             for row in raw_res:
                 yield tsi.CallSchema.model_validate(
-                    _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
+                    _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row))),
                 )
 
         else:
@@ -346,7 +346,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             batch = []
             for row in raw_res:
                 call_dict = _ch_call_dict_to_call_schema_dict(
-                    dict(zip(select_columns, row))
+                    dict(zip(select_columns, row)),
                 )
                 batch.append(call_dict)
 
@@ -395,7 +395,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return calls
 
     def _get_refs_to_resolve(
-        self, calls: list[dict[str, Any]], expand_columns: list[str]
+        self,
+        calls: list[dict[str, Any]],
+        expand_columns: list[str],
     ) -> Dict[tuple[int, str], ri.InternalObjectRef]:
         refs_to_resolve: Dict[tuple[int, str], ri.InternalObjectRef] = {}
         for i, call in enumerate(calls):
@@ -414,7 +416,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if not isinstance(ref, ri.InternalObjectRef):
                     continue
 
-                refs_to_resolve[(i, col)] = ref
+                refs_to_resolve[i, col] = ref
         return refs_to_resolve
 
     def _expand_call_refs(
@@ -431,13 +433,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         for depth in sorted(expand_column_by_depth.keys()):
             refs_to_resolve = self._get_refs_to_resolve(
-                calls, expand_column_by_depth[depth]
+                calls,
+                expand_column_by_depth[depth],
             )
             if not refs_to_resolve:
                 continue
 
             vals = self._refs_read_batch_within_project(
-                project_id, list(refs_to_resolve.values()), ref_cache
+                project_id,
+                list(refs_to_resolve.values()),
+                ref_cache,
             )
             for ((i, col), ref), val in zip(refs_to_resolve.items(), vals):
                 if isinstance(val, dict) and "_ref" not in val:
@@ -448,7 +453,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         assert_non_null_wb_user_id(req)
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
             raise RequestTooLarge(
-                f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
+                f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once",
             )
 
         # get all parents
@@ -461,8 +466,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     ),
                     # request minimal columns
                     columns=["id", "parent_id"],
-                )
-            )
+                ),
+            ),
         )
 
         # get all calls with trace_ids matching parents
@@ -475,8 +480,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     ),
                     # request minimal columns
                     columns=["id", "parent_id"],
-                )
-            )
+                ),
+            ),
         )
 
         all_descendants = find_call_descendants(
@@ -508,7 +513,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 return
 
         raise ValueError(
-            f"One of [{', '.join(valid_update_fields)}] is required for call update"
+            f"One of [{', '.join(valid_update_fields)}] is required for call update",
         )
 
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
@@ -525,7 +530,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallUpdateRes()
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         conds = [
@@ -629,7 +634,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conds.append("is_latest = 1")
             if req.filter.base_object_classes:
                 conds.append(
-                    "base_object_class IN {base_object_classes: Array(String)}"
+                    "base_object_class IN {base_object_classes: Array(String)}",
                 )
                 parameters["base_object_classes"] = req.filter.base_object_classes
 
@@ -651,7 +656,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for r in req.table.rows:
             if not isinstance(r, dict):
                 raise ValueError(
-                    f"""Validation Error: Encountered a non-dictionary row when creating a table. Please ensure that all rows are dictionaries. Violating row:\n{r}."""
+                    f"""Validation Error: Encountered a non-dictionary row when creating a table. Please ensure that all rows are dictionaries. Violating row:\n{r}.""",
                 )
             row_json = json.dumps(r)
             row_digest = str_digest(row_json)
@@ -661,7 +666,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     row_digest,
                     extract_refs_from_values(r),
                     row_json,
-                )
+                ),
             )
 
         self._insert(
@@ -724,7 +729,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         row_digest,
                         extract_refs_from_values(row_data),
                         row_json,
-                    )
+                    ),
                 )
                 known_digests.add(row_digest)
             return row_digest
@@ -776,14 +781,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.TableQueryRes(rows=rows)
 
     def table_query_stream(
-        self, req: tsi.TableQueryReq
+        self,
+        req: tsi.TableQueryReq,
     ) -> Iterator[tsi.TableRowSchema]:
         conds = []
         pb = ParamBuilder()
         if req.filter:
             if req.filter.row_digests:
                 conds.append(
-                    f"tr.digest IN {{{pb.add_param(req.filter.row_digests)}: Array(String)}}"
+                    f"tr.digest IN {{{pb.add_param(req.filter.row_digests)}: Array(String)}}",
                 )
 
         sort_fields = []
@@ -793,7 +799,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 extra_path = sort.field.split(".")
                 field = OrderField(
                     field=QueryBuilderDynamicField(
-                        field=VAL_DUMP_COLUMN_NAME, extra_path=extra_path
+                        field=VAL_DUMP_COLUMN_NAME,
+                        extra_path=extra_path,
                     ),
                     direction="ASC" if sort.direction.lower() == "asc" else "DESC",
                 )
@@ -829,7 +836,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 OrderField(
                     field=QueryBuilderField(field=ROW_ORDER_COLUMN_NAME),
                     direction="ASC",
-                )
+                ),
             ]
 
         if (
@@ -847,7 +854,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
         else:
             order_by_components = ", ".join(
-                [sort_field.as_sql(pb, TABLE_ROWS_ALIAS) for sort_field in sort_fields]
+                [sort_field.as_sql(pb, TABLE_ROWS_ALIAS) for sort_field in sort_fields],
             )
             sql_safe_sort_clause = f"ORDER BY {order_by_components}"
             query = make_standard_table_query(
@@ -1012,7 +1019,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
                 op, arg = extra[extra_index], extra[extra_index + 1]
                 if isinstance(val, str) and val.startswith(
-                    ri.WEAVE_INTERNAL_SCHEME + "://"
+                    ri.WEAVE_INTERNAL_SCHEME + "://",
                 ):
                     parsed_ref = ri.parse_internal_uri(val)
 
@@ -1036,7 +1043,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             unresolved_table_ref=None,
                             val=val,
                         )
-                    elif isinstance(parsed_ref, ri.InternalTableRef):
+                    if isinstance(parsed_ref, ri.InternalTableRef):
                         return PartialRefResult(
                             remaining_extra=extra[extra_index:],
                             unresolved_obj_ref=None,
@@ -1045,9 +1052,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         )
                 if val is None:
                     return empty_result
-                if op == ri.DICT_KEY_EDGE_NAME:
-                    val = val.get(arg)
-                elif op == ri.OBJECT_ATTR_EDGE_NAME:
+                if op == ri.DICT_KEY_EDGE_NAME or op == ri.OBJECT_ATTR_EDGE_NAME:
                     val = val.get(arg)
                 elif op == ri.LIST_INDEX_EDGE_NAME:
                     index = int(arg)
@@ -1118,7 +1123,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     if op != ri.TABLE_ROW_ID_EDGE_NAME:
                         raise ValueError("Table refs must have id extra")
                     table_queries.setdefault(
-                        (table_ref.project_id, table_ref.digest), []
+                        (table_ref.project_id, table_ref.digest),
+                        [],
                     ).append((i, row_digest))
             # Make the queries
             for (project_id, digest), index_digests in table_queries.items():
@@ -1137,7 +1143,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     digest=digest,
                     pb=pb,
                     sql_safe_conditions=[
-                        f"digest IN {{{row_digests_name}: Array(String)}}"
+                        f"digest IN {{{row_digests_name}: Array(String)}}",
                     ],
                 )
                 rows = list(rows_stream)
@@ -1155,7 +1161,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for i, extra_result in enumerate(extra_results):
                 if extra_result.remaining_extra:
                     extra_results[i] = resolve_extra(
-                        extra_result.remaining_extra, extra_result.val
+                        extra_result.remaining_extra,
+                        extra_result.val,
                     )
 
         return [r.val for r in extra_results]
@@ -1230,11 +1237,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "created_at": created_at,
                 "pricing_level": "project",
                 "pricing_level_id": req.project_id,
-                "provider_id": cost.provider_id if cost.provider_id else "default",
+                "provider_id": cost.provider_id or "default",
                 "llm_id": llm_id,
-                "effective_date": (
-                    cost.effective_date if cost.effective_date else created_at
-                ),
+                "effective_date": (cost.effective_date or created_at),
                 "prompt_token_cost": cost.prompt_token_cost,
                 "completion_token_cost": cost.completion_token_cost,
                 "prompt_token_cost_unit": cost.prompt_token_cost_unit,
@@ -1244,10 +1249,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             costs.append((cost_id, llm_id))
 
             prepared = LLM_TOKEN_PRICES_TABLE.insert(row).prepare(
-                database_type="clickhouse"
+                database_type="clickhouse",
             )
             self._insert(
-                LLM_TOKEN_PRICES_TABLE.name, prepared.data, prepared.column_names
+                LLM_TOKEN_PRICES_TABLE.name,
+                prepared.data,
+                prepared.column_names,
             )
 
         return tsi.CostCreateRes(ids=costs)
@@ -1271,7 +1278,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         {"$literal": "project"},
                     ],
                 },
-            ]
+            ],
         }
         query_with_pricing_level = tsi.Query(**{"$expr": expr})
         query = LLM_TOKEN_PRICES_TABLE.select()
@@ -1282,7 +1289,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
-            query_result.result_rows, prepared.fields
+            query_result.result_rows,
+            prepared.fields,
         )
         return tsi.CostQueryRes(results=results)
 
@@ -1304,7 +1312,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         {"$literal": "project"},
                     ],
                 },
-            ]
+            ],
         }
         query_with_pricing_level = tsi.Query(**{"$expr": expr})
 
@@ -1324,7 +1332,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             em = req.payload["emoji"]
             if emoji.emoji_count(em) != 1:
                 raise InvalidRequest(
-                    "Value of emoji key in payload must be exactly one emoji"
+                    "Value of emoji key in payload must be exactly one emoji",
                 )
             req.payload["alias"] = emoji.demojize(em)
             detoned = detone_emojis(em)
@@ -1368,7 +1376,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         result = TABLE_FEEDBACK.tuples_to_rows(
-            query_result.result_rows, prepared.fields
+            query_result.result_rows,
+            prepared.fields,
         )
         return tsi.FeedbackQueryRes(result=result)
 
@@ -1384,6 +1393,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
+
+    def actions_execute_batch(
+        self, req: tsi.ActionsExecuteBatchReq
+    ) -> tsi.ActionsExecuteBatchRes:
+        return tsi.ActionsExecuteBatchRes(id=generate_id())
 
     # Private Methods
     @property
@@ -1432,8 +1446,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         offset: Optional[int] = None,
         sort_by: Optional[list[tsi.SortBy]] = None,
     ) -> list[SelectableCHObjSchema]:
-        """
-        Main query for fetching objects.
+        """Main query for fetching objects.
 
         conditions:
             conditions should include operations on version_index, digest, kind (is_op)
@@ -1441,12 +1454,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_id_conditions:
             conditions should include operations on ONLY object_id
             ALL conditions are AND'ed together.
-        parameters:
+
+        Parameters
+        ----------
             parameters to be passed to the query. Must include all parameters for both
             conditions and object_id_conditions.
         metadata_only:
             if metadata_only is True, then we return early and dont grab the value.
             Otherwise, make a second query to grab the val_dump from the db
+
         """
         if not conditions:
             conditions = ["1 = 1"]
@@ -1562,9 +1578,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             ],
                             # Add an empty val_dump to the end of the row
                             list(row) + ["{}"],
-                        )
-                    )
-                )
+                        ),
+                    ),
+                ),
             )
 
         # -- Don't make second query for object values if metadata_only --
@@ -1592,7 +1608,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_values: Dict[tuple[str, str], Any] = {}
         for row in query_result:
             (object_id, digest, val_dump) = row
-            object_values[(object_id, digest)] = val_dump
+            object_values[object_id, digest] = val_dump
 
         # update the val_dump for each object
         for obj in result:
@@ -1614,7 +1630,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         summary = None
         parameters = _process_parameters(parameters)
         with self.ch_client.query_rows_stream(
-            query, parameters=parameters, column_formats=column_formats, use_none=True
+            query,
+            parameters=parameters,
+            column_formats=column_formats,
+            use_none=True,
         ) as stream:
             if isinstance(stream.source, QueryResult):
                 summary = stream.source.summary
@@ -1638,7 +1657,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """Directly queries the database and returns the result."""
         parameters = _process_parameters(parameters)
         res = self.ch_client.query(
-            query, parameters=parameters, column_formats=column_formats, use_none=True
+            query,
+            parameters=parameters,
+            column_formats=column_formats,
+            use_none=True,
         )
         logger.info(
             "clickhouse_query",
@@ -1659,7 +1681,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> QuerySummary:
         try:
             return self.ch_client.insert(
-                table, data=data, column_names=column_names, settings=settings
+                table,
+                data=data,
+                column_names=column_names,
+                settings=settings,
             )
         except ValueError as e:
             if "negative shift count" in str(e):
@@ -1672,7 +1697,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 raise InsertTooLarge(
                     "Database insertion failed. Record too large. "
                     "A likely cause is that a single row or cell exceeded "
-                    "the limit. If logging images, save them as `Image.PIL`."
+                    "the limit. If logging images, save them as `Image.PIL`.",
                 )
             raise
 
@@ -1696,8 +1721,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch = []
 
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
-        """
-        Iterate through the batch and replace large values with placeholders.
+        """Iterate through the batch and replace large values with placeholders.
 
         If values are larger than 1MiB replace them with placeholder values.
         """
@@ -1728,8 +1752,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
 
 def _num_bytes(data: Any) -> int:
-    """
-    Calculate the number of bytes in a string.
+    """Calculate the number of bytes in a string.
 
     This can be computationally expensive, only call when necessary.
     Never raise on a failed str cast, just return 0.
@@ -1950,13 +1973,13 @@ def _process_parameters(
 def get_type(val: Any) -> str:
     if val == None:
         return "none"
-    elif isinstance(val, dict):
+    if isinstance(val, dict):
         if "_type" in val:
             if "weave_type" in val:
                 return val["weave_type"]["type"]
             return val["_type"]
         return "dict"
-    elif isinstance(val, list):
+    if isinstance(val, list):
         return "list"
     return "unknown"
 
@@ -1977,7 +2000,7 @@ def get_base_object_class(val: Any) -> Optional[str]:
                         if val["_bases"][-2] == "Object":
                             if len(val["_bases"]) > 2:
                                 return val["_bases"][-3]
-                            elif "_class_name" in val:
+                            if "_class_name" in val:
                                 return val["_class_name"]
     return None
 
