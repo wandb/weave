@@ -82,6 +82,7 @@ import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
+import {ModsPage} from './Browse3/pages/ModsPage';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
 import {
@@ -153,6 +154,7 @@ const tabOptions = [
   'evaluations',
   'boards',
   'tables',
+  'mods',
 ];
 const tabs = tabOptions.join('|');
 const browse3Paths = (projectRoot: string) => [
@@ -510,6 +512,11 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/tables`}>
           <TablesPageBinding />
+        </Route>
+        {/* MODS */}
+        <Route
+          path={[`${projectRoot}/mods/:itemName`, `${projectRoot}/:tab(mods)`]}>
+          <ModsPageBinding />
         </Route>
       </Switch>
     </Box>
@@ -983,6 +990,17 @@ const BoardsPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
 
   return <BoardsPage entity={params.entity} project={params.project} />;
+};
+
+const ModsPageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemVersionParams>();
+  return (
+    <ModsPage
+      entity={params.entity}
+      project={params.project}
+      itemName={params.itemName}
+    />
+  );
 };
 
 const TablesPageBinding = () => {

@@ -159,6 +159,13 @@ export const useProjectSidebar = (
             iconName: IconNames.Table,
           },
           {
+            type: 'button' as const,
+            name: 'Mods',
+            slug: 'weave/mods',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.DockerWhale,
+          },
+          {
             type: 'divider' as const,
             key: 'dividerWithinWeave',
             isShown: isWeaveOnly,
