@@ -4,10 +4,12 @@ from openai import OpenAI
 
 import weave
 from weave.collection_objects import action_objects
-from weave.trace.feedback_types.score import SCORE_TYPE_NAME
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.collections import action_collection
+from weave.trace_server.interface.feedback_types.action_feedback_type import (
+    ACTION_FEEDBACK_TYPE_NAME,
+)
 
 
 def test_action_create(client: WeaveClient):
@@ -34,7 +36,7 @@ def test_action_create(client: WeaveClient):
 
     res, call = extract_name.call("My name is Tim.")
 
-    action = action_objects.ActionWithConfig(
+    action = action_objects.ActionWithConfigObject(
         name="is_name_extracted",
         action=action_collection._BuiltinAction(
             name="openai_completion",
@@ -57,8 +59,9 @@ def test_action_create(client: WeaveClient):
             },
         },
     )
-    weave.publish(action)
-    mapping = action_objects.ActionOpMapping(
+
+    mapping = action_objects.ActionOpMappingObject(
+        name="extract_name-is_name_extracted",
         action=action,
         op_name=get_ref(extract_name).name,
         op_digest=get_ref(extract_name).digest,
@@ -67,11 +70,14 @@ def test_action_create(client: WeaveClient):
             "response": "output",
         },
     )
-    weave.publish(mapping)
     req = tsi.ExecuteBatchActionReq(
         project_id=client._project_id(), call_ids=[call.id], mapping=mapping
     )
+
     res = client.server.execute_batch_action(req=req)
+
+    # AFTER CALL!
+    weave.publish(mapping)
 
     gotten_call = client.server.calls_query(
         req=tsi.CallsQueryReq(
@@ -85,11 +91,9 @@ def test_action_create(client: WeaveClient):
     feedbacks = target_call.summary["weave"]["feedback"]
     assert len(feedbacks) == 1
     feedback = feedbacks[0]
-    assert (
-        feedback["feedback_type"] == SCORE_TYPE_NAME
-    )  # Should this be something else? Need to decide before checking this into master.
+    assert feedback["feedback_type"] == ACTION_FEEDBACK_TYPE_NAME
     assert feedback["payload"]["name"] == "is_name_extracted"
-    assert feedback["payload"]["action_ref"] == get_ref(action).uri()
+    assert feedback["payload"]["action_mapping_ref"] == get_ref(mapping).uri()
     assert feedback["payload"]["results"] == {"is_extracted": True}
 
 

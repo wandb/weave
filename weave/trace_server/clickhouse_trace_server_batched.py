@@ -80,6 +80,10 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.ids import generate_id
+from weave.trace_server.interface.collections.action_collection import (
+    ActionOpMapping,
+    ActionWithConfig,
+)
 from weave.trace_server.interface.collections.collection import (
     make_python_object_from_dict,
 )
@@ -586,15 +590,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for cr in collections:
                 if cr.name == req.collection_name:
                     dict_val = make_python_object_from_dict(
-                        "Leaderboard",
-                        "Leaderboard",
-                        ["Object", "BaseModel"],
+                        cr.name,
+                        cr.base_model_spec.__name__,
+                        ["BaseModel"],
                         dict_val,
                     )
                     break
 
         json_val = json.dumps(dict_val)
         digest = str_digest(json_val)
+        print("!", req_obj.object_id, digest, json_val)
         ch_obj = ObjCHInsertable(
             project_id=req_obj.project_id,
             object_id=req_obj.object_id,
@@ -1426,23 +1431,58 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> tsi.ExecuteBatchActionRes:
         if req.mapping is None and req.mapping_ref is None:
             raise InvalidRequest("Either mapping or mapping_ref must be provided")
+        if req.mapping is not None and req.mapping_ref is not None:
+            raise InvalidRequest("Only one of mapping or mapping_ref can be provided")
 
-        mapping: tsi.ActionOpMapping
+        mapping: ActionOpMapping
         mapping_ref: str
         if req.mapping is not None:
             mapping = req.mapping
+            from weave.trace_server.interface.collections.action_collection import (
+                action_op_mapping_collection,
+                action_with_config_collection,
+            )
+
+            action_ref: str
+            if isinstance(mapping.action, dict):
+                mapping.action = ActionWithConfig.model_validate(mapping.action)
+            if isinstance(mapping.action, ActionWithConfig):
+                action_digest = self.obj_create(
+                    tsi.ObjCreateReq(
+                        collection_name=action_with_config_collection.name,
+                        obj=tsi.ObjSchemaForInsert(
+                            project_id=req.project_id,
+                            object_id=mapping.action.name,
+                            val=mapping.action.model_dump(),
+                        ),
+                    )
+                ).digest
+                action_ref = ri.InternalObjectRef(
+                    project_id=req.project_id,
+                    name=mapping.action.name,
+                    version=action_digest,
+                ).uri()
+            elif isinstance(mapping.action, str):
+                action_ref = mapping.action
+            else:
+                raise InvalidRequest("Invalid action")
+
+            mapping_val = mapping.model_dump()
+            mapping_val["action"] = action_ref # YUK YUK YUK YUK
+
             digest = self.obj_create(
                 tsi.ObjCreateReq(
+                    collection_name=action_op_mapping_collection.name,
                     obj=tsi.ObjSchemaForInsert(
                         project_id=req.project_id,
-                        object_id=mapping.action.name,
-                        val=mapping.model_dump(),
-                    )
+                        object_id=mapping.name,
+                        val=mapping_val,
+                    ),
                 )
             ).digest
             mapping_ref = ri.InternalObjectRef(
                 project_id=req.project_id,
-                name=mapping.action.name,
+                name=mapping.name,
                 version=digest,
             ).uri()
         elif req.mapping_ref is not None:
@@ -1462,18 +1502,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             mapping_val["action"] = action_dict
             mapping = tsi.ActionOpMapping.model_validate(mapping_val)
+        else:
+            raise InvalidRequest("Either mapping or mapping_ref must be provided")
 
-        if mapping_val.action.action.action_type != "builtin":
+        if mapping.action.action.action_type != "builtin":
             raise InvalidRequest(
                 "Only builtin actions are supported for batch execution"
             )
 
-        if mapping_val.action.action.name != "openai_completion":
+        if mapping.action.action.name != "openai_completion":
             raise InvalidRequest(
                 "Only openai_completion is supported for batch execution"
             )
 
-        if mapping_val.action.action.digest != "*":
+        if mapping.action.action.digest != "*":
             raise InvalidRequest("Digest must be '*' for batch execution")
 
         # Step 1: Get all the calls in the batch
@@ -1485,8 +1527,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     op_names=[
                         ri.InternalOpRef(
                             project_id=req.project_id,
-                            name=mapping_val.op_name,
-                            version=mapping_val.op_digest,
+                            name=mapping.op_name,
+                            version=mapping.op_digest,
                         ).uri(),
                     ],
                 ),
@@ -1495,13 +1537,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Normally we would dispatch here, but just hard coding for now
         # We should do some validation here
-        config = mapping_val.action.config
+        config = mapping.action.config
         model = config["model"]
         system_prompt = config["system_prompt"]
         response_format = config["response_format"]
-        action_name = mapping_val.action.name
+        action_name = mapping.action.name
 
-        mapping = mapping_val.input_mapping
+        mapping = mapping.input_mapping
 
         # Step 2: For Each call, execute the action: (this needs a lot of safety checks)
         for call in calls:
@@ -1546,9 +1588,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     wb_user_id="ACTIONS_BOT",  # - THIS IS NOT GOOD!
                     payload=ActionFeedback(
                         name=action_name,
-                        mapping_ref=mapping_ref,
+                        action_mapping_ref=mapping_ref,
                         results=json.loads(completion.choices[0].message.content),
-                    ),
+                    ).model_dump(),
                 )
             )
 

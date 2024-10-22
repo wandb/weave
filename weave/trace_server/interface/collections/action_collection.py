@@ -30,6 +30,7 @@ class ActionWithConfig(BaseModel):
 
 
 class ActionOpMapping(BaseModel):
+    name: str  # uggg, want to get rid of this
     action: ActionWithConfig
     op_name: str
     op_digest: str
