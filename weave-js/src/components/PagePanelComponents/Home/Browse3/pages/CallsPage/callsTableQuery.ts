@@ -7,6 +7,7 @@ import {useCallback, useMemo} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {isValuelessOperator} from '../../filters/common';
+import {addCostsToCallResults} from '../CallPage/cost';
 import {operationConverter} from '../common/tabularListViews/operators';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
@@ -36,6 +37,7 @@ export const useCallsForQuery = (
   expandedColumns: Set<string>,
   columns?: string[]
 ): {
+  costsLoading: boolean;
   result: CallSchema[];
   loading: boolean;
   total: number;
@@ -81,19 +83,52 @@ export const useCallsForQuery = (
     }
   }, [callResults.length, callsStats.loading, callsStats.result, offset]);
 
+  const costFilter: CallFilter = useMemo(
+    () => ({
+      callIds: calls.result?.map(call => call.traceCall?.id || '') || [],
+    }),
+    [calls.result]
+  );
+
+  const costs = useCalls(
+    entity,
+    project,
+    costFilter,
+    limit,
+    undefined,
+    sortBy,
+    undefined,
+    undefined,
+    expandedColumns,
+    {
+      skip: calls.loading,
+      includeCosts: true,
+    }
+  );
+
+  const costResults = useMemo(() => {
+    return costs.result ?? [];
+  }, [costs]);
   const refetch = useCallback(() => {
     calls.refetch();
+    costs.refetch();
     callsStats.refetch();
-  }, [calls, callsStats]);
+  }, [calls, callsStats, costs]);
 
   return useMemo(() => {
     return {
+      costsLoading: costs.loading,
       loading: calls.loading,
-      result: calls.loading ? [] : callResults,
+      // Return faster calls query results until cost query finishes
+      result: calls.loading
+        ? []
+        : costResults.length > 0
+        ? addCostsToCallResults(callResults, costResults)
+        : callResults,
       total,
       refetch,
     };
-  }, [callResults, calls.loading, total, refetch]);
+  }, [callResults, calls.loading, total, costs.loading, costResults, refetch]);
 };
 
 export const useFilterSortby = (
