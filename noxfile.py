@@ -11,7 +11,7 @@ PY313_INCOMPATIBLE_SHARDS = [
     "litellm",
     "notdiamond",
     "google_ai_studio",
-    "scorers",
+    "scorers_integrations",
 ]
 
 
@@ -41,7 +41,7 @@ def lint(session):
         "mistral1",
         "notdiamond",
         "openai",
-        "scorers",
+        "scorers_integrations",
     ],
 )
 def tests(session, shard):
@@ -67,7 +67,7 @@ def tests(session, shard):
 
     # we are doing some integration test in test_llm_integrations.py that requires
     # setting some environment variables for the LLM providers
-    if shard == "scorers":
+    if shard == "scorers_integrations":
         env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
         env["ANTHROPIC_API_KEY"] = session.env.get("ANTHROPIC_API_KEY")
         env["MISTRAL_API_KEY"] = session.env.get("MISTRAL_API_KEY")
@@ -79,7 +79,7 @@ def tests(session, shard):
         "trace_server": ["trace_server/"],
         "mistral0": ["integrations/mistral/v0/"],
         "mistral1": ["integrations/mistral/v1/"],
-        "scorers": ["scorers/"],
+        "scorers_integrations": ["scorers/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)

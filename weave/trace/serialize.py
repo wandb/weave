@@ -178,13 +178,18 @@ DEFAULT_MAX_DICTIFY_DEPTH = 10
 
 
 def fallback_encode(obj: Any) -> Any:
-    # TODO: Should we try to compute an object size and skip if too big?
-    if isinstance(obj, ALWAYS_STRINGIFY):
-        return stringify(obj)
+    rep = None
     try:
-        return dictify(obj, maxdepth=DEFAULT_MAX_DICTIFY_DEPTH)
+        rep = repr(obj)
     except Exception:
-        return stringify(obj)
+        try:
+            rep = str(obj)
+        except Exception:
+            rep = f"<{type(obj).__name__}: {id(obj)}>"
+    if isinstance(rep, str):
+        if len(rep) > MAX_STR_LEN:
+            rep = rep[:MAX_STR_LEN] + "..."
+    return rep
 
 
 def isinstance_namedtuple(obj: Any) -> bool:

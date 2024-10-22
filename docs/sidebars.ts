@@ -68,6 +68,7 @@ const sidebars: SidebarsConfig = {
         "guides/core-types/datasets",
         "guides/tracking/feedback",
         "guides/tracking/costs",
+        "guides/core-types/media",
         {
           type: "category",
           collapsible: true,
