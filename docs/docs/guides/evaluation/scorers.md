@@ -91,7 +91,7 @@ When a weave `Evaluation` is run, the output of the AI system is passed to the `
 ### Mapping Column Names
 Sometimes, the scorer's parameter names don't match the column names in your dataset. You can fix this using a `column_map`.
 
-If you're using a class-based scorer, pass a dictionary to the `column_map` attribute of `Scorer` when you initialise your scorer class. This dictionary maps your scorer's parameter names to the dataset's column names, in the order: `{scorer keyword argument : dataset column name}`.
+If you're using a class-based scorer, pass a dictionary to the `column_map` attribute of `Scorer` when you initialise your scorer class. This dictionary maps your scorer's parameter names to the dataset's column names, in the order: `{scorer_keyword_argument: dataset_column_name}`.
 
 Example:
 
@@ -302,7 +302,7 @@ llm_client = ...  # initialise your LlM client
 entity_recall_scorer = ContextEntityRecallScorer(
     client=llm_client
     model_id="your-model-id"
-    )
+)
 ```
 
 **How It Works:**
