@@ -363,7 +363,7 @@ class Evaluation(Object):
             except OpCallError as e:
                 dataset_column_names = list(example.keys())
                 dataset_column_names_str = ", ".join(dataset_column_names[:3])
-                if len(dataset_column_names) > 3:
+                if len(dataset_column_names) > 10:
                     dataset_column_names_str += ", ..."
                 required_arg_names = [
                     param.name
@@ -377,19 +377,20 @@ class Evaluation(Object):
                     Call error: {e}
 
                                         If using the `Scorer` weave class, you can set the `scorer.column_map`
-                    attribute to map scorer parameter names to dataset columns.
+                    attribute to map scorer argument names to dataset columns.
                     
-                    For example, if the scorer expects "output", "input" and "ground_truth" and we have a dataset
-                    with columns "question" and "answer", `column_map` can be used to map the non-output parameter to like so:
+                    For example, if the `score` expects "output", "input" and "ground_truth" and we have a dataset
+                    with columns "question" and "answer", `column_map` can be used to map the non-output parameter like so:
                     {{"input": "question", "ground_truth": "answer"}}
                     
                     scorer argument names: {score_arg_names}
                     dataset keys: {example.keys()}
-                    scorer.column_map: {getattr(scorer, 'column_map', None)}
+                    scorer.column_map: {getattr(scorer, 'column_map', '{}')}
 
                     Options for resolving:
-                    a. change {scorer_name} argument names to match a subset of dataset column names ({dataset_column_names_str})
-                    b. change dataset column names to match expected {scorer_name} argument names: {required_arg_names}
+                    a. if using the `Scorer` weave class, you can set the `scorer.column_map` attribute to map scorer argument names to dataset column names or
+                    b. change the argument names the in the scoring function of {scorer_name} to match a subset of dataset column names: ({dataset_column_names_str}) or
+                    c. change dataset column names to match expected {scorer_name} argument names: {required_arg_names}
                     """
                 )
                 raise OpCallError(message)
