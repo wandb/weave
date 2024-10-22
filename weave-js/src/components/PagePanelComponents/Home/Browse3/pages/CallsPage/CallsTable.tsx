@@ -373,7 +373,8 @@ export const CallsTable: FC<{
     onExpand,
     columnIsRefExpanded,
     allowedColumnPatterns,
-    onAddFilter
+    onAddFilter,
+    calls.costsLoading
   );
 
   // This contains columns which are suitable for selection and raw data

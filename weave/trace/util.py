@@ -71,7 +71,7 @@ class ContextAwareThread(_Thread):
     (see call_context.py), but new threads do not automatically copy context from
     the parent, which can cause the call context to be lost -- not good!  This
     class automates contextvar copying so using this thread "just works" as the
-    user probaly expects.
+    user probably expects.
 
     You can achieve the same effect without this class by instead writing:
 
