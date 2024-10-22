@@ -43,12 +43,14 @@ And finally import the required libraries.
 ```python
 import base64
 import os
-import wave
-import numpy as np
-from openai import OpenAI
-from IPython.display import display
-import weave
 import time
+import wave
+
+import numpy as np
+from IPython.display import display
+from openai import OpenAI
+
+import weave
 
 ```
 
@@ -150,7 +152,7 @@ display(Audio("output.wav", rate=SAMPLE_RATE, autoplay=True))
 ```
 
 # Advanced Usage: Real Time Audio API with Weave
-<img src="https://i.imgur.com/ZiW3IVu.png" style="width:100%;height:auto;"/>
+<img src="https://i.imgur.com/ZiW3IVu.png"/>
 <details>
 <summary> (Advanced) Real Time Audio API with Weave </summary>
 OpenAI's real time API is a highly functional and reliable conversational API for building real time audio and text assistants.
@@ -179,21 +181,22 @@ Please note:
 
 
 ```python
+import base64
+import io
+import json
 import os
 import threading
 import time
-from typing import Optional, List, Dict
-import base64
-import json
 import wave
-import io
+from typing import Dict, List, Optional
 
-from set_env import set_env
-import weave
 import numpy as np
-import websocket
 import pyaudio
 import resampy
+import websocket
+from set_env import set_env
+
+import weave
 ```
 
 
@@ -245,9 +248,10 @@ OUTPUT_DEVICE_CHANNELS = 1  # Set to 1 for mono output
 
 
 ```python
-from typing import List, Optional, Union, Literal, Dict, Any
-from pydantic import BaseModel, Field, ValidationError
 from enum import Enum
+from typing import Any, Dict, List, Literal, Optional, Union
+
+from pydantic import BaseModel, Field, ValidationError
 
 
 class BaseEvent(BaseModel):
