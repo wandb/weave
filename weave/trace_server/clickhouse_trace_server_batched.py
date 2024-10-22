@@ -1480,6 +1480,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
             )
 
+        return tsi.ExecuteBatchActionRes()
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:

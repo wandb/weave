@@ -553,7 +553,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self, req: tsi.ExecuteBatchActionReq
     ) -> tsi.ExecuteBatchActionRes:
         return self._generic_request(
-            "/batch_action/execute",
+            "/execute/batch_action",
             req,
             tsi.ExecuteBatchActionReq,
             tsi.ExecuteBatchActionRes,
