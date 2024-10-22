@@ -20,7 +20,7 @@ export function op<T extends (...args: any[]) => any>(
     }
     const displayName = options?.callDisplayName ? options.callDisplayName(...params) : undefined;
     const thisArg = options?.bindThis;
-    const startCallPromise = client.startCall(
+    const startCallPromise = client.createCall(
       opWrapper,
       params,
       options?.parameterNames,

@@ -373,7 +373,7 @@ export class WeaveClient {
     return op.__savedRef;
   }
 
-  public async startCall(
+  public async createCall(
     opRef: OpRef | Op<any>,
     params: any[],
     parameterNames: ParameterNamesOption,
