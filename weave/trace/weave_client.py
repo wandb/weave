@@ -35,6 +35,7 @@ from weave.trace.refs import (
     parse_op_uri,
     parse_uri,
 )
+from weave.trace.sanitize import REDACT_KEYS, REDACTED_VALUE
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.settings import client_parallelism
@@ -698,7 +699,7 @@ class WeaveClient:
         project_id = self._project_id()
 
         def send_start_call() -> None:
-            inputs_json = to_json(inputs_with_refs, project_id, self)
+            inputs_json = to_json(inputs_with_refs, project_id, self, use_dictify=True)
             self.server.call_start(
                 CallStartReq(
                     start=StartedCallSchemaForInsert(
@@ -797,7 +798,7 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
-            output_json = to_json(call.output, project_id, self)
+            output_json = to_json(call.output, project_id, self, use_dictify=True)
             self.server.call_end(
                 CallEndReq(
                     end=EndedCallSchemaForInsert(
@@ -1518,13 +1519,6 @@ def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
     op = as_op(op)
     op.name = name
     return op
-
-
-REDACT_KEYS = (
-    "api_key",
-    "Authorization",
-)
-REDACTED_VALUE = "REDACTED"
 
 
 def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
