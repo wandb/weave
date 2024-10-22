@@ -179,8 +179,6 @@ const CallPageInnerVertical: FC<{
     callId: selectedCall.callId,
   });
 
-  console.log({rows, call, costLoading, selectedCall});
-
   const assumeCallIsSelectedCall = path == null || path === '';
   const [currentCall, setCurrentCall] = useState(call);
 

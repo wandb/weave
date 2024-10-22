@@ -383,7 +383,6 @@ export const useCallFlattenedTraceTree = (
     // Refetch the trace tree on delete or rename
     {refetchOnDelete: true}
   );
-  console.log({traceCalls});
   const traceCallsResult = useMemo(
     () => traceCalls.result ?? [],
     [traceCalls.result]
