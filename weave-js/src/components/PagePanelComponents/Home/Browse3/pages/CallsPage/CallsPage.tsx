@@ -52,7 +52,6 @@ export const CallsPage: FC<{
     props.initialFilter ?? {},
     props.onFilterUpdate
   );
-  console.log('HERE', props.filterModel, filter);
   const isEvaluationTable = useCurrentFilterIsEvaluationsFilter(
     filter,
     props.entity,
@@ -71,8 +70,11 @@ export const CallsPage: FC<{
     }
     return 'Traces';
   }, [filter.opVersionRefs, isEvaluationTable]);
-  console.log('marie', props.filterModel);
-  console.log('sweet', props, filter);
+  const memoizedFilter = useMemo(() => filter, [JSON.stringify(filter)]);
+  const memoizedFilterModel = useMemo(
+    () => props.filterModel,
+    [JSON.stringify(props.filterModel)]
+  );
 
   return (
     <WeaveHeaderExtrasProvider>
@@ -85,10 +87,10 @@ export const CallsPage: FC<{
             content: (
               <>
                 <CallsCharts
-                  // filter={filter}
                   entity={props.entity}
                   project={props.project}
-                  filterModel={props.filterModel}
+                  filter={memoizedFilter}
+                  // filterModel={props.filterModel}
                   // setFilterModel={props.setFilterModel}
                 />
                 <CallsTable

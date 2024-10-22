@@ -51,7 +51,6 @@ export const useCallsForQuery = (
     gridFilter,
     gridSort
   );
-  console.log('columns', columns);
   const calls = useCalls(
     entity,
     project,
@@ -66,7 +65,6 @@ export const useCallsForQuery = (
       refetchOnDelete: true,
     }
   );
-  console.log('Mefilter', filter, gridFilter);
   const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
     refetchOnDelete: true,
   });
@@ -105,7 +103,6 @@ export const useCallsForQuery = (
       includeCosts: true,
     }
   );
-  console.log('filter:', costs);
   const costResults = useMemo(() => {
     return costs.result ?? [];
   }, [costs]);
@@ -136,9 +133,9 @@ export const useCallsForQueryCharts = (
   project: string,
   filter: WFHighLevelCallFilter,
   gridFilter: GridFilterModel,
-  gridSort: GridSortModel,
-  expandedColumns: Set<string>,
-  columns?: string[]
+  columns: string[],
+  expandedColumns?: Set<string>,
+  gridSort?: GridSortModel
 ): {
   costsLoading: boolean;
   result: CallSchema[];
@@ -154,8 +151,6 @@ export const useCallsForQueryCharts = (
     gridFilter,
     gridSort
   );
-  console.log('banana', filter, gridFilter);
-  console.log('columns', columns);
   const calls = useCalls(
     entity,
     project,
@@ -170,7 +165,6 @@ export const useCallsForQueryCharts = (
       refetchOnDelete: true,
     }
   );
-  console.log('Me', calls);
   const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
     refetchOnDelete: true,
   });
@@ -209,7 +203,6 @@ export const useCallsForQueryCharts = (
       includeCosts: true,
     }
   );
-  console.log('costs:', costs);
   const costResults = useMemo(() => {
     return costs.result ?? [];
   }, [costs]);

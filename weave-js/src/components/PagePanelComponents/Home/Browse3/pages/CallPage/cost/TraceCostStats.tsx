@@ -111,7 +111,6 @@ export const getCostFromCostData = (
     }
   }
   const costNum = metrics.inputs.cost.total + metrics.outputs.cost.total;
-  console.log('costNum', costNum);
   const formattedCost = formatTokenCost(costNum);
 
   const costToolTipContent = <CostToolTip {...metrics} />;
@@ -123,7 +122,6 @@ export const getCostFromCostData = (
 };
 
 export const getCostsFromCellParams = (params: {[key: string]: any}) => {
-  console.log('params', params);
   const costData = getCostFromCellParams(params);
   return getCostFromCostData(costData);
 };

@@ -196,8 +196,6 @@ export const CallsTable: FC<{
     [filter, frozenFilter]
   );
 
-  console.log('marie filter', filter, filterModel);
-
   // 2. Filter (Unstructured Filter)
   const filterModelResolved = filterModel ?? DEFAULT_FILTER_CALLS;
 
@@ -251,7 +249,6 @@ export const CallsTable: FC<{
     paginationModelResolved,
     expandedRefCols
   );
-  console.log('calls', calls);
   // Here, we only update our local state once the calls have loaded.
   // If we were not to do this, we would see a flicker of an empty table
   // before the calls are loaded. Since the columns are data-driven, this

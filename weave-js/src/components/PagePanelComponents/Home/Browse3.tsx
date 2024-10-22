@@ -672,7 +672,6 @@ const CallPageBinding = () => {
 const CallsPageBinding = () => {
   const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
-  console.log('taylor', query);
   const initialFilter = useMemo(() => {
     if (tab === 'evaluations') {
       return {
@@ -737,7 +736,6 @@ const CallsPageBinding = () => {
     () => getValidFilterModel(query.filters, DEFAULT_FILTER_CALLS),
     [query.filters]
   );
-  console.log('filterModel', filterModel, query);
   const setFilterModel = (newModel: GridFilterModel) => {
     const newQuery = new URLSearchParams(location.search);
     if (newModel.items.length === 0) {
