@@ -14,7 +14,7 @@ def test_actions_execute_batch(client: WeaveClient):
 
     # Warning: Test hacks below. This endpoint doesn't have an equivalent read endpoint, so we're going to verify correct behavior by inspecting the CH table directly.
     ch_client = ClickHouseTraceServer.from_env().ch_client
-    res = ch_client.query("""
+    query_res = ch_client.query("""
     SELECT project_id,
            call_id,
            id,
@@ -27,9 +27,9 @@ def test_actions_execute_batch(client: WeaveClient):
     GROUP BY project_id, call_id, id
     ORDER BY call_id ASC
     """)
-    rows = list(res.named_results())
+    rows = list(query_res.named_results())
     # TODO(Tim): This is ugly and bad..we need a better pattern.
-    db_project_id = client.server.server._idc.ext_to_int_project_id(client.project)
+    db_project_id = client.server.server._idc.ext_to_int_project_id(client.project)  # type: ignore
     assert len(rows) == 2
     assert {
         "project_id": rows[0]["project_id"],
@@ -67,23 +67,23 @@ def test_actions_execute_batch(client: WeaveClient):
 def test_actions_ack_batch(client: WeaveClient):
     # Build on previous test by adding an action and then acking it.
     server = client.server
-    res = server.actions_execute_batch(
+    exec_res = server.actions_execute_batch(
         tsi.ActionsExecuteBatchReq(
             project_id=client.project, call_ids=["3", "4"], id="1"
         )
     )
-    assert res.id == "1"
+    assert exec_res.id == "1"
 
     # Ack call_id 3.
-    res = server.actions_ack_batch(
+    ack_res = server.actions_ack_batch(
         tsi.ActionsAckBatchReq(
             project_id=client.project, call_ids=["3"], id="1", succeeded=True
         )
     )
-    assert res.id == "1"
+    assert ack_res.id == "1"
     ch_client = ClickHouseTraceServer.from_env().ch_client
-    db_project_id = client.server.server._idc.ext_to_int_project_id(client.project)
-    res = ch_client.query(f"""
+    db_project_id = client.server.server._idc.ext_to_int_project_id(client.project)  # type: ignore
+    query_res = ch_client.query(f"""
     SELECT project_id,
            call_id,
            id,
@@ -97,20 +97,20 @@ def test_actions_ack_batch(client: WeaveClient):
     GROUP BY project_id, call_id, id
     ORDER BY call_id ASC
     """)
-    rows = list(res.named_results())
+    rows = list(query_res.named_results())
     assert len(rows) == 2
     assert rows[0]["finished_at"] is not None
     assert rows[1]["finished_at"] is None
     # call_id 1 should now be finished, but call_id 2 should not.
 
     # Now let's ack call_id 4.
-    res = server.actions_ack_batch(
+    ack_res = server.actions_ack_batch(
         tsi.ActionsAckBatchReq(
             project_id=client.project, call_ids=["4"], id="1", succeeded=False
         )
     )
-    assert res.id == "1"
-    res = ch_client.query(f"""
+    assert ack_res.id == "1"
+    query_res = ch_client.query(f"""
     SELECT project_id,
            call_id,
            id,
@@ -124,7 +124,7 @@ def test_actions_ack_batch(client: WeaveClient):
     GROUP BY project_id, call_id, id
     ORDER BY call_id ASC
     """)
-    rows = list(res.named_results())
+    rows = list(query_res.named_results())
     assert len(rows) == 2
     assert rows[1]["finished_at"] is None
     assert rows[1]["failed_at"] is not None
