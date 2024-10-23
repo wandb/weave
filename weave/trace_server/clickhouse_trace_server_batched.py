@@ -1438,17 +1438,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = TABLE_ACTIONS.insertMany(rows).prepare(database_type="clickhouse")
         self._insert(TABLE_ACTIONS.name, prepared.data, prepared.column_names)
 
-        # Convert timestamp so that it can be serialized when pushing to redis.
-        rows = [
-            {
-                **row,
-                "finished_at": received_at.isoformat() if row["finished_at"] else None,
-                "failed_at": received_at.isoformat() if row["failed_at"] else None,
-            }
-            for row in rows
-        ]
-        for row in rows:
-            self.action_queue_client.push(row)
         return tsi.ActionsAckBatchRes(
             project_id=req.project_id, call_ids=req.call_ids, id=req.id
         )
