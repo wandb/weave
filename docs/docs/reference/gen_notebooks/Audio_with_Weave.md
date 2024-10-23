@@ -11,7 +11,16 @@
 
 # How to use Weave with Audio Data: An OpenAI Example
 
-This demo uses the OpenAI chat completions API with GPT 4o Audio Preview to generate audio responses to text prompts.
+This demo uses the OpenAI chat completions API with GPT 4o Audio Preview to generate audio responses to text prompts and track these in Weave.
+
+
+<img src="https://i.imgur.com/OUfsZ2x.png"></img>
+
+For the advanced use case, we leverage the OpenAI Realtime API to stream audio in real time. Click the following thumbnail to view the video demonstration, or click [here](https://www.youtube.com/watch?v=lnnd73xDElw).
+
+[![Everything Is AWESOME](https://img.youtube.com/vi/lnnd73xDElw/0.jpg)](https://www.youtube.com/watch?v=lnnd73xDElw "Everything Is AWESOME")
+
+
 
 ## Setup
 
@@ -25,13 +34,11 @@ Start by installing the OpenAI (`openai`) and Weave (`weave`) dependencies, as w
 !pip install set-env-colab-kaggle-dotenv -q # for env var
 ```
 
-Next, load the required API keys for OpenAI and Weave.
+Next, load the required API keys for OpenAI and Weave. Here, we use set_env which is compatible with google colab's secret keys manager, and is an alternative to colab's specific `google.colab.userdata`. See: [here](https://pypi.org/project/set-env-colab-kaggle-dotenv/) for usage instructions. 
 
 
 ```python
-# Set environment variables
-# See: https://pypi.org/project/set-env-colab-kaggle-dotenv/ for usage instructions.
-from set_env import set_env
+# Set environment variables.
 
 _ = set_env("OPENAI_API_KEY")
 _ = set_env("WANDB_API_KEY")
@@ -63,7 +70,7 @@ client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 weave.init("openai-audio-chat")
 ```
 
-Now we will define our weave op and OpenAI completions request.
+Now we will define our OpenAI completions request and add our Weave decorator (op).
 
 Here, we define the function `prompt_endpont_and_log_trace`. This function has three primary steps:
 1. We make a completion object using the `GPT 4o Audio Preview` model that supports text and audio inputs and outputs.
@@ -129,9 +136,6 @@ def prompt_endpoint_and_log_trace(system_prompt=None, user_prompt=None):
 ## Testing
 
 Run the following cell. The system and user prompt will be stored in a Weave trace as well as the output audio.
-
-<img src="https://i.imgur.com/OUfsZ2x.png"></img>
-
 After running the cell, click the link next to the "🍩" emoji to view your trace.
 
 
@@ -148,7 +152,7 @@ prompt_endpoint_and_log_trace(
 display(Audio("output.wav", rate=SAMPLE_RATE, autoplay=True))
 ```
 
-# Advanced Usage: Real Time Audio API with Weave
+# Advanced Usage: Real Time Audio API with Weave #TODO: Record video of weave traces and me chatting with it w/ the terminal output side by side. 
 <img src="https://i.imgur.com/ZiW3IVu.png"/>
 <details>
 <summary> (Advanced) Real Time Audio API with Weave </summary>
@@ -160,7 +164,6 @@ Please note:
     - On MacOS you will need to install `portaudio` via Brew (see [here](https://formulae.brew.sh/formula/portaudio)) for Pyaudio to function.
 - We implement the complete OAI Real Time API schema in Pydantic for greater legibility.
 - The `enable_audio_playback` toggle will cause playback of assistant outputted audio. Please note that **headphones are required if this is enabled**, as echo detection requires a highly complex implementation.
-
 
 
 ## Requirements Setup
@@ -222,7 +225,7 @@ for i, device in devices_data.items():
 
 ```python
 INPUT_DEVICE_INDEX = 3  # @param                                                 # Choose based on device list above. Make sure device has > 0 input channels.
-OUTPUT_DEVICE_INDEX = 4  # @param                                                # Chose based on device list above. Make sure device has > 0 output channels.
+OUTPUT_DEVICE_INDEX = 12  # @param                                                # Chose based on device list above. Make sure device has > 0 output channels.
 enable_audio_playback = True  # @param {type:"boolean"}                           # Toggle on assistant audio playback. Requires headphones.
 
 # Audio recording and streaming parameters
@@ -241,7 +244,10 @@ OAI_SAMPLE_RATE = (
 OUTPUT_DEVICE_CHANNELS = 1  # Set to 1 for mono output
 ```
 
-## OpenAI Real Time API Schema Implementation and Audio Writer
+## OpenAI Real Time API Schema Implementation
+
+<details>
+<summary> (API Helper Code) Pydantic Wrappers for OpenAI Realtime API </summary>
 
 
 ```python
@@ -849,6 +855,10 @@ def parse_server_event(event_data: dict) -> ServerEvent:
         raise ValueError(f"Failed to parse event of type {event_type}: {str(e)}")
 ```
 
+</details>
+
+## Audio Stream Writer (To Disk and In Memory)
+
 
 ```python
 class StreamingWavWriter:
@@ -908,7 +918,7 @@ The realtime (RT) audio model uses a websocket to send events to OpenAI's Realti
 
     - RESPONSE_AUDIO_DELTA:
     
-        The server sends a new chunk of assistant response audio. We append this to the ongoing response data vai the response ID, and add this to the output stream for playback.
+        The server sends a new chunk of assistant response audio. We append this to the ongoing response data via the response ID, and add this to the output stream for playback.
 
     - RESPONSE_DONE:
     
