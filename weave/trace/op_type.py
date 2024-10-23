@@ -29,6 +29,8 @@ from weave.trace_server.trace_server_interface_util import str_digest
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
 
+CODE_DEP_ERROR_SENTINEL = "<error>"
+
 
 def type_code(type_: Any) -> str:
     if isinstance(type_, py_types.GenericAlias) or isinstance(
@@ -329,7 +331,7 @@ def get_code_deps_safe(
         print(f"Error getting code deps for {fn}: {e}")
         return {
             "import_code": [],
-            "code": ["<error>"],
+            "code": [CODE_DEP_ERROR_SENTINEL],
             "warnings": [f"Error getting code dependencies for function {fn}: {e}"],
         }
 

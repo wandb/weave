@@ -240,7 +240,7 @@ jobs:
             'mistral1',
             'notdiamond',
             'openai',
-            'pandas',
+            'pandas-test',
           ]
       fail-fast: false
     services:

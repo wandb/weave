@@ -1,6 +1,7 @@
 import pandas as pd
-
+import pytest
 import weave
+from datetime import datetime
 
 
 def test_op_save_with_global_df(client):
@@ -8,7 +9,7 @@ def test_op_save_with_global_df(client):
 
     @weave.op()
     def my_op(a: str) -> str:
-        # modify the global df
+        # modify df outside of op scope
         prev_val = df.loc[df.index[0], "a"]
         df.loc[df.index[0], "a"] = a
         return prev_val
