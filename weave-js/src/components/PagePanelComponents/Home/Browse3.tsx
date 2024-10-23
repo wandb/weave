@@ -29,9 +29,22 @@ import {
   useParams,
 } from 'react-router-dom';
 
+import {
+  ProjectInfo,
+  useProjectInfo,
+} from '../../../common/hooks/useProjectInfo';
+import {
+  MaybeUserInfo,
+  UserInfo,
+  useViewerInfo,
+} from '../../../common/hooks/useViewerInfo';
+import {safeLocalStorage} from '../../../core/util/localStorage';
+import {useDeepMemo} from '../../../hookUtils';
 import {URL_BROWSE3} from '../../../urls';
+import {Alert} from '../../Alert';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
+import {Loading} from '../../Loading';
 import {ComparePage} from './Browse3/compare/ComparePage';
 import {
   baseContext,
@@ -47,10 +60,7 @@ import {
 } from './Browse3/context';
 import {FullPageButton} from './Browse3/FullPageButton';
 import {getValidFilterModel} from './Browse3/grid/filters';
-import {
-  DEFAULT_PAGE_SIZE,
-  getValidPaginationModel,
-} from './Browse3/grid/pagination';
+import {getValidPaginationModel} from './Browse3/grid/pagination';
 import {getValidPinModel, removeAlwaysLeft} from './Browse3/grid/pin';
 import {getValidSortModel} from './Browse3/grid/sort';
 import {BoardPage} from './Browse3/pages/BoardPage';
@@ -79,6 +89,10 @@ import {OpsPage} from './Browse3/pages/OpsPage/OpsPage';
 import {OpVersionPage} from './Browse3/pages/OpsPage/OpVersionPage';
 import {OpVersionsPage} from './Browse3/pages/OpsPage/OpVersionsPage';
 import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
+import {
+  getDefaultView,
+  getDefaultViewId,
+} from './Browse3/pages/SavedViews/savedViewUtil';
 import {ScorersPage} from './Browse3/pages/ScorersPage/ScorersPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
@@ -87,7 +101,12 @@ import {
   useWFHooks,
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
-import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import {
+  useGetTraceServerClientContext,
+  useHasTraceServerClientContext,
+} from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import {TraceObjSchema} from './Browse3/pages/wfReactInterface/traceServerClientTypes';
+import {projectIdFromParts} from './Browse3/pages/wfReactInterface/tsDataModelHooks';
 import {TableRowSelectionProvider} from './TableRowSelectionContext';
 import {useDrawerResize} from './useDrawerResize';
 
@@ -642,123 +661,347 @@ const CallPageBinding = () => {
   );
 };
 
-// TODO(tim/weaveflow_improved_nav): Generalize this
-const CallsPageBinding = () => {
-  const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
-  const query = useURLSearchParamsDict();
-  const initialFilter = useMemo(() => {
-    if (tab === 'evaluations') {
-      return {
-        frozen: true,
-        opVersionRefs: [
-          opVersionKeyToRefUri({
-            entity,
-            project,
-            opId: EVALUATE_OP_NAME_POST_PYDANTIC,
-            versionHash: '*',
-          }),
-        ],
-      };
-    }
-    if (query.filter === undefined) {
-      return {};
-    }
-    try {
-      return JSON.parse(query.filter);
-    } catch (e) {
-      console.log(e);
-      return {};
-    }
-  }, [query.filter, entity, project, tab]);
+type CallsPageLastViewProps = {
+  entity: string;
+  project: string;
+  tab: string;
+};
+
+const CallsPageLastView = ({entity, project, tab}: CallsPageLastViewProps) => {
+  const location = useLocation();
+  const {loading: loadingProjectInfo, projectInfo} = useProjectInfo(
+    entity,
+    project
+  );
+  if (loadingProjectInfo) {
+    return <Loading />;
+  }
+  if (!projectInfo) {
+    return <Alert severity="error">Invalid project: {project}</Alert>;
+  }
+
+  // Traces table might be under 'calls'
+  const table = tab === 'evaluations' ? 'evaluations' : 'traces';
+  const localStorageKey = `SavedView.lastViewed.${projectInfo.internalIdEncoded}.${table}`;
+  const defaultView = getDefaultViewId(table);
+  const lastView = safeLocalStorage.getItem(localStorageKey) ?? defaultView;
+
+  // Create a new URLSearchParams object from the current query parameters
+  const searchParams = new URLSearchParams();
+  searchParams.set('view', lastView);
+
+  // Return the Redirect component to navigate to the updated URL
+  return <Redirect to={`${location.pathname}?${searchParams.toString()}`} />;
+};
+
+type CallsPageLoadViewProps = {
+  entity: string;
+  project: string;
+  tab: string;
+  view?: string;
+};
+
+const CallsPageLoadView = ({
+  entity,
+  project,
+  tab,
+  view,
+}: CallsPageLoadViewProps) => {
+  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+  const {loading: loadingProjectInfo, projectInfo} = useProjectInfo(
+    entity,
+    project
+  );
+
+  if (loadingUserInfo || loadingProjectInfo) {
+    return <Loading />;
+  }
+  if (!userInfo) {
+    return <Alert severity="error">User not found</Alert>;
+  }
+  if (!projectInfo) {
+    return <Alert severity="error">Invalid project: {project}</Alert>;
+  }
+
+  return (
+    <CallsPageLoadViewWithUser
+      entity={entity}
+      project={project}
+      tab={tab}
+      view={view}
+      userInfo={userInfo}
+      projectInfo={projectInfo}
+    />
+  );
+};
+
+type CallsPageLoadViewWithUserProps = {
+  entity: string;
+  project: string;
+  tab: string;
+  view?: string;
+  userInfo: UserInfo;
+  projectInfo: ProjectInfo;
+};
+
+const CallsPageLoadViewWithUser = ({
+  entity,
+  project,
+  tab,
+  view,
+  userInfo,
+  projectInfo,
+}: CallsPageLoadViewWithUserProps) => {
+  const projectId = projectIdFromParts({entity, project});
+
+  // Traces table might be under 'calls'
+  const table = tab === 'evaluations' ? 'evaluations' : 'traces';
+  const [views, setViews] = useState<TraceObjSchema[] | null>(null);
+
+  const getTsClient = useGetTraceServerClientContext();
+  const tsClient = getTsClient();
+  const fetchViews = useCallback(() => {
+    tsClient
+      .objsQuery({
+        project_id: projectId,
+        filter: {
+          // TODO: Could we filter at query time based on the page
+          // so we don't have to do it on the result?
+          base_object_classes: ['SavedView'],
+          latest_only: true,
+        },
+      })
+      .then(res => {
+        // We always add a synthetic "Default" view.
+        const viewsForPage = res.objs.filter(v => v.val.table === table);
+        viewsForPage.push(getDefaultView(projectId, table));
+        setViews(viewsForPage);
+      })
+      .catch(err => {
+        console.error(err);
+      });
+  }, [projectId, tsClient, table]);
+
+  // Load view data on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(fetchViews, [table]);
+
+  if (views == null) {
+    return <Loading />;
+  }
+
+  const defaultView = views[views.length - 1];
+  let baseView = null;
+  if (view) {
+    baseView = views.find(v => v.object_id === view) ?? defaultView;
+  } else {
+    baseView = defaultView;
+  }
+
+  return (
+    <CallsPageLoaded
+      entity={entity}
+      project={project}
+      table={table}
+      baseView={baseView}
+      fetchViews={fetchViews}
+      views={views}
+      userInfo={userInfo}
+      projectInfo={projectInfo}
+    />
+  );
+};
+
+type CallsPageLoadedProps = {
+  entity: string;
+  project: string;
+  table: string;
+  baseView: TraceObjSchema;
+  fetchViews: () => void;
+  views: TraceObjSchema[];
+  userInfo: MaybeUserInfo;
+  projectInfo: ProjectInfo;
+};
+
+const CallsPageLoaded = ({
+  entity,
+  project,
+  table,
+  baseView,
+  fetchViews,
+  views,
+  userInfo,
+  projectInfo,
+}: CallsPageLoadedProps) => {
   const history = useHistory();
-  const routerContext = useWeaveflowCurrentRouteContext();
+  const location = useLocation();
+  const currentViewerId = userInfo ? userInfo.id : null;
+  const isReadonly = !currentViewerId || !userInfo?.teams.includes(entity);
+
+  const onRecordLastView = useCallback(
+    (loadedView: string) => {
+      const localStorageKey = `SavedView.lastViewed.${projectInfo.internalIdEncoded}.${table}`;
+      safeLocalStorage.setItem(localStorageKey, loadedView);
+    },
+    [projectInfo.internalIdEncoded, table]
+  );
+
+  const viewDef = baseView.val.definition;
+  const query = useURLSearchParamsDict();
+
+  const initialFilter = useDeepMemo(
+    useMemo(() => {
+      if (table === 'evaluations') {
+        return {
+          frozen: true,
+          opVersionRefs: [
+            opVersionKeyToRefUri({
+              entity,
+              project,
+              opId: EVALUATE_OP_NAME_POST_PYDANTIC,
+              versionHash: '*',
+            }),
+          ],
+        };
+      }
+      if (query.filter === undefined) {
+        return viewDef.filter ?? {};
+      }
+      try {
+        return JSON.parse(query.filter);
+      } catch (e) {
+        console.log(e);
+        return {};
+      }
+    }, [query.filter, entity, project, table, viewDef])
+  );
+
   const onFilterUpdate = useCallback(
     filter => {
-      history.push(routerContext.callsUIUrl(entity, project, filter));
+      const {search} = history.location;
+      const newQuery = new URLSearchParams(search);
+      newQuery.set('filter', JSON.stringify(filter));
+      history.push({search: newQuery.toString()});
     },
-    [history, entity, project, routerContext]
+    [history]
   );
 
-  const location = useLocation();
-  const columnVisibilityModel = useMemo(() => {
-    try {
-      return JSON.parse(query.cols);
-    } catch (e) {
-      return {};
-    }
-  }, [query.cols]);
-  const setColumnVisibilityModel = (newModel: GridColumnVisibilityModel) => {
-    const newQuery = new URLSearchParams(location.search);
-    newQuery.set('cols', JSON.stringify(newModel));
-    history.push({search: newQuery.toString()});
-  };
-
-  const pinModel = useMemo(
-    () => getValidPinModel(query.pin, DEFAULT_PIN_CALLS, ALWAYS_PIN_LEFT_CALLS),
-    [query.pin]
+  const columnVisibilityModel = useDeepMemo(
+    useMemo(() => {
+      if (query.cols) {
+        try {
+          return JSON.parse(query.cols);
+        } catch (e) {
+          return {};
+        }
+      }
+      return viewDef.cols ?? {};
+    }, [query.cols, viewDef])
   );
-  const setPinModel = (newModel: GridPinnedColumnFields) => {
-    const newQuery = new URLSearchParams(location.search);
-    newQuery.set(
-      'pin',
-      JSON.stringify(removeAlwaysLeft(newModel, ALWAYS_PIN_LEFT_CALLS))
-    );
-    history.push({search: newQuery.toString()});
-  };
-
-  const filterModel = useMemo(
-    () => getValidFilterModel(query.filters, DEFAULT_FILTER_CALLS),
-    [query.filters]
+  const setColumnVisibilityModel = useCallback(
+    (newModel: GridColumnVisibilityModel) => {
+      const newQuery = new URLSearchParams(location.search);
+      newQuery.set('cols', JSON.stringify(newModel));
+      history.push({search: newQuery.toString()});
+    },
+    [history, location.search]
   );
-  const setFilterModel = (newModel: GridFilterModel) => {
-    const newQuery = new URLSearchParams(location.search);
-    if (newModel.items.length === 0) {
-      newQuery.delete('filters');
-    } else {
+
+  const pinModel = useDeepMemo(
+    useMemo(() => {
+      if (query.pin) {
+        return getValidPinModel(
+          query.pin,
+          DEFAULT_PIN_CALLS,
+          ALWAYS_PIN_LEFT_CALLS
+        );
+      }
+      return viewDef.pin ?? {};
+    }, [query.pin, viewDef])
+  );
+  const setPinModel = useCallback(
+    (newModel: GridPinnedColumnFields) => {
+      const newQuery = new URLSearchParams(location.search);
+      newQuery.set(
+        'pin',
+        JSON.stringify(removeAlwaysLeft(newModel, ALWAYS_PIN_LEFT_CALLS))
+      );
+      history.push({search: newQuery.toString()});
+    },
+    [history, location.search]
+  );
+
+  const filterModel = useDeepMemo(
+    useMemo(() => {
+      if (query.filters) {
+        return getValidFilterModel(query.filters, DEFAULT_FILTER_CALLS);
+      }
+      return viewDef.filters ?? DEFAULT_FILTER_CALLS;
+    }, [query.filters, viewDef])
+  );
+  const setFilterModel = useCallback(
+    (newModel: GridFilterModel) => {
+      // When there are no items in the newModel, it would be tempting
+      // to remove the query parameter entirely, however, that would cause
+      // the value from the saved view to get used, which is a problem if you
+      // just removed it.
+      const newQuery = new URLSearchParams(location.search);
       newQuery.set('filters', JSON.stringify(newModel));
-    }
-    history.push({search: newQuery.toString()});
-  };
-
-  const sortModel = useMemo(
-    () => getValidSortModel(query.sort, DEFAULT_SORT_CALLS),
-    [query.sort]
+      history.push({search: newQuery.toString()});
+    },
+    [history, location.search]
   );
-  const setSortModel = (newModel: GridSortModel) => {
-    const newQuery = new URLSearchParams(location.search);
-    if (newModel.length === 0) {
-      newQuery.delete('sort');
-    } else {
+
+  const sortModel = useDeepMemo(
+    useMemo(() => {
+      if (query.sort) {
+        return getValidSortModel(query.sort, DEFAULT_SORT_CALLS);
+      }
+      return viewDef.sort ?? DEFAULT_SORT_CALLS;
+    }, [query.sort, viewDef])
+  );
+  const setSortModel = useCallback(
+    (newModel: GridSortModel) => {
+      const newQuery = new URLSearchParams(location.search);
       newQuery.set('sort', JSON.stringify(newModel));
-    }
-    history.push({search: newQuery.toString()});
-  };
-
-  const paginationModel = useMemo(
-    () => getValidPaginationModel(query.page, query.pageSize),
-    [query.page, query.pageSize]
+      history.push({search: newQuery.toString()});
+    },
+    [history, location.search]
   );
-  const setPaginationModel = (newModel: GridPaginationModel) => {
-    const newQuery = new URLSearchParams(location.search);
-    const {page, pageSize} = newModel;
-    // TODO: If we change page size, should we reset page to 0?
-    if (page === 0) {
-      newQuery.delete('page');
-    } else {
-      newQuery.set('page', page.toString());
-    }
-    if (pageSize === DEFAULT_PAGE_SIZE) {
-      newQuery.delete('pageSize');
-    } else {
+
+  const paginationModel = useDeepMemo(
+    useMemo(
+      () =>
+        getValidPaginationModel(query.page, query.pageSize ?? viewDef.pageSize),
+      [query.page, query.pageSize, viewDef]
+    )
+  );
+  const setPaginationModel = useCallback(
+    (newModel: GridPaginationModel) => {
+      const newQuery = new URLSearchParams(location.search);
+      const {page, pageSize} = newModel;
+      // TODO: If we change page size, should we reset page to 0?
+      if (page === 0) {
+        newQuery.delete('page');
+      } else {
+        newQuery.set('page', page.toString());
+      }
       newQuery.set('pageSize', pageSize.toString());
-    }
-    history.push({search: newQuery.toString()});
-  };
+      history.push({search: newQuery.toString()});
+    },
+    [history, location.search]
+  );
 
   return (
     <CallsPage
+      currentViewerId={currentViewerId}
+      isReadonly={isReadonly}
       entity={entity}
       project={project}
+      baseView={baseView}
+      views={views}
+      fetchViews={fetchViews}
+      onRecordLastView={onRecordLastView}
       initialFilter={initialFilter}
       onFilterUpdate={onFilterUpdate}
       columnVisibilityModel={columnVisibilityModel}
@@ -771,6 +1014,23 @@ const CallsPageBinding = () => {
       setSortModel={setSortModel}
       paginationModel={paginationModel}
       setPaginationModel={setPaginationModel}
+    />
+  );
+};
+
+const CallsPageBinding = () => {
+  const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
+  const query = useURLSearchParamsDict();
+  const loadLastView = Object.keys(query).length === 0;
+  if (loadLastView) {
+    return <CallsPageLastView entity={entity} project={project} tab={tab} />;
+  }
+  return (
+    <CallsPageLoadView
+      entity={entity}
+      project={project}
+      tab={tab}
+      view={query.view}
     />
   );
 };
