@@ -60,16 +60,14 @@ export function op<T extends (...args: any[]) => any>(
         return wrappedIterator as unknown as ReturnType<T>;
       } else {
         const endTime = new Date();
-        client.finishCall(result, currentCall, parentCall, options?.summarize, endTime, startCallPromise);
+        await client.finishCall(result, currentCall, parentCall, options?.summarize, endTime, startCallPromise);
         return result;
       }
     } catch (error) {
       // console.error(`Op ${actualOpName} failed:`, error);
       const endTime = new Date();
-      client.finishCallWithException(error, currentCall, parentCall, endTime, startCallPromise);
+      await client.finishCallWithException(error, currentCall, parentCall, endTime, startCallPromise);
       throw error;
-    } finally {
-      // No need to do anything here.
     }
   };
 

@@ -80,9 +80,22 @@ export class WeaveClient {
     };
   }
 
+  private batchProcessingPromises: Set<Promise<void>> = new Set();
   private scheduleBatchProcessing() {
     if (this.batchProcessTimeout || this.isBatchProcessing) return;
-    this.batchProcessTimeout = setTimeout(() => this.processBatch(), this.BATCH_INTERVAL);
+    const promise = new Promise<void>(resolve => {
+      this.batchProcessTimeout = setTimeout(() => this.processBatch().then(resolve), this.BATCH_INTERVAL);
+    });
+    this.batchProcessingPromises.add(promise);
+    promise.finally(() => {
+      this.batchProcessingPromises.delete(promise);
+    });
+  }
+
+  public async waitForBatchProcessing() {
+    while (this.batchProcessingPromises.size > 0) {
+      await Promise.all(this.batchProcessingPromises);
+    }
   }
 
   private async processBatch() {
