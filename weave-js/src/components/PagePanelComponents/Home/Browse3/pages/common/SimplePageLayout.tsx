@@ -348,6 +348,7 @@ export const SimpleKeyValueTable: FC<{
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'flex-start',
+                  width: 100,
                 }}>
                 {key}
               </td>
