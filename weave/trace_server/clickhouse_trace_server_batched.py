@@ -49,7 +49,6 @@ import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
-from pydantic import BaseModel
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
@@ -81,7 +80,6 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.collections.action_collection import (
-    ActionOpMapping,
     ActionWithConfig,
 )
 from weave.trace_server.interface.collections.collection import (
@@ -1428,94 +1426,126 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def execute_batch_action(
         self, req: tsi.ExecuteBatchActionReq
     ) -> tsi.ExecuteBatchActionRes:
-        if req.mapping is None and req.mapping_ref is None:
-            raise InvalidRequest("Either mapping or mapping_ref must be provided")
-        if req.mapping is not None and req.mapping_ref is not None:
-            raise InvalidRequest("Only one of mapping or mapping_ref can be provided")
+        from weave.trace_server.interface.collections.action_collection import (
+            action_with_config_collection,
+        )
+        # if req.mapping is None and req.mapping_ref is None:
+        #     raise InvalidRequest("Either mapping or mapping_ref must be provided")
+        # if req.mapping is not None and req.mapping_ref is not None:
+        #     raise InvalidRequest("Only one of mapping or mapping_ref can be provided")
 
-        mapping: ActionOpMapping
-        mapping_ref: str
-        if req.mapping is not None:
-            mapping = req.mapping
-            from weave.trace_server.interface.collections.action_collection import (
-                action_op_mapping_collection,
-                action_with_config_collection,
-            )
+        # mapping: ActionOpMapping
+        # mapping_ref: str
+        # if req.mapping is not None:
+        #     mapping = req.mapping
+ 
 
-            action_ref: str
-            if isinstance(mapping.action, dict):
-                mapping.action = ActionWithConfig.model_validate(mapping.action)
-            if isinstance(mapping.action, ActionWithConfig):
-                action_digest = self.obj_create(
-                    tsi.ObjCreateReq(
-                        collection_name=action_with_config_collection.name,
-                        obj=tsi.ObjSchemaForInsert(
-                            project_id=req.project_id,
-                            object_id=mapping.action.name,
-                            val=mapping.action.model_dump(),
-                        ),
-                    )
-                ).digest
-                action_ref = ri.InternalObjectRef(
-                    project_id=req.project_id,
-                    name=mapping.action.name,
-                    version=action_digest,
-                ).uri()
-            elif isinstance(mapping.action, str):
-                action_ref = mapping.action
-            else:
-                raise InvalidRequest("Invalid action")
+        #     action_ref: str
+        #     if isinstance(mapping.action, dict):
+        #         mapping.action = ActionWithConfig.model_validate(mapping.action)
+        #     if isinstance(mapping.action, ActionWithConfig):
+        #         action_digest = self.obj_create(
+        #             tsi.ObjCreateReq(
+        #                 collection_name=action_with_config_collection.name,
+        #                 obj=tsi.ObjSchemaForInsert(
+        #                     project_id=req.project_id,
+        #                     object_id=mapping.action.name,
+        #                     val=mapping.action.model_dump(),
+        #                 ),
+        #             )
+        #         ).digest
+        #         action_ref = ri.InternalObjectRef(
+        #             project_id=req.project_id,
+        #             name=mapping.action.name,
+        #             version=action_digest,
+        #         ).uri()
+        #     elif isinstance(mapping.action, str):
+        #         action_ref = mapping.action
+        #     else:
+        #         raise InvalidRequest("Invalid action")
 
-            mapping_val = mapping.model_dump()
-            mapping_val["action"] = action_ref  # YUK YUK YUK YUK
+        #     mapping_val = mapping.model_dump()
+        #     mapping_val["action"] = action_ref  # YUK YUK YUK YUK
 
-            digest = self.obj_create(
+        #     digest = self.obj_create(
+        #         tsi.ObjCreateReq(
+        #             collection_name=action_op_mapping_collection.name,
+        #             obj=tsi.ObjSchemaForInsert(
+        #                 project_id=req.project_id,
+        #                 object_id=mapping.name,
+        #                 val=mapping_val,
+        #             ),
+        #         )
+        #     ).digest
+        #     mapping_ref = ri.InternalObjectRef(
+        #         project_id=req.project_id,
+        #         name=mapping.name,
+        #         version=digest,
+        #     ).uri()
+        # elif req.mapping_ref is not None:
+        #     mapping_ref = req.mapping_ref
+        #     mapping_val_res = self.refs_read_batch(
+        #         tsi.RefsReadBatchReq(refs=[req.mapping_ref])
+        #     )
+        #     mapping_val = mapping_val_res.vals[0]
+        #     maybe_action = mapping_val.get("action")
+        #     if isinstance(maybe_action, dict):
+        #         action_dict = maybe_action
+        #     elif isinstance(maybe_action, str):
+        #         action_dict_res = self.refs_read_batch(
+        #             tsi.RefsReadBatchReq(refs=[maybe_action])
+        #         )
+        #         action_dict = action_dict_res.vals[0]
+
+        #     mapping_val["action"] = action_dict
+        #     print(f"mapping_val: {mapping_val}")
+        #     mapping = tsi.ActionOpMapping.model_validate(mapping_val)
+        # else:
+        #     raise InvalidRequest("Either mapping or mapping_ref must be provided")
+        action = req.action
+        action_ref = req.action_ref
+
+        if action is None and action_ref is None:
+            raise InvalidRequest("Either action or action_ref must be provided")
+        if action is not None and action_ref is not None:
+            raise InvalidRequest("Only one of action or action_ref can be provided")
+
+        if isinstance(action, ActionWithConfig):
+            action_digest = self.obj_create(
                 tsi.ObjCreateReq(
-                    collection_name=action_op_mapping_collection.name,
+                    collection_name=action_with_config_collection.name,
                     obj=tsi.ObjSchemaForInsert(
                         project_id=req.project_id,
-                        object_id=mapping.name,
-                        val=mapping_val,
+                        object_id=action.name,
+                        val=action.model_dump(),
                     ),
                 )
             ).digest
-            mapping_ref = ri.InternalObjectRef(
+            action_ref = ri.InternalObjectRef(
                 project_id=req.project_id,
-                name=mapping.name,
-                version=digest,
+                name=action.name,
+                version=action_digest,
             ).uri()
-        elif req.mapping_ref is not None:
-            mapping_ref = req.mapping_ref
-            mapping_val_res = self.refs_read_batch(
-                tsi.RefsReadBatchReq(refs=[req.mapping_ref])
+        elif isinstance(action_ref, str):
+            action_dict_res = self.refs_read_batch(
+                tsi.RefsReadBatchReq(refs=[action_ref])
             )
-            mapping_val = mapping_val_res.vals[0]
-            maybe_action = mapping_val.get("action")
-            if isinstance(maybe_action, dict):
-                action_dict = maybe_action
-            elif isinstance(maybe_action, str):
-                action_dict_res = self.refs_read_batch(
-                    tsi.RefsReadBatchReq(refs=[maybe_action])
-                )
-                action_dict = action_dict_res.vals[0]
-
-            mapping_val["action"] = action_dict
-            print(f"mapping_val: {mapping_val}")
-            mapping = tsi.ActionOpMapping.model_validate(mapping_val)
+            action_dict = action_dict_res.vals[0]
+            action = ActionWithConfig.model_validate(action_dict)
         else:
-            raise InvalidRequest("Either mapping or mapping_ref must be provided")
+            raise InvalidRequest("Invalid action", action)
 
-        if mapping.action.action.action_type != "builtin":
+        if action.action.action_type != "builtin":
             raise InvalidRequest(
                 "Only builtin actions are supported for batch execution"
             )
 
-        if mapping.action.action.name != "openai_completion":
+        if action.action.name != "openai_completion":
             raise InvalidRequest(
                 "Only openai_completion is supported for batch execution"
             )
 
-        if mapping.action.action.digest != "*":
+        if action.action.digest != "*":
             raise InvalidRequest("Digest must be '*' for batch execution")
 
         # Step 1: Get all the calls in the batch
@@ -1524,43 +1554,47 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 project_id=req.project_id,
                 filter=tsi.CallsFilter(
                     call_ids=req.call_ids,
-                    op_names=[
-                        ri.InternalOpRef(
-                            project_id=req.project_id,
-                            name=mapping.op_name,
-                            version=mapping.op_digest,
-                        ).uri(),
-                    ],
+                    # op_names=[
+                    #     ri.InternalOpRef(
+                    #         project_id=req.project_id,
+                    #         name=mapping.op_name,
+                    #         version=mapping.op_digest,
+                    #     ).uri(),
+                    # ],
                 ),
             )
         )
 
         # Normally we would dispatch here, but just hard coding for now
         # We should do some validation here
-        config = mapping.action.config
+        config = action.config
         model = config["model"]
         system_prompt = config["system_prompt"]
         response_format = config["response_format"]
-        action_name = mapping.action.name
+        action_name = action.name
 
-        mapping = mapping.input_mapping
+        # mapping = mapping.input_mapping
 
         # Step 2: For Each call, execute the action: (this needs a lot of safety checks)
         for call in calls:
-            args = {}
-            for input_name, call_selector in mapping.items():
-                call_selector_parts = call_selector.split(".")
-                val = call
-                for part in call_selector_parts:
-                    if isinstance(val, dict):
-                        val = val[part]
-                    elif isinstance(val, list):
-                        val = val[int(part)]
-                    elif isinstance(val, BaseModel):
-                        val = getattr(val, part)
-                    else:
-                        raise InvalidRequest(f"Invalid call selector: {call_selector}")
-                args[input_name] = val
+            args = {
+                "inputs": call.inputs,
+                "output": call.output,
+            }
+            # for input_name, call_selector in mapping.items():
+            #     call_selector_parts = call_selector.split(".")
+            #     val = call
+            #     for part in call_selector_parts:
+            #         if isinstance(val, dict):
+            #             val = val[part]
+            #         elif isinstance(val, list):
+            #             val = val[int(part)]
+            #         elif isinstance(val, BaseModel):
+            #             val = getattr(val, part)
+            #         else:
+            #             raise InvalidRequest(f"Invalid call selector: {call_selector}")
+            #     args[input_name] = val
+
 
             from openai import OpenAI
 
@@ -1588,7 +1622,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     wb_user_id="ACTIONS_BOT",  # - THIS IS NOT GOOD!
                     payload=ActionFeedback(
                         name=action_name,
-                        action_mapping_ref=mapping_ref,
+                        action_ref=action_ref,
+                        # action_mapping_ref=mapping_ref,
                         results=json.loads(completion.choices[0].message.content),
                     ).model_dump(),
                 )

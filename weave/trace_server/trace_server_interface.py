@@ -6,7 +6,10 @@ from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Union
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
 
-from weave.trace_server.interface.collections.action_collection import ActionOpMapping
+from weave.trace_server.interface.collections.action_collection import (
+    ActionOpMapping,
+    ActionWithConfig,
+)
 from weave.trace_server.interface.query import Query
 
 WB_USER_ID_DESCRIPTION = (
@@ -802,6 +805,8 @@ class CostPurgeRes(BaseModel):
 class ExecuteBatchActionReq(BaseModel):
     project_id: str
     call_ids: list[str]
+    action: typing.Optional[ActionWithConfig] = None
+    action_ref: typing.Optional[str] = None
     mapping: typing.Optional[ActionOpMapping] = None
     mapping_ref: typing.Optional[str] = None
 

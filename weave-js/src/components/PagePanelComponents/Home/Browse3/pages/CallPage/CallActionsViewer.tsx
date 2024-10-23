@@ -31,8 +31,8 @@ import {ActionOpMappingSchema} from '../../collections/actionCollection';
 type CallActionRow = {
   actionRef: string;
   actionDef: ActionWithConfig;
-  mapping?: ActionOpMapping;
-  mappingRef?: string;
+  // mapping?: ActionOpMapping;
+  // mappingRef?: string;
   runCount: number;
   lastResult: Record<string, unknown>;
 };
@@ -53,23 +53,23 @@ export const CallActionsViewer: React.FC<{
     project: props.call.project,
     weaveRef,
   });
-  const actionOpMappings = useCollectionObjects('ActionOpMapping', {
-    project_id: projectIdFromParts({
-      entity: props.call.entity,
-      project: props.call.project,
-    }),
-    filter: {latest_only: true},
-  });
+  // const actionOpMappings = useCollectionObjects('ActionOpMapping', {
+  //   project_id: projectIdFromParts({
+  //     entity: props.call.entity,
+  //     project: props.call.project,
+  //   }),
+  //   filter: {latest_only: true},
+  // });
 
-  const verifiedActions = useMemo(() => {
-    return actionOpMappings.filter(mapping => {
-      return (
-        mapping.val.op_name === artifactName &&
-        (mapping.val.op_digest === artifactVersion ||
-          mapping.val.op_digest === '*')
-      );
-    });
-  }, [actionOpMappings, artifactName, artifactVersion]);
+  // const verifiedActions = useMemo(() => {
+  //   return actionOpMappings.filter(mapping => {
+  //     return (
+  //       mapping.val.op_name === artifactName &&
+  //       (mapping.val.op_digest === artifactVersion ||
+  //         mapping.val.op_digest === '*')
+  //     );
+  //   });
+  // }, [actionOpMappings, artifactName, artifactVersion]);
 
   const actionWithConfigs = useCollectionObjects('ActionWithConfig', {
     project_id: projectIdFromParts({
@@ -79,7 +79,7 @@ export const CallActionsViewer: React.FC<{
     filter: {latest_only: true},
   });
 
-  console.log({actionOpMappings, actionWithConfigs, verifiedActions});
+  // console.log({actionOpMappings, actionWithConfigs, verifiedActions});
 
   const allCallActions: CallActionRow[] = useMemo(() => {
     return (
@@ -93,40 +93,35 @@ export const CallActionsViewer: React.FC<{
           versionHash: actionWithConfig.digest,
           path: '',
         });
-        const mapping = verifiedActions?.find(mapping => {
-          if (typeof mapping.val.action === 'string') {
-            return mapping.val.action === actionWithConfigRefUri;
-          } else {
-            return _.isEqual(mapping.val.action, actionWithConfig);
-          }
-        });
-        const mappingRef = mapping
-          ? objectVersionKeyToRefUri({
-              scheme: WEAVE_REF_SCHEME,
-              weaveKind: 'object',
-              entity: props.call.entity,
-              project: props.call.project,
-              objectId: mapping.object_id,
-              versionHash: mapping.digest,
-              path: '',
-            })
-          : undefined;
+        // const mapping = verifiedActions?.find(mapping => {
+        //   if (typeof mapping.val.action === 'string') {
+        //     return mapping.val.action === actionWithConfigRefUri;
+        //   } else {
+        //     return _.isEqual(mapping.val.action, actionWithConfig);
+        //   }
+        // });
+        // const mappingRef = mapping
+        //   ? objectVersionKeyToRefUri({
+        //       scheme: WEAVE_REF_SCHEME,
+        //       weaveKind: 'object',
+        //       entity: props.call.entity,
+        //       project: props.call.project,
+        //       objectId: mapping.object_id,
+        //       versionHash: mapping.digest,
+        //       path: '',
+        //     })
+        //   : undefined;
         return {
           actionRef: actionWithConfigRefUri,
           actionDef: actionWithConfig.val,
-          mapping: mapping?.val,
-          mappingRef,
+          // mapping: mapping?.val,
+          // mappingRef,
           runCount: 0,
           lastResult: {},
         };
       }) ?? []
     );
-  }, [
-    verifiedActions,
-    actionWithConfigs,
-    props.call.entity,
-    props.call.project,
-  ]);
+  }, [actionWithConfigs, props.call.entity, props.call.project]);
   //   console.log(allActions.result)
 
   type BuiltinAction = {
@@ -153,11 +148,11 @@ export const CallActionsViewer: React.FC<{
       .map(result => result.data);
   }, [feedbackQuery.result]);
 
-  console.log({verifiedActions, verifiedActionFeedbacks});
+  // console.log({verifiedActions, verifiedActionFeedbacks});
 
   const getFeedbackForAction = (actionRef: string) => {
     return verifiedActionFeedbacks.filter(
-      feedback => feedback.action_mapping_ref === actionRef
+      feedback => feedback.action_ref === actionRef
     );
   };
 
@@ -196,13 +191,13 @@ export const CallActionsViewer: React.FC<{
             <th>Run Count</th>
             <th>Last Result</th>
             <th>Run</th>
-            <th>Mapping</th>
+            {/* <th>Mapping</th> */}
           </tr>
         </thead>
         <tbody>
           {allCallActions.map(action => {
             const actionRef = action.actionRef;
-            const feedbacks = getFeedbackForAction(action.mappingRef ?? '');
+            const feedbacks = getFeedbackForAction(action.actionRef ?? '');
             return (
               <tr key={actionRef}>
                 <td>{action.actionDef.name}</td>
@@ -212,8 +207,8 @@ export const CallActionsViewer: React.FC<{
                     ? JSON.stringify(feedbacks[0].results)
                     : 'N/A'}
                 </td>
-                {action.mappingRef ? (
-                  <>
+
+
                     <td>
                       <button
                         onClick={() => {
@@ -225,7 +220,7 @@ export const CallActionsViewer: React.FC<{
                                 project: props.call.project,
                               }),
                               call_ids: [props.call.callId],
-                              mapping_ref: action.mappingRef,
+                              action_ref: action.actionRef,
                             })
                             .then(res => {
                               feedbackQuery.refetch();
@@ -234,21 +229,7 @@ export const CallActionsViewer: React.FC<{
                         Run
                       </button>
                     </td>
-                    <td>
-                      <button onClick={console.log}>Edit</button>
-                    </td>
-                  </>
-                ) : (
-                  <>
-
-                    <td>
-                      {/* Intentional empty cell */}
-                    </td>
-                    <td>
-                      <button onClick={() => handleCreateMapping(action)}>Create</button>
-                    </td>
-                  </>
-                )}
+                 
               </tr>
             );
           })}
@@ -326,7 +307,7 @@ export const CallActionsViewer: React.FC<{
 const ActionFeedbackZ = z.object({
   // _type: z.literal("ActionFeedback"),
   name: z.string(),
-  action_mapping_ref: z.string(),
+  action_ref: z.string(),
   results: z.record(z.string(), z.unknown()),
 });
 

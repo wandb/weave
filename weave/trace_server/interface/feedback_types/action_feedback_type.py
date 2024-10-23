@@ -7,7 +7,8 @@ ACTION_FEEDBACK_TYPE_NAME = "wandb.action.1"
 
 class ActionFeedback(BaseModel):
     name: str
-    action_mapping_ref: str
+    action_ref: str
+    # action_mapping_ref: str
     results: dict
 
 

@@ -305,7 +305,7 @@ export type ExecuteBatchActionReq = {
   project_id: string;
   call_ids: string[];
   // mapping: ActionOpMapping;
-  mapping_ref?: string;
+  action_ref?: string;
 };
 
 export type ExecuteBatchActionRes = {};

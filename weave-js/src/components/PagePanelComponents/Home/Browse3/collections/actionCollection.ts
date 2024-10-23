@@ -13,7 +13,7 @@ const BuiltinActionConfigSchema = z.object({
     z.object({
       name: z.string(),
       type: z.enum(['text', 'number', 'boolean']),
-      is_required: z.boolean(),
+      // is_required: z.boolean(),
     })
   ),
 });
@@ -36,11 +36,32 @@ export type BuiltinAction = z.infer<typeof BuiltinActionSchema>;
 export type ActionWithConfig = z.infer<typeof ActionWithConfigSchema>;
 export type ActionOpMapping = z.infer<typeof ActionOpMappingSchema>;
 
-export type ActionAndSpec = {action: BuiltinAction; configSpec: z.Schema};
+export type ActionAndSpec = {action: BuiltinAction; configSpec: z.Schema; convertToConfig: (data: any) => Record<string, any>};
 
 export const knownBuiltinActions: ActionAndSpec[] = [
   {
     action: {action_type: 'builtin', name: 'openai_completion', digest: '*'},
     configSpec: BuiltinActionConfigSchema,
-  },
+    convertToConfig: (data: z.infer<typeof BuiltinActionConfigSchema>) => {
+      return {
+        model: data.model,
+        system_prompt: data.system_prompt,
+        response_format: {
+          "type": "json_schema",
+          "json_schema": {
+              "name": "response_format",
+              "schema": {
+                  "type": "object",
+                  "properties": data.response_format_properties.reduce((acc, prop) =>   {
+                    acc[prop.name] = {type: prop.type};
+                    return acc;
+                  }, {}),
+          required: data.response_format_properties
+            .map(prop => prop.name),
+          additionalProperties: false,
+        },
+        strict: true,
+      }
+    }}
+  }}
 ];

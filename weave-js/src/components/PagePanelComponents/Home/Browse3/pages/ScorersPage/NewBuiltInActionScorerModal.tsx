@@ -41,7 +41,7 @@ export const NewBuiltInActionScorerModal: FC<
     const newAction = ActionWithConfigSchema.parse({
       name,
       action: knownBuiltinActions[selectedActionIndex].action,
-      config,
+      config: knownBuiltinActions[selectedActionIndex].convertToConfig(config),
     });
     onSave(newAction);
   };
