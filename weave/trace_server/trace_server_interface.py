@@ -805,6 +805,9 @@ class CostPurgeRes(BaseModel):
     pass
 
 
+class SecretFetcher(Protocol):
+    def fetch(self, secret_name: str) -> Optional[str]: ...
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str

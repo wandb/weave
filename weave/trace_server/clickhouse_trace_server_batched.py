@@ -106,6 +106,7 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
     str_digest,
 )
+# from weave.trace_server.model_providers.model_providers import fetch_model_to_provider_info_map
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -184,6 +185,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._flush_immediately = True
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
+        # self._model_to_provider_info_map = fetch_model_to_provider_info_map()
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -1384,6 +1386,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
+    
+    def calls_llm(self, req: tsi.CallsLLMReq, secret_fetcher: tsi.SecretFetcher) -> tsi.CallsLLMRes:
+        pass
+
 
     # Private Methods
     @property
