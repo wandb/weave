@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
+import numeral from 'numeral';
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
@@ -190,6 +191,11 @@ const ObjectVersionPageInner: React.FC<{
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
 
+  const bytesStored = useMemo(
+    () => (data.result?.[0] ? JSON.stringify(data.result?.[0]).length : 0),
+    [data.result]
+  );
+
   if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;
   }
@@ -238,6 +244,15 @@ const ObjectVersionPageInner: React.FC<{
                   Subpath: refExtra,
                 }
               : {}),
+            'Bytes stored': (
+              <>
+                {data.loading ? (
+                  <LoadingDots />
+                ) : (
+                  numeral(bytesStored).format('0.0b')
+                )}
+              </>
+            ),
             // 'Type Version': (
             //   <TypeVersionLink
             //     entityName={entityName}
