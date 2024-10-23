@@ -1,4 +1,5 @@
 import { isOp } from './op';
+import { getGlobalDomain } from './urls';
 
 export interface Callable {}
 
@@ -21,7 +22,8 @@ export class ObjectRef {
   }
 
   public ui_url() {
-    return `https://wandb.ai/${this.projectId}/weave/objects/${this.objectId}/versions/${this.digest}`;
+    const domain = getGlobalDomain();
+    return `https://${domain}/${this.projectId}/weave/objects/${this.objectId}/versions/${this.digest}`;
   }
 }
 

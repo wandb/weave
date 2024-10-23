@@ -10,7 +10,8 @@ export function initWithCustomTraceServer(projectName: string, customTraceServer
     customTraceServer as unknown as TraceServerApi<any>,
     {} as WandbServerApi, // Placeholder, as we don't use WandbServerApi in this case
     projectName,
-    new Settings(true)
+    new Settings(true),
+    ''
   );
   setGlobalClient(client);
 }

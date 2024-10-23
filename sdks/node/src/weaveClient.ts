@@ -60,13 +60,25 @@ export class WeaveClient {
   private batchProcessTimeout: NodeJS.Timeout | null = null;
   private isBatchProcessing: boolean = false;
   private readonly BATCH_INTERVAL: number = 200;
+  public readonly urls: {
+    baseUrl: string;
+    traceBaseUrl: string;
+    domain: string;
+  };
 
   constructor(
     public traceServerApi: TraceServerApi<any>,
     private wandbServerApi: WandbServerApi,
     public projectId: string,
-    public settings: Settings = new Settings()
-  ) {}
+    public settings: Settings = new Settings(),
+    private domain: string
+  ) {
+    this.urls = {
+      baseUrl: this.traceServerApi?.baseUrl,
+      traceBaseUrl: this.wandbServerApi?.baseUrl,
+      domain: domain,
+    };
+  }
 
   private scheduleBatchProcessing() {
     if (this.batchProcessTimeout || this.isBatchProcessing) return;

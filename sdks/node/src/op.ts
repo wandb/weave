@@ -16,7 +16,7 @@ export function op<T extends (...args: any[]) => any>(
     const { currentCall, parentCall, newStack } = client.pushNewCall();
     const startTime = new Date();
     if (client.settings.shouldPrintCallLink && parentCall == null) {
-      console.log(`${TRACE_CALL_EMOJI} https://wandb.ai/${client.projectId}/r/call/${currentCall.callId}`);
+      console.log(`${TRACE_CALL_EMOJI} https://${client.urls.domain}/${client.projectId}/r/call/${currentCall.callId}`);
     }
     const displayName = options?.callDisplayName ? options.callDisplayName(...params) : undefined;
     const thisArg = options?.bindThis;

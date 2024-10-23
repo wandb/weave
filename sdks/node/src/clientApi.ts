@@ -1,4 +1,6 @@
 import { Api as TraceServerApi } from './generated/traceServerApi';
+import { Settings } from './settings';
+import { defaultBaseUrl, defaultDomain, defaultTraceBaseUrl, setGlobalDomain } from './urls';
 import { ConcurrencyLimiter } from './utils/concurrencyLimit';
 import { createFetchWithRetry } from './utils/retry';
 import { getApiKey } from './wandb/settings';
@@ -9,8 +11,11 @@ export interface InitOptions {
   project: string;
   entity?: string;
   projectName?: string;
-  host?: string;
+  baseUrl?: string;
+  traceBaseUrl?: string;
+  domain?: string;
   apiKey?: string;
+  settings?: Settings;
 }
 
 // Global client instance
@@ -19,16 +24,18 @@ export let globalClient: WeaveClient | null = null;
 export async function init({
   project,
   entity,
-  host = 'https://api.wandb.ai',
-  apiKey = getApiKey(),
+  baseUrl,
+  traceBaseUrl,
+  domain,
+  apiKey,
+  settings,
 }: InitOptions): Promise<WeaveClient> {
-  const headers = {
-    'User-Agent': `W&B Internal JS Client ${process.env.VERSION || 'unknown'}`,
-    Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
-  };
-
+  const resolvedUrl = new URL(baseUrl ?? defaultBaseUrl);
+  const resolvedTraceUrl = new URL(traceBaseUrl ?? defaultTraceBaseUrl);
+  const resolvedApiKey = apiKey ?? getApiKey(resolvedUrl.host);
+  const resolvedDomain = domain ?? defaultDomain;
   try {
-    const wandbServerApi = new WandbServerApi(host, apiKey);
+    const wandbServerApi = new WandbServerApi(resolvedUrl.origin, resolvedApiKey);
     const entityName = entity ?? (await wandbServerApi.defaultEntityName());
     const projectId = `${entityName}/${project}`;
 
@@ -49,13 +56,19 @@ export async function init({
     );
 
     const traceServerApi = new TraceServerApi({
-      baseUrl: 'https://trace.wandb.ai',
-      baseApiParams: { headers },
+      baseUrl: resolvedTraceUrl.origin,
+      baseApiParams: {
+        headers: {
+          'User-Agent': `W&B Internal JS Client ${process.env.VERSION || 'unknown'}`,
+          Authorization: `Basic ${Buffer.from(`api:${resolvedApiKey}`).toString('base64')}`,
+        },
+      },
       customFetch: concurrencyLimitedFetch,
     });
 
-    const client = new WeaveClient(traceServerApi, wandbServerApi, projectId);
+    const client = new WeaveClient(traceServerApi, wandbServerApi, projectId, settings, resolvedDomain);
     setGlobalClient(client);
+    setGlobalDomain(resolvedDomain);
     console.log(`Initializing project: ${projectId}`);
     return client;
   } catch (error) {

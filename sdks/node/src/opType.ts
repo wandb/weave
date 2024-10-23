@@ -1,3 +1,4 @@
+import { getGlobalDomain } from './urls';
 import { WeaveObject } from './weaveObject';
 
 export type ParameterNamesOption = 'useParam0Object' | string[] | undefined;
@@ -55,6 +56,7 @@ export class OpRef {
   }
 
   public ui_url() {
-    return `https://wandb.ai/${this.projectId}/weave/ops/${this.objectId}/versions/${this.digest}`;
+    const domain = getGlobalDomain();
+    return `https://${domain}/${this.projectId}/weave/ops/${this.objectId}/versions/${this.digest}`;
   }
 }

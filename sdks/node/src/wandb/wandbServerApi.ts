@@ -13,13 +13,13 @@ query DefaultEntity {
 
 export class WandbServerApi {
   constructor(
-    private host: string,
+    public baseUrl: string,
     private apiKey: string
   ) {}
 
   private async graphqlRequest(query: string, variables: Record<string, any> = {}) {
     try {
-      const response = await fetch(`${this.host}/graphql`, {
+      const response = await fetch(`${this.baseUrl}/graphql`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
