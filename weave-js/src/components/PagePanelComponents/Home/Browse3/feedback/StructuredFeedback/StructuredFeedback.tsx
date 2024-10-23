@@ -7,7 +7,8 @@ import { Tailwind } from '@wandb/weave/components/Tailwind';
 import { Checkbox } from '@mui/material';
 import CreatableSelect from 'react-select/creatable';
 
-export const StructuredFeedbackCell = ({structuredFeedbackOptions, callId, weaveRef, entity, project, feedbackSpecRef}: {structuredFeedbackOptions: any, callId: string, weaveRef: string, entity: string, project: string, feedbackSpecRef: string}) => {
+
+export const StructuredFeedbackCell = ({structuredFeedbackOptions, weaveRef, entity, project, feedbackSpecRef}: {structuredFeedbackOptions: any, weaveRef: string, entity: string, project: string, feedbackSpecRef: string}) => {
 
     const {useFeedback} = useWFHooks();
     const query = useFeedback(
@@ -69,6 +70,7 @@ export const StructuredFeedbackCell = ({structuredFeedbackOptions, callId, weave
             return
         }
         if (currFeedback.payload.ref !== feedbackSpecRef) {
+            // console.log("structured column version mismatch", currFeedback.payload.ref, feedbackSpecRef);
             return;
         }
         setCurrentFeedbackId(currFeedback.id);
@@ -79,30 +81,30 @@ export const StructuredFeedbackCell = ({structuredFeedbackOptions, callId, weave
         return <LoadingDots />;
     }
 
-    if (!structuredFeedbackOptions.editable) {
-        return <div>{foundValue}</div>
-    }
-
-    // console.log(structuredFeedbackOptions, query?.result?.find((feedback: any) => feedback.feedback_type === 'wandb.structuredFeedback.1'))
+    // console.log(structuredFeedbackOptions.type, query?.result?.find((feedback: any) => feedback.feedback_type === 'wandb.structuredFeedback.1'))
      
     if (structuredFeedbackOptions.type === 'RangeFeedback') {
-        return <RangeFeedbackColumn min={structuredFeedbackOptions.min} max={structuredFeedbackOptions.max} onAddFeedback={onAddFeedback} defaultValue={foundValue} currentFeedbackId={currentFeedbackId} editable={structuredFeedbackOptions.editable} />;
+        return <RangeFeedbackColumn 
+            min={structuredFeedbackOptions.min} 
+            max={structuredFeedbackOptions.max} 
+            onAddFeedback={onAddFeedback} 
+            defaultValue={foundValue as string | null} 
+            currentFeedbackId={currentFeedbackId} 
+        />;
     } else if (structuredFeedbackOptions.type === 'CategoricalFeedback') {
         return <CategoricalFeedbackColumn 
             options={structuredFeedbackOptions.options} 
             onAddFeedback={onAddFeedback} 
-            defaultValue={foundValue} 
+            defaultValue={foundValue as string | null} 
             currentFeedbackId={currentFeedbackId}
             multiSelect={structuredFeedbackOptions.multi_select}
             addNewOption={structuredFeedbackOptions.add_new_option}
-            editable={structuredFeedbackOptions.editable}
         />;
-    } else if (structuredFeedbackOptions.type === 'BinaryFeedback') {
+    } else if (structuredFeedbackOptions.type === 'BooleanFeedback') {
         return <BinaryFeedbackColumn 
             onAddFeedback={onAddFeedback} 
-            defaultValue={foundValue} 
+            defaultValue={foundValue as string | null} 
             currentFeedbackId={currentFeedbackId}
-            editable={structuredFeedbackOptions.editable}
         />;
     }
   return <div>unknown feedback type</div>;
@@ -110,14 +112,13 @@ export const StructuredFeedbackCell = ({structuredFeedbackOptions, callId, weave
 
 
 export const RangeFeedbackColumn = (
-    {min, max, onAddFeedback, defaultValue, currentFeedbackId, editable}: 
+    {min, max, onAddFeedback, defaultValue, currentFeedbackId}: 
     {
         min: number,
         max: number, 
         onAddFeedback?: (value: any, currentFeedbackId: string | null) => Promise<boolean>, 
         defaultValue: string | null,
-        currentFeedbackId: string | null,
-        editable: boolean
+        currentFeedbackId?: string | null,
     }
 ) => {
     const [value, setValue] = useState<any | null>(min);
@@ -132,7 +133,7 @@ export const RangeFeedbackColumn = (
     const onValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         // Todo debounce this
         const val = parseInt(e.target.value);
-        onAddFeedback?.(val, currentFeedbackId).then((success) => {
+        onAddFeedback?.(val, currentFeedbackId ?? null).then((success) => {
             if (success) {
                 setValue(val);
             }
@@ -150,7 +151,6 @@ export const RangeFeedbackColumn = (
                 step={1.0}
                 value={value}
                 onChange={onValueChange} 
-                disabled={!editable && defaultValue != null}
             />
         </div>
     </Tailwind>
@@ -163,16 +163,14 @@ export const CategoricalFeedbackColumn = ({
     defaultValue, 
     currentFeedbackId,
     multiSelect,
-    addNewOption,
-    editable
+    addNewOption
 }: {
     options: string[], 
     onAddFeedback?: (value: string, currentFeedbackId: string | null) => Promise<boolean>, 
     defaultValue: string | null, 
-    currentFeedbackId: string | null,
+    currentFeedbackId?: string | null,
     multiSelect: boolean,
-    addNewOption: boolean,
-    editable: boolean
+    addNewOption: boolean
 }) => {
     let foundValue = defaultValue;
     if (defaultValue && !options.includes(defaultValue)) {
@@ -190,7 +188,7 @@ export const CategoricalFeedbackColumn = ({
 
     const onValueChange = (newValue: any) => {
         const val = newValue ? newValue.value : '';
-        onAddFeedback?.(val, currentFeedbackId).then((success) => {
+        onAddFeedback?.(val, currentFeedbackId ?? null).then((success) => {
             if (success) {
                 setValue(val);
             }
@@ -225,7 +223,6 @@ export const CategoricalFeedbackColumn = ({
                         onChange={onValueChange}
                         options={dropdownOptions}
                         value={dropdownOptions.find(option => option.value === value)}
-                        isDisabled={!editable && defaultValue != null}
                     />
                 ) : (
                     <Select
@@ -236,7 +233,6 @@ export const CategoricalFeedbackColumn = ({
                             control: ({ isFocused }) =>
                                 `isFocused ? ${controlStyles.focus} : ${controlStyles.nonFocus} ${controlStyles.base}`,
                         }}
-                        isDisabled={!editable && defaultValue != null}
                     />
                 )} 
             </div>
@@ -244,9 +240,9 @@ export const CategoricalFeedbackColumn = ({
     );
 }
 
-export const BinaryFeedbackColumn = ({onAddFeedback, defaultValue, currentFeedbackId, editable}: {onAddFeedback?: (value: string, currentFeedbackId: string | null) => Promise<boolean>, defaultValue: string | null, currentFeedbackId: string | null, editable: boolean}) => {
+export const BinaryFeedbackColumn = ({onAddFeedback, defaultValue, currentFeedbackId}: {onAddFeedback?: (value: string, currentFeedbackId: string | null) => Promise<boolean>, defaultValue: string | null, currentFeedbackId: string | null}) => {
     // Checkbox
-    const [value, setValue] = useState<boolean | null>(defaultValue);
+    const [value, setValue] = useState<boolean | null>(defaultValue ? defaultValue === 'true' : null);
 
     const onValueChange = (e: SyntheticEvent<HTMLInputElement>) => {
         const val = (e.target as HTMLInputElement).checked ? 'true' : 'false';
@@ -258,6 +254,6 @@ export const BinaryFeedbackColumn = ({onAddFeedback, defaultValue, currentFeedba
     }
 
     return <Tailwind>
-        <Checkbox checked={value ?? false} onChange={onValueChange} disabled={!editable && defaultValue != null}/>
+        <Checkbox checked={value ?? false} onChange={onValueChange}/>
     </Tailwind>
 }

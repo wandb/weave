@@ -31,6 +31,7 @@ import {Icon} from '@wandb/weave/components/Icon';
 import React, {
   FC,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -87,8 +88,8 @@ import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
-import { AddStructuredFeedbackColumnButton, AddStructuredFeedbackColumnModal } from '../../feedback/StructuredFeedback/AddColumnButton';
-import { objectRefWithExtra } from '@wandb/weave/react';
+import { ConfigureStructuredFeedbackModal } from '../../feedback/StructuredFeedback/AddColumnButton';
+import { CallIdContext } from '../../../Browse3';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -334,8 +335,22 @@ export const CallsTable: FC<{
     [callsResult, columnIsRefExpanded, expandedRefCols]
   );
 
-  // Do structured feedback stuff
+  // Hide structured feedback columns by default
   const structuredFeedbackOptions = useStructuredFeedbackOptions(entity, project);
+  useEffect(() => {
+    if (setColumnVisibilityModel == null || structuredFeedbackOptions == null) {
+      return;
+    }
+    for (const feedback of structuredFeedbackOptions.types) {
+      const name = feedbackColName(feedback);
+      if (columnVisibilityModel?.[name] == null) {
+        setColumnVisibilityModel({
+          ...columnVisibilityModel,
+          [name]: false,
+        });
+      }
+    }
+  }, [structuredFeedbackOptions, setColumnVisibilityModel]);
 
   const onAddFilter: OnAddFilter | undefined =
     filterModel && setFilterModel
@@ -452,20 +467,20 @@ export const CallsTable: FC<{
     [effectiveFilter.parentId, parentIdOptions]
   );
 
-  useEffect(() => {
-    if (pinModel != null &&  setPinModel != null && structuredFeedbackOptions != null && structuredFeedbackOptions.types.length > 0) {
-      // do structured feedback stuff
-      const feedbackCols = structuredFeedbackOptions.types.map(feedbackCol => feedbackColName(feedbackCol));
-      // right pin feedback when we have a parent id
-      const currentLeft = pinModel?.left ?? [];
-      if (!currentLeft.find(col => feedbackCols.includes(col))) {
-        setPinModel({
-          ...pinModel,
-          left: [...currentLeft, ...feedbackCols],
-        });
-      }
-    }
-  }, [selectedParentId, structuredFeedbackOptions, pinModel, setPinModel]);
+  // useEffect(() => {
+  //   if (pinModel != null &&  setPinModel != null && structuredFeedbackOptions != null && structuredFeedbackOptions.types.length > 0) {
+  //     // do structured feedback stuff
+  //     const feedbackCols = structuredFeedbackOptions.types.map(feedbackCol => feedbackColName(feedbackCol));
+  //     // right pin feedback when we have a parent id
+  //     const currentLeft = pinModel?.left ?? [];
+  //     if (!currentLeft.find(col => feedbackCols.includes(col))) {
+  //       setPinModel({
+  //         ...pinModel,
+  //         left: [...currentLeft, ...feedbackCols],
+  //       });
+  //     }
+  //   }
+  // }, [selectedParentId, structuredFeedbackOptions, pinModel, setPinModel]);
 
   // DataGrid Model Management
   const pinModelResolved = pinModel ?? DEFAULT_PIN_CALLS;
@@ -500,6 +515,20 @@ export const CallsTable: FC<{
       }
     }
   }, [rowIds, peekId]);
+  const {setCallIds, nextPageNeeded} = useContext(CallIdContext);
+  useEffect(() => {
+    if (setCallIds) {
+      setCallIds(rowIds);
+    }
+  }, [rowIds, setCallIds]);
+  useEffect(() => {
+    if (nextPageNeeded && setPaginationModel) {
+      setPaginationModel({
+        ...paginationModelResolved,
+        page: paginationModelResolved.page + 1,
+      });
+    }
+  }, [nextPageNeeded]);
 
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {
@@ -867,14 +896,16 @@ export const CallsTable: FC<{
                   columnVisibilityModel={columnVisibilityModel}
                   setColumnVisibilityModel={setColumnVisibilityModel}
                   onAddColumn={() => setStructuredFeedbackModalOpen(true)}
+                  structuredFeedbackOptions={structuredFeedbackOptions}
                 />
-                {structuredFeedbackModalOpen && (
-                  <AddStructuredFeedbackColumnModal
+                {/* {structuredFeedbackModalOpen && (
+                  <ConfigureStructuredFeedbackModal
                     entity={entity}
                     project={project}
+                    existingFeedback={structuredFeedbackOptions}
                     onClose={() => setStructuredFeedbackModalOpen(false)}
                   />
-                )}
+                )} */}
               </div>
             </>
           )}
@@ -1074,9 +1105,19 @@ export const useStructuredFeedbackOptions = (entity: string, project: string) =>
     }
     const latest = feedbackObjects.result?.sort((a, b) => a.createdAtMs - b.createdAtMs).pop();
 
-    const ref = `weave:///${entity}/${project}/object/${latest?.baseObjectClass}:${latest?.versionHash}`
-    console.log("ref", ref);
+    if (!latest) {
+      return null;
+    }
 
-    return {...latest?.val, ref}
+    const ref = `weave:///${entity}/${project}/object/${latest?.baseObjectClass}:${latest?.versionHash}`
+
+    // ensure that there are no duplicate names
+    const values = latest?.val?.types.filter((type: any, index: number, self: any[]) =>
+      index === self.findIndex((t: any) => t.name === type.name)
+    );
+    latest.val.types = values;
+    latest.val.ref = ref;
+  
+    return latest.val;
   }, [feedbackObjects.loading, feedbackObjects.result]);
 };

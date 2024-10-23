@@ -21,6 +21,7 @@ type ManageColumnsButtonProps = {
   columnVisibilityModel: GridColumnVisibilityModel;
   setColumnVisibilityModel: (model: GridColumnVisibilityModel) => void;
   onAddColumn: () => void;
+  structuredFeedbackOptions: any;
 };
 
 export const ManageColumnsButton = ({
@@ -28,6 +29,7 @@ export const ManageColumnsButton = ({
   columnVisibilityModel,
   setColumnVisibilityModel,
   onAddColumn,
+  structuredFeedbackOptions,
 }: ManageColumnsButtonProps) => {
   const [search, setSearch] = useState('');
   const lowerSearch = search.toLowerCase();

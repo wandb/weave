@@ -30,6 +30,7 @@ import React, {
   useMemo,
   useRef,
   useState,
+  useContext,
 } from 'react';
 import useMousetrap from 'react-hook-mousetrap';
 import {
@@ -161,6 +162,54 @@ const browse3Paths = (projectRoot: string) => [
   `${projectRoot}/:tab(${tabs})`,
   `${projectRoot}`,
 ];
+
+// Create a context for managing call IDs
+export const CallIdContext = React.createContext<{
+  setCallIds?: (callIds: string[]) => void;
+  getNextCallId?: (currentId: string) => string | null;
+  getPreviousCallId?: (currentId: string) => string | null;
+  nextPageNeeded: boolean;
+}>({
+  setCallIds: () => {},
+  getNextCallId: () => null,
+  getPreviousCallId: () => null,
+  nextPageNeeded: false,
+});
+
+const CallIdProvider: FC<{children: React.ReactNode}> = ({children}) => {
+  const [callIds, setCallIds] = useState<string[]>([]);
+  const [nextPageNeeded, setNextPageNeeded] = useState(false);
+
+  const getNextCallId = useCallback(
+    (currentId: string) => {
+      const currentIndex = callIds.indexOf(currentId);
+      if (currentIndex === callIds.length - 1 && callIds.length === DEFAULT_PAGE_SIZE) {
+        setNextPageNeeded(true);
+      } else if (currentIndex !== -1) {
+        return callIds[currentIndex + 1];
+      } else if (nextPageNeeded) {
+        setNextPageNeeded(false);
+        return callIds[0];
+      }
+      return null;
+    },
+    [callIds]
+  );
+
+  const getPreviousCallId = useCallback(
+    (currentId: string) => {
+      const currentIndex = callIds.indexOf(currentId);
+      return callIds[currentIndex - 1];
+    },
+    [callIds]
+  );
+
+  return (
+    <CallIdContext.Provider value={{setCallIds, getNextCallId, getPreviousCallId, nextPageNeeded}}>
+      {children}
+    </CallIdContext.Provider>
+  );
+};
 
 export const Browse3: FC<{
   hideHeader?: boolean;
@@ -338,8 +387,9 @@ const MainPeekingLayout: FC = () => {
     <WFDataModelAutoProvider
       entityName={params.entity!}
       projectName={params.project!}>
-      <Box
-        sx={{
+      <CallIdProvider>
+        <Box
+          sx={{
           flex: '1 1 auto',
           width: '100%',
           height: '100%',
@@ -422,6 +472,7 @@ const MainPeekingLayout: FC = () => {
           )}
         </Drawer>
       </Box>
+      </CallIdProvider>
     </WFDataModelAutoProvider>
   );
 };
@@ -781,6 +832,14 @@ const CallsPageBinding = () => {
     history.push({search: newQuery.toString()});
   };
 
+  // const {setCallIds} = useContext(CallIdContext);
+
+  // useEffect(() => {
+  //   // Assume fetchCallIds is a function that fetches the list of call IDs
+  //   const callIds = fetchCallIds();
+  //   setCallIds(callIds);
+  // }, [setCallIds]);
+
   return (
     <CallsPage
       entity={entity}
@@ -1080,3 +1139,4 @@ const Browse3Breadcrumbs: FC = props => {
     </Breadcrumbs>
   );
 };
+
