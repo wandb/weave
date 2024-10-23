@@ -17,7 +17,7 @@ import {
   ActionWithConfigSchema,
   knownBuiltinActions,
 } from '../../collections/actionCollection';
-import {DynamicConfigForm} from './DynamicConfigForm';
+import {DynamicConfigForm} from '../../DynamicConfigForm';
 
 interface NewBuiltInActionScorerModalProps {
   open: boolean;
