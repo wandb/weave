@@ -114,6 +114,7 @@
     "react-vega": "^7.4.1",
     "react-virtualized": "^9.10.1",
     "react-virtualized-auto-sizer": "^1.0.6",
+    "recharts": "^2.13.0",
     "redux": "^4.0.1",
     "rehype-katex": "^2.0.0",
     "rehype-raw": "^6.1.1",

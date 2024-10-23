@@ -51,7 +51,6 @@ export const useCallsForQuery = (
     gridFilter,
     gridSort
   );
-  console.log(columns);
   const calls = useCalls(
     entity,
     project,
@@ -135,6 +134,8 @@ export const useCallsForQueryCharts = (
   project: string,
   filter: WFHighLevelCallFilter,
   gridFilter: GridFilterModel,
+  offset: number,
+  limit: number,
   columns?: string[],
   expandedColumns?: Set<string>,
   gridSort?: GridSortModel
@@ -146,8 +147,7 @@ export const useCallsForQueryCharts = (
   refetch: () => void;
 } => {
   const {useCalls, useCallsStats} = useWFHooks();
-  const offset = 0;
-  const limit = 2;
+  console.log(gridSort);
   const {sortBy, lowLevelFilter, filterBy} = useFilterSortby(
     filter,
     gridFilter,
@@ -167,7 +167,6 @@ export const useCallsForQueryCharts = (
       refetchOnDelete: true,
     }
   );
-  console.log(calls);
 
   const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
     refetchOnDelete: true,
