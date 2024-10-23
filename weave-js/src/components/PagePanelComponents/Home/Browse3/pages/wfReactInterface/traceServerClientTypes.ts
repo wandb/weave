@@ -239,6 +239,16 @@ export type TraceObjReadRes = {
   obj: TraceObjSchema;
 };
 
+export type TraceObjDeleteReq = {
+  project_id: string;
+  object_id: string;
+  digests?: string[];
+};
+
+export type TraceObjDeleteRes = {
+  num_deleted: number;
+};
+
 export type TraceObjCreateReq<T extends any = any> = {
   obj: {
     project_id: string;
