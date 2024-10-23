@@ -801,9 +801,10 @@ class CallsLLMReq(BaseModel):
     model_name: str
     messages: List[str]
     api_key: Optional[str] = None
+    wb_user_id: Optional[str] = None
 
 class CallsLLMRes(BaseModel):
-    pass
+    response: Dict[str, Any]
 
 class TraceServerInterface(Protocol):
     def ensure_project_exists(

@@ -102,6 +102,7 @@ from weave.trace_server.trace_server_common import (
     make_derived_summary_fields,
     make_feedback_query_req,
     set_nested_key,
+    parse_messages
 )
 from weave.trace_server.trace_server_interface_util import (
     assert_non_null_wb_user_id,
@@ -530,12 +531,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallUpdateRes()
     
     def calls_llm(self, req: tsi.CallsLLMReq) -> tsi.CallsLLMRes:
+        messages = parse_messages(req.messages)
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
+            wb_user_id=req.wb_user_id,
             op_name="call_llm",
             started_at=datetime.datetime.now(),
-            inputs={"messages": req.messages, "model_name": req.model_name},
-            attributes={"client": "playground"}
+            inputs={"messages": messages, "model_name": req.model_name},
+            attributes={}
         )
         ch_call = _start_call_for_insert_to_ch_insertable_start_call(start)
 
@@ -543,14 +546,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # the call does not already exist
         self._insert_call(ch_call)
 
-        res = llm_completion.call_llm(req)
-        print(res)
+        res = llm_completion.call_llm(req.api_key, req.model_name, messages)
+
+
         end = tsi.EndedCallSchemaForInsert(
             project_id=req.project_id,
             id=ch_call.id,
             ended_at=datetime.datetime.now(),
-            output=res
+            output=res.response,
+            summary={"status": "success", }
         )
+
+        if "error" in res.response:
+            end.summary = {"status": "fail"}
+            end.exception = res.response["error"]
+        
+        print(end)
 
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
@@ -560,7 +571,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
         self._insert_call(ch_call)
-        return tsi.CallsLLMRes()
+        return res
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
