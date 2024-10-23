@@ -93,7 +93,7 @@ export const CallSummary: React.FC<{
               }
             : {}),
           'Bytes stored': (
-            <BytesStoredInfoIcon totalBytesStored={totalBytesStored} />
+            <BytesStoredInfoIcon bytesStored={totalBytesStored} />
           ),
           ...(Object.keys(attributes).length > 0
             ? {Attributes: attributes}
