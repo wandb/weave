@@ -15,6 +15,8 @@ title: Use an LLM to tag and caption images
 
 <!--- @wandbcode{cod-notebook} -->
 
+*Adapted from the OpenAI Cookbook "[Using GPT4o mini to tag and caption images](https://cookbook.openai.com/examples/tag_caption_images_with_gpt4v)"*
+
 # Use an LLM to tag & caption images
 
 This notebook explores how to leverage the vision capabilities of the GPT-4* models (for example `gpt-4o`, `gpt-4o-mini` or `gpt-4-turbo`) to tag & caption images. 
@@ -31,27 +33,33 @@ As an example, we will use a dataset of Amazon furniture items, tag them with re
 
 ```python
 # Install dependencies if needed
-%pip install openai
-%pip install scikit-learn
+%pip install --quiet openai scikit-learn pandas pillow
+%pip install --quiet weave
 ```
 
 
 ```python
-from IPython.display import Image, display
+from IPython.display import display
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from openai import OpenAI
 
 # Initializing OpenAI client - see https://platform.openai.com/docs/quickstart?context=python
+# Define the OPENAI_API_KEY environment variable to simplify the initialization
 client = OpenAI()
 ```
 
 
 ```python
 # Loading dataset
-dataset_path =  "data/amazon_furniture_dataset.csv"
-df = pd.read_csv(dataset_path)
+import weave
+
+# Retrieve the dataset
+dataset = weave.ref(
+    "weave:///team-jdoc/tag_caption_images/object/Amazon-Furniture-Dataset:latest"
+).get()
+df = pd.DataFrame(dataset.rows)
 df.head()
 ```
 
@@ -67,6 +75,15 @@ We will use a combination of an image and the product title to avoid extracting 
 
 
 ```python
+import requests
+from PIL import Image
+from io import BytesIO
+
+def get_image(url):
+    response = requests.get(url)
+    img = Image.open(BytesIO(response.content))
+    return img
+
 system_prompt = '''
     You are an agent specialized in tagging images of furniture items, decorative items, or furnishings with relevant keywords that could be used to search for these items on a marketplace.
     
@@ -87,7 +104,8 @@ system_prompt = '''
     
 '''
 
-def analyze_image(img_url, title):
+@weave.op
+def gen_keywords(img_url, title):
     response = client.chat.completions.create(
     model="gpt-4o-mini",
     messages=[
@@ -115,24 +133,27 @@ def analyze_image(img_url, title):
         top_p=0.1
     )
 
-    return response.choices[0].message.content
+    # return response.choices[0].message.content
+    return {"keywords": response.choices[0].message.content, "image": get_image(img_url)}
 ```
 
 #### Testing with a few examples
 
 
 ```python
-examples = df.iloc[:5]
+examples = df.iloc[-5:]
 ```
 
 
 ```python
+# Initialize tracing with weave
+weave.init("tag_caption_images")
+
 for index, ex in examples.iterrows():
     url = ex['primary_image']
-    img = Image(url=url)
-    display(img)
-    result = analyze_image(url, ex['title'])
-    print(result)
+    results = gen_keywords(url, ex['title'])
+    display(results["image"])
+    print(results["keywords"])
     print("\n\n")
 ```
 
@@ -143,13 +164,14 @@ Using embeddings to avoid duplicates (synonyms) and/or match pre-defined keyword
 
 ```python
 # Feel free to change the embedding model here
+# @weave.op
 def get_embedding(value, model="text-embedding-3-large"): 
     embeddings = client.embeddings.create(
       model=model,
       input=value,
       encoding_format="float"
     )
-    return embeddings.data[0].embedding
+    return {"embedding": embeddings.data[0].embedding}
 ```
 
 #### Testing with example keywords
@@ -157,30 +179,44 @@ def get_embedding(value, model="text-embedding-3-large"):
 
 ```python
 # Existing keywords
-keywords_list = ['industrial', 'metal', 'wood', 'vintage', 'bed']
+keywords_list = ["industrial", "metal", "wood", "vintage", "bed"]
 ```
 
 
 ```python
-df_keywords = pd.DataFrame(keywords_list, columns=['keyword'])
-df_keywords['embedding'] = df_keywords['keyword'].apply(lambda x: get_embedding(x))
-df_keywords
+from weave import Dataset
+
+keywords_embeddings = []
+for keyword in keywords_list:
+    item = {"embedding": get_embedding(keyword)["embedding"], "keyword": keyword}
+    keywords_embeddings.append(item)
+
+weave.publish(Dataset(name="keywords_embeddings", rows=keywords_embeddings))
 ```
 
 
 ```python
-def compare_keyword(keyword):
-    embedded_value = get_embedding(keyword)
+@weave.op
+def compare_keyword(keyword, embeddings_ref):
+    df_keywords = pd.DataFrame(embeddings_ref.get().rows)
+    embedded_value = get_embedding(keyword)["embedding"]
     df_keywords['similarity'] = df_keywords['embedding'].apply(lambda x: cosine_similarity(np.array(x).reshape(1,-1), np.array(embedded_value).reshape(1, -1)))
     most_similar = df_keywords.sort_values('similarity', ascending=False).iloc[0]
-    return most_similar
+    most_similar["similarity"] = most_similar["similarity"][0][0]
+    return {
+        "embedding": most_similar["embedding"],
+        "keyword": most_similar["keyword"],
+        "similarity": most_similar["similarity"]
+    }
 
-def replace_keyword(keyword, threshold = 0.6):
-    most_similar = compare_keyword(keyword)
+
+@weave.op
+def replace_keyword(keyword, embeddings_ref, threshold=0.6):
+    most_similar = compare_keyword(keyword, embeddings_ref)
     if most_similar['similarity'] > threshold:
         print(f"Replacing '{keyword}' with existing keyword: '{most_similar['keyword']}'")
-        return most_similar['keyword']
-    return keyword
+        return {"keyword": most_similar['keyword']}
+    return {"keyword": keyword}
 ```
 
 
@@ -190,8 +226,10 @@ example_keywords = ['bed frame', 'wooden', 'vintage', 'old school', 'desk', 'tab
 final_keywords = []
 
 for k in example_keywords:
-    final_keywords.append(replace_keyword(k))
-    
+    final_keywords.append(
+        replace_keyword(k, weave.ref("keywords_embeddings:latest"))["keyword"]
+    )
+
 final_keywords = set(final_keywords)
 print(f"Final keywords: {final_keywords}")
 ```
@@ -221,6 +259,7 @@ describe_system_prompt = '''
     If there are multiple items depicted, refer to the title to understand which item you should describe.
     '''
 
+@weave.op
 def describe_image(img_url, title):
     response = client.chat.completions.create(
     model="gpt-4o-mini",
@@ -249,7 +288,7 @@ def describe_image(img_url, title):
     max_tokens=300,
     )
 
-    return response.choices[0].message.content
+    return {"description": response.choices[0].message.content}
 ```
 
 #### Testing on a few examples
@@ -257,9 +296,9 @@ def describe_image(img_url, title):
 
 ```python
 for index, row in examples.iterrows():
-    print(f"{row['title'][:50]}{'...' if len(row['title']) > 50 else ''} - {row['url']} :\n")
-    img_description = describe_image(row['primary_image'], row['title'])
-    print(f"{img_description}\n--------------------------\n")
+    print(f"{row['title'][:50]}{'...' if len(row['title']) > 50 else ''} - {row['url']} :")
+    result = describe_image(row['primary_image'], row['title'])
+    print(f"{result}\n--------------------------\n")
 ```
 
 ### Turning descriptions into captions
@@ -301,11 +340,15 @@ formatted_examples = [[{
 ]
 
 formatted_examples = [i for ex in formatted_examples for i in ex]
+for item in formatted_examples:
+    print(item)
+
 ```
 
 
 ```python
-def caption_image(description, model="gpt-4o-mini"):
+@weave.op
+def caption_image(formatted_examples, description: str, model="gpt-4o-mini"):
     messages = formatted_examples
     messages.insert(0, 
         {
@@ -323,7 +366,10 @@ def caption_image(description, model="gpt-4o-mini"):
     messages=messages
     )
 
-    return response.choices[0].message.content
+    return {
+        "caption": response.choices[0].message.content,
+        "message_count": len(messages),
+    }
 ```
 
 #### Testing on a few examples
@@ -336,10 +382,10 @@ examples = df.iloc[5:8]
 
 ```python
 for index, row in examples.iterrows():
-    print(f"{row['title'][:50]}{'...' if len(row['title']) > 50 else ''} - {row['url']} :\n")
-    img_description = describe_image(row['primary_image'], row['title'])
-    print(f"{img_description}\n--------------------------\n")
-    img_caption = caption_image(img_description)
+    print(f"{row['title'][:50]}{'...' if len(row['title']) > 50 else ''} - {row['url']} :")
+    result = describe_image(row["primary_image"], row["title"])
+    print(f"{result}")
+    img_caption = caption_image(formatted_examples, result["description"])
     print(f"{img_caption}\n--------------------------\n")
 ```
 
@@ -352,30 +398,32 @@ We will leverage our embeddings model to generate embeddings for the keywords an
 
 ```python
 # Df we'll use to compare keywords
-df_keywords = pd.DataFrame(columns=['keyword', 'embedding'])
 df['keywords'] = ''
 df['img_description'] = ''
 df['caption'] = ''
+df.head()
 ```
 
 
 ```python
 # Function to replace a keyword with an existing keyword if it's too similar
-def get_keyword(keyword, df_keywords, threshold = 0.6):
-    embedded_value = get_embedding(keyword)
+@weave.op
+def get_keyword(keyword, embeddings_ref, threshold=0.6):
+    embedded_value = get_embedding(keyword)["embedding"]
+    df_keywords = pd.DataFrame(embeddings_ref.get().rows)
     df_keywords['similarity'] = df_keywords['embedding'].apply(lambda x: cosine_similarity(np.array(x).reshape(1,-1), np.array(embedded_value).reshape(1, -1)))
     sorted_keywords = df_keywords.copy().sort_values('similarity', ascending=False)
     if len(sorted_keywords) > 0 :
         most_similar = sorted_keywords.iloc[0]
         if most_similar['similarity'] > threshold:
             print(f"Replacing '{keyword}' with existing keyword: '{most_similar['keyword']}'")
-            return most_similar['keyword']
+            return {"keyword": most_similar['keyword']}
     new_keyword = {
         'keyword': keyword,
         'embedding': embedded_value
     }
     df_keywords = pd.concat([df_keywords, pd.DataFrame([new_keyword])], ignore_index=True)
-    return keyword
+    return {"keyword": keyword}
 ```
 
 ### Preparing the dataset
@@ -384,22 +432,27 @@ def get_keyword(keyword, df_keywords, threshold = 0.6):
 ```python
 import ast
 
-def tag_and_caption(row):
-    keywords = analyze_image(row['primary_image'], row['title'])
+
+@weave.op
+def tag_and_caption(row, embeddings_ref):
+    df_keywords = pd.DataFrame(embeddings_ref.get().rows)
+    keywords = gen_keywords(row["primary_image"], row["title"])["keywords"]
     try:
-        keywords = ast.literal_eval(keywords)
-        mapped_keywords = [get_keyword(k, df_keywords) for k in keywords]
+        keywords = ast.literal_eval(keywords.strip())
+        mapped_keywords = [
+            get_keyword(k, weave.ref("keywords_embeddings:latest"))["keyword"]
+            for k in keywords
+        ]
     except Exception as e:
         print(f"Error parsing keywords: {keywords}")
         mapped_keywords = []
-    img_description = describe_image(row['primary_image'], row['title'])
-    caption = caption_image(img_description)
+    img_description = describe_image(row['primary_image'], row['title'])["description"]
+    caption = caption_image(formatted_examples, img_description)["caption"]
     return {
         'keywords': mapped_keywords,
         'img_description': img_description,
         'caption': caption
     }
-
 ```
 
 
@@ -408,38 +461,34 @@ df.shape
 ```
 
 Processing all 312 lines of the dataset will take a while.
-To test out the idea, we will only run it on the first 50 lines: this takes ~20 mins. 
+To test out the idea, we will only run it on the first 5 lines. 
 Feel free to skip this step and load the already processed dataset (see below).
 
 
 ```python
-# Running on first 50 lines
-for index, row in df[:50].iterrows():
-    print(f"{index} - {row['title'][:50]}{'...' if len(row['title']) > 50 else ''}")
-    updates = tag_and_caption(row)
+# Running on first 5 lines
+for index, row in df[:5].iterrows():
+    print(
+        f"{index} - {row['title'][:50]}{'...' if len(row['title']) > 50 else ''}"
+    )
+    updates = tag_and_caption(row, weave.ref("keywords_embeddings:latest"))
     df.loc[index, updates.keys()] = updates.values()
 ```
 
 
 ```python
+# Save to weave - optional: uncomment if you processed the whole dataset
+# weave.publish(
+#     Dataset(name="Tagged-and-Captioned-Items", rows=df.to_dict(orient="records"))
+# )
+```
+
+
+```python
+# Load data from weave
+df = weave.ref("Tagged-and-Captioned-Items:latest").get()
+df = pd.DataFrame(df.rows)
 df.head()
-```
-
-
-```python
-data_path = "data/items_tagged_and_captioned.csv"
-```
-
-
-```python
-# Saving locally for later - optional: do not execute if you prefer to use the provided file
-df.to_csv(data_path, index=False)
-```
-
-
-```python
-# Optional: load data from saved file if you haven't processed the whole dataset
-df = pd.read_csv(data_path)
 ```
 
 ### Embedding captions and keywords
@@ -484,21 +533,10 @@ print(df_search.shape)
 
 
 ```python
-data_embeddings_path = "data/items_tagged_and_captioned_embeddings.csv"
-```
-
-
-```python
-# Saving locally for later - optional: do not execute if you prefer to use the provided file
-df_search.to_csv(data_embeddings_path, index=False)
-```
-
-
-```python
-# Optional: load data from saved file if you haven't processed the whole dataset
-from ast import literal_eval
-df_search = pd.read_csv(data_embeddings_path)
-df_search["embedding"] = df_search.embedding.apply(literal_eval).apply(np.array)
+# Optional: save to weave for later
+# weave.publish(
+#     Dataset(name="Tagged-and-Captioned-Embeddings", rows=df_search.to_dict(orient="records"))
+# )
 ```
 
 ### Search from input text    
@@ -507,12 +545,17 @@ We can compare the input text from a user directly to the embeddings we just cre
 
 
 ```python
+from ast import literal_eval
+
 # Searching for N most similar results
-def search_from_input_text(query, n = 2):
-    embedded_value = get_embedding(query)
+@weave.op
+def search_from_input_text(query, search_embeddings_ref, n = 2):
+    embedded_value = get_embedding(query)["embedding"]
+    df_search = pd.DataFrame(search_embeddings_ref.get().rows)
+    df_search["embedding"] = df_search.embedding.apply(literal_eval).apply(np.array)
     df_search['similarity'] = df_search['embedding'].apply(lambda x: cosine_similarity(np.array(x).reshape(1,-1), np.array(embedded_value).reshape(1, -1)))
     most_similar = df_search.sort_values('similarity', ascending=False).iloc[:n]
-    return most_similar
+    return {"most_similar": most_similar}
 ```
 
 
@@ -524,13 +567,15 @@ user_inputs = ['shoe storage', 'black metal side table', 'doormat', 'step booksh
 ```python
 for i in user_inputs:
     print(f"Input: {i}\n")
-    res = search_from_input_text(i)
+    res = search_from_input_text(i, weave.ref("Tagged-and-Captioned-Embeddings:latest"))[
+        "most_similar"
+    ]
     for index, row in res.iterrows():
         similarity_score = row['similarity']
         if isinstance(similarity_score, np.ndarray):
             similarity_score = similarity_score[0][0]
         print(f"{row['title'][:50]}{'...' if len(row['title']) > 50 else ''} ({row['url']}) - Similarity: {similarity_score:.2f}")
-        img = Image(url=row['primary_image'])
+        img = get_image(row['primary_image'])
         display(img)
         print("\n\n")
 ```
@@ -542,26 +587,32 @@ If the input is an image, we can find similar images by first turning images int
 
 ```python
 # We'll take a mix of images: some we haven't seen and some that are already in the dataset
-example_images = df.iloc[306:]['primary_image'].to_list() + df.iloc[5:10]['primary_image'].to_list()
+example_images = df.iloc[306:309]['primary_image'].to_list() + df.iloc[1:4]['primary_image'].to_list()
 ```
 
 
 ```python
-for i in example_images:
-    img_description = describe_image(i, '')
-    caption = caption_image(img_description)
-    img = Image(url=i)
-    print('Input: \n')
-    display(img)
-    res = search_from_input_text(caption, 1).iloc[0]
-    similarity_score = res['similarity']
+@weave.op
+def search_from_image(image, image_url, search_embeddings_ref, n = 1):
+    img_description = describe_image(image_url, "")["description"]
+    caption = caption_image(formatted_examples, img_description)["caption"]
+    res = search_from_input_text(caption, search_embeddings_ref, 1)["most_similar"].iloc[0]
+    similarity_score = res["similarity"]
     if isinstance(similarity_score, np.ndarray):
         similarity_score = similarity_score[0][0]
-    print(f"{res['title'][:50]}{'...' if len(res['title']) > 50 else ''} ({res['url']}) - Similarity: {similarity_score:.2f}")
-    img_res = Image(url=res['primary_image'])
-    display(img_res)
-    print("\n\n")
-    
+    print(
+        f"{res['title'][:50]}{'...' if len(res['title']) > 50 else ''} ({res['url']}) - Similarity: {similarity_score:.2f}"
+    )
+    img_res = get_image(res["primary_image"])
+    return {"image": img_res}
+
+```
+
+
+```python
+for url in example_images:
+    img = get_image(url)
+    search_from_image(img, url, weave.ref("Tagged-and-Captioned-Embeddings:latest"))
 ```
 
 ## Wrapping up
