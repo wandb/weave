@@ -1,4 +1,4 @@
-import {Box, SxProps, Theme} from '@mui/material';
+import {Box, Button, SxProps, Theme} from '@mui/material';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import _ from 'lodash';
 import React, {
@@ -259,11 +259,12 @@ export const SimplePageLayoutWithHeader: FC<{
                 {props.headerContent}
               </Box>
               {(!props.hideTabsIfSingle || tabs.length > 1) && (
+                <Box sx={{borderBottom: '1px solid #e0e0e0'}}>
                 <Tabs.Root
-                  style={{margin: '12px 16px 0 16px'}}
+                  style={{padding: '12px 16px 0 16px'}}
                   value={tabs[tabValue].label}
                   onValueChange={handleTabChange}>
-                  <Tabs.List>
+                  <Tabs.List style={{borderBottom: 'none'}}>
                     {tabs.map(tab => (
                       <Tabs.Trigger
                         key={tab.label}
@@ -273,7 +274,8 @@ export const SimplePageLayoutWithHeader: FC<{
                       </Tabs.Trigger>
                     ))}
                   </Tabs.List>
-                </Tabs.Root>
+                  </Tabs.Root>
+                </Box>
               )}
               <Box
                 sx={{
