@@ -718,6 +718,26 @@ class ActionsAckBatchRes(BaseModel):
     id: str
 
 
+class ActionsReadStaleReq(BaseModel):
+    pass
+
+
+# TODO: Merge this with schema in ActionsExecuteBatchReq
+class ActionSchema(BaseModel):
+    project_id: str
+    call_id: str
+    id: str
+    rule_matched: Optional[str] = None
+    effect: Optional[str] = None
+    created_at: datetime.datetime
+    finished_at: Optional[datetime.datetime] = None
+    failed_at: Optional[datetime.datetime] = None
+
+
+class ActionsReadStaleRes(BaseModel):
+    actions: list[ActionSchema]
+
+
 class FileCreateReq(BaseModel):
     project_id: str
     name: str

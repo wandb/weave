@@ -54,7 +54,7 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.action_queue import ActionQueue, RedisActionQueue
-from weave.trace_server.actions import TABLE_ACTIONS
+from weave.trace_server.actions import TABLE_ACTIONS, get_stale_actions
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -1410,8 +1410,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = TABLE_ACTIONS.insertMany(rows).prepare(database_type="clickhouse")
         self._insert(TABLE_ACTIONS.name, prepared.data, prepared.column_names)
         try:
-            # TODO push all rows instead of one at a time
-            self.action_queue_client.push(req.model_dump())
+            for row in rows:
+                self.action_queue_client.push(row)
             return tsi.ActionsExecuteBatchRes(
                 project_id=req.project_id, call_ids=req.call_ids, id=id
             )
@@ -1436,6 +1436,27 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ActionsAckBatchRes(
             project_id=req.project_id, call_ids=req.call_ids, id=req.id
         )
+
+    # NOTE: This is a private admin function, meant to be invoked by an action cleaner.
+    # The action cleaner's job is to find actions that have been in the action queue for too long, and requeue them.
+    def _actions_requeue_stale(self) -> None:
+        try:
+            prepared_select = get_stale_actions(
+                older_than=datetime.datetime.now(ZoneInfo("UTC"))
+                - datetime.timedelta(hours=1)
+            )
+            query_result = self._query(prepared_select.sql, prepared_select.parameters)
+            rows = TABLE_ACTIONS.tuples_to_rows(
+                query_result.result_rows, prepared_select.fields
+            )
+            for row in rows:
+                try:
+                    self.action_queue_client.push(row)
+                except Exception as e:
+                    logger.error(f"Failed to requeue action: {row}. Error: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error in _actions_requeue_stale: {str(e)}")
+            raise
 
     # Private Methods
     @property

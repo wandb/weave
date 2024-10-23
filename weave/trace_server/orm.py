@@ -177,7 +177,9 @@ class Table:
         if database_type == "sqlite":
             return f"DELETE FROM {self.name}"
 
-    def tuple_to_row(self, tup: typing.Tuple, fields: list[str]) -> Row:
+    def tuple_to_row(
+        self, tup: typing.Tuple | typing.Sequence[typing.Any], fields: list[str]
+    ) -> Row:
         d = {}
         for i, field in enumerate(fields):
             if field.endswith("_dump"):
@@ -189,7 +191,11 @@ class Table:
                 d[field] = value
         return d
 
-    def tuples_to_rows(self, tuples: list[typing.Tuple], fields: list[str]) -> Rows:
+    def tuples_to_rows(
+        self,
+        tuples: list[typing.Tuple] | typing.Sequence[typing.Sequence[typing.Any]],
+        fields: list[str],
+    ) -> Rows:
         rows = []
         for t in tuples:
             rows.append(self.tuple_to_row(t, fields))
