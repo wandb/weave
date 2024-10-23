@@ -515,7 +515,7 @@ export const CallsTable: FC<{
           const searchParams = new URLSearchParams();
           searchParams.set(
             PEEK_PARAM,
-            baseContext.callUIUrl(entity, project, "", selectedCallID)
+            baseContext.callUIUrl(entity, project, '', selectedCallID)
           );
           const newSearch = searchParams.toString();
           const newUrl = `${path}?${newSearch}`;
