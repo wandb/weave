@@ -28,6 +28,9 @@ import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
+import { useGetTraceServerClientContext } from '../wfReactInterface/traceServerClientContext';
+import { useStructuredFeedbackOptions } from '../CallsPage/CallsTable';
+import StructuredFeedbackSidebar from '../../feedback/StructuredFeedback/StructuredFeedbackSidebar';
 export const CallPage: FC<{
   entity: string;
   project: string;
@@ -140,6 +143,7 @@ const CallPageInnerVertical: FC<{
   useViewTraceEvent(call);
 
   const {useCall} = useWFHooks();
+  const getTsClient = useGetTraceServerClientContext();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
 
@@ -182,6 +186,25 @@ const CallPageInnerVertical: FC<{
   const assumeCallIsSelectedCall = path == null || path === '';
   const [currentCall, setCurrentCall] = useState(call);
 
+  const feedbackOptions = useStructuredFeedbackOptions(selectedCall.entity, selectedCall.project);
+  const [showFeedbackExpand, setShowFeedbackExpand] = useState(false);
+  const onToggleFeedbackExpand = useCallback(() => {
+    // increase drawer width
+    // then show the drawer
+    setShowFeedbackExpand(!showFeedbackExpand);
+    history.replace(
+      currentRouter.callUIUrl(
+        call.entity,
+        call.project,
+        call.traceId,
+        call.callId,
+        path,
+        showTraceTree,
+        !showFeedbackExpand
+      )
+    );
+  }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
+
   useEffect(() => {
     if (assumeCallIsSelectedCall) {
       setCurrentCall(selectedCall);
@@ -204,6 +227,16 @@ const CallPageInnerVertical: FC<{
     <SimplePageLayoutWithHeader
       headerExtra={
         <Box>
+          {feedbackOptions && (
+            <Button
+              icon="settings"
+              tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback sidebar`}
+              variant="ghost"
+              active={showFeedbackExpand ?? false}
+              onClick={onToggleFeedbackExpand}
+              className="mr-4"
+            />
+          )}
           <Button
             icon="layout-tabs"
             tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
@@ -214,6 +247,8 @@ const CallPageInnerVertical: FC<{
         </Box>
       }
       isSidebarOpen={showTraceTree}
+      isFeedbackSidebarOpen={showFeedbackExpand}
+      feedbackSidebarContent={<StructuredFeedbackSidebar call={currentCall} structuredFeedbackOptions={feedbackOptions}/>}
       headerContent={<CallOverview call={currentCall} />}
       leftSidebar={
         <Tailwind style={{display: 'contents'}}>

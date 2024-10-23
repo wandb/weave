@@ -43,7 +43,7 @@ import {
 } from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
-import { StructuredFeedbackColumn } from '../../feedback/StructuredFeedback/StructuredFeedback';
+import { StructuredFeedbackCell } from '../../feedback/StructuredFeedback/StructuredFeedback';
 
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.weave'];
 
@@ -206,6 +206,7 @@ function buildCallsTableColumns(
     });
 
   const simpleFeedback = !structuredFeedbackOptions || structuredFeedbackOptions?.types?.length === 0;
+  const feedbackSpecRef = structuredFeedbackOptions?.ref;
 
   const structuredFeedbackColumns = (structuredFeedbackOptions?.types ?? []).map((feedbackType: any) => ({
     field: feedbackColName(feedbackType),
@@ -217,17 +218,17 @@ function buildCallsTableColumns(
       const callId = rowParams.row.id;
       const weaveRef = makeRefCall(entity, project, callId);
 
-      return <StructuredFeedbackColumn 
+      return <StructuredFeedbackCell
         entity={entity} 
         project={project} 
         structuredFeedbackOptions={feedbackType} 
         callId={callId} 
-        weaveRef={weaveRef} 
+        weaveRef={weaveRef}
+        feedbackSpecRef={feedbackSpecRef}
       />
     },
   }));
 
-  console.log("structuredFeedbackOptions", simpleFeedback, structuredFeedbackOptions, structuredFeedbackColumns)
 
   const cols: Array<GridColDef<TraceCallSchema>> = [
     {

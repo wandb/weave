@@ -6,11 +6,16 @@ from weave.flow.obj import Object
 
 
 class FeedbackType(BaseModel):
-    pass
+    editable: bool = True
 
 
 class StructuredFeedback(Object):
     types: list[dict]
+
+
+class BinaryFeedback(FeedbackType):
+    name: Optional[str] = None
+    type: str = "BinaryFeedback"
 
 
 class RangeFeedback(FeedbackType):
@@ -26,26 +31,28 @@ class CategoricalFeedback(FeedbackType):
     type: str = "CategoricalFeedback"
 
     options: list[str]
+    multi_select: bool = False
+    add_new_option: bool = False
 
 
 if __name__ == "__main__":
     import weave
 
-    api = weave.init("griffin_wb/prod-evals-aug")
-
-    existing_evaluations = api.get_calls(
-        filter={"call_ids": ["019268dc-cdf8-7dc2-8719-34f0a7492263"]}
-    )
-    print(existing_evaluations)
-
-    eval_1 = existing_evaluations[0]
+    api = weave.init("griffin_wb/trace-values")
 
     feedback = StructuredFeedback(
         types=[
-            RangeFeedback(min=0, max=100).model_dump(),
+            RangeFeedback(min=0, max=1).model_dump(),
             RangeFeedback(min=0, max=10, name="score-val").model_dump(),
             CategoricalFeedback(
                 options=["option a", "option b", "option c"]
+            ).model_dump(),
+            BinaryFeedback(name="binary-feedback", editable=False).model_dump(),
+            CategoricalFeedback(
+                options=[],
+                multi_select=True,
+                add_new_option=True,
+                name="Tags",
             ).model_dump(),
         ]
     )

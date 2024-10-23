@@ -88,6 +88,7 @@ import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 import { AddStructuredFeedbackColumnButton, AddStructuredFeedbackColumnModal } from '../../feedback/StructuredFeedback/AddColumnButton';
+import { objectRefWithExtra } from '@wandb/weave/react';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -1053,7 +1054,7 @@ function prepareFlattenedCallDataForTable(
   return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
 }
 
-const useStructuredFeedbackOptions = (entity: string, project: string) => {
+export const useStructuredFeedbackOptions = (entity: string, project: string) => {
 
   const {useRootObjectVersions} = useWFHooks();
 
@@ -1072,6 +1073,10 @@ const useStructuredFeedbackOptions = (entity: string, project: string) => {
       return null;
     }
     const latest = feedbackObjects.result?.sort((a, b) => a.createdAtMs - b.createdAtMs).pop();
-    return latest?.val;
+
+    const ref = `weave:///${entity}/${project}/object/${latest?.baseObjectClass}:${latest?.versionHash}`
+    console.log("ref", ref);
+
+    return {...latest?.val, ref}
   }, [feedbackObjects.loading, feedbackObjects.result]);
 };
