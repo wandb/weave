@@ -124,6 +124,7 @@ export const IconNames = {
   MagicWandStar: 'magic-wand-star',
   MagicWandStick: 'magic-wand-stick',
   Markdown: 'markdown',
+  Marker: 'marker',
   Menu: 'menu',
   MicrophoneAudio: 'microphone-audio',
   MillerColumns: 'miller-columns',

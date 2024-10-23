@@ -251,14 +251,14 @@ const CallPageInnerVertical: FC<{
         <Box sx={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
             <Button
-              icon="chevron-up"
+              icon="sort-ascending"
               tooltip={`Previous call`}
               variant="ghost"
               onClick={onPreviousCall}
               className="mr-2"
             />
             <Button
-              icon="chevron-down"
+              icon="sort-descending"
               tooltip={`Next call`}
               variant="ghost"
               onClick={onNextCall}
@@ -266,7 +266,7 @@ const CallPageInnerVertical: FC<{
           </Box>
           <Box>
             <Button
-              icon="settings"
+              icon="marker"
               tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback sidebar`}
               variant="ghost"
               active={showFeedbackExpand ?? false}

@@ -1,10 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { StructuredFeedbackCell } from './StructuredFeedback';
-import { CallSchema } from '../../pages/wfReactInterface/wfDataModelHooksInterface';
-import { makeRefCall, makeRefObject } from '@wandb/weave/util/refs';
+import { makeRefCall } from '@wandb/weave/util/refs';
 import { Tailwind } from '@wandb/weave/components/Tailwind';
-import {  ConfigureStructuredFeedbackModal } from './AddColumnButton';
-import { Button } from '@wandb/weave/components/Button';
 import { useStructuredFeedbackOptions } from '../../pages/CallsPage/CallsTable';
 
 export default function StructuredFeedbackSidebar(
@@ -17,28 +14,29 @@ export default function StructuredFeedbackSidebar(
 ) {
     const feedbackOptions = useStructuredFeedbackOptions(props.entity, props.project);
     const types = feedbackOptions?.types;
-    const feedbackSpecRef = feedbackOptions?.ref
+    const feedbackSpecRef = feedbackOptions?.ref;
     const weaveRef = makeRefCall(props.entity, props.project, props.callID);
 
     return (
         <Tailwind>
-            <div className='flex flex-col h-full'>
-                <div className='flex-grow'>
-                    {types?.map((type: any) => {
-                        return (
-                            <div className='p-8' key={type.name}>
-                                <h3>{type.name}</h3>
-                                <div className='flex flex-col gap-2'>
-                                    <StructuredFeedbackCell feedbackSpecRef={feedbackSpecRef} weaveRef={weaveRef} structuredFeedbackOptions={type} entity={props.entity} project={props.project}/>
-                                </div>
+            <div className='flex flex-col h-full bg-white'>
+                <div className='flex-grow overflow-y-auto'>
+                    {types?.map((type: any) => (
+                        <div className='border-b border-gray-200 last:border-b-0' key={type.name}>
+                            <h3 className='px-4 py-3 text-sm font-semibold text-gray-700 bg-gray-50'>{type.name}</h3>
+                            <div className='p-4'>
+                                <StructuredFeedbackCell
+                                    feedbackSpecRef={feedbackSpecRef}
+                                    weaveRef={weaveRef}
+                                    structuredFeedbackOptions={type}
+                                    entity={props.entity}
+                                    project={props.project}
+                                />
                             </div>
-                        )
-                    })}
-                </div>
-                <div className='flex justify-center p-8 mt-auto'>
-                    <Button onClick={props.nextCall}>Next call</Button>
+                        </div>
+                    ))}
                 </div>
             </div>
         </Tailwind>
-    )
+    );
 }

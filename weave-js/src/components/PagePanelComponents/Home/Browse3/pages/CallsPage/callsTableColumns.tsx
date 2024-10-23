@@ -222,7 +222,6 @@ function buildCallsTableColumns(
         entity={entity} 
         project={project} 
         structuredFeedbackOptions={feedbackType} 
-        callId={callId} 
         weaveRef={weaveRef}
         feedbackSpecRef={feedbackSpecRef}
       />

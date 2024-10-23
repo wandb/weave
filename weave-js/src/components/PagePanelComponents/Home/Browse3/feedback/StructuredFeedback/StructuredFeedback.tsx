@@ -6,110 +6,146 @@ import Select from 'react-select'
 import { Tailwind } from '@wandb/weave/components/Tailwind';
 import { Checkbox } from '@mui/material';
 import CreatableSelect from 'react-select/creatable';
+import { FeedbackCreateReq, FeedbackCreateRes, FeedbackReplaceReq, FeedbackReplaceRes } from '../../pages/wfReactInterface/traceServerClientTypes';
 
-
-export const StructuredFeedbackCell = ({structuredFeedbackOptions, weaveRef, entity, project, feedbackSpecRef}: {structuredFeedbackOptions: any, weaveRef: string, entity: string, project: string, feedbackSpecRef: string}) => {
-
-    const {useFeedback} = useWFHooks();
-    const query = useFeedback(
-        {
-        entity,
-        project,
-        weaveRef,
-        },
-    );
-
-    const [currentFeedbackId, setCurrentFeedbackId] = useState<string | null>(null);
-    const [foundValue, setFoundValue] = useState<string | number | null>(null);
-    const getTsClient = useGetTraceServerClientContext();
-
-    const onAddFeedback = (value: any, currentFeedbackId: string | null): Promise<boolean> => {
-        console.log("onAddFeedback", value, currentFeedbackId);
-        const req = {
-          project_id: `${entity}/${project}`,
-          weave_ref: weaveRef,
-          creator: null,
-          feedback_type: 'wandb.structuredFeedback.1',
-          payload: {
-            value,
-            ref: feedbackSpecRef,
-          },
-          sort_by: [{"created_at": "desc"}]
-        };
-        if (currentFeedbackId) {
-            const replaceReq = {...req, feedback_id: currentFeedbackId};
-            return getTsClient().feedbackReplace(replaceReq).then((res) => {
-                console.log("feedback replace res", res);
-                if (res.reason) {
-                    console.error("feedback replace failed", res.reason);
-                }
-                if (res.id) {
-                    setCurrentFeedbackId(res.id);
-                    return true;
-                }
-                return false;
-            });
-        } else {
-            return getTsClient().feedbackCreate(req).then((res) => {
-                console.log("feedback create res", res);
-                if (res.id) {
-                    setCurrentFeedbackId(res.id);
-                    return true;
-                }
-                return false;
-            });
-        }
-      };
-
-    useEffect(() => {
-        if (query?.loading) {
-            return;
-        }
-        const currFeedback = query.result?.find((feedback: any) => feedback.feedback_type === 'wandb.structuredFeedback.1');
-        if (!currFeedback) {
-            return
-        }
-        if (currFeedback.payload.ref !== feedbackSpecRef) {
-            // console.log("structured column version mismatch", currFeedback.payload.ref, feedbackSpecRef);
-            return;
-        }
-        setCurrentFeedbackId(currFeedback.id);
-        setFoundValue(currFeedback?.payload?.value ?? null);
-    }, [query?.result, query?.loading, setCurrentFeedbackId, setFoundValue]);
-
-    if (query?.loading) {
-        return <LoadingDots />;
-    }
-
-    // console.log(structuredFeedbackOptions.type, query?.result?.find((feedback: any) => feedback.feedback_type === 'wandb.structuredFeedback.1'))
-     
-    if (structuredFeedbackOptions.type === 'RangeFeedback') {
-        return <RangeFeedbackColumn 
-            min={structuredFeedbackOptions.min} 
-            max={structuredFeedbackOptions.max} 
-            onAddFeedback={onAddFeedback} 
-            defaultValue={foundValue as string | null} 
-            currentFeedbackId={currentFeedbackId} 
-        />;
-    } else if (structuredFeedbackOptions.type === 'CategoricalFeedback') {
-        return <CategoricalFeedbackColumn 
-            options={structuredFeedbackOptions.options} 
-            onAddFeedback={onAddFeedback} 
-            defaultValue={foundValue as string | null} 
-            currentFeedbackId={currentFeedbackId}
-            multiSelect={structuredFeedbackOptions.multi_select}
-            addNewOption={structuredFeedbackOptions.add_new_option}
-        />;
-    } else if (structuredFeedbackOptions.type === 'BooleanFeedback') {
-        return <BinaryFeedbackColumn 
-            onAddFeedback={onAddFeedback} 
-            defaultValue={foundValue as string | null} 
-            currentFeedbackId={currentFeedbackId}
-        />;
-    }
-  return <div>unknown feedback type</div>;
+// Constants
+const STRUCTURED_FEEDBACK_TYPE = 'wandb.structuredFeedback.1';
+const FEEDBACK_TYPES = {
+  RANGE: 'RangeFeedback',
+  CATEGORICAL: 'CategoricalFeedback',
+  BOOLEAN: 'BooleanFeedback',
 };
 
+// Interfaces
+interface StructuredFeedbackProps {
+  structuredFeedbackOptions: any;
+  weaveRef: string;
+  entity: string;
+  project: string;
+  feedbackSpecRef: string;
+}
+
+// Utility function for creating feedback request
+const createFeedbackRequest = (props: StructuredFeedbackProps, value: any, currentFeedbackId: string | null) => {
+  const baseRequest = {
+    project_id: `${props.entity}/${props.project}`,
+    weave_ref: props.weaveRef,
+    creator: null,
+    feedback_type: STRUCTURED_FEEDBACK_TYPE,
+    payload: {
+      value,
+      ref: props.feedbackSpecRef,
+    },
+    sort_by: [{ created_at: 'desc' }],
+  };
+
+  if (currentFeedbackId) {
+    return { ...baseRequest, feedback_id: currentFeedbackId };
+  }
+
+  return baseRequest;
+};
+
+export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props) => {
+  const { useFeedback } = useWFHooks();
+  const query = useFeedback({
+    entity: props.entity,
+    project: props.project,
+    weaveRef: props.weaveRef,
+  });
+
+  const [currentFeedbackId, setCurrentFeedbackId] = useState<string | null>(null);
+  const [foundValue, setFoundValue] = useState<string | number | null>(null);
+  const getTsClient = useGetTraceServerClientContext();
+
+  const onAddFeedback = async (value: any, currentFeedbackId: string | null): Promise<boolean> => {
+    const tsClient = getTsClient();
+
+    if (!tsClient) {
+      console.error('Failed to get trace server client');
+      return false;
+    }
+
+    try {
+      let res: FeedbackCreateRes | FeedbackReplaceRes;
+
+      if (currentFeedbackId) {
+        const replaceRequest = createFeedbackRequest(props, value, currentFeedbackId) as FeedbackReplaceReq;
+        res = await tsClient.feedbackReplace(replaceRequest);
+      } else {
+        const createRequest = createFeedbackRequest(props, value, null) as FeedbackCreateReq;
+        res = await tsClient.feedbackCreate(createRequest);
+      }
+
+      if (res.reason) {
+        console.error(`Feedback ${currentFeedbackId ? 'replace' : 'create'} failed:`, res.reason);
+        return false;
+      }
+
+      if (res.id) {
+        setCurrentFeedbackId(res.id);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error(`Error in onAddFeedback:`, error);
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    if (query?.loading) return;
+
+    const currFeedback = query.result?.find((feedback: any) => feedback.feedback_type === STRUCTURED_FEEDBACK_TYPE);
+    if (!currFeedback || currFeedback.payload.ref !== props.feedbackSpecRef) {
+        // Feedback is not for this feedback spec
+        return;
+    }
+
+    console.log(currFeedback);
+
+    setCurrentFeedbackId(currFeedback.id);
+    setFoundValue(currFeedback?.payload?.value ?? null);
+  }, [query?.result, query?.loading, props.feedbackSpecRef]);
+
+  if (query?.loading) return <LoadingDots />;
+
+  // Render appropriate feedback component based on type
+  switch (props.structuredFeedbackOptions.type) {
+    case FEEDBACK_TYPES.RANGE:
+      return (
+        <RangeFeedbackColumn
+          min={props.structuredFeedbackOptions.min}
+          max={props.structuredFeedbackOptions.max}
+          onAddFeedback={onAddFeedback}
+          defaultValue={foundValue as string | null}
+          currentFeedbackId={currentFeedbackId}
+        />
+      );
+    case FEEDBACK_TYPES.CATEGORICAL:
+      return (
+        <CategoricalFeedbackColumn
+          options={props.structuredFeedbackOptions.options}
+          onAddFeedback={onAddFeedback}
+          defaultValue={foundValue as string | null}
+          currentFeedbackId={currentFeedbackId}
+          multiSelect={props.structuredFeedbackOptions.multi_select}
+          addNewOption={props.structuredFeedbackOptions.add_new_option}
+        />
+      );
+    case FEEDBACK_TYPES.BOOLEAN:
+      return (
+        <BinaryFeedbackColumn
+          onAddFeedback={onAddFeedback}
+          defaultValue={foundValue as string | null}
+          currentFeedbackId={currentFeedbackId}
+        />
+      );
+    default:
+      return <div>Unknown feedback type</div>;
+  }
+};
 
 export const RangeFeedbackColumn = (
     {min, max, onAddFeedback, defaultValue, currentFeedbackId}: 
@@ -174,7 +210,6 @@ export const CategoricalFeedbackColumn = ({
 }) => {
     let foundValue = defaultValue;
     if (defaultValue && !options.includes(defaultValue)) {
-        console.log("structured column version mismatch, option not found", defaultValue, options);
         foundValue = null;
     }
     
@@ -200,41 +235,61 @@ export const CategoricalFeedbackColumn = ({
         value: option,
     }));
 
-    const controlStyles = {
-        base: "border rounded-lg bg-white hover:cursor-pointer max-w-full h-10 max-h-10",
-        focus: "border-primary-600 ring-1 ring-primary-500",
-        nonFocus: "border-gray-300 hover:border-gray-400",
-      };
+    const customStyles = {
+        control: (provided: any, state: any) => ({
+            ...provided,
+            backgroundColor: 'white',
+            borderColor: state.isFocused ? '#007AFF' : '#E2E8F0',
+            boxShadow: state.isFocused ? '0 0 0 1px #007AFF' : 'none',
+            borderRadius: '8px',
+            minHeight: '36px',
+            '&:hover': {
+                borderColor: '#007AFF',
+            },
+        }),
+        menu: (provided: any) => ({
+            ...provided,
+            borderRadius: '8px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            zIndex: 9999, // Ensure the dropdown appears above other elements
+        }),
+        option: (provided: any, state: any) => ({
+            ...provided,
+            backgroundColor: state.isSelected ? '#007AFF' : state.isFocused ? '#F0F0F0' : 'white',
+            color: state.isSelected ? 'white' : '#333',
+            '&:active': {
+                backgroundColor: '#007AFF',
+                color: 'white',
+            },
+        }),
+        singleValue: (provided: any) => ({
+            ...provided,
+            color: '#333',
+        }),
+        input: (provided: any) => ({
+            ...provided,
+            color: '#333',
+        }),
+    };
+
+    const SelectComponent = addNewOption ? CreatableSelect : Select;
 
     return (
         <Tailwind>
-            <div className="flex flex-col justify-center items-center bg-moon-100">
-                {addNewOption === true ? (
-                    <CreatableSelect
-                        classNames={{
-                            control:  ({ isFocused }) =>
-                                `isFocused ? ${controlStyles.focus} : ${controlStyles.nonFocus} ${controlStyles.base}`,
-                        }}
-                        isClearable
-                        isMulti={multiSelect}
-                        onCreateOption={(inputValue: string) => {
-                            return {label: inputValue, value: inputValue};
-                        }}
-                        onChange={onValueChange}
-                        options={dropdownOptions}
-                        value={dropdownOptions.find(option => option.value === value)}
-                    />
-                ) : (
-                    <Select
-                        onChange={onValueChange}
-                        options={dropdownOptions}
-                        value={dropdownOptions.find(option => option.value === value)}
-                        classNames={{
-                            control: ({ isFocused }) =>
-                                `isFocused ? ${controlStyles.focus} : ${controlStyles.nonFocus} ${controlStyles.base}`,
-                        }}
-                    />
-                )} 
+            <div className="flex flex-col justify-center items-center w-full">
+                <SelectComponent
+                    styles={customStyles}
+                    isClearable
+                    isMulti={multiSelect}
+                    onCreateOption={(inputValue: string) => {
+                        return {label: inputValue, value: inputValue};
+                    }}
+                    onChange={onValueChange}
+                    options={dropdownOptions}
+                    value={dropdownOptions.find(option => option.value === value)}
+                    menuPortalTarget={document.body} // This ensures the menu is rendered in the body
+                    menuPosition="fixed" // This helps prevent the menu from being cut off
+                />
             </div>
         </Tailwind>
     );
