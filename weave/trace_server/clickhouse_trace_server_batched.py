@@ -590,12 +590,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for cr in collections:
                 if cr.name == req.collection_name:
                     dict_val = make_python_object_from_dict(
-                        cr.name,
-                        cr.base_model_spec.__name__,
-                        ["BaseModel"],
+                        cr,
                         dict_val,
                     )
+                    base_object_class = cr.name
                     break
+        
 
         json_val = json.dumps(dict_val)
         digest = str_digest(json_val)
@@ -603,9 +603,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ch_obj = ObjCHInsertable(
             project_id=req_obj.project_id,
             object_id=req_obj.object_id,
-            kind=get_kind(req_obj.val),
-            base_object_class=get_base_object_class(req_obj.val),
-            refs=extract_refs_from_values(req_obj.val),
+            kind=get_kind(dict_val),
+            base_object_class=get_base_object_class(dict_val),
+            refs=extract_refs_from_values(dict_val),
             val_dump=json_val,
             digest=digest,
         )
@@ -1468,7 +1468,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 raise InvalidRequest("Invalid action")
 
             mapping_val = mapping.model_dump()
-            mapping_val["action"] = action_ref # YUK YUK YUK YUK
+            mapping_val["action"] = action_ref  # YUK YUK YUK YUK
 
             digest = self.obj_create(
                 tsi.ObjCreateReq(
@@ -1496,11 +1496,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 action_dict = maybe_action
             elif isinstance(maybe_action, str):
                 action_dict_res = self.refs_read_batch(
-                    tsi.RefsReadBatchReq(refs=[req.mapping_ref])
+                    tsi.RefsReadBatchReq(refs=[maybe_action])
                 )
                 action_dict = action_dict_res.vals[0]
 
             mapping_val["action"] = action_dict
+            print(f"mapping_val: {mapping_val}")
             mapping = tsi.ActionOpMapping.model_validate(mapping_val)
         else:
             raise InvalidRequest("Either mapping or mapping_ref must be provided")
@@ -2183,13 +2184,17 @@ def get_base_object_class(val: Any) -> Optional[str]:
     if isinstance(val, dict):
         if "_bases" in val:
             if isinstance(val["_bases"], list):
-                if len(val["_bases"]) >= 2:
-                    if val["_bases"][-1] == "BaseModel":
-                        if val["_bases"][-2] == "Object":
-                            if len(val["_bases"]) > 2:
-                                return val["_bases"][-3]
-                            elif "_class_name" in val:
-                                return val["_class_name"]
+                bases = val["_bases"]
+                if bases[-1] == "BaseModel":
+                    bases = bases[:-1]
+                    if len(bases) > 0 and bases[-1] == "Object":
+                        bases = bases[:-1]
+                    if len(bases) > 0:
+                        return bases[0]
+                    elif "_class_name" in val:
+                        return val["_class_name"]
+                    else:
+                        return None
     return None
 
 

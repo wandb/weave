@@ -288,3 +288,14 @@ export const fileExtensions = {
   [ContentType.any]: 'jsonl',
   [ContentType.json]: 'json',
 };
+
+export type ExecuteBatchActionReq = {
+  project_id: string;
+  call_ids: string[];
+  // mapping: ActionOpMapping;
+  mapping_ref?: string;
+};
+
+export type ExecuteBatchActionRes = {
+
+};

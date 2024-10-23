@@ -77,7 +77,7 @@ def test_action_create(client: WeaveClient):
     res = client.server.execute_batch_action(req=req)
 
     # AFTER CALL!
-    weave.publish(mapping)
+    # weave.publish(mapping)
 
     gotten_call = client.server.calls_query(
         req=tsi.CallsQueryReq(

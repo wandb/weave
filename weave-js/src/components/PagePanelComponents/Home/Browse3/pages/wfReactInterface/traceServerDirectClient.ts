@@ -17,6 +17,8 @@ import fetch from 'isomorphic-unfetch';
 
 import {
   ContentType,
+  ExecuteBatchActionReq,
+  ExecuteBatchActionRes,
   FeedbackCreateReq,
   FeedbackCreateRes,
   FeedbackPurgeReq,
@@ -264,6 +266,13 @@ export class DirectTraceServerClient {
   public feedbackPurge(req: FeedbackPurgeReq): Promise<FeedbackPurgeRes> {
     return this.makeRequest<FeedbackPurgeReq, FeedbackPurgeRes>(
       '/feedback/purge',
+      req
+    );
+  }
+
+  public executeBatchAction(req: ExecuteBatchActionReq): Promise<ExecuteBatchActionRes> {
+    return this.makeRequest<ExecuteBatchActionReq, ExecuteBatchActionRes>(
+      '/execute/batch_action',
       req
     );
   }
