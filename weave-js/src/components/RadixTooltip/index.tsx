@@ -3,7 +3,7 @@ import classNames from 'classnames';
 import React from 'react';
 import {twMerge} from 'tailwind-merge';
 
-import {Tailwind} from '../Tailwind';
+import {TailwindContents} from '../Tailwind';
 
 /**
  * {@link https://www.radix-ui.com/docs/primitives/components/tooltip#provider}
@@ -57,7 +57,7 @@ export const Portal = RadixTooltip.Portal;
  */
 export const Content = React.forwardRef(
   ({className, children, ...props}: RadixTooltip.TooltipContentProps, ref) => (
-    <Tailwind style={{display: 'contents'}}>
+    <TailwindContents>
       <RadixTooltip.Content
         className={twMerge(
           'night-aware',
@@ -69,6 +69,6 @@ export const Content = React.forwardRef(
         {...props}>
         {children}
       </RadixTooltip.Content>
-    </Tailwind>
+    </TailwindContents>
   )
 );
