@@ -196,6 +196,8 @@ const CallPageInnerVertical: FC<{
 
   const callTabs = useCallTabs(currentCall);
 
+  console.log({callTabs, loading, assumeCallIsSelectedCall});
+
   if (loading && !assumeCallIsSelectedCall) {
     return <Loading centered />;
   }

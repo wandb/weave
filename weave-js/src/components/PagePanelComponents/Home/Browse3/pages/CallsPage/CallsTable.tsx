@@ -42,7 +42,11 @@ import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {Tailwind} from '../../../../../Tailwind';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
-import {useWeaveflowCurrentRouteContext} from '../../context';
+import {
+  baseContext,
+  PEEK_PARAM,
+  useWeaveflowCurrentRouteContext,
+} from '../../context';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
@@ -210,6 +214,11 @@ export const CallsTable: FC<{
     new Set<string>().add('inputs.example')
   );
 
+  const [selectedRowIdx, setSelectedRowIdx] = useState<number | null>(null);
+
+  const history = useHistory();
+  const router = useWeaveflowCurrentRouteContext();
+
   // Helpers to handle expansion
   const onExpand = (col: string) => {
     setExpandedRefCols(prevState => new Set(prevState).add(col));
@@ -280,6 +289,8 @@ export const CallsTable: FC<{
     () => prepareFlattenedCallDataForTable(callsResult),
     [callsResult]
   );
+
+  console.log({tableData});
 
   // This is a specific helper that is used when the user attempts to option-click
   // a cell that is a child cell of an expanded ref. In this case, we want to
@@ -448,6 +459,7 @@ export const CallsTable: FC<{
 
   // DataGrid Model Management
   const pinModelResolved = pinModel ?? DEFAULT_PIN_CALLS;
+  console.log({pinModel, pinModelResolved});
 
   // END OF CPR FACTORED CODE
 
@@ -461,8 +473,10 @@ export const CallsTable: FC<{
   const rowIds = useMemo(() => {
     return tableData.map(row => row.id);
   }, [tableData]);
+  console.log({rowIds});
   const [rowSelectionModel, setRowSelectionModel] =
     useState<GridRowSelectionModel>([]);
+
   useEffect(() => {
     if (rowIds.length === 0) {
       // Data may have not loaded
@@ -471,14 +485,56 @@ export const CallsTable: FC<{
     if (peekId == null) {
       // No peek drawer, clear any selection
       setRowSelectionModel([]);
+      setSelectedRowIdx(null);
     } else {
       // If peek drawer matches a row, select it.
       // If not, don't modify selection.
       if (rowIds.includes(peekId)) {
         setRowSelectionModel([peekId]);
+        setSelectedRowIdx(rowIds.indexOf(peekId));
       }
     }
   }, [rowIds, peekId]);
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      setSelectedRowIdx(prev => {
+        let newIndex = prev ?? -1;
+
+        if (event.key === 'ArrowDown' && newIndex < rowIds.length - 1) {
+          newIndex++;
+        } else if (event.key === 'ArrowUp' && newIndex > 0) {
+          newIndex--;
+        }
+
+        // If a valid row is selected, update the URL with the selected call ID
+        if (newIndex >= 0 && newIndex < rowIds.length) {
+          const selectedCallID = rowIds[newIndex];
+
+          const path = router.tracesUIUrl(entity, project);
+          const searchParams = new URLSearchParams();
+          searchParams.set(
+            PEEK_PARAM,
+            baseContext.callUIUrl(entity, project, "", selectedCallID)
+          );
+          const newSearch = searchParams.toString();
+          const newUrl = `${path}?${newSearch}`;
+          history.replace(newUrl);
+        }
+
+        return newIndex;
+      });
+    },
+    [rowIds, router, history, entity, project]
+  );
+
+  // Attach and detach event listener
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [rowIds, handleKeyDown]);
 
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {
@@ -588,10 +644,6 @@ export const CallsTable: FC<{
     return cols;
   }, [columns.cols, selectedCalls, tableData, isEvaluateTable]);
 
-  // Register Compare Evaluations Button
-  const history = useHistory();
-  const router = useWeaveflowCurrentRouteContext();
-
   // We really want to use columns here, but because visibleColumns
   // is a prop to ExportSelector, it causes infinite reloads.
   // memoize key computation, then filter out hidden columns
@@ -654,6 +706,8 @@ export const CallsTable: FC<{
     },
     [callsLoading, setPaginationModel]
   );
+
+  console.log({selectedRowIdx});
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
@@ -782,6 +836,7 @@ export const CallsTable: FC<{
           {isEvaluateTable && (
             <CompareEvaluationsTableButton
               onClick={() => {
+                console.log('is this clicked', {selectedCalls}); // no this is not called
                 history.push(
                   router.compareEvaluationsUri(
                     entity,
