@@ -42,7 +42,7 @@ export const Trigger = ({
   ...props
 }: RadixTooltip.TooltipTriggerProps) => (
   <RadixTooltip.Trigger
-    className={twMerge(classNames('cursor-default', className))}
+    className={twMerge(classNames('cursor-inherit', className))}
     {...props}
   />
 );
