@@ -159,6 +159,35 @@ scorer = HallucinationFreeScorer(
 **Notes:**
 - The `score` method expects an input column named `context`. If your dataset uses a different name, use the `column_map` attribute to map `context` to the dataset column.
 
+Here you have an example in the context of an evaluation:
+
+```python
+from weave.scorers import HallucinationFreeScorer
+from openai import OpenAI
+import weave
+
+class SimpleModel(weave.Model):
+    @weave.op()
+    async def predict(self, question: str) -> str:
+        return "The Earth is the third planet from the Sun."
+
+llm_client = OpenAI()
+model = SimpleModel()
+hallucination_scorer = HallucinationFreeScorer(
+    client=llm_client, 
+    model_id="gpt-4o",
+    column_map={"context": "background_info"}
+)
+
+dataset = [
+    {"background_info": "The Earth is the third planet from the Sun.", "question": "What is the position of Earth in the solar system?"},
+    {"background_info": "Paris is the capital of France.", "question": "What is the capital of Germany?"}
+]
+
+evaluation = weave.Evaluation(dataset=dataset, scorers=[hallucination_scorer])
+results = asyncio.run(evaluation.evaluate(model))
+print(results)
+```
 ---
 
 ### `SummarizationScorer`
@@ -192,6 +221,32 @@ This scorer evaluates summaries in two ways:
 - The `score` method expects the original text that was summarized to be present in the `input` column of the dataset. Use the `column_map` class attribute to map `input` to the correct dataset column if needed.
 
 
+Here you have an example usage of the `SummarizationScorer` in the context of an evaluation:
+
+```python
+from weave.scorers import SummarizationScorer
+from openai import OpenAI
+import weave
+
+class SummarizationModel(weave.Model):
+    @weave.op()
+    async def predict(self, input: str) -> str:
+        return "This is a summary of the input text."
+
+llm_client = OpenAI()
+model = SummarizationModel()
+summarization_scorer = SummarizationScorer(client=llm_client, model_id="gpt-4o")
+
+dataset = [
+    {"input": "The quick brown fox jumps over the lazy dog. This sentence contains every letter of the alphabet.", "expected": "A sentence with all alphabet letters."},
+    {"input": "Artificial Intelligence is revolutionizing various industries, from healthcare to finance.", "expected": "AI's impact on different sectors."}
+]
+
+evaluation = weave.Evaluation(dataset=dataset, scorers=[summarization_scorer])
+results = asyncio.run(evaluation.evaluate(model))
+print(results)
+```
+
 ---
 
 ### `OpenAIModerationScorer`
@@ -217,6 +272,25 @@ scorer = OpenAIModerationScorer(
 **Notes:**
 - Requires the `openai` Python package.
 - The client must be an instance of OpenAI's `OpenAI` or `AsyncOpenAI` client.
+
+
+Here you have an example in the context of an evaluation:
+```python
+from weave.scorers import OpenAIModerationScorer
+from openai import OpenAI
+
+client = OpenAI()
+moderation_scorer = OpenAIModerationScorer(client=client)
+
+dataset = [
+    {"input": "I love puppies and kittens!"},
+    {"input": "I hate everyone and want to hurt them."}
+]
+
+evaluation = Evaluation(dataset=dataset, scorers=[moderation_scorer])
+results = asyncio.run(evaluation.evaluate(model))
+print(results)
+```
 
 ---
 
@@ -246,6 +320,37 @@ similarity_scorer = EmbeddingSimilarityScorer(
 
 The correct cosine similarity threshold to set can fluctuate quite a lot depending on your use case, we advise exploring different thresholds.
 
+
+Here you have an example usage of the `EmbeddingSimilarityScorer` in the context of an evaluation:
+
+```python
+from weave.scorers import EmbeddingSimilarityScorer
+from openai import OpenAI
+import weave
+
+class AnswerModel(weave.Model):
+    @weave.op()
+    async def predict(self, question: str) -> str:
+        return "The capital of France is Paris."
+
+llm_client = OpenAI()
+model = AnswerModel()
+similarity_scorer = EmbeddingSimilarityScorer(
+    client=llm_client,
+    threshold=0.7,
+    column_map={"target": "reference_answer"}
+)
+
+dataset = [
+    {"question": "What is the capital of France?", "reference_answer": "The capital of France is Paris."},
+    {"question": "Who wrote Romeo and Juliet?", "reference_answer": "Shakespeare wrote Romeo and Juliet."}
+]
+
+evaluation = weave.Evaluation(dataset=dataset, scorers=[similarity_scorer])
+results = asyncio.run(evaluation.evaluate(model))
+print(results)
+```
+
 ---
 
 ### `ValidJSONScorer`
@@ -258,8 +363,31 @@ from weave.scorers import ValidJSONScorer
 json_scorer = ValidJSONScorer()
 ```
 
-**Notes:**
-- If the output cannot be parsed as JSON, or if it parses to a data type other than dict or list, it is considered invalid.
+Here you have an example usage of the `ValidJSONScorer` in the context of an evaluation:
+
+```python
+from weave.scorers import ValidJSONScorer
+import weave
+
+class JSONModel(weave.Model):
+    @weave.op()
+    async def predict(self, input: str) -> str:
+        # This is a placeholder. 
+        # In a real scenario, this would generate JSON.
+        return '{"key": "value"}'
+
+model = JSONModel()
+json_scorer = ValidJSONScorer()
+
+dataset = [
+    {"input": "Generate a JSON object with a key and value"},
+    {"input": "Create an invalid JSON"}
+]
+
+evaluation = weave.Evaluation(dataset=dataset, scorers=[json_scorer])
+results = asyncio.run(evaluation.evaluate(model))
+print(results)
+```
 
 
 ---
@@ -272,6 +400,32 @@ The `ValidXMLScorer` checks whether the AI system's output is valid XML. This is
 from weave.scorers import ValidXMLScorer
 
 xml_scorer = ValidXMLScorer()
+```
+
+
+Here you have an example usage of the `ValidXMLScorer` in the context of an evaluation:
+
+```python
+from weave.scorers import ValidXMLScorer
+import weave
+
+class XMLModel(weave.Model):
+    @weave.op()
+    async def predict(self, input: str) -> str:
+        # This is a placeholder. In a real scenario, this would generate XML.
+        return '<root><element>value</element></root>'
+
+model = XMLModel()
+xml_scorer = ValidXMLScorer()
+
+dataset = [
+    {"input": "Generate a valid XML with a root element"},
+    {"input": "Create an invalid XML"}
+]
+
+evaluation = weave.Evaluation(dataset=dataset, scorers=[xml_scorer])
+results = asyncio.run(evaluation.evaluate(model))
+print(results)
 ```
 
 ---
@@ -318,6 +472,36 @@ entity_recall_scorer = ContextEntityRecallScorer(
 
 - Expects a `context` column in your dataset, use `column_map` to map `context` to another dataset column if needed.
 
+
+Here you have an example usage of the `ContextEntityRecallScorer` in the context of an evaluation:
+
+```python
+from weave.scorers import ContextEntityRecallScorer
+from openai import OpenAI
+import weave
+
+class RAGModel(weave.Model):
+    @weave.op()
+    async def predict(self, question: str, context: str) -> str:
+        return "Paris is the capital of France."
+
+llm_client = OpenAI()
+model = RAGModel()
+entity_recall_scorer = ContextEntityRecallScorer(
+    client=llm_client,
+    model_id="gpt-4o",
+    column_map={"context": "answer"}
+)
+
+dataset = [
+    {"question": "What is the capital of France?", "answer": "The capital city of France is Paris."},
+    {"question": "Who wrote Romeo and Juliet?", "answer": "William Shakespeare wrote many famous plays, including Romeo and Juliet."}
+]
+
+evaluation = weave.Evaluation(dataset=dataset, scorers=[entity_recall_scorer])
+results = asyncio.run(evaluation.evaluate(model))
+print(results)
+```
 ---
 
 ### RAGAS - `ContextRelevancyScorer`
@@ -344,3 +528,45 @@ relevancy_scorer = ContextRelevancyScorer(
 
 - Expects a `context` column in your dataset, use `column_map` to map `context` to another dataset column if needed.
 - Customize the `relevancy_prompt` to define how relevancy is assessed.
+
+
+Here you have an example usage of the `ContextRelevancyScorer` in the context of an evaluation:
+
+```python
+from weave.scorers import ContextRelevancyScorer
+from openai import OpenAI
+import weave
+from textwrap import dedent
+
+class RAGModel(weave.Model):
+    @weave.op()
+    async def predict(self, question: str, context: str) -> str:
+        return "Paris is the capital of France."
+
+llm_client = OpenAI()
+model = RAGModel()
+
+relevancy_prompt: str = dedent("""
+    Given the following question and context, rate the relevancy of the context to the question on a scale from 0 to 1.
+
+    Question: {question}
+    Context: {context}
+    Relevancy Score (0-1):
+    """)
+
+
+relevancy_scorer = ContextRelevancyScorer(
+    client=llm_client,
+    model_id="gpt-4o",
+    relevancy_prompt=relevancy_prompt
+)
+
+dataset = [
+    {"question": "What is the capital of France?", "context": "Paris is the capital city of France."},
+    {"question": "Who wrote Romeo and Juliet?", "context": "The Eiffel Tower is located in Paris, France."}
+]
+
+evaluation = weave.Evaluation(dataset=dataset, scorers=[relevancy_scorer])
+results = asyncio.run(evaluation.evaluate(model))
+print(results)
+```
