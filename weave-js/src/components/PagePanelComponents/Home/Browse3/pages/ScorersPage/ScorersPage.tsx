@@ -5,7 +5,9 @@ import React, { FC, useState } from 'react';
 import { SimplePageLayout, SimplePageLayoutWithHeader } from '../common/SimplePageLayout';
 import { FilterableObjectVersionsTable } from '../ObjectVersionsPage';
 import { NewBuiltInActionScorerModal } from './NewBuiltInActionScorerModal';
-import { ActionWithConfigSchema } from '../../collections/actionCollection';
+import { ActionWithConfig, ActionWithConfigSchema } from '../../collections/actionCollection';
+import { useCreateCollectionObject } from '../../collections/getCollectionObjects';
+import { projectIdFromParts } from '../wfReactInterface/tsDataModelHooks';
 
 export const ScorersPage: React.FC<{
   entity: string;
@@ -66,13 +68,27 @@ const OnlineScorersTab: React.FC<{
   project: string;
 }> = ({entity, project}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const createCollectionObject = useCreateCollectionObject("ActionWithConfig");
+  const [lastUpdatedTimestamp, setLastUpdatedTimestamp] = useState(0);
 
   const handleOpenModal = () => setIsModalOpen(true);
   const handleCloseModal = () => setIsModalOpen(false);
-  const handleSaveModal = (newAction: ActionWithConfigSchema) => {
+  const handleSaveModal = (newAction: ActionWithConfig) => {
     // Implement save logic here
     console.log('New action:', newAction);
     // TODO: Save the new action to the backend or update the state
+    //
+    let objectId = newAction.name
+    // Remove non alphanumeric characters
+    objectId = objectId.replace(/[^a-zA-Z0-9]/g, '-');
+    createCollectionObject({
+      obj: {
+        project_id: projectIdFromParts({entity, project}),
+        object_id: objectId,
+        val: newAction,
+      }
+    });
+    setLastUpdatedTimestamp(Date.now());
     handleCloseModal();
   };
 
@@ -93,6 +109,7 @@ const OnlineScorersTab: React.FC<{
         <AddNewButton onClick={handleOpenModal} />
       </Box>
       <FilterableObjectVersionsTable
+        key={lastUpdatedTimestamp}
         entity={entity}
         project={project}
         initialFilter={{

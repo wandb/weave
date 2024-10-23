@@ -36,6 +36,8 @@ import {
   TraceCallUpdateReq,
   TraceFileContentReadReq,
   TraceFileContentReadRes,
+  TraceObjCreateReq,
+  TraceObjCreateRes,
   TraceObjQueryReq,
   TraceObjQueryRes,
   TraceObjReadReq,
@@ -224,6 +226,13 @@ export class DirectTraceServerClient {
 
   public objRead(req: TraceObjReadReq): Promise<TraceObjReadRes> {
     return this.makeRequest<TraceObjReadReq, TraceObjReadRes>('/obj/read', req);
+  }
+
+  public objCreate(req: TraceObjCreateReq): Promise<TraceObjCreateRes> {
+    return this.makeRequest<TraceObjCreateReq, TraceObjCreateRes>(
+      '/obj/create',
+      req
+    );
   }
 
   public readBatch(req: TraceRefsReadBatchReq): Promise<TraceRefsReadBatchRes> {

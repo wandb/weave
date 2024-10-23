@@ -595,7 +595,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     )
                     base_object_class = cr.name
                     break
-        
 
         json_val = json.dumps(dict_val)
         digest = str_digest(json_val)

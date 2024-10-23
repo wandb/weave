@@ -22,7 +22,7 @@ export const ActionWithConfigSchema = z.object({
   config: z.record(z.string(), z.any()),
 });
 
-const ActionOpMappingSchema = z.object({
+export const ActionOpMappingSchema = z.object({
   name: z.string(), // Note: This field is marked for removal in the future
   action: ActionWithConfigSchema,
   op_name: z.string(),
@@ -34,10 +34,7 @@ export type BuiltinAction = z.infer<typeof BuiltinActionSchema>;
 export type ActionWithConfig = z.infer<typeof ActionWithConfigSchema>;
 export type ActionOpMapping = z.infer<typeof ActionOpMappingSchema>;
 
-const actionCollection = {
-    "ActionWithConfig": ActionWithConfigSchema,
-    "ActionOpMapping": ActionOpMappingSchema,
-}
+
 
 
 export type ActionAndSpec = {action: BuiltinAction, configSpec: z.Schema}
