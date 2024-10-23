@@ -106,6 +106,7 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
     str_digest,
 )
+from weave.trace_server.model_providers.model_providers import fetch_model_to_provider_info_map, MODEL_PROVIDERS_FILE
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -184,6 +185,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._flush_immediately = True
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
+        self._model_to_provider_info_map = fetch_model_to_provider_info_map(MODEL_PROVIDERS_FILE)
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -1384,6 +1386,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
+    
+    def execute_llm_completion(self, req: tsi.ExecuteLLMCompletionReq, secret_fetcher: tsi.SecretFetcher) -> tsi.ExecuteLLMCompletionRes:
+        model_name = req.model_name
+        secret_name = self._model_to_provider_info_map.get(model_name)
+        if not secret_name:
+            raise InvalidRequest(f"No secret name found for model {model_name}")
+        api_key = secret_fetcher.fetch(secret_name)
+        # lite LLM API call
+        return tsi.ExecuteLLMCompletionRes()
+
 
     # Private Methods
     @property

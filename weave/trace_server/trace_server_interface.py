@@ -236,6 +236,14 @@ class CallsDeleteRes(BaseModel):
     pass
 
 
+class ExecuteLLMCompletionReq(BaseModel):
+    project_id: str
+    model_name: str
+    # messages: List[str]
+
+class ExecuteLLMCompletionRes(BaseModel):
+    pass
+
 class CallsFilter(BaseModel):
     op_names: Optional[List[str]] = None
     input_refs: Optional[List[str]] = None
@@ -796,6 +804,9 @@ class CostPurgeRes(BaseModel):
     pass
 
 
+class SecretFetcher(Protocol):
+    def fetch(self, secret_name: str) -> Optional[str]: ...
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -837,3 +848,6 @@ class TraceServerInterface(Protocol):
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
+
+    # Execute LLM API
+    def execute_llm_completion(self, req: ExecuteLLMCompletionReq, secret_fetcher: SecretFetcher) -> ExecuteLLMCompletionRes: ...
