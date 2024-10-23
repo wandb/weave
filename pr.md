@@ -38,3 +38,11 @@
    - [ ] OpVersion View
         - [ ] View associated mappings
 - [ ] Create additional 
+
+
+Decisions:
+1. Use a standard name -> Pydantic Type for Objects and Feedback.
+2. Action spec is pretty solid for now
+3. Tomorrow:
+   - [ ] UI for browsing/creating actions
+   - [ ] UI for executing action first time with no action
