@@ -4,7 +4,6 @@ import json
 import platform
 import sys
 
-import pandas as pd
 import pydantic
 import pytest
 import requests
