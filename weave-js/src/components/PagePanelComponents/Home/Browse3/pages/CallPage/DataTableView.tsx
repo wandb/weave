@@ -183,7 +183,6 @@ export const WeaveCHTable: FC<{
         );
 
         history.push(target);
-        console.log('table clicked', {target}); // this is not called
       }
     },
     [history, sourceRef, router]

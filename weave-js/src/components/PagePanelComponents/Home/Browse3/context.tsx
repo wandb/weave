@@ -61,7 +61,6 @@ export const Browse3WeaveflowRouteContextProvider = ({
   projectRoot(entityName: string, projectName: string): string;
 }) => {
   const baseRouter = browse3ContextGen(projectRoot);
-  console.log('browse3 context provider', {baseRouter, projectRoot});
 
   return (
     <WeaveflowRouteContext.Provider
@@ -643,7 +642,6 @@ export const useClosePeek = () => {
   return () => {
     const queryParams = new URLSearchParams(history.location.search);
     if (queryParams.has(PEEK_PARAM)) {
-      console.log('closing peek');
       queryParams.delete(PEEK_PARAM);
       history.replace({
         search: queryParams.toString(),

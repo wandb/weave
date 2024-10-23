@@ -172,7 +172,6 @@ export const CallDetails: FC<{
             }
           );
           const onClick = () => {
-            console.log('child calls clicked', {multipleChildURL}); // this is not called
             history.push(multipleChildURL);
           };
 

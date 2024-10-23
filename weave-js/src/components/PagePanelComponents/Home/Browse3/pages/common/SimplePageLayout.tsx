@@ -35,7 +35,6 @@ export const SimplePageLayout: FC<{
 }> = props => {
   const {tabs} = props;
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
-  console.log({simplePageLayoutContextValue});
 
   // We try to preserve the selected tab even if the set of tabs changes,
   // falling back to the first tab.
@@ -52,7 +51,6 @@ export const SimplePageLayout: FC<{
   }, [tabs, idxSelected]);
   const tabContent = useMemo(() => tabs[tabValue].content, [tabs, tabValue]);
 
-  console.log({tabContent, idxSelected, tabValue});
   return (
     <Box
       sx={{

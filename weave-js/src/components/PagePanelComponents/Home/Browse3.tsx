@@ -626,7 +626,6 @@ const useCallPeekRedirect = () => {
       );
       const newSearch = searchParams.toString();
       const newUrl = `${path}&${newSearch}`;
-      console.log('clicked!!! redirecting to', {newUrl});
       history.replace(newUrl);
     }
   }, [
