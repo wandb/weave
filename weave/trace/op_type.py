@@ -320,6 +320,7 @@ def get_code_deps_safe(
         tupe: A tuple containing
             import_code: str, the code that should be included in the generated code to ensure all
                 dependencies are available for the function body.
+            code: str, the function body code.
             warnings: list[str], any warnings that occurred during the process.
     """
     try:
@@ -329,7 +330,7 @@ def get_code_deps_safe(
         return {
             "import_code": [],
             "code": ["<error>"],
-            "warnings": [f"Error getting code dependencies: {e}"],
+            "warnings": [f"Error getting code dependencies for function {fn}: {e}"],
         }
 
 

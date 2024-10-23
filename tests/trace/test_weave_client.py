@@ -1535,7 +1535,7 @@ def test_op_save_with_global_df(client):
     df = pd.DataFrame({"a": ["a", "b", "c"]})
 
     @weave.op()
-    def my_op(a: int) -> int:
+    def my_op(a: str) -> str:
         # modify the global df
         prev_val = df.loc[df.index[0], "a"]
         df.loc[df.index[0], "a"] = a
