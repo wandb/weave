@@ -214,8 +214,6 @@ export const CallsTable: FC<{
     new Set<string>().add('inputs.example')
   );
 
-  const [selectedRowIdx, setSelectedRowIdx] = useState<number | null>(null);
-
   const history = useHistory();
   const router = useWeaveflowCurrentRouteContext();
 
@@ -481,47 +479,41 @@ export const CallsTable: FC<{
     if (peekId == null) {
       // No peek drawer, clear any selection
       setRowSelectionModel([]);
-      setSelectedRowIdx(null);
     } else {
       // If peek drawer matches a row, select it.
       // If not, don't modify selection.
       if (rowIds.includes(peekId)) {
         setRowSelectionModel([peekId]);
-        setSelectedRowIdx(rowIds.indexOf(peekId));
       }
     }
   }, [rowIds, peekId]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      setSelectedRowIdx(prev => {
-        let newIndex = prev ?? -1;
+      let newIndex = peekId ? rowIds.findIndex(id => id === peekId) : -1;
 
-        if (event.key === 'ArrowDown' && newIndex < rowIds.length - 1) {
-          newIndex++;
-        } else if (event.key === 'ArrowUp' && newIndex > 0) {
-          newIndex--;
-        }
+      if (event.key === 'ArrowDown' && newIndex < rowIds.length - 1) {
+        newIndex++;
+      } else if (event.key === 'ArrowUp' && newIndex > 0) {
+        newIndex--;
+      }
 
-        // If a valid row is selected, update the URL with the selected call ID
-        if (newIndex >= 0 && newIndex < rowIds.length) {
-          const selectedCallID = rowIds[newIndex];
+      // If a valid row is selected, update the URL with the selected call ID
+      if (newIndex >= 0 && newIndex < rowIds.length) {
+        const selectedCallID = rowIds[newIndex];
 
-          const path = router.tracesUIUrl(entity, project);
-          const searchParams = new URLSearchParams();
-          searchParams.set(
-            PEEK_PARAM,
-            baseContext.callUIUrl(entity, project, '', selectedCallID)
-          );
-          const newSearch = searchParams.toString();
-          const newUrl = `${path}?${newSearch}`;
-          history.replace(newUrl);
-        }
-
-        return newIndex;
-      });
+        const path = router.tracesUIUrl(entity, project);
+        const searchParams = new URLSearchParams();
+        searchParams.set(
+          PEEK_PARAM,
+          baseContext.callUIUrl(entity, project, '', selectedCallID)
+        );
+        const newSearch = searchParams.toString();
+        const newUrl = `${path}?${newSearch}`;
+        history.replace(newUrl);
+      }
     },
-    [rowIds, router, history, entity, project]
+    [peekId, rowIds, router, entity, project, history]
   );
 
   // Attach and detach event listener
