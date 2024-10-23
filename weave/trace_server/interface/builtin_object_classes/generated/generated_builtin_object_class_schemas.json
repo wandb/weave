@@ -166,6 +166,58 @@
       "title": "ContainsWordsActionConfig",
       "type": "object"
     },
+    "Filter": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "operator": {
+          "title": "Operator",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value"
+        }
+      },
+      "required": [
+        "id",
+        "field",
+        "operator",
+        "value"
+      ],
+      "title": "Filter",
+      "type": "object"
+    },
+    "Filters": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Filter"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "logicOperator": {
+          "const": "and",
+          "enum": [
+            "and"
+          ],
+          "title": "Logicoperator",
+          "type": "string"
+        }
+      },
+      "required": [
+        "items",
+        "logicOperator"
+      ],
+      "title": "Filters",
+      "type": "object"
+    },
     "Leaderboard": {
       "properties": {
         "name": {
@@ -241,6 +293,57 @@
       "title": "LeaderboardColumn",
       "type": "object"
     },
+    "LegacyFilter": {
+      "properties": {
+        "op_version_refs": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Version Refs"
+        },
+        "input_object_version_refs": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input Object Version Refs"
+        },
+        "output_object_version_refs": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output Object Version Refs"
+        }
+      },
+      "title": "LegacyFilter",
+      "type": "object"
+    },
     "LlmJudgeActionConfig": {
       "properties": {
         "action_type": {
@@ -275,6 +378,179 @@
         "response_schema"
       ],
       "title": "LlmJudgeActionConfig",
+      "type": "object"
+    },
+    "Pin": {
+      "properties": {
+        "left": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Left",
+          "type": "array"
+        },
+        "right": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Right",
+          "type": "array"
+        }
+      },
+      "required": [
+        "left",
+        "right"
+      ],
+      "title": "Pin",
+      "type": "object"
+    },
+    "SavedView": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "table": {
+          "title": "Table",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "definition": {
+          "$ref": "#/$defs/SavedViewDefinition"
+        }
+      },
+      "required": [
+        "table",
+        "label",
+        "definition"
+      ],
+      "title": "SavedView",
+      "type": "object"
+    },
+    "SavedViewDefinition": {
+      "properties": {
+        "filter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LegacyFilter"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "filters": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Filters"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "cols": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "boolean"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cols"
+        },
+        "pin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Pin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sort": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/SortClause"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sort"
+        },
+        "page_size": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page Size"
+        }
+      },
+      "title": "SavedViewDefinition",
+      "type": "object"
+    },
+    "SortClause": {
+      "properties": {
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "sort": {
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "title": "Sort",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "sort"
+      ],
+      "title": "SortClause",
       "type": "object"
     },
     "TestOnlyExample": {
@@ -389,6 +665,9 @@
     },
     "AnnotationSpec": {
       "$ref": "#/$defs/AnnotationSpec"
+    },
+    "SavedView": {
+      "$ref": "#/$defs/SavedView"
     }
   },
   "required": [
@@ -396,7 +675,8 @@
     "TestOnlyNestedBaseObject",
     "Leaderboard",
     "ActionSpec",
-    "AnnotationSpec"
+    "AnnotationSpec",
+    "SavedView"
   ],
   "title": "CompositeBaseObject",
   "type": "object"

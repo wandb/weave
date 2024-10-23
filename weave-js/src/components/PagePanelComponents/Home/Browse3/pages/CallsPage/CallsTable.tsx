@@ -138,6 +138,29 @@ const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   page: 0,
 };
 
+const resolveColumnVisibility = (
+  columnVisibilityModel: GridColumnVisibilityModel,
+  columns: GridColDef[]
+): GridColumnVisibilityModel => {
+  const resolvedModel: GridColumnVisibilityModel = {
+    ...columnVisibilityModel,
+  };
+
+  // By default columns are shown. If we have columns that we want to
+  // hide by default, set that in the visibility model.
+  for (const col of columns) {
+    if (
+      !(col.field in resolvedModel) &&
+      DEFAULT_HIDDEN_COLUMN_PREFIXES.some(prefix =>
+        col.field.startsWith(prefix)
+      )
+    ) {
+      resolvedModel[col.field] = false;
+    }
+  }
+  return resolvedModel;
+};
+
 export const CallsTable: FC<{
   entity: string;
   project: string;
@@ -216,6 +239,7 @@ export const CallsTable: FC<{
     () => getEffectiveFilter(filter, frozenFilter),
     [filter, frozenFilter]
   );
+  // console.log({initialFilter, filter, frozenFilter, effectiveFilter});
 
   // 2. Filter (Unstructured Filter)
   const filterModelResolved = filterModel ?? DEFAULT_FILTER_CALLS;
@@ -530,37 +554,43 @@ export const CallsTable: FC<{
   );
 
   // Set default hidden columns to be hidden
-  useEffect(() => {
-    if (!setColumnVisibilityModel || !columnVisibilityModel) {
-      return;
-    }
-    const hiddenColumns: string[] = [];
-    for (const hiddenColPrefix of DEFAULT_HIDDEN_COLUMN_PREFIXES) {
-      const cols = columns.cols.filter(col =>
-        col.field.startsWith(hiddenColPrefix)
-      );
-      hiddenColumns.push(...cols.map(col => col.field));
-    }
-    // Check if we need to update - only update if any annotation columns are missing from the model
-    const needsUpdate = hiddenColumns.some(
-      col => columnVisibilityModel[col] === undefined
-    );
-    if (!needsUpdate) {
-      return;
-    }
-    const hiddenColumnVisiblityFalse = hiddenColumns.reduce((acc, col) => {
-      // Only add columns=false when not already in the model
-      if (columnVisibilityModel[col] === undefined) {
-        acc[col] = false;
-      }
-      return acc;
-    }, {} as Record<string, boolean>);
+  const columnVisibilityModelResolved = resolveColumnVisibility(
+    columnVisibilityModel ?? {},
+    columns.cols
+  );
 
-    setColumnVisibilityModel({
-      ...columnVisibilityModel,
-      ...hiddenColumnVisiblityFalse,
-    });
-  }, [columns.cols, columnVisibilityModel, setColumnVisibilityModel]);
+  // // Set default hidden columns to be hidden
+  // useEffect(() => {
+  //   if (!setColumnVisibilityModel || !columnVisibilityModel) {
+  //     return;
+  //   }
+  //   const hiddenColumns: string[] = [];
+  //   for (const hiddenColPrefix of DEFAULT_HIDDEN_COLUMN_PREFIXES) {
+  //     const cols = columns.cols.filter(col =>
+  //       col.field.startsWith(hiddenColPrefix)
+  //     );
+  //     hiddenColumns.push(...cols.map(col => col.field));
+  //   }
+  //   // Check if we need to update - only update if any annotation columns are missing from the model
+  //   const needsUpdate = hiddenColumns.some(
+  //     col => columnVisibilityModel[col] === undefined
+  //   );
+  //   if (!needsUpdate) {
+  //     return;
+  //   }
+  //   const hiddenColumnVisiblityFalse = hiddenColumns.reduce((acc, col) => {
+  //     // Only add columns=false when not already in the model
+  //     if (columnVisibilityModel[col] === undefined) {
+  //       acc[col] = false;
+  //     }
+  //     return acc;
+  //   }, {} as Record<string, boolean>);
+
+  //   setColumnVisibilityModel({
+  //     ...columnVisibilityModel,
+  //     ...hiddenColumnVisiblityFalse,
+  //   });
+  // }, [columns.cols, columnVisibilityModel, setColumnVisibilityModel]);
 
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
@@ -886,7 +916,7 @@ export const CallsTable: FC<{
               <div className="flex-none">
                 <ManageColumnsButton
                   columnInfo={columns}
-                  columnVisibilityModel={columnVisibilityModel}
+                  columnVisibilityModel={columnVisibilityModelResolved}
                   setColumnVisibilityModel={setColumnVisibilityModel}
                 />
               </div>
@@ -929,7 +959,7 @@ export const CallsTable: FC<{
         rows={tableData}
         // initialState={initialState}
         onColumnVisibilityModelChange={onColumnVisibilityModelChange}
-        columnVisibilityModel={columnVisibilityModel}
+        columnVisibilityModel={columnVisibilityModelResolved}
         // SORT SECTION START
         sortingMode="server"
         sortModel={sortModel}

@@ -29,9 +29,20 @@ import {
   useParams,
 } from 'react-router-dom';
 
+import {
+  ProjectInfo,
+  useProjectInfo,
+} from '../../../common/hooks/useProjectInfo';
+import {
+  MaybeUserInfo,
+  useViewerInfo,
+} from '../../../common/hooks/useViewerInfo';
 import {URL_BROWSE3} from '../../../urls';
+// import {useLocalStorage} from '../../../util/useLocalStorage';
+import {Alert} from '../../Alert';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
+import {Loading} from '../../Loading';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {ComparePage} from './Browse3/compare/ComparePage';
@@ -81,6 +92,7 @@ import {OpsPage} from './Browse3/pages/OpsPage/OpsPage';
 import {OpVersionPage} from './Browse3/pages/OpsPage/OpVersionPage';
 import {OpVersionsPage} from './Browse3/pages/OpsPage/OpVersionsPage';
 import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
+import {getDefaultViewId} from './Browse3/pages/SavedViews/savedViewUtil';
 import {ScorersPage} from './Browse3/pages/ScorersPage/ScorersPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
@@ -90,6 +102,7 @@ import {
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import {sanitizeObjectId} from './Browse3/pages/wfReactInterface/traceServerDirectClient';
 import {TableRowSelectionProvider} from './TableRowSelectionContext';
 import {useDrawerResize} from './useDrawerResize';
 
@@ -657,10 +670,90 @@ const CallPageBinding = () => {
   );
 };
 
-// TODO(tim/weaveflow_improved_nav): Generalize this
 const CallsPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+  const {loading: loadingProjectInfo, projectInfo} = useProjectInfo(
+    entity,
+    project
+  );
+  if (loadingUserInfo || loadingProjectInfo) {
+    return <Loading />;
+  }
+  if (!projectInfo) {
+    return <Alert severity="error">Invalid project: {project}</Alert>;
+  }
+  return (
+    <CallsPageBindingLoaded userInfo={userInfo} projectInfo={projectInfo} />
+  );
+};
+
+// type CallsPageBindingLoadViewProps = {
+//   entity: string;
+//   project: string;
+//   view: string;
+// };
+
+// Load a saved view
+// const CallsPageBindingLoadView = ({
+//   entity,
+//   project,
+//   view,
+// }: CallsPageBindingLoadViewProps) => {
+//   const history = useHistory();
+//   const getTsClient = useGetTraceServerClientContext();
+//   const tsClient = getTsClient();
+//   tsClient
+//     .objRead({
+//       project_id: projectIdFromParts({
+//         entity,
+//         project,
+//       }),
+//       object_id: view,
+//       digest: 'latest',
+//     })
+//     .then((res: TraceObjReadRes) => {
+//       const search = savedViewObjectToQuery(res.obj);
+//       if (search) {
+//         history.replace({search});
+//       } else {
+//         // TODO: saved view has no description. We don't want to
+//         // go into an infinite loop of requests. Should have a
+//         // way to report error.
+//       }
+//     });
+//   return <Loading />;
+// };
+
+type ComparePageBindingLoadedProps = {
+  projectInfo: ProjectInfo;
+  userInfo: MaybeUserInfo;
+};
+
+const CallsPageBindingLoaded = ({
+  projectInfo,
+  userInfo,
+}: ComparePageBindingLoadedProps) => {
   const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
+
+  const currentViewerId = userInfo ? userInfo.id : null;
+  const isReadonly = !currentViewerId || !userInfo?.teams.includes(entity);
+
   const query = useURLSearchParamsDict();
+
+  // // Using internal ID because it doesn't change across project renames
+  // const [lastView, setLastView] = useLocalStorage(
+  //   `SavedView.lastViewed.${projectInfo.internalIdEncoded}.${tab}`,
+  //   'default'
+  // );
+  const onRecordLastView = (loadedView: string) => {
+    // setLastView(loadedView);
+  };
+  // const view = query.view ? sanitizeObjectId(query.view) : lastView;
+  const view = query.view
+    ? sanitizeObjectId(query.view)
+    : getDefaultViewId(tab);
+
   const initialFilter = useMemo(() => {
     if (tab === 'evaluations') {
       return {
@@ -686,12 +779,14 @@ const CallsPageBinding = () => {
     }
   }, [query.filter, entity, project, tab]);
   const history = useHistory();
-  const routerContext = useWeaveflowCurrentRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
-      history.push(routerContext.callsUIUrl(entity, project, filter));
+      const {search} = history.location;
+      const newQuery = new URLSearchParams(search);
+      newQuery.set('filter', JSON.stringify(filter));
+      history.push({search: newQuery.toString()});
     },
-    [history, entity, project, routerContext]
+    [history]
   );
 
   const location = useLocation();
@@ -772,8 +867,12 @@ const CallsPageBinding = () => {
 
   return (
     <CallsPage
+      currentViewerId={currentViewerId}
+      isReadonly={isReadonly}
       entity={entity}
       project={project}
+      view={view}
+      onRecordLastView={onRecordLastView}
       initialFilter={initialFilter}
       onFilterUpdate={onFilterUpdate}
       columnVisibilityModel={columnVisibilityModel}

@@ -79,10 +79,10 @@
         },
         "field_schema": {
           "default": {},
-          "description": "Expected to be valid JSON Schema. Can be provided as a dict or a Pydantic model class",
+          "description": "Expected to be valid JSON Schema. Can be provided as a dict, a Pydantic model class, a tuple of a primitive type and a Pydantic Field, or primitive type",
           "examples": [
             {
-              "max_length": 100,
+              "maxLength": 100,
               "type": "string"
             },
             {
