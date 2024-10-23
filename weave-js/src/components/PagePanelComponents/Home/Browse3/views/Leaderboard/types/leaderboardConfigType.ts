@@ -43,3 +43,14 @@ export type FilterAndGroupModelSpec = {
   version: string; // "*" means all
   groupAllVersions?: boolean;
 };
+
+export type PythonLeaderboardObjectVal = {
+  name: string;
+  description: string;
+  columns: Array<{
+    evaluation_object_ref: string;
+    scorer_name: string;
+    should_minimize?: boolean;
+    summary_metric_path_parts: string[];
+  }>;
+};

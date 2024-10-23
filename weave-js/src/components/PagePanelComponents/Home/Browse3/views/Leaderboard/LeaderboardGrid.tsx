@@ -23,11 +23,17 @@ import {
 } from './query/leaderboardQuery';
 
 const USE_COMPARE_EVALUATIONS_PAGE = true;
-
+export type LeaderboardColumnOrderType = Array<{
+  datasetGroup: string;
+  scorerGroup: string;
+  metricGroup: string;
+  minimize: boolean;
+}>;
 interface LeaderboardGridProps {
   entity: string;
   project: string;
   data: GroupedLeaderboardData;
+  columnOrder?: LeaderboardColumnOrderType;
   loading: boolean;
 }
 
@@ -42,6 +48,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   project,
   data,
   loading,
+  columnOrder,
 }) => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const history = useHistory();
@@ -73,7 +80,10 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       if (['Trials', 'Run Date'].includes(metricPathGroup)) {
         return 'transparent';
       }
-      const shouldMinimize = ['Avg. Latency'].includes(metricPathGroup);
+      const shouldMinimize =
+        ['Avg. Latency'].includes(metricPathGroup) ||
+        columnStats.datasetGroups[datasetGroup].scorerGroups[scorerGroup]
+          .metricPathGroups[metricPathGroup].shouldMinimize;
       if (score == null) {
         return 'transparent';
       }
@@ -111,8 +121,23 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         minWidth: 150,
         flex: 1,
         renderCell: (params: GridRenderCellParams) => {
+          let isOp = false;
+          try {
+            isOp =
+              Object.values(
+                Object.values(
+                  Object.values(
+                    (params.row as RowData).modelGroup.datasetGroups
+                  )[0].scorerGroups
+                )[0].metricPathGroups
+              )[0][0].modelType === 'op';
+          } catch (e) {
+            console.log(e);
+          }
           const modelRef = parseRefMaybe(
-            `weave:///${entity}/${project}/object/${params.value}` ?? ''
+            `weave:///${entity}/${project}/${isOp ? 'op' : 'object'}/${
+              params.value
+            }` ?? ''
           );
           if (modelRef) {
             return (
@@ -233,6 +258,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         const datasetColGroup: GridColumnGroup = {
           groupId: datasetGroupName,
           headerName: datasetGroupName,
+          freeReordering: true,
           children: [],
           renderHeaderGroup: params => {
             const ref = parseRefMaybe(
@@ -250,6 +276,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
             const scorerColGroup: GridColumnGroup = {
               groupId: `${datasetGroupName}--${scorerGroupName}`,
               headerName: scorerGroupName,
+              freeReordering: true,
               children: [],
               renderHeaderGroup: params => {
                 const ref = parseRefMaybe(
@@ -282,11 +309,36 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 
   const [sortModel, setSortModel] = useState<GridSortItem[]>([]);
 
-  useEffect(() => {
-    if (sortModel.length === 0 && columns.length > 1 && !loading) {
-      setSortModel([{field: columns[1].field, sort: 'desc'}]);
+  const orderedColumns = useMemo(() => {
+    if (!columnOrder) {
+      return columns;
     }
-  }, [columns, loading, sortModel]);
+    const columnOrderKeys = columnOrder.map(
+      c => `${c.datasetGroup}--${c.scorerGroup}--${c.metricGroup}`
+    );
+    return columns.sort((a, b) => {
+      return (
+        columnOrderKeys.indexOf(a.field) - columnOrderKeys.indexOf(b.field)
+      );
+    });
+  }, [columns, columnOrder]);
+
+  const defaultSortModel: GridSortItem[] = useMemo(() => {
+    if (!columnOrder) {
+      return columns.map(c => ({field: c.field, sort: 'desc'}));
+    } else {
+      return columnOrder.map(c => ({
+        field: `${c.datasetGroup}--${c.scorerGroup}--${c.metricGroup}`,
+        sort: c.minimize ? 'asc' : 'desc',
+      }));
+    }
+  }, [columnOrder, columns]);
+
+  useEffect(() => {
+    if (columns.length > 1 && !loading) {
+      setSortModel(defaultSortModel);
+    }
+  }, [columns, defaultSortModel, loading]);
 
   return (
     <Box
@@ -299,9 +351,10 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       }}>
       <StyledDataGrid
         rows={rows}
-        columns={columns}
+        columns={orderedColumns}
         columnGroupingModel={groupingModel}
         disableRowSelectionOnClick
+        disableColumnReorder
         hideFooterSelectedRowCount
         disableMultipleColumnsSorting={false}
         columnHeaderHeight={40}
@@ -350,6 +403,7 @@ type ColumnStats = {
               min: number;
               max: number;
               count: number;
+              shouldMinimize: boolean;
             };
           };
         };
@@ -395,6 +449,7 @@ const getColumnStats = (data: GroupedLeaderboardData): ColumnStats => {
                     min: metricValue,
                     max: metricValue,
                     count: metricPathGroup.length,
+                    shouldMinimize: metricPathGroup[0].shouldMinimize ?? false,
                   };
                 } else {
                   currScorerGroup.metricPathGroups[metricPathGroupName].min =

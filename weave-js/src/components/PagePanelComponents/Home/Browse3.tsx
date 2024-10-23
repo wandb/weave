@@ -82,6 +82,8 @@ import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
+import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
+import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
 import {
@@ -151,6 +153,7 @@ const tabOptions = [
   'op-versions',
   'calls',
   'evaluations',
+  'leaderboards',
   'boards',
   'tables',
 ];
@@ -491,6 +494,13 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
+        </Route>
+        <Route
+          path={[
+            `${projectRoot}/leaderboards/:itemName`,
+            `${projectRoot}/leaderboards`,
+          ]}>
+          <LeaderboardPageBinding />
         </Route>
         {/* BOARDS */}
         <Route
@@ -969,6 +979,24 @@ const CompareEvaluationsBinding = () => {
       onEvaluationCallIdsUpdate={onEvaluationCallIdsUpdate}
       selectedMetrics={selectedMetrics}
       setSelectedMetrics={setSelectedMetrics}
+    />
+  );
+};
+
+const LeaderboardPageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+  const {entity, project, itemName: leaderboardName} = params;
+  const query = useURLSearchParamsDict();
+  const edit = query.edit === 'true';
+  if (!leaderboardName) {
+    return <LeaderboardListingPage entity={entity} project={project} />;
+  }
+  return (
+    <LeaderboardPage
+      entity={entity}
+      project={project}
+      leaderboardName={leaderboardName}
+      openEditorOnMount={edit}
     />
   );
 };
