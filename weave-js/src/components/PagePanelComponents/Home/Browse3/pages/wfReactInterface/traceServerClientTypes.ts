@@ -205,7 +205,7 @@ export type TraceObjQueryReq = {
   metadata_only?: boolean;
 };
 
-export interface TraceObjSchema {
+export interface TraceObjSchema<T extends any = any> {
   project_id: string;
   object_id: string;
   created_at: string;
@@ -214,10 +214,10 @@ export interface TraceObjSchema {
   is_latest: number;
   kind: 'op' | 'object';
   base_object_class?: string;
-  val: any;
+  val: T;
 }
-export type TraceObjQueryRes = {
-  objs: TraceObjSchema[];
+export type TraceObjQueryRes<T extends any = any> = {
+  objs: Array<TraceObjSchema<T>>;
 };
 export type TraceObjReadReq = {
   project_id: string;
@@ -308,6 +308,4 @@ export type ExecuteBatchActionReq = {
   mapping_ref?: string;
 };
 
-export type ExecuteBatchActionRes = {
-
-};
+export type ExecuteBatchActionRes = {};

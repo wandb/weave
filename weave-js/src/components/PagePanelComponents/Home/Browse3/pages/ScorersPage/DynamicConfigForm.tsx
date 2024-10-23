@@ -1,6 +1,14 @@
-import { TextField, Typography, Box, Button, IconButton, Select, MenuItem } from '@material-ui/core';
+import {
+  Box,
+  Button,
+  IconButton,
+  MenuItem,
+  Select,
+  TextField,
+  Typography,
+} from '@material-ui/core';
 import React from 'react';
-import { z } from 'zod';
+import {z} from 'zod';
 
 interface DynamicConfigFormProps {
   configSchema: z.ZodType<any>;
@@ -57,13 +65,18 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
         label={key}
         type={fieldType}
         value={currentValue || ''}
-        onChange={(e) => updateConfig(currentPath, e.target.value)}
+        onChange={e => updateConfig(currentPath, e.target.value)}
         margin="normal"
       />
     );
   };
 
-  const renderArrayField = (key: string, fieldSchema: z.ZodArray<any>, path: string[], value: any[]) => {
+  const renderArrayField = (
+    key: string,
+    fieldSchema: z.ZodArray<any>,
+    targetPath: string[],
+    value: any[]
+  ) => {
     const arrayValue = Array.isArray(value) ? value : [];
     const elementSchema = fieldSchema.element;
 
@@ -77,20 +90,27 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
                 configSchema={elementSchema}
                 config={config}
                 setConfig={setConfig}
-                path={[...path, index.toString()]}
+                path={[...targetPath, index.toString()]}
               />
             </Box>
-            <IconButton onClick={() => removeArrayItem(path, index)}>
+            <IconButton onClick={() => removeArrayItem(targetPath, index)}>
               Delete
             </IconButton>
           </Box>
         ))}
-        <Button onClick={() => addArrayItem(path, elementSchema)}>Add Item</Button>
+        <Button onClick={() => addArrayItem(targetPath, elementSchema)}>
+          Add Item
+        </Button>
       </Box>
     );
   };
 
-  const renderEnumField = (key: string, fieldSchema: z.ZodEnum<any>, path: string[], value: any) => {
+  const renderEnumField = (
+    key: string,
+    fieldSchema: z.ZodEnum<any>,
+    targetPath: string[],
+    value: any
+  ) => {
     const options = fieldSchema.options;
 
     return (
@@ -99,9 +119,8 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
         <Select
           fullWidth
           value={value || ''}
-          onChange={(e) => updateConfig(path, e.target.value)}
-        >
-          {options.map((option) => (
+          onChange={e => updateConfig(targetPath, e.target.value)}>
+          {options.map(option => (
             <MenuItem key={option} value={option}>
               {option}
             </MenuItem>
@@ -111,32 +130,38 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
     );
   };
 
-  const getNestedValue = (obj: any, path: string[]): any => {
-    return path.reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), obj);
+  const getNestedValue = (obj: any, targetPath: string[]): any => {
+    return targetPath.reduce(
+      (acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined),
+      obj
+    );
   };
 
-  const updateConfig = (path: string[], value: any) => {
-    const newConfig = { ...config };
+  const updateConfig = (targetPath: string[], value: any) => {
+    const newConfig = {...config};
     let current = newConfig;
-    for (let i = 0; i < path.length - 1; i++) {
-      if (!(path[i] in current)) {
-        current[path[i]] = {};
+    for (let i = 0; i < targetPath.length - 1; i++) {
+      if (!(targetPath[i] in current)) {
+        current[targetPath[i]] = {};
       }
-      current = current[path[i]];
+      current = current[targetPath[i]];
     }
-    current[path[path.length - 1]] = value;
+    current[targetPath[targetPath.length - 1]] = value;
     setConfig(newConfig);
   };
 
-  const addArrayItem = (path: string[], elementSchema: z.ZodTypeAny) => {
-    const currentArray = getNestedValue(config, path) || [];
+  const addArrayItem = (targetPath: string[], elementSchema: z.ZodTypeAny) => {
+    const currentArray = getNestedValue(config, targetPath) || [];
     const newItem = elementSchema instanceof z.ZodObject ? {} : null;
-    updateConfig(path, [...currentArray, newItem]);
+    updateConfig(targetPath, [...currentArray, newItem]);
   };
 
-  const removeArrayItem = (path: string[], index: number) => {
-    const currentArray = getNestedValue(config, path) || [];
-    updateConfig(path, currentArray.filter((_, i) => i !== index));
+  const removeArrayItem = (targetPath: string[], index: number) => {
+    const currentArray = getNestedValue(config, targetPath) || [];
+    updateConfig(
+      targetPath,
+      currentArray.filter((_, i) => i !== index)
+    );
   };
 
   return (

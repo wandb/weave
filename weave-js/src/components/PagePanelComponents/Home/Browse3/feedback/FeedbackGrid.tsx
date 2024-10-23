@@ -27,8 +27,6 @@ export const FeedbackGrid = ({
 }: FeedbackGridProps) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
 
-
-
   const {useFeedback} = useWFHooks();
   const query = useFeedback({
     entity,

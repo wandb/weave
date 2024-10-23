@@ -279,7 +279,9 @@ export class DirectTraceServerClient {
     );
   }
 
-  public executeBatchAction(req: ExecuteBatchActionReq): Promise<ExecuteBatchActionRes> {
+  public executeBatchAction(
+    req: ExecuteBatchActionReq
+  ): Promise<ExecuteBatchActionRes> {
     return this.makeRequest<ExecuteBatchActionReq, ExecuteBatchActionRes>(
       '/execute/batch_action',
       req

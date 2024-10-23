@@ -260,20 +260,20 @@ export const SimplePageLayoutWithHeader: FC<{
               </Box>
               {(!props.hideTabsIfSingle || tabs.length > 1) && (
                 <Box sx={{borderBottom: '1px solid #e0e0e0'}}>
-                <Tabs.Root
-                  style={{padding: '12px 16px 0 16px'}}
-                  value={tabs[tabValue].label}
-                  onValueChange={handleTabChange}>
-                  <Tabs.List style={{borderBottom: 'none'}}>
-                    {tabs.map(tab => (
-                      <Tabs.Trigger
-                        key={tab.label}
-                        value={tab.label}
-                        className="h-[30px] text-sm">
-                        {tab.label}
-                      </Tabs.Trigger>
-                    ))}
-                  </Tabs.List>
+                  <Tabs.Root
+                    style={{padding: '12px 16px 0 16px'}}
+                    value={tabs[tabValue].label}
+                    onValueChange={handleTabChange}>
+                    <Tabs.List style={{borderBottom: 'none'}}>
+                      {tabs.map(tab => (
+                        <Tabs.Trigger
+                          key={tab.label}
+                          value={tab.label}
+                          className="h-[30px] text-sm">
+                          {tab.label}
+                        </Tabs.Trigger>
+                      ))}
+                    </Tabs.List>
                   </Tabs.Root>
                 </Box>
               )}

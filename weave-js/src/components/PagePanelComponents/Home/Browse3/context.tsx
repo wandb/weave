@@ -193,10 +193,7 @@ export const browse2Context = {
   ) => {
     throw new Error('Not implemented');
   },
-  metricsUIUrl: (
-    entityName: string,
-    projectName: string,
-  ) => {
+  metricsUIUrl: (entityName: string, projectName: string) => {
     throw new Error('Not implemented');
   },
 };
@@ -428,10 +425,7 @@ export const browse3ContextGen = (
         JSON.stringify(evaluationCallIds)
       )}${metricsPart}`;
     },
-    metricsUIUrl: (
-      entityName: string,
-      projectName: string,
-    ) => {
+    metricsUIUrl: (entityName: string, projectName: string) => {
       return `${projectRoot(entityName, projectName)}/metrics`;
     },
   };
@@ -518,10 +512,7 @@ type RouteType = {
     evaluationCallIds: string[],
     metrics: Record<string, boolean> | null
   ) => string;
-  metricsUIUrl: (
-    entityName: string,
-    projectName: string,
-  ) => string;
+  metricsUIUrl: (entityName: string, projectName: string) => string;
 };
 
 const useSetSearchParam = () => {
