@@ -61,7 +61,6 @@ export const Browse3WeaveflowRouteContextProvider = ({
   projectRoot(entityName: string, projectName: string): string;
 }) => {
   const baseRouter = browse3ContextGen(projectRoot);
-
   return (
     <WeaveflowRouteContext.Provider
       value={{baseRouter, peekingRouter: useMakePeekingRouter()}}>
