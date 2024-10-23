@@ -290,8 +290,6 @@ export const CallsTable: FC<{
     [callsResult]
   );
 
-  console.log({tableData});
-
   // This is a specific helper that is used when the user attempts to option-click
   // a cell that is a child cell of an expanded ref. In this case, we want to
   // add a filter on the parent ref itself, not the child cell. Once we can properly
@@ -459,7 +457,6 @@ export const CallsTable: FC<{
 
   // DataGrid Model Management
   const pinModelResolved = pinModel ?? DEFAULT_PIN_CALLS;
-  console.log({pinModel, pinModelResolved});
 
   // END OF CPR FACTORED CODE
 
@@ -473,7 +470,6 @@ export const CallsTable: FC<{
   const rowIds = useMemo(() => {
     return tableData.map(row => row.id);
   }, [tableData]);
-  console.log({rowIds});
   const [rowSelectionModel, setRowSelectionModel] =
     useState<GridRowSelectionModel>([]);
 
@@ -707,8 +703,6 @@ export const CallsTable: FC<{
     [callsLoading, setPaginationModel]
   );
 
-  console.log({selectedRowIdx});
-
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
@@ -836,7 +830,6 @@ export const CallsTable: FC<{
           {isEvaluateTable && (
             <CompareEvaluationsTableButton
               onClick={() => {
-                console.log('is this clicked', {selectedCalls}); // no this is not called
                 history.push(
                   router.compareEvaluationsUri(
                     entity,
