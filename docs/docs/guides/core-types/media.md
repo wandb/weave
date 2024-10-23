@@ -29,7 +29,7 @@ def generate_image(prompt: str) -> Image:
     image_response = requests.get(image_url, stream=True)
     image = Image.open(image_response.raw)
 
-    # return an PIL.Image.Image object to be logged as an image
+    # return a PIL.Image.Image object to be logged as an image
     return image
 
 generate_image("a cat with a pumpkin hat")
