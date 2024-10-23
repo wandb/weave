@@ -1,4 +1,4 @@
-import React, { SyntheticEvent, useEffect, useState } from 'react';
+import React, { SyntheticEvent, useEffect, useState, useCallback } from 'react';
 import { useWFHooks } from '../../pages/wfReactInterface/context';
 import { useGetTraceServerClientContext } from '../../pages/wfReactInterface/traceServerClientContext';
 import { LoadingDots } from '@wandb/weave/components/LoadingDots';
@@ -7,6 +7,8 @@ import { Tailwind } from '@wandb/weave/components/Tailwind';
 import { Checkbox } from '@mui/material';
 import CreatableSelect from 'react-select/creatable';
 import { FeedbackCreateReq, FeedbackCreateRes, FeedbackReplaceReq, FeedbackReplaceRes } from '../../pages/wfReactInterface/traceServerClientTypes';
+import {TextField} from '@wandb/weave/components/Form/TextField';
+import debounce from 'lodash/debounce';
 
 // Constants
 const STRUCTURED_FEEDBACK_TYPE = 'wandb.structuredFeedback.1';
@@ -35,6 +37,7 @@ const createFeedbackRequest = (props: StructuredFeedbackProps, value: any, curre
     payload: {
       value,
       ref: props.feedbackSpecRef,
+      name: props.structuredFeedbackOptions.name,
     },
     sort_by: [{ created_at: 'desc' }],
   };
@@ -97,13 +100,19 @@ export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props)
   useEffect(() => {
     if (query?.loading) return;
 
-    const currFeedback = query.result?.find((feedback: any) => feedback.feedback_type === STRUCTURED_FEEDBACK_TYPE);
-    if (!currFeedback || currFeedback.payload.ref !== props.feedbackSpecRef) {
-        // Feedback is not for this feedback spec
+    // 3 conditions must be true for the feedback to be valid for this component:
+    // 1. Feedback is for this feedback spec
+    // 2. Feedback is for this structured feedback type
+    // 3. Feedback is for this structured feedback name
+
+    const feedbackTypeMatches = (feedback: any) => feedback.feedback_type === STRUCTURED_FEEDBACK_TYPE; 
+    const feedbackNameMatches = (feedback: any) => feedback.payload.name === props.structuredFeedbackOptions.name;
+    const feedbackSpecMatches = (feedback: any) => feedback.payload.ref === props.feedbackSpecRef;
+
+    const currFeedback = query.result?.find((feedback: any) => feedbackTypeMatches(feedback) && feedbackNameMatches(feedback) && feedbackSpecMatches(feedback));
+    if (!currFeedback) {
         return;
     }
-
-    console.log(currFeedback);
 
     setCurrentFeedbackId(currFeedback.id);
     setFoundValue(currFeedback?.payload?.value ?? null);
@@ -111,86 +120,146 @@ export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props)
 
   if (query?.loading) return <LoadingDots />;
 
-  // Render appropriate feedback component based on type
-  switch (props.structuredFeedbackOptions.type) {
-    case FEEDBACK_TYPES.RANGE:
-      return (
-        <RangeFeedbackColumn
-          min={props.structuredFeedbackOptions.min}
-          max={props.structuredFeedbackOptions.max}
-          onAddFeedback={onAddFeedback}
-          defaultValue={foundValue as string | null}
-          currentFeedbackId={currentFeedbackId}
-        />
-      );
-    case FEEDBACK_TYPES.CATEGORICAL:
-      return (
-        <CategoricalFeedbackColumn
-          options={props.structuredFeedbackOptions.options}
-          onAddFeedback={onAddFeedback}
-          defaultValue={foundValue as string | null}
-          currentFeedbackId={currentFeedbackId}
-          multiSelect={props.structuredFeedbackOptions.multi_select}
-          addNewOption={props.structuredFeedbackOptions.add_new_option}
-        />
-      );
-    case FEEDBACK_TYPES.BOOLEAN:
-      return (
-        <BinaryFeedbackColumn
-          onAddFeedback={onAddFeedback}
-          defaultValue={foundValue as string | null}
-          currentFeedbackId={currentFeedbackId}
-        />
-      );
-    default:
-      return <div>Unknown feedback type</div>;
+  return (
+    <div className="flex justify-center w-full">
+      {renderFeedbackComponent()}
+    </div>
+  );
+
+  function renderFeedbackComponent() {
+    switch (props.structuredFeedbackOptions.type) {
+      case FEEDBACK_TYPES.RANGE:
+        return (
+          <NumericalFeedbackColumn
+            min={props.structuredFeedbackOptions.min}
+            max={props.structuredFeedbackOptions.max}
+            onAddFeedback={onAddFeedback}
+            defaultValue={foundValue as number | null}
+            currentFeedbackId={currentFeedbackId}
+          />
+        );
+      case FEEDBACK_TYPES.CATEGORICAL:
+        return (
+          <CategoricalFeedbackColumn
+            options={props.structuredFeedbackOptions.options}
+            onAddFeedback={onAddFeedback}
+            defaultValue={foundValue as string | null}
+            currentFeedbackId={currentFeedbackId}
+            multiSelect={props.structuredFeedbackOptions.multi_select}
+            addNewOption={props.structuredFeedbackOptions.add_new_option}
+          />
+        );
+      case FEEDBACK_TYPES.BOOLEAN:
+        return (
+          <BinaryFeedbackColumn
+            onAddFeedback={onAddFeedback}
+            defaultValue={foundValue as string | null}
+            currentFeedbackId={currentFeedbackId}
+          />
+        );
+      default:
+        return <div>Unknown feedback type</div>;
+    }
   }
 };
 
-export const RangeFeedbackColumn = (
-    {min, max, onAddFeedback, defaultValue, currentFeedbackId}: 
-    {
-        min: number,
-        max: number, 
-        onAddFeedback?: (value: any, currentFeedbackId: string | null) => Promise<boolean>, 
-        defaultValue: string | null,
-        currentFeedbackId?: string | null,
-    }
-) => {
-    const [value, setValue] = useState<any | null>(min);
+// export const RangeFeedbackColumn = (
+//     {min, max, onAddFeedback, defaultValue, currentFeedbackId}: 
+//     {
+//         min: number,
+//         max: number, 
+//         onAddFeedback?: (value: any, currentFeedbackId: string | null) => Promise<boolean>, 
+//         defaultValue: number | null,
+//         currentFeedbackId?: string | null,
+//     }
+// ) => {
+//     const [value, setValue] = useState<number | undefined>(min ?? undefined);
+
+//     useEffect(() => {
+//         setValue(defaultValue ?? undefined);
+//     }, [defaultValue]);
+
+
+//     const onValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+//         // Todo debounce this
+//         const val = parseInt(e.target.value);
+//         onAddFeedback?.(val, currentFeedbackId ?? null).then((success) => {
+//             if (success) {
+//                 setValue(val);
+//             }
+//         });
+//     }
+        
+//     return (
+//     <Tailwind>
+//         <div className="flex flex-col items-center w-full">
+//             <span className="text-moon-500 mb-2">{value}</span>
+//             <input
+//                 type="range" 
+//                 min={min} 
+//                 max={max}
+//                 step={1.0}
+//                 value={value}
+//                 onChange={onValueChange}
+//                 className="w-full"
+//             />
+//         </div>
+//     </Tailwind>
+//     );
+// }
+
+export const NumericalFeedbackColumn = ({min, max, onAddFeedback, defaultValue, currentFeedbackId}: {min: number, max: number, onAddFeedback?: (value: number, currentFeedbackId: string | null) => Promise<boolean>, defaultValue: number | null, currentFeedbackId?: string | null}) => {
+    const [value, setValue] = useState<number | undefined>(defaultValue ?? undefined);
 
     useEffect(() => {
-        if (defaultValue) {
-            setValue(defaultValue);
-        }
+        setValue(defaultValue ?? undefined);
     }, [defaultValue]);
 
-
-    const onValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        // Todo debounce this
-        const val = parseInt(e.target.value);
-        onAddFeedback?.(val, currentFeedbackId ?? null).then((success) => {
-            if (success) {
-                setValue(val);
-            }
-        });
-    }
-        
-    return (
-    <Tailwind>
-        <div className="flex">
-            <span className="text-moon-500 mr-4">{value}</span>
-            <input
-                type="range" 
-                min={min} 
-                max={max}
-                step={1.0}
-                value={value}
-                onChange={onValueChange} 
-            />
-        </div>
-    </Tailwind>
+    const debouncedOnAddFeedback = useCallback(
+        debounce((val: number) => {
+            onAddFeedback?.(val, currentFeedbackId ?? null);
+        }, 500),
+        [onAddFeedback, currentFeedbackId]
     );
+
+    const onValueChange = (v: string) => {
+        const val = parseInt(v);
+        setValue(val);
+        debouncedOnAddFeedback(val);
+    }
+
+    return <div className='w-full'>
+        <TextField
+            type="number"
+            value={value?.toString() ?? ''}
+            onChange={onValueChange}
+            placeholder='1000'
+        />
+    </div>
+}
+
+export const TextFeedbackColumn = ({onAddFeedback, defaultValue, currentFeedbackId}: {onAddFeedback?: (value: string, currentFeedbackId: string | null) => Promise<boolean>, defaultValue: string | null, currentFeedbackId?: string | null}) => {
+    const [value, setValue] = useState<string>(defaultValue ?? '');
+
+    useEffect(() => {
+        setValue(defaultValue ?? '');
+    }, [defaultValue]);
+
+    const debouncedOnAddFeedback = useCallback(
+        debounce((val: string) => {
+            onAddFeedback?.(val, currentFeedbackId ?? null);
+        }, 500),
+        [onAddFeedback, currentFeedbackId]
+    );
+
+    const onValueChange = (newValue: string) => {
+        setValue(newValue);
+        debouncedOnAddFeedback(newValue);
+    }
+
+    return <div className='w-full'>
+        <TextField value={value} onChange={onValueChange} placeholder='Text'/>
+    </div>
 }
 
 export const CategoricalFeedbackColumn = ({
@@ -208,26 +277,23 @@ export const CategoricalFeedbackColumn = ({
     multiSelect: boolean,
     addNewOption: boolean
 }) => {
-    let foundValue = defaultValue;
-    if (defaultValue && !options.includes(defaultValue)) {
-        foundValue = null;
-    }
-    
     const [value, setValue] = useState<string>('');
 
     useEffect(() => {
-        if (foundValue) {
-            setValue(foundValue);
-        }
-    }, [foundValue]);
+        setValue(defaultValue ?? '');
+    }, [defaultValue]);
+
+    const debouncedOnAddFeedback = useCallback(
+        debounce((val: string) => {
+            onAddFeedback?.(val, currentFeedbackId ?? null);
+        }, 500),
+        [onAddFeedback, currentFeedbackId]
+    );
 
     const onValueChange = (newValue: any) => {
         const val = newValue ? newValue.value : '';
-        onAddFeedback?.(val, currentFeedbackId ?? null).then((success) => {
-            if (success) {
-                setValue(val);
-            }
-        });
+        setValue(val);
+        debouncedOnAddFeedback(val);
     }
 
     const dropdownOptions = options.map((option: string) => ({
@@ -243,6 +309,7 @@ export const CategoricalFeedbackColumn = ({
             boxShadow: state.isFocused ? '0 0 0 1px #007AFF' : 'none',
             borderRadius: '8px',
             minHeight: '36px',
+            width: '100%', // Make the select widget full width
             '&:hover': {
                 borderColor: '#007AFF',
             },
@@ -276,7 +343,7 @@ export const CategoricalFeedbackColumn = ({
 
     return (
         <Tailwind>
-            <div className="flex flex-col justify-center items-center w-full">
+            <div className="flex justify-center w-full">
                 <SelectComponent
                     styles={customStyles}
                     isClearable
@@ -287,8 +354,9 @@ export const CategoricalFeedbackColumn = ({
                     onChange={onValueChange}
                     options={dropdownOptions}
                     value={dropdownOptions.find(option => option.value === value)}
-                    menuPortalTarget={document.body} // This ensures the menu is rendered in the body
-                    menuPosition="fixed" // This helps prevent the menu from being cut off
+                    menuPortalTarget={document.body}
+                    menuPosition="fixed"
+                    className="w-full" // Make the select component full width
                 />
             </div>
         </Tailwind>
@@ -296,19 +364,28 @@ export const CategoricalFeedbackColumn = ({
 }
 
 export const BinaryFeedbackColumn = ({onAddFeedback, defaultValue, currentFeedbackId}: {onAddFeedback?: (value: string, currentFeedbackId: string | null) => Promise<boolean>, defaultValue: string | null, currentFeedbackId: string | null}) => {
-    // Checkbox
-    const [value, setValue] = useState<boolean | null>(defaultValue ? defaultValue === 'true' : null);
+    const [value, setValue] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        setValue(defaultValue === 'true');
+    }, [defaultValue]);
+
+    const debouncedOnAddFeedback = useCallback(
+        debounce((val: string) => {
+            onAddFeedback?.(val, currentFeedbackId);
+        }, 500),
+        [onAddFeedback, currentFeedbackId]
+    );
 
     const onValueChange = (e: SyntheticEvent<HTMLInputElement>) => {
         const val = (e.target as HTMLInputElement).checked ? 'true' : 'false';
-        onAddFeedback?.(val, currentFeedbackId).then((success) => {
-            if (success) {
-                setValue(val === 'true');
-            }
-        });
+        setValue(val === 'true');
+        debouncedOnAddFeedback(val);
     }
 
     return <Tailwind>
-        <Checkbox checked={value ?? false} onChange={onValueChange}/>
+        <div className="flex justify-center w-full">
+            <Checkbox checked={value ?? false} onChange={onValueChange}/>
+        </div>
     </Tailwind>
 }
