@@ -28,4 +28,4 @@ def wf_clickhouse_database() -> str:
 
 def wf_action_queue() -> str:
     """The host of the action queue."""
-    return os.environ.get("WF_ACTION_QUEUE", "localhost")
+    return os.environ.get("WF_ACTION_QUEUE", "redis://127.0.0.1:6379")

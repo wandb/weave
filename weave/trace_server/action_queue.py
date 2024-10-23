@@ -2,20 +2,32 @@ import json
 import logging
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 import redis
 
-from . import environment as wf_env
+
+class ActionQueueItem(TypedDict):
+    id: str
+    data: Dict[str, Any]
+
+
+def queue_from_addr(addr: str) -> "ActionQueue":
+    if addr == "noop://":
+        return NoOpActionQueue()
+    elif addr.startswith("redis://"):
+        return RedisActionQueue(addr)
+    else:
+        raise ValueError(f"Invalid action queue address: {addr}")
 
 
 class ActionQueue(ABC):
     @abstractmethod
-    def pull(self) -> Optional[Dict[str, Any]]:
+    def pull(self) -> Optional[ActionQueueItem]:
         pass
 
     @abstractmethod
-    def ack(self, action: Dict[str, Any]) -> None:
+    def ack(self, id: str) -> None:
         pass
 
     @abstractmethod
@@ -25,9 +37,8 @@ class ActionQueue(ABC):
 
 # TODO: Probably move this into a separate file.
 class RedisActionQueue(ActionQueue):
-    def __init__(self) -> None:
-        redis_url = wf_env.wf_action_queue()
-        self.redis_client = redis.from_url(redis_url)
+    def __init__(self, addr: str) -> None:
+        self.redis_client = redis.from_url(addr)
         self.stream_key = "action_queue_stream"
         self.consumer_group = "action_processors"
         self.consumer_name = "consumer-" + str(uuid.uuid4())
@@ -41,7 +52,7 @@ class RedisActionQueue(ActionQueue):
             # Group already exists
             pass
 
-    def pull(self) -> Optional[Dict[str, Any]]:
+    def pull(self) -> Optional[ActionQueueItem]:
         # First try to claim any pending actions.
         actions = self.claim_pending_actions(1)
         if actions:
@@ -61,10 +72,10 @@ class RedisActionQueue(ActionQueue):
             return {"id": message_id, "data": json.loads(message[b"data"])}
         return None
 
-    def ack(self, action: Dict[str, Any]) -> None:
-        self.redis_client.xack(self.stream_key, self.consumer_group, action["id"])  # type: ignore
+    def ack(self, id: str) -> None:
+        self.redis_client.xack(self.stream_key, self.consumer_group, id)  # type: ignore
 
-    def claim_pending_actions(self, count: int = 10) -> List[Dict[str, Any]]:
+    def claim_pending_actions(self, count: int = 1) -> List[ActionQueueItem]:
         # Claim messages that haven't been acknowledged for 10 minutes
         min_idle_time = 10 * 60 * 1000  # 10 minutes in milliseconds
         claimed = self.redis_client.xautoclaim(
@@ -77,7 +88,7 @@ class RedisActionQueue(ActionQueue):
         )
 
         # Process the claimed messages
-        actions = []
+        actions: List[ActionQueueItem] = []
         for message_id, message in claimed[1]:
             actions.append({"id": message_id, "data": json.loads(message[b"data"])})
 
@@ -90,3 +101,29 @@ class RedisActionQueue(ActionQueue):
             # Log the error and re-raise
             logging.error(f"Failed to push action to Redis stream: {e}")
             raise
+
+    def _TESTONLY_clear_queue(self) -> None:
+        # Delete the stream
+        self.redis_client.delete(self.stream_key)
+
+        # Delete the consumer group if it exists
+        try:
+            self.redis_client.xgroup_destroy(self.stream_key, self.consumer_group)  # type: ignore
+        except redis.exceptions.ResponseError:
+            pass  # Group doesn't exist, which is fine
+
+        # Recreate the consumer group
+        self.redis_client.xgroup_create(
+            self.stream_key, self.consumer_group, id="0", mkstream=True
+        )
+
+
+class NoOpActionQueue(ActionQueue):
+    def pull(self) -> Optional[ActionQueueItem]:
+        return {"id": "", "data": {}}
+
+    def ack(self, id: str) -> None:
+        pass
+
+    def push(self, action: Dict[str, Any]) -> None:
+        pass

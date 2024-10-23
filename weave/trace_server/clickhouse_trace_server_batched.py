@@ -53,7 +53,10 @@ from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.action_queue import ActionQueue, RedisActionQueue
+from weave.trace_server.action_queue import (
+    ActionQueue,
+    queue_from_addr,
+)
 from weave.trace_server.actions import TABLE_ACTIONS, get_stale_actions
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
@@ -174,7 +177,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         user: str = "default",
         password: str = "",
         database: str = "default",
-        action_queue_addr: Optional[str] = None,
+        action_queue_addr: str = "noop://",
         use_async_insert: bool = False,
     ):
         super().__init__()
@@ -199,6 +202,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             user=wf_env.wf_clickhouse_user(),
             password=wf_env.wf_clickhouse_pass(),
             database=wf_env.wf_clickhouse_database(),
+            action_queue_addr=wf_env.wf_action_queue(),
             use_async_insert=use_async_insert,
         )
 
@@ -1396,6 +1400,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # That way we can avoid unnecessary duplicates if the server fails after inserting the batch into CH
         # but before inserting into the action queue.
         id = req.id or generate_id()
+        created_at = datetime.datetime.now(ZoneInfo("UTC"))
         rows: list[Row] = [
             {
                 "project_id": req.project_id,
@@ -1403,21 +1408,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "id": req.id or id,
                 "rule_matched": req.rule_matched,
                 "effect": req.effect,
-                "created_at": datetime.datetime.now(ZoneInfo("UTC")),
+                "created_at": created_at,
             }
             for call_id in req.call_ids
         ]
         prepared = TABLE_ACTIONS.insertMany(rows).prepare(database_type="clickhouse")
         self._insert(TABLE_ACTIONS.name, prepared.data, prepared.column_names)
-        try:
-            for row in rows:
-                self.action_queue_client.push(row)
-            return tsi.ActionsExecuteBatchRes(
-                project_id=req.project_id, call_ids=req.call_ids, id=id
-            )
-        except Exception as e:
-            logger.error(f"Error executing batch action: {str(e)}")
-            raise InvalidRequest("Failed to execute batch action") from e
+
+        # Convert timestamp so that it can be serialized when pushing to redis.
+        rows = [{**row, "created_at": created_at.isoformat()} for row in rows]
+        for row in rows:
+            self.action_queue_client.push(row)
+        return tsi.ActionsExecuteBatchRes(
+            project_id=req.project_id, call_ids=req.call_ids, id=id
+        )
 
     def actions_ack_batch(self, req: tsi.ActionsAckBatchReq) -> tsi.ActionsAckBatchRes:
         received_at = datetime.datetime.now(ZoneInfo("UTC"))
@@ -1433,6 +1437,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ]
         prepared = TABLE_ACTIONS.insertMany(rows).prepare(database_type="clickhouse")
         self._insert(TABLE_ACTIONS.name, prepared.data, prepared.column_names)
+
+        # Convert timestamp so that it can be serialized when pushing to redis.
+        rows = [
+            {
+                **row,
+                "finished_at": received_at.isoformat() if row["finished_at"] else None,
+                "failed_at": received_at.isoformat() if row["failed_at"] else None,
+            }
+            for row in rows
+        ]
+        for row in rows:
+            self.action_queue_client.push(row)
         return tsi.ActionsAckBatchRes(
             project_id=req.project_id, call_ids=req.call_ids, id=req.id
         )
@@ -1468,7 +1484,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     @property
     def action_queue_client(self) -> ActionQueue:
         if not hasattr(self._thread_local, "action_queue_client"):
-            self._thread_local.action_queue_client = RedisActionQueue()
+            self._thread_local.action_queue_client = queue_from_addr(
+                self._action_queue_addr
+            )
         return self._thread_local.action_queue_client
 
     def _mint_client(self) -> CHClient:

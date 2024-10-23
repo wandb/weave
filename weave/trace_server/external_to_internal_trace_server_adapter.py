@@ -345,3 +345,19 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                     raise ValueError("Internal Error - Project Mismatch")
                 cost["pricing_level_id"] = original_project_id
         return res
+
+    def actions_execute_batch(
+        self, req: tsi.ActionsExecuteBatchReq
+    ) -> tsi.ActionsExecuteBatchRes:
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        res = self._ref_apply(self._internal_trace_server.actions_execute_batch, req)
+        res.project_id = original_project_id
+        return res
+
+    def actions_ack_batch(self, req: tsi.ActionsAckBatchReq) -> tsi.ActionsAckBatchRes:
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        res = self._ref_apply(self._internal_trace_server.actions_ack_batch, req)
+        res.project_id = original_project_id
+        return res
