@@ -16,22 +16,18 @@ export const NewBuiltInActionScorerModal: FC<NewBuiltInActionScorerModalProps> =
   onSave,
 }) => {
   const [name, setName] = useState('');
-  const [selectedAction, setSelectedAction] = useState<ActionAndSpec>();
+  const [selectedActionIndex, setSelectedActionIndex] = useState<number>(0);
   const [config, setConfig] = useState<Record<string, any>>({});
 
   useEffect(() => {
     // Reset config when action type changes
     setConfig({});
-  }, [selectedAction]);
+  }, [selectedActionIndex]);
 
   const handleSave = () => {
     const newAction = ActionWithConfigSchema.parse({
       name,
-      action: {
-        action_type: 'builtin',
-        name: selectedAction,
-        digest: '*',
-      },
+      action: knownBuiltinActions[selectedActionIndex].action,
       config,
     });
     onSave(newAction);
@@ -74,8 +70,8 @@ export const NewBuiltInActionScorerModal: FC<NewBuiltInActionScorerModalProps> =
           <FormControl fullWidth margin="normal">
             <InputLabel>Action Type</InputLabel>
             <Select
-              value={selectedAction ?? null}
-              onChange={(e) => setSelectedAction(knownBuiltinActions[parseInt(e.target.value)])}
+              value={selectedActionIndex}
+              onChange={(e) => setSelectedActionIndex(parseInt(e.target.value))}
             >
               {knownBuiltinActions.map(({action}, ndx) => (
                 <MenuItem key={action.name} value={ndx}>
@@ -84,9 +80,9 @@ export const NewBuiltInActionScorerModal: FC<NewBuiltInActionScorerModalProps> =
               ))}
             </Select>
           </FormControl>
-          {selectedAction && (
+          {selectedActionIndex !== -1 && (
             <DynamicConfigForm
-              configSchema={selectedAction.configSpec}
+              configSchema={knownBuiltinActions[selectedActionIndex].configSpec}
               config={config}
               setConfig={setConfig}
             />
@@ -97,7 +93,7 @@ export const NewBuiltInActionScorerModal: FC<NewBuiltInActionScorerModalProps> =
           <Button onClick={onClose} sx={{ mr: 1 }}>
             Cancel
           </Button>
-          <Button onClick={handleSave} variant="contained" color="primary" disabled={!name || !selectedAction}>
+          <Button onClick={handleSave} variant="contained" color="primary" disabled={!name || selectedActionIndex === -1}>
             Save
           </Button>
         </Box>
