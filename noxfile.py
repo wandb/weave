@@ -40,15 +40,12 @@ def lint(session):
         "mistral1",
         "notdiamond",
         "openai",
+        "pandas",
     ],
 )
 def tests(session, shard):
     if session.python.startswith("3.13") and shard in PY313_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.13")
-
-    # shard specific installs
-    if shard == "trace":
-        session.install("pandas")
 
     session.install("-e", f".[{shard},test]")
     session.chdir("tests")
