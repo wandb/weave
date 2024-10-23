@@ -109,6 +109,10 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         req.end.project_id = self._idc.ext_to_int_project_id(req.end.project_id)
         return self._ref_apply(self._internal_trace_server.call_end, req)
+    
+    def calls_llm(self, req: tsi.CallsLLMReq) -> tsi.CallsLLMRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self.internal_trace_server.calls_llm, req)
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         original_project_id = req.project_id

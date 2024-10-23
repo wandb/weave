@@ -325,6 +325,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return self._generic_request(
             "/call/update", req, tsi.CallUpdateReq, tsi.CallUpdateRes
         )
+    
+    def calls_llm(self, req: tsi.CallsLLMReq) -> tsi.CallsLLMRes:
+        return self._generic_request("/calls/llm", req, tsi.CallsLLMReq, tsi.CallsLLMRes)
 
     # Op API
 
