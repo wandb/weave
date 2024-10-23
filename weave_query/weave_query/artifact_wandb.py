@@ -1031,7 +1031,7 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
         fragment: str,
     ):
         path = parse.unquote(path.strip("/"))
-        spl_netloc = netloc.split(":")
+        spl_netloc = netloc.split(":", 1)
         if len(spl_netloc) == 1:
             name = spl_netloc[0]
             version = None
