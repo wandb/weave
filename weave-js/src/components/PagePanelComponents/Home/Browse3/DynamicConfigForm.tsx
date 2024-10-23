@@ -51,6 +51,10 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
       return renderEnumField(key, fieldSchema, currentPath, currentValue);
     }
 
+    if (fieldSchema instanceof z.ZodRecord) {
+      return renderRecordField(key, fieldSchema, currentPath, currentValue);
+    }
+
     let fieldType = 'text';
     if (fieldSchema instanceof z.ZodNumber) {
       fieldType = 'number';
@@ -120,12 +124,51 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
           fullWidth
           value={value || ''}
           onChange={e => updateConfig(targetPath, e.target.value)}>
-          {options.map(option => (
+          {options.map((option: string) => (
             <MenuItem key={option} value={option}>
               {option}
             </MenuItem>
           ))}
         </Select>
+      </Box>
+    );
+  };
+
+  const renderRecordField = (
+    key: string,
+    fieldSchema: z.ZodRecord<any, any>,
+    targetPath: string[],
+    value: Record<string, any>
+  ) => {
+    const recordValue = value || {};
+
+    return (
+      <Box key={key} mb={2}>
+        <Typography variant="subtitle1">{key}</Typography>
+        {Object.entries(recordValue).map(([recordKey, recordValue]) => (
+          <Box key={recordKey} display="flex" alignItems="center">
+            <TextField
+              fullWidth
+              label={`Key: ${recordKey}`}
+              value={recordKey}
+              onChange={e => updateRecordKey(targetPath, recordKey, e.target.value)}
+              margin="normal"
+            />
+            <TextField
+              fullWidth
+              label={`Value: ${recordKey}`}
+              value={recordValue}
+              onChange={e => updateRecordValue(targetPath, recordKey, e.target.value)}
+              margin="normal"
+            />
+            <IconButton onClick={() => removeRecordItem(targetPath, recordKey)}>
+              Delete
+            </IconButton>
+          </Box>
+        ))}
+        <Button onClick={() => addRecordItem(targetPath)}>
+          Add Item
+        </Button>
       </Box>
     );
   };
@@ -160,8 +203,43 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
     const currentArray = getNestedValue(config, targetPath) || [];
     updateConfig(
       targetPath,
-      currentArray.filter((_, i) => i !== index)
+      currentArray.filter((_: any, i: number) => i !== index)
     );
+  };
+
+  const addRecordItem = (targetPath: string[]) => {
+    const currentRecord = getNestedValue(config, targetPath) || {};
+    const newKey = `key${Object.keys(currentRecord).length + 1}`;
+    updateConfig(targetPath, {...currentRecord, [newKey]: ''});
+  };
+
+  const removeRecordItem = (targetPath: string[], key: string) => {
+    const currentRecord = getNestedValue(config, targetPath) || {};
+    const {[key]: _, ...newRecord} = currentRecord;
+    updateConfig(targetPath, newRecord);
+  };
+
+  const updateRecordKey = (targetPath: string[], oldKey: string, newKey: string) => {
+    const currentRecord = getNestedValue(config, targetPath) || {};
+    const {[oldKey]: value, ...rest} = currentRecord;
+    updateConfig(targetPath, {...rest, [newKey]: value});
+  };
+
+  const updateRecordValue = (targetPath: string[], key: string, value: any) => {
+    const currentRecord = getNestedValue(config, targetPath) || {};
+    updateConfig(targetPath, {...currentRecord, [key]: value});
+  };
+
+  const renderContent = () => {
+    if (configSchema instanceof z.ZodRecord) {
+      return renderRecordField('', configSchema, [], config);
+    } else if (configSchema instanceof z.ZodObject) {
+      return Object.entries(configSchema.shape).map(([key, fieldSchema]) =>
+        renderField(key, fieldSchema as z.ZodTypeAny)
+      );
+    } else {
+      return <Typography color="error">Unsupported schema type</Typography>;
+    }
   };
 
   return (
@@ -171,9 +249,7 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
           Configuration
         </Typography>
       )}
-      {Object.entries(configSchema.shape || {}).map(([key, fieldSchema]) =>
-        renderField(key, fieldSchema as z.ZodTypeAny)
-      )}
+      {renderContent()}
     </>
   );
 };

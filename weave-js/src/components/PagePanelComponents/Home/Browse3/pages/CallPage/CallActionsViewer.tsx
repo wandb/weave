@@ -1,6 +1,6 @@
 import {makeRefCall} from '@wandb/weave/util/refs';
 import _ from 'lodash';
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 import {z} from 'zod';
 
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
@@ -18,6 +18,15 @@ import {
   CallSchema,
   ObjectVersionSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
+import {
+  Modal,
+  Box,
+  Typography,
+  Button,
+  TextField,
+} from '@material-ui/core';
+import {DynamicConfigForm} from '../../DynamicConfigForm';
+import {ActionOpMappingSchema} from '../../collections/actionCollection';
 
 type CallActionRow = {
   actionRef: string;
@@ -154,69 +163,163 @@ export const CallActionsViewer: React.FC<{
 
   const getClient = useGetTraceServerClientContext();
 
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedAction, setSelectedAction] = useState<CallActionRow | null>(null);
+  const [newMapping, setNewMapping] = useState<Partial<ActionOpMapping>>({
+    name: '',
+    op_name: artifactName || '',
+    op_digest: artifactVersion || '*',
+    input_mapping: {},
+  });
+
+  const handleCreateMapping = (action: CallActionRow) => {
+    setSelectedAction(action);
+    setNewMapping(prev => ({
+      ...prev,
+      action: action.actionRef,
+    }));
+    setIsModalOpen(true);
+  };
+
+  const handleSaveMapping = () => {
+    // TODO: Implement the logic to save the new mapping
+    console.log('New mapping:', newMapping);
+    setIsModalOpen(false);
+  };
+
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>Action</th>
-          <th>Run Count</th>
-          <th>Last Result</th>
-          <th>Run</th>
-          <th>Mapping</th>
-        </tr>
-      </thead>
-      <tbody>
-        {allCallActions.map(action => {
-          const actionRef = action.actionRef;
-          const feedbacks = getFeedbackForAction(action.mappingRef ?? '');
-          return (
-            <tr key={actionRef}>
-              <td>{action.actionDef.name}</td>
-              <td>{feedbacks.length}</td>
-              <td>
-                {feedbacks.length > 0
-                  ? JSON.stringify(feedbacks[0].results)
-                  : 'N/A'}
-              </td>
-              {action.mappingRef ? (
-                <>
-                  <td>
-                    <button
-                      onClick={() => {
-                        // # TODO IF MAPPING REF IS UNDEFINED, THEN WE NEED TO FIND THE CORRECT MAPPING REF
-                        getClient()
-                          .executeBatchAction({
-                            project_id: projectIdFromParts({
-                              entity: props.call.entity,
-                              project: props.call.project,
-                            }),
-                            call_ids: [props.call.callId],
-                            mapping_ref: action.mappingRef,
-                          })
-                          .then(res => {
-                            feedbackQuery.refetch();
-                          });
-                      }}>
-                      Run
-                    </button>
-                  </td>
-                  <td>
-                    <button onClick={console.log}>Edit</button>
-                  </td>
-                </>
-              ) : (
-                <>
-                  <td></td>
-                  <td>
-                    <button onClick={console.log}>Create</button>
-                  </td>
-                </>
-              )}
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <>
+      <table>
+        <thead>
+          <tr>
+            <th>Action</th>
+            <th>Run Count</th>
+            <th>Last Result</th>
+            <th>Run</th>
+            <th>Mapping</th>
+          </tr>
+        </thead>
+        <tbody>
+          {allCallActions.map(action => {
+            const actionRef = action.actionRef;
+            const feedbacks = getFeedbackForAction(action.mappingRef ?? '');
+            return (
+              <tr key={actionRef}>
+                <td>{action.actionDef.name}</td>
+                <td>{feedbacks.length}</td>
+                <td>
+                  {feedbacks.length > 0
+                    ? JSON.stringify(feedbacks[0].results)
+                    : 'N/A'}
+                </td>
+                {action.mappingRef ? (
+                  <>
+                    <td>
+                      <button
+                        onClick={() => {
+                          // # TODO IF MAPPING REF IS UNDEFINED, THEN WE NEED TO FIND THE CORRECT MAPPING REF
+                          getClient()
+                            .executeBatchAction({
+                              project_id: projectIdFromParts({
+                                entity: props.call.entity,
+                                project: props.call.project,
+                              }),
+                              call_ids: [props.call.callId],
+                              mapping_ref: action.mappingRef,
+                            })
+                            .then(res => {
+                              feedbackQuery.refetch();
+                            });
+                        }}>
+                        Run
+                      </button>
+                    </td>
+                    <td>
+                      <button onClick={console.log}>Edit</button>
+                    </td>
+                  </>
+                ) : (
+                  <>
+
+                    <td>
+                      {/* Intentional empty cell */}
+                    </td>
+                    <td>
+                      <button onClick={() => handleCreateMapping(action)}>Create</button>
+                    </td>
+                  </>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <Modal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        aria-labelledby="create-action-mapping-modal"
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 400,
+            bgcolor: 'background.paper',
+            boxShadow: 24,
+            p: 4,
+            borderRadius: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+          }}
+        >
+          <Typography id="create-action-mapping-modal" variant="h6" component="h2" gutterBottom>
+            Create Action Mapping
+          </Typography>
+          <TextField
+            fullWidth
+            label="Name"
+            value={newMapping.name}
+            onChange={(e) => setNewMapping(prev => ({...prev, name: e.target.value}))}
+            margin="normal"
+          />
+          {/* <TextField
+            fullWidth
+            label="Op Name"
+            value={newMapping.op_name}
+            onChange={(e) => setNewMapping(prev => ({...prev, op_name: e.target.value}))}
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            label="Op Digest"
+            value={newMapping.op_digest}
+            onChange={(e) => setNewMapping(prev => ({...prev, op_digest: e.target.value}))}
+            margin="normal"
+          /> */}
+          <Typography variant="subtitle1" gutterBottom>
+            Input Mapping
+          </Typography>
+          <DynamicConfigForm
+            configSchema={z.record(z.string())}
+            config={newMapping.input_mapping || {}}
+            setConfig={(newInputMapping) => setNewMapping(prev => ({...prev, input_mapping: newInputMapping}))}
+          />
+          <Box sx={{display: 'flex', justifyContent: 'flex-end', mt: 2}}>
+            <Button onClick={() => setIsModalOpen(false)} sx={{mr: 1}}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveMapping} variant="contained" color="primary">
+              Save
+            </Button>
+          </Box>
+        </Box>
+      </Modal>
+    </>
   );
 };
 
