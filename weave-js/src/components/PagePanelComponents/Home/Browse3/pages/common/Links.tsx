@@ -192,7 +192,6 @@ export const OpLink: React.FC<{
   opName: string;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  console.log('OpLink', {opName: props.opName});
   return (
     <Link
       to={peekingRouter.opUIUrl(
@@ -274,8 +273,6 @@ export const CallLink: React.FC<{
   const {peekingRouter} = useWeaveflowRouteContext();
   const opName = opNiceName(props.opName);
 
-  console.log('CallLink', {callId: props.callId});
-
   // Custom logic to calculate path and tracetree here is not good. Shows
   // a leak of abstraction. We should not be reaching into the peek location and
   // URL params here. This is a smell that we need to refactor the context
@@ -294,7 +291,6 @@ export const CallLink: React.FC<{
     path
   );
   const onClick = () => {
-    console.log('CallLink clicked :)', {to, called: props.callId});
     history.push(to);
   };
 
