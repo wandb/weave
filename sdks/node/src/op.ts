@@ -67,6 +67,7 @@ export function op<T extends (...args: any[]) => any>(
       // console.error(`Op ${actualOpName} failed:`, error);
       const endTime = new Date();
       await client.finishCallWithException(error, currentCall, parentCall, endTime, startCallPromise);
+      await client.waitForBatchProcessing();
       throw error;
     }
   };
