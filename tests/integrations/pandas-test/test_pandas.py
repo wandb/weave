@@ -1,7 +1,6 @@
 import pandas as pd
-import pytest
+
 import weave
-from datetime import datetime
 
 
 def test_op_save_with_global_df(client):
