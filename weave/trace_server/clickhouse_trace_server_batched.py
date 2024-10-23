@@ -1387,7 +1387,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
     
-    def calls_llm(self, req: tsi.CallsLLMReq, secret_fetcher: tsi.SecretFetcher) -> tsi.CallsLLMRes:
+    def execute_llm_completion(self, req: tsi.ExecuteLLMCompletionReq, secret_fetcher: tsi.SecretFetcher) -> tsi.ExecuteLLMCompletionRes:
         pass
 
 

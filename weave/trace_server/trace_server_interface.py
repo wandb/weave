@@ -236,13 +236,13 @@ class CallsDeleteRes(BaseModel):
     pass
 
 
-class CallsLLMReq(BaseModel):
+class ExecuteLLMCompletionReq(BaseModel):
     project_id: str
     secret_name: str # TODO: base on model name
     # model_name: str
     # messages: List[str]
 
-class CallsLLMRes(BaseModel):
+class ExecuteLLMCompletionRes(BaseModel):
     pass
 
 class CallsFilter(BaseModel):
@@ -851,4 +851,4 @@ class TraceServerInterface(Protocol):
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
 
     # Calls LLM API
-    def calls_llm(self, req: CallsLLMReq, secret_fetcher: SecretFetcher) -> CallsLLMRes: ...
+    def execute_llm_completion(self, req: ExecuteLLMCompletionReq, secret_fetcher: SecretFetcher) -> ExecuteLLMCompletionRes: ...

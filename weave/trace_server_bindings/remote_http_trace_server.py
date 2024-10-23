@@ -549,8 +549,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/cost/purge", req, tsi.CostPurgeReq, tsi.CostPurgeRes
         )
     
-    def calls_llm(self, req: tsi.CallsLLMReq) -> tsi.CallsLLMRes:
-        return self._generic_request("/calls/llm", req, tsi.CallsLLMReq, tsi.CallsLLMRes)
+    def execute_llm_completion(self, req: tsi.ExecuteLLMCompletionReq) -> tsi.ExecuteLLMCompletionRes:
+        return self._generic_request("/execute/llm_completion", req, tsi.ExecuteLLMCompletionReq, tsi.ExecuteLLMCompletionRes)
 
 
 __docspec__ = [
