@@ -101,6 +101,7 @@ import {
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
 import {useDrawerResize} from './useDrawerResize';
+import { ScorersPage } from './Browse3/pages/CallsPage/ScorersPage/ScorersPage';
 
 LicenseInfo.setLicenseKey(
   'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
@@ -153,6 +154,7 @@ const tabOptions = [
   'evaluations',
   'boards',
   'tables',
+  'scorers',
 ];
 const tabs = tabOptions.join('|');
 const browse3Paths = (projectRoot: string) => [
@@ -491,6 +493,9 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
+        </Route>
+        <Route path={`${projectRoot}/:tab(scorers)`}>
+          <ScorersPageBinding />
         </Route>
         {/* BOARDS */}
         <Route
@@ -971,6 +976,11 @@ const CompareEvaluationsBinding = () => {
       setSelectedMetrics={setSelectedMetrics}
     />
   );
+};
+
+const ScorersPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  return <ScorersPage entity={entity} project={project} />;
 };
 
 const OpsPageBinding = () => {

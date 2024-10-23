@@ -193,6 +193,12 @@ export const browse2Context = {
   ) => {
     throw new Error('Not implemented');
   },
+  metricsUIUrl: (
+    entityName: string,
+    projectName: string,
+  ) => {
+    throw new Error('Not implemented');
+  },
 };
 
 export const browse3ContextGen = (
@@ -422,6 +428,12 @@ export const browse3ContextGen = (
         JSON.stringify(evaluationCallIds)
       )}${metricsPart}`;
     },
+    metricsUIUrl: (
+      entityName: string,
+      projectName: string,
+    ) => {
+      return `${projectRoot(entityName, projectName)}/metrics`;
+    },
   };
   return browse3Context;
 };
@@ -505,6 +517,10 @@ type RouteType = {
     projectName: string,
     evaluationCallIds: string[],
     metrics: Record<string, boolean> | null
+  ) => string;
+  metricsUIUrl: (
+    entityName: string,
+    projectName: string,
   ) => string;
 };
 
@@ -618,6 +634,9 @@ const useMakePeekingRouter = (): RouteType => {
         PEEK_PARAM,
         baseContext.compareEvaluationsUri(...args)
       );
+    },
+    metricsUIUrl: (...args: Parameters<typeof baseContext.metricsUIUrl>) => {
+      return setSearchParam(PEEK_PARAM, baseContext.metricsUIUrl(...args));
     },
   };
 };
