@@ -12,6 +12,7 @@ const colorMap: Record<KnownBaseObjectClassType, TagColorName> = {
   Scorer: 'purple',
   ActionSpec: 'sienna',
   AnnotationSpec: 'magenta',
+  SavedView: 'magenta',
 };
 
 export const TypeVersionCategoryChip: React.FC<{

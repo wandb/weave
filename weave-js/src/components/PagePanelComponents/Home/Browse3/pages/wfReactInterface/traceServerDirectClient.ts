@@ -226,17 +226,6 @@ export class DirectTraceServerClient {
     );
   }
 
-  public objRead(req: TraceObjReadReq): Promise<TraceObjReadRes> {
-    return this.makeRequest<TraceObjReadReq, TraceObjReadRes>('/obj/read', req);
-  }
-
-  public readBatch(req: TraceRefsReadBatchReq): Promise<TraceRefsReadBatchRes> {
-    return this.makeRequest<TraceRefsReadBatchReq, TraceRefsReadBatchRes>(
-      '/refs/read_batch',
-      req
-    );
-  }
-
   public objCreate(req: TraceObjCreateReq): Promise<TraceObjCreateRes> {
     const initialObjectId = req.obj.object_id;
     const sanitizedObjectId = sanitizeObjectId(initialObjectId);
@@ -249,6 +238,17 @@ export class DirectTraceServerClient {
     }
     return this.makeRequest<TraceObjCreateReq, TraceObjCreateRes>(
       '/obj/create',
+      req
+    );
+  }
+
+  public objRead(req: TraceObjReadReq): Promise<TraceObjReadRes> {
+    return this.makeRequest<TraceObjReadReq, TraceObjReadRes>('/obj/read', req);
+  }
+
+  public readBatch(req: TraceRefsReadBatchReq): Promise<TraceRefsReadBatchRes> {
+    return this.makeRequest<TraceRefsReadBatchReq, TraceRefsReadBatchRes>(
+      '/refs/read_batch',
       req
     );
   }

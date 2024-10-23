@@ -25,7 +25,7 @@ const VIEWER_QUERY = gql`
 `;
 
 // TODO: Would be useful to add admin mode flags
-type UserInfo = {
+export type UserInfo = {
   id: string;
   username: string;
   teams: string[];
@@ -35,9 +35,10 @@ type UserInfoResponseLoading = {
   loading: true;
   userInfo: {};
 };
+export type MaybeUserInfo = UserInfo | null;
 type UserInfoResponseSuccess = {
   loading: false;
-  userInfo: UserInfo | null;
+  userInfo: MaybeUserInfo;
 };
 type UserInfoResponse = UserInfoResponseLoading | UserInfoResponseSuccess;
 

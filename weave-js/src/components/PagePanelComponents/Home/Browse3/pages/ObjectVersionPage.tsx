@@ -55,6 +55,7 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Scorer: 'type-number-alt',
   ActionSpec: 'rocket-launch',
   AnnotationSpec: 'forum-chat-bubble',
+  SavedView: 'view-glasses',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {

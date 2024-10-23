@@ -42,9 +42,15 @@ import {
   useParams,
 } from 'react-router-dom';
 
+import {
+  MaybeUserInfo,
+  useViewerInfo,
+} from '../../../common/hooks/useViewerInfo';
 import {URL_BROWSE3} from '../../../urls';
+import {useLocalStorage} from '../../../util/useLocalStorage';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
+import {Loading} from '../../Loading';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {ComparePage} from './Browse3/compare/ComparePage';
@@ -104,6 +110,7 @@ import {
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import {sanitizeObjectId} from './Browse3/pages/wfReactInterface/traceServerDirectClient';
 import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
@@ -699,8 +706,36 @@ const CallPageBinding = () => {
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const CallsPageBinding = () => {
+  const {loading, userInfo} = useViewerInfo();
+  if (loading) {
+    return <Loading />;
+  }
+  return <CallsPageBindingWithViewer userInfo={userInfo} />;
+};
+
+type ComparePageBindingWithViewerProps = {
+  userInfo: MaybeUserInfo;
+};
+
+const CallsPageBindingWithViewer = ({
+  userInfo,
+}: ComparePageBindingWithViewerProps) => {
   const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
+
+  const currentViewerId = userInfo ? userInfo.id : null;
+  const isReadonly = !currentViewerId || !userInfo?.teams.includes(entity);
+
   const query = useURLSearchParamsDict();
+
+  const [lastView, setLastView] = useLocalStorage(
+    `SavedView.lastViewed.${project}.${tab}`,
+    'default'
+  );
+  const onSaveLastView = (loadedView: string) => {
+    setLastView(loadedView);
+  };
+  const view = query.view ? sanitizeObjectId(query.view) : lastView;
+
   const initialFilter = useMemo(() => {
     if (tab === 'evaluations') {
       return {
@@ -812,8 +847,12 @@ const CallsPageBinding = () => {
 
   return (
     <CallsPage
+      currentViewerId={currentViewerId}
+      isReadonly={isReadonly}
       entity={entity}
       project={project}
+      view={view}
+      onSaveLastView={onSaveLastView}
       initialFilter={initialFilter}
       onFilterUpdate={onFilterUpdate}
       columnVisibilityModel={columnVisibilityModel}
