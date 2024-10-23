@@ -1388,7 +1388,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.FeedbackPurgeRes()
     
     def execute_llm_completion(self, req: tsi.ExecuteLLMCompletionReq, secret_fetcher: tsi.SecretFetcher) -> tsi.ExecuteLLMCompletionRes:
-        pass
+        model_name = req.model_name
+        secret_name = self._model_to_provider_info_map.get(model_name)
+        if not secret_name:
+            raise InvalidRequest(f"No secret name found for model {model_name}")
+        api_key = secret_fetcher.fetch(secret_name)
+        # lite LLM API call
+        return tsi.ExecuteLLMCompletionRes()
 
 
     # Private Methods

@@ -238,8 +238,7 @@ class CallsDeleteRes(BaseModel):
 
 class ExecuteLLMCompletionReq(BaseModel):
     project_id: str
-    secret_name: str # TODO: base on model name
-    # model_name: str
+    model_name: str
     # messages: List[str]
 
 class ExecuteLLMCompletionRes(BaseModel):
