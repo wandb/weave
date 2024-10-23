@@ -12,6 +12,7 @@ from weave.flow.dataset import Dataset
 from weave.flow.eval import Evaluation, Scorer
 from weave.flow.model import Model
 from weave.flow.obj import Object
+from weave.trace.log import log as log
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
 

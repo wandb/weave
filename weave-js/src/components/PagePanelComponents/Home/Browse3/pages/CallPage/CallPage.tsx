@@ -28,6 +28,7 @@ import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
+import {CallLog} from './CallLog';
 export const CallPage: FC<{
   entity: string;
   project: string;
@@ -119,6 +120,14 @@ const useCallTabs = (call: CallSchema) => {
       content: (
         <Tailwind style={{height: '100%', overflow: 'auto'}}>
           <CallSummary call={call} />
+        </Tailwind>
+      ),
+    },
+    {
+      label: 'Log',
+      content: (
+        <Tailwind>
+          <CallLog call={call} />
         </Tailwind>
       ),
     },
