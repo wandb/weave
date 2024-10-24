@@ -145,7 +145,7 @@ class StartedCallSchemaForInsert(BaseModel):
     attributes: Dict[str, Any]
 
     # Inputs
-    inputs: Dict[str, Any] #messages List[Dict[str, str]], model_name
+    inputs: Dict[str, Any]
 
     # WB Metadata
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -239,10 +239,11 @@ class CallsDeleteRes(BaseModel):
 class ExecuteLLMCompletionReq(BaseModel):
     project_id: str
     model_name: str
-    # messages: List[str]
+    inputs: Dict[str, Any] # TODO: make this use the lite llm completion api schema
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 class ExecuteLLMCompletionRes(BaseModel):
-    pass
+    response: Dict[str, Any]
 
 class CallsFilter(BaseModel):
     op_names: Optional[List[str]] = None

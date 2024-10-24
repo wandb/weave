@@ -1,10 +1,11 @@
 import copy
 import datetime
 from collections import OrderedDict, defaultdict
-from typing import Any, Dict, Optional, Tuple, cast
+from typing import Any, Dict, Optional, Tuple, cast, List
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+import json
 
 
 def make_feedback_query_req(
@@ -107,6 +108,16 @@ def make_derived_summary_fields(
     summary["weave"] = weave_summary
     return cast(tsi.SummaryMap, summary)
 
+def parse_messages(messages: List[str]) -> List[Dict[str, Any]]:
+    print("PARSING MESSAGES", messages)
+    msg = []
+    for s in messages:
+        print("STRING", s)
+        json_s = f"{{{s}}}"
+        print("JSON S", json_s)
+        msg.append(json.loads(json_s))
+    print("PARSED MESSAGES", msg)
+    return msg
 
 def empty_str_to_none(val: Optional[str]) -> Optional[str]:
     return val if val != "" else None
