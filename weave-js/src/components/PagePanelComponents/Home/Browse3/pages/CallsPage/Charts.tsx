@@ -27,6 +27,7 @@ import {localPoint} from '@visx/event';
 import * as d3 from 'd3';
 import {bisect} from 'd3-array';
 import {curveLinear} from '@visx/curve'; // Import curveLinear
+import {throttle} from 'lodash';
 
 type ChartData = {
   started_at: string;
@@ -200,24 +201,26 @@ export const LatencyVisXChart: React.FC<LatencyVisXChartProps> = ({
     React.useState<string>('p50'); // Add state for latencyType
 
   // Group data by time bins
-  const groupedData = _(chartData)
-    .groupBy(d =>
-      moment(d.started_at)
-        .startOf('minute')
-        .minute(
-          Math.floor(moment(d.started_at).minute() / binSizeMinutes) *
-            binSizeMinutes
-        )
-        .format()
-    )
-    .map((group, date) => {
-      const latencies = _.sortBy(group.map(d => d.latency));
-      const p50 = quantile(latencies, 0.5) ?? 0;
-      const p95 = quantile(latencies, 0.95) ?? 0;
-      const p99 = quantile(latencies, 0.99) ?? 0;
-      return {timestamp: new Date(date), p50, p95, p99};
-    })
-    .value();
+  const groupedData = useMemo(() => {
+    return _(chartData)
+      .groupBy(d =>
+        moment(d.started_at)
+          .startOf('minute')
+          .minute(
+            Math.floor(moment(d.started_at).minute() / binSizeMinutes) *
+              binSizeMinutes
+          )
+          .format()
+      )
+      .map((group, date) => {
+        const latencies = _.sortBy(group.map(d => d.latency));
+        const p50 = quantile(latencies, 0.5) ?? 0;
+        const p95 = quantile(latencies, 0.95) ?? 0;
+        const p99 = quantile(latencies, 0.99) ?? 0;
+        return {timestamp: new Date(date), p50, p95, p99};
+      })
+      .value();
+  }, [chartData, binSizeMinutes]);
 
   const xScale = scaleTime({
     range: [0, xMax],
@@ -245,41 +248,53 @@ export const LatencyVisXChart: React.FC<LatencyVisXChartProps> = ({
     x: number;
     y: number;
   } | null>(null);
+  console.log('xscale', xScale.domain);
 
-  const handleMouseMove = (
-    event: React.MouseEvent<SVGElement, MouseEvent>,
-    yAccessor: (d: ChartDataWithLatencies) => number,
-    latencyType: string
-  ) => {
-    setCurrentLatencyType(latencyType); // Update state with current latencyType
+  const handleMouseMove = React.useCallback(
+    (event: React.MouseEvent<SVGElement, MouseEvent>) => {
+      console.log('mouse move');
+      requestAnimationFrame(() => {
+        const coords = localPoint(event);
+        if (!coords) return;
 
-    const svgElement = (event.target as SVGElement).ownerSVGElement;
-    if (!svgElement) return;
-    const coords = localPoint(svgElement, event);
-    if (!coords) return;
-    const x0 = xScale.invert(coords.x - margin.left);
-    const index = bisect(
-      groupedData.map(d => d.timestamp),
-      x0
-    );
-    const d0 = groupedData[index - 1];
-    const d1 = groupedData[index];
-    const data =
-      d1 &&
-      x0.getTime() - d0.timestamp.getTime() >
-        d1.timestamp.getTime() - x0.getTime()
-        ? d1
-        : d0;
+        const x0 = xScale.invert(coords.x - margin.left);
+        const index = bisect(
+          groupedData.map(d => d.timestamp),
+          x0
+        );
 
-    if (data) {
-      showTooltip({
-        tooltipData: data,
-        tooltipLeft: coords.x,
-        tooltipTop: coords.y,
+        const d0 = groupedData[index - 1];
+        const d1 = groupedData[index];
+        const data =
+          d1 &&
+          x0.getTime() - d0.timestamp.getTime() >
+            d1.timestamp.getTime() - x0.getTime()
+            ? d1
+            : d0;
+
+        if (data) {
+          const xPosition = xScale(data.timestamp);
+          if (xPosition !== undefined) {
+            const yValues = [data.p50, data.p95, data.p99];
+            const closestYValue = yValues.reduce((prev, curr) =>
+              Math.abs(yScale(curr) - coords.y) <
+              Math.abs(yScale(prev) - coords.y)
+                ? curr
+                : prev
+            );
+
+            showTooltip({
+              tooltipData: data,
+              tooltipLeft: xPosition,
+              tooltipTop: yScale(closestYValue),
+            });
+            setCrosshair({x: xPosition, y: yScale(closestYValue)});
+          }
+        }
       });
-      setCrosshair({x: coords.x, y: coords.y});
-    }
-  };
+    },
+    [groupedData, xScale, yScale, margin.left, showTooltip]
+  );
   return (
     <div>
       <svg
@@ -288,6 +303,16 @@ export const LatencyVisXChart: React.FC<LatencyVisXChartProps> = ({
         height={height}
         onMouseLeave={hideTooltip}>
         <Group left={margin.left} top={margin.top}>
+          <rect
+            width={xMax}
+            height={yMax}
+            fill="transparent"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={() => {
+              hideTooltip();
+              setCrosshair(null);
+            }}
+          />
           <LinePath
             data={groupedData}
             x={d => xScale(d.timestamp) ?? 0}
@@ -295,7 +320,7 @@ export const LatencyVisXChart: React.FC<LatencyVisXChartProps> = ({
             stroke={BLUE_500} // Match p50 color
             strokeWidth={2}
             curve={curveLinear}
-            onMouseMove={event => handleMouseMove(event, d => d.p50, 'p50')}
+            onMouseMove={event => handleMouseMove(event)}
             onMouseLeave={() => hideTooltip()}
           />
           {groupedData.map((d, i) => (
@@ -315,7 +340,7 @@ export const LatencyVisXChart: React.FC<LatencyVisXChartProps> = ({
             stroke={GREEN_500} // Match p95 color
             strokeWidth={2}
             curve={curveLinear}
-            onMouseMove={event => handleMouseMove(event, d => d.p95, 'p95')}
+            onMouseMove={event => handleMouseMove(event)}
           />
           {groupedData.map((d, i) => (
             <circle
@@ -334,7 +359,7 @@ export const LatencyVisXChart: React.FC<LatencyVisXChartProps> = ({
             stroke={MOON_500} // Match p99 color
             strokeWidth={2}
             curve={curveLinear}
-            onMouseMove={event => handleMouseMove(event, d => d.p99, 'p99')}
+            onMouseMove={event => handleMouseMove(event)}
           />
           {groupedData.map((d, i) => (
             <circle
@@ -349,10 +374,10 @@ export const LatencyVisXChart: React.FC<LatencyVisXChartProps> = ({
           {crosshair && (
             <>
               <line
-                x1={xScale(tooltipData?.timestamp ?? new Date(0))} // Use xScale with tooltipData, default to epoch
-                x2={xScale(tooltipData?.timestamp ?? new Date(0))}
-                y1={0}
-                y2={yMax}
+                x1={crosshair.x}
+                x2={crosshair.x}
+                y1={0} // Start from the top of the chart
+                y2={yMax} // Extend to the bottom of the chart
                 stroke="gray"
                 strokeDasharray="4"
               />
