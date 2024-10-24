@@ -1,6 +1,6 @@
 import { Api as TraceServerApi } from './generated/traceServerApi';
 import { Settings } from './settings';
-import { defaultBaseUrl, defaultDomain, defaultTraceBaseUrl, setGlobalDomain } from './urls';
+import { getUrls, setGlobalDomain } from './urls';
 import { ConcurrencyLimiter } from './utils/concurrencyLimit';
 import { Netrc } from './utils/netrc';
 import { createFetchWithRetry } from './utils/retry';
@@ -12,16 +12,13 @@ export interface InitOptions {
   project: string;
   entity?: string;
   projectName?: string;
-  baseUrl?: string;
-  traceBaseUrl?: string;
-  domain?: string;
+  host?: string;
   apiKey?: string;
   settings?: Settings;
 }
 export interface LoginOptions {
   apiKey: string;
-  baseUrl?: string;
-  traceBaseUrl?: string;
+  host?: string;
 }
 
 // Global client instance
@@ -31,22 +28,19 @@ export async function login(options?: LoginOptions) {
   if (!options?.apiKey) {
     throw Error('API Key must be specified');
   }
-  const { apiKey, baseUrl, traceBaseUrl } = options;
-  const url = new URL(baseUrl ?? defaultBaseUrl);
-  const host = url.host;
-  const resolvedTraceBaseUrl = traceBaseUrl ?? defaultTraceBaseUrl;
+  const { traceBaseUrl, domain } = getUrls(options?.host);
 
   const netrc = new Netrc();
-  netrc.setMachine(host, { login: 'user', password: apiKey });
+  netrc.setMachine(domain, { login: 'user', password: options.apiKey });
   netrc.save();
 
   // Test the connection to the traceServerApi
   const testTraceServerApi = new TraceServerApi({
-    baseUrl: resolvedTraceBaseUrl,
+    baseUrl: traceBaseUrl,
     baseApiParams: {
       headers: {
         'User-Agent': `W&B Internal JS Client ${process.env.VERSION || 'unknown'}`,
-        Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
+        Authorization: `Basic ${Buffer.from(`api:${options.apiKey}`).toString('base64')}`,
       },
     },
   });
@@ -56,23 +50,12 @@ export async function login(options?: LoginOptions) {
     throw new Error('Unable to verify connection to the weave trace server with given API Key');
   }
 
-  console.log(`Successfully logged in.  Credentials saved for ${host}`);
+  console.log(`Successfully logged in.  Credentials saved for ${domain}`);
 }
-export async function init({
-  project,
-  entity,
-  baseUrl,
-  traceBaseUrl,
-  domain,
-  apiKey,
-  settings,
-}: InitOptions): Promise<WeaveClient> {
-  const resolvedUrl = new URL(baseUrl ?? defaultBaseUrl);
-  const resolvedTraceUrl = new URL(traceBaseUrl ?? defaultTraceBaseUrl);
-  const resolvedApiKey = apiKey ?? getApiKey(resolvedUrl.host);
-  const resolvedDomain = domain ?? defaultDomain;
+  const { baseUrl, traceBaseUrl, domain } = getUrls(host);
+  const resolvedApiKey = apiKey ?? getApiKey(domain);
   try {
-    const wandbServerApi = new WandbServerApi(resolvedUrl.origin, resolvedApiKey);
+    const wandbServerApi = new WandbServerApi(baseUrl, resolvedApiKey);
     const entityName = entity ?? (await wandbServerApi.defaultEntityName());
     const projectId = `${entityName}/${project}`;
 
@@ -93,7 +76,7 @@ export async function init({
     );
 
     const traceServerApi = new TraceServerApi({
-      baseUrl: resolvedTraceUrl.origin,
+      baseUrl: traceBaseUrl,
       baseApiParams: {
         headers: {
           'User-Agent': `W&B Internal JS Client ${process.env.VERSION || 'unknown'}`,
@@ -103,9 +86,9 @@ export async function init({
       customFetch: concurrencyLimitedFetch,
     });
 
-    const client = new WeaveClient(traceServerApi, wandbServerApi, projectId, settings, resolvedDomain);
+    const client = new WeaveClient(traceServerApi, wandbServerApi, projectId, settings, domain);
     setGlobalClient(client);
-    setGlobalDomain(resolvedDomain);
+    setGlobalDomain(domain);
     console.log(`Initializing project: ${projectId}`);
     return client;
   } catch (error) {
