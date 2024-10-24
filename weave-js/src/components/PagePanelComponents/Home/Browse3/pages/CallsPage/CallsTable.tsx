@@ -45,6 +45,7 @@ import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {
   baseContext,
   PEEK_PARAM,
+  usePeekLocation,
   useWeaveflowCurrentRouteContext,
 } from '../../context';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
@@ -246,6 +247,51 @@ export const CallsTable: FC<{
     [expandedRefCols]
   );
 
+  const prevEffectiveFilter = useRef(effectiveFilter);
+  const prevFilterModel = useRef(filterModelResolved);
+  const prevSortModel = useRef(sortModelResolved);
+  const prevPaginationModel = useRef(paginationModelResolved);
+
+  useEffect(() => {
+    if (effectiveFilter !== prevEffectiveFilter.current) {
+      console.log(
+        'effectiveFilter changed!',
+        prevEffectiveFilter.current,
+        effectiveFilter
+      );
+      prevEffectiveFilter.current = effectiveFilter;
+    }
+    if (filterModelResolved !== prevFilterModel.current) {
+      console.log(
+        'filterModelResolved changed!',
+        prevFilterModel.current,
+        filterModelResolved
+      );
+      prevFilterModel.current = filterModelResolved;
+    }
+    if (sortModelResolved !== prevSortModel.current) {
+      console.log(
+        'sortModelResolved changed!',
+        prevSortModel.current,
+        sortModelResolved
+      );
+      prevSortModel.current = sortModelResolved;
+    }
+    if (paginationModelResolved !== prevPaginationModel.current) {
+      console.log(
+        'paginationModelResolved changed!',
+        prevPaginationModel.current,
+        paginationModelResolved
+      );
+      prevPaginationModel.current = paginationModelResolved;
+    }
+  }, [
+    effectiveFilter,
+    filterModelResolved,
+    sortModelResolved,
+    paginationModelResolved,
+  ]);
+
   // Fetch the calls
   const calls = useCallsForQuery(
     entity,
@@ -283,10 +329,9 @@ export const CallsTable: FC<{
   }, [calls, effectiveFilter]);
 
   // Construct Flattened Table Data
-  const tableData: FlattenedCallData[] = useMemo(
-    () => prepareFlattenedCallDataForTable(callsResult),
-    [callsResult]
-  );
+  const tableData: FlattenedCallData[] = useMemo(() => {
+    return prepareFlattenedCallDataForTable(callsResult);
+  }, [callsResult]);
 
   // This is a specific helper that is used when the user attempts to option-click
   // a cell that is a child cell of an expanded ref. In this case, we want to
@@ -465,14 +510,11 @@ export const CallsTable: FC<{
   const query = useURLSearchParamsDict();
   const {peekPath} = query;
   const peekId = getPeekId(peekPath);
-  const rowIds = useMemo(() => {
-    return tableData.map(row => row.id);
-  }, [tableData]);
   const [rowSelectionModel, setRowSelectionModel] =
     useState<GridRowSelectionModel>([]);
 
   useEffect(() => {
-    if (rowIds.length === 0) {
+    if (tableData.length === 0) {
       // Data may have not loaded
       return;
     }
@@ -482,26 +524,35 @@ export const CallsTable: FC<{
     } else {
       // If peek drawer matches a row, select it.
       // If not, don't modify selection.
-      if (rowIds.includes(peekId)) {
+      if (tableData.some(row => row.id === peekId)) {
         setRowSelectionModel([peekId]);
       }
     }
-  }, [rowIds, peekId]);
+  }, [tableData, peekId]);
+
+  const peekLocation = usePeekLocation();
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      let newIndex = peekId ? rowIds.findIndex(id => id === peekId) : -1;
+      let newIndex = peekId
+        ? tableData.findIndex(data => data.id === peekId)
+        : -1;
 
-      if (event.key === 'ArrowDown' && newIndex < rowIds.length - 1) {
+      if (event.key === 'ArrowDown' && newIndex < tableData.length - 1) {
+        console.log('ArrowDown');
         newIndex++;
       } else if (event.key === 'ArrowUp' && newIndex > 0) {
+        console.log('ArrowUp');
         newIndex--;
       }
 
       // If a valid row is selected, update the URL with the selected call ID
-      if (newIndex >= 0 && newIndex < rowIds.length) {
-        const selectedCallID = rowIds[newIndex];
+      if (newIndex >= 0 && newIndex < tableData.length) {
+        console.log('peekLocation', peekLocation);
 
+        const selectedCallID = tableData[newIndex].id;
+
+        // the new URL will be wandb.ai/{tracesUIURL}?{PEEK_PARAM}={callUIURL}
         const path = router.tracesUIUrl(entity, project);
         const searchParams = new URLSearchParams();
         searchParams.set(
@@ -509,11 +560,19 @@ export const CallsTable: FC<{
           baseContext.callUIUrl(entity, project, '', selectedCallID)
         );
         const newSearch = searchParams.toString();
-        const newUrl = `${path}?${newSearch}`;
+        let newUrl = `${path}?${newSearch}`;
+
+        // retain any extra sorting and filtering from the previous URL
+        const queryParams = new URLSearchParams(history.location.search);
+        console.log('queryParams', queryParams.toString());
+        if (queryParams.toString() !== '') {
+          newUrl += `&${queryParams.toString()}`;
+        }
+
         history.replace(newUrl);
       }
     },
-    [peekId, rowIds, router, entity, project, history]
+    [peekId, tableData, router, entity, project, history]
   );
 
   // Attach and detach event listener
@@ -522,7 +581,7 @@ export const CallsTable: FC<{
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [rowIds, handleKeyDown]);
+  }, [tableData, handleKeyDown]);
 
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {

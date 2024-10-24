@@ -282,6 +282,7 @@ export const CallLink: React.FC<{
   const existingPath = peekParams.get(PATH_PARAM) ?? '';
   // Preserve the path only when showing trace tree
   const path = props.preservePath ? existingPath : null;
+  console.log('path in CallLink: ', path, existingPath);
 
   const to = peekingRouter.callUIUrl(
     props.entityName,

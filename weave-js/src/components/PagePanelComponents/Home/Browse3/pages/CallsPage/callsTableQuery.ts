@@ -52,6 +52,15 @@ export const useCallsForQuery = (
     gridSort
   );
 
+  console.log({
+    filter,
+    gridFilter,
+    gridSort,
+    gridPage,
+    expandedColumns,
+    columns,
+  });
+
   const calls = useCalls(
     entity,
     project,

@@ -675,6 +675,18 @@ export const usePeekLocation = () => {
   }, [peekPath]);
 };
 
+// updates only the call ID part of callUIUrl. expect to call this from 
+// other CallUIUrl. 
+export const useUpdateCallUIURL = (callID: string, keepExtra: boolean) => {
+  const {peekRouter} = useWeaveflowRouteContext();
+  const history = useHistory();
+  
+
+  return () => {
+    
+  }
+}
+
 export const WeaveHeaderExtrasContext = createContext<{
   extras: {[key: string]: HeaderExtra};
   addExtra: (key: string, value: HeaderExtra) => void;
