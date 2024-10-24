@@ -3,6 +3,17 @@ import { TRACE_CALL_EMOJI } from './constants';
 import { Op, OpOptions } from './opType';
 import { warnOnce } from './utils/warnOnce';
 
+export function op<T extends (...args: any[]) => any>(
+  fn: T,
+  options?: OpOptions<T>
+): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>>;
+
+export function op<T extends (...args: any[]) => any>(
+  thisArg: any,
+  fn: T,
+  options?: OpOptions<T>
+): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>>;
+
 /**
  * A wrapper to weave op-ify a function or method that works on sync and async functions.
  *
@@ -32,11 +43,49 @@ import { warnOnce } from './utils/warnOnce';
  * });
  *
  * await extract();
+ *
+ * // You can also wrap methods by passing the object as the first argument.
+ * // This will bind the method to the object and wrap it with op.
+ * class MyModel {
+ *   private oaiClient: OpenAI;
+ *
+ *   constructor() {
+ *     this.oaiClient = weave.wrapOpenAI(new OpenAI());
+ *     this.invoke = weave.op(this, this.invoke);
+ *   }
+ *
+ *   async invoke() {
+ *     return await this.oaiClient.chat.completions.create({
+ *       model: 'gpt-4-turbo',
+ *       messages: [{ role: 'user', content: 'Create a user as JSON' }],
+ *     });
+ *   }
+ * }
+ *
+ * const model = new MyModel();
+ * const res = await model.invoke();
  */
 export function op<T extends (...args: any[]) => any>(
-  fn: T,
-  options?: OpOptions<T>
+  fnOrThis: T | any,
+  fnOrOptions: T | OpOptions<T>,
+  maybeOptions?: OpOptions<T>
 ): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>> {
+  let fn: T;
+  let options: OpOptions<T> | undefined;
+  let bindThis: any;
+
+  if (typeof fnOrThis === 'function') {
+    fn = fnOrThis;
+    options = fnOrOptions as OpOptions<T>;
+  } else {
+    bindThis = fnOrThis;
+    fn = fnOrOptions as T;
+    options = maybeOptions;
+
+    const boundFn = fn.bind(bindThis) as T;
+    return op(boundFn, { originalFunction: fn, bindThis, ...options });
+  }
+
   const opWrapper = async function (...params: Parameters<T>): Promise<ReturnType<T>> {
     const client = getGlobalClient();
 
@@ -121,9 +170,4 @@ export function op<T extends (...args: any[]) => any>(
 
 export function isOp(fn: any): fn is Op<any> {
   return fn?.__isOp === true;
-}
-
-export function boundOp<T extends (...args: any[]) => any>(bindThis: any, fn: T, options?: OpOptions<T>) {
-  const boundFn = fn.bind(bindThis) as T;
-  return op(boundFn, { originalFunction: fn, bindThis, ...options });
 }
