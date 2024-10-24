@@ -137,8 +137,7 @@ export const refStringToRefDict = (uri: string): WFNaiveRefDict | null => {
 };
 
 const wandbArtifactRefStringToRefDict = (uri: string): WFNaiveRefDict => {
-  // const scheme = WANDB_ARTIFACT_SCHEME;
-  const scheme = WANDB_ARTIFACT_REF_SCHEME;
+  const scheme = WANDB_ARTIFACT_SCHEME;
   if (!uri.startsWith(WANDB_ARTIFACT_REF_PREFIX)) {
     throw new Error('Invalid uri: ' + uri);
   }

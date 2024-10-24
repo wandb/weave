@@ -11,7 +11,7 @@ import {
   isWeaveObjectRef,
   ObjectRef,
   parseRef,
-  refUri, WandbArtifactRef,
+  refUri, WandbArtifactRef, WeaveObjectRef,
 } from '@wandb/weave/react';
 import React, {FC} from 'react';
 
@@ -182,8 +182,8 @@ export const SmallArtifactRef: FC<{
   );
 };
 
-export const SmallRef: FC<{
-  objRef: ObjectRef;
+export const SmallWeaveRef: FC<{
+  objRef: WeaveObjectRef;
   wfTable?: WFDBTableType;
   iconOnly?: boolean;
 }> = ({objRef, wfTable, iconOnly = false}) => {
@@ -196,46 +196,37 @@ export const SmallRef: FC<{
   let objVersionKey: ObjectVersionKey | null = null;
   let opVersionKey: OpVersionKey | null = null;
 
-  const isArtifactRef = isWandbArtifactRef(objRef);
-  const isWeaveObjRef = isWeaveObjectRef(objRef);
-
-  if (isArtifactRef) {
-    return (
-        <SmallArtifactRef objRef={objRef} />
-    )
-  } else if (isWeaveObjRef) {
-    if (objRef.weaveKind === 'op') {
-      opVersionKey = {
-        entity: objRef.entityName,
-        project: objRef.projectName,
-        opId: objRef.artifactName,
-        versionHash: objRef.artifactVersion,
-      };
-    } else {
-      objVersionKey = {
-        scheme: 'weave',
-        entity: objRef.entityName,
-        project: objRef.projectName,
-        weaveKind: objRef.weaveKind,
-        objectId: objRef.artifactName,
-        versionHash: objRef.artifactVersion,
-        path: '',
-        refExtra: objRef.artifactRefExtra,
-      };
-    }
+  if (objRef.weaveKind === 'op') {
+    opVersionKey = {
+      entity: objRef.entityName,
+      project: objRef.projectName,
+      opId: objRef.artifactName,
+      versionHash: objRef.artifactVersion,
+    };
+  } else {
+    objVersionKey = {
+      scheme: 'weave',
+      entity: objRef.entityName,
+      project: objRef.projectName,
+      weaveKind: objRef.weaveKind,
+      objectId: objRef.artifactName,
+      versionHash: objRef.artifactVersion,
+      path: '',
+      refExtra: objRef.artifactRefExtra,
+    };
   }
 
   const objectVersion = useObjectVersion(objVersionKey);
   const opVersion = useOpVersion(opVersionKey);
   const versionIndex =
-    objectVersion.result?.versionIndex ?? opVersion.result?.versionIndex;
+      objectVersion.result?.versionIndex ?? opVersion.result?.versionIndex;
 
   const {peekingRouter} = useWeaveflowRouteContext();
   const refTypeQuery = useRefsType([refUri(objRef)]);
   const refType: Type =
-    refTypeQuery.loading || refTypeQuery.result == null
-      ? 'unknown'
-      : refTypeQuery.result[0];
+      refTypeQuery.loading || refTypeQuery.result == null
+          ? 'unknown'
+          : refTypeQuery.result[0];
   let rootType = getRootType(refType);
   if (objRef.scheme === 'weave' && objRef.weaveKind === 'op') {
     // TODO: Why is this necessary? The type is coming back as `objRef`
@@ -255,52 +246,67 @@ export const SmallRef: FC<{
     icon = IconNames.JobProgramCode;
   }
   const Item = (
-    <Box display="flex" alignItems="center">
-      <Box
-        mr="4px"
-        bgcolor={hexToRGB(MOON_300, 0.48)}
-        sx={{
-          height: '22px',
-          width: '22px',
-          borderRadius: '16px',
-          display: 'flex',
-          flex: '0 0 22px',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}>
-        <Icon name={icon} width={14} height={14} />
-      </Box>
-      {!iconOnly && (
+      <Box display="flex" alignItems="center">
         <Box
-          sx={{
-            height: '22px',
-            flex: 1,
-            minWidth: 0,
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-            textOverflow: 'ellipsis',
-          }}>
-          {label}
+            mr="4px"
+            bgcolor={hexToRGB(MOON_300, 0.48)}
+            sx={{
+              height: '22px',
+              width: '22px',
+              borderRadius: '16px',
+              display: 'flex',
+              flex: '0 0 22px',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+          <Icon name={icon} width={14} height={14} />
         </Box>
-      )}
-    </Box>
+        {!iconOnly && (
+            <Box
+                sx={{
+                  height: '22px',
+                  flex: 1,
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap',
+                  textOverflow: 'ellipsis',
+                }}>
+              {label}
+            </Box>
+        )}
+      </Box>
   );
   if (refTypeQuery.loading) {
     return Item;
   }
+  return (
+      <Link
+          $variant="secondary"
+          style={{
+            width: '100%',
+          }}
+          to={peekingRouter.refUIUrl(rootTypeName, objRef, wfTable)}>
+        {Item}
+      </Link>
+  );
+};
+
+export const SmallRef: FC<{
+  objRef: ObjectRef;
+  wfTable?: WFDBTableType;
+  iconOnly?: boolean;
+}> = ({objRef, wfTable, iconOnly = false}) => {
+  const isArtifactRef = isWandbArtifactRef(objRef);
+  const isWeaveObjRef = isWeaveObjectRef(objRef);
+
   if (!isArtifactRef && !isWeaveObjRef) {
     return <div>[Error: non wandb ref]</div>;
   }
-  return (
-    <Link
-      $variant="secondary"
-      style={{
-        width: '100%',
-      }}
-      to={peekingRouter.refUIUrl(rootTypeName, objRef, wfTable)}>
-      {Item}
-    </Link>
-  );
+
+  if (isArtifactRef) {
+    return <SmallArtifactRef objRef={objRef} />
+  }
+  return <SmallWeaveRef objRef={objRef}/>
 };
 
 export const parseRefMaybe = (s: string): ObjectRef | null => {
