@@ -553,11 +553,11 @@ const LiteralField: React.FC<{
 }) => {
   const literalValue = unwrappedSchema.value;
 
-  // useEffect(() => {
-  //   if (value === undefined) {
-  //     updateConfig(targetPath, literalValue, config, setConfig);
-  //   }
-  // }, [value, literalValue, targetPath, config, setConfig]);
+  useEffect(() => {
+    if (value !== literalValue) {
+      updateConfig(targetPath, literalValue, config, setConfig);
+    }
+  }, [value, literalValue, targetPath, config, setConfig]);
 
   return (
     <TextField

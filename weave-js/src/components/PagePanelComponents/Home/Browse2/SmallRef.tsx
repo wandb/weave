@@ -80,7 +80,8 @@ export const SmallRef: FC<{
   objRef: ObjectRef;
   wfTable?: WFDBTableType;
   iconOnly?: boolean;
-}> = ({objRef, wfTable, iconOnly = false}) => {
+  nameOnly?: boolean;
+}> = ({objRef, wfTable, iconOnly = false, nameOnly = false}) => {
   const {
     useObjectVersion,
     useOpVersion,
@@ -140,7 +141,9 @@ export const SmallRef: FC<{
     // TODO: Why is this necessary? The type is coming back as `objRef`
     rootType = {type: 'OpDef'};
   }
-  const {label} = objectRefDisplayName(objRef, versionIndex);
+  const {label} = nameOnly
+    ? {label: objRef.artifactName}
+    : objectRefDisplayName(objRef, versionIndex);
 
   const rootTypeName = getTypeName(rootType);
   let icon: IconName = IconNames.CubeContainer;
@@ -159,7 +162,7 @@ export const SmallRef: FC<{
         mr="4px"
         bgcolor={hexToRGB(MOON_300, 0.48)}
         sx={{
-          height: '22px',
+          // height: '22px',
           width: '22px',
           borderRadius: '16px',
           display: 'flex',

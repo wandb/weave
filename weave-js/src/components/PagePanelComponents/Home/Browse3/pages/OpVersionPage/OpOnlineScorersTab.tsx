@@ -4,6 +4,8 @@ import {parseRef} from '@wandb/weave/react';
 import React, {FC, useMemo, useState} from 'react';
 import {z} from 'zod';
 
+import {CellValue} from '../../../Browse2/CellValue';
+import {SmallRef} from '../../../Browse2/SmallRef';
 import {
   ActionDispatchFilter,
   ActionDispatchFilterSchema,
@@ -28,9 +30,32 @@ type OnlineScorerType = TraceObjSchema<ActionDispatchFilter>;
 
 const useOnlineScorersForOpVersion = (
   opVersion: OpVersionSchema
-): OnlineScorerType[] => {
-  // Placeholder
-  return [];
+): {scorers: OnlineScorerType[]; refresh: () => void} => {
+  const [poorMansRefreshCount, setPoorMansRefreshCount] = useState(0);
+  const req = useMemo(() => {
+    return {
+      project_id: projectIdFromParts({
+        entity: opVersion.entity,
+        project: opVersion.project,
+      }),
+      filter: {
+        latest_only: true,
+      },
+      poorMansRefreshCount,
+    };
+  }, [opVersion.entity, opVersion.project, poorMansRefreshCount]);
+  const scorers = useCollectionObjects('ActionDispatchFilter', req).sort(
+    (a, b) => {
+      return (
+        convertISOToDate(a.created_at).getTime() -
+        convertISOToDate(b.created_at).getTime()
+      );
+    }
+  );
+  const refresh = () => {
+    setPoorMansRefreshCount(poorMansRefreshCount + 1);
+  };
+  return {scorers, refresh};
 };
 
 export const OpOnlineScorersTab: React.FC<{
@@ -49,25 +74,37 @@ export const OpOnlineScorersTab: React.FC<{
   }, [opVersion.entity, opVersion.project]);
   const availableActions = useCollectionObjects('ConfiguredAction', req);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const onlineScorers = useOnlineScorersForOpVersion(opVersion);
+  const {scorers: onlineScorers, refresh} =
+    useOnlineScorersForOpVersion(opVersion);
 
   const handleOpenModal = () => {
     setIsModalOpen(true);
   };
 
   const handleCloseModal = (didSave: boolean) => {
+    refresh();
     setIsModalOpen(false);
   };
 
   const columns = [
-    {field: 'name', headerName: 'Name', flex: 1},
-    {field: 'disabled', headerName: 'Disabled', flex: 1},
+    {
+      field: 'name',
+      headerName: 'Name',
+      flex: 1,
+      renderCell: (params: any) => {
+        return <SmallRef nameOnly objRef={parseRef(params.value)} />;
+      },
+    },
     {field: 'sampleRate', headerName: 'Sample Rate', flex: 1},
     {
       field: 'configuredActionRef',
-      headerName: 'Configured Action Ref',
+      headerName: 'Configured Action',
       flex: 1,
+      renderCell: (params: any) => {
+        return <SmallRef nameOnly objRef={parseRef(params.value)} />;
+      },
     },
+    {field: 'disabled', headerName: 'Disabled', flex: 1},
   ];
 
   const rows = onlineScorers
@@ -84,7 +121,7 @@ export const OpOnlineScorersTab: React.FC<{
       });
       return {
         id: scorerRef,
-        name: scorer.object_id,
+        name: scorerRef,
         createdAt: convertISOToDate(scorer.created_at),
         disabled: scorer.val.disabled,
         sampleRate: scorer.val.sample_rate,
