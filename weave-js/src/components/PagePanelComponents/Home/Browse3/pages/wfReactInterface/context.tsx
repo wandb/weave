@@ -65,7 +65,7 @@ export const useProjectHasTraceServerData = (
     undefined,
     undefined,
     undefined,
-    undefined,
+    ['id'],
     undefined,
     {
       skip: !hasTraceServer,
