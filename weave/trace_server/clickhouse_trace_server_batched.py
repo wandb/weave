@@ -2095,6 +2095,12 @@ def get_kind(val: Any) -> str:
 
 
 def get_base_object_class(val: Any) -> Optional[str]:
+    """
+    Get the base object class of a value using:
+    1. The last base class that is a subclass of BaseModel and not Object
+    2. The _class_name attribute if it exists
+    3. None if no base class is found
+    """
     if isinstance(val, dict):
         if "_bases" in val:
             if isinstance(val["_bases"], list):
