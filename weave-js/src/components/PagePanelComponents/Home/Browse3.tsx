@@ -101,6 +101,7 @@ import {
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
 import {useDrawerResize} from './useDrawerResize';
+import {TableNavigationProvider} from './Browse3/navigationContext';
 
 LicenseInfo.setLicenseKey(
   'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
@@ -413,10 +414,12 @@ const MainPeekingLayout: FC = () => {
                     </Box>
                   ),
                 }}>
-                <Browse3ProjectRoot
-                  customLocation={peekLocation}
-                  projectRoot={generalProjectRoot}
-                />
+                <TableNavigationProvider>
+                  <Browse3ProjectRoot
+                    customLocation={peekLocation}
+                    projectRoot={generalProjectRoot}
+                  />
+                </TableNavigationProvider>
               </SimplePageLayoutContext.Provider>
             </WeaveflowPeekContext.Provider>
           )}
