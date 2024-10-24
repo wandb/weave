@@ -382,7 +382,8 @@ export class WeaveClient {
     op.__savedRef = (async () => {
       const objId = getOpName(op);
       const opFn = getOpWrappedFunction(op);
-      const saveValue = await this.serializedFileBlob('Op', 'obj.py', new Blob([opFn.toString()]));
+      const formattedOpFn = await maybeFormatCode(opFn.toString());
+      const saveValue = await this.serializedFileBlob('Op', 'obj.py', new Blob([formattedOpFn]));
       const response = await this.traceServerApi.obj.objCreateObjCreatePost({
         obj: {
           project_id: this.projectId,
@@ -538,4 +539,14 @@ function processSummary(
   }
 
   return mergedSummary;
+}
+
+async function maybeFormatCode(code: string) {
+  try {
+    const prettier = await import('prettier');
+    return prettier.format(code, { parser: 'babel' });
+  } catch (error) {
+    // prettier not available, just use the original string
+    return code;
+  }
 }
