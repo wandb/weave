@@ -532,45 +532,45 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     
     def calls_llm(self, req: tsi.CallsLLMReq) -> tsi.CallsLLMRes:
         messages = parse_messages(req.messages)
-        # start = tsi.StartedCallSchemaForInsert(
-        #     project_id=req.project_id,
-        #     wb_user_id=req.wb_user_id,
-        #     op_name="call_llm",
-        #     started_at=datetime.datetime.now(),
-        #     inputs={"messages": messages, "model_name": req.model_name},
-        #     attributes={}
-        # )
-        # ch_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=req.project_id,
+            wb_user_id=req.wb_user_id,
+            op_name="call_llm",
+            started_at=datetime.datetime.now(),
+            inputs={"messages": messages, "model_name": req.model_name},
+            attributes={}
+        )
+        ch_call = _start_call_for_insert_to_ch_insertable_start_call(start)
 
-        # # Inserts the call into the clickhouse database, verifying that
-        # # the call does not already exist
-        # self._insert_call(ch_call)
+        # Inserts the call into the clickhouse database, verifying that
+        # the call does not already exist
+        self._insert_call(ch_call)
 
-        res = llm_completion.call_llm(req.project_id, req.api_key, req.model_name, messages)
+        res = llm_completion.call_llm(req.api_key, req.model_name, messages)
 
 
-        # end = tsi.EndedCallSchemaForInsert(
-        #     project_id=req.project_id,
-        #     id=ch_call.id,
-        #     ended_at=datetime.datetime.now(),
-        #     output=res.response,
-        #     summary={"status": "success", }
-        # )
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=req.project_id,
+            id=ch_call.id,
+            ended_at=datetime.datetime.now(),
+            output=res.response,
+            summary={"status": "success", }
+        )
 
-        # if "error" in res.response:
-        #     end.summary = {"status": "fail"}
-        #     end.exception = res.response["error"]
+        if "error" in res.response:
+            end.summary = {"status": "fail"}
+            end.exception = res.response["error"]
         
-        # print(end)
+        print(end)
 
-        # # Converts the user-provided call details into a clickhouse schema.
-        # # This does validation and conversion of the input data as well
-        # # as enforcing business rules and defaults
-        # ch_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+        # Converts the user-provided call details into a clickhouse schema.
+        # This does validation and conversion of the input data as well
+        # as enforcing business rules and defaults
+        ch_call = _end_call_for_insert_to_ch_insertable_end_call(end)
 
-        # # Inserts the call into the clickhouse database, verifying that
-        # # the call does not already exist
-        # self._insert_call(ch_call)
+        # Inserts the call into the clickhouse database, verifying that
+        # the call does not already exist
+        self._insert_call(ch_call)
         return res
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
