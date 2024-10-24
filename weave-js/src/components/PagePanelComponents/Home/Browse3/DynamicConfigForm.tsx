@@ -288,7 +288,7 @@ const EnumField: React.FC<{
       <InputLabel>{keyName}</InputLabel>
       <Select
         fullWidth
-        value={selectedValue}
+        value={selectedValue ?? undefined}
         onChange={e =>
           updateConfig(targetPath, e.target.value, config, setConfig)
         }>
@@ -553,11 +553,11 @@ const LiteralField: React.FC<{
 }) => {
   const literalValue = unwrappedSchema.value;
 
-  useEffect(() => {
-    if (value === undefined) {
-      updateConfig(targetPath, literalValue, config, setConfig);
-    }
-  }, [value, literalValue, targetPath, config, setConfig]);
+  // useEffect(() => {
+  //   if (value === undefined) {
+  //     updateConfig(targetPath, literalValue, config, setConfig);
+  //   }
+  // }, [value, literalValue, targetPath, config, setConfig]);
 
   return (
     <TextField
@@ -568,8 +568,7 @@ const LiteralField: React.FC<{
         readOnly: true,
       }}
       margin="normal"
-      variant='filled'
-
+      variant="filled"
     />
   );
 };
@@ -591,9 +590,10 @@ const BooleanField: React.FC<{
   config,
   setConfig,
 }) => {
-  const defaultValue = fieldSchema instanceof z.ZodDefault
-    ? fieldSchema._def.defaultValue()
-    : false;
+  const defaultValue =
+    fieldSchema instanceof z.ZodDefault
+      ? fieldSchema._def.defaultValue()
+      : false;
 
   useEffect(() => {
     if (value === undefined) {
@@ -606,7 +606,9 @@ const BooleanField: React.FC<{
       control={
         <Checkbox
           checked={value ?? defaultValue}
-          onChange={(e) => updateConfig(targetPath, e.target.checked, config, setConfig)}
+          onChange={e =>
+            updateConfig(targetPath, e.target.checked, config, setConfig)
+          }
         />
       }
       label={keyName}

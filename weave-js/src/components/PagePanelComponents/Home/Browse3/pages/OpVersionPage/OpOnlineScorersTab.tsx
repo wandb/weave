@@ -1,6 +1,7 @@
 import {Box} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button/Button';
-import React, {FC, useState} from 'react';
+import {parseRef} from '@wandb/weave/react';
+import React, {FC, useMemo, useState} from 'react';
 import {z} from 'zod';
 
 import {
@@ -8,7 +9,10 @@ import {
   ActionDispatchFilterSchema,
 } from '../../collections/actionCollection';
 import {collectionRegistry} from '../../collections/collectionRegistry';
-import {useCreateCollectionObject} from '../../collections/getCollectionObjects';
+import {
+  useCollectionObjects,
+  useCreateCollectionObject,
+} from '../../collections/getCollectionObjects';
 import {DynamicConfigForm} from '../../DynamicConfigForm';
 import {ReusableDrawer} from '../../ReusableDrawer';
 import {StyledDataGrid} from '../../StyledDataGrid';
@@ -32,6 +36,18 @@ const useOnlineScorersForOpVersion = (
 export const OpOnlineScorersTab: React.FC<{
   opVersion: OpVersionSchema;
 }> = ({opVersion}) => {
+  const req = useMemo(() => {
+    return {
+      project_id: projectIdFromParts({
+        entity: opVersion.entity,
+        project: opVersion.project,
+      }),
+      filter: {
+        latest_only: true,
+      },
+    };
+  }, [opVersion.entity, opVersion.project]);
+  const availableActions = useCollectionObjects('ConfiguredAction', req);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const onlineScorers = useOnlineScorersForOpVersion(opVersion);
 
@@ -39,7 +55,7 @@ export const OpOnlineScorersTab: React.FC<{
     setIsModalOpen(true);
   };
 
-  const handleCloseModal = () => {
+  const handleCloseModal = (didSave: boolean) => {
     setIsModalOpen(false);
   };
 
@@ -77,11 +93,38 @@ export const OpOnlineScorersTab: React.FC<{
       };
     });
 
-  const inputSchema = ActionDispatchFilterSchema.merge(
-    z.object({
-      op_name: z.literal(opVersion.opId),
-    })
-  );
+  const actionRefs = useMemo(() => {
+    return availableActions.map(action => {
+      return objectVersionKeyToRefUri({
+        scheme: 'weave',
+        weaveKind: 'object',
+        entity: opVersion.entity,
+        project: opVersion.project,
+        objectId: action.object_id,
+        versionHash: action.digest,
+        path: '',
+      });
+    });
+  }, [availableActions, opVersion.entity, opVersion.project]);
+
+  const inputSchema = useMemo(() => {
+    const base = ActionDispatchFilterSchema.merge(
+      z.object({
+        op_name: z.literal(opVersion.opId),
+      })
+    );
+    if (actionRefs.length === 0) {
+      return base;
+    }
+
+    return base.merge(
+      z.object({
+        configured_action_ref: z.enum(
+          actionRefs as unknown as [string, ...string[]]
+        ),
+      })
+    );
+  }, [actionRefs, opVersion.opId]);
 
   return (
     <Box
@@ -142,7 +185,7 @@ interface NewOnlineOpScorerModalProps {
     schema: z.Schema;
   };
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (didSave: boolean) => void;
 }
 
 export const NewOnlineOpScorerModal: FC<NewOnlineOpScorerModalProps> = ({
@@ -164,7 +207,10 @@ export const NewOnlineOpScorerModal: FC<NewOnlineOpScorerModalProps> = ({
       );
       return;
     }
-    let objectId = newAction.name;
+    const opName = parsedAction.data.op_name;
+    const actionRef = parsedAction.data.configured_action_ref;
+    const actionName = parseRef(actionRef).artifactName;
+    let objectId = `${opName}-${actionName}`;
     // Remove non alphanumeric characters
     objectId = objectId.replace(/[^a-zA-Z0-9]/g, '-');
     createCollectionObject({
@@ -178,7 +224,7 @@ export const NewOnlineOpScorerModal: FC<NewOnlineOpScorerModalProps> = ({
         console.error(err);
       })
       .finally(() => {
-        onClose();
+        onClose(true);
       });
   };
 
@@ -188,7 +234,7 @@ export const NewOnlineOpScorerModal: FC<NewOnlineOpScorerModalProps> = ({
     <ReusableDrawer
       open={isOpen}
       title="Configure new built-in action scorer"
-      onClose={onClose}
+      onClose={() => onClose(false)}
       onSave={() => handleSaveModal(config)}
       saveDisabled={!isValid}>
       <DynamicConfigForm
