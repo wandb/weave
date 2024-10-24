@@ -303,6 +303,7 @@ export const SmallRef: FC<{
     return <div>[Error: non wandb ref]</div>;
   }
 
+  // There is now a dependency on the WandbArtifactRef type for the functionality of linking from weave to model artifacts
   if (isArtifactRef) {
     return <SmallArtifactRef objRef={objRef} />
   }
