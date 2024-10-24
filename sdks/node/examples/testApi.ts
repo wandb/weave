@@ -4,7 +4,7 @@ import { wrapOpenAI } from '../src/integrations/openai';
 import { op } from '../src/op';
 
 // Initialize the API
-init({ project: 'shawn/weavejs-test1' });
+init('weavejs-test1');
 
 // Create OpenAI client
 const openai = wrapOpenAI(new OpenAI());

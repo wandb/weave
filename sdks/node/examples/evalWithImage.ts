@@ -39,7 +39,7 @@ const model = op(async function myModel({ datasetRow }) {
 });
 
 async function main() {
-  await init({ project: 'weavejsdev-evalwithimage' });
+  await init('weavejsdev-evalwithimage');
   const ds = new Dataset({
     id: 'Fruit Dataset',
     rows: examples,

@@ -40,7 +40,7 @@ const examples = [
 ];
 
 async function main() {
-  await init({ project: 'weavejsdev-dataset2' });
+  await init('weavejsdev-dataset2');
   const ds = new Dataset({
     id: 'Fruit Dataset',
     rows: examples,

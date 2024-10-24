@@ -1,6 +1,5 @@
 import { init, op } from 'weave';
 import { Op } from '../src/opType';
-import { Settings } from '../src/settings';
 import { WeaveClient } from '../src/weaveClient';
 
 const func = op(async () => 1);
@@ -31,17 +30,7 @@ async function bench(func: Op<any>, calls: number, client: WeaveClient) {
 }
 
 async function main() {
-  const client = await init({
-    project: 'weavejsdev-loadtest2-k8s',
-    settings: new Settings(true),
-    // baseUrl: 'https://weave-test-1.wandb.ml',
-    // traceBaseUrl: 'https://weave-test-1.wandb.ml/traces',
-    // domain: 'weave-test-1.wandb.ml',
-
-    baseUrl: 'https://api.wandb.ai',
-    traceBaseUrl: 'https://weave-trace.wandb.ai',
-    domain: 'wandb.ai',
-  });
+  const client = await init('weavejsdev-loadtest2-k8s');
   // for (let x = 1; x <= 5; x++) {
   //   const calls = Math.pow(10, x);
   //   await bench(calls, client);

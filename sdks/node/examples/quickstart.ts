@@ -18,7 +18,7 @@ async function extractDinos(input: string) {
 const extractDinosOp = op(extractDinos);
 
 async function main() {
-  await init({ project: 'weave-quickstart' });
+  await init('weave-quickstart');
   const result = await extractDinosOp(
     'I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below.'
   );
