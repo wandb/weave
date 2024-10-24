@@ -6,6 +6,29 @@ const BuiltinActionSchema = z.object({
   digest: z.string().default('*'),
 });
 
+
+
+export const ConfiguredActionSchema = z.object({
+  name: z.string(),
+  action: BuiltinActionSchema,
+  config: z.record(z.string(), z.any()),
+});
+
+export const ActionDispatchFilterSchema = z.object({
+  op_name: z.string(),
+  sample_rate: z.number(),
+  configured_action_ref: z.string(),
+});
+
+export type ActionDispatchFilter = z.infer<typeof ActionDispatchFilterSchema>;
+export type ConfiguredAction = z.infer<typeof ConfiguredActionSchema>;
+
+export type ActionAndSpec = {
+  action: z.infer<typeof BuiltinActionSchema>;
+  configSpec: z.Schema;
+  convertToConfig: (data: any) => Record<string, any>;
+};
+
 const BuiltinActionConfigSchema = z.object({
   model: z.enum(['gpt-4o-mini', 'gpt-4o']),
   system_prompt: z.string(),
@@ -17,30 +40,6 @@ const BuiltinActionConfigSchema = z.object({
     })
   ),
 });
-
-export const ConfiguredActionSchema = z.object({
-  name: z.string(),
-  action: BuiltinActionSchema,
-  config: z.record(z.string(), z.any()),
-});
-
-export const ActionOpMappingSchema = z.object({
-  name: z.string(), // Note: This field is marked for removal in the future
-  action: z.union([ConfiguredActionSchema, z.string()]),
-  op_name: z.string(),
-  op_digest: z.string(),
-  input_mapping: z.record(z.string()), // Input field name -> Call selector
-});
-
-export type BuiltinAction = z.infer<typeof BuiltinActionSchema>;
-export type ConfiguredAction = z.infer<typeof ConfiguredActionSchema>;
-export type ActionOpMapping = z.infer<typeof ActionOpMappingSchema>;
-
-export type ActionAndSpec = {
-  action: BuiltinAction;
-  configSpec: z.Schema;
-  convertToConfig: (data: any) => Record<string, any>;
-};
 
 export const knownBuiltinActions: ActionAndSpec[] = [
   {

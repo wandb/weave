@@ -134,11 +134,7 @@ const OpVersionPageInner: React.FC<{
         },
         {
           label: 'Online Scorers',
-          content: (
-            <OpOnlineScorersTab
-              opVersion={opVersion}
-            />
-          ),
+          content: <OpOnlineScorersTab opVersion={opVersion} />,
         },
         ...(useOpSupported
           ? [
