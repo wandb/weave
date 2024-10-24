@@ -913,6 +913,9 @@ export const CallsTable: FC<{
           '& .MuiDataGrid-footerContainer': {
             justifyContent: 'flex-start',
           },
+          '& .MuiDataGrid-main:focus-visible': {
+            outline: 'none',
+          },
         }}
         slots={{
           noRowsOverlay: () => {
