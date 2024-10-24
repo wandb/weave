@@ -2105,7 +2105,7 @@ def get_base_object_class(val: Any) -> Optional[str]:
         if "_bases" in val:
             if isinstance(val["_bases"], list):
                 bases = val["_bases"]
-                if bases[-1] == "BaseModel":
+                if len(bases) > 0 and bases[-1] == "BaseModel":
                     bases = bases[:-1]
                     if len(bases) > 0 and bases[-1] == "Object":
                         bases = bases[:-1]
@@ -2113,8 +2113,6 @@ def get_base_object_class(val: Any) -> Optional[str]:
                         return bases[0]
                     elif "_class_name" in val:
                         return val["_class_name"]
-                    else:
-                        return None
     return None
 
 
