@@ -26,9 +26,9 @@ export default function StructuredFeedbackSidebar(
         <Tailwind>
             <div className='flex flex-col h-full bg-white'>
                 <div className='p-12 border-b border-moon-300 w-full flex justify-center'>
-                    <h2 className='text-lg font-semibold text-gray-900'>Structured feedback</h2>
+                    <h2 className='text-lg font-semibold text-gray-900'>Add feedback</h2>
                 </div>
-                <div className='mx-6 flex-grow overflow-y-auto'>
+                <div className='mx-6 flex-grow h-full'>
                     <div>
                         <button
                             className='w-full px-6 py-8 flex items-center justify-between text-md font-semibold text-gray-700 hover:bg-gray-100'
@@ -47,13 +47,14 @@ export default function StructuredFeedbackSidebar(
                                 {types?.map((type: any) => (
                                     <div key={type.name}>
                                         <h3 className='px-6 py-4 text-sm font-semibold text-gray-700 bg-gray-50'>{type.name}</h3>
-                                        <div className='px-6 py-4'>
+                                        <div className='px-6 pt-2 pb-8'>
                                             <StructuredFeedbackCell
                                                 feedbackSpecRef={feedbackSpecRef}
                                                 weaveRef={weaveRef}
                                                 structuredFeedbackOptions={type}
                                                 entity={props.entity}
                                                 project={props.project}
+                                                readOnly={false}
                                             />
                                         </div>
                                     </div>
@@ -62,7 +63,7 @@ export default function StructuredFeedbackSidebar(
                         )}
                     </div>
                 </div>
-                <div className='p-6 border-t border-gray-200 sticky bottom-0 bg-white'>
+                <div className='p-6 border-t border-moon-300 sticky bottom-0 bg-white'>
                     <Button
                         onClick={props.nextCall}
                         className='w-full'

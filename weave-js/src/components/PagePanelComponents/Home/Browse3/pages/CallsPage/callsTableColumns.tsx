@@ -224,6 +224,7 @@ function buildCallsTableColumns(
         structuredFeedbackOptions={feedbackType} 
         weaveRef={weaveRef}
         feedbackSpecRef={feedbackSpecRef}
+        readOnly={true}
       />
     },
   }));

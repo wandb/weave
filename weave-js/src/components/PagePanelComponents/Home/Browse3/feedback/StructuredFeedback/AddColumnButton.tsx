@@ -8,19 +8,25 @@ import {
 import { Button } from '@wandb/weave/components/Button';
 import styled from 'styled-components';
 import { CodeEditor } from '@wandb/weave/components/CodeEditor';
-import { BinaryFeedbackColumn, CategoricalFeedbackColumn, RangeFeedbackColumn } from './StructuredFeedback';
+import { BinaryFeedbackColumn, CategoricalFeedbackColumn, NumericalFeedbackColumn } from './StructuredFeedback';
 import { useGetTraceServerClientContext } from '../../pages/wfReactInterface/traceServerClientContext';
 import { Tailwind } from '@wandb/weave/components/Tailwind';
+import { TextInput } from '@wandb/weave/common/components/elements/TextInputNew';
+import { TextField } from '@wandb/weave/components/Form/TextField';
 
 
 type BaseFeedback = {
     name: string,
 }
 
-type RangeFeedback = BaseFeedback & {
-    type: "RangeFeedback",
+type NumericalFeedback = BaseFeedback & {
+    type: "NumericalFeedback",
     min: number,
     max: number,
+}
+
+type TextFeedback = BaseFeedback & {
+    type: "TextFeedback",
 }
 
 type CategoricalFeedback = BaseFeedback & {
@@ -38,7 +44,7 @@ type EmojiFeedback = BaseFeedback & {
     type: "EmojiFeedback",
 }
 
-type StructuredFeedback = CategoricalFeedback | RangeFeedback | BooleanFeedback | EmojiFeedback;
+type StructuredFeedback = CategoricalFeedback | NumericalFeedback | TextFeedback | BooleanFeedback | EmojiFeedback;
 
 type StructuredFeedbackSpec = {
     _bases: string[],
@@ -51,12 +57,21 @@ type StructuredFeedbackSpec = {
 export const ConfigureStructuredFeedbackModal = ({ entity, project, existingFeedback, onClose }: { entity: string, project: string, existingFeedback: any, onClose: () => void }) => {
 
     const [open, setOpen] = useState(true);
-    const [exampleRangeFeedbackColumn, setExampleRangeFeedbackColumn] = useState<StructuredFeedback>(
+    const [nameField, setNameField] = useState<string>("");
+    const [minValue, setMinValue] = useState<number>(0);
+    const [maxValue, setMaxValue] = useState<number>(10);
+    const [exampleNumericalFeedbackColumn, setExampleNumericalFeedbackColumn] = useState<StructuredFeedback>(
         {
-            type: "RangeFeedback",
-            name: "Example range feedback",
+            type: "NumericalFeedback",
+            name: "Example numerical feedback",
             min: 0,
             max: 100,
+        }
+    );
+    const [exampleTextFeedbackColumn, setExampleTextFeedbackColumn] = useState<StructuredFeedback>(
+        {
+            type: "TextFeedback",
+            name: "Example text feedback",
         }
     );
     const [exampleCategoricalFeedbackColumn, setExampleCategoricalFeedbackColumn] = useState<StructuredFeedback>(
@@ -82,7 +97,8 @@ export const ConfigureStructuredFeedbackModal = ({ entity, project, existingFeed
     );
 
     const options = [
-        {"name": "Range feedback", "value": exampleRangeFeedbackColumn},
+        {"name": "Numerical feedback", "value": exampleNumericalFeedbackColumn},
+        {"name": "Text feedback", "value": exampleTextFeedbackColumn},
         {"name": "Categorical feedback", "value": exampleCategoricalFeedbackColumn},
         {"name": "Boolean feedback", "value": exampleBooleanFeedbackColumn},
         {"name": "Emoji feedback", "value": exampleEmojiFeedbackColumn},
@@ -131,10 +147,11 @@ export const ConfigureStructuredFeedbackModal = ({ entity, project, existingFeed
         <div>
             <h3>Existing structured feedback</h3>
             {feedbackColumns.map((feedback) => {
-                return <div className='flex items-center'>
+                return <div className='flex items-center p-8'>
                     <div className='mr-4 text-moon-700 font-bold'>{feedback.name}</div>
+                    <div className='flex-grow'/>
                     <div>
-                        <Button icon="delete" onClick={() => {
+                        <Button icon="delete" variant="ghost" onClick={() => {
                             setFeedbackColumns(feedbackColumns.filter((t) => t.name !== feedback.name));
                         }}/>
                     </div>
@@ -142,22 +159,35 @@ export const ConfigureStructuredFeedbackModal = ({ entity, project, existingFeed
             })}
         </div>
         <h3>Add new structured feedback</h3>
-        <select onChange={(e) => setSelectedOption(e.target.value)} value={selectedOption} className='w-full'>
-        {options.map((option) => (
-            <option key={option.name} value={option.name}>{option.name}</option>
-        ))}
-        </select>
-        {selectedOption === "Range feedback" && (
+        <div className='my-8'>
+            <span className='p-4 font-semibold'>Metric name</span>
+            <TextField value={nameField} onChange={(value) => setNameField(value)} placeholder='...'/>
+        </div>
+        <div className='my-8'>
+            <span className='p-4 font-semibold'>Metric type</span>
+            <select onChange={(e) => setSelectedOption(e.target.value)} value={selectedOption} className='w-full'>
+                {options.map((option) => (
+                    <option key={option.name} value={option.name}>{option.name}</option>
+                ))}
+                </select>
+        </div>
+        {selectedOption === "Numerical feedback" && (
+            <>
+            <TextField value={minValue.toString()} type="number" onChange={(value) => setMinValue(Number(value))} placeholder=''/>
+            <TextField value={maxValue.toString()} type="number" onChange={(value) => setMaxValue(Number(value))} placeholder=''/>
+            <span>Example</span>
+            <NumericalFeedbackColumn min={minValue} max={maxValue} defaultValue={null}/>
+            </>
+        )}
+        {selectedOption === "Text feedback" && (
             <>
             <CodeEditor 
-                value={JSON.stringify(exampleRangeFeedbackColumn, null, 2)}
+                value={JSON.stringify(exampleTextFeedbackColumn, null, 2)}
                 language="json"
                 onChange={(value) => {
-                    setExampleRangeFeedbackColumn(JSON.parse(value));
+                    setExampleTextFeedbackColumn(JSON.parse(value));
                 }}
             />
-            <span>Example</span>
-            <RangeFeedbackColumn min={exampleRangeFeedbackColumn.min} max={exampleRangeFeedbackColumn.max} defaultValue={null}/>
             </>
         )}
         {selectedOption === "Categorical feedback" && (

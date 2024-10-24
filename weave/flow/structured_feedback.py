@@ -5,29 +5,30 @@ from pydantic import BaseModel
 from weave.flow.obj import Object
 
 
-class FeedbackType(BaseModel):
-    editable: bool = True
+class FeedbackType(Object):
+    name: str = None
 
 
 class StructuredFeedback(Object):
-    types: list[dict]
+    types: list[FeedbackType]
 
 
 class BinaryFeedback(FeedbackType):
-    name: Optional[str] = None
     type: str = "BinaryFeedback"
 
 
-class RangeFeedback(FeedbackType):
-    name: Optional[str] = None
-    type: str = "RangeFeedback"
+class NumericalFeedback(FeedbackType):
+    type: str = "NumericalFeedback"
 
     min: float
     max: float
 
 
+class TextFeedback(FeedbackType):
+    type: str = "TextFeedback"
+
+
 class CategoricalFeedback(FeedbackType):
-    name: Optional[str] = None
     type: str = "CategoricalFeedback"
 
     options: list[str]
@@ -42,18 +43,17 @@ if __name__ == "__main__":
 
     feedback = StructuredFeedback(
         types=[
-            RangeFeedback(min=0, max=1).model_dump(),
-            RangeFeedback(min=0, max=10, name="score-val").model_dump(),
+            NumericalFeedback(min=0, max=5, name="Score"),
             CategoricalFeedback(
-                options=["option a", "option b", "option c"]
-            ).model_dump(),
-            BinaryFeedback(name="binary-feedback", editable=False).model_dump(),
+                name="Qualitative", options=["plain", "complex", "spicy"]
+            ),
+            BinaryFeedback(name="Viewed"),
             CategoricalFeedback(
                 options=[],
                 multi_select=True,
                 add_new_option=True,
                 name="Tags",
-            ).model_dump(),
+            ),
         ]
     )
 

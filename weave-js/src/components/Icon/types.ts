@@ -174,6 +174,7 @@ export const IconNames = {
   RemoveAlt: 'remove-alt',
   Report: 'report',
   Retry: 'retry',
+  ReloadRefresh: 'reload-refresh',
   RobotServiceMember: 'robot-service-member',
   RocketLaunch: 'rocket-launch',
   RowHeightLarge: 'row-height-large',

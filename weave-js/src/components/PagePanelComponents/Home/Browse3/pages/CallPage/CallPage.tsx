@@ -28,8 +28,6 @@ import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
-import { useGetTraceServerClientContext } from '../wfReactInterface/traceServerClientContext';
-import { useStructuredFeedbackOptions } from '../CallsPage/CallsTable';
 import StructuredFeedbackSidebar from '../../feedback/StructuredFeedback/StructuredFeedbackSidebar';
 import { CallIdContext } from '../../../Browse3';
 export const CallPage: FC<{

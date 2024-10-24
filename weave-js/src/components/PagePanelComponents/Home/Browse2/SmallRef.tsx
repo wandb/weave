@@ -18,6 +18,7 @@ import {
   ObjectVersionKey,
   OpVersionKey,
 } from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import { useApolloClient } from '@apollo/client';
 
 const getRootType = (t: Type): Type => {
   if (
@@ -124,6 +125,7 @@ export const SmallRef: FC<{
       };
     }
   }
+  // if a wandb artifact
   const objectVersion = useObjectVersion(objVersionKey);
   const opVersion = useOpVersion(opVersionKey);
   const versionIndex =

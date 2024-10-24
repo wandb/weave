@@ -13,7 +13,8 @@ import debounce from 'lodash/debounce';
 // Constants
 const STRUCTURED_FEEDBACK_TYPE = 'wandb.structuredFeedback.1';
 const FEEDBACK_TYPES = {
-  RANGE: 'RangeFeedback',
+  NUMERICAL: 'NumericalFeedback',
+  TEXT: 'TextFeedback',
   CATEGORICAL: 'CategoricalFeedback',
   BOOLEAN: 'BooleanFeedback',
 };
@@ -25,6 +26,7 @@ interface StructuredFeedbackProps {
   entity: string;
   project: string;
   feedbackSpecRef: string;
+  readOnly?: boolean;
 }
 
 // Utility function for creating feedback request
@@ -60,6 +62,13 @@ export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props)
   const [currentFeedbackId, setCurrentFeedbackId] = useState<string | null>(null);
   const [foundValue, setFoundValue] = useState<string | number | null>(null);
   const getTsClient = useGetTraceServerClientContext();
+
+  useEffect(() => {
+    if (props.weaveRef !== query?.result?.[0]?.weave_ref) {
+        setFoundValue(null);
+        setCurrentFeedbackId(null);
+    }
+  }, [props.weaveRef]);
 
   const onAddFeedback = async (value: any, currentFeedbackId: string | null): Promise<boolean> => {
     const tsClient = getTsClient();
@@ -120,6 +129,12 @@ export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props)
 
   if (query?.loading) return <LoadingDots />;
 
+  if (props.readOnly) {
+    return <div className="flex justify-center w-full">
+      {foundValue}
+    </div>
+  }
+
   return (
     <div className="flex justify-center w-full">
       {renderFeedbackComponent()}
@@ -128,13 +143,21 @@ export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props)
 
   function renderFeedbackComponent() {
     switch (props.structuredFeedbackOptions.type) {
-      case FEEDBACK_TYPES.RANGE:
+      case FEEDBACK_TYPES.NUMERICAL:
         return (
           <NumericalFeedbackColumn
             min={props.structuredFeedbackOptions.min}
             max={props.structuredFeedbackOptions.max}
             onAddFeedback={onAddFeedback}
             defaultValue={foundValue as number | null}
+            currentFeedbackId={currentFeedbackId}
+          />
+        );
+      case FEEDBACK_TYPES.TEXT:
+        return (
+          <TextFeedbackColumn
+            onAddFeedback={onAddFeedback}
+            defaultValue={foundValue as string | null}
             currentFeedbackId={currentFeedbackId}
           />
         );
@@ -163,51 +186,6 @@ export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props)
   }
 };
 
-// export const RangeFeedbackColumn = (
-//     {min, max, onAddFeedback, defaultValue, currentFeedbackId}: 
-//     {
-//         min: number,
-//         max: number, 
-//         onAddFeedback?: (value: any, currentFeedbackId: string | null) => Promise<boolean>, 
-//         defaultValue: number | null,
-//         currentFeedbackId?: string | null,
-//     }
-// ) => {
-//     const [value, setValue] = useState<number | undefined>(min ?? undefined);
-
-//     useEffect(() => {
-//         setValue(defaultValue ?? undefined);
-//     }, [defaultValue]);
-
-
-//     const onValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-//         // Todo debounce this
-//         const val = parseInt(e.target.value);
-//         onAddFeedback?.(val, currentFeedbackId ?? null).then((success) => {
-//             if (success) {
-//                 setValue(val);
-//             }
-//         });
-//     }
-        
-//     return (
-//     <Tailwind>
-//         <div className="flex flex-col items-center w-full">
-//             <span className="text-moon-500 mb-2">{value}</span>
-//             <input
-//                 type="range" 
-//                 min={min} 
-//                 max={max}
-//                 step={1.0}
-//                 value={value}
-//                 onChange={onValueChange}
-//                 className="w-full"
-//             />
-//         </div>
-//     </Tailwind>
-//     );
-// }
-
 export const NumericalFeedbackColumn = ({min, max, onAddFeedback, defaultValue, currentFeedbackId}: {min: number, max: number, onAddFeedback?: (value: number, currentFeedbackId: string | null) => Promise<boolean>, defaultValue: number | null, currentFeedbackId?: string | null}) => {
     const [value, setValue] = useState<number | undefined>(defaultValue ?? undefined);
 
@@ -233,7 +211,7 @@ export const NumericalFeedbackColumn = ({min, max, onAddFeedback, defaultValue, 
             type="number"
             value={value?.toString() ?? ''}
             onChange={onValueChange}
-            placeholder='1000'
+            placeholder='...'
         />
     </div>
 }
@@ -258,7 +236,7 @@ export const TextFeedbackColumn = ({onAddFeedback, defaultValue, currentFeedback
     }
 
     return <div className='w-full'>
-        <TextField value={value} onChange={onValueChange} placeholder='Text'/>
+        <TextField value={value} onChange={onValueChange} placeholder='...'/>
     </div>
 }
 

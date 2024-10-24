@@ -68,8 +68,8 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
-import {objectVersionNiceString} from '../wfReactInterface/utilities';
-import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {objectVersionKeyToRefUri, objectVersionNiceString} from '../wfReactInterface/utilities';
+import {CallSchema, ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
   BulkDeleteButton,
@@ -337,6 +337,7 @@ export const CallsTable: FC<{
 
   // Hide structured feedback columns by default
   const structuredFeedbackOptions = useStructuredFeedbackOptions(entity, project);
+  console.log(structuredFeedbackOptions);
   useEffect(() => {
     if (setColumnVisibilityModel == null || structuredFeedbackOptions == null) {
       return;
@@ -896,16 +897,15 @@ export const CallsTable: FC<{
                   columnVisibilityModel={columnVisibilityModel}
                   setColumnVisibilityModel={setColumnVisibilityModel}
                   onAddColumn={() => setStructuredFeedbackModalOpen(true)}
-                  structuredFeedbackOptions={structuredFeedbackOptions}
                 />
-                {/* {structuredFeedbackModalOpen && (
+                {structuredFeedbackModalOpen && (
                   <ConfigureStructuredFeedbackModal
                     entity={entity}
                     project={project}
                     existingFeedback={structuredFeedbackOptions}
                     onClose={() => setStructuredFeedbackModalOpen(false)}
                   />
-                )} */}
+                )}
               </div>
             </>
           )}
@@ -1085,11 +1085,26 @@ function prepareFlattenedCallDataForTable(
   return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
 }
 
-export const useStructuredFeedbackOptions = (entity: string, project: string) => {
+const useResolveTypeObjects = (typeRefs: string[]) => {
+  const {useRefsData} = useWFHooks();
+  const refsData = useRefsData(typeRefs);
+  return useMemo(() => {
+    if (refsData.loading || refsData.result == null) {
+      return null;
+    }
+    const refDataWithRefs = refsData.result.map((x, i) => ({
+      ...x,
+      ref: typeRefs[i],
+    }));
+    return refDataWithRefs;
+  }, [refsData.loading, refsData.result]);
+};
 
+export const useStructuredFeedbackOptions = (entity: string, project: string) => {
   const {useRootObjectVersions} = useWFHooks();
 
-  const feedbackObjects = useRootObjectVersions(
+  const [latestSpec, setLatestSpec] = useState<ObjectVersionSchema | null>(null);
+  const structuredFeedbackObjects = useRootObjectVersions(
     entity,
     project,
     {
@@ -1098,26 +1113,26 @@ export const useStructuredFeedbackOptions = (entity: string, project: string) =>
     },
     undefined,
   );
+  const refsData = useResolveTypeObjects(latestSpec?.val.types ?? []);
+
+  useEffect(() => {
+    if (structuredFeedbackObjects.loading || structuredFeedbackObjects.result == null) {
+      return;
+    }
+    const latestSpec = structuredFeedbackObjects.result?.sort((a, b) => a.createdAtMs - b.createdAtMs).pop();
+    if (!latestSpec) {
+      return;
+    }
+    setLatestSpec(latestSpec);
+  }, [structuredFeedbackObjects.loading, structuredFeedbackObjects.result]);
 
   return useMemo(() => {
-    if (feedbackObjects.loading || feedbackObjects.result == null || feedbackObjects.result.length === 0) {
+    if (latestSpec == null || refsData == null) {
       return null;
     }
-    const latest = feedbackObjects.result?.sort((a, b) => a.createdAtMs - b.createdAtMs).pop();
-
-    if (!latest) {
-      return null;
-    }
-
-    const ref = `weave:///${entity}/${project}/object/${latest?.baseObjectClass}:${latest?.versionHash}`
-
-    // ensure that there are no duplicate names
-    const values = latest?.val?.types.filter((type: any, index: number, self: any[]) =>
-      index === self.findIndex((t: any) => t.name === type.name)
-    );
-    latest.val.types = values;
-    latest.val.ref = ref;
-  
-    return latest.val;
-  }, [feedbackObjects.loading, feedbackObjects.result]);
+    return {
+      types: refsData,
+      ref: objectVersionKeyToRefUri(latestSpec),
+    };
+  }, [latestSpec, refsData]);
 };
