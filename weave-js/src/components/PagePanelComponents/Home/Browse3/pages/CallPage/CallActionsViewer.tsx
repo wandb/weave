@@ -16,6 +16,7 @@ import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerCli
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {Drawer} from '@material-ui/core';
 
 type CallActionRow = {
   actionRef: string;
@@ -155,31 +156,31 @@ export const CallActionsViewer: React.FC<{
         </tbody>
       </table>
 
-      <Modal
+      <Drawer
+        anchor="right"
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        aria-labelledby="create-action-mapping-modal">
+        ModalProps={{
+          keepMounted: true, // Better open performance on mobile
+        }}
+      >
         <Box
           sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            // transform: 'translate(-50%, -50%)',
-            width: 400,
+            width: '40vw',
+            height: '100%',
             bgcolor: 'background.paper',
-            boxShadow: 24,
             p: 4,
-            borderRadius: 2,
             display: 'flex',
             flexDirection: 'column',
-            maxHeight: '80vh',
             overflow: 'auto',
-          }}>
+          }}
+        >
           <Typography
             id="create-action-mapping-modal"
             variant="h6"
             component="h2"
-            gutterBottom>
+            gutterBottom
+          >
             Create Action Mapping
           </Typography>
           <TextField
@@ -204,18 +205,20 @@ export const CallActionsViewer: React.FC<{
           <Box sx={{display: 'flex', justifyContent: 'flex-end', mt: 2}}>
             <Button
               onClick={() => setIsModalOpen(false)}
-              style={{marginRight: 8}}>
+              style={{marginRight: 8}}
+            >
               Cancel
             </Button>
             <Button
               onClick={handleSaveMapping}
               variant="contained"
-              color="primary">
+              color="primary"
+            >
               Save
             </Button>
           </Box>
         </Box>
-      </Modal>
+      </Drawer>
     </>
   );
 };

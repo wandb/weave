@@ -4,7 +4,7 @@ import {
   FormControl,
   InputLabel,
   MenuItem,
-  Modal,
+  Drawer,
   Select,
   TextField,
   Typography,
@@ -46,33 +46,34 @@ export const NewBuiltInActionScorerModal: FC<
   };
 
   return (
-    <Modal
+    <Drawer
+      anchor="right"
       open={open}
       onClose={() => {
         // Prevent closing if the user hasn't saved
         return;
       }}
-      aria-labelledby="new-built-in-action-scorer-modal">
+      ModalProps={{
+        keepMounted: true, // Better open performance on mobile
+      }}
+    >
       <Box
         sx={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          // transform: 'translate(-50%, -50%)',
-          width: 400,
+          width: '40vw',
+          height: '100%',
           bgcolor: 'background.paper',
-          boxShadow: 24,
           p: 4,
-          borderRadius: 2,
           display: 'flex',
           flexDirection: 'column',
-          maxHeight: '80vh',
-        }}>
+          overflow: 'auto',
+        }}
+      >
         <Typography
           id="new-built-in-action-scorer-modal"
           variant="h6"
           component="h2"
-          gutterBottom>
+          gutterBottom
+        >
           Configure new built-in action scorer
         </Typography>
 
@@ -90,7 +91,8 @@ export const NewBuiltInActionScorerModal: FC<
               value={selectedActionIndex}
               onChange={e =>
                 setSelectedActionIndex(parseInt(e.target.value as string, 10))
-              }>
+              }
+            >
               {knownBuiltinActions.map(({action}, ndx) => (
                 <MenuItem key={action.name} value={ndx}>
                   {action.name}
@@ -115,11 +117,12 @@ export const NewBuiltInActionScorerModal: FC<
             onClick={handleSave}
             variant="contained"
             color="primary"
-            disabled={!name || selectedActionIndex === -1}>
+            disabled={!name || selectedActionIndex === -1}
+          >
             Save
           </Button>
         </Box>
       </Box>
-    </Modal>
+    </Drawer>
   );
 };
