@@ -2,6 +2,9 @@ import * as Colors from '@wandb/weave/common/css/color.styles';
 import {Alert} from '@wandb/weave/components/Alert';
 import React from 'react';
 import styled from 'styled-components';
+import copyToClipboard from 'copy-to-clipboard';
+import {Button} from '../../../../../Button';
+import {toast} from '../../../../../../common/components/elements/Toast';
 
 const AlertExceptionType = styled.span`
   font-weight: 600;
@@ -92,6 +95,7 @@ export const ExceptionAlert = ({exception}: ExceptionAlertProps) => {
     return null;
   }
   const {type, message} = info;
+
   return (
     <Alert severity="error">
       <AlertExceptionType>{type}:</AlertExceptionType> {message}
@@ -107,9 +111,35 @@ export const ExceptionDetails = ({exceptionInfo}: ExceptionDetailsProps) => {
   if (!exceptionInfo.traceback) {
     return null;
   }
+
+  const handleCopy = () => {
+    const tracebackText = exceptionInfo.traceback
+      .map(
+        frame =>
+          `File "${frame.filename}", line ${frame.line_number}, in ${frame.function_name}\n  ${frame.text}`
+      )
+      .join('\n');
+    const textToCopy = `${tracebackText}\n${exceptionInfo.type}: ${exceptionInfo.message}`;
+    copyToClipboard(textToCopy);
+    toast('Exception traceback details copied to clipboard');
+  };
+
   return (
     <Traceback>
-      <div>Traceback (most recent call last):</div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+        <div>Traceback (most recent call last):</div>
+        <Button
+          icon="copy"
+          tooltip="Copy"
+          variant="ghost"
+          onClick={handleCopy}
+        />
+      </div>
       {exceptionInfo.traceback.map((frame: StackFrame, i: number) => (
         <React.Fragment key={i}>
           <FileInfo>
