@@ -7,7 +7,7 @@ import {
   StartedCallSchemaForInsert,
   Api as TraceServerApi,
 } from './generated/traceServerApi';
-import { isWeaveAudio, isWeaveImage } from './media';
+import { AudioType, DEFAULT_AUDIO_TYPE, DEFAULT_IMAGE_TYPE, ImageType, isWeaveAudio, isWeaveImage } from './media';
 import { Op, OpRef, ParameterNamesOption, getOpName, getOpWrappedFunction, isOp } from './opType';
 import { Settings } from './settings';
 import { Table, TableRef, TableRowRef } from './table';
@@ -288,12 +288,12 @@ export class WeaveClient {
     return placeholder;
   }
 
-  private async serializedImage(imageData: Buffer, imageType: 'png'): Promise<any> {
+  private async serializedImage(imageData: Buffer, imageType: ImageType = DEFAULT_IMAGE_TYPE): Promise<any> {
     const blob = new Blob([imageData], { type: `image/${imageType}` });
     return this.serializedFileBlob('PIL.Image.Image', 'image.png', blob);
   }
 
-  private async serializedAudio(audioData: Buffer, audioType: 'wav'): Promise<any> {
+  private async serializedAudio(audioData: Buffer, audioType: AudioType = DEFAULT_AUDIO_TYPE): Promise<any> {
     const blob = new Blob([audioData], { type: `audio/${audioType}` });
     return this.serializedFileBlob('wave.Wave_read', 'audio.wav', blob);
   }
