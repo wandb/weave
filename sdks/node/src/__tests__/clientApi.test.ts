@@ -17,7 +17,7 @@ describe('Client API', () => {
       defaultEntityName: jest.fn().mockResolvedValue('test-entity'),
     }));
 
-    const client = await init({ project: 'test-project' });
+    const client = await init('test-project');
     const gottenClient = requireGlobalClient();
 
     expect(gottenClient).toBeDefined();

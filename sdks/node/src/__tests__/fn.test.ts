@@ -26,7 +26,7 @@ class ParametrizedFunction extends CallableObject<{ input: number }, { output: n
 
 describe('Fn', () => {
   test('use fn', async () => {
-    const client = await init({ project: 'test-project' });
+    const client = await init('test-project');
 
     const fn = new ParametrizedFunction({ magicNumber: 7 });
     const res = await fn.run({ input: 1 });

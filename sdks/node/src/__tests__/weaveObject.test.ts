@@ -28,7 +28,7 @@ describe('weaveObject', () => {
   });
 
   test('class-example', async () => {
-    const client = await init({ project: 'test-project' });
+    const client = await init('test-project');
     const obj = new ExampleObject('test', 1);
 
     // save an object

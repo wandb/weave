@@ -3,7 +3,7 @@ import { Dataset } from '../dataset';
 
 describe('Dataset', () => {
   test('should save a dataset', async () => {
-    const client = await init({ project: 'test-project' });
+    const client = await init('test-project');
     const data = [
       { id: 1, value: 2 },
       { id: 2, value: 3 },

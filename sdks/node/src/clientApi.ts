@@ -4,17 +4,10 @@ import { getUrls, setGlobalDomain } from './urls';
 import { ConcurrencyLimiter } from './utils/concurrencyLimit';
 import { Netrc } from './utils/netrc';
 import { createFetchWithRetry } from './utils/retry';
-import { getApiKey } from './wandb/settings';
+import { getApiKey, parseProject } from './wandb/settings';
 import { WandbServerApi } from './wandb/wandbServerApi';
 import { CallStackEntry, WeaveClient } from './weaveClient';
 
-export interface InitOptions {
-  project: string;
-  entity?: string;
-  projectName?: string;
-  host?: string;
-  settings?: Settings;
-}
 export interface LoginOptions {
   apiKey: string;
   host?: string;
@@ -39,7 +32,7 @@ export async function login(options?: LoginOptions) {
   const { traceBaseUrl, domain } = getUrls(options?.host);
 
   const netrc = new Netrc();
-  netrc.setMachine(domain, { login: 'user', password: options.apiKey });
+  netrc.setEntry(domain, { login: 'user', password: options.apiKey });
   netrc.save();
 
   // Test the connection to the traceServerApi
@@ -72,13 +65,16 @@ export async function login(options?: LoginOptions) {
  * @returns A promise that resolves to the initialized Weave client.
  * @throws {Error} If the initialization fails
  */
-export async function init({ project, entity, settings, host }: InitOptions): Promise<WeaveClient> {
+export async function init(project: string, settings?: Settings): Promise<WeaveClient> {
+  const { entityName: entity, projectName } = parseProject(project);
+
+  const host = new Netrc().getLastEntry()?.machine;
   const { baseUrl, traceBaseUrl, domain } = getUrls(host);
   const resolvedApiKey = getApiKey(domain);
   try {
     const wandbServerApi = new WandbServerApi(baseUrl, resolvedApiKey);
     const entityName = entity ?? (await wandbServerApi.defaultEntityName());
-    const projectId = `${entityName}/${project}`;
+    const projectId = `${entityName}/${projectName}`;
 
     const retryFetch = createFetchWithRetry({
       baseDelay: 1000,

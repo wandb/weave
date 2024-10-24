@@ -48,3 +48,13 @@ export function getApiKey(host: string): string {
   }
   return apiKey;
 }
+
+export function parseProject(project: string): { entityName?: string; projectName: string } {
+  let entityName: string | undefined;
+  let projectName: string = project;
+
+  if (project.includes('/')) {
+    [entityName, projectName] = project.split('/');
+  }
+  return { entityName, projectName };
+}

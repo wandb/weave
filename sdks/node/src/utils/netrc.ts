@@ -3,6 +3,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 
 interface NetrcEntry {
+  machine: string;
   login: string;
   password: string;
   account?: string;
@@ -33,7 +34,7 @@ export class Netrc {
               this.entries.set(currentMachine, currentEntry as NetrcEntry);
             }
             currentMachine = value;
-            currentEntry = {};
+            currentEntry = { machine: value };
             break;
           case 'login':
           case 'password':
@@ -45,7 +46,7 @@ export class Netrc {
         }
       }
 
-      if (currentMachine && Object.keys(currentEntry).length) {
+      if (currentMachine && Object.keys(currentEntry).length > 1) {
         this.entries.set(currentMachine, currentEntry as NetrcEntry);
       }
     } catch (error) {
@@ -67,11 +68,18 @@ export class Netrc {
     writeFileSync(this.path, content, { mode: 0o600 });
   }
 
-  getMachine(machine: string): NetrcEntry | undefined {
+  getEntry(machine: string): NetrcEntry | undefined {
     return this.entries.get(machine);
   }
+  setEntry(machine: string, entry: Partial<NetrcEntry>): void {
+    const existingEntry = this.entries.get(machine) || { machine };
+    const updatedEntry = { ...existingEntry, ...entry } as NetrcEntry;
+    this.entries.delete(machine);
+    this.entries.set(machine, updatedEntry);
+  }
 
-  setMachine(machine: string, entry: NetrcEntry): void {
-    this.entries.set(machine, entry);
+  getLastEntry(): NetrcEntry | undefined {
+    const entries = Array.from(this.entries.values());
+    return entries[entries.length - 1];
   }
 }

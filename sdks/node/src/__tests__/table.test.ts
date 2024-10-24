@@ -19,7 +19,7 @@ describe('table', () => {
     }
 
     // Saving the table generates refs for the table and its rows
-    const client = await init({ project: 'test-project' });
+    const client = await init('test-project');
 
     (client as any).saveTable(table); // TODO: Saving a Table is not public... but maybe it should be?
     const ref = await table.__savedRef;
