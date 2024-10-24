@@ -1,10 +1,15 @@
 import datetime
+import typing
 from enum import Enum
 from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
 
+from weave.trace_server.interface.collections.action_collection import (
+    ActionOpMapping,
+    ActionWithConfig,
+)
 from weave.trace_server.interface.query import Query
 
 WB_USER_ID_DESCRIPTION = (
@@ -351,6 +356,7 @@ class OpQueryRes(BaseModel):
 
 class ObjCreateReq(BaseModel):
     obj: ObjSchemaForInsert
+    collection_name: Optional[str] = None
 
 
 class ObjCreateRes(BaseModel):
@@ -796,6 +802,19 @@ class CostPurgeRes(BaseModel):
     pass
 
 
+class ExecuteBatchActionReq(BaseModel):
+    project_id: str
+    call_ids: list[str]
+    action: typing.Optional[ActionWithConfig] = None
+    action_ref: typing.Optional[str] = None
+    mapping: typing.Optional[ActionOpMapping] = None
+    mapping_ref: typing.Optional[str] = None
+
+
+class ExecuteBatchActionRes(BaseModel):
+    pass
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -837,3 +856,35 @@ class TraceServerInterface(Protocol):
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
+
+    # Action API
+    def execute_batch_action(
+        self, req: ExecuteBatchActionReq
+    ) -> ExecuteBatchActionRes: ...
+
+    # Tim's Custom ideas
+    # def create_collection_object(self, req: CreateCollectionObjectReq) -> CreateCollectionObjectRes: ...
+    # def create_feedback_entry(self, req: CreateFeedbackEntryReq) -> CreateFeedbackEntryRes: ...
+
+    # def action_create(self, req: ActionCreateReq) -> ActionCreateRes: ...
+    # def action_read(self, req: ActionReadReq) -> ActionReadRes: ...
+    # def actions_list(self) -> list[Action]: ...
+
+
+# class CreateCollectionObjectReq(BaseModel):
+#     project_id: str
+#     object_id: str
+#     collection_name: str
+#     payload: dict
+
+# class CreateCollectionObjectRes(BaseModel):
+#     digest: str
+
+# class CreateFeedbackEntryReq(BaseModel):
+#     project_id: str = Field(examples=["entity/project"])
+#     weave_ref: str = Field(examples=["weave:///entity/project/object/name:digest"])
+#     creator: Optional[str] = Field(default=None, examples=["Jane Smith"])
+#     feedback_type: str = Field(examples=["custom"])
+#     payload: dict
+#     # wb_user_id is automatically populated by the server
+#     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)

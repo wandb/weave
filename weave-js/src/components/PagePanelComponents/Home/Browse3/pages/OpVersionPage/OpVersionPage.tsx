@@ -1,24 +1,24 @@
 import React, {useMemo} from 'react';
 
-import {LoadingDots} from '../../../../LoadingDots';
-import {Tailwind} from '../../../../Tailwind';
-import {NotFoundPanel} from '../NotFoundPanel';
-import {OpCodeViewer} from '../OpCodeViewer';
+import {LoadingDots} from '../../../../../LoadingDots';
+import {Tailwind} from '../../../../../Tailwind';
+import {NotFoundPanel} from '../../NotFoundPanel';
+import {OpCodeViewer} from '../../OpCodeViewer';
 import {
   CallsLink,
   opNiceName,
   OpVersionsLink,
   opVersionText,
-} from './common/Links';
-import {CenteredAnimatedLoader} from './common/Loader';
+} from '../common/Links';
+import {CenteredAnimatedLoader} from '../common/Loader';
 import {
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
-} from './common/SimplePageLayout';
-import {TabUseOp} from './TabUseOp';
-import {useWFHooks} from './wfReactInterface/context';
-import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
-import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
+} from '../common/SimplePageLayout';
+import {TabUseOp} from '../TabUseOp';
+import {useWFHooks} from '../wfReactInterface/context';
+import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
+import {OpVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const OpVersionPage: React.FC<{
   entity: string;
@@ -131,6 +131,17 @@ const OpVersionPageInner: React.FC<{
             />
           ),
         },
+        // {
+        //   label: 'Actions',
+        //   content: (
+        //     <OpActionsViewer
+        //       entity={entity}
+        //       project={project}
+        //       opName={opId}
+        //       currentVersionURI={uri}
+        //     />
+        //   ),
+        // },
         ...(useOpSupported
           ? [
               {
