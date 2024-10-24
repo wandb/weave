@@ -8,6 +8,7 @@ import {DEFAULT_FILTER_CALLS} from './CallsTable';
 import {
   ErrorPlotlyChart,
   LatencyPlotlyChart,
+  LatencyVisXChart,
   RequestsPlotlyChart,
 } from './Charts';
 import {Tailwind} from '../../../../../Tailwind';
@@ -100,6 +101,13 @@ CallsChartsProps) => {
       <div className="flex w-full flex-row">
         <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
           <LatencyPlotlyChart chartData={costAndTimeData} height={500} />
+        </div>
+        <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
+          <LatencyVisXChart
+            width={500}
+            height={500}
+            chartData={costAndTimeData}
+          />
         </div>
         <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
           <ErrorPlotlyChart chartData={costAndTimeData} height={500} />

@@ -10,6 +10,18 @@ import {
   MOON_500,
   TEAL_400,
 } from '../../../../../../common/css/color.styles';
+import {scaleTime, scaleLinear} from '@visx/scale';
+import {LinePath} from '@visx/shape';
+import {AxisBottom, AxisLeft} from '@visx/axis';
+import {Group} from '@visx/group';
+import {curveMonotoneX} from '@visx/curve';
+import {extent, max, quantile} from 'd3-array';
+import {timeFormat} from 'd3-time-format';
+import {useTooltip, useTooltipInPortal, TooltipWithBounds} from '@visx/tooltip';
+import {localPoint} from '@visx/event';
+import * as d3 from 'd3';
+import {bisect} from 'd3-array';
+import {curveLinear} from '@visx/curve'; // Import curveLinear
 
 type ChartData = {
   started_at: string;
@@ -153,6 +165,228 @@ export const LatencyPlotlyChart: React.FC<{
   }, [plotlyData, height]);
 
   return <div ref={divRef}></div>;
+};
+
+const margin = {top: 20, right: 30, bottom: 50, left: 40};
+
+type LatencyVisXChartProps = {
+  width: number;
+  height: number;
+  chartData: ChartData[];
+  binSizeMinutes?: number;
+};
+
+type ChartDataWithLatencies = {
+  timestamp: Date;
+  p50: number;
+  p95: number;
+  p99: number;
+};
+
+export const LatencyVisXChart: React.FC<LatencyVisXChartProps> = ({
+  width,
+  height,
+  chartData,
+  binSizeMinutes = 60,
+}) => {
+  const xMax = width - margin.left - margin.right;
+  const yMax = height - margin.top - margin.bottom;
+  const [currentLatencyType, setCurrentLatencyType] =
+    React.useState<string>('p50'); // Add state for latencyType
+
+  // Group data by time bins
+  const groupedData = _(chartData)
+    .groupBy(d =>
+      moment(d.started_at)
+        .startOf('minute')
+        .minute(
+          Math.floor(moment(d.started_at).minute() / binSizeMinutes) *
+            binSizeMinutes
+        )
+        .format()
+    )
+    .map((group, date) => {
+      const latencies = _.sortBy(group.map(d => d.latency));
+      const p50 = quantile(latencies, 0.5) ?? 0;
+      const p95 = quantile(latencies, 0.95) ?? 0;
+      const p99 = quantile(latencies, 0.99) ?? 0;
+      return {timestamp: new Date(date), p50, p95, p99};
+    })
+    .value();
+
+  const xScale = scaleTime({
+    range: [0, xMax],
+    domain: extent(groupedData, d => d.timestamp) as [Date, Date],
+  });
+
+  const yScale = scaleLinear({
+    range: [yMax, 0],
+    domain: [0, max(groupedData, d => Math.max(d.p50, d.p95, d.p99)) || 0],
+  });
+
+  const {
+    tooltipData,
+    tooltipLeft,
+    tooltipTop,
+    tooltipOpen,
+    showTooltip,
+    hideTooltip,
+  } = useTooltip<ChartDataWithLatencies>();
+  const {containerRef, TooltipInPortal} = useTooltipInPortal({
+    detectBounds: true,
+    scroll: true,
+  });
+  const [crosshair, setCrosshair] = React.useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const handleMouseMove = (
+    event: React.MouseEvent<SVGElement, MouseEvent>,
+    yAccessor: (d: ChartDataWithLatencies) => number,
+    latencyType: string
+  ) => {
+    setCurrentLatencyType(latencyType); // Update state with current latencyType
+
+    const svgElement = (event.target as SVGElement).ownerSVGElement;
+    if (!svgElement) return;
+    const coords = localPoint(svgElement, event);
+    if (!coords) return;
+    const x0 = xScale.invert(coords.x - margin.left);
+    const index = bisect(
+      groupedData.map(d => d.timestamp),
+      x0
+    );
+    const d0 = groupedData[index - 1];
+    const d1 = groupedData[index];
+    const data =
+      d1 &&
+      x0.getTime() - d0.timestamp.getTime() >
+        d1.timestamp.getTime() - x0.getTime()
+        ? d1
+        : d0;
+
+    if (data) {
+      showTooltip({
+        tooltipData: data,
+        tooltipLeft: coords.x,
+        tooltipTop: coords.y,
+      });
+      setCrosshair({x: coords.x, y: coords.y});
+    }
+  };
+  return (
+    <div>
+      <svg
+        ref={containerRef}
+        width={width}
+        height={height}
+        onMouseLeave={hideTooltip}>
+        <Group left={margin.left} top={margin.top}>
+          <LinePath
+            data={groupedData}
+            x={d => xScale(d.timestamp) ?? 0}
+            y={d => yScale(d.p50) ?? 0}
+            stroke={BLUE_500} // Match p50 color
+            strokeWidth={2}
+            curve={curveLinear}
+            onMouseMove={event => handleMouseMove(event, d => d.p50, 'p50')}
+            onMouseLeave={() => hideTooltip()}
+          />
+          {groupedData.map((d, i) => (
+            <circle
+              key={`p50-dot-${i}`}
+              cx={xScale(d.timestamp) ?? 0}
+              cy={yScale(d.p50) ?? 0}
+              r={3}
+              fill={BLUE_500} // Match p50 color
+            />
+          ))}
+
+          <LinePath
+            data={groupedData}
+            x={d => xScale(d.timestamp) ?? 0}
+            y={d => yScale(d.p95) ?? 0}
+            stroke={GREEN_500} // Match p95 color
+            strokeWidth={2}
+            curve={curveLinear}
+            onMouseMove={event => handleMouseMove(event, d => d.p95, 'p95')}
+          />
+          {groupedData.map((d, i) => (
+            <circle
+              key={`p95-dot-${i}`}
+              cx={xScale(d.timestamp) ?? 0}
+              cy={yScale(d.p95) ?? 0}
+              r={3}
+              fill={GREEN_500} // Match p95 color
+            />
+          ))}
+
+          <LinePath
+            data={groupedData}
+            x={d => xScale(d.timestamp) ?? 0}
+            y={d => yScale(d.p99) ?? 0}
+            stroke={MOON_500} // Match p99 color
+            strokeWidth={2}
+            curve={curveLinear}
+            onMouseMove={event => handleMouseMove(event, d => d.p99, 'p99')}
+          />
+          {groupedData.map((d, i) => (
+            <circle
+              key={`p99-dot-${i}`}
+              cx={xScale(d.timestamp) ?? 0}
+              cy={yScale(d.p99) ?? 0}
+              r={3}
+              fill={MOON_500} // Match p99 color
+            />
+          ))}
+
+          {crosshair && (
+            <>
+              <line
+                x1={xScale(tooltipData?.timestamp ?? new Date(0))} // Use xScale with tooltipData, default to epoch
+                x2={xScale(tooltipData?.timestamp ?? new Date(0))}
+                y1={0}
+                y2={yMax}
+                stroke="gray"
+                strokeDasharray="4"
+              />
+            </>
+          )}
+
+          {/* Repeat for p95 and p99 lines */}
+          <AxisBottom
+            top={yMax}
+            scale={xScale}
+            numTicks={width > 520 ? 10 : 5}
+            tickFormat={value => {
+              const date =
+                value instanceof Date ? value : new Date(value.valueOf());
+              return timeFormat('%b %d')(date);
+            }}
+          />
+          <AxisLeft scale={yScale} />
+        </Group>
+      </svg>
+
+      {tooltipOpen && (
+        <TooltipInPortal
+          key={Math.random()}
+          top={tooltipTop}
+          left={tooltipLeft}>
+          <div>
+            <strong>Date:</strong>{' '}
+            {timeFormat('%b %d')(new Date(tooltipData?.timestamp ?? 0))}
+          </div>
+          <div>
+            <strong>{currentLatencyType} Latency:</strong>{' '}
+            {tooltipData?.[currentLatencyType as keyof ChartDataWithLatencies]}{' '}
+            ms
+          </div>
+        </TooltipInPortal>
+      )}
+    </div>
+  );
 };
 
 export const ErrorPlotlyChart: React.FC<{
