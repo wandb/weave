@@ -554,14 +554,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             id=ch_call.id,
             ended_at=datetime.datetime.now(),
             output=res.response,
-            summary={"status": "success", }
+            summary={}
         )
 
+        if "usage" in res.response:
+            end.summary["usage"] = {req.model_name: res.response["usage"]}
+
         if "error" in res.response:
-            end.summary = {"status": "fail"}
             end.exception = res.response["error"]
         
-        print(end)
 
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
