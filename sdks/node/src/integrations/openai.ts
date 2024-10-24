@@ -143,6 +143,16 @@ interface OpenAIAPI {
   };
 }
 
+/**
+ * Wraps the OpenAI API to enable function tracing for OpenAI calls.
+ *
+ * @example
+ * const openai = wrapOpenAI(new OpenAI());
+ * const result = await openai.chat.completions.create({
+ *   model: 'gpt-3.5-turbo',
+ *   messages: [{ role: 'user', content: 'Hello, world!' }]
+ * });
+ */
 export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
   const chatCompletionsProxy = new Proxy(openai.chat.completions, {
     get(target, p, receiver) {
