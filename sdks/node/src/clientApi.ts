@@ -13,7 +13,6 @@ export interface InitOptions {
   entity?: string;
   projectName?: string;
   host?: string;
-  apiKey?: string;
   settings?: Settings;
 }
 export interface LoginOptions {
@@ -53,7 +52,7 @@ export async function login(options?: LoginOptions) {
   console.log(`Successfully logged in.  Credentials saved for ${domain}`);
 }
   const { baseUrl, traceBaseUrl, domain } = getUrls(host);
-  const resolvedApiKey = apiKey ?? getApiKey(domain);
+  const resolvedApiKey = getApiKey(domain);
   try {
     const wandbServerApi = new WandbServerApi(baseUrl, resolvedApiKey);
     const entityName = entity ?? (await wandbServerApi.defaultEntityName());
