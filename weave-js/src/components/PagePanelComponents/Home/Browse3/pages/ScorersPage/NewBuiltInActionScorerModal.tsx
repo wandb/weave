@@ -12,7 +12,6 @@ import {
 import React, {FC, useEffect, useState} from 'react';
 
 import {
-  ActionAndSpec,
   ActionWithConfig,
   ActionWithConfigSchema,
   knownBuiltinActions,
@@ -49,14 +48,17 @@ export const NewBuiltInActionScorerModal: FC<
   return (
     <Modal
       open={open}
-      onClose={null}
+      onClose={() => {
+        // Prevent closing if the user hasn't saved
+        return;
+      }}
       aria-labelledby="new-built-in-action-scorer-modal">
       <Box
         sx={{
           position: 'absolute',
           top: '50%',
           left: '50%',
-          transform: 'translate(-50%, -50%)',
+          // transform: 'translate(-50%, -50%)',
           width: 400,
           bgcolor: 'background.paper',
           boxShadow: 24,
@@ -74,7 +76,7 @@ export const NewBuiltInActionScorerModal: FC<
           Configure new built-in action scorer
         </Typography>
 
-        <Box sx={{flexGrow: 1, overflowY: 'auto', my: 2}}>
+        <Box sx={{flexGrow: 1, overflow: 'auto', my: 2}}>
           <TextField
             fullWidth
             label="Name"
@@ -87,7 +89,7 @@ export const NewBuiltInActionScorerModal: FC<
             <Select
               value={selectedActionIndex}
               onChange={e =>
-                setSelectedActionIndex(parseInt(e.target.value, 10))
+                setSelectedActionIndex(parseInt(e.target.value as string, 10))
               }>
               {knownBuiltinActions.map(({action}, ndx) => (
                 <MenuItem key={action.name} value={ndx}>
@@ -106,7 +108,7 @@ export const NewBuiltInActionScorerModal: FC<
         </Box>
 
         <Box sx={{display: 'flex', justifyContent: 'flex-end', mt: 2}}>
-          <Button onClick={onClose} sx={{mr: 1}}>
+          <Button onClick={onClose} style={{marginRight: 8}}>
             Cancel
           </Button>
           <Button

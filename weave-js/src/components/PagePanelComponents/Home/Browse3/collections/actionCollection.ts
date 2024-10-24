@@ -36,7 +36,11 @@ export type BuiltinAction = z.infer<typeof BuiltinActionSchema>;
 export type ActionWithConfig = z.infer<typeof ActionWithConfigSchema>;
 export type ActionOpMapping = z.infer<typeof ActionOpMappingSchema>;
 
-export type ActionAndSpec = {action: BuiltinAction; configSpec: z.Schema; convertToConfig: (data: any) => Record<string, any>};
+export type ActionAndSpec = {
+  action: BuiltinAction;
+  configSpec: z.Schema;
+  convertToConfig: (data: any) => Record<string, any>;
+};
 
 export const knownBuiltinActions: ActionAndSpec[] = [
   {
@@ -47,21 +51,24 @@ export const knownBuiltinActions: ActionAndSpec[] = [
         model: data.model,
         system_prompt: data.system_prompt,
         response_format: {
-          "type": "json_schema",
-          "json_schema": {
-              "name": "response_format",
-              "schema": {
-                  "type": "object",
-                  "properties": data.response_format_properties.reduce((acc, prop) =>   {
-                    acc[prop.name] = {type: prop.type};
-                    return acc;
-                  }, {}),
-          required: data.response_format_properties
-            .map(prop => prop.name),
-          additionalProperties: false,
+          type: 'json_schema',
+          json_schema: {
+            name: 'response_format',
+            schema: {
+              type: 'object',
+              properties: data.response_format_properties.reduce<
+                Record<string, {type: string}>
+              >((acc, prop) => {
+                acc[prop.name] = {type: prop.type};
+                return acc;
+              }, {}),
+              required: data.response_format_properties.map(prop => prop.name),
+              additionalProperties: false,
+            },
+            strict: true,
+          },
         },
-        strict: true,
-      }
-    }}
-  }}
+      };
+    },
+  },
 ];

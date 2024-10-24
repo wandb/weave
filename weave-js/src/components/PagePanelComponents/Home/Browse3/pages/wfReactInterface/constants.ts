@@ -24,4 +24,5 @@ export const KNOWN_BASE_OBJECT_CLASSES = [
   'Dataset',
   'Evaluation',
   'Scorer',
+  'ConfiguredAction',
 ] as const;

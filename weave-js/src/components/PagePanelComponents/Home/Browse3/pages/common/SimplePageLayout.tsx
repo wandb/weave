@@ -1,4 +1,4 @@
-import {Box, Button, SxProps, Theme} from '@mui/material';
+import {Box, SxProps, Theme} from '@mui/material';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import _ from 'lodash';
 import React, {

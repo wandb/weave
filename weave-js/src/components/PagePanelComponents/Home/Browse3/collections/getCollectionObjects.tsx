@@ -25,11 +25,13 @@ export const useCollectionObjects = <
 
   useEffect(() => {
     let isMounted = true;
-    getCollectionObjects(client, collectionName, deepReq).then(objects => {
-      if (isMounted) {
-        setObjects(objects as Array<TraceObjSchema<T>>);
+    getCollectionObjects(client, collectionName, deepReq).then(
+      collectionObjects => {
+        if (isMounted) {
+          setObjects(collectionObjects as Array<TraceObjSchema<T>>);
+        }
       }
-    });
+    );
     return () => {
       isMounted = false;
     };

@@ -1,12 +1,5 @@
-import {
-  Box,
-  Button,
-  Modal,
-  TextField,
-  Typography,
-} from '@material-ui/core';
+import {Box, Button, Modal, TextField, Typography} from '@material-ui/core';
 import {makeRefCall} from '@wandb/weave/util/refs';
-import _ from 'lodash';
 import React, {useMemo, useState} from 'react';
 import {z} from 'zod';
 
@@ -15,7 +8,6 @@ import {
   ActionOpMapping,
   ActionWithConfig,
 } from '../../collections/actionCollection';
-import {ActionOpMappingSchema} from '../../collections/actionCollection';
 import {useCollectionObjects} from '../../collections/getCollectionObjects';
 import {DynamicConfigForm} from '../../DynamicConfigForm';
 import {WEAVE_REF_SCHEME} from '../wfReactInterface/constants';
@@ -23,10 +15,7 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
-import {
-  CallSchema,
-  ObjectVersionSchema,
-} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 type CallActionRow = {
   actionRef: string;
@@ -42,7 +31,7 @@ export const CallActionsViewer: React.FC<{
 }> = props => {
   const {artifactName, artifactVersion} =
     parseRefMaybe(props.call.traceCall?.op_name ?? '') ?? {};
-  const {useFeedback, useRootObjectVersions, useRefsData} = useWFHooks();
+  const {useFeedback} = useWFHooks();
   const weaveRef = makeRefCall(
     props.call.entity,
     props.call.project,
@@ -53,24 +42,6 @@ export const CallActionsViewer: React.FC<{
     project: props.call.project,
     weaveRef,
   });
-  // const actionOpMappings = useCollectionObjects('ActionOpMapping', {
-  //   project_id: projectIdFromParts({
-  //     entity: props.call.entity,
-  //     project: props.call.project,
-  //   }),
-  //   filter: {latest_only: true},
-  // });
-
-  // const verifiedActions = useMemo(() => {
-  //   return actionOpMappings.filter(mapping => {
-  //     return (
-  //       mapping.val.op_name === artifactName &&
-  //       (mapping.val.op_digest === artifactVersion ||
-  //         mapping.val.op_digest === '*')
-  //     );
-  //   });
-  // }, [actionOpMappings, artifactName, artifactVersion]);
-
   const actionWithConfigs = useCollectionObjects('ActionWithConfig', {
     project_id: projectIdFromParts({
       entity: props.call.entity,
@@ -78,8 +49,6 @@ export const CallActionsViewer: React.FC<{
     }),
     filter: {latest_only: true},
   });
-
-  // console.log({actionOpMappings, actionWithConfigs, verifiedActions});
 
   const allCallActions: CallActionRow[] = useMemo(() => {
     return (
@@ -93,62 +62,25 @@ export const CallActionsViewer: React.FC<{
           versionHash: actionWithConfig.digest,
           path: '',
         });
-        // const mapping = verifiedActions?.find(mapping => {
-        //   if (typeof mapping.val.action === 'string') {
-        //     return mapping.val.action === actionWithConfigRefUri;
-        //   } else {
-        //     return _.isEqual(mapping.val.action, actionWithConfig);
-        //   }
-        // });
-        // const mappingRef = mapping
-        //   ? objectVersionKeyToRefUri({
-        //       scheme: WEAVE_REF_SCHEME,
-        //       weaveKind: 'object',
-        //       entity: props.call.entity,
-        //       project: props.call.project,
-        //       objectId: mapping.object_id,
-        //       versionHash: mapping.digest,
-        //       path: '',
-        //     })
-        //   : undefined;
         return {
           actionRef: actionWithConfigRefUri,
           actionDef: actionWithConfig.val,
-          // mapping: mapping?.val,
-          // mappingRef,
           runCount: 0,
           lastResult: {},
         };
       }) ?? []
     );
   }, [actionWithConfigs, props.call.entity, props.call.project]);
-  //   console.log(allActions.result)
-
-  type BuiltinAction = {
-    action_type: 'builtin';
-    name: string;
-    digest: string;
-  };
-
-  type ActionWithConfig = {
-    _type: 'ActionWithConfig';
-    name: string;
-    action: BuiltinAction;
-    config: Record<string, unknown>;
-  };
 
   const verifiedActionFeedbacks: ActionFeedback[] = useMemo(() => {
     return (feedbackQuery.result ?? [])
       .map(feedback => {
         const res = ActionFeedbackZ.safeParse(feedback.payload);
-        console.log(res);
         return res;
       })
       .filter(result => result.success)
-      .map(result => result.data);
+      .map(result => result.data) as ActionFeedback[];
   }, [feedbackQuery.result]);
-
-  // console.log({verifiedActions, verifiedActionFeedbacks});
 
   const getFeedbackForAction = (actionRef: string) => {
     return verifiedActionFeedbacks.filter(
@@ -159,22 +91,12 @@ export const CallActionsViewer: React.FC<{
   const getClient = useGetTraceServerClientContext();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedAction, setSelectedAction] = useState<CallActionRow | null>(null);
   const [newMapping, setNewMapping] = useState<Partial<ActionOpMapping>>({
     name: '',
     op_name: artifactName || '',
     op_digest: artifactVersion || '*',
     input_mapping: {},
   });
-
-  const handleCreateMapping = (action: CallActionRow) => {
-    setSelectedAction(action);
-    setNewMapping(prev => ({
-      ...prev,
-      action: action.actionRef,
-    }));
-    setIsModalOpen(true);
-  };
 
   const handleSaveMapping = () => {
     // TODO: Implement the logic to save the new mapping
@@ -191,7 +113,6 @@ export const CallActionsViewer: React.FC<{
             <th>Run Count</th>
             <th>Last Result</th>
             <th>Run</th>
-            {/* <th>Mapping</th> */}
           </tr>
         </thead>
         <tbody>
@@ -208,28 +129,26 @@ export const CallActionsViewer: React.FC<{
                     : 'N/A'}
                 </td>
 
-
-                    <td>
-                      <button
-                        onClick={() => {
-                          // # TODO IF MAPPING REF IS UNDEFINED, THEN WE NEED TO FIND THE CORRECT MAPPING REF
-                          getClient()
-                            .executeBatchAction({
-                              project_id: projectIdFromParts({
-                                entity: props.call.entity,
-                                project: props.call.project,
-                              }),
-                              call_ids: [props.call.callId],
-                              action_ref: action.actionRef,
-                            })
-                            .then(res => {
-                              feedbackQuery.refetch();
-                            });
-                        }}>
-                        Run
-                      </button>
-                    </td>
-                 
+                <td>
+                  <button
+                    onClick={() => {
+                      // # TODO IF MAPPING REF IS UNDEFINED, THEN WE NEED TO FIND THE CORRECT MAPPING REF
+                      getClient()
+                        .executeBatchAction({
+                          project_id: projectIdFromParts({
+                            entity: props.call.entity,
+                            project: props.call.project,
+                          }),
+                          call_ids: [props.call.callId],
+                          configured_action_ref: action.actionRef,
+                        })
+                        .then(res => {
+                          feedbackQuery.refetch();
+                        });
+                    }}>
+                    Run
+                  </button>
+                </td>
               </tr>
             );
           })}
@@ -239,14 +158,13 @@ export const CallActionsViewer: React.FC<{
       <Modal
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        aria-labelledby="create-action-mapping-modal"
-      >
+        aria-labelledby="create-action-mapping-modal">
         <Box
           sx={{
             position: 'absolute',
             top: '50%',
             left: '50%',
-            transform: 'translate(-50%, -50%)',
+            // transform: 'translate(-50%, -50%)',
             width: 400,
             bgcolor: 'background.paper',
             boxShadow: 24,
@@ -255,46 +173,44 @@ export const CallActionsViewer: React.FC<{
             display: 'flex',
             flexDirection: 'column',
             maxHeight: '80vh',
-            overflowY: 'auto',
-          }}
-        >
-          <Typography id="create-action-mapping-modal" variant="h6" component="h2" gutterBottom>
+            overflow: 'auto',
+          }}>
+          <Typography
+            id="create-action-mapping-modal"
+            variant="h6"
+            component="h2"
+            gutterBottom>
             Create Action Mapping
           </Typography>
           <TextField
             fullWidth
             label="Name"
             value={newMapping.name}
-            onChange={(e) => setNewMapping(prev => ({...prev, name: e.target.value}))}
+            onChange={e =>
+              setNewMapping(prev => ({...prev, name: e.target.value}))
+            }
             margin="normal"
           />
-          {/* <TextField
-            fullWidth
-            label="Op Name"
-            value={newMapping.op_name}
-            onChange={(e) => setNewMapping(prev => ({...prev, op_name: e.target.value}))}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Op Digest"
-            value={newMapping.op_digest}
-            onChange={(e) => setNewMapping(prev => ({...prev, op_digest: e.target.value}))}
-            margin="normal"
-          /> */}
           <Typography variant="subtitle1" gutterBottom>
             Input Mapping
           </Typography>
           <DynamicConfigForm
             configSchema={z.record(z.string())}
             config={newMapping.input_mapping || {}}
-            setConfig={(newInputMapping) => setNewMapping(prev => ({...prev, input_mapping: newInputMapping}))}
+            setConfig={newInputMapping =>
+              setNewMapping(prev => ({...prev, input_mapping: newInputMapping}))
+            }
           />
           <Box sx={{display: 'flex', justifyContent: 'flex-end', mt: 2}}>
-            <Button onClick={() => setIsModalOpen(false)} sx={{mr: 1}}>
+            <Button
+              onClick={() => setIsModalOpen(false)}
+              style={{marginRight: 8}}>
               Cancel
             </Button>
-            <Button onClick={handleSaveMapping} variant="contained" color="primary">
+            <Button
+              onClick={handleSaveMapping}
+              variant="contained"
+              color="primary">
               Save
             </Button>
           </Box>

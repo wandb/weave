@@ -1,15 +1,11 @@
 import {Box} from '@material-ui/core';
-import { Alert } from '@mui/material';
+import {Alert} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button/Button';
 import React, {FC, useState} from 'react';
 
-import {
-  ActionWithConfig,
-} from '../../collections/actionCollection';
+import {ActionWithConfig} from '../../collections/actionCollection';
 import {useCreateCollectionObject} from '../../collections/getCollectionObjects';
-import {
-  SimplePageLayoutWithHeader,
-} from '../common/SimplePageLayout';
+import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {NewBuiltInActionScorerModal} from './NewBuiltInActionScorerModal';
@@ -60,7 +56,11 @@ const HumanScorersTab: React.FC<{
   entity: string;
   project: string;
 }> = ({entity, project}) => {
-  return (<Box sx={{p: 3}}><Alert severity="info">Human Review coming soon</Alert></Box>);
+  return (
+    <Box sx={{p: 3}}>
+      <Alert severity="info">Human Review coming soon</Alert>
+    </Box>
+  );
   // return (
   //   <FilterableObjectVersionsTable
   //     entity={entity}
@@ -131,7 +131,7 @@ const OnlineScorersTab: React.FC<{
         entity={entity}
         project={project}
         initialFilter={{
-          baseObjectClass: 'ActionWithConfig',
+          baseObjectClass: 'ConfiguredAction',
         }}
       />
       <NewBuiltInActionScorerModal

@@ -145,30 +145,35 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
     return (
       <Box key={key} mb={2}>
         <Typography variant="subtitle1">{key}</Typography>
-        {Object.entries(recordValue).map(([recordKey, recordValue]) => (
-          <Box key={recordKey} display="flex" alignItems="center">
-            <TextField
-              fullWidth
-              label={`Key: ${recordKey}`}
-              value={recordKey}
-              onChange={e => updateRecordKey(targetPath, recordKey, e.target.value)}
-              margin="normal"
-            />
-            <TextField
-              fullWidth
-              label={`Value: ${recordKey}`}
-              value={recordValue}
-              onChange={e => updateRecordValue(targetPath, recordKey, e.target.value)}
-              margin="normal"
-            />
-            <IconButton onClick={() => removeRecordItem(targetPath, recordKey)}>
-              Delete
-            </IconButton>
-          </Box>
-        ))}
-        <Button onClick={() => addRecordItem(targetPath)}>
-          Add Item
-        </Button>
+        {Object.entries(recordValue).map(
+          ([recordValueKey, recordValueValue]) => (
+            <Box key={recordValueKey} display="flex" alignItems="center">
+              <TextField
+                fullWidth
+                label={`Key: ${recordValueKey}`}
+                value={recordValueKey}
+                onChange={e =>
+                  updateRecordKey(targetPath, recordValueKey, e.target.value)
+                }
+                margin="normal"
+              />
+              <TextField
+                fullWidth
+                label={`Value: ${recordValueKey}`}
+                value={recordValueValue}
+                onChange={e =>
+                  updateRecordValue(targetPath, recordValueKey, e.target.value)
+                }
+                margin="normal"
+              />
+              <IconButton
+                onClick={() => removeRecordItem(targetPath, recordValueKey)}>
+                Delete
+              </IconButton>
+            </Box>
+          )
+        )}
+        <Button onClick={() => addRecordItem(targetPath)}>Add Item</Button>
       </Box>
     );
   };
@@ -219,7 +224,11 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
     updateConfig(targetPath, newRecord);
   };
 
-  const updateRecordKey = (targetPath: string[], oldKey: string, newKey: string) => {
+  const updateRecordKey = (
+    targetPath: string[],
+    oldKey: string,
+    newKey: string
+  ) => {
     const currentRecord = getNestedValue(config, targetPath) || {};
     const {[oldKey]: value, ...rest} = currentRecord;
     updateConfig(targetPath, {...rest, [newKey]: value});
