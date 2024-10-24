@@ -93,14 +93,10 @@ export const CallSummary: React.FC<{
               }
             : {}),
           'Bytes stored': (
-<<<<<<< Updated upstream
-            <BytesStoredInfoIcon bytesStored={totalBytesStored} />
-=======
             <BytesStoredInfoIcon
               bytesStored={totalBytesStored}
               weaveKind="trace"
             />
->>>>>>> Stashed changes
           ),
           ...(Object.keys(attributes).length > 0
             ? {Attributes: attributes}
