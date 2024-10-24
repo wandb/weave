@@ -16,7 +16,7 @@ This demo uses the OpenAI chat completions API with GPT 4o Audio Preview to gene
 
 <img src="https://i.imgur.com/OUfsZ2x.png"></img>
 
-For the advanced use case, we leverage the OpenAI Realtime API to stream audio in real time. Click the following thumbnail to view the video demonstration, or click [here](https://www.youtube.com/watch?v=lnnd73xDElw).
+For the advanced use case, we leverage the OpenAI Realtime API to stream audio in realtime. Click the following thumbnail to view the video demonstration, or click [here](https://www.youtube.com/watch?v=lnnd73xDElw).
 
 [![Everything Is AWESOME](https://img.youtube.com/vi/lnnd73xDElw/0.jpg)](https://www.youtube.com/watch?v=lnnd73xDElw "Everything Is AWESOME")
 
@@ -152,17 +152,17 @@ prompt_endpoint_and_log_trace(
 display(Audio("output.wav", rate=SAMPLE_RATE, autoplay=True))
 ```
 
-# Advanced Usage: Real Time Audio API with Weave #TODO: Record video of weave traces and me chatting with it w/ the terminal output side by side. 
+# Advanced Usage: Realtime Audio API with Weave #TODO: Record video of weave traces and me chatting with it w/ the terminal output side by side. 
 <img src="https://i.imgur.com/ZiW3IVu.png"/>
 <details>
-<summary> (Advanced) Real Time Audio API with Weave </summary>
-OpenAI's real time API is a highly functional and reliable conversational API for building real time audio and text assistants.
+<summary> (Advanced) Realtime Audio API with Weave </summary>
+OpenAI's realtime API is a highly functional and reliable conversational API for building realtime audio and text assistants.
 
 Please note:
 - Review the cells in [Microphone Configuration](#scrollTo=detJ21276p31)
 - Due to limitations of the Google Colab execution environment, **this must be run on your host machine** as a Jupyter Notebook. This cannot be ran in the browser.
     - On MacOS you will need to install `portaudio` via Brew (see [here](https://formulae.brew.sh/formula/portaudio)) for Pyaudio to function.
-- We implement the complete OAI Real Time API schema in Pydantic for greater legibility.
+- OpenAI's Python SDK does not yet provide Realtime API support. We implement the complete OAI Realtime API schema in Pydantic for greater legibility, and may deprecate once official support is released.
 - The `enable_audio_playback` toggle will cause playback of assistant outputted audio. Please note that **headphones are required if this is enabled**, as echo detection requires a highly complex implementation.
 
 
@@ -244,10 +244,12 @@ OAI_SAMPLE_RATE = (
 OUTPUT_DEVICE_CHANNELS = 1  # Set to 1 for mono output
 ```
 
-## OpenAI Real Time API Schema Implementation
+## OpenAI Realtime API Schema Implementation
+
+The OpenAI Python SDK does not yet provide Realtime API support. We implement the complete OAI Realtime API schema in Pydantic for greater legibility, and may deprecate once official support is released.
 
 <details>
-<summary> (API Helper Code) Pydantic Wrappers for OpenAI Realtime API </summary>
+<summary> Pydantic Schema for OpenAI Realtime API (OpenAI's SDK lacks Realtime API support) </summary>
 
 
 ```python
