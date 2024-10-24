@@ -45,7 +45,7 @@ CallsChartsProps) => {
   const columns = useMemo(() => ['summary.weave.costs', 'started_at'], []);
   const columnSet = useMemo(() => new Set(columns), [columns]);
   const sortCalls: GridSortModel = useMemo(
-    () => [{field: 'started_at', sort: 'asc'}],
+    () => [{field: 'started_at', sort: 'desc'}],
     []
   );
   const calls = useCallsForQueryCharts(
@@ -99,7 +99,7 @@ CallsChartsProps) => {
     costAndTimeData,
     calls
   );
-  const [isInsightsOpen, setIsInsightsOpen] = useState(true);
+  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
 
   const toggleInsights = () => {
     setIsInsightsOpen(!isInsightsOpen);
