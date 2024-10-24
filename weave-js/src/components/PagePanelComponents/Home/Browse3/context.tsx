@@ -675,53 +675,6 @@ export const usePeekLocation = () => {
   }, [peekPath]);
 };
 
-// updates only the call ID part of callUIUrl. expect to call this from
-// other CallUIUrl.
-export const useUpdateCallUIURL = () => {
-  const result = useWeaveflowCurrentRouteContext();
-  const peekLocation = usePeekLocation();
-  const history = useHistory();
-  const searchParams = useURLSearchParamsDict();
-  /*
-    peekPath:"/haruka/test-weave/calls/0192baad-e714-7300-9156-da4a564b68fd"
-    sort:"[{\"field\":\"inputs.model\",\"sort\":\"desc\"}]"
-  */
-
-  console.log({peekLocation, history, searchParams});
-
-  return (callID: string, keepExtra: boolean = true) => {
-    const peekPathParts = searchParams[PEEK_PARAM].split('/');
-    if (peekPathParts.length < 4) {
-      console.error('use callUIUrl function');
-    }
-
-    console.log('peekPathParts: ', peekPathParts);
-
-    const [entity, project, traceID] = [
-      peekPathParts[0],
-      peekPathParts[1],
-      peekPathParts[2],
-    ];
-    const newPeekPath = result.callUIUrl(entity, project, traceID, callID);
-
-    const newSearchParams = new URLSearchParams(searchParams);
-    newSearchParams.set(PEEK_PARAM, newPeekPath);
-
-    // If keepExtra is false, remove all other params except 'peekPath'
-    if (!keepExtra) {
-      for (const key of newSearchParams.keys()) {
-        if (key !== 'peekPath') {
-          newSearchParams.delete(key);
-        }
-      }
-    }
-
-    history.replace({
-      search: newSearchParams.toString(),
-    });
-  };
-};
-
 export const WeaveHeaderExtrasContext = createContext<{
   extras: {[key: string]: HeaderExtra};
   addExtra: (key: string, value: HeaderExtra) => void;
