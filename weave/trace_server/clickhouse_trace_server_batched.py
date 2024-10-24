@@ -580,6 +580,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             digest=digest,
         )
 
+        # TODO remove this debug print
+        print(f"obj_create: ch_obj={ch_obj}, req_obj={req_obj}", req, flush=True)
         self._insert(
             "object_versions",
             data=[list(ch_obj.model_dump().values())],
