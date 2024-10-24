@@ -190,6 +190,18 @@ export type FeedbackPurgeError = {
   detail: string;
 };
 export type FeedbackPurgeRes = FeedbackPurgeSuccess | FeedbackPurgeError;
+
+export type FeedbackReplaceReq = {
+  project_id: string;
+  feedback_id: string;
+  payload: Record<string, any>;
+};
+export type FeedbackReplaceSuccess = {};
+export type FeedbackReplaceError = {
+  detail: string;
+};
+export type FeedbackReplaceRes = FeedbackCreateRes;
+
 interface TraceObjectsFilter {
   base_object_classes?: string[];
   object_ids?: string[];
@@ -228,6 +240,19 @@ export type TraceObjReadReq = {
 export type TraceObjReadRes = {
   obj: TraceObjSchema;
 };
+
+export type ObjCreateReq = {
+  obj: {
+    project_id: string;
+    object_id: string;
+    val: any;
+  }
+};
+
+export type ObjCreateRes = {
+  digest: string;
+};
+
 
 export type TraceRefsReadBatchReq = {
   refs: string[];

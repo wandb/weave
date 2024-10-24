@@ -31,6 +31,7 @@ import {Icon} from '@wandb/weave/components/Icon';
 import React, {
   FC,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -67,8 +68,8 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
-import {objectVersionNiceString} from '../wfReactInterface/utilities';
-import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {objectVersionKeyToRefUri, objectVersionNiceString} from '../wfReactInterface/utilities';
+import {CallSchema, ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
   BulkDeleteButton,
@@ -77,7 +78,7 @@ import {
   PaginationButtons,
   RefreshButton,
 } from './CallsTableButtons';
-import {useCallsTableColumns} from './callsTableColumns';
+import {feedbackColName, useCallsTableColumns} from './callsTableColumns';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {getEffectiveFilter} from './callsTableFilter';
 import {useOpVersionOptions} from './callsTableFilter';
@@ -87,6 +88,8 @@ import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
+import { ConfigureStructuredFeedbackModal } from '../../feedback/StructuredFeedback/AddColumnButton';
+import { CallIdContext } from '../../../Browse3';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -332,6 +335,24 @@ export const CallsTable: FC<{
     [callsResult, columnIsRefExpanded, expandedRefCols]
   );
 
+  // Hide structured feedback columns by default
+  const structuredFeedbackOptions = useStructuredFeedbackOptions(entity, project);
+  console.log(structuredFeedbackOptions);
+  useEffect(() => {
+    if (setColumnVisibilityModel == null || structuredFeedbackOptions == null) {
+      return;
+    }
+    for (const feedback of structuredFeedbackOptions.types) {
+      const name = feedbackColName(feedback);
+      if (columnVisibilityModel?.[name] == null) {
+        setColumnVisibilityModel({
+          ...columnVisibilityModel,
+          [name]: false,
+        });
+      }
+    }
+  }, [structuredFeedbackOptions, setColumnVisibilityModel]);
+
   const onAddFilter: OnAddFilter | undefined =
     filterModel && setFilterModel
       ? (field: string, operator: string | null, value: any, rowId: string) => {
@@ -374,7 +395,8 @@ export const CallsTable: FC<{
     columnIsRefExpanded,
     allowedColumnPatterns,
     onAddFilter,
-    calls.costsLoading
+    calls.costsLoading,
+    structuredFeedbackOptions
   );
 
   // This contains columns which are suitable for selection and raw data
@@ -446,6 +468,21 @@ export const CallsTable: FC<{
     [effectiveFilter.parentId, parentIdOptions]
   );
 
+  // useEffect(() => {
+  //   if (pinModel != null &&  setPinModel != null && structuredFeedbackOptions != null && structuredFeedbackOptions.types.length > 0) {
+  //     // do structured feedback stuff
+  //     const feedbackCols = structuredFeedbackOptions.types.map(feedbackCol => feedbackColName(feedbackCol));
+  //     // right pin feedback when we have a parent id
+  //     const currentLeft = pinModel?.left ?? [];
+  //     if (!currentLeft.find(col => feedbackCols.includes(col))) {
+  //       setPinModel({
+  //         ...pinModel,
+  //         left: [...currentLeft, ...feedbackCols],
+  //       });
+  //     }
+  //   }
+  // }, [selectedParentId, structuredFeedbackOptions, pinModel, setPinModel]);
+
   // DataGrid Model Management
   const pinModelResolved = pinModel ?? DEFAULT_PIN_CALLS;
 
@@ -479,6 +516,20 @@ export const CallsTable: FC<{
       }
     }
   }, [rowIds, peekId]);
+  const {setCallIds, nextPageNeeded} = useContext(CallIdContext);
+  useEffect(() => {
+    if (setCallIds) {
+      setCallIds(rowIds);
+    }
+  }, [rowIds, setCallIds]);
+  useEffect(() => {
+    if (nextPageNeeded && setPaginationModel) {
+      setPaginationModel({
+        ...paginationModelResolved,
+        page: paginationModelResolved.page + 1,
+      });
+    }
+  }, [nextPageNeeded]);
 
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {
@@ -654,6 +705,8 @@ export const CallsTable: FC<{
     },
     [callsLoading, setPaginationModel]
   );
+
+  const [structuredFeedbackModalOpen, setStructuredFeedbackModalOpen] = useState(false);
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
@@ -843,7 +896,16 @@ export const CallsTable: FC<{
                   columnInfo={columns}
                   columnVisibilityModel={columnVisibilityModel}
                   setColumnVisibilityModel={setColumnVisibilityModel}
+                  onAddColumn={() => setStructuredFeedbackModalOpen(true)}
                 />
+                {structuredFeedbackModalOpen && (
+                  <ConfigureStructuredFeedbackModal
+                    entity={entity}
+                    project={project}
+                    existingFeedback={structuredFeedbackOptions}
+                    onClose={() => setStructuredFeedbackModalOpen(false)}
+                  />
+                )}
               </div>
             </>
           )}
@@ -1022,3 +1084,55 @@ function prepareFlattenedCallDataForTable(
 ): FlattenedCallData[] {
   return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
 }
+
+const useResolveTypeObjects = (typeRefs: string[]) => {
+  const {useRefsData} = useWFHooks();
+  const refsData = useRefsData(typeRefs);
+  return useMemo(() => {
+    if (refsData.loading || refsData.result == null) {
+      return null;
+    }
+    const refDataWithRefs = refsData.result.map((x, i) => ({
+      ...x,
+      ref: typeRefs[i],
+    }));
+    return refDataWithRefs;
+  }, [refsData.loading, refsData.result]);
+};
+
+export const useStructuredFeedbackOptions = (entity: string, project: string) => {
+  const {useRootObjectVersions} = useWFHooks();
+
+  const [latestSpec, setLatestSpec] = useState<ObjectVersionSchema | null>(null);
+  const structuredFeedbackObjects = useRootObjectVersions(
+    entity,
+    project,
+    {
+      baseObjectClasses: ['StructuredFeedback'],
+      latestOnly: true,
+    },
+    undefined,
+  );
+  const refsData = useResolveTypeObjects(latestSpec?.val.types ?? []);
+
+  useEffect(() => {
+    if (structuredFeedbackObjects.loading || structuredFeedbackObjects.result == null) {
+      return;
+    }
+    const latestSpec = structuredFeedbackObjects.result?.sort((a, b) => a.createdAtMs - b.createdAtMs).pop();
+    if (!latestSpec) {
+      return;
+    }
+    setLatestSpec(latestSpec);
+  }, [structuredFeedbackObjects.loading, structuredFeedbackObjects.result]);
+
+  return useMemo(() => {
+    if (latestSpec == null || refsData == null) {
+      return null;
+    }
+    return {
+      types: refsData,
+      ref: objectVersionKeyToRefUri(latestSpec),
+    };
+  }, [latestSpec, refsData]);
+};

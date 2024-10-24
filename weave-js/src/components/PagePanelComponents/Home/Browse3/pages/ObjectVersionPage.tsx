@@ -48,6 +48,7 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Model: 'model',
   Dataset: 'table',
   Evaluation: 'benchmark-square',
+  StructuredFeedback: 'forum-chat-bubble',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
@@ -126,6 +127,9 @@ const ObjectVersionPageInner: React.FC<{
     }
     if (objectVersion.baseObjectClass === 'Evaluation') {
       return 'Evaluation';
+    }
+    if (objectVersion.baseObjectClass === 'StructuredFeedback') {
+      return 'StructuredFeedback';
     }
     return null;
   }, [objectVersion.baseObjectClass]);

@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import {Loading} from '@wandb/weave/components/Loading';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {FC, useCallback, useEffect, useState} from 'react';
+import React, {FC, useCallback, useContext, useEffect, useRef, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {makeRefCall} from '../../../../../../util/refs';
@@ -28,6 +28,8 @@ import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
+import StructuredFeedbackSidebar from '../../feedback/StructuredFeedback/StructuredFeedbackSidebar';
+import { CallIdContext } from '../../../Browse3';
 export const CallPage: FC<{
   entity: string;
   project: string;
@@ -182,6 +184,24 @@ const CallPageInnerVertical: FC<{
   const assumeCallIsSelectedCall = path == null || path === '';
   const [currentCall, setCurrentCall] = useState(call);
 
+  const [showFeedbackExpand, setShowFeedbackExpand] = useState(false);
+  const onToggleFeedbackExpand = useCallback(() => {
+    // increase drawer width
+    // then show the drawer
+    setShowFeedbackExpand(!showFeedbackExpand);
+    history.replace(
+      currentRouter.callUIUrl(
+        call.entity,
+        call.project,
+        call.traceId,
+        call.callId,
+        path,
+        showTraceTree,
+        !showFeedbackExpand
+      )
+    );
+  }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
+
   useEffect(() => {
     if (assumeCallIsSelectedCall) {
       setCurrentCall(selectedCall);
@@ -195,6 +215,29 @@ const CallPageInnerVertical: FC<{
   }, [callComplete]);
 
   const callTabs = useCallTabs(currentCall);
+  const {getNextCallId, getPreviousCallId, nextPageNeeded} = useContext(CallIdContext);
+  const onNextCall = useCallback(() => {
+    const nextCallId = getNextCallId?.(currentCall.callId);
+    if (nextCallId) {
+      history.replace(currentRouter.callUIUrl(currentCall.entity, currentCall.project, currentCall.traceId, nextCallId, path, showTraceTree, showFeedbackExpand));
+    }
+  }, [currentCall, currentRouter, history, path, showTraceTree, showFeedbackExpand]);
+  const onPreviousCall = useCallback(() => {
+    const previousCallId = getPreviousCallId?.(currentCall.callId);
+    if (previousCallId) {
+      history.replace(currentRouter.callUIUrl(currentCall.entity, currentCall.project, currentCall.traceId, previousCallId, path, showTraceTree, showFeedbackExpand));
+    }
+  }, [currentCall, currentRouter, history, path, showTraceTree, showFeedbackExpand]);
+
+  const nextCallRef = useRef(false);
+  useEffect(() => {
+    // wait until next page is loaded
+    if (nextPageNeeded && !nextCallRef.current) {
+      nextCallRef.current = true;
+      onNextCall();
+      nextCallRef.current = false;
+    }
+  }, [nextPageNeeded, onNextCall]);
 
   if (loading && !assumeCallIsSelectedCall) {
     return <Loading centered />;
@@ -203,17 +246,44 @@ const CallPageInnerVertical: FC<{
   return (
     <SimplePageLayoutWithHeader
       headerExtra={
-        <Box>
-          <Button
-            icon="layout-tabs"
-            tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
-            variant="ghost"
-            active={showTraceTree ?? false}
-            onClick={onToggleTraceTree}
-          />
+        <Box sx={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
+            <Button
+              icon="sort-ascending"
+              tooltip={`Previous call`}
+              variant="ghost"
+              onClick={onPreviousCall}
+              className="mr-2"
+            />
+            <Button
+              icon="sort-descending"
+              tooltip={`Next call`}
+              variant="ghost"
+              onClick={onNextCall}
+            />
+          </Box>
+          <Box>
+            <Button
+              icon="marker"
+              tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback sidebar`}
+              variant="ghost"
+              active={showFeedbackExpand ?? false}
+              onClick={onToggleFeedbackExpand}
+              className="mr-4"
+            />
+            <Button
+              icon="layout-tabs"
+              tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
+              variant="ghost"
+              active={showTraceTree ?? false}
+              onClick={onToggleTraceTree}
+            />
+          </Box>
         </Box>
       }
       isSidebarOpen={showTraceTree}
+      isFeedbackSidebarOpen={showFeedbackExpand}
+      feedbackSidebarContent={<StructuredFeedbackSidebar entity={currentCall.entity} project={currentCall.project} callID={currentCall.callId} nextCall={onNextCall}/>}
       headerContent={<CallOverview call={currentCall} />}
       leftSidebar={
         <Tailwind style={{display: 'contents'}}>

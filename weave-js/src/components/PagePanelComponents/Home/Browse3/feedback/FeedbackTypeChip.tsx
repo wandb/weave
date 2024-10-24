@@ -15,6 +15,9 @@ export const FeedbackTypeChip = ({feedbackType}: FeedbackTypeChipProps) => {
   } else if (feedbackType === 'wandb.note.1') {
     color = 'gold';
     label = 'Note';
+  } else if (feedbackType === 'wandb.structuredFeedback.1') {
+    color = 'moon';
+    label = 'Structured';
   }
   return <Pill color={color} label={label} />;
 };

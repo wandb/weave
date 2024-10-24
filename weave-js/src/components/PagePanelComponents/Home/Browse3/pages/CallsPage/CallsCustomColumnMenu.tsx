@@ -8,6 +8,7 @@ import {
   GridColumnMenuHideItem,
   GridColumnMenuProps,
 } from '@mui/x-data-grid-pro';
+import { Button } from '@wandb/weave/components/Button';
 import React from 'react';
 
 type Slots = Record<string, React.JSXElementConstructor<any> | null>;
@@ -15,8 +16,19 @@ type Slots = Record<string, React.JSXElementConstructor<any> | null>;
 // See: https://mui.com/x/react-data-grid/column-menu/#customize-column-menu-items
 export const CallsCustomColumnMenu = (props: GridColumnMenuProps) => {
   const slots: Slots = {columnMenuColumnsItem: null};
-  if (props.colDef.hideable ?? true) {
+  if (props.colDef.field === 'feedback') {
+    slots.columnMenuUserItem = ConfigureFeedbackMenu;
+  } else if (props.colDef.hideable ?? true) {
     slots.columnMenuUserItem = GridColumnMenuHideItem;
   }
   return <GridColumnMenu {...props} slots={slots} />;
+};
+
+
+const ConfigureFeedbackMenu = () => {
+  return (
+    <div className="items-center w-full justify-center">
+      <Button variant="ghost">Configure feedback</Button>
+    </div>
+  );
 };

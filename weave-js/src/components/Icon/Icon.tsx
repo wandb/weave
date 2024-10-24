@@ -249,6 +249,8 @@ import {ReactComponent as ImportXAxiAlt} from '../../assets/icons/icon-x-axi-alt
 import {ReactComponent as ImportXAxis} from '../../assets/icons/icon-x-axis.svg';
 import {ReactComponent as ImportYoutubeSocial} from '../../assets/icons/icon-youtube-social.svg';
 import {ReactComponent as ImportZoomInTool} from '../../assets/icons/icon-zoom-in-tool.svg';
+import {ReactComponent as ImportMarker} from '../../assets/icons/icon-marker.svg';
+import {ReactComponent as ImportReloadRefresh} from '../../assets/icons/icon-reload-refresh.svg';
 import {IconName} from './types';
 
 type SVGIconProps = SVGProps<SVGElement>;
@@ -628,6 +630,12 @@ export const IconLogOut = (props: SVGIconProps) => (
 );
 export const IconLogoColab = (props: SVGIconProps) => (
   <ImportLogoColab {...updateIconProps(props)} />
+);
+export const IconMarker = (props: SVGIconProps) => (
+  <ImportMarker {...updateIconProps(props)} />
+);
+export const IconReloadRefresh = (props: SVGIconProps) => (
+  <ImportReloadRefresh {...updateIconProps(props)} />
 );
 export const IconMagicWandStar = (props: SVGIconProps) => (
   <ImportMagicWandStar {...updateIconProps(props)} />
@@ -1063,6 +1071,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'cube-container': IconCubeContainer,
   'dashboard-blackboard': IconDashboardBlackboard,
   'database-artifacts': IconDatabaseArtifacts,
+  'reload-refresh': IconReloadRefresh,
   date: IconDate,
   delete: IconDelete,
   diamond: IconDiamond,
@@ -1136,6 +1145,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'logo-colab': IconLogoColab,
   'magic-wand-star': IconMagicWandStar,
   'magic-wand-stick': IconMagicWandStick,
+  marker: IconMarker,
   markdown: IconMarkdown,
   menu: IconMenu,
   'microphone-audio': IconMicrophoneAudio,

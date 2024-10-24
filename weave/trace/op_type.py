@@ -290,7 +290,9 @@ def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
         def {func_name}{sig_str}:
             ... # Code-capture unavailable for this op
         """
-    )[1:]  # skip first newline char
+    )[
+        1:
+    ]  # skip first newline char
 
     return missing_code_template
 
