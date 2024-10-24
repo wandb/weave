@@ -2,7 +2,7 @@ import {z} from 'zod';
 
 const BuiltinActionSchema = z.object({
   action_type: z.literal('builtin'),
-  name: z.enum(['llm_judge']),
+  name: z.enum(['llm_judge']).default('llm_judge'),
   digest: z.string().default('*'),
 });
 
@@ -14,7 +14,7 @@ export const ConfiguredActionSchema = z.object({
 
 export const ActionDispatchFilterSchema = z.object({
   op_name: z.string(),
-  sample_rate: z.number(),
+  sample_rate: z.number().min(0).max(1).default(1),
   configured_action_ref: z.string(),
   disabled: z.boolean().optional(),
 });
@@ -29,15 +29,16 @@ export type ActionAndSpec = {
 };
 
 const BuiltinActionConfigSchema = z.object({
-  model: z.enum(['gpt-4o-mini', 'gpt-4o']),
+  model: z.enum(['gpt-4o-mini', 'gpt-4o']).default('gpt-4o-mini'),
   system_prompt: z.string(),
-  response_format_properties: z.array(
-    z.object({
-      name: z.string(),
-      type: z.enum(['boolean', 'number', 'string']),
-      // is_required: z.boolean(),
-    })
-  ).min(1),
+  response_format_properties: z
+    .array(
+      z.object({
+        name: z.string(),
+        type: z.enum(['boolean', 'number', 'string']),
+      })
+    )
+    .min(1),
 });
 
 export const knownBuiltinActions: ActionAndSpec[] = [

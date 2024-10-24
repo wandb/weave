@@ -1,12 +1,22 @@
 import {Box} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button/Button';
-import React, {useState} from 'react';
+import React, {FC, useState} from 'react';
+import {z} from 'zod';
 
-import {ActionDispatchFilter} from '../../collections/actionCollection';
+import {
+  ActionDispatchFilter,
+  ActionDispatchFilterSchema,
+} from '../../collections/actionCollection';
+import {collectionRegistry} from '../../collections/collectionRegistry';
+import {useCreateCollectionObject} from '../../collections/getCollectionObjects';
+import {DynamicConfigForm} from '../../DynamicConfigForm';
+import {ReusableDrawer} from '../../ReusableDrawer';
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {NewBuiltInActionScorerModal} from '../ScorersPage/NewBuiltInActionScorerModal';
 import {TraceObjSchema} from '../wfReactInterface/traceServerClientTypes';
-import {convertISOToDate} from '../wfReactInterface/tsDataModelHooks';
+import {
+  convertISOToDate,
+  projectIdFromParts,
+} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {OpVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
@@ -33,12 +43,6 @@ export const OpOnlineScorersTab: React.FC<{
     setIsModalOpen(false);
   };
 
-  const handleSaveModal = (newAction: any) => {
-    // Implement save logic here
-    console.log('New action:', newAction);
-    handleCloseModal();
-  };
-
   const columns = [
     {field: 'name', headerName: 'Name', flex: 1},
     {field: 'disabled', headerName: 'Disabled', flex: 1},
@@ -48,7 +52,6 @@ export const OpOnlineScorersTab: React.FC<{
       headerName: 'Configured Action Ref',
       flex: 1,
     },
-    // Add more columns as needed
   ];
 
   const rows = onlineScorers
@@ -111,11 +114,83 @@ export const OpOnlineScorersTab: React.FC<{
           },
         }}
       />
-      <NewBuiltInActionScorerModal
-        open={isModalOpen}
+      <NewOnlineOpScorerModal
+        entity={opVersion.entity}
+        project={opVersion.project}
+        collectionDef={{
+          name: 'ActionDispatchFilter',
+          schema: ActionDispatchFilterSchema,
+        }}
+        isOpen={isModalOpen}
         onClose={handleCloseModal}
-        onSave={handleSaveModal}
       />
     </Box>
+  );
+};
+
+interface NewOnlineOpScorerModalProps {
+  entity: string;
+  project: string;
+  collectionDef: {
+    name: keyof typeof collectionRegistry;
+    schema: z.Schema;
+  };
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const NewOnlineOpScorerModal: FC<NewOnlineOpScorerModalProps> = ({
+  entity,
+  project,
+  collectionDef,
+  isOpen,
+  onClose,
+}) => {
+  const [config, setConfig] = useState<Record<string, any>>({});
+
+  const createCollectionObject = useCreateCollectionObject(collectionDef.name);
+
+  const handleSaveModal = (newAction: Record<string, any>) => {
+    const parsedAction = collectionDef.schema.safeParse(newAction);
+    if (!parsedAction.success) {
+      console.error(
+        `Invalid action: ${JSON.stringify(parsedAction.error.errors)}`
+      );
+      return;
+    }
+    let objectId = newAction.name;
+    // Remove non alphanumeric characters
+    objectId = objectId.replace(/[^a-zA-Z0-9]/g, '-');
+    createCollectionObject({
+      obj: {
+        project_id: projectIdFromParts({entity, project}),
+        object_id: objectId,
+        val: parsedAction.data,
+      },
+    })
+      .catch(err => {
+        console.error(err);
+      })
+      .finally(() => {
+        onClose();
+      });
+  };
+
+  const [isValid, setIsValid] = useState(false);
+
+  return (
+    <ReusableDrawer
+      open={isOpen}
+      title="Configure new built-in action scorer"
+      onClose={onClose}
+      onSave={() => handleSaveModal(config)}
+      saveDisabled={!isValid}>
+      <DynamicConfigForm
+        configSchema={collectionDef.schema}
+        config={config}
+        setConfig={setConfig}
+        onValidChange={setIsValid}
+      />
+    </ReusableDrawer>
   );
 };

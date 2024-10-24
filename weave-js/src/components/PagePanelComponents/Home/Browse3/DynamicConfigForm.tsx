@@ -10,7 +10,7 @@ import {
   Typography,
 } from '@material-ui/core';
 import {Delete} from '@mui/icons-material';
-import React, {useState, useEffect} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {z} from 'zod';
 
 interface DynamicConfigFormProps {
@@ -20,6 +20,30 @@ interface DynamicConfigFormProps {
   path?: string[];
   onValidChange?: (isValid: boolean) => void;
 }
+
+const isZodType = (
+  schema: z.ZodTypeAny,
+  predicate: (s: z.ZodTypeAny) => boolean
+): boolean => {
+  if (predicate(schema)) {
+    return true;
+  }
+  if (schema instanceof z.ZodOptional) {
+    return isZodType(schema.unwrap(), predicate);
+  } else if (schema instanceof z.ZodDefault) {
+    return isZodType(schema._def.innerType, predicate);
+  }
+  return false;
+};
+
+const unwrapSchema = (schema: z.ZodTypeAny): z.ZodTypeAny => {
+  if (schema instanceof z.ZodOptional) {
+    return unwrapSchema(schema.unwrap());
+  } else if (schema instanceof z.ZodDefault) {
+    return unwrapSchema(schema._def.innerType);
+  }
+  return schema;
+};
 
 const NestedForm: React.FC<{
   keyName: string;
@@ -31,13 +55,15 @@ const NestedForm: React.FC<{
   const currentPath = [...path, keyName];
   const currentValue = getNestedValue(config, currentPath);
 
-  if (fieldSchema instanceof z.ZodObject) {
+  const unwrappedSchema = unwrapSchema(fieldSchema);
+
+  if (isZodType(fieldSchema, s => s instanceof z.ZodObject)) {
     return (
       <FormControl fullWidth margin="normal">
         <InputLabel>{keyName}</InputLabel>
         <Box ml={2}>
           <DynamicConfigForm
-            configSchema={fieldSchema}
+            configSchema={unwrappedSchema as z.ZodObject<any>}
             config={config}
             setConfig={setConfig}
             path={currentPath}
@@ -47,11 +73,12 @@ const NestedForm: React.FC<{
     );
   }
 
-  if (fieldSchema instanceof z.ZodArray) {
+  if (isZodType(fieldSchema, s => s instanceof z.ZodArray)) {
     return (
       <ArrayField
         keyName={keyName}
         fieldSchema={fieldSchema}
+        unwrappedSchema={unwrappedSchema as z.ZodArray<any>}
         targetPath={currentPath}
         value={currentValue}
         config={config}
@@ -60,11 +87,12 @@ const NestedForm: React.FC<{
     );
   }
 
-  if (fieldSchema instanceof z.ZodEnum) {
+  if (isZodType(fieldSchema, s => s instanceof z.ZodEnum)) {
     return (
       <EnumField
         keyName={keyName}
         fieldSchema={fieldSchema}
+        unwrappedSchema={unwrappedSchema as z.ZodEnum<any>}
         targetPath={currentPath}
         value={currentValue}
         config={config}
@@ -73,11 +101,26 @@ const NestedForm: React.FC<{
     );
   }
 
-  if (fieldSchema instanceof z.ZodRecord) {
+  if (isZodType(fieldSchema, s => s instanceof z.ZodRecord)) {
     return (
       <RecordField
         keyName={keyName}
         fieldSchema={fieldSchema}
+        unwrappedSchema={unwrappedSchema as z.ZodRecord<any, any>}
+        targetPath={currentPath}
+        value={currentValue}
+        config={config}
+        setConfig={setConfig}
+      />
+    );
+  }
+
+  if (isZodType(fieldSchema, s => s instanceof z.ZodNumber)) {
+    return (
+      <NumberField
+        keyName={keyName}
+        fieldSchema={fieldSchema}
+        unwrappedSchema={unwrappedSchema as z.ZodNumber}
         targetPath={currentPath}
         value={currentValue}
         config={config}
@@ -87,9 +130,9 @@ const NestedForm: React.FC<{
   }
 
   let fieldType = 'text';
-  if (fieldSchema instanceof z.ZodNumber) {
+  if (isZodType(fieldSchema, s => s instanceof z.ZodNumber)) {
     fieldType = 'number';
-  } else if (fieldSchema instanceof z.ZodBoolean) {
+  } else if (isZodType(fieldSchema, s => s instanceof z.ZodBoolean)) {
     fieldType = 'checkbox';
   }
 
@@ -98,7 +141,7 @@ const NestedForm: React.FC<{
       fullWidth
       label={keyName}
       type={fieldType}
-      value={currentValue || ''}
+      value={currentValue ?? ''}
       onChange={e =>
         updateConfig(currentPath, e.target.value, config, setConfig)
       }
@@ -109,26 +152,37 @@ const NestedForm: React.FC<{
 
 const ArrayField: React.FC<{
   keyName: string;
-  fieldSchema: z.ZodArray<any>;
+  fieldSchema: z.ZodTypeAny;
+  unwrappedSchema: z.ZodArray<any>;
   targetPath: string[];
   value: any[];
   config: Record<string, any>;
   setConfig: (config: Record<string, any>) => void;
-}> = ({keyName, fieldSchema, targetPath, value, config, setConfig}) => {
-  const arrayValue = Array.isArray(value) ? value : [];
-  const elementSchema = fieldSchema.element;
-  const minItems = fieldSchema._def.minLength?.value ?? 0;
+}> = ({
+  keyName,
+  fieldSchema,
+  unwrappedSchema,
+  targetPath,
+  value,
+  config,
+  setConfig,
+}) => {
+  const arrayValue = useMemo(
+    () => (Array.isArray(value) ? value : []),
+    [value]
+  );
+  const minItems = unwrappedSchema._def.minLength?.value ?? 0;
 
   // Ensure the minimum number of items is always present
   React.useEffect(() => {
     if (arrayValue.length < minItems) {
       const itemsToAdd = minItems - arrayValue.length;
-      const newItems = Array(itemsToAdd).fill(null).map(() => 
-        elementSchema instanceof z.ZodObject ? {} : null
-      );
+      const newItems = Array(itemsToAdd)
+        .fill(null)
+        .map(() => (fieldSchema instanceof z.ZodObject ? {} : null));
       updateConfig(targetPath, [...arrayValue, ...newItems], config, setConfig);
     }
-  }, [arrayValue, minItems, elementSchema, targetPath, config, setConfig]);
+  }, [arrayValue, minItems, fieldSchema, targetPath, config, setConfig]);
 
   return (
     <FormControl fullWidth margin="normal">
@@ -146,7 +200,7 @@ const ArrayField: React.FC<{
           }}>
           <Box flexGrow={1} width="100%">
             <DynamicConfigForm
-              configSchema={elementSchema}
+              configSchema={fieldSchema}
               config={config}
               setConfig={setConfig}
               path={[...targetPath, index.toString()]}
@@ -165,7 +219,7 @@ const ArrayField: React.FC<{
       ))}
       <Button
         onClick={() =>
-          addArrayItem(targetPath, elementSchema, config, setConfig)
+          addArrayItem(targetPath, fieldSchema, config, setConfig)
         }>
         Add Item
       </Button>
@@ -175,13 +229,22 @@ const ArrayField: React.FC<{
 
 const EnumField: React.FC<{
   keyName: string;
-  fieldSchema: z.ZodEnum<any>;
+  fieldSchema: z.ZodTypeAny;
+  unwrappedSchema: z.ZodEnum<any>;
   targetPath: string[];
   value: any;
   config: Record<string, any>;
   setConfig: (config: Record<string, any>) => void;
-}> = ({keyName, fieldSchema, targetPath, value, config, setConfig}) => {
-  const options = fieldSchema.options;
+}> = ({
+  keyName,
+  fieldSchema,
+  unwrappedSchema,
+  targetPath,
+  value,
+  config,
+  setConfig,
+}) => {
+  const options = unwrappedSchema.options;
 
   const selectedValue = value ?? options[0];
   useEffect(() => {
@@ -211,12 +274,21 @@ const EnumField: React.FC<{
 
 const RecordField: React.FC<{
   keyName: string;
-  fieldSchema: z.ZodRecord<any, any>;
+  fieldSchema: z.ZodTypeAny;
+  unwrappedSchema: z.ZodRecord<any, any>;
   targetPath: string[];
   value: Record<string, any>;
   config: Record<string, any>;
   setConfig: (config: Record<string, any>) => void;
-}> = ({keyName, fieldSchema, targetPath, value, config, setConfig}) => {
+}> = ({
+  keyName,
+  fieldSchema,
+  unwrappedSchema,
+  targetPath,
+  value,
+  config,
+  setConfig,
+}) => {
   const recordValue = value || {};
 
   return (
@@ -378,6 +450,60 @@ const validateConfig = (schema: z.ZodType<any>, config: any): boolean => {
   }
 };
 
+const NumberField: React.FC<{
+  keyName: string;
+  fieldSchema: z.ZodTypeAny;
+  unwrappedSchema: z.ZodNumber;
+  targetPath: string[];
+  value: number | undefined;
+  config: Record<string, any>;
+  setConfig: (config: Record<string, any>) => void;
+}> = ({
+  keyName,
+  fieldSchema,
+  unwrappedSchema,
+  targetPath,
+  value,
+  config,
+  setConfig,
+}) => {
+  const min =
+    (unwrappedSchema._def.checks.find(check => check.kind === 'min') as any)
+      ?.value ?? undefined;
+  const max =
+    (unwrappedSchema._def.checks.find(check => check.kind === 'max') as any)
+      ?.value ?? undefined;
+  // const defaultValue =
+  //   fieldSchema instanceof z.ZodDefault
+  //     ? fieldSchema._def.defaultValue()
+  //     : undefined;
+
+  // useEffect(() => {
+  //   if (value === undefined && defaultValue !== undefined) {
+  //     updateConfig(targetPath, defaultValue, config, setConfig);
+  //   }
+  // }, [value, defaultValue, targetPath, config, setConfig]);
+
+  return (
+    <TextField
+      fullWidth
+      label={keyName}
+      type="number"
+      value={value ?? ''}
+      onChange={e => {
+        const newValue =
+          e.target.value === '' ? undefined : Number(e.target.value);
+        if (newValue !== undefined && (newValue < min || newValue > max)) {
+          return;
+        }
+        updateConfig(targetPath, newValue, config, setConfig);
+      }}
+      inputProps={{min, max}}
+      margin="normal"
+    />
+  );
+};
+
 export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
   configSchema,
   config,
@@ -398,6 +524,7 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
         <RecordField
           keyName=""
           fieldSchema={configSchema}
+          unwrappedSchema={configSchema}
           targetPath={[]}
           value={config}
           config={config}
