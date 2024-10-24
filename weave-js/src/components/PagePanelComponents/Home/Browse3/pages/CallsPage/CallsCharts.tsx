@@ -2,16 +2,22 @@ import React, {useMemo, useState} from 'react';
 import {useCallsForQueryCharts} from './callsTableQuery';
 
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
+import {Drawer} from '@mui/material';
 
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {DEFAULT_FILTER_CALLS} from './CallsTable';
 import {
   ErrorPlotlyChart,
   LatencyPlotlyChart,
-  LatencyVisXChart,
   RequestsPlotlyChart,
 } from './Charts';
 import {Tailwind} from '../../../../../Tailwind';
+import {Button} from '../../../../../Button';
+import {
+  IconChevronDown,
+  IconChevronNext,
+  IconLightbulbInfo,
+} from '../../../../../Icon';
 
 type CallsChartsProps = {
   startTime?: number;
@@ -93,28 +99,44 @@ CallsChartsProps) => {
     costAndTimeData,
     calls
   );
+  const [isInsightsOpen, setIsInsightsOpen] = useState(true);
 
-  // const costSums = costconsData !== undefined ? sumCostDataForCostTable(costData) : [];
-  // console.log(costData2, callsResult);
+  const toggleInsights = () => {
+    setIsInsightsOpen(!isInsightsOpen);
+  };
+
   return (
-    <Tailwind>
-      <div className="mb-10 flex w-full flex-row">
-        <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
-          <LatencyPlotlyChart chartData={costAndTimeData} height={200} />
+    <Tailwind style={{marginRight: '20px'}}>
+      {/* Button to toggle insights */}
+      <div className="mb-10 ml-10 mr-[20px] w-full rounded-lg border border-moon-250 bg-moon-50">
+        <div
+          className="flex cursor-pointer items-center gap-2 p-10"
+          w-full
+          onClick={toggleInsights}>
+          {isInsightsOpen ? <IconChevronDown /> : <IconChevronNext />}
+
+          <IconLightbulbInfo width={18} height={18} className="text-teal-500" />
+          <div className="font-source-sans-pro text-[18px] font-semibold text-moon-500">
+            {'Insights'}
+          </div>
         </div>
-        {/* <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
-          <LatencyVisXChart
-            width={500}
-            height={500}
-            chartData={costAndTimeData}
-          />
-        </div> */}
-        <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
-          <ErrorPlotlyChart chartData={costAndTimeData} height={200} />
-        </div>
-        <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
-          <RequestsPlotlyChart chartData={costAndTimeData} height={200} />
-        </div>
+
+        {/* Collapsible insights section */}
+        {isInsightsOpen && (
+          <div className="m-10 mt-4 flex w-full">
+            <div className="mb-10 flex w-full flex-row gap-[10px]">
+              <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-[10px]">
+                <LatencyPlotlyChart chartData={costAndTimeData} height={300} />
+              </div>
+              <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-[10px]">
+                <ErrorPlotlyChart chartData={costAndTimeData} height={300} />
+              </div>
+              <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-[10px]">
+                <RequestsPlotlyChart chartData={costAndTimeData} height={300} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Tailwind>
   );

@@ -99,15 +99,21 @@ export const LatencyPlotlyChart: React.FC<{
     // Configure the layout for the Plotly chart with crosshairs (spikelines)
     const plotlyLayout: Partial<Plotly.Layout> = {
       height: height - 40,
+      // width: window.innerWidth / 3,
       title: {
         text: 'Latency',
-        y: 0.98, // Move title up slightly
-        font: {
-          size: 16, // Adjust title font size if needed
-        },
+        // y: 0.9, // Adjust the y position to align with other charts
+        // font: {
+        //   size: 16,
+        // },
       },
-      margin: {l: 50, r: 30, b: 50, t: 50, pad: 0},
-
+      margin: {
+        l: 50,
+        r: 30,
+        b: 50,
+        t: 50,
+        pad: 0,
+      },
       xaxis: {
         title: 'Time',
         type: 'date',
@@ -143,6 +149,7 @@ export const LatencyPlotlyChart: React.FC<{
     const plotlyConfig: Partial<Plotly.Config> = {
       displayModeBar: false, // Hide the mode bar
       // showlegend: false, // Hide the legend
+      responsive: true, // Make the chart responsive
     };
 
     Plotly.newPlot(
@@ -153,293 +160,7 @@ export const LatencyPlotlyChart: React.FC<{
     );
   }, [plotlyData, height]);
 
-  return <div ref={divRef}></div>;
-};
-
-const margin = {top: 20, right: 30, bottom: 50, left: 40};
-
-type LatencyVisXChartProps = {
-  width: number;
-  height: number;
-  chartData: ChartData[];
-  binSizeMinutes?: number;
-};
-
-type ChartDataWithLatencies = {
-  timestamp: Date;
-  p50: number;
-  p95: number;
-  p99: number;
-};
-
-export const LatencyVisXChart: React.FC<LatencyVisXChartProps> = ({
-  width,
-  height,
-  chartData,
-  binSizeMinutes = 60,
-}) => {
-  const xMax = width - margin.left - margin.right;
-  const yMax = height - margin.top - margin.bottom;
-  const [currentLatencyType, setCurrentLatencyType] =
-    React.useState<string>('p50'); // Add state for latencyType
-
-  // Group data by time bins
-  const groupedData = useMemo(() => {
-    return _(chartData)
-      .groupBy(d =>
-        moment(d.started_at)
-          .startOf('minute')
-          .minute(
-            Math.floor(moment(d.started_at).minute() / binSizeMinutes) *
-              binSizeMinutes
-          )
-          .format()
-      )
-      .map((group, date) => {
-        const latencies = _.sortBy(group.map(d => d.latency));
-        const p50 = quantile(latencies, 0.5) ?? 0;
-        const p95 = quantile(latencies, 0.95) ?? 0;
-        const p99 = quantile(latencies, 0.99) ?? 0;
-        return {timestamp: new Date(date), p50, p95, p99};
-      })
-      .value();
-  }, [chartData, binSizeMinutes]);
-
-  const xScale = scaleTime({
-    range: [0, xMax],
-    domain: extent(groupedData, d => d.timestamp) as [Date, Date],
-  });
-
-  const yScale = scaleLinear({
-    range: [yMax, 0],
-    domain: [0, max(groupedData, d => Math.max(d.p50, d.p95, d.p99)) || 0],
-  });
-
-  const {
-    tooltipData,
-    tooltipLeft,
-    tooltipTop,
-    tooltipOpen,
-    showTooltip,
-    hideTooltip,
-  } = useTooltip<ChartDataWithLatencies>();
-  const {containerRef, TooltipInPortal} = useTooltipInPortal({
-    detectBounds: true,
-    scroll: true,
-  });
-  const [crosshair, setCrosshair] = React.useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-  console.log('xscale', xScale.domain);
-
-  const handleMouseMove = React.useCallback(
-    (event: React.MouseEvent<SVGElement, MouseEvent>) => {
-      console.log('mouse move');
-      requestAnimationFrame(() => {
-        const coords = localPoint(event);
-        if (!coords) return;
-
-        const x0 = xScale.invert(coords.x - margin.left);
-        const index = bisect(
-          groupedData.map(d => d.timestamp),
-          x0
-        );
-
-        const d0 = groupedData[index - 1];
-        const d1 = groupedData[index];
-        const data =
-          d1 &&
-          x0.getTime() - d0.timestamp.getTime() >
-            d1.timestamp.getTime() - x0.getTime()
-            ? d1
-            : d0;
-
-        if (data) {
-          const xPosition = xScale(data.timestamp);
-          if (xPosition !== undefined) {
-            const yValues = [data.p50, data.p95, data.p99];
-            const closestYValue = yValues.reduce((prev, curr) =>
-              Math.abs(yScale(curr) - coords.y) <
-              Math.abs(yScale(prev) - coords.y)
-                ? curr
-                : prev
-            );
-
-            showTooltip({
-              tooltipData: data,
-              tooltipLeft: xPosition,
-              tooltipTop: yScale(closestYValue),
-            });
-            setCrosshair({x: xPosition, y: yScale(closestYValue)});
-          }
-        }
-      });
-    },
-    [groupedData, xScale, yScale, margin.left, showTooltip]
-  );
-  return (
-    <div>
-      <svg
-        ref={containerRef}
-        width={width}
-        height={height}
-        onMouseLeave={hideTooltip}>
-        <Group left={margin.left} top={margin.top}>
-          <rect
-            width={xMax}
-            height={yMax}
-            fill="transparent"
-            onMouseMove={handleMouseMove}
-            onMouseLeave={() => {
-              hideTooltip();
-              setCrosshair(null);
-            }}
-          />
-          <LinePath
-            data={groupedData}
-            x={d => xScale(d.timestamp) ?? 0}
-            y={d => yScale(d.p50) ?? 0}
-            stroke={BLUE_500} // Match p50 color
-            strokeWidth={2}
-            curve={curveLinear}
-            onMouseMove={event => handleMouseMove(event)}
-            onMouseLeave={() => hideTooltip()}
-          />
-          {groupedData.map((d, i) => (
-            <circle
-              key={`p50-dot-${i}`}
-              cx={xScale(d.timestamp) ?? 0}
-              cy={yScale(d.p50) ?? 0}
-              r={3}
-              fill={BLUE_500} // Match p50 color
-            />
-          ))}
-
-          <LinePath
-            data={groupedData}
-            x={d => xScale(d.timestamp) ?? 0}
-            y={d => yScale(d.p95) ?? 0}
-            stroke={GREEN_500} // Match p95 color
-            strokeWidth={2}
-            curve={curveLinear}
-            onMouseMove={event => handleMouseMove(event)}
-          />
-          {groupedData.map((d, i) => (
-            <circle
-              key={`p95-dot-${i}`}
-              cx={xScale(d.timestamp) ?? 0}
-              cy={yScale(d.p95) ?? 0}
-              r={3}
-              fill={GREEN_500} // Match p95 color
-            />
-          ))}
-
-          <LinePath
-            data={groupedData}
-            x={d => xScale(d.timestamp) ?? 0}
-            y={d => yScale(d.p99) ?? 0}
-            stroke={MOON_500} // Match p99 color
-            strokeWidth={2}
-            curve={curveLinear}
-            onMouseMove={event => handleMouseMove(event)}
-          />
-          {groupedData.map((d, i) => (
-            <circle
-              key={`p99-dot-${i}`}
-              cx={xScale(d.timestamp) ?? 0}
-              cy={yScale(d.p99) ?? 0}
-              r={3}
-              fill={MOON_500} // Match p99 color
-            />
-          ))}
-
-          {crosshair && (
-            <>
-              <line
-                x1={crosshair.x}
-                x2={crosshair.x}
-                y1={0} // Start from the top of the chart
-                y2={yMax} // Extend to the bottom of the chart
-                stroke="gray"
-                strokeDasharray="4"
-              />
-            </>
-          )}
-
-          {/* Repeat for p95 and p99 lines */}
-          <AxisBottom
-            top={yMax}
-            scale={xScale}
-            numTicks={width > 520 ? 10 : 5}
-            tickFormat={value => {
-              const date =
-                value instanceof Date ? value : new Date(value.valueOf());
-              return timeFormat('%b %d')(date);
-            }}
-          />
-          <AxisLeft scale={yScale} />
-        </Group>
-      </svg>
-
-      {tooltipOpen && (
-        <TooltipInPortal
-          key={Math.random()}
-          top={tooltipTop}
-          left={tooltipLeft}
-          style={{
-            ...defaultStyles,
-            display: 'flex',
-            flexDirection: 'column',
-            rowGap: '8px', // Adjust gap between rows
-            backgroundColor: 'white',
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '8px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-            pointerEvents: 'none',
-            zIndex: 1000,
-            transition: 'opacity 0.1s ease-out',
-            opacity: tooltipOpen ? 1 : 0,
-          }}>
-          <div style={{display: 'flex', alignItems: 'center'}}>
-            {/* <strong>Date:</strong>{' '} */}
-            {timeFormat('%b %d')(new Date(tooltipData?.timestamp ?? 0))}
-          </div>
-          <div style={{display: 'flex', alignItems: 'center'}}>
-            <span
-              style={{
-                width: '10px',
-                height: '2px',
-                backgroundColor: BLUE_500,
-                marginRight: '8px',
-              }}></span>
-            <strong>p50 Latency:</strong> {tooltipData?.p50} ms
-          </div>
-          <div style={{display: 'flex', alignItems: 'center'}}>
-            <span
-              style={{
-                width: '10px',
-                height: '2px',
-                backgroundColor: GREEN_500,
-                marginRight: '8px',
-              }}></span>
-            <strong>p95 Latency:</strong> {tooltipData?.p95} ms
-          </div>
-          <div style={{display: 'flex', alignItems: 'center'}}>
-            <span
-              style={{
-                width: '10px',
-                height: '2px',
-                backgroundColor: MOON_500,
-                marginRight: '8px',
-              }}></span>
-            <strong>p99 Latency:</strong> {tooltipData?.p99} ms
-          </div>
-        </TooltipInPortal>
-      )}
-    </div>
-  );
+  return <div ref={divRef} style={{width: '100%'}}></div>;
 };
 
 export const ErrorPlotlyChart: React.FC<{
@@ -499,6 +220,8 @@ export const ErrorPlotlyChart: React.FC<{
     // Configure the layout for the Plotly chart
     const plotlyLayout: Partial<Plotly.Layout> = {
       height: height - 40,
+      // width: window.innerWidth / 3,
+
       title: 'Errors',
       margin: {
         l: 50,
@@ -538,6 +261,7 @@ export const ErrorPlotlyChart: React.FC<{
 
     const plotlyConfig: Partial<Plotly.Config> = {
       displayModeBar: false, // Hide the mode bar
+      responsive: true, // Make the chart responsive
     };
 
     Plotly.newPlot(
@@ -548,7 +272,7 @@ export const ErrorPlotlyChart: React.FC<{
     );
   }, [plotlyData, height]);
 
-  return <div ref={divRef}></div>;
+  return <div ref={divRef} style={{width: '100%'}}></div>;
 };
 
 export const RequestsPlotlyChart: React.FC<{
@@ -573,6 +297,8 @@ export const RequestsPlotlyChart: React.FC<{
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
       height: height - 40,
+      // width: window.innerWidth / 3,
+
       title: 'Requests',
       margin: {l: 50, r: 30, b: 50, t: 50, pad: 0},
       xaxis: {
@@ -606,6 +332,7 @@ export const RequestsPlotlyChart: React.FC<{
 
     const plotlyConfig: Partial<Plotly.Config> = {
       displayModeBar: false,
+      responsive: true, // Make the chart responsive
     };
 
     Plotly.newPlot(
@@ -616,5 +343,5 @@ export const RequestsPlotlyChart: React.FC<{
     );
   }, [plotlyData, height]);
 
-  return <div ref={divRef}></div>;
+  return <div ref={divRef} style={{width: '100%'}}></div>;
 };
