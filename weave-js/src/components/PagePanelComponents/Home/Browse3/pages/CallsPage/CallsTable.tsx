@@ -40,7 +40,7 @@ import {useHistory} from 'react-router-dom';
 
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
-import {Tailwind} from '../../../../../Tailwind';
+import {TailwindContents} from '../../../../../Tailwind';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {
   baseContext,
@@ -704,7 +704,7 @@ export const CallsTable: FC<{
         alignItems: 'center',
       }}
       filterListItems={
-        <Tailwind style={{display: 'contents'}}>
+        <TailwindContents>
           <RefreshButton onClick={() => calls.refetch()} />
           {!hideOpSelector && (
             <div className="flex-none">
@@ -887,7 +887,7 @@ export const CallsTable: FC<{
               </div>
             </>
           )}
-        </Tailwind>
+        </TailwindContents>
       }>
       <StyledDataGrid
         // Start Column Menu
@@ -952,6 +952,9 @@ export const CallsTable: FC<{
           // This moves the pagination controls to the left
           '& .MuiDataGrid-footerContainer': {
             justifyContent: 'flex-start',
+          },
+          '& .MuiDataGrid-main:focus-visible': {
+            outline: 'none',
           },
         }}
         slots={{
