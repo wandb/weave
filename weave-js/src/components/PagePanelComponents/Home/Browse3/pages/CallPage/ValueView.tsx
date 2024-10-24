@@ -2,7 +2,7 @@ import React, {useMemo} from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
-import {isWeaveRef} from '../../filters/common';
+import {isWeaveRef,isArtifactRef} from '../../filters/common';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {
@@ -63,6 +63,10 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   }
   if (data.value === null) {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
+  }
+  if (isArtifactRef(data.value)) {
+    // expects format "wandb-artifact:///<entity>/<project>/<artifact name>:<artifact version, i.e., v0>/<optional path>"
+    return <SmallRef objRef={parseRef(data.value)} />;
   }
   if (isWeaveRef(data.value)) {
     if (
