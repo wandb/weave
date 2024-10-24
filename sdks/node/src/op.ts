@@ -1,6 +1,7 @@
 import { getGlobalClient } from './clientApi';
 import { TRACE_CALL_EMOJI } from './constants';
 import { Op, OpOptions } from './opType';
+import { warnOnce } from './utils/warnOnce';
 
 /**
  * A wrapper to weave op-ify a function or method that works on sync and async functions.
@@ -40,6 +41,10 @@ export function op<T extends (...args: any[]) => any>(
     const client = getGlobalClient();
 
     if (!client) {
+      warnOnce(
+        'weave-not-initialized',
+        'WARNING: Weave is not initialized, so calls wont be tracked.  Call `weave.init` to initialize before calling ops.  If this is intentional, you can safely ignore this warning.'
+      );
       return await fn(...params);
     }
 
