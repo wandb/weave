@@ -2,6 +2,36 @@ import { getGlobalClient } from './clientApi';
 import { TRACE_CALL_EMOJI } from './constants';
 import { Op, OpOptions } from './opType';
 
+/**
+ * A wrapper to weave op-ify a function or method that works on sync and async functions.
+ *
+ * Wrapped functions:
+ *  1. Take the same inputs and return the same outputs as the original function.
+ *  2. Will automatically track calls in the Weave UI.
+ *
+ * If you don't call `weave.init` then the function will behave as if it were not wrapped.
+ *
+ * @param fn The function to wrap
+ * @param options Optional configs like call and param naming
+ * @returns The wrapped function
+ *
+ * @example
+ * // Basic usage
+ * import OpenAI from 'openai';
+ * import * as weave from 'weave';
+ *
+ * const client = await weave.init({ project: 'my-project' });
+ * const oaiClient = weave.wrapOpenAI(new OpenAI());
+ *
+ * const extract = weave.op(async function extract() {
+ *   return await oaiClient.chat.completions.create({
+ *     model: 'gpt-4-turbo',
+ *     messages: [{ role: 'user', content: 'Create a user as JSON' }],
+ *   });
+ * });
+ *
+ * await extract();
+ */
 export function op<T extends (...args: any[]) => any>(
   fn: T,
   options?: OpOptions<T>
