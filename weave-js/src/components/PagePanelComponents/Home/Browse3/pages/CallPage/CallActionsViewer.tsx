@@ -1,4 +1,5 @@
-import {Box, Button, Modal, TextField, Typography} from '@material-ui/core';
+import {Box, Button, TextField, Typography} from '@material-ui/core';
+import {Drawer} from '@material-ui/core';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useMemo, useState} from 'react';
 import {z} from 'zod';
@@ -16,7 +17,6 @@ import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerCli
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {Drawer} from '@material-ui/core';
 
 type CallActionRow = {
   actionRef: string;
@@ -162,25 +162,23 @@ export const CallActionsViewer: React.FC<{
         onClose={() => setIsModalOpen(false)}
         ModalProps={{
           keepMounted: true, // Better open performance on mobile
-        }}
-      >
+        }}>
         <Box
           sx={{
             width: '40vw',
-            height: '100%',
+            marginTop: '60px',
+            height: '100%', // -40 for the header
             bgcolor: 'background.paper',
             p: 4,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'auto',
-          }}
-        >
+          }}>
           <Typography
             id="create-action-mapping-modal"
             variant="h6"
             component="h2"
-            gutterBottom
-          >
+            gutterBottom>
             Create Action Mapping
           </Typography>
           <TextField
@@ -205,15 +203,13 @@ export const CallActionsViewer: React.FC<{
           <Box sx={{display: 'flex', justifyContent: 'flex-end', mt: 2}}>
             <Button
               onClick={() => setIsModalOpen(false)}
-              style={{marginRight: 8}}
-            >
+              style={{marginRight: 8}}>
               Cancel
             </Button>
             <Button
               onClick={handleSaveMapping}
               variant="contained"
-              color="primary"
-            >
+              color="primary">
               Save
             </Button>
           </Box>

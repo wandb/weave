@@ -1,10 +1,10 @@
 import {
   Box,
   Button,
+  Drawer,
   FormControl,
   InputLabel,
   MenuItem,
-  Drawer,
   Select,
   TextField,
   Typography,
@@ -55,25 +55,23 @@ export const NewBuiltInActionScorerModal: FC<
       }}
       ModalProps={{
         keepMounted: true, // Better open performance on mobile
-      }}
-    >
+      }}>
       <Box
         sx={{
           width: '40vw',
+          marginTop: '60px',
           height: '100%',
           bgcolor: 'background.paper',
           p: 4,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'auto',
-        }}
-      >
+        }}>
         <Typography
           id="new-built-in-action-scorer-modal"
           variant="h6"
           component="h2"
-          gutterBottom
-        >
+          gutterBottom>
           Configure new built-in action scorer
         </Typography>
 
@@ -91,8 +89,7 @@ export const NewBuiltInActionScorerModal: FC<
               value={selectedActionIndex}
               onChange={e =>
                 setSelectedActionIndex(parseInt(e.target.value as string, 10))
-              }
-            >
+              }>
               {knownBuiltinActions.map(({action}, ndx) => (
                 <MenuItem key={action.name} value={ndx}>
                   {action.name}
@@ -117,8 +114,7 @@ export const NewBuiltInActionScorerModal: FC<
             onClick={handleSave}
             variant="contained"
             color="primary"
-            disabled={!name || selectedActionIndex === -1}
-          >
+            disabled={!name || selectedActionIndex === -1}>
             Save
           </Button>
         </Box>
