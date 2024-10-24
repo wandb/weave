@@ -799,8 +799,9 @@ def process_calls_filter_to_conditions(
         )
 
     if filter.wb_run_ids:
+        # todo(dom): This is a quick fix to resolve a bug where an extra parenthesis is generated
         conditions.append(
-            f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
+            f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')}"
         )
 
     return conditions

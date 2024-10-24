@@ -35,11 +35,15 @@
 # responsible for scanning the data instead of using the sampledHistory field.
 
 import json
+import requests
 import typing
+import os
 
 from weave_query import engine_trace
+from weave_query import wandb_api
 from weave_query import weave_types as types
 from weave_query.api import op
+from weave_query import ops_arrow
 from weave_query import compile_table
 from weave_query.gql_op_plugin import wb_gql_op_plugin
 from weave_query.input_provider import InputAndStitchProvider
@@ -168,6 +172,27 @@ gql_prop_op(
     types.Number(),
     hidden=True,
 )
+
+class TraceApiClient:
+    def __init__(self):
+        if os.environ["WANDB_BASE_URL"] == 'https://api.wandb.ai':
+            self.base_url = "https://trace.wandb.ai"    
+        else:
+            self.base_url = "http://127.0.0.1:6345"
+    def _get_full_url(self, endpoint):
+        return f"{self.base_url}/{endpoint.lstrip('/')}"
+    def post_stream(self, endpoint, data=None, json_data=None, headers=None):
+        s = requests.Session()
+        url = self._get_full_url(endpoint)
+        with s.post(url, data=data, headers=headers, json=json_data,stream=True) as resp:
+            res = []
+            for line in resp.iter_lines():
+                if line:
+                    data_dict = json.loads(line)
+                    res.append(data_dict)
+            return res
+
+trace_client = TraceApiClient()
 
 
 def config_to_values(config: dict) -> dict:
@@ -414,6 +439,92 @@ def link(run: wdt.Run) -> wdt.Link:
         f'/{run["project"]["entity"]["name"]}/{run["project"]["name"]}/runs/{run["name"]}',
     )
 
+def get_traces(run: wdt.Run, op_name: str):
+    # Get traces from weave trace
+    wandb_context = wandb_api.get_wandb_api_context()
+    op_names = [f'weave-trace-internal:///{run["project"]["entity"]["name"]}/{run["project"]["name"]}/op/{op_name}:*']
+
+    data = {
+        "project_id": f'{run["project"]["entity"]["name"]}/{run["project"]["name"]}',
+        "filter": {
+            # "op_names": op_names,
+            "wb_run_ids": [f'{run["project"]["entity"]["name"]}/{run["project"]["name"]}/{run["name"]}'],
+            "trace_roots_only": True,
+        }
+    }
+    if "origin" not in wandb_context.headers:
+        origin = wandb_context.headers["x-origin"]
+    else:
+        origin = wandb_context.headers["origin"]
+    if "cookie" not in wandb_context.headers:
+        cookie = f'wandb={wandb_context.cookies["wandb"]}'
+    else:
+        cookie = wandb_context.headers["cookie"]
+    headers = {
+        "origin": origin,
+        "cookie": cookie,
+        "authorization": "Basic Og==",
+        "use-admin-privileges": "true"
+    }
+
+    res = trace_client.post_stream("/calls/query", json_data=data, headers=headers)
+    return res
+
+@op(
+    name="run-tracesType",
+    input_type={
+        "op_name": types.String(),
+    },
+    output_type=types.TypeType(),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+    displayName
+    project {
+        id
+        name
+        entity {
+            id
+            name
+        }
+    }
+"""
+    ),
+    hidden=True,
+)
+def traces_type(run: wdt.Run, op_name: str):
+    res = get_traces(run, op_name)
+    ttype = types.TypeRegistry.type_of(res[0]["calls"])
+    return ttype
+
+
+@op(
+    name="run-traces",
+    input_type={
+        "op_name": types.String(),
+    },
+    output_type=ops_arrow.ArrowWeaveListType(types.TypedDict({})),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+    displayName
+    project {
+        id
+        name
+        entity {
+            id
+            name
+        }
+    }
+"""
+    ),
+    refine_output_type=traces_type
+)
+def traces(run: wdt.Run, op_name: str):
+    res = get_traces(run, op_name)
+    if "calls" in res[0]:
+        return ops_arrow.to_arrow(res[0]["calls"])
+    else:
+        return ops_arrow.to_arrow([])
+
 
 @op(
     name="constructor-wbRunLink",
@@ -443,7 +554,6 @@ def run_logged_artifact_version_gql_plugin(inputs, inner):
             {inner}
         }}
     }}"""
-
 
 @op(
     name="run-loggedArtifactVersion",

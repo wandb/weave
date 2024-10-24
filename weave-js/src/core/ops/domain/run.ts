@@ -278,6 +278,56 @@ export const opRunSummaryType = OpKinds.makeBasicOp({
   },
 });
 
+export const opRunTracesType = makeRunOp({
+  hidden: true,
+  name: 'run-tracesType',
+  argTypes: {
+    ...runArgTypes,
+    op_name: 'string',
+  },
+  description: 'Returns the types of the traces',
+  argDescriptions: {
+    run: runArgDescriptions,
+    op_name: "The op captured from weave.trace"
+  },
+  returnValueDescription: 'The types of the traces',
+  returnType: inputTypes => 'type',
+  resolver: async (inputs, node, executableNode, client, engine) => {
+    throw Error("not implemented")
+  },
+})
+
+export const opRunTraces = makeRunOp({
+  name: 'run-traces',
+  argTypes: {
+    ...runArgTypes,
+    op_name: 'string',
+  },
+  description: 'Returns the traces of the run',
+  argDescriptions: {
+    run: runArgDescriptions,
+    op_name: "The op captured from weave.trace"
+  },
+  returnValueDescription: 'The traces of the run',
+  returnType: inputTypes => TypeHelpers.list(TypeHelpers.typedDict({})),
+  resolver: async ({run}) => TypeHelpers.list(TypeHelpers.typedDict({})),
+  // resolveOutputType: makeResolveOutputTypeFromOp(opRunTracesType, ['run', 'op_name']),
+  resolveOutputType: async (inputTypes, node, executableNode, client, stack) => {
+    // return node;
+    // return TypeHelpers.list(TypeHelpers.typedDict({ key: "string", hello: "number"}))
+    console.log('inputs to tracesType.resolveOutputType', {inputTypes, node, executableNode, client, stack})
+    const res = await client.query(opRunTracesType(executableNode.fromOp.inputs as any))
+    console.log('@@@@res', res, node)
+    return res
+    return  {
+      ...node,
+      // type: res.value
+      type: TypeHelpers.list(TypeHelpers.list(TypeHelpers.typedDict({"id": "string"})))
+      // type: res.type,
+    }
+  },
+})
+
 export const opRunSummary = makeRunOp({
   name: 'run-summary',
   argTypes: runArgTypes,

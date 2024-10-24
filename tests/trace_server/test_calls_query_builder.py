@@ -444,3 +444,73 @@ def test_query_light_column_with_costs() -> None:
             "pb_3": 1,
         },
     )
+
+def test_query_heavy_column_with_wb_run_ids() -> None:
+    cq = CallsQuery(
+        project_id="UHJvamVjdEludGVybmFsSWQ6NQ==", include_costs=True
+    )
+    cq.add_field("id")
+    cq.set_hardcoded_filter(
+        HardCodedFilter(
+            filter=tsi.CallsFilter(
+                wb_run_ids=["UHJvamVjdEludGVybmFsSWQ6NQ==:mvznq68g"],
+            )
+        )
+    )
+    # print('heyooo;', cq.as_sql({
+    #         'pb_1_0': ['UHJvamVjdEludGVybmFsSWQ6NQ==:mvznq68g'],
+    #         'pb_1_1': 'UHJvamVjdEludGVybmFsSWQ6NQ==',
+    #         'pb_1_2':'UHJvamVjdEludGVybmFsSWQ6NQ==',
+    #         'pb_1_3': ['UHJvamVjdEludGVybmFsSWQ6NQ==:mvznq68g'], 
+    #         'pb_1_4': 'UHJvamVjdEludGVybmFsSWQ6NQ==',
+    #         'pb_1_5': 'UHJvamVjdEludGVybmFsSWQ6NQ=='
+    #     }))
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        WHERE project_id = {pb_1_4:String}
+        GROUP BY (project_id,
+                    id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                AND (any(calls_merged.wb_run_id) IN {pb_1_3:Array(String)})))
+        SELECT calls_merged.project_id AS project_id,
+            calls_merged.id AS id,
+            any(calls_merged.op_name) AS op_name,
+            argMaxMerge(calls_merged.display_name) AS display_name,
+            any(calls_merged.trace_id) AS trace_id,
+            any(calls_merged.parent_id) AS parent_id,
+            any(calls_merged.started_at) AS started_at,
+            any(calls_merged.ended_at) AS ended_at,
+            any(calls_merged.exception) AS
+        exception,
+            any(calls_merged.attributes_dump) AS attributes_dump,
+            any(calls_merged.inputs_dump) AS inputs_dump,
+            any(calls_merged.output_dump) AS output_dump,
+            any(calls_merged.summary_dump) AS summary_dump,
+            array_concat_agg(calls_merged.input_refs) AS input_refs,
+            array_concat_agg(calls_merged.output_refs) AS output_refs,
+            any(calls_merged.wb_user_id) AS wb_user_id,
+            any(calls_merged.wb_run_id) AS wb_run_id,
+            any(calls_merged.deleted_at) AS deleted_at
+        FROM calls_merged
+        WHERE project_id = {pb_1_5:String}
+        AND (id IN filtered_calls)
+        GROUP BY (project_id,
+                id)
+        ORDER BY any(calls_merged.started_at) ASC
+        """,
+        {
+            'pb_1_0': ['UHJvamVjdEludGVybmFsSWQ6NQ==:mvznq68g'],
+            'pb_1_1': 'UHJvamVjdEludGVybmFsSWQ6NQ==',
+            'pb_1_2':'UHJvamVjdEludGVybmFsSWQ6NQ==',
+            'pb_1_3': ['UHJvamVjdEludGVybmFsSWQ6NQ==:mvznq68g'], 
+            'pb_1_4': 'UHJvamVjdEludGVybmFsSWQ6NQ==',
+            'pb_1_5': 'UHJvamVjdEludGVybmFsSWQ6NQ=='
+        },
+    )
