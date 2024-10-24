@@ -17,6 +17,8 @@ import fetch from 'isomorphic-unfetch';
 
 import {
   ContentType,
+  ExecuteBatchActionReq,
+  ExecuteBatchActionRes,
   FeedbackCreateReq,
   FeedbackCreateRes,
   FeedbackPurgeReq,
@@ -34,6 +36,8 @@ import {
   TraceCallUpdateReq,
   TraceFileContentReadReq,
   TraceFileContentReadRes,
+  TraceObjCreateReq,
+  TraceObjCreateRes,
   TraceObjQueryReq,
   TraceObjQueryRes,
   TraceObjReadReq,
@@ -224,6 +228,13 @@ export class DirectTraceServerClient {
     return this.makeRequest<TraceObjReadReq, TraceObjReadRes>('/obj/read', req);
   }
 
+  public objCreate(req: TraceObjCreateReq): Promise<TraceObjCreateRes> {
+    return this.makeRequest<TraceObjCreateReq, TraceObjCreateRes>(
+      '/obj/create',
+      req
+    );
+  }
+
   public readBatch(req: TraceRefsReadBatchReq): Promise<TraceRefsReadBatchRes> {
     return this.makeRequest<TraceRefsReadBatchReq, TraceRefsReadBatchRes>(
       '/refs/read_batch',
@@ -264,6 +275,15 @@ export class DirectTraceServerClient {
   public feedbackPurge(req: FeedbackPurgeReq): Promise<FeedbackPurgeRes> {
     return this.makeRequest<FeedbackPurgeReq, FeedbackPurgeRes>(
       '/feedback/purge',
+      req
+    );
+  }
+
+  public executeBatchAction(
+    req: ExecuteBatchActionReq
+  ): Promise<ExecuteBatchActionRes> {
+    return this.makeRequest<ExecuteBatchActionReq, ExecuteBatchActionRes>(
+      '/execute/batch_action',
       req
     );
   }

@@ -1,4 +1,4 @@
-import {Box, SxProps, Theme} from '@mui/material';
+import {Box, Button, SxProps, Theme} from '@mui/material';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import _ from 'lodash';
 import React, {
@@ -259,21 +259,23 @@ export const SimplePageLayoutWithHeader: FC<{
                 {props.headerContent}
               </Box>
               {(!props.hideTabsIfSingle || tabs.length > 1) && (
-                <Tabs.Root
-                  style={{margin: '12px 16px 0 16px'}}
-                  value={tabs[tabValue].label}
-                  onValueChange={handleTabChange}>
-                  <Tabs.List>
-                    {tabs.map(tab => (
-                      <Tabs.Trigger
-                        key={tab.label}
-                        value={tab.label}
-                        className="h-[30px] text-sm">
-                        {tab.label}
-                      </Tabs.Trigger>
-                    ))}
-                  </Tabs.List>
-                </Tabs.Root>
+                <Box sx={{borderBottom: '1px solid #e0e0e0'}}>
+                  <Tabs.Root
+                    style={{padding: '12px 16px 0 16px'}}
+                    value={tabs[tabValue].label}
+                    onValueChange={handleTabChange}>
+                    <Tabs.List style={{borderBottom: 'none'}}>
+                      {tabs.map(tab => (
+                        <Tabs.Trigger
+                          key={tab.label}
+                          value={tab.label}
+                          className="h-[30px] text-sm">
+                          {tab.label}
+                        </Tabs.Trigger>
+                      ))}
+                    </Tabs.List>
+                  </Tabs.Root>
+                </Box>
               )}
               <Box
                 sx={{
@@ -332,7 +334,6 @@ export const SimpleKeyValueTable: FC<{
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'flex-start',
-                  width: 100,
                 }}>
                 {key}
               </td>

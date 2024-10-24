@@ -23,11 +23,13 @@ import {TabUseCall} from '../TabUseCall';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallActionsViewer} from './CallActionsViewer';
 import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
+
 export const CallPage: FC<{
   entity: string;
   project: string;
@@ -119,6 +121,14 @@ const useCallTabs = (call: CallSchema) => {
       content: (
         <Tailwind style={{height: '100%', overflow: 'auto'}}>
           <CallSummary call={call} />
+        </Tailwind>
+      ),
+    },
+    {
+      label: 'Scores',
+      content: (
+        <Tailwind>
+          <CallActionsViewer call={call} />
         </Tailwind>
       ),
     },
