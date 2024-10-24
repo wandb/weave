@@ -542,11 +542,12 @@ function processSummary(
 }
 
 async function maybeFormatCode(code: string) {
-  try {
-    const prettier = await import('prettier');
-    return prettier.format(code, { parser: 'babel' });
-  } catch (error) {
-    // prettier not available, just use the original string
-    return code;
-  }
+  return code;
+  //   try {
+  //     const prettier = await import('prettier');
+  //     return prettier.format(code, { parser: 'babel' });
+  //   } catch (error) {
+  //     // prettier not available or formatting failed, just use the original string
+  //     return code;
+  //   }
 }
