@@ -1,12 +1,15 @@
 import {
   Box,
   Button,
+  FormControl,
   IconButton,
+  InputLabel,
   MenuItem,
   Select,
   TextField,
   Typography,
 } from '@material-ui/core';
+import { Delete } from '@mui/icons-material';
 import React from 'react';
 import {z} from 'zod';
 
@@ -29,8 +32,8 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
 
     if (fieldSchema instanceof z.ZodObject) {
       return (
-        <Box key={key} mb={2}>
-          <Typography variant="subtitle1">{key}</Typography>
+        <FormControl fullWidth margin="normal">
+          <InputLabel>{key}</InputLabel>
           <Box ml={2}>
             <DynamicConfigForm
               configSchema={fieldSchema}
@@ -39,7 +42,7 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
               path={currentPath}
             />
           </Box>
-        </Box>
+        </FormControl>
       );
     }
 
@@ -85,11 +88,14 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
     const elementSchema = fieldSchema.element;
 
     return (
-      <Box key={key} mb={2}>
-        <Typography variant="subtitle1">{key}</Typography>
+      <FormControl fullWidth margin="normal">
+        <InputLabel>{key}</InputLabel>
         {arrayValue.map((_, index) => (
-          <Box key={index} display="flex" alignItems="center">
-            <Box flexGrow={1}>
+          <Box key={index} display="flex" flexDirection="column" alignItems="flex-start" mb={2} sx={{
+            borderBottom: '1px solid',
+            p: 2,
+          }}>
+            <Box flexGrow={1} width="100%">
               <DynamicConfigForm
                 configSchema={elementSchema}
                 config={config}
@@ -97,15 +103,17 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
                 path={[...targetPath, index.toString()]}
               />
             </Box>
-            <IconButton onClick={() => removeArrayItem(targetPath, index)}>
-              Delete
-            </IconButton>
+            <Box mt={1}>
+              <IconButton onClick={() => removeArrayItem(targetPath, index)}>
+                <Delete />
+              </IconButton>
+            </Box>
           </Box>
         ))}
         <Button onClick={() => addArrayItem(targetPath, elementSchema)}>
           Add Item
         </Button>
-      </Box>
+      </FormControl>
     );
   };
 
@@ -118,8 +126,8 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
     const options = fieldSchema.options;
 
     return (
-      <Box key={key} mb={2}>
-        <Typography variant="subtitle1">{key}</Typography>
+      <FormControl fullWidth margin="normal">
+        <InputLabel>{key}</InputLabel>
         <Select
           fullWidth
           value={value || ''}
@@ -130,7 +138,7 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
             </MenuItem>
           ))}
         </Select>
-      </Box>
+      </FormControl>
     );
   };
 
@@ -143,8 +151,8 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
     const recordValue = value || {};
 
     return (
-      <Box key={key} mb={2}>
-        <Typography variant="subtitle1">{key}</Typography>
+      <FormControl fullWidth margin="normal">
+        <InputLabel>{key}</InputLabel>
         {Object.entries(recordValue).map(
           ([recordValueKey, recordValueValue]) => (
             <Box key={recordValueKey} display="flex" alignItems="center">
@@ -174,7 +182,7 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
           )
         )}
         <Button onClick={() => addRecordItem(targetPath)}>Add Item</Button>
-      </Box>
+      </FormControl>
     );
   };
 
@@ -251,14 +259,5 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
     }
   };
 
-  return (
-    <>
-      {path.length === 0 && (
-        <Typography variant="h6" gutterBottom>
-          Configuration
-        </Typography>
-      )}
-      {renderContent()}
-    </>
-  );
+  return <>{renderContent()}</>
 };

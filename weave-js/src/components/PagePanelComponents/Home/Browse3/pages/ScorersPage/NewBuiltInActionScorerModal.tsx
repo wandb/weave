@@ -78,6 +78,7 @@ export const NewBuiltInActionScorerModal: FC<
           setConfig={setConfig}
         />
       )}
+
     </ReusableDrawer>
   );
 };
