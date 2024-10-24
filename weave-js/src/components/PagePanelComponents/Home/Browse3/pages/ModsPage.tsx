@@ -5,9 +5,9 @@ import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
 import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid2';
-import Typography from '@mui/material/Typography';
-import React from 'react';
-import {Link} from 'react-router-dom';
+import TextField from '@mui/material/TextField';
+import React, {useState} from 'react';
+import {Link, useHistory, useSearchParams} from 'react-router-dom';
 
 import {SimplePageLayout} from './common/SimplePageLayout';
 
@@ -52,9 +52,19 @@ const mods: ModCategories = {
   ],
   Demos: [
     {
+      id: 'welcome',
+      name: 'Welcome',
+      description: 'A simple welcome mod',
+    },
+    {
       id: 'openui',
       name: 'OpenUI',
       description: 'Generate UIs from images or text descriptions',
+    },
+    {
+      id: 'gist',
+      name: 'Gist',
+      description: 'Load a gist that contains a streamlit app.py file',
     },
   ],
 };
@@ -87,6 +97,13 @@ const ModCards: React.FC<{mods: Mod[]; entity: string; project: string}> = ({
   entity,
   project,
 }) => {
+  const history = useHistory();
+  const [searchParams] = useSearchParams();
+  const [gistId, setGistId] = useState('');
+
+  const purl =
+    searchParams.get('purl') ||
+    (gistId !== '' ? encodeURIComponent(`pkg:gist/${gistId}`) : '');
   return (
     <Grid container spacing={2} sx={{padding: '1em'}}>
       {mods.map(mod => (
@@ -97,11 +114,21 @@ const ModCards: React.FC<{mods: Mod[]; entity: string; project: string}> = ({
               <p>{mod.description}</p>
             </CardContent>
             <CardActions>
+              {mod.id === 'gist' && (
+                <TextField
+                  size="small"
+                  id="gist"
+                  label="Gist ID"
+                  variant="outlined"
+                  value={gistId}
+                  onChange={e => setGistId(e.target.value)}
+                />
+              )}
               <Button
                 component={Link}
                 to={`/${entity}/${project}/weave/mods/${encodeURIComponent(
                   mod.id
-                )}`}
+                )}?purl=${purl}`}
                 size="small">
                 Run
               </Button>
@@ -124,7 +151,9 @@ const ModFrame: React.FC<{entity: string; project: string; modId: string}> = ({
       title="Weave Mod"
       allow="accelerometer; ambient-light-sensor; autoplay; battery; camera; clipboard-read; clipboard-write; display-capture; document-domain; encrypted-media; fullscreen; geolocation; gyroscope; layout-animations; legacy-image-formats; magnetometer; microphone; midi; oversized-images; payment; picture-in-picture; publickey-credentials-get; sync-xhr; usb; vr ; wake-lock; xr-spatial-tracking"
       sandbox="allow-downloads allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-storage-access-by-user-activation"
-      src={`/service-redirect/${entity}/${project}/${modId}/mod`}
+      src={`/service-redirect/${entity}/${project}/${encodeURIComponent(
+        modId
+      )}/mod`}
     />
   );
 };
