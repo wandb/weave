@@ -116,6 +116,7 @@ const ObjectVersionPageInner: React.FC<{
     undefined,
     true
   );
+  console.log({objectName, objectVersionIndex, refExtra, objectVersions});
   const objectVersionCount = (objectVersions.result ?? []).length;
   const baseObjectClass = useMemo(() => {
     if (objectVersion.baseObjectClass === 'Dataset') {
