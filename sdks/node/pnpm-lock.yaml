@@ -17,6 +17,9 @@ importers:
       uuidv7:
         specifier: ^1.0.1
         version: 1.0.2
+      weave:
+        specifier: 'link:'
+        version: 'link:'
     devDependencies:
       '@types/cli-progress':
         specifier: ^3.11.6
