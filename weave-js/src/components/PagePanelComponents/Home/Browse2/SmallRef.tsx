@@ -172,6 +172,8 @@ export const SmallArtifactRef: FC<{
           style={{
             width: '100%',
             minHeight: '38px',
+            display: 'flex',
+            alignItems: 'center',
           }}
       as="a"
       href={`${window.location.origin}/${objRef.entityName}/${objRef.projectName}/artifacts/model/${objRef.artifactName}/${objRef.artifactVersion}/overview`}
