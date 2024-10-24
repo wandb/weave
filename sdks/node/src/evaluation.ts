@@ -2,7 +2,7 @@ import cliProgress from 'cli-progress';
 import { Dataset, DatasetRow } from './dataset';
 import { ColumnMapping, mapArgs } from './fn';
 import { isMedia } from './media';
-import { boundOp } from './op';
+import { op } from './op';
 import { Op, getOpName } from './opType';
 import { WeaveObject, WeaveObjectParameters } from './weaveObject';
 
@@ -130,11 +130,11 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
     super(parameters);
     this.dataset = parameters.dataset;
     this.scorers = parameters.scorers;
-    this.evaluate = boundOp(this, this.evaluate, {
+    this.evaluate = op(this, this.evaluate, {
       parameterNames: 'useParam0Object',
       callDisplayName: inputs => `${this.id}_${weaveCallableName(inputs.model)}`,
     });
-    this.predictAndScore = boundOp(this, this.predictAndScore, {
+    this.predictAndScore = op(this, this.predictAndScore, {
       parameterNames: 'useParam0Object',
     });
     this.columnMapping = parameters.columnMapping;
