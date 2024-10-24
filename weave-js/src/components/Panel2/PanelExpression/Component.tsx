@@ -40,6 +40,7 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
   } = state;
   const weave = useWeaveContext();
   const enableFullScreen = useWeaveFeaturesContext().fullscreenMode;
+  console.log(weave.expToString(refinedExpression));
 
   const {updateConfig} = props;
   const onMount = React.useCallback(

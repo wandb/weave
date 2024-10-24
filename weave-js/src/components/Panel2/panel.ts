@@ -74,6 +74,7 @@ export function toConvertSpec(panelSpec: PanelSpec): PanelConvertSpec {
   if (outputTypeFn == null) {
     throw new Error('Invalid panel spec: missing outputType');
   }
+  console.log('panel spec!! ', panelSpec)
   return {
     id: panelSpec.id,
     displayName: panelSpec.displayName,
