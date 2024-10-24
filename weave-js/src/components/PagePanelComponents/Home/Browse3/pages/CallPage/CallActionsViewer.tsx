@@ -1,3 +1,10 @@
+import {
+  Box,
+  Button,
+  Modal,
+  TextField,
+  Typography,
+} from '@material-ui/core';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import _ from 'lodash';
 import React, {useMemo, useState} from 'react';
@@ -8,7 +15,9 @@ import {
   ActionOpMapping,
   ActionWithConfig,
 } from '../../collections/actionCollection';
+import {ActionOpMappingSchema} from '../../collections/actionCollection';
 import {useCollectionObjects} from '../../collections/getCollectionObjects';
+import {DynamicConfigForm} from '../../DynamicConfigForm';
 import {WEAVE_REF_SCHEME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
@@ -18,15 +27,6 @@ import {
   CallSchema,
   ObjectVersionSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
-import {
-  Modal,
-  Box,
-  Typography,
-  Button,
-  TextField,
-} from '@material-ui/core';
-import {DynamicConfigForm} from '../../DynamicConfigForm';
-import {ActionOpMappingSchema} from '../../collections/actionCollection';
 
 type CallActionRow = {
   actionRef: string;

@@ -1,14 +1,13 @@
 import {Box} from '@material-ui/core';
+import { Alert } from '@mui/material';
 import {Button} from '@wandb/weave/components/Button/Button';
 import React, {FC, useState} from 'react';
 
 import {
   ActionWithConfig,
-  ActionWithConfigSchema,
 } from '../../collections/actionCollection';
 import {useCreateCollectionObject} from '../../collections/getCollectionObjects';
 import {
-  SimplePageLayout,
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
@@ -25,16 +24,16 @@ export const ScorersPage: React.FC<{
       // hideTabsIfSingle
       tabs={[
         {
-          label: 'Code Scorers',
-          content: <CodeScorersTab entity={entity} project={project} />,
+          label: 'Built-In Actions',
+          content: <OnlineScorersTab entity={entity} project={project} />,
         },
         {
           label: 'Human Review',
           content: <HumanScorersTab entity={entity} project={project} />,
         },
         {
-          label: 'Built-In Actions',
-          content: <OnlineScorersTab entity={entity} project={project} />,
+          label: 'Code Scorers',
+          content: <CodeScorersTab entity={entity} project={project} />,
         },
       ]}
       headerContent={undefined}
@@ -46,7 +45,6 @@ const CodeScorersTab: React.FC<{
   entity: string;
   project: string;
 }> = ({entity, project}) => {
-  // return <div>Placeholder - Add All the saved scorers here! - complexity - missing oponly scorers</div>;
   return (
     <FilterableObjectVersionsTable
       entity={entity}
@@ -62,15 +60,16 @@ const HumanScorersTab: React.FC<{
   entity: string;
   project: string;
 }> = ({entity, project}) => {
-  return (
-    <FilterableObjectVersionsTable
-      entity={entity}
-      project={project}
-      initialFilter={{
-        baseObjectClass: 'PLACEHOLDER_FOR_COLUMN_CONFIG',
-      }}
-    />
-  );
+  return (<Box sx={{p: 3}}><Alert severity="info">Human Review coming soon</Alert></Box>);
+  // return (
+  //   <FilterableObjectVersionsTable
+  //     entity={entity}
+  //     project={project}
+  //     initialFilter={{
+  //       baseObjectClass: 'PLACEHOLDER_FOR_COLUMN_CONFIG',
+  //     }}
+  //   />
+  // );
 };
 
 const OnlineScorersTab: React.FC<{

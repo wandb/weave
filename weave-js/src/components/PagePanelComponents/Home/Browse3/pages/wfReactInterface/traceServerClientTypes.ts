@@ -304,8 +304,7 @@ export const fileExtensions = {
 export type ExecuteBatchActionReq = {
   project_id: string;
   call_ids: string[];
-  // mapping: ActionOpMapping;
-  action_ref?: string;
+  configured_action_ref: string;
 };
 
 export type ExecuteBatchActionRes = {};
