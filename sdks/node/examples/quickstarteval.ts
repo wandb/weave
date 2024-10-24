@@ -44,7 +44,7 @@ const model = op(async function myModel(input) {
 });
 
 async function main() {
-  await init('weavejsdev-introeval5');
+  await init('examples');
   const ds = new Dataset({
     id: 'Fruit Dataset',
     rows: examples,

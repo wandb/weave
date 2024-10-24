@@ -2,7 +2,7 @@ import 'source-map-support/register';
 import { Dataset, Evaluation, init, op } from 'weave';
 
 async function main() {
-  await init('weavejsdev-eval6');
+  await init('examples');
 
   const ds = new Dataset({
     id: 'My Dataset',

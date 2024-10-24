@@ -30,7 +30,7 @@ async function bench(func: Op<any>, calls: number, client: WeaveClient) {
 }
 
 async function main() {
-  const client = await init('weavejsdev-loadtest2-k8s');
+  const client = await init('examples');
   // for (let x = 1; x <= 5; x++) {
   //   const calls = Math.pow(10, x);
   //   await bench(calls, client);

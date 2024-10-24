@@ -55,7 +55,7 @@ async function extractDinos(input: string) {
 const extractDinosOp = op(extractDinos);
 
 async function main() {
-  await init('weave-quickstart');
+  await init('examples');
   const result = await extractDinosOp('London');
 }
 
