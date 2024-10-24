@@ -42,12 +42,7 @@ import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {TailwindContents} from '../../../../../Tailwind';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
-import {
-  baseContext,
-  PEEK_PARAM,
-  usePeekLocation,
-  useWeaveflowCurrentRouteContext,
-} from '../../context';
+import {useWeaveflowCurrentRouteContext} from '../../context';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
@@ -215,9 +210,6 @@ export const CallsTable: FC<{
     new Set<string>().add('inputs.example')
   );
 
-  const history = useHistory();
-  const router = useWeaveflowCurrentRouteContext();
-
   // Helpers to handle expansion
   const onExpand = (col: string) => {
     setExpandedRefCols(prevState => new Set(prevState).add(col));
@@ -246,51 +238,6 @@ export const CallsTable: FC<{
     },
     [expandedRefCols]
   );
-
-  const prevEffectiveFilter = useRef(effectiveFilter);
-  const prevFilterModel = useRef(filterModelResolved);
-  const prevSortModel = useRef(sortModelResolved);
-  const prevPaginationModel = useRef(paginationModelResolved);
-
-  useEffect(() => {
-    if (effectiveFilter !== prevEffectiveFilter.current) {
-      console.log(
-        'effectiveFilter changed!',
-        prevEffectiveFilter.current,
-        effectiveFilter
-      );
-      prevEffectiveFilter.current = effectiveFilter;
-    }
-    if (filterModelResolved !== prevFilterModel.current) {
-      console.log(
-        'filterModelResolved changed!',
-        prevFilterModel.current,
-        filterModelResolved
-      );
-      prevFilterModel.current = filterModelResolved;
-    }
-    if (sortModelResolved !== prevSortModel.current) {
-      console.log(
-        'sortModelResolved changed!',
-        prevSortModel.current,
-        sortModelResolved
-      );
-      prevSortModel.current = sortModelResolved;
-    }
-    if (paginationModelResolved !== prevPaginationModel.current) {
-      console.log(
-        'paginationModelResolved changed!',
-        prevPaginationModel.current,
-        paginationModelResolved
-      );
-      prevPaginationModel.current = paginationModelResolved;
-    }
-  }, [
-    effectiveFilter,
-    filterModelResolved,
-    sortModelResolved,
-    paginationModelResolved,
-  ]);
 
   // Fetch the calls
   const calls = useCallsForQuery(
@@ -329,9 +276,10 @@ export const CallsTable: FC<{
   }, [calls, effectiveFilter]);
 
   // Construct Flattened Table Data
-  const tableData: FlattenedCallData[] = useMemo(() => {
-    return prepareFlattenedCallDataForTable(callsResult);
-  }, [callsResult]);
+  const tableData: FlattenedCallData[] = useMemo(
+    () => prepareFlattenedCallDataForTable(callsResult),
+    [callsResult]
+  );
 
   // This is a specific helper that is used when the user attempts to option-click
   // a cell that is a child cell of an expanded ref. In this case, we want to
@@ -510,11 +458,13 @@ export const CallsTable: FC<{
   const query = useURLSearchParamsDict();
   const {peekPath} = query;
   const peekId = getPeekId(peekPath);
+  const rowIds = useMemo(() => {
+    return tableData.map(row => row.id);
+  }, [tableData]);
   const [rowSelectionModel, setRowSelectionModel] =
     useState<GridRowSelectionModel>([]);
-
   useEffect(() => {
-    if (tableData.length === 0) {
+    if (rowIds.length === 0) {
       // Data may have not loaded
       return;
     }
@@ -524,64 +474,11 @@ export const CallsTable: FC<{
     } else {
       // If peek drawer matches a row, select it.
       // If not, don't modify selection.
-      if (tableData.some(row => row.id === peekId)) {
+      if (rowIds.includes(peekId)) {
         setRowSelectionModel([peekId]);
       }
     }
-  }, [tableData, peekId]);
-
-  const peekLocation = usePeekLocation();
-
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      let newIndex = peekId
-        ? tableData.findIndex(data => data.id === peekId)
-        : -1;
-
-      if (event.key === 'ArrowDown' && newIndex < tableData.length - 1) {
-        console.log('ArrowDown');
-        newIndex++;
-      } else if (event.key === 'ArrowUp' && newIndex > 0) {
-        console.log('ArrowUp');
-        newIndex--;
-      }
-
-      // If a valid row is selected, update the URL with the selected call ID
-      if (newIndex >= 0 && newIndex < tableData.length) {
-        console.log('peekLocation', peekLocation);
-
-        const selectedCallID = tableData[newIndex].id;
-
-        // the new URL will be wandb.ai/{tracesUIURL}?{PEEK_PARAM}={callUIURL}
-        const path = router.tracesUIUrl(entity, project);
-        const searchParams = new URLSearchParams();
-        searchParams.set(
-          PEEK_PARAM,
-          baseContext.callUIUrl(entity, project, '', selectedCallID)
-        );
-        const newSearch = searchParams.toString();
-        let newUrl = `${path}?${newSearch}`;
-
-        // retain any extra sorting and filtering from the previous URL
-        const queryParams = new URLSearchParams(history.location.search);
-        console.log('queryParams', queryParams.toString());
-        if (queryParams.toString() !== '') {
-          newUrl += `&${queryParams.toString()}`;
-        }
-
-        history.replace(newUrl);
-      }
-    },
-    [peekId, tableData, router, entity, project, history]
-  );
-
-  // Attach and detach event listener
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [tableData, handleKeyDown]);
+  }, [rowIds, peekId]);
 
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {
@@ -690,6 +587,10 @@ export const CallsTable: FC<{
     ];
     return cols;
   }, [columns.cols, selectedCalls, tableData, isEvaluateTable]);
+
+  // Register Compare Evaluations Button
+  const history = useHistory();
+  const router = useWeaveflowCurrentRouteContext();
 
   // We really want to use columns here, but because visibleColumns
   // is a prop to ExportSelector, it causes infinite reloads.
@@ -1011,9 +912,6 @@ export const CallsTable: FC<{
           // This moves the pagination controls to the left
           '& .MuiDataGrid-footerContainer': {
             justifyContent: 'flex-start',
-          },
-          '& .MuiDataGrid-main:focus-visible': {
-            outline: 'none',
           },
         }}
         slots={{
