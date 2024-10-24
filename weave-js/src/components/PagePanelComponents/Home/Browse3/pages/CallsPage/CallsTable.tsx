@@ -40,7 +40,7 @@ import {useHistory} from 'react-router-dom';
 
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
-import {TailwindContents} from '../../../../../Tailwind';
+import {Tailwind} from '../../../../../Tailwind';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
@@ -664,7 +664,7 @@ export const CallsTable: FC<{
         alignItems: 'center',
       }}
       filterListItems={
-        <TailwindContents>
+        <Tailwind style={{display: 'contents'}}>
           <RefreshButton onClick={() => calls.refetch()} />
           {!hideOpSelector && (
             <div className="flex-none">
@@ -847,7 +847,7 @@ export const CallsTable: FC<{
               </div>
             </>
           )}
-        </TailwindContents>
+        </Tailwind>
       }>
       <StyledDataGrid
         // Start Column Menu
