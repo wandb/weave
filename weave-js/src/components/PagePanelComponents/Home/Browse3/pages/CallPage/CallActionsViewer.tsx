@@ -1,21 +1,22 @@
-import { Button } from '@wandb/weave/components/Button/Button';
-import { Timestamp } from '@wandb/weave/components/Timestamp';
+import {Button} from '@wandb/weave/components/Button/Button';
+import {Timestamp} from '@wandb/weave/components/Timestamp';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useCallback, useMemo, useState} from 'react';
 import {z} from 'zod';
 
-import { CellValue } from '../../../Browse2/CellValue';
-import { NotApplicable } from '../../../Browse2/NotApplicable';
-import {
-  ConfiguredAction,
-} from '../../collections/actionCollection';
+import {CellValue} from '../../../Browse2/CellValue';
+import {NotApplicable} from '../../../Browse2/NotApplicable';
+import {ConfiguredAction} from '../../collections/actionCollection';
 import {useCollectionObjects} from '../../collections/getCollectionObjects';
 import {StyledDataGrid} from '../../StyledDataGrid'; // Import the StyledDataGrid component
 import {WEAVE_REF_SCHEME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
-import { Feedback } from '../wfReactInterface/traceServerClientTypes';
-import {convertISOToDate, projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
+import {Feedback} from '../wfReactInterface/traceServerClientTypes';
+import {
+  convertISOToDate,
+  projectIdFromParts,
+} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
@@ -56,9 +57,11 @@ const RunButton: React.FC<{
   };
 
   if (error) {
-    return <Button variant="destructive" onClick={handleRunClick} disabled>
-      Error
-    </Button>
+    return (
+      <Button variant="destructive" onClick={handleRunClick} disabled>
+        Error
+      </Button>
+    );
   }
 
   return (
@@ -93,22 +96,30 @@ export const CallActionsViewer: React.FC<{
     filter: {latest_only: true},
   }).sort((a, b) => a.val.name.localeCompare(b.val.name));
 
-
-  const verifiedActionFeedbacks: Array<{data: ActionFeedback, feedbackRaw: Feedback }> = useMemo(() => {
+  const verifiedActionFeedbacks: Array<{
+    data: ActionFeedback;
+    feedbackRaw: Feedback;
+  }> = useMemo(() => {
     return (feedbackQuery.result ?? [])
       .map(feedback => {
         const res = ActionFeedbackZ.safeParse(feedback.payload);
         return {res, feedbackRaw: feedback};
       })
       .filter(result => result.res.success)
-      .map(result => ({data: result.res.data, feedbackRaw: result.feedbackRaw})) as Array<{data: ActionFeedback, feedbackRaw: Feedback}>;
+      .map(result => ({
+        data: result.res.data,
+        feedbackRaw: result.feedbackRaw,
+      })) as Array<{data: ActionFeedback; feedbackRaw: Feedback}>;
   }, [feedbackQuery.result]);
 
-  const getFeedbackForAction = useCallback((actionRef: string) => {
-    return verifiedActionFeedbacks.filter(
-      feedback => feedback.data.configured_action_ref === actionRef
-    );
-  }, [verifiedActionFeedbacks]);
+  const getFeedbackForAction = useCallback(
+    (actionRef: string) => {
+      return verifiedActionFeedbacks.filter(
+        feedback => feedback.data.configured_action_ref === actionRef
+      );
+    },
+    [verifiedActionFeedbacks]
+  );
 
   const getClient = useGetTraceServerClientContext();
 
@@ -125,36 +136,55 @@ export const CallActionsViewer: React.FC<{
           path: '',
         });
         const feedbacks = getFeedbackForAction(configuredActionRefUri);
-        const selectedFeedback = feedbacks.length > 0 ? feedbacks[0] : undefined;
+        const selectedFeedback =
+          feedbacks.length > 0 ? feedbacks[0] : undefined;
         return {
           actionRef: configuredActionRefUri,
           actionDef: configuredAction.val,
           runCount: feedbacks.length,
-          lastRanAt: selectedFeedback ? convertISOToDate(selectedFeedback.feedbackRaw.created_at + "Z") : undefined,
+          lastRanAt: selectedFeedback
+            ? convertISOToDate(selectedFeedback.feedbackRaw.created_at + 'Z')
+            : undefined,
           lastResult: selectedFeedback?.data.output,
         };
       }) ?? []
     );
-  }, [configuredActions, getFeedbackForAction, props.call.entity, props.call.project]);
+  }, [
+    configuredActions,
+    getFeedbackForAction,
+    props.call.entity,
+    props.call.project,
+  ]);
 
   const columns = [
-    {field: 'action', headerName: 'Action', flex: 1,
-  },
+    {field: 'action', headerName: 'Action', flex: 1},
     {field: 'runCount', headerName: 'Run Count', flex: 1},
-    {field: 'lastResult', headerName: 'Last Result', flex: 1, renderCell: (params: any) => {
-      const value = params.row.lastResult;
-      if (value == null) {
-        return <NotApplicable />
-      }
-      return <CellValue value={value} isExpanded={false} />
-    }},
-    {field: 'lastRanAt', headerName: 'Last Ran At', flex: 1, renderCell: (params: any) => {
-      const value = params.row.lastRanAt ? params.row.lastRanAt.getTime() / 1000 : undefined;
-      if (value == null) {
-        return <NotApplicable />
-      }
-      return <Timestamp value={value} format="relative" />
-    }},
+    {
+      field: 'lastResult',
+      headerName: 'Last Result',
+      flex: 1,
+      renderCell: (params: any) => {
+        const value = params.row.lastResult;
+        if (value == null) {
+          return <NotApplicable />;
+        }
+        return <CellValue value={value} isExpanded={false} />;
+      },
+    },
+    {
+      field: 'lastRanAt',
+      headerName: 'Last Ran At',
+      flex: 1,
+      renderCell: (params: any) => {
+        const value = params.row.lastRanAt
+          ? params.row.lastRanAt.getTime() / 1000
+          : undefined;
+        if (value == null) {
+          return <NotApplicable />;
+        }
+        return <Timestamp value={value} format="relative" />;
+      },
+    },
     {
       field: 'run',
       headerName: 'Run',
@@ -212,7 +242,6 @@ export const CallActionsViewer: React.FC<{
           '& .MuiDataGrid-row:hover': {
             backgroundColor: 'inherit',
           },
-          
         }}
       />
     </>
