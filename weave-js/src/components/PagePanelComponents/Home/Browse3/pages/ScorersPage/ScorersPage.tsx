@@ -3,7 +3,7 @@ import {Alert} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button/Button';
 import React, {FC, useState} from 'react';
 
-import {ActionWithConfig} from '../../collections/actionCollection';
+import {ConfiguredAction} from '../../collections/actionCollection';
 import {useCreateCollectionObject} from '../../collections/getCollectionObjects';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
@@ -77,12 +77,14 @@ const OnlineScorersTab: React.FC<{
   project: string;
 }> = ({entity, project}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const createCollectionObject = useCreateCollectionObject('ActionWithConfig');
+  const createCollectionObject = useCreateCollectionObject('ConfiguredAction');
   const [lastUpdatedTimestamp, setLastUpdatedTimestamp] = useState(0);
 
-  const handleOpenModal = () => setIsModalOpen(true);
+  const handleOpenModal = () => {
+    setIsModalOpen(true);
+  };
   const handleCloseModal = () => setIsModalOpen(false);
-  const handleSaveModal = (newAction: ActionWithConfig) => {
+  const handleSaveModal = (newAction: ConfiguredAction) => {
     // Implement save logic here
     console.log('New action:', newAction);
     // TODO: Save the new action to the backend or update the state

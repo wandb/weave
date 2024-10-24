@@ -9,7 +9,7 @@ import {
   TextField,
   Typography,
 } from '@material-ui/core';
-import { Delete } from '@mui/icons-material';
+import {Delete} from '@mui/icons-material';
 import React from 'react';
 import {z} from 'zod';
 
@@ -91,10 +91,16 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
       <FormControl fullWidth margin="normal">
         <InputLabel>{key}</InputLabel>
         {arrayValue.map((_, index) => (
-          <Box key={index} display="flex" flexDirection="column" alignItems="flex-start" mb={2} sx={{
-            borderBottom: '1px solid',
-            p: 2,
-          }}>
+          <Box
+            key={index}
+            display="flex"
+            flexDirection="column"
+            alignItems="flex-start"
+            mb={2}
+            sx={{
+              borderBottom: '1px solid',
+              p: 2,
+            }}>
             <Box flexGrow={1} width="100%">
               <DynamicConfigForm
                 configSchema={elementSchema}
@@ -125,12 +131,18 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
   ) => {
     const options = fieldSchema.options;
 
+    // Check if the current value is null or undefined, and default to the first option
+    const selectedValue = value ?? options[0];
+    if (value === null || value === undefined) {
+      updateConfig(targetPath, selectedValue);
+    }
+
     return (
       <FormControl fullWidth margin="normal">
         <InputLabel>{key}</InputLabel>
         <Select
           fullWidth
-          value={value || ''}
+          value={selectedValue}
           onChange={e => updateConfig(targetPath, e.target.value)}>
           {options.map((option: string) => (
             <MenuItem key={option} value={option}>
@@ -259,5 +271,5 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
     }
   };
 
-  return <>{renderContent()}</>
+  return <>{renderContent()}</>;
 };

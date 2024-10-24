@@ -20,7 +20,10 @@ export const ReusableDrawer: FC<ReusableDrawerProps> = ({
     <Drawer
       anchor="right"
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        // do nothing
+        return;
+      }}
       ModalProps={{
         keepMounted: true, // Better open performance on mobile
       }}>

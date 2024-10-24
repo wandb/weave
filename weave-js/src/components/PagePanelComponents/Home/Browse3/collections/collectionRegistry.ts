@@ -1,9 +1,9 @@
 import {
-  ActionOpMappingSchema,
-  ActionWithConfigSchema,
+  // ActionOpMappingSchema,
+  ConfiguredActionSchema,
 } from './actionCollection';
 
 export const collectionRegistry = {
-  ActionWithConfig: ActionWithConfigSchema,
-  ActionOpMapping: ActionOpMappingSchema,
+  ConfiguredAction: ConfiguredActionSchema,
+  // ActionOpMapping: ActionOpMappingSchema,
 };

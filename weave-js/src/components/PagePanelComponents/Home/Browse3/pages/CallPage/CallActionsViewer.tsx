@@ -7,7 +7,7 @@ import {z} from 'zod';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {
   ActionOpMapping,
-  ActionWithConfig,
+  ConfiguredAction,
 } from '../../collections/actionCollection';
 import {useCollectionObjects} from '../../collections/getCollectionObjects';
 import {DynamicConfigForm} from '../../DynamicConfigForm';
@@ -20,11 +20,9 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 type CallActionRow = {
   actionRef: string;
-  actionDef: ActionWithConfig;
-  // mapping?: ActionOpMapping;
-  // mappingRef?: string;
+  actionDef: ConfiguredAction;
   runCount: number;
-  lastResult: Record<string, unknown>;
+  lastResult?: Record<string, unknown>;
 };
 
 export const CallActionsViewer: React.FC<{
@@ -43,7 +41,7 @@ export const CallActionsViewer: React.FC<{
     project: props.call.project,
     weaveRef,
   });
-  const actionWithConfigs = useCollectionObjects('ActionWithConfig', {
+  const configuredActions = useCollectionObjects('ConfiguredAction', {
     project_id: projectIdFromParts({
       entity: props.call.entity,
       project: props.call.project,
@@ -51,27 +49,7 @@ export const CallActionsViewer: React.FC<{
     filter: {latest_only: true},
   });
 
-  const allCallActions: CallActionRow[] = useMemo(() => {
-    return (
-      actionWithConfigs?.map(actionWithConfig => {
-        const actionWithConfigRefUri = objectVersionKeyToRefUri({
-          scheme: WEAVE_REF_SCHEME,
-          weaveKind: 'object',
-          entity: props.call.entity,
-          project: props.call.project,
-          objectId: actionWithConfig.object_id,
-          versionHash: actionWithConfig.digest,
-          path: '',
-        });
-        return {
-          actionRef: actionWithConfigRefUri,
-          actionDef: actionWithConfig.val,
-          runCount: 0,
-          lastResult: {},
-        };
-      }) ?? []
-    );
-  }, [actionWithConfigs, props.call.entity, props.call.project]);
+
 
   const verifiedActionFeedbacks: ActionFeedback[] = useMemo(() => {
     return (feedbackQuery.result ?? [])
@@ -84,8 +62,9 @@ export const CallActionsViewer: React.FC<{
   }, [feedbackQuery.result]);
 
   const getFeedbackForAction = (actionRef: string) => {
+    console.log('verifiedActionFeedbacks', verifiedActionFeedbacks);
     return verifiedActionFeedbacks.filter(
-      feedback => feedback.action_ref === actionRef
+      feedback => feedback.configured_action_ref === actionRef
     );
   };
 
@@ -104,6 +83,31 @@ export const CallActionsViewer: React.FC<{
     console.log('New mapping:', newMapping);
     setIsModalOpen(false);
   };
+
+
+  const allCallActions: CallActionRow[] = useMemo(() => {
+    return (
+      configuredActions?.map(configuredAction => {
+        const configuredActionRefUri = objectVersionKeyToRefUri({
+          scheme: WEAVE_REF_SCHEME,
+          weaveKind: 'object',
+          entity: props.call.entity,
+          project: props.call.project,
+          objectId: configuredAction.object_id,
+          versionHash: configuredAction.digest,
+          path: '',
+        });
+        const feedbacks = getFeedbackForAction(configuredActionRefUri);
+        return {
+          actionRef: configuredActionRefUri,
+          actionDef: configuredAction.val,
+          runCount: feedbacks.length,
+          lastResult: feedbacks.length > 0 ? feedbacks[0].output : undefined,
+        };
+      }) ?? []
+    );
+  }, [configuredActions, getFeedbackForAction, props.call.entity, props.call.project]);
+
 
   return (
     <>
@@ -126,7 +130,7 @@ export const CallActionsViewer: React.FC<{
                 <td>{feedbacks.length}</td>
                 <td>
                   {feedbacks.length > 0
-                    ? JSON.stringify(feedbacks[0].results)
+                    ? JSON.stringify(feedbacks[0].output)
                     : 'N/A'}
                 </td>
 
@@ -221,9 +225,8 @@ export const CallActionsViewer: React.FC<{
 
 const ActionFeedbackZ = z.object({
   // _type: z.literal("ActionFeedback"),
-  name: z.string(),
-  action_ref: z.string(),
-  results: z.record(z.string(), z.unknown()),
+  configured_action_ref: z.string(),
+  output: z.record(z.string(), z.unknown()),
 });
 
 type ActionFeedback = z.infer<typeof ActionFeedbackZ>;

@@ -1,6 +1,4 @@
 import {
-  Box,
-  Button,
   FormControl,
   InputLabel,
   MenuItem,
@@ -10,8 +8,8 @@ import {
 import React, {FC, useEffect, useState} from 'react';
 
 import {
-  ActionWithConfig,
-  ActionWithConfigSchema,
+  ConfiguredAction,
+  ConfiguredActionSchema,
   knownBuiltinActions,
 } from '../../collections/actionCollection';
 import {DynamicConfigForm} from '../../DynamicConfigForm';
@@ -20,7 +18,7 @@ import {ReusableDrawer} from '../../ReusableDrawer';
 interface NewBuiltInActionScorerModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (newAction: ActionWithConfig) => void;
+  onSave: (newAction: ConfiguredAction) => void;
 }
 
 export const NewBuiltInActionScorerModal: FC<
@@ -36,7 +34,7 @@ export const NewBuiltInActionScorerModal: FC<
   }, [selectedActionIndex]);
 
   const handleSave = () => {
-    const newAction = ActionWithConfigSchema.parse({
+    const newAction = ConfiguredActionSchema.parse({
       name,
       action: knownBuiltinActions[selectedActionIndex].action,
       config: knownBuiltinActions[selectedActionIndex].convertToConfig(config),
@@ -78,7 +76,6 @@ export const NewBuiltInActionScorerModal: FC<
           setConfig={setConfig}
         />
       )}
-
     </ReusableDrawer>
   );
 };
