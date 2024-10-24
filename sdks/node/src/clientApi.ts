@@ -23,6 +23,15 @@ export interface LoginOptions {
 // Global client instance
 export let globalClient: WeaveClient | null = null;
 
+/**
+ * Log in to Weights & Biases (W&B) using the provided API key.
+ * This function saves the credentials to your netrc file for future use.
+ *
+ * @param options - The login options.
+ * @param options.apiKey - Your W&B API key.
+ * @param options.host - (Optional) The host name (usually only needed if you're using a custom W&B server).
+ * @throws {Error} If the API key is not specified or if the connection to the weave trace server cannot be verified.
+ */
 export async function login(options?: LoginOptions) {
   if (!options?.apiKey) {
     throw Error('API Key must be specified');
@@ -51,6 +60,19 @@ export async function login(options?: LoginOptions) {
 
   console.log(`Successfully logged in.  Credentials saved for ${domain}`);
 }
+
+/**
+ * Initialize the Weave client, which is required for weave tracing to work.
+ *
+ * @param options - The initialization options.
+ * @param options.project - The W&B project name.
+ * @param options.entity - (Optional) The W&B entity name.  If not provided, the default entity for your API key will be used.
+ * @param options.host - (Optional) The host name (usually you only need to set this if you're using a custom W&B server).
+ * @param options.settings - (Optional) Weave tracing settings
+ * @returns A promise that resolves to the initialized Weave client.
+ * @throws {Error} If the initialization fails
+ */
+export async function init({ project, entity, settings, host }: InitOptions): Promise<WeaveClient> {
   const { baseUrl, traceBaseUrl, domain } = getUrls(host);
   const resolvedApiKey = getApiKey(domain);
   try {
