@@ -13,8 +13,8 @@ export class Netrc {
   private path: string;
   public entries: Map<string, NetrcEntry>;
 
-  constructor(path?: string) {
-    this.path = path || join(homedir(), '.netrc');
+  constructor(path: string = join(homedir(), '.netrc')) {
+    this.path = path;
     this.entries = new Map();
     this.load();
   }
