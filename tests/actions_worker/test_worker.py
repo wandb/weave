@@ -1,11 +1,27 @@
-# Add the parent directory to the Python path
-# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import pytest
+from unittest.mock import patch, MagicMock
+from weave.actions_worker.tasks import llm_judge
 
-# from weave.actions_worker.tasks import add
 
+@patch("weave.actions_worker.tasks.llm_judge.apply_async")
+def test_action_wordcount(mock_apply_async):
+    mock_apply_async.return_value = MagicMock()
+    mock_publish_results = patch("weave.actions_worker.tasks.publish_results_as_feedback").start()
+    mock_ack_on_clickhouse = patch("weave.actions_worker.tasks.ack_on_clickhouse").start()
 
-# def test_add():
-#     print("Adding task to queue...")
-#     result = add.delay(4, 4)
-#     print(f"Task ID: {result.id}")
-#     print("Task added to queue. Check worker output for results.")
+    ctx = {
+        "call_id": "1",
+        "project_id": "1",
+        "id": "1",
+    }
+    out = llm_judge(ctx, "junk_payload", "junk_prompt")
+    mock_publish_results.assert_called_once_with(
+        ctx,
+        {"llm_judge": "I'm sorry Hal, I'm afraid I can't do that."}
+    )
+    mock_ack_on_clickhouse.assert_called_once_with(
+        ctx,
+        True
+    )
+    # Assert that the function returned the expected output
+    assert out == "I'm sorry Hal, I'm afraid I can't do that."
