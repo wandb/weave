@@ -87,6 +87,7 @@ import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
+import {CallsCharts} from './CallsCharts';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -849,6 +850,13 @@ export const CallsTable: FC<{
           )}
         </TailwindContents>
       }>
+      <CallsCharts
+        entity={entity}
+        project={project}
+        filter={filter}
+        filterModelProp={filterModelResolved}
+        // setFilterModel={props.setFilterModel}
+      />
       <StyledDataGrid
         // Start Column Menu
         // ColumnMenu is needed to support pinning and column visibility

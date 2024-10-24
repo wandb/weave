@@ -82,13 +82,13 @@ export const CallsPage: FC<{
             label: 'All',
             content: (
               <>
-                <CallsCharts
+                {/* <CallsCharts
                   entity={props.entity}
                   project={props.project}
                   filter={memoizedFilter}
                   filterModelProp={props.filterModel}
                   // setFilterModel={props.setFilterModel}
-                />
+                /> */}
                 <CallsTable
                   {...props}
                   // CPR (Tim): Applying "hide controls" when the filter is frozen is pretty crude.

@@ -98,22 +98,22 @@ CallsChartsProps) => {
   // console.log(costData2, callsResult);
   return (
     <Tailwind>
-      <div className="flex w-full flex-row">
+      <div className="mb-10 flex w-full flex-row">
         <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
-          <LatencyPlotlyChart chartData={costAndTimeData} height={500} />
+          <LatencyPlotlyChart chartData={costAndTimeData} height={200} />
         </div>
-        <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
+        {/* <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
           <LatencyVisXChart
             width={500}
             height={500}
             chartData={costAndTimeData}
           />
+        </div> */}
+        <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
+          <ErrorPlotlyChart chartData={costAndTimeData} height={200} />
         </div>
         <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
-          <ErrorPlotlyChart chartData={costAndTimeData} height={500} />
-        </div>
-        <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
-          <RequestsPlotlyChart chartData={costAndTimeData} height={500} />
+          <RequestsPlotlyChart chartData={costAndTimeData} height={200} />
         </div>
       </div>
     </Tailwind>

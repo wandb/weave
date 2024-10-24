@@ -106,13 +106,8 @@ export const LatencyPlotlyChart: React.FC<{
           size: 16, // Adjust title font size if needed
         },
       },
-      margin: {
-        l: 50,
-        r: 30,
-        b: 50,
-        t: 100, // Increase top margin to make room for title and legend
-        pad: 4,
-      },
+      margin: {l: 50, r: 30, b: 50, t: 50, pad: 0},
+
       xaxis: {
         title: 'Time',
         type: 'date',
@@ -139,27 +134,15 @@ export const LatencyPlotlyChart: React.FC<{
       },
       hovermode: 'x unified', // Show hover information for all points sharing the same x-axis value
       dragmode: false, // Disable zooming and panning
+      showlegend: false, // Hide the legend
+
       hoverlabel: {
-        // bgcolor: '#333', // Background color of the tooltip
-        // font: {
-        //   color: '#fff', // Font color of the tooltip text
-        //   size: 12, // Font size of the tooltip text
-        // },
         bordercolor: MOON_200, // Border color of the tooltip
-      },
-      legend: {
-        orientation: 'h', // horizontal orientation
-        yanchor: 'top',
-        y: 1.05, // Position legend below the title
-        xanchor: 'center',
-        x: 0.5,
-        font: {
-          size: 12, // Adjust legend font size if needed
-        },
       },
     };
     const plotlyConfig: Partial<Plotly.Config> = {
       displayModeBar: false, // Hide the mode bar
+      // showlegend: false, // Hide the legend
     };
 
     Plotly.newPlot(
@@ -548,6 +531,7 @@ export const ErrorPlotlyChart: React.FC<{
         bordercolor: MOON_200,
         font: {family: 'Arial, sans-serif'},
       },
+      // showlegend: false, // Hide the legend
 
       dragmode: 'zoom', // Disable zooming and panning
     };
