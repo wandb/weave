@@ -20,6 +20,10 @@ interface WeaveImage extends WeaveImageInput {
  * @param options The options for this media type
  * @param options.data The raw image data as a Buffer
  * @param options.imageType (Optional) The type of image file, currently only 'png' is supported
+ *
+ * @example
+ * const imageBuffer = fs.readFileSync('path/to/image.png');
+ * const weaveImage = weaveImage({ data: imageBuffer });
  */
 export function weaveImage({ data, imageType }: WeaveImageInput): WeaveImage {
   const resolvedImageType = imageType ?? DEFAULT_IMAGE_TYPE;
