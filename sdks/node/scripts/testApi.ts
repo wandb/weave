@@ -1,13 +1,10 @@
-import { OpenAI } from 'openai';
-import { init } from '../src/clientApi';
-import { wrapOpenAI } from '../src/integrations/openai';
-import { op } from '../src/op';
-
+import OpenAI from 'openai';
+import * as weave from 'weave';
 // Initialize the API
-init('weavejs-test1');
+weave.init('examples');
 
 // Create OpenAI client
-const openai = wrapOpenAI(new OpenAI());
+const openai = weave.wrapOpenAI(new OpenAI());
 
 // Define a simple function to be wrapped
 function add(a: number, b: number): number {
@@ -15,7 +12,7 @@ function add(a: number, b: number): number {
 }
 
 // Wrap the function using op
-const wrappedAdd = op(add);
+const wrappedAdd = weave.op(add);
 
 // Function to demonstrate async behavior
 async function delayedMultiply(a: number, b: number): Promise<number> {
@@ -24,7 +21,7 @@ async function delayedMultiply(a: number, b: number): Promise<number> {
 }
 
 // Wrap the async function
-const wrappedDelayedMultiply = op(delayedMultiply);
+const wrappedDelayedMultiply = weave.op(delayedMultiply);
 
 // Function to call OpenAI
 async function callOpenAI(prompt: string): Promise<string> {
@@ -36,7 +33,7 @@ async function callOpenAI(prompt: string): Promise<string> {
 }
 
 // Wrap the OpenAI function
-const wrappedCallOpenAI = op(callOpenAI);
+const wrappedCallOpenAI = weave.op(callOpenAI);
 
 // Function to demonstrate nested calls including OpenAI
 async function complexOperationWithAI(a: number, b: number, c: number): Promise<string> {
@@ -48,7 +45,7 @@ async function complexOperationWithAI(a: number, b: number, c: number): Promise<
 }
 
 // Wrap the complex function
-const wrappedComplexOperationWithAI = op(complexOperationWithAI);
+const wrappedComplexOperationWithAI = weave.op(complexOperationWithAI);
 
 // Main async function to run our tests
 async function runTests() {

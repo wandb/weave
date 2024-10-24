@@ -1,9 +1,9 @@
 import OpenAI from 'openai';
-import { init, wrapOpenAI } from 'weave';
+import * as weave from 'weave';
 
 async function main() {
-  const client = await init('examples');
-  const openai = wrapOpenAI(new OpenAI());
+  const client = await weave.init('examples');
+  const openai = weave.wrapOpenAI(new OpenAI());
 
   // Generate an image
   const result = await openai.images.generate({

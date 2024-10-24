@@ -1,8 +1,7 @@
 import OpenAI from 'openai';
-import { init, op, wrapOpenAI } from 'weave';
+import * as weave from 'weave';
 
-const openai = wrapOpenAI(new OpenAI());
-// const openai = new OpenAI();
+const openai = weave.wrapOpenAI(new OpenAI());
 
 async function extractDinos(input: string) {
   const functions = [
@@ -52,11 +51,12 @@ async function extractDinos(input: string) {
     console.log(JSON.stringify(chunk));
   }
 }
-const extractDinosOp = op(extractDinos);
+const extractDinosOp = weave.op(extractDinos);
 
 async function main() {
-  await init('examples');
+  await weave.init('examples');
   const result = await extractDinosOp('London');
+  console.log(result);
 }
 
 main();

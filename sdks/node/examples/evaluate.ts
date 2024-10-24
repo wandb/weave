@@ -1,10 +1,10 @@
 import 'source-map-support/register';
-import { Dataset, Evaluation, init, op } from 'weave';
+import * as weave from 'weave';
 
 async function main() {
-  await init('examples');
+  await weave.init('examples');
 
-  const ds = new Dataset({
+  const ds = new weave.Dataset({
     id: 'My Dataset',
     description: 'This is a dataset',
     rows: [
@@ -13,16 +13,16 @@ async function main() {
       { name: 'Charlie', age: 34 },
     ],
   });
-  const evaluation = new Evaluation({
+  const evaluation = new weave.Evaluation({
     dataset: ds,
     scorers: [
-      op(({ modelOutput, datasetItem }) => modelOutput == datasetItem.age, {
+      weave.op(({ modelOutput, datasetItem }) => modelOutput == datasetItem.age, {
         name: 'isEqual',
       }),
     ],
   });
 
-  const model = op(async function myModel(input) {
+  const model = weave.op(async function myModel(input) {
     return input.age;
   });
 

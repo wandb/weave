@@ -1,6 +1,6 @@
 import { OpenAI } from 'openai';
 import 'source-map-support/register';
-import { Dataset, Evaluation, init, op, wrapOpenAI } from 'weave';
+import * as weave from 'weave';
 
 const sentences = [
   'There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.',
@@ -27,9 +27,9 @@ const examples = [
   { id: '11', sentence: sentences[2], target: labels[2] },
 ];
 
-const openaiClient = wrapOpenAI(new OpenAI());
+const openaiClient = weave.wrapOpenAI(new OpenAI());
 
-const model = op(async function myModel(input) {
+const model = weave.op(async function myModel(input) {
   const prompt = `Extract fields ("fruit": <str>, "color": <str>, "flavor") from the following text, as json: ${input.sentence}`;
   const response = await openaiClient.chat.completions.create({
     model: 'gpt-3.5-turbo',
@@ -44,15 +44,15 @@ const model = op(async function myModel(input) {
 });
 
 async function main() {
-  await init('examples');
-  const ds = new Dataset({
+  await weave.init('examples');
+  const ds = new weave.Dataset({
     id: 'Fruit Dataset',
     rows: examples,
   });
-  const evaluation = new Evaluation({
+  const evaluation = new weave.Evaluation({
     dataset: ds,
     scorers: [
-      op(function fruitEqual({ modelOutput, datasetItem }) {
+      weave.op(function fruitEqual({ modelOutput, datasetItem }) {
         return {
           correct: modelOutput.fruit == datasetItem.target.fruit,
         };
