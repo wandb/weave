@@ -16,14 +16,19 @@ import {
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {TEAL_600} from '../../../../../common/css/color.styles';
 import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
-import {useWeaveflowRouteContext} from '../context';
+import {
+  baseContext,
+  PEEK_PARAM,
+  useWeaveflowCurrentRouteContext,
+  useWeaveflowRouteContext,
+} from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
 import {Empty} from './common/Empty';
@@ -56,6 +61,7 @@ import {
   KnownBaseObjectClassType,
   ObjectVersionSchema,
 } from './wfReactInterface/wfDataModelHooksInterface';
+import {useHistory} from 'react-router-dom';
 
 const DATASET_BASE_OBJECT_CLASS = 'Dataset';
 
@@ -175,6 +181,8 @@ export const FilterableObjectVersionsTable: React.FC<{
       <ObjectVersionsTable
         objectVersions={objectVersions}
         usingLatestFilter={effectivelyLatestOnly}
+        entity={props.entity}
+        project={props.project}
       />
     </FilterLayoutTemplate>
   );
@@ -183,6 +191,8 @@ export const FilterableObjectVersionsTable: React.FC<{
 const ObjectVersionsTable: React.FC<{
   objectVersions: ObjectVersionSchema[];
   usingLatestFilter?: boolean;
+  entity: string;
+  project: string;
 }> = props => {
   // `showPropsAsColumns` probably needs to be a bit more robust
   const showPropsAsColumns = !props.usingLatestFilter;
@@ -332,7 +342,24 @@ const ObjectVersionsTable: React.FC<{
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();
   const {peekPath} = query;
-  const peekId = peekPath ? peekPath.split('/').pop() : null;
+  const peekPathSplit = peekPath?.split('/') ?? [];
+  const peekHash = peekPathSplit.pop() ?? ''; // pop the version hash (last element)
+  const constVersions = peekPathSplit.pop() ?? ''; // const "versions" (second to last element)
+  const peekObjId = peekPathSplit.pop() ?? ''; // pop the object id (third to last element)
+  console.log(constVersions);
+
+  const peekId = objectVersionKeyToRefUri({
+    scheme: 'weave',
+    entity: props.entity,
+    project: props.project,
+    objectId: peekObjId,
+    versionHash: peekHash,
+    path: '',
+    refExtra: '',
+    weaveKind: 'object',
+  });
+  console.log({peekId});
+
   const rowIds = useMemo(() => {
     return rows.map(row => row.id);
   }, [rows]);
@@ -350,10 +377,78 @@ const ObjectVersionsTable: React.FC<{
       // If peek drawer matches a row, select it.
       // If not, don't modify selection.
       if (rowIds.includes(peekId)) {
+        console.log('YAAAAAAYYYY setting rowSelectionModel', {peekId});
         setRowSelectionModel([peekId]);
+      } else {
+        console.log('peekId not in rowIds, also maybe never hit here?', {
+          peekId,
+          rowIds,
+        });
       }
     }
   }, [rowIds, peekId]);
+
+  const history = useHistory();
+  const {peekingRouter} = useWeaveflowRouteContext();
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      let newIndex = rowIds.findIndex(id => id === peekId) ?? -1;
+      console.log({
+        beforeIdx: newIndex,
+        peekPath,
+        peekId,
+        rowIds,
+        rows,
+      });
+
+      if (event.key === 'ArrowDown' && newIndex < rowIds.length - 1) {
+        newIndex++;
+      } else if (event.key === 'ArrowUp' && newIndex > 0) {
+        newIndex--;
+      }
+
+      console.log({afterIdx: newIndex});
+
+      // If a valid row is selected, update the URL with the selected call ID
+      if (newIndex >= 0 && newIndex < rowIds.length) {
+        const newPeekID = rowIds[newIndex];
+        console.log({rowIds});
+
+        const obj = newPeekID.split('/').pop();
+        const objName = obj.split(':')[0];
+        const versionHash = obj.split(':')[1];
+
+        const to = peekingRouter.objectVersionUIUrl(
+          props.entity,
+          props.project,
+          objName,
+          versionHash
+        );
+        console.log('URL UPDATE', {objName, versionHash, to});
+
+        history.push(to);
+      }
+    },
+    [
+      peekPath,
+      rowIds,
+      peekId,
+      rows,
+      peekingRouter,
+      props.entity,
+      props.project,
+      history,
+    ]
+  );
+
+  // Attach and detach event listener
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [rowIds, handleKeyDown]);
 
   return (
     <StyledDataGrid
@@ -385,7 +480,7 @@ const ObjectVersionsTable: React.FC<{
       rowHeight={38}
       columns={columns}
       disableRowSelectionOnClick
-      rowSelectionModel={rowSelectionModel}
+      rowSelectionModel={rowSelectionModel} // this never worked :'( this controls the row to be highlighted with selected
       columnGroupingModel={columnGroupingModel}
     />
   );
