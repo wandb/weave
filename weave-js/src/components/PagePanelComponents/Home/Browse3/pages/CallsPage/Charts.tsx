@@ -17,7 +17,12 @@ import {Group} from '@visx/group';
 import {curveMonotoneX} from '@visx/curve';
 import {extent, max, quantile} from 'd3-array';
 import {timeFormat} from 'd3-time-format';
-import {useTooltip, useTooltipInPortal, TooltipWithBounds} from '@visx/tooltip';
+import {
+  useTooltip,
+  useTooltipInPortal,
+  TooltipWithBounds,
+  defaultStyles,
+} from '@visx/tooltip';
 import {localPoint} from '@visx/event';
 import * as d3 from 'd3';
 import {bisect} from 'd3-array';
@@ -373,15 +378,55 @@ export const LatencyVisXChart: React.FC<LatencyVisXChartProps> = ({
         <TooltipInPortal
           key={Math.random()}
           top={tooltipTop}
-          left={tooltipLeft}>
-          <div>
-            <strong>Date:</strong>{' '}
+          left={tooltipLeft}
+          style={{
+            ...defaultStyles,
+            display: 'flex',
+            flexDirection: 'column',
+            rowGap: '8px', // Adjust gap between rows
+            backgroundColor: 'white',
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '8px',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+            pointerEvents: 'none',
+            zIndex: 1000,
+            transition: 'opacity 0.1s ease-out',
+            opacity: tooltipOpen ? 1 : 0,
+          }}>
+          <div style={{display: 'flex', alignItems: 'center'}}>
+            {/* <strong>Date:</strong>{' '} */}
             {timeFormat('%b %d')(new Date(tooltipData?.timestamp ?? 0))}
           </div>
-          <div>
-            <strong>{currentLatencyType} Latency:</strong>{' '}
-            {tooltipData?.[currentLatencyType as keyof ChartDataWithLatencies]}{' '}
-            ms
+          <div style={{display: 'flex', alignItems: 'center'}}>
+            <span
+              style={{
+                width: '10px',
+                height: '2px',
+                backgroundColor: BLUE_500,
+                marginRight: '8px',
+              }}></span>
+            <strong>p50 Latency:</strong> {tooltipData?.p50} ms
+          </div>
+          <div style={{display: 'flex', alignItems: 'center'}}>
+            <span
+              style={{
+                width: '10px',
+                height: '2px',
+                backgroundColor: GREEN_500,
+                marginRight: '8px',
+              }}></span>
+            <strong>p95 Latency:</strong> {tooltipData?.p95} ms
+          </div>
+          <div style={{display: 'flex', alignItems: 'center'}}>
+            <span
+              style={{
+                width: '10px',
+                height: '2px',
+                backgroundColor: MOON_500,
+                marginRight: '8px',
+              }}></span>
+            <strong>p99 Latency:</strong> {tooltipData?.p99} ms
           </div>
         </TooltipInPortal>
       )}
