@@ -131,6 +131,7 @@
     "remark-rehype": "^10.1.0",
     "safe-json-stringify": "^1.2.0",
     "semantic-ui-react": "^0.88.2",
+    "simple-statistics": "^7.8.7",
     "slate": "0.94.1",
     "slate-history": "0.93.0",
     "slate-react": "0.97.1",

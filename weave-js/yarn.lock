@@ -13655,6 +13655,11 @@ simple-get@^3.0.3:
     once "^1.3.1"
     simple-concat "^1.0.0"
 
+simple-statistics@^7.8.7:
+  version "7.8.7"
+  resolved "https://registry.yarnpkg.com/simple-statistics/-/simple-statistics-7.8.7.tgz#14b30bfda7ac252da83899362a3cf96a13264c8d"
+  integrity sha512-ed5FwTNYvkMTfbCai1U+r3symP+lIPKWCqKdudpN4NFNMn9RtDlFtSyAQhCp4oPH0YBjWu/qnW+5q5ZkPB3uHQ==
+
 simple-swizzle@^0.2.2:
   version "0.2.2"
   resolved "https://registry.yarnpkg.com/simple-swizzle/-/simple-swizzle-0.2.2.tgz#a4da6b635ffcccca33f70d17cb92592de95e557a"

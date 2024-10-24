@@ -71,10 +71,6 @@ export const CallsPage: FC<{
     return 'Traces';
   }, [filter.opVersionRefs, isEvaluationTable]);
   const memoizedFilter = useMemo(() => filter, [JSON.stringify(filter)]);
-  const memoizedFilterModel = useMemo(
-    () => props.filterModel,
-    [JSON.stringify(props.filterModel)]
-  );
 
   return (
     <WeaveHeaderExtrasProvider>

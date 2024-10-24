@@ -5,8 +5,11 @@ import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
 
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {DEFAULT_FILTER_CALLS} from './CallsTable';
-import {getCostFromCostData} from '../CallPage/cost';
-import GradientAreaChart from './Charts';
+import {
+  ErrorPlotlyChart,
+  LatencyPlotlyChart,
+  RequestsPlotlyChart,
+} from './Charts';
 import {Tailwind} from '../../../../../Tailwind';
 
 type CallsChartsProps = {
@@ -29,13 +32,6 @@ export const CallsCharts = ({
 }: // filterModel,
 // filter,
 CallsChartsProps) => {
-  //   <FilterPanel
-  //   filterModel={filterModel}
-  //   columnInfo={filterFriendlyColumnInfo}
-  //   setFilterModel={setFilterModel}
-  //   selectedCalls={selectedCalls}
-  //   clearSelectedCalls={clearSelectedCalls}
-  // />
   const [filterModel, setFilterModel] = useState<GridFilterModel>(
     filterModelProp ?? DEFAULT_FILTER_CALLS
   );
@@ -51,7 +47,7 @@ CallsChartsProps) => {
     filter,
     filterModelProp,
     0,
-    10, // change back to 1000 later
+    1000, // change back to 1000 later
     columns, // need to select columns for performance. not working??
     columnSet,
     sortCalls
@@ -80,6 +76,7 @@ CallsChartsProps) => {
       started_at: call.traceCall?.started_at ?? '',
       //   ended_at: call.traceCall?.ended_at ?? '',
       latency: call.traceCall?.summary?.weave?.latency_ms ?? 0,
+      isError: call.traceCall?.summary?.weave?.status === 'error',
       //   timestamp: call.traceCall?.started_at ?? '',
     }));
   }, [calls.result]);
@@ -100,10 +97,19 @@ CallsChartsProps) => {
   // console.log(costData2, callsResult);
   return (
     <Tailwind>
-      <div className="ml-10 mr-10 rounded-lg border border-moon-250 p-[30px]">
-        <div>Latency</div>
-        <GradientAreaChart chartData={costAndTimeData} />
+      <div className="flex w-full flex-row">
+        <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
+          <LatencyPlotlyChart chartData={costAndTimeData} height={500} />
+        </div>
+        <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
+          <ErrorPlotlyChart chartData={costAndTimeData} height={500} />
+        </div>
+        <div className="ml-10 mr-10 flex-1 rounded-lg border border-moon-250 p-[30px]">
+          <RequestsPlotlyChart chartData={costAndTimeData} height={500} />
+        </div>
       </div>
     </Tailwind>
   );
 };
+
+// export default CallsCharts;
