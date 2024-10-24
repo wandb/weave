@@ -129,14 +129,16 @@ class Evaluation(Object):
                 raise ValueError(f"Invalid scorer: {scorer}")
             scorers.append(scorer)
         self.scorers = scorers
-        
+
         if isinstance(self.dataset, str):
             if self.dataset.startswith("hf://"):
                 import datasets
-                
+
                 dataset_name = self.dataset.replace("hf://", "").split("[")[0]
-                dataset_split = re.findall(r'\[(.*?)\]', self.dataset)[0]
-                self.dataset = datasets.load_dataset(dataset_name)[dataset_split].to_list()
+                dataset_split = re.findall(r"\[(.*?)\]", self.dataset)[0]
+                self.dataset = datasets.load_dataset(dataset_name)[
+                    dataset_split
+                ].to_list()
 
         if isinstance(self.dataset, list):
             self.dataset = Dataset(rows=self.dataset)
