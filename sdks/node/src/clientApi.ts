@@ -40,7 +40,7 @@ export async function login(options?: LoginOptions) {
     baseUrl: traceBaseUrl,
     baseApiParams: {
       headers: {
-        'User-Agent': `W&B Internal JS Client ${process.env.VERSION || 'unknown'}`,
+        'User-Agent': `W&B Weave JS Client ${process.env.VERSION || 'unknown'}`,
         Authorization: `Basic ${Buffer.from(`api:${options.apiKey}`).toString('base64')}`,
       },
     },
@@ -96,7 +96,7 @@ export async function init(project: string, settings?: Settings): Promise<WeaveC
       baseUrl: traceBaseUrl,
       baseApiParams: {
         headers: {
-          'User-Agent': `W&B Internal JS Client ${process.env.VERSION || 'unknown'}`,
+          'User-Agent': `W&B Weave JS Client ${process.env.VERSION || 'unknown'}`,
           Authorization: `Basic ${Buffer.from(`api:${resolvedApiKey}`).toString('base64')}`,
         },
       },
