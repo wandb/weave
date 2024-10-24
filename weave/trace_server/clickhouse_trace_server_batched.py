@@ -1392,28 +1392,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.FeedbackPurgeRes()
     
     def execute_llm_completion(self, req: tsi.ExecuteLLMCompletionReq) -> tsi.ExecuteLLMCompletionRes:
-        print("IN BATCHEDr")
         model_name = req.model_name
-        print("MODEL NAME", model_name)
         model_info = self._model_to_provider_info_map.get(model_name)
-        print("MODEL INFO", model_info)
         secret_fetcher = _secret_fetcher_context.get()
         if not model_info:
             raise InvalidRequest(f"No secret name found for model {model_name}")
         secret_name = model_info.get("api_key_name")
         api_key = secret_fetcher.fetch(secret_name)
-        print("API KEY", api_key)
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
             wb_user_id=req.wb_user_id,
             op_name="call_llm",
             started_at=datetime.datetime.now(),
-            inputs={**req.inputs, "model_name": req.model_name},
+            inputs={**req.inputs.model_dump(), "model_name": req.model_name},
             attributes={}
         )
         ch_call = _start_call_for_insert_to_ch_insertable_start_call(start)
         self._insert_call(ch_call)
-        print("CALLING OUT TO LITELLM", req.inputs)
         res = lite_llm_completion(api_key, model_name, req.inputs)
         end = tsi.EndedCallSchemaForInsert(
             project_id=req.project_id,
