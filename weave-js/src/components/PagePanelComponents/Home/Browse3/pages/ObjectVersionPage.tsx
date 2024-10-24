@@ -249,7 +249,10 @@ const ObjectVersionPageInner: React.FC<{
                 {data.loading ? (
                   <LoadingDots />
                 ) : (
-                  <BytesStoredInfoIcon bytesStored={bytesStored} />
+                  <BytesStoredInfoIcon
+                    bytesStored={bytesStored}
+                    weaveKind="object"
+                  />
                 )}
               </>
             ),
