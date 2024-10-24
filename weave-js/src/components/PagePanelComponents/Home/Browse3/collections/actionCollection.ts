@@ -6,8 +6,6 @@ const BuiltinActionSchema = z.object({
   digest: z.string().default('*'),
 });
 
-
-
 export const ConfiguredActionSchema = z.object({
   name: z.string(),
   action: BuiltinActionSchema,
@@ -18,6 +16,7 @@ export const ActionDispatchFilterSchema = z.object({
   op_name: z.string(),
   sample_rate: z.number(),
   configured_action_ref: z.string(),
+  disabled: z.boolean().optional(),
 });
 
 export type ActionDispatchFilter = z.infer<typeof ActionDispatchFilterSchema>;
