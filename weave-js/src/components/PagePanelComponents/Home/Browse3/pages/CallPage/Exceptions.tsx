@@ -114,6 +114,9 @@ export const ExceptionDetails = ({exceptionInfo}: ExceptionDetailsProps) => {
   }
 
   const handleCopyTraceback = () => {
+    if (!exceptionInfo.traceback) {
+      return;
+    }
     const tracebackText = exceptionInfo.traceback
       .map(
         frame =>
