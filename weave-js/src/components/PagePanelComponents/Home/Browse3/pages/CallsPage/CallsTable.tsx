@@ -40,13 +40,9 @@ import {useHistory} from 'react-router-dom';
 
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
-import {Tailwind} from '../../../../../Tailwind';
+import {TailwindContents} from '../../../../../Tailwind';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
-import {
-  baseContext,
-  PEEK_PARAM,
-  useWeaveflowCurrentRouteContext,
-} from '../../context';
+import {useWeaveflowCurrentRouteContext} from '../../context';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
@@ -213,9 +209,6 @@ export const CallsTable: FC<{
   const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
     new Set<string>().add('inputs.example')
   );
-
-  const history = useHistory();
-  const router = useWeaveflowCurrentRouteContext();
 
   // Helpers to handle expansion
   const onExpand = (col: string) => {
@@ -470,7 +463,6 @@ export const CallsTable: FC<{
   }, [tableData]);
   const [rowSelectionModel, setRowSelectionModel] =
     useState<GridRowSelectionModel>([]);
-
   useEffect(() => {
     if (rowIds.length === 0) {
       // Data may have not loaded
@@ -487,42 +479,6 @@ export const CallsTable: FC<{
       }
     }
   }, [rowIds, peekId]);
-
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      let newIndex = peekId ? rowIds.findIndex(id => id === peekId) : -1;
-
-      if (event.key === 'ArrowDown' && newIndex < rowIds.length - 1) {
-        newIndex++;
-      } else if (event.key === 'ArrowUp' && newIndex > 0) {
-        newIndex--;
-      }
-
-      // If a valid row is selected, update the URL with the selected call ID
-      if (newIndex >= 0 && newIndex < rowIds.length) {
-        const selectedCallID = rowIds[newIndex];
-
-        const path = router.tracesUIUrl(entity, project);
-        const searchParams = new URLSearchParams();
-        searchParams.set(
-          PEEK_PARAM,
-          baseContext.callUIUrl(entity, project, '', selectedCallID)
-        );
-        const newSearch = searchParams.toString();
-        const newUrl = `${path}?${newSearch}`;
-        history.replace(newUrl);
-      }
-    },
-    [peekId, rowIds, router, entity, project, history]
-  );
-
-  // Attach and detach event listener
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [rowIds, handleKeyDown]);
 
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {
@@ -632,6 +588,10 @@ export const CallsTable: FC<{
     return cols;
   }, [columns.cols, selectedCalls, tableData, isEvaluateTable]);
 
+  // Register Compare Evaluations Button
+  const history = useHistory();
+  const router = useWeaveflowCurrentRouteContext();
+
   // We really want to use columns here, but because visibleColumns
   // is a prop to ExportSelector, it causes infinite reloads.
   // memoize key computation, then filter out hidden columns
@@ -704,7 +664,7 @@ export const CallsTable: FC<{
         alignItems: 'center',
       }}
       filterListItems={
-        <Tailwind style={{display: 'contents'}}>
+        <TailwindContents>
           <RefreshButton onClick={() => calls.refetch()} />
           {!hideOpSelector && (
             <div className="flex-none">
@@ -887,7 +847,7 @@ export const CallsTable: FC<{
               </div>
             </>
           )}
-        </Tailwind>
+        </TailwindContents>
       }>
       <StyledDataGrid
         // Start Column Menu
