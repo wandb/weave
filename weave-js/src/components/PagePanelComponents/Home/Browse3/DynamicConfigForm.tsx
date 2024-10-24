@@ -202,6 +202,7 @@ const ArrayField: React.FC<{
     [value]
   );
   const minItems = unwrappedSchema._def.minLength?.value ?? 0;
+  const elementSchema = unwrappedSchema.element;
 
   // Ensure the minimum number of items is always present
   React.useEffect(() => {
@@ -209,10 +210,10 @@ const ArrayField: React.FC<{
       const itemsToAdd = minItems - arrayValue.length;
       const newItems = Array(itemsToAdd)
         .fill(null)
-        .map(() => (fieldSchema instanceof z.ZodObject ? {} : null));
+        .map(() => (elementSchema instanceof z.ZodObject ? {} : null));
       updateConfig(targetPath, [...arrayValue, ...newItems], config, setConfig);
     }
-  }, [arrayValue, minItems, fieldSchema, targetPath, config, setConfig]);
+  }, [arrayValue, minItems, elementSchema, targetPath, config, setConfig]);
 
   return (
     <FormControl fullWidth margin="normal">
@@ -229,8 +230,9 @@ const ArrayField: React.FC<{
             p: 2,
           }}>
           <Box flexGrow={1} width="100%">
-            <DynamicConfigForm
-              configSchema={fieldSchema}
+            <NestedForm
+              keyName={`${keyName}[${index}]`}
+              fieldSchema={elementSchema}
               config={config}
               setConfig={setConfig}
               path={[...targetPath, index.toString()]}
@@ -249,7 +251,7 @@ const ArrayField: React.FC<{
       ))}
       <Button
         onClick={() =>
-          addArrayItem(targetPath, fieldSchema, config, setConfig)
+          addArrayItem(targetPath, elementSchema, config, setConfig)
         }>
         Add Item
       </Button>
@@ -471,14 +473,6 @@ const updateRecordValue = (
   updateConfig(targetPath, {...currentRecord, [key]: value}, config, setConfig);
 };
 
-const validateConfig = (schema: z.ZodType<any>, config: any): boolean => {
-  try {
-    schema.parse(config);
-    return true;
-  } catch (error) {
-    return false;
-  }
-};
 
 const NumberField: React.FC<{
   keyName: string;
@@ -624,9 +618,9 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
   onValidChange,
 }) => {
   useEffect(() => {
-    const validationResult = validateConfig(configSchema, config);
+    const validationResult = configSchema.safeParse(config);
     if (onValidChange) {
-      onValidChange(validationResult);
+      onValidChange(validationResult.success);
     }
   }, [config, configSchema, onValidChange]);
 
@@ -655,6 +649,7 @@ export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
         />
       ));
     } else {
+      console.error('Unsupported schema type', configSchema);
       return <Typography color="error">Unsupported schema type</Typography>;
     }
   };
