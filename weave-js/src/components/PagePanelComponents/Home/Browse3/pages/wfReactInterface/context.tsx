@@ -10,9 +10,9 @@
 
 import React, {createContext, FC, useContext} from 'react';
 
+import {useHasTraceServerClientContext} from './traceServerClientContext';
 import {tsWFDataModelHooks} from './tsDataModelHooks';
 import {WFDataModelHooksInterface} from './wfDataModelHooksInterface';
-import {useHasTraceServerClientContext} from './traceServerClientContext';
 
 const WFDataModelHooksContext = createContext<WFDataModelHooksInterface | null>(
   null
