@@ -113,7 +113,7 @@ export const ExceptionDetails = ({exceptionInfo}: ExceptionDetailsProps) => {
     return null;
   }
 
-  const handleCopy = () => {
+  const handleCopyTraceback = () => {
     const tracebackText = exceptionInfo.traceback
       .map(
         frame =>
@@ -138,7 +138,7 @@ export const ExceptionDetails = ({exceptionInfo}: ExceptionDetailsProps) => {
           icon="copy"
           tooltip="Copy"
           variant="ghost"
-          onClick={handleCopy}
+          onClick={handleCopyTraceback}
         />
       </div>
       {exceptionInfo.traceback.map((frame: StackFrame, i: number) => (
