@@ -189,6 +189,7 @@ class ObjSchema(BaseModel):
 class ObjSchemaForInsert(BaseModel):
     project_id: str
     object_id: str
+    base_object_class: Optional[str] = None
     val: Any
 
 
@@ -843,6 +844,16 @@ class CostPurgeRes(BaseModel):
     pass
 
 
+class ExecuteBatchActionReq(BaseModel):
+    project_id: str
+    call_ids: list[str]
+    configured_action_ref: str
+
+
+class ExecuteBatchActionRes(BaseModel):
+    pass
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -890,3 +901,8 @@ class TraceServerInterface(Protocol):
         self, req: ActionsExecuteBatchReq
     ) -> ActionsExecuteBatchRes: ...
     def actions_ack_batch(self, req: ActionsAckBatchReq) -> ActionsAckBatchRes: ...
+
+    # Tim's version
+    def execute_batch_action(
+        self, req: ExecuteBatchActionReq
+    ) -> ExecuteBatchActionRes: ...
