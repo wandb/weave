@@ -1,6 +1,6 @@
 import { init } from '../clientApi';
 import { CallableObject } from '../fn';
-import { boundOp } from '../op';
+import { op } from '../op';
 import { WeaveObjectParameters } from '../weaveObject';
 
 interface ParametrizedFunctionOptions extends WeaveObjectParameters {
@@ -14,7 +14,7 @@ class ParametrizedFunction extends CallableObject<{ input: number }, { output: n
     super(options);
     this.magicNumber = options.magicNumber ?? 42;
 
-    this.run = boundOp(this, this.run, {
+    this.run = op(this, this.run, {
       parameterNames: ['input'],
     });
   }
