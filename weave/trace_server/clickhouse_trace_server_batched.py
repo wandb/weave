@@ -1425,6 +1425,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def execute_batch_action(
         self, req: tsi.ExecuteBatchActionReq
     ) -> tsi.ExecuteBatchActionRes:
+        # WARNING: THIS IS NOT GOING TO WORK IN PRODUCTION
+        # UNTIL WE HAVE THE API KEY PIECE IN PLACE
         configured_action_ref = req.configured_action_ref
 
         action_dict_res = self.refs_read_batch(
