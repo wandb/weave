@@ -77,6 +77,12 @@ export const OpOnlineScorersTab: React.FC<{
       };
     });
 
+  const inputSchema = ActionDispatchFilterSchema.merge(
+    z.object({
+      op_name: z.literal(opVersion.opId),
+    })
+  );
+
   return (
     <Box
       sx={{
@@ -119,7 +125,7 @@ export const OpOnlineScorersTab: React.FC<{
         project={opVersion.project}
         collectionDef={{
           name: 'ActionDispatchFilter',
-          schema: ActionDispatchFilterSchema,
+          schema: inputSchema,
         }}
         isOpen={isModalOpen}
         onClose={handleCloseModal}

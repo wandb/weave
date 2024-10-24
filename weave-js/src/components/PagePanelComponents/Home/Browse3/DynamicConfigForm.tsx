@@ -1,7 +1,9 @@
 import {
   Box,
   Button,
+  Checkbox,
   FormControl,
+  FormControlLabel,
   IconButton,
   InputLabel,
   MenuItem,
@@ -121,6 +123,34 @@ const NestedForm: React.FC<{
         keyName={keyName}
         fieldSchema={fieldSchema}
         unwrappedSchema={unwrappedSchema as z.ZodNumber}
+        targetPath={currentPath}
+        value={currentValue}
+        config={config}
+        setConfig={setConfig}
+      />
+    );
+  }
+
+  if (isZodType(fieldSchema, s => s instanceof z.ZodLiteral)) {
+    return (
+      <LiteralField
+        keyName={keyName}
+        fieldSchema={fieldSchema}
+        unwrappedSchema={unwrappedSchema as z.ZodLiteral<any>}
+        targetPath={currentPath}
+        value={currentValue}
+        config={config}
+        setConfig={setConfig}
+      />
+    );
+  }
+
+  if (isZodType(fieldSchema, s => s instanceof z.ZodBoolean)) {
+    return (
+      <BooleanField
+        keyName={keyName}
+        fieldSchema={fieldSchema}
+        unwrappedSchema={unwrappedSchema as z.ZodBoolean}
         targetPath={currentPath}
         value={currentValue}
         config={config}
@@ -500,6 +530,86 @@ const NumberField: React.FC<{
       }}
       inputProps={{min, max}}
       margin="normal"
+    />
+  );
+};
+
+const LiteralField: React.FC<{
+  keyName: string;
+  fieldSchema: z.ZodTypeAny;
+  unwrappedSchema: z.ZodLiteral<any>;
+  targetPath: string[];
+  value: any;
+  config: Record<string, any>;
+  setConfig: (config: Record<string, any>) => void;
+}> = ({
+  keyName,
+  fieldSchema,
+  unwrappedSchema,
+  targetPath,
+  value,
+  config,
+  setConfig,
+}) => {
+  const literalValue = unwrappedSchema.value;
+
+  useEffect(() => {
+    if (value === undefined) {
+      updateConfig(targetPath, literalValue, config, setConfig);
+    }
+  }, [value, literalValue, targetPath, config, setConfig]);
+
+  return (
+    <TextField
+      fullWidth
+      label={keyName}
+      value={literalValue}
+      InputProps={{
+        readOnly: true,
+      }}
+      margin="normal"
+      variant='filled'
+
+    />
+  );
+};
+
+const BooleanField: React.FC<{
+  keyName: string;
+  fieldSchema: z.ZodTypeAny;
+  unwrappedSchema: z.ZodBoolean;
+  targetPath: string[];
+  value: boolean | undefined;
+  config: Record<string, any>;
+  setConfig: (config: Record<string, any>) => void;
+}> = ({
+  keyName,
+  fieldSchema,
+  unwrappedSchema,
+  targetPath,
+  value,
+  config,
+  setConfig,
+}) => {
+  const defaultValue = fieldSchema instanceof z.ZodDefault
+    ? fieldSchema._def.defaultValue()
+    : false;
+
+  useEffect(() => {
+    if (value === undefined) {
+      updateConfig(targetPath, defaultValue, config, setConfig);
+    }
+  }, [value, defaultValue, targetPath, config, setConfig]);
+
+  return (
+    <FormControlLabel
+      control={
+        <Checkbox
+          checked={value ?? defaultValue}
+          onChange={(e) => updateConfig(targetPath, e.target.checked, config, setConfig)}
+        />
+      }
+      label={keyName}
     />
   );
 };
