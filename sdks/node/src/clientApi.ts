@@ -2,6 +2,7 @@ import { Api as TraceServerApi } from './generated/traceServerApi';
 import { Settings } from './settings';
 import { defaultBaseUrl, defaultDomain, defaultTraceBaseUrl, setGlobalDomain } from './urls';
 import { ConcurrencyLimiter } from './utils/concurrencyLimit';
+import { Netrc } from './utils/netrc';
 import { createFetchWithRetry } from './utils/retry';
 import { getApiKey } from './wandb/settings';
 import { WandbServerApi } from './wandb/wandbServerApi';
@@ -17,10 +18,46 @@ export interface InitOptions {
   apiKey?: string;
   settings?: Settings;
 }
+export interface LoginOptions {
+  apiKey: string;
+  baseUrl?: string;
+  traceBaseUrl?: string;
+}
 
 // Global client instance
 export let globalClient: WeaveClient | null = null;
 
+export async function login(options?: LoginOptions) {
+  if (!options?.apiKey) {
+    throw Error('API Key must be specified');
+  }
+  const { apiKey, baseUrl, traceBaseUrl } = options;
+  const url = new URL(baseUrl ?? defaultBaseUrl);
+  const host = url.host;
+  const resolvedTraceBaseUrl = traceBaseUrl ?? defaultTraceBaseUrl;
+
+  const netrc = new Netrc();
+  netrc.setMachine(host, { login: 'user', password: apiKey });
+  netrc.save();
+
+  // Test the connection to the traceServerApi
+  const testTraceServerApi = new TraceServerApi({
+    baseUrl: resolvedTraceBaseUrl,
+    baseApiParams: {
+      headers: {
+        'User-Agent': `W&B Internal JS Client ${process.env.VERSION || 'unknown'}`,
+        Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
+      },
+    },
+  });
+  try {
+    await testTraceServerApi.health.readRootHealthGet({});
+  } catch (error) {
+    throw new Error('Unable to verify connection to the weave trace server with given API Key');
+  }
+
+  console.log(`Successfully logged in.  Credentials saved for ${host}`);
+}
 export async function init({
   project,
   entity,
