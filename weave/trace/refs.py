@@ -159,15 +159,14 @@ class ObjectRef(RefWithExtra):
         # yet initialized the client, we can initialize a client to
         # fetch the object. It is critical to reset the client after fetching the
         # object to avoid any side effects in user code.
-        if gc is None:
-            init_client = init_weave(
-                f"{self.entity}/{self.project}", ensure_project_exists=False
-            )
-            try:
-                res = init_client.client.get(self)
-            finally:
-                init_client.reset()
-            return res
+        init_client = init_weave(
+            f"{self.entity}/{self.project}", ensure_project_exists=False
+        )
+        try:
+            res = init_client.client.get(self)
+        finally:
+            init_client.reset()
+        return res
 
     def is_descended_from(self, potential_ancestor: "ObjectRef") -> bool:
         if self.entity != potential_ancestor.entity:
