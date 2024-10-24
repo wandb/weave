@@ -71,6 +71,7 @@ export class Netrc {
   getEntry(machine: string): NetrcEntry | undefined {
     return this.entries.get(machine);
   }
+
   setEntry(machine: string, entry: Partial<NetrcEntry>): void {
     const existingEntry = this.entries.get(machine) || { machine };
     const updatedEntry = { ...existingEntry, ...entry } as NetrcEntry;

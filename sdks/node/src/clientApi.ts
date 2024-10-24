@@ -4,7 +4,7 @@ import { getUrls, setGlobalDomain } from './urls';
 import { ConcurrencyLimiter } from './utils/concurrencyLimit';
 import { Netrc } from './utils/netrc';
 import { createFetchWithRetry } from './utils/retry';
-import { getApiKey, parseProject } from './wandb/settings';
+import { getApiKey } from './wandb/settings';
 import { WandbServerApi } from './wandb/wandbServerApi';
 import { CallStackEntry, WeaveClient } from './weaveClient';
 
@@ -57,23 +57,27 @@ export async function login(options?: LoginOptions) {
 /**
  * Initialize the Weave client, which is required for weave tracing to work.
  *
- * @param options - The initialization options.
- * @param options.project - The W&B project name.
- * @param options.entity - (Optional) The W&B entity name.  If not provided, the default entity for your API key will be used.
- * @param options.host - (Optional) The host name (usually you only need to set this if you're using a custom W&B server).
- * @param options.settings - (Optional) Weave tracing settings
+ * @param project - The W&B project name (can be project or entity/project).
+ * @param settings - (Optional) Weave tracing settings
  * @returns A promise that resolves to the initialized Weave client.
  * @throws {Error} If the initialization fails
  */
 export async function init(project: string, settings?: Settings): Promise<WeaveClient> {
-  const { entityName: entity, projectName } = parseProject(project);
-
   const host = new Netrc().getLastEntry()?.machine;
   const { baseUrl, traceBaseUrl, domain } = getUrls(host);
   const resolvedApiKey = getApiKey(domain);
+
   try {
     const wandbServerApi = new WandbServerApi(baseUrl, resolvedApiKey);
-    const entityName = entity ?? (await wandbServerApi.defaultEntityName());
+
+    let entityName: string | undefined;
+    let projectName: string;
+    if (project.includes('/')) {
+      [entityName, projectName] = project.split('/');
+    } else {
+      entityName = await wandbServerApi.defaultEntityName();
+      projectName = project;
+    }
     const projectId = `${entityName}/${projectName}`;
 
     const retryFetch = createFetchWithRetry({
