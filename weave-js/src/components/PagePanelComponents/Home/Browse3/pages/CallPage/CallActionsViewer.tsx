@@ -1,8 +1,11 @@
 import { Button } from '@wandb/weave/components/Button/Button';
+import { Timestamp } from '@wandb/weave/components/Timestamp';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useCallback, useMemo, useState} from 'react';
 import {z} from 'zod';
 
+import { CellValue } from '../../../Browse2/CellValue';
+import { NotApplicable } from '../../../Browse2/NotApplicable';
 import {
   ConfiguredAction,
 } from '../../collections/actionCollection';
@@ -11,14 +14,10 @@ import {StyledDataGrid} from '../../StyledDataGrid'; // Import the StyledDataGri
 import {WEAVE_REF_SCHEME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import { Feedback } from '../wfReactInterface/traceServerClientTypes';
 import {convertISOToDate, projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import { Feedback } from '../wfReactInterface/traceServerClientTypes';
-import { Timestamp } from '@wandb/weave/components/Timestamp';
-import { NotApplicable } from '../../../Browse2/NotApplicable';
-import { ValueView } from './ValueView';
-import { CellValue } from '../../../Browse2/CellValue';
 
 type CallActionRow = {
   actionRef: string;
@@ -27,7 +26,6 @@ type CallActionRow = {
   lastResult?: Record<string, unknown>;
   lastRanAt?: Date;
 };
-
 // New RunButton component
 const RunButton: React.FC<{
   actionRef: string;
@@ -38,9 +36,11 @@ const RunButton: React.FC<{
   getClient: () => any;
 }> = ({actionRef, callId, entity, project, refetchFeedback, getClient}) => {
   const [isRunning, setIsRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleRunClick = async () => {
     setIsRunning(true);
+    setError(null);
     try {
       await getClient().executeBatchAction({
         project_id: projectIdFromParts({entity, project}),
@@ -48,15 +48,25 @@ const RunButton: React.FC<{
         configured_action_ref: actionRef,
       });
       refetchFeedback();
+    } catch (err) {
+      setError('An error occurred while running the action.');
     } finally {
       setIsRunning(false);
     }
   };
 
-  return (
-    <Button variant="secondary" onClick={handleRunClick} disabled={isRunning}>
-      {isRunning ? 'Running...' : 'Run'}
+  if (error) {
+    return <Button variant="destructive" onClick={handleRunClick} disabled>
+      Error
     </Button>
+  }
+
+  return (
+    <div>
+      <Button variant="secondary" onClick={handleRunClick} disabled={isRunning}>
+        {isRunning ? 'Running...' : 'Run'}
+      </Button>
+    </div>
   );
 };
 
@@ -84,14 +94,14 @@ export const CallActionsViewer: React.FC<{
   }).sort((a, b) => a.val.name.localeCompare(b.val.name));
 
 
-  const verifiedActionFeedbacks: {data: ActionFeedback, feedbackRaw: Feedback }[] = useMemo(() => {
+  const verifiedActionFeedbacks: Array<{data: ActionFeedback, feedbackRaw: Feedback }> = useMemo(() => {
     return (feedbackQuery.result ?? [])
       .map(feedback => {
         const res = ActionFeedbackZ.safeParse(feedback.payload);
         return {res, feedbackRaw: feedback};
       })
       .filter(result => result.res.success)
-      .map(result => ({data: result.res.data, feedbackRaw: result.feedbackRaw})) as {data: ActionFeedback, feedbackRaw: Feedback}[];
+      .map(result => ({data: result.res.data, feedbackRaw: result.feedbackRaw})) as Array<{data: ActionFeedback, feedbackRaw: Feedback}>;
   }, [feedbackQuery.result]);
 
   const getFeedbackForAction = useCallback((actionRef: string) => {
@@ -128,7 +138,8 @@ export const CallActionsViewer: React.FC<{
   }, [configuredActions, getFeedbackForAction, props.call.entity, props.call.project]);
 
   const columns = [
-    {field: 'action', headerName: 'Action', flex: 1},
+    {field: 'action', headerName: 'Action', flex: 1,
+  },
     {field: 'runCount', headerName: 'Run Count', flex: 1},
     {field: 'lastResult', headerName: 'Last Result', flex: 1, renderCell: (params: any) => {
       const value = params.row.lastResult;
@@ -201,6 +212,7 @@ export const CallActionsViewer: React.FC<{
           '& .MuiDataGrid-row:hover': {
             backgroundColor: 'inherit',
           },
+          
         }}
       />
     </>
