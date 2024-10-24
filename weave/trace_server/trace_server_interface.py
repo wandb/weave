@@ -692,33 +692,6 @@ class FeedbackPurgeRes(BaseModel):
     pass
 
 
-class ActionsExecuteBatchReq(BaseModel):
-    project_id: str
-    call_ids: list[str]
-    id: Optional[str] = None
-    rule_matched: Optional[str] = None
-    effect: str
-
-
-class ActionsExecuteBatchRes(BaseModel):
-    project_id: str
-    call_ids: list[str]
-    id: str
-
-
-class ActionsAckBatchReq(BaseModel):
-    project_id: str
-    call_ids: list[str]
-    id: str
-    succeeded: bool
-
-
-class ActionsAckBatchRes(BaseModel):
-    project_id: str
-    call_ids: list[str]
-    id: str
-
-
 class ActionsReadStaleReq(BaseModel):
     pass
 
@@ -842,6 +815,33 @@ class CostPurgeReq(BaseModel):
 
 class CostPurgeRes(BaseModel):
     pass
+
+
+class ActionsExecuteBatchReq(BaseModel):
+    project_id: str
+    call_ids: list[str]
+    id: Optional[str] = None
+    rule_matched: Optional[str] = None
+    effect: str
+
+
+class ActionsExecuteBatchRes(BaseModel):
+    project_id: str
+    call_ids: list[str]
+    id: str
+
+
+class ActionsAckBatchReq(BaseModel):
+    project_id: str
+    call_ids: list[str]
+    id: str
+    succeeded: bool
+
+
+class ActionsAckBatchRes(BaseModel):
+    project_id: str
+    call_ids: list[str]
+    id: str
 
 
 class ExecuteBatchActionReq(BaseModel):
