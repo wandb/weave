@@ -17,6 +17,6 @@ class ConfiguredAction(BaseModel):
 
 
 class ActionDispatchFilter(BaseModel):
-    name: str
+    op_name: str
     sample_rate: float
     configured_action_ref: str
