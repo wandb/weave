@@ -30,6 +30,7 @@ import logging
 import threading
 from collections import defaultdict
 from contextlib import contextmanager
+import contextvars
 from typing import (
     Any,
     Dict,
@@ -107,7 +108,7 @@ from weave.trace_server.trace_server_interface_util import (
     str_digest,
 )
 from weave.trace_server.model_providers.model_providers import fetch_model_to_provider_info_map, MODEL_PROVIDERS_FILE
-
+from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -1387,13 +1388,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
     
-    def execute_llm_completion(self, req: tsi.ExecuteLLMCompletionReq, secret_fetcher: tsi.SecretFetcher) -> tsi.ExecuteLLMCompletionRes:
+    def execute_llm_completion(self, req: tsi.ExecuteLLMCompletionReq) -> tsi.ExecuteLLMCompletionRes:
+        print("EXECUTE LLM COMPLETION2", req)
         model_name = req.model_name
-        secret_name = self._model_to_provider_info_map.get(model_name)
-        if not secret_name:
+        print("MODEL NAME", model_name)
+        print("MODEL TO PROVIDER INFO MAP", self._model_to_provider_info_map)
+        model_info = self._model_to_provider_info_map.get(model_name)
+        secret_fetcher = _secret_fetcher_context.get()
+        if not model_info:
             raise InvalidRequest(f"No secret name found for model {model_name}")
+        secret_name = model_info.get("api_key_name")
+        print("SECRET NAME", secret_name)
+        print("SECRET FETCHER", secret_fetcher)
         api_key = secret_fetcher.fetch(secret_name)
+        print("API KEY", api_key)
         # lite LLM API call
+
         return tsi.ExecuteLLMCompletionRes()
 
 

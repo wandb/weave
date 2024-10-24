@@ -1,6 +1,6 @@
 import datetime
 from enum import Enum
-from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Union
+from typing import Any, Callable, Dict, Iterator, List, Literal, Optional, Protocol, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
@@ -145,7 +145,7 @@ class StartedCallSchemaForInsert(BaseModel):
     attributes: Dict[str, Any]
 
     # Inputs
-    inputs: Dict[str, Any]
+    inputs: Dict[str, Any] #messages List[Dict[str, str]], model_name
 
     # WB Metadata
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -803,10 +803,6 @@ class CostPurgeReq(BaseModel):
 class CostPurgeRes(BaseModel):
     pass
 
-
-class SecretFetcher(Protocol):
-    def fetch(self, secret_name: str) -> Optional[str]: ...
-
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -850,4 +846,4 @@ class TraceServerInterface(Protocol):
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
 
     # Execute LLM API
-    def execute_llm_completion(self, req: ExecuteLLMCompletionReq, secret_fetcher: SecretFetcher) -> ExecuteLLMCompletionRes: ...
+    def execute_llm_completion(self, req: ExecuteLLMCompletionReq) -> ExecuteLLMCompletionRes: ...
