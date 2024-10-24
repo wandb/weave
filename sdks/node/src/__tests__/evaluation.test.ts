@@ -63,7 +63,7 @@ const createMockScorers = (failable: boolean) => {
 const createMockEvaluation = (
   failable: boolean,
   dataset: Dataset<any> = createMockDataset(),
-  columnMapping?: ColumnMapping
+  columnMapping?: ColumnMapping<any, any>
 ) => {
   return new Evaluation({
     dataset,

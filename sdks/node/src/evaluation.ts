@@ -8,11 +8,12 @@ import { WeaveObject, WeaveObjectParameters } from './weaveObject';
 
 const PROGRESS_BAR = false;
 
-interface EvaluationParameters<R extends DatasetRow, M> extends WeaveObjectParameters {
+// Column mapping takes a dataset row of type R and maps it to a scorer's dataset row of type E
+interface EvaluationParameters<R extends DatasetRow, E extends DatasetRow, M> extends WeaveObjectParameters {
   dataset: Dataset<R>;
-  scorers: WeaveCallable<(...args: [{ datasetRow: R; modelOutput: M }]) => any>[];
+  scorers: WeaveCallable<(...args: [{ datasetRow: E; modelOutput: M }]) => any>[];
   maxConcurrency?: number;
-  columnMapping?: ColumnMapping;
+  columnMapping?: ColumnMapping<R, E>;
 }
 
 interface Callable<T extends (...args: any[]) => any> {
@@ -121,12 +122,12 @@ async function* asyncParallelMap<T, U>(
  *
  * const results = await evaluation.evaluate({ model });
  */
-export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
+export class Evaluation<R extends DatasetRow, E extends DatasetRow, M> extends WeaveObject {
   private dataset: Dataset<R>;
-  private scorers: WeaveCallable<(...args: [{ datasetRow: R; modelOutput: M }]) => any>[];
-  private columnMapping?: ColumnMapping;
+  private scorers: WeaveCallable<(...args: [{ datasetRow: E; modelOutput: M }]) => any>[];
+  private columnMapping?: ColumnMapping<R, E>;
 
-  constructor(parameters: EvaluationParameters<R, M>) {
+  constructor(parameters: EvaluationParameters<R, E, M>) {
     super(parameters);
     this.dataset = parameters.dataset;
     this.scorers = parameters.scorers;
@@ -213,16 +214,16 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
     example,
     columnMapping,
   }: {
-    model: WeaveCallable<(...args: [{ datasetRow: R }]) => Promise<M>>;
+    model: WeaveCallable<(...args: [{ datasetRow: E }]) => Promise<M>>;
     example: R;
-    columnMapping?: ColumnMapping;
+    columnMapping?: ColumnMapping<R, E>;
   }) {
     const startTime = new Date();
     let modelOutput;
     let modelError = false;
-    let datasetRow = example;
+    let datasetRow: E = example as unknown as E;
     if (columnMapping) {
-      datasetRow = mapArgs(example, columnMapping) as R;
+      datasetRow = mapArgs(example, columnMapping);
     }
     try {
       modelOutput = await callWeaveCallable(model, { datasetRow });
