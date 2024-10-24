@@ -23,6 +23,27 @@ export type DatasetRow = Record<string, any> & {
   __savedRef?: DatasetRowRef | Promise<DatasetRowRef>;
 };
 
+/**
+ * Dataset object with easy saving and automatic versioning
+ *
+ * @example
+ * // Create a dataset
+ * const dataset = new Dataset({
+ *   id: 'grammar-dataset',
+ *   rows: [
+ *     { id: '0', sentence: "He no likes ice cream.", correction: "He doesn't like ice cream." },
+ *     { id: '1', sentence: "She goed to the store.", correction: "She went to the store." },
+ *     { id: '2', sentence: "They plays video games all day.", correction: "They play video games all day." }
+ *   ]
+ * })
+ *
+ * // Access a specific example
+ * const exampleLabel = dataset.getRow(2).sentence;
+ *
+ * // Save the dataset
+ * const ref = await dataset.save()
+ *
+ */
 export class Dataset<R extends DatasetRow> extends WeaveObject {
   public rows: Table<R>;
 

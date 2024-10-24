@@ -83,6 +83,44 @@ async function* asyncParallelMap<T, U>(
   }
 }
 
+/**
+ * Sets up an evaluation which includes a set of scorers and a dataset.
+ *
+ * Calling evaluation.evaluate(model) will pass in rows form a dataset into a model matching
+ * the names of the columns of the dataset to the argument names in model.predict.
+ *
+ * Then it will call all of the scorers and save the results in weave.
+ *
+ * @example
+ * // Collect your examples into a dataset
+ * const dataset = new weave.Dataset({
+ *   id: 'my-dataset',
+ *   rows: [
+ *     { question: 'What is the capital of France?', expected: 'Paris' },
+ *     { question: 'Who wrote "To Kill a Mockingbird"?', expected: 'Harper Lee' },
+ *     { question: 'What is the square root of 64?', expected: '8' },
+ *   ],
+ * });
+ *
+ * // Define any custom scoring function
+ * const scoringFunction = weave.op(function isEqual({ modelOutput, datasetRow }) {
+ *   return modelOutput == datasetRow.expected;
+ * });
+ *
+ * // Define the function to evaluate
+ * const model = weave.op(async function alwaysParisModel({ question }) {
+ *   return 'Paris';
+ * });
+ *
+ * // Start evaluating
+ * const evaluation = new weave.Evaluation({
+ *   id: 'my-evaluation',
+ *   dataset: dataset,
+ *   scorers: [scoringFunction],
+ * });
+ *
+ * const results = await evaluation.evaluate({ model });
+ */
 export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
   private dataset: Dataset<R>;
   private scorers: WeaveCallable<(...args: [{ datasetRow: R; modelOutput: M }]) => any>[];
@@ -179,7 +217,6 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
     example: R;
     columnMapping?: ColumnMapping;
   }) {
-    console.log('calling predictAndScore with example=', example, 'columnMapping=', columnMapping);
     const startTime = new Date();
     let modelOutput;
     let modelError = false;
@@ -187,10 +224,8 @@ export class Evaluation<R extends DatasetRow, M> extends WeaveObject {
     if (columnMapping) {
       datasetRow = mapArgs(example, columnMapping) as R;
     }
-    console.log('datasetRow=', datasetRow);
     try {
       modelOutput = await callWeaveCallable(model, { datasetRow });
-      console.log('modelOutput=', modelOutput);
     } catch (e) {
       console.error(e);
       modelError = true;
