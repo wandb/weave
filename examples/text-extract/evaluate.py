@@ -6,7 +6,7 @@ from typing import Any
 import openai
 
 import weave
-from weave.flow.scorer import MultiTaskBinaryClassificationF1
+from weave.scorers import MultiTaskBinaryClassificationF1
 
 
 class TextExtractModel(weave.Model):

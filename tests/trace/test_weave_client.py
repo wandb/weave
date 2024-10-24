@@ -754,8 +754,8 @@ def test_evaluate(client):
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 
     @weave.op()
-    async def score(target, model_output):
-        return target == model_output
+    async def score(target, output):
+        return target == output
 
     evaluation = Evaluation(
         name="my-eval",
@@ -764,7 +764,7 @@ def test_evaluate(client):
     )
     result = asyncio.run(evaluation.evaluate(model_predict))
     expected_eval_result = {
-        "model_output": {"mean": 9.5},
+        "output": {"mean": 9.5},
         "score": {"true_count": 1, "true_fraction": 0.5},
     }
     assert result == expected_eval_result
@@ -864,8 +864,8 @@ def test_nested_ref_is_inner(client):
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 
     @weave.op()
-    async def score(target, model_output):
-        return target == model_output
+    async def score(target, output):
+        return target == output
 
     evaluation = Evaluation(
         name="my-eval",

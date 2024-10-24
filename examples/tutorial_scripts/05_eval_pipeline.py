@@ -60,7 +60,7 @@ examples = [
 ]
 
 import weave
-from weave.flow.scorer import MultiTaskBinaryClassificationF1
+from weave.scorers import MultiTaskBinaryClassificationF1
 
 
 @weave.op()

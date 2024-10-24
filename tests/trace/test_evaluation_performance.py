@@ -91,8 +91,8 @@ def build_evaluation():
         return "I don't know"
 
     @weave.op()
-    def score(question: str, expected: str, model_output: str):
-        return model_output == expected
+    def score(question: str, expected: str, output: str):
+        return output == expected
 
     evaluation = weave.Evaluation(
         name="My Evaluation",
