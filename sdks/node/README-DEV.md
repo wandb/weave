@@ -3,6 +3,8 @@
 1. Setup your env
 
    ```sh
+   make boostrap
+
    pnpm install
    pnpm link --global
    pnpm link --global weave
