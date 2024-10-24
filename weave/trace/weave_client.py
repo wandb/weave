@@ -1,5 +1,6 @@
 import dataclasses
 import datetime
+import logging
 import platform
 import re
 import sys
@@ -37,7 +38,7 @@ from weave.trace.refs import (
 )
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
-from weave.trace.settings import client_parallelism
+from weave.trace.settings import client_parallelism, should_convert_paths_to_images
 from weave.trace.table import Table
 from weave.trace.util import deprecated
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
@@ -76,11 +77,15 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.type_serializers.Image.image import PathImage
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
 # If True, use existing ref to object in other project.
 ALLOW_MIXED_PROJECT_REFS = False
+
+
+logger = logging.getLogger(__name__)
 
 
 def dataclasses_asdict_one_level(obj: Any) -> typing.Dict[str, Any]:
@@ -641,11 +646,17 @@ class WeaveClient:
         unbound_op = maybe_unbind_method(op)
         op_def_ref = self._save_op(unbound_op)
 
-        inputs_redacted = redact_sensitive_keys(inputs)
+        parse_obj_functions: list[Callable] = [redact_sensitive_keys]
+        if should_convert_paths_to_images():
+            parse_obj_functions.append(convert_paths_to_images)
+
+        inputs = parse_obj(inputs, parse_obj_functions)
+
+        # user controlled parsing of inputs
         if op.postprocess_inputs:
-            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
+            inputs_postprocessed = op.postprocess_inputs(inputs)
         else:
-            inputs_postprocessed = inputs_redacted
+            inputs_postprocessed = inputs
 
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
@@ -734,14 +745,21 @@ class WeaveClient:
     ) -> None:
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
+
+        parse_obj_functions: list[Callable] = []
+        if should_convert_paths_to_images():
+            parse_obj_functions.append(convert_paths_to_images)
+
+        output = parse_obj(output, parse_obj_functions)
         original_output = output
 
+        # user controlled postprocessing of output
         if op is not None and op.postprocess_output:
             postprocessed_output = op.postprocess_output(original_output)
         else:
             postprocessed_output = original_output
-        self._save_nested_objects(postprocessed_output)
 
+        self._save_nested_objects(postprocessed_output)
         call.output = map_to_refs(postprocessed_output)
 
         # Summary handling
@@ -1527,37 +1545,19 @@ REDACT_KEYS = (
 REDACTED_VALUE = "REDACTED"
 
 
-def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
-    # We should NEVER mutate reffed objects.
-    #
-    # 1. This code builds new objects that no longer have refs
-    # 2. Even if we did an in-place edit, that would invalidate the ref (since
-    # the ref is to the object's digest)
+def redact_sensitive_keys(obj: dict) -> dict:
     if get_ref(obj):
         return obj
 
-    if isinstance(obj, dict):
-        dict_res = {}
-        for k, v in obj.items():
-            if k in REDACT_KEYS:
-                dict_res[k] = REDACTED_VALUE
-            else:
-                dict_res[k] = redact_sensitive_keys(v)
-        return dict_res
+    assert isinstance(obj, dict)
 
-    elif isinstance(obj, list):
-        list_res = []
-        for v in obj:
-            list_res.append(redact_sensitive_keys(v))
-        return list_res
-
-    elif isinstance(obj, tuple):
-        tuple_res = []
-        for v in obj:
-            tuple_res.append(redact_sensitive_keys(v))
-        return tuple(tuple_res)
-
-    return obj
+    dict_res = {}
+    for k, v in obj.items():
+        if k in REDACT_KEYS:
+            dict_res[k] = REDACTED_VALUE
+        else:
+            dict_res[k] = v
+    return dict_res
 
 
 def sanitize_object_name(name: str) -> str:
@@ -1570,6 +1570,68 @@ def sanitize_object_name(name: str) -> str:
     if len(res) > 128:
         res = res[:128]
     return res
+
+
+# match local image file paths
+image_suffix = r".*\.(png|jpg|jpeg|gif|tiff)"
+local_image_pattern = re.compile(rf"^{image_suffix}$", re.IGNORECASE)
+remote_image_pattern = re.compile(rf"https://.*\.{image_suffix}", re.IGNORECASE)
+
+
+def convert_paths_to_images(obj: str) -> typing.Union[str, PathImage]:
+    """Load or download paths to images as PathImage objects.
+
+    If the path is a local image, open it and return a PathImage object.
+    If the path is a remote image, download it and return a PathImage object.
+    """
+    if remote_image_pattern.match(obj):
+        return PathImage(path=obj, is_local=False)
+    elif local_image_pattern.match(obj):
+        return PathImage(path=obj, is_local=True)
+
+    return obj
+
+
+def parse_obj(obj: Any, parsers: list[Callable[..., Any]]) -> Any:
+    """Parse an object with conversion parsers.
+    Accepts a list of functions that do operations on the object.
+        parser functions must include type hints, and accept exactly
+        one parameter called "obj" that can be modified and returned
+        example:
+            def atoi(obj: str):
+                return int(obj)
+
+
+    Returns the modified object
+    """
+    # Dont mutate reffed objects
+    if get_ref(obj):
+        return obj
+
+    # recurse through container types
+    if isinstance(obj, dict):
+        # Do any dict-type parsing
+        for parser in parsers:
+            param_types = typing.get_type_hints(parser)
+            if "obj" in param_types and param_types["obj"] == dict:
+                obj = parser(obj)
+
+        # Then recurse through the items
+        obj = {k: parse_obj(v, parsers) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        obj = [parse_obj(v, parsers) for v in obj]
+    elif isinstance_namedtuple(obj):
+        obj = {k: parse_obj(v, parsers) for k, v in obj._asdict().items()}
+    elif isinstance(obj, tuple):
+        obj = tuple([parse_obj(v, parsers) for v in obj])
+
+    # apply parsers to primatives
+    if isinstance(obj, str):
+        for parser in parsers:
+            param_types = typing.get_type_hints(parser)
+            if "obj" in param_types and param_types["obj"] == str:
+                obj = parser(obj)
+    return obj
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]
