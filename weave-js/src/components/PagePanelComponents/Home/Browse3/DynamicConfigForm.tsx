@@ -10,7 +10,7 @@ import {
   Typography,
 } from '@material-ui/core';
 import {Delete} from '@mui/icons-material';
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import {z} from 'zod';
 
 interface DynamicConfigFormProps {
@@ -18,254 +18,403 @@ interface DynamicConfigFormProps {
   config: Record<string, any>;
   setConfig: (config: Record<string, any>) => void;
   path?: string[];
+  onValidChange?: (isValid: boolean) => void;
 }
+
+const NestedForm: React.FC<{
+  keyName: string;
+  fieldSchema: z.ZodTypeAny;
+  config: Record<string, any>;
+  setConfig: (config: Record<string, any>) => void;
+  path: string[];
+}> = ({keyName, fieldSchema, config, setConfig, path}) => {
+  const currentPath = [...path, keyName];
+  const currentValue = getNestedValue(config, currentPath);
+
+  if (fieldSchema instanceof z.ZodObject) {
+    return (
+      <FormControl fullWidth margin="normal">
+        <InputLabel>{keyName}</InputLabel>
+        <Box ml={2}>
+          <DynamicConfigForm
+            configSchema={fieldSchema}
+            config={config}
+            setConfig={setConfig}
+            path={currentPath}
+          />
+        </Box>
+      </FormControl>
+    );
+  }
+
+  if (fieldSchema instanceof z.ZodArray) {
+    return (
+      <ArrayField
+        keyName={keyName}
+        fieldSchema={fieldSchema}
+        targetPath={currentPath}
+        value={currentValue}
+        config={config}
+        setConfig={setConfig}
+      />
+    );
+  }
+
+  if (fieldSchema instanceof z.ZodEnum) {
+    return (
+      <EnumField
+        keyName={keyName}
+        fieldSchema={fieldSchema}
+        targetPath={currentPath}
+        value={currentValue}
+        config={config}
+        setConfig={setConfig}
+      />
+    );
+  }
+
+  if (fieldSchema instanceof z.ZodRecord) {
+    return (
+      <RecordField
+        keyName={keyName}
+        fieldSchema={fieldSchema}
+        targetPath={currentPath}
+        value={currentValue}
+        config={config}
+        setConfig={setConfig}
+      />
+    );
+  }
+
+  let fieldType = 'text';
+  if (fieldSchema instanceof z.ZodNumber) {
+    fieldType = 'number';
+  } else if (fieldSchema instanceof z.ZodBoolean) {
+    fieldType = 'checkbox';
+  }
+
+  return (
+    <TextField
+      fullWidth
+      label={keyName}
+      type={fieldType}
+      value={currentValue || ''}
+      onChange={e =>
+        updateConfig(currentPath, e.target.value, config, setConfig)
+      }
+      margin="normal"
+    />
+  );
+};
+
+const ArrayField: React.FC<{
+  keyName: string;
+  fieldSchema: z.ZodArray<any>;
+  targetPath: string[];
+  value: any[];
+  config: Record<string, any>;
+  setConfig: (config: Record<string, any>) => void;
+}> = ({keyName, fieldSchema, targetPath, value, config, setConfig}) => {
+  const arrayValue = Array.isArray(value) ? value : [];
+  const elementSchema = fieldSchema.element;
+  const minItems = fieldSchema._def.minLength?.value ?? 0;
+
+  // Ensure the minimum number of items is always present
+  React.useEffect(() => {
+    if (arrayValue.length < minItems) {
+      const itemsToAdd = minItems - arrayValue.length;
+      const newItems = Array(itemsToAdd).fill(null).map(() => 
+        elementSchema instanceof z.ZodObject ? {} : null
+      );
+      updateConfig(targetPath, [...arrayValue, ...newItems], config, setConfig);
+    }
+  }, [arrayValue, minItems, elementSchema, targetPath, config, setConfig]);
+
+  return (
+    <FormControl fullWidth margin="normal">
+      <InputLabel>{keyName}</InputLabel>
+      {arrayValue.map((_, index) => (
+        <Box
+          key={index}
+          display="flex"
+          flexDirection="column"
+          alignItems="flex-start"
+          mb={2}
+          sx={{
+            borderBottom: '1px solid',
+            p: 2,
+          }}>
+          <Box flexGrow={1} width="100%">
+            <DynamicConfigForm
+              configSchema={elementSchema}
+              config={config}
+              setConfig={setConfig}
+              path={[...targetPath, index.toString()]}
+            />
+          </Box>
+          <Box mt={1}>
+            <IconButton
+              onClick={() =>
+                removeArrayItem(targetPath, index, config, setConfig)
+              }
+              disabled={arrayValue.length <= minItems}>
+              <Delete />
+            </IconButton>
+          </Box>
+        </Box>
+      ))}
+      <Button
+        onClick={() =>
+          addArrayItem(targetPath, elementSchema, config, setConfig)
+        }>
+        Add Item
+      </Button>
+    </FormControl>
+  );
+};
+
+const EnumField: React.FC<{
+  keyName: string;
+  fieldSchema: z.ZodEnum<any>;
+  targetPath: string[];
+  value: any;
+  config: Record<string, any>;
+  setConfig: (config: Record<string, any>) => void;
+}> = ({keyName, fieldSchema, targetPath, value, config, setConfig}) => {
+  const options = fieldSchema.options;
+
+  const selectedValue = value ?? options[0];
+  useEffect(() => {
+    if (value === null || value === undefined) {
+      updateConfig(targetPath, selectedValue, config, setConfig);
+    }
+  }, [value, selectedValue, targetPath, config, setConfig]);
+
+  return (
+    <FormControl fullWidth margin="normal">
+      <InputLabel>{keyName}</InputLabel>
+      <Select
+        fullWidth
+        value={selectedValue}
+        onChange={e =>
+          updateConfig(targetPath, e.target.value, config, setConfig)
+        }>
+        {options.map((option: string) => (
+          <MenuItem key={option} value={option}>
+            {option}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  );
+};
+
+const RecordField: React.FC<{
+  keyName: string;
+  fieldSchema: z.ZodRecord<any, any>;
+  targetPath: string[];
+  value: Record<string, any>;
+  config: Record<string, any>;
+  setConfig: (config: Record<string, any>) => void;
+}> = ({keyName, fieldSchema, targetPath, value, config, setConfig}) => {
+  const recordValue = value || {};
+
+  return (
+    <FormControl fullWidth margin="normal">
+      <InputLabel>{keyName}</InputLabel>
+      {Object.entries(recordValue).map(([recordValueKey, recordValueValue]) => (
+        <Box key={recordValueKey} display="flex" alignItems="center">
+          <TextField
+            fullWidth
+            label={`Key: ${recordValueKey}`}
+            value={recordValueKey}
+            onChange={e =>
+              updateRecordKey(
+                targetPath,
+                recordValueKey,
+                e.target.value,
+                config,
+                setConfig
+              )
+            }
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            label={`Value: ${recordValueKey}`}
+            value={recordValueValue}
+            onChange={e =>
+              updateRecordValue(
+                targetPath,
+                recordValueKey,
+                e.target.value,
+                config,
+                setConfig
+              )
+            }
+            margin="normal"
+          />
+          <IconButton
+            onClick={() =>
+              removeRecordItem(targetPath, recordValueKey, config, setConfig)
+            }>
+            <Delete />
+          </IconButton>
+        </Box>
+      ))}
+      <Button onClick={() => addRecordItem(targetPath, config, setConfig)}>
+        Add Item
+      </Button>
+    </FormControl>
+  );
+};
+
+const getNestedValue = (obj: any, targetPath: string[]): any => {
+  return targetPath.reduce(
+    (acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined),
+    obj
+  );
+};
+
+const updateConfig = (
+  targetPath: string[],
+  value: any,
+  config: Record<string, any>,
+  setConfig: (config: Record<string, any>) => void
+) => {
+  const newConfig = {...config};
+  let current = newConfig;
+  for (let i = 0; i < targetPath.length - 1; i++) {
+    if (!(targetPath[i] in current)) {
+      current[targetPath[i]] = {};
+    }
+    current = current[targetPath[i]];
+  }
+  current[targetPath[targetPath.length - 1]] = value;
+  setConfig(newConfig);
+};
+
+const addArrayItem = (
+  targetPath: string[],
+  elementSchema: z.ZodTypeAny,
+  config: Record<string, any>,
+  setConfig: (config: Record<string, any>) => void
+) => {
+  const currentArray = getNestedValue(config, targetPath) || [];
+  const newItem = elementSchema instanceof z.ZodObject ? {} : null;
+  updateConfig(targetPath, [...currentArray, newItem], config, setConfig);
+};
+
+const removeArrayItem = (
+  targetPath: string[],
+  index: number,
+  config: Record<string, any>,
+  setConfig: (config: Record<string, any>) => void
+) => {
+  const currentArray = getNestedValue(config, targetPath) || [];
+  const fieldSchema = getNestedValue(config, targetPath.slice(0, -1));
+  const minItems = fieldSchema?._def?.minLength?.value ?? 0;
+
+  if (currentArray.length > minItems) {
+    updateConfig(
+      targetPath,
+      currentArray.filter((_: any, i: number) => i !== index),
+      config,
+      setConfig
+    );
+  }
+};
+
+const addRecordItem = (
+  targetPath: string[],
+  config: Record<string, any>,
+  setConfig: (config: Record<string, any>) => void
+) => {
+  const currentRecord = getNestedValue(config, targetPath) || {};
+  const newKey = `key${Object.keys(currentRecord).length + 1}`;
+  updateConfig(targetPath, {...currentRecord, [newKey]: ''}, config, setConfig);
+};
+
+const removeRecordItem = (
+  targetPath: string[],
+  key: string,
+  config: Record<string, any>,
+  setConfig: (config: Record<string, any>) => void
+) => {
+  const currentRecord = getNestedValue(config, targetPath) || {};
+  const {[key]: _, ...newRecord} = currentRecord;
+  updateConfig(targetPath, newRecord, config, setConfig);
+};
+
+const updateRecordKey = (
+  targetPath: string[],
+  oldKey: string,
+  newKey: string,
+  config: Record<string, any>,
+  setConfig: (config: Record<string, any>) => void
+) => {
+  const currentRecord = getNestedValue(config, targetPath) || {};
+  const {[oldKey]: value, ...rest} = currentRecord;
+  updateConfig(targetPath, {...rest, [newKey]: value}, config, setConfig);
+};
+
+const updateRecordValue = (
+  targetPath: string[],
+  key: string,
+  value: any,
+  config: Record<string, any>,
+  setConfig: (config: Record<string, any>) => void
+) => {
+  const currentRecord = getNestedValue(config, targetPath) || {};
+  updateConfig(targetPath, {...currentRecord, [key]: value}, config, setConfig);
+};
+
+const validateConfig = (schema: z.ZodType<any>, config: any): boolean => {
+  try {
+    schema.parse(config);
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
 
 export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
   configSchema,
   config,
   setConfig,
   path = [],
+  onValidChange,
 }) => {
-  const renderField = (key: string, fieldSchema: z.ZodTypeAny) => {
-    const currentPath = [...path, key];
-    const currentValue = getNestedValue(config, currentPath);
-
-    if (fieldSchema instanceof z.ZodObject) {
-      return (
-        <FormControl fullWidth margin="normal">
-          <InputLabel>{key}</InputLabel>
-          <Box ml={2}>
-            <DynamicConfigForm
-              configSchema={fieldSchema}
-              config={config}
-              setConfig={setConfig}
-              path={currentPath}
-            />
-          </Box>
-        </FormControl>
-      );
+  useEffect(() => {
+    const validationResult = validateConfig(configSchema, config);
+    if (onValidChange) {
+      onValidChange(validationResult);
     }
-
-    if (fieldSchema instanceof z.ZodArray) {
-      return renderArrayField(key, fieldSchema, currentPath, currentValue);
-    }
-
-    if (fieldSchema instanceof z.ZodEnum) {
-      return renderEnumField(key, fieldSchema, currentPath, currentValue);
-    }
-
-    if (fieldSchema instanceof z.ZodRecord) {
-      return renderRecordField(key, fieldSchema, currentPath, currentValue);
-    }
-
-    let fieldType = 'text';
-    if (fieldSchema instanceof z.ZodNumber) {
-      fieldType = 'number';
-    } else if (fieldSchema instanceof z.ZodBoolean) {
-      fieldType = 'checkbox';
-    }
-
-    return (
-      <TextField
-        key={key}
-        fullWidth
-        label={key}
-        type={fieldType}
-        value={currentValue || ''}
-        onChange={e => updateConfig(currentPath, e.target.value)}
-        margin="normal"
-      />
-    );
-  };
-
-  const renderArrayField = (
-    key: string,
-    fieldSchema: z.ZodArray<any>,
-    targetPath: string[],
-    value: any[]
-  ) => {
-    const arrayValue = Array.isArray(value) ? value : [];
-    const elementSchema = fieldSchema.element;
-
-    return (
-      <FormControl fullWidth margin="normal">
-        <InputLabel>{key}</InputLabel>
-        {arrayValue.map((_, index) => (
-          <Box
-            key={index}
-            display="flex"
-            flexDirection="column"
-            alignItems="flex-start"
-            mb={2}
-            sx={{
-              borderBottom: '1px solid',
-              p: 2,
-            }}>
-            <Box flexGrow={1} width="100%">
-              <DynamicConfigForm
-                configSchema={elementSchema}
-                config={config}
-                setConfig={setConfig}
-                path={[...targetPath, index.toString()]}
-              />
-            </Box>
-            <Box mt={1}>
-              <IconButton onClick={() => removeArrayItem(targetPath, index)}>
-                <Delete />
-              </IconButton>
-            </Box>
-          </Box>
-        ))}
-        <Button onClick={() => addArrayItem(targetPath, elementSchema)}>
-          Add Item
-        </Button>
-      </FormControl>
-    );
-  };
-
-  const renderEnumField = (
-    key: string,
-    fieldSchema: z.ZodEnum<any>,
-    targetPath: string[],
-    value: any
-  ) => {
-    const options = fieldSchema.options;
-
-    // Check if the current value is null or undefined, and default to the first option
-    const selectedValue = value ?? options[0];
-    if (value === null || value === undefined) {
-      updateConfig(targetPath, selectedValue);
-    }
-
-    return (
-      <FormControl fullWidth margin="normal">
-        <InputLabel>{key}</InputLabel>
-        <Select
-          fullWidth
-          value={selectedValue}
-          onChange={e => updateConfig(targetPath, e.target.value)}>
-          {options.map((option: string) => (
-            <MenuItem key={option} value={option}>
-              {option}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-    );
-  };
-
-  const renderRecordField = (
-    key: string,
-    fieldSchema: z.ZodRecord<any, any>,
-    targetPath: string[],
-    value: Record<string, any>
-  ) => {
-    const recordValue = value || {};
-
-    return (
-      <FormControl fullWidth margin="normal">
-        <InputLabel>{key}</InputLabel>
-        {Object.entries(recordValue).map(
-          ([recordValueKey, recordValueValue]) => (
-            <Box key={recordValueKey} display="flex" alignItems="center">
-              <TextField
-                fullWidth
-                label={`Key: ${recordValueKey}`}
-                value={recordValueKey}
-                onChange={e =>
-                  updateRecordKey(targetPath, recordValueKey, e.target.value)
-                }
-                margin="normal"
-              />
-              <TextField
-                fullWidth
-                label={`Value: ${recordValueKey}`}
-                value={recordValueValue}
-                onChange={e =>
-                  updateRecordValue(targetPath, recordValueKey, e.target.value)
-                }
-                margin="normal"
-              />
-              <IconButton
-                onClick={() => removeRecordItem(targetPath, recordValueKey)}>
-                Delete
-              </IconButton>
-            </Box>
-          )
-        )}
-        <Button onClick={() => addRecordItem(targetPath)}>Add Item</Button>
-      </FormControl>
-    );
-  };
-
-  const getNestedValue = (obj: any, targetPath: string[]): any => {
-    return targetPath.reduce(
-      (acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined),
-      obj
-    );
-  };
-
-  const updateConfig = (targetPath: string[], value: any) => {
-    const newConfig = {...config};
-    let current = newConfig;
-    for (let i = 0; i < targetPath.length - 1; i++) {
-      if (!(targetPath[i] in current)) {
-        current[targetPath[i]] = {};
-      }
-      current = current[targetPath[i]];
-    }
-    current[targetPath[targetPath.length - 1]] = value;
-    setConfig(newConfig);
-  };
-
-  const addArrayItem = (targetPath: string[], elementSchema: z.ZodTypeAny) => {
-    const currentArray = getNestedValue(config, targetPath) || [];
-    const newItem = elementSchema instanceof z.ZodObject ? {} : null;
-    updateConfig(targetPath, [...currentArray, newItem]);
-  };
-
-  const removeArrayItem = (targetPath: string[], index: number) => {
-    const currentArray = getNestedValue(config, targetPath) || [];
-    updateConfig(
-      targetPath,
-      currentArray.filter((_: any, i: number) => i !== index)
-    );
-  };
-
-  const addRecordItem = (targetPath: string[]) => {
-    const currentRecord = getNestedValue(config, targetPath) || {};
-    const newKey = `key${Object.keys(currentRecord).length + 1}`;
-    updateConfig(targetPath, {...currentRecord, [newKey]: ''});
-  };
-
-  const removeRecordItem = (targetPath: string[], key: string) => {
-    const currentRecord = getNestedValue(config, targetPath) || {};
-    const {[key]: _, ...newRecord} = currentRecord;
-    updateConfig(targetPath, newRecord);
-  };
-
-  const updateRecordKey = (
-    targetPath: string[],
-    oldKey: string,
-    newKey: string
-  ) => {
-    const currentRecord = getNestedValue(config, targetPath) || {};
-    const {[oldKey]: value, ...rest} = currentRecord;
-    updateConfig(targetPath, {...rest, [newKey]: value});
-  };
-
-  const updateRecordValue = (targetPath: string[], key: string, value: any) => {
-    const currentRecord = getNestedValue(config, targetPath) || {};
-    updateConfig(targetPath, {...currentRecord, [key]: value});
-  };
+  }, [config, configSchema, onValidChange]);
 
   const renderContent = () => {
     if (configSchema instanceof z.ZodRecord) {
-      return renderRecordField('', configSchema, [], config);
-    } else if (configSchema instanceof z.ZodObject) {
-      return Object.entries(configSchema.shape).map(([key, fieldSchema]) =>
-        renderField(key, fieldSchema as z.ZodTypeAny)
+      return (
+        <RecordField
+          keyName=""
+          fieldSchema={configSchema}
+          targetPath={[]}
+          value={config}
+          config={config}
+          setConfig={setConfig}
+        />
       );
+    } else if (configSchema instanceof z.ZodObject) {
+      return Object.entries(configSchema.shape).map(([key, fieldSchema]) => (
+        <NestedForm
+          key={key} // React key for list rendering
+          keyName={key}
+          fieldSchema={fieldSchema as z.ZodTypeAny}
+          config={config}
+          setConfig={setConfig}
+          path={path}
+        />
+      ));
     } else {
       return <Typography color="error">Unsupported schema type</Typography>;
     }

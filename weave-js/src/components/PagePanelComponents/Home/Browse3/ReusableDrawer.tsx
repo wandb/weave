@@ -6,6 +6,7 @@ interface ReusableDrawerProps {
   title: string;
   onClose: () => void;
   onSave: () => void;
+  saveDisabled?: boolean;
   children: ReactNode;
 }
 
@@ -14,6 +15,7 @@ export const ReusableDrawer: FC<ReusableDrawerProps> = ({
   title,
   onClose,
   onSave,
+  saveDisabled,
   children,
 }) => {
   return (
@@ -48,7 +50,11 @@ export const ReusableDrawer: FC<ReusableDrawerProps> = ({
           <Button onClick={onClose} style={{marginRight: 8}}>
             Cancel
           </Button>
-          <Button onClick={onSave} variant="contained" color="primary">
+          <Button
+            onClick={onSave}
+            variant="contained"
+            color="primary"
+            disabled={saveDisabled}>
             Save
           </Button>
         </Box>

@@ -103,6 +103,7 @@ export const OpOnlineScorersTab: React.FC<{
         rows={rows}
         columns={columns}
         autoHeight
+        columnHeaderHeight={40}
         disableRowSelectionOnClick
         sx={{
           '& .MuiDataGrid-row:hover': {

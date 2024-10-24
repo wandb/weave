@@ -37,7 +37,7 @@ const BuiltinActionConfigSchema = z.object({
       type: z.enum(['boolean', 'number', 'string']),
       // is_required: z.boolean(),
     })
-  ),
+  ).min(1),
 });
 
 export const knownBuiltinActions: ActionAndSpec[] = [

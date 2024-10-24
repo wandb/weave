@@ -42,12 +42,15 @@ export const NewBuiltInActionScorerModal: FC<
     onSave(newAction);
   };
 
+  const [isValid, setIsValid] = useState(false);
+
   return (
     <ReusableDrawer
       open={open}
       title="Configure new built-in action scorer"
       onClose={onClose}
-      onSave={handleSave}>
+      onSave={handleSave}
+      saveDisabled={!isValid}>
       <TextField
         fullWidth
         label="Name"
@@ -74,6 +77,7 @@ export const NewBuiltInActionScorerModal: FC<
           configSchema={knownBuiltinActions[selectedActionIndex].configSpec}
           config={config}
           setConfig={setConfig}
+          onValidChange={setIsValid}
         />
       )}
     </ReusableDrawer>
