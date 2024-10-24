@@ -191,10 +191,8 @@ export type FeedbackPurgeError = {
 };
 export type FeedbackPurgeRes = FeedbackPurgeSuccess | FeedbackPurgeError;
 
-export type FeedbackReplaceReq = {
-  project_id: string;
+export type FeedbackReplaceReq = FeedbackCreateReq & {
   feedback_id: string;
-  payload: Record<string, any>;
 };
 export type FeedbackReplaceSuccess = {};
 export type FeedbackReplaceError = {

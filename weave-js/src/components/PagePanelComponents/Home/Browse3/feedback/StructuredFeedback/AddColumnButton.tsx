@@ -46,8 +46,8 @@ type EmojiFeedback = BaseFeedback & {
 type StructuredFeedback = CategoricalFeedback | NumericalFeedback | TextFeedback | BooleanFeedback | EmojiFeedback;
 
 type StructuredFeedbackSpec = {
-    _bases: string[],
-    _class_name: string,
+    _bases?: string[],
+    _class_name?: string,
 
     types: StructuredFeedback[],
     ref?: string,
@@ -257,8 +257,9 @@ const CreateStructuredFeedbackModal = ({ entity, project, existingFeedbackColumn
     const getTsClient = useGetTraceServerClientContext();
 
     const submit = () => {
-        const option = FEEDBACK_TYPE_OPTIONS.find((o) => o.name === selectedFeedbackType);
+        const option = FEEDBACK_TYPE_OPTIONS.find((o) => o.value === selectedFeedbackType);
         if (!option) {
+            console.error(`Invalid feedback type: ${selectedFeedbackType}, options: ${FEEDBACK_TYPE_OPTIONS.map((o) => o.value).join(', ')}`);
             return;
         }
         let newFeedback;
@@ -298,13 +299,13 @@ const CreateStructuredFeedbackModal = ({ entity, project, existingFeedbackColumn
                 selectedFeedbackType={selectedFeedbackType}
                 setSelectedFeedbackType={setSelectedFeedbackType}
             />
-            {selectedFeedbackType === "Numerical feedback" && (
+            {selectedFeedbackType === "NumericalFeedback" && (
                 <NumericalFeedbackComponent
                     onSetMin={setMinValue}
                     onSetMax={setMaxValue}
                 />
             )}
-            {selectedFeedbackType === "Categorical feedback" && (
+            {selectedFeedbackType === "CategoricalFeedback" && (
                 <CategoricalFeedbackComponent
                     options={categoricalOptions}
                     setOptions={setCategoricalOptions}

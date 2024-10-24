@@ -118,6 +118,8 @@ export class TraceServerClient extends DirectTraceServerClient {
   }
   public feedbackReplace(req: FeedbackReplaceReq): Promise<FeedbackReplaceRes> {
     const res = super.feedbackReplace(req).then(replaceRes => {
+      const listeners = this.onFeedbackListeners[req.weave_ref] ?? [];
+      listeners.forEach(listener => listener());
       return replaceRes;
     });
     return res;

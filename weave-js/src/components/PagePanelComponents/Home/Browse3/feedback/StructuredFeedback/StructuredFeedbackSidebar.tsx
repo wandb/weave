@@ -50,7 +50,7 @@ export default function StructuredFeedbackSidebar(
                                 {types?.map((type: any) => (
                                     <div key={type.name}>
                                         <h3 className='px-6 py-4 text-sm font-semibold text-gray-700 bg-gray-50'>{type.name}</h3>
-                                        <div className='px-6 pt-2 pb-8'>
+                                        <div className='pl-6 pr-8 pt-2 pb-8'>
                                             <StructuredFeedbackCell
                                                 sfData={type}
                                                 callRef={callRef}

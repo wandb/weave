@@ -302,7 +302,13 @@ const CallPageInnerVertical: FC<{
       }
       isSidebarOpen={showTraceTree}
       isFeedbackSidebarOpen={showFeedbackExpand}
-      feedbackSidebarContent={<StructuredFeedbackSidebar entity={currentCall.entity} project={currentCall.project} callID={currentCall.callId} nextCall={onNextCall}/>}
+      feedbackSidebarContent={
+        <StructuredFeedbackSidebar
+          entity={currentCall.entity}
+          project={currentCall.project}
+          callID={currentCall.callId}
+        />
+      }
       headerContent={<CallOverview call={currentCall} />}
       leftSidebar={
         <Tailwind style={{display: 'contents'}}>

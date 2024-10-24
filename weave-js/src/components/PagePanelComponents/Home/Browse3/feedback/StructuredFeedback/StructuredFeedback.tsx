@@ -18,6 +18,7 @@ const FEEDBACK_TYPES = {
   CATEGORICAL: 'CategoricalFeedback',
   BOOLEAN: 'BooleanFeedback',
 };
+const DEBOUNCE_VAL = 150;
 
 // Interfaces
 interface StructuredFeedbackProps {
@@ -51,7 +52,6 @@ const createFeedbackRequest = (props: StructuredFeedbackProps, value: any, curre
 };
 
 export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props) => {
-  console.log("StructuredFeedbackCell", props.callRef);
   const { useFeedback } = useWFHooks();
   const query = useFeedback({
     entity: props.entity,
@@ -62,6 +62,11 @@ export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props)
   const [currentFeedbackId, setCurrentFeedbackId] = useState<string | null>(null);
   const [foundValue, setFoundValue] = useState<string | number | null>(null);
   const getTsClient = useGetTraceServerClientContext();
+
+  useEffect(() => {
+    return getTsClient().registerOnFeedbackListener(props.callRef, query.refetch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (props.callRef !== query?.result?.[0]?.weave_ref) {
@@ -137,7 +142,7 @@ export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props)
   }
 
   return (
-    <div className="flex justify-center w-full">
+    <div className="flex justify-center w-full p-6">
       {renderFeedbackComponent()}
     </div>
   );
@@ -198,7 +203,7 @@ export const NumericalFeedbackColumn = ({min, max, onAddFeedback, defaultValue, 
     const debouncedOnAddFeedback = useCallback(
         debounce((val: number) => {
             onAddFeedback?.(val, currentFeedbackId ?? null);
-        }, 500),
+        }, DEBOUNCE_VAL),
         [onAddFeedback, currentFeedbackId]
     );
 
@@ -236,7 +241,7 @@ export const TextFeedbackColumn = ({onAddFeedback, defaultValue, currentFeedback
     const debouncedOnAddFeedback = useCallback(
         debounce((val: string) => {
             onAddFeedback?.(val, currentFeedbackId ?? null);
-        }, 500),
+        }, DEBOUNCE_VAL),
         [onAddFeedback, currentFeedbackId]
     );
 
@@ -254,7 +259,6 @@ type Option = {
   label: string;
   value: string;
 }
-// const NEW_OPTION_VALUE = "add_new_option";
 
 export const CategoricalFeedbackColumn = ({
     options, 
@@ -288,7 +292,7 @@ export const CategoricalFeedbackColumn = ({
     const debouncedOnAddFeedback = useCallback(
         debounce((val: string) => {
             onAddFeedback?.(val, currentFeedbackId ?? null);
-        }, 500),
+        }, DEBOUNCE_VAL),
         [onAddFeedback, currentFeedbackId]
     );
 
@@ -358,7 +362,7 @@ export const BinaryFeedbackColumn = ({onAddFeedback, defaultValue, currentFeedba
     const debouncedOnAddFeedback = useCallback(
         debounce((val: string) => {
             onAddFeedback?.(val, currentFeedbackId);
-        }, 500),
+        }, DEBOUNCE_VAL),
         [onAddFeedback, currentFeedbackId]
     );
 

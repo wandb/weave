@@ -338,7 +338,6 @@ export const CallsTable: FC<{
 
   // Hide structured feedback columns by default
   const structuredFeedbackOptions = useStructuredFeedbackOptions(entity, project);
-  console.log(structuredFeedbackOptions);
   useEffect(() => {
     if (setColumnVisibilityModel == null || structuredFeedbackOptions == null) {
       return;
@@ -907,7 +906,7 @@ export const CallsTable: FC<{
                   <ConfigureStructuredFeedbackModal
                     entity={entity}
                     project={project}
-                    structuredFeedbackData={structuredFeedbackOptions}
+                    structuredFeedbackData={structuredFeedbackOptions ?? undefined}
                     editColumnName={editStructuredFeedbackColumnName}
                     onClose={() => setStructuredFeedbackModalOpen(false)}
                   />
