@@ -1,13 +1,38 @@
+import json
+
+from redis import Redis
+
+from weave.actions_worker.celery_app import app as celery_app
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
 
+def assert_num_actions_in_queue(num_actions: int):
+    redis = Redis.from_url(celery_app.conf.result_backend)
+    # all_task_ids = redis.keys("celery-task-meta-*")
+    queue_name = "celery"
+    tasks = redis.lrange(queue_name, 0, -1)  # Get all tasks in the queue
+
+    assert len(tasks) == num_actions
+
+
 def test_actions_execute_batch(client: WeaveClient):
+    # TODO: This is neither unit test nor integration test. It's a bit of both.
     server = client.server
     res = server.actions_execute_batch(
         tsi.ActionsExecuteBatchReq(
-            project_id=client.project, call_ids=["1", "2"], id="1"
+            project_id=client.project,
+            call_ids=["1", "2"],
+            id="1",
+            effect=json.dumps(
+                {
+                    "task": "wordcount",
+                    "kwargs": {
+                        "payload": "hello world, i am so happy to be rushing this feature for friday"
+                    },
+                }
+            ),
         )
     )
     assert res.id == "1"
@@ -44,24 +69,7 @@ def test_actions_execute_batch(client: WeaveClient):
 
     # Ok, if we got to here, we've successfully added two actions to the table.
     # Now let's check to see everything made it into the queue.
-    action_queue_client = ClickHouseTraceServer.from_env().action_queue_client
-    queue_item = action_queue_client.pull()
-    assert queue_item is not None
-    msg = queue_item["data"]
-    assert {
-        "project_id": msg["project_id"],
-        "call_id": msg["call_id"],
-        "id": msg["id"],
-    } == {"project_id": db_project_id, "call_id": "1", "id": "1"}
-
-    queue_item = action_queue_client.pull()
-    assert queue_item is not None
-    msg = queue_item["data"]
-    assert {
-        "project_id": msg["project_id"],
-        "call_id": msg["call_id"],
-        "id": msg["id"],
-    } == {"project_id": db_project_id, "call_id": "2", "id": "1"}
+    assert_num_actions_in_queue(2)
 
 
 def test_actions_ack_batch(client: WeaveClient):
@@ -69,7 +77,10 @@ def test_actions_ack_batch(client: WeaveClient):
     server = client.server
     exec_res = server.actions_execute_batch(
         tsi.ActionsExecuteBatchReq(
-            project_id=client.project, call_ids=["3", "4"], id="1"
+            project_id=client.project,
+            call_ids=["3", "4"],
+            id="1",
+            effect=json.dumps({"task": "noop", "kwargs": {}}),
         )
     )
     assert exec_res.id == "1"

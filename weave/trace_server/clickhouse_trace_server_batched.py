@@ -177,7 +177,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         user: str = "default",
         password: str = "",
         database: str = "default",
-        action_queue_addr: str = "noop://",
+        action_queue_addr: str,
         use_async_insert: bool = False,
     ):
         super().__init__()
@@ -1415,10 +1415,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = TABLE_ACTIONS.insertMany(rows).prepare(database_type="clickhouse")
         self._insert(TABLE_ACTIONS.name, prepared.data, prepared.column_names)
 
+        task_ctxs = [
+            {"project_id": req.project_id, "call_id": call_id, "id": id}
+            for call_id in req.call_ids
+        ]
+        for task_ctx in task_ctxs:
+            self.action_queue_client.push(task_ctx, req.effect)
         # Convert timestamp so that it can be serialized when pushing to redis.
-        rows = [{**row, "created_at": created_at.isoformat()} for row in rows]
-        for row in rows:
-            self.action_queue_client.push(row)
+        # rows = [{**row, "created_at": created_at.isoformat()} for row in rows]
+        # for row in rows:
+        #     self.action_queue_client.push(row)
         return tsi.ActionsExecuteBatchRes(
             project_id=req.project_id, call_ids=req.call_ids, id=id
         )
@@ -1456,7 +1462,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
             for row in rows:
                 try:
-                    self.action_queue_client.push(row)
+                    self.action_queue_client.push(
+                        {
+                            "project_id": row["project_id"],
+                            "call_id": row["call_id"],
+                            "id": row["id"],
+                        },
+                        row["effect"],  # type: ignore
+                    )
                 except Exception as e:
                     logger.error(f"Failed to requeue action: {row}. Error: {str(e)}")
         except Exception as e:

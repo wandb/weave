@@ -696,7 +696,7 @@ class ActionsExecuteBatchReq(BaseModel):
     call_ids: list[str]
     id: Optional[str] = None
     rule_matched: Optional[str] = None
-    effect: Optional[str] = None
+    effect: str
 
 
 class ActionsExecuteBatchRes(BaseModel):
