@@ -1,4 +1,4 @@
-from openai import BaseModel
+from pydantic import BaseModel
 
 
 class ActionScore(BaseModel):

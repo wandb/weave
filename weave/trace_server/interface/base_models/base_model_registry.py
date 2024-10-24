@@ -1,4 +1,4 @@
-from openai import BaseModel
+from pydantic import BaseModel
 
 from weave.trace_server.interface.base_models.action_base_models import (
     ActionDispatchFilter,
