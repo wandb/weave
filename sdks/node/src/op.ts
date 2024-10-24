@@ -3,17 +3,6 @@ import { TRACE_CALL_EMOJI } from './constants';
 import { Op, OpOptions } from './opType';
 import { warnOnce } from './utils/warnOnce';
 
-export function op<T extends (...args: any[]) => any>(
-  fn: T,
-  options?: OpOptions<T>
-): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>>;
-
-export function op<T extends (...args: any[]) => any>(
-  thisArg: any,
-  fn: T,
-  options?: OpOptions<T>
-): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>>;
-
 /**
  * A wrapper to weave op-ify a function or method that works on sync and async functions.
  *
@@ -66,8 +55,17 @@ export function op<T extends (...args: any[]) => any>(
  * const res = await model.invoke();
  */
 export function op<T extends (...args: any[]) => any>(
+  fn: T,
+  options?: OpOptions<T>
+): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>>;
+export function op<T extends (...args: any[]) => any>(
+  thisArg: any,
+  fn: T,
+  options?: OpOptions<T>
+): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>>;
+export function op<T extends (...args: any[]) => any>(
   fnOrThis: T | any,
-  fnOrOptions: T | OpOptions<T>,
+  fnOrOptions?: T | OpOptions<T>,
   maybeOptions?: OpOptions<T>
 ): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>> {
   let fn: T;

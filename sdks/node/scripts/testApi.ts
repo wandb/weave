@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import * as weave from 'weave';
+
 // Initialize the API
 weave.init('examples');
 
