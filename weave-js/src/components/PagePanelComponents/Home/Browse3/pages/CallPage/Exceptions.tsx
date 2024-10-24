@@ -1,10 +1,11 @@
 import * as Colors from '@wandb/weave/common/css/color.styles';
 import {Alert} from '@wandb/weave/components/Alert';
+import copyToClipboard from 'copy-to-clipboard';
 import React from 'react';
 import styled from 'styled-components';
-import copyToClipboard from 'copy-to-clipboard';
-import {Button} from '../../../../../Button';
+
 import {toast} from '../../../../../../common/components/elements/Toast';
+import {Button} from '../../../../../Button';
 
 const AlertExceptionType = styled.span`
   font-weight: 600;
