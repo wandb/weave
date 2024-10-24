@@ -79,8 +79,15 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.ids import generate_id
-from weave.trace_server.interface.base_models.action_base_models import ConfiguredAction
-from weave.trace_server.interface.base_models.base_model_registry import base_models
+from weave.trace_server.interface.base_models.action_base_models import (
+    LLM_JUDGE_ACTION_NAME,
+    ConfiguredAction,
+)
+from weave.trace_server.interface.base_models.base_model_registry import (
+    base_model_dump,
+    base_model_name,
+    base_models,
+)
 from weave.trace_server.interface.base_models.feedback_base_model_registry import (
     ActionScore,
     feedback_base_models,
@@ -580,9 +587,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         if req.obj.base_object_class:
             for base_model in base_models:
-                if base_model.name == req.obj.base_object_class:
+                if base_model_name(base_model) == req.obj.base_object_class:
                     # 1. Validate the object against the base model & re-dump to a dict
-                    dict_val = base_model.model_validate(dict_val).model_dump()
+                    dict_val = base_model_dump(base_model.model_validate(dict_val))
                     break
             else:
                 raise ValueError(
@@ -1343,10 +1350,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         res_payload = req.payload
 
         for feedback_base_model in feedback_base_models:
-            if feedback_base_model.name == feedback_type:
-                res_payload = feedback_base_model.model_validate(
-                    res_payload
-                ).model_dump()
+            if base_model_name(feedback_base_model) == feedback_type:
+                res_payload = base_model_dump(
+                    feedback_base_model.model_validate(res_payload)
+                )
                 break
 
         # Augment emoji with alias.
@@ -1423,6 +1430,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         action_dict_res = self.refs_read_batch(
             tsi.RefsReadBatchReq(refs=[configured_action_ref])
         )
+
         action_dict = action_dict_res.vals[0]
         action = ConfiguredAction.model_validate(action_dict)
 
@@ -1431,13 +1439,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "Only builtin actions are supported for batch execution"
             )
 
-        if action.action.name != "openai_completion":
-            raise InvalidRequest(
-                "Only openai_completion is supported for batch execution"
-            )
-
-        if action.action.digest != "*":
-            raise InvalidRequest("Digest must be '*' for batch execution")
+        if action.action.name != LLM_JUDGE_ACTION_NAME:
+            raise InvalidRequest("Only llm_judge is supported for batch execution")
 
         # Step 1: Get all the calls in the batch
         calls = self.calls_query_stream(
@@ -1453,8 +1456,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # We should do some validation here
         config = action.config
         model = config["model"]
+
+        if model not in ["gpt-4o-mini", "gpt-4o"]:
+            raise InvalidRequest("Only gpt-4o-mini and gpt-4o are supported")
+
         system_prompt = config["system_prompt"]
-        response_format = config["response_format"]
+        response_format_schema = config["response_format_schema"]
+        response_format = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "response_format",
+                "schema": response_format_schema,
+            },
+        }
 
         # mapping = mapping.input_mapping
 
@@ -1486,11 +1500,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         project_id=req.project_id,
                         id=call.id,
                     ).uri(),
-                    feedback_type=ActionScore.name,
+                    feedback_type=base_model_name(ActionScore),
                     wb_user_id=WEAVE_ACTION_EXECUTOR_PACEHOLDER_ID,  # - THIS IS NOT GOOD!
                     payload=ActionScore(
                         configured_action_ref=configured_action_ref,
-                        results=json.loads(completion.choices[0].message.content),
+                        output=json.loads(completion.choices[0].message.content),
                     ).model_dump(),
                 )
             )

@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+LLM_JUDGE_ACTION_NAME = "llm_judge"
+
 
 class _BuiltinAction(BaseModel):
     action_type: Literal["builtin"] = "builtin"
