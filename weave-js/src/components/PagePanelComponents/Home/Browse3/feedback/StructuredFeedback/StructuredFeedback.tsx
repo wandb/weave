@@ -1,14 +1,14 @@
-import React, { SyntheticEvent, useEffect, useState, useCallback } from 'react';
+import React, { SyntheticEvent, useEffect, useState, useCallback, useMemo } from 'react';
 import { useWFHooks } from '../../pages/wfReactInterface/context';
 import { useGetTraceServerClientContext } from '../../pages/wfReactInterface/traceServerClientContext';
 import { LoadingDots } from '@wandb/weave/components/LoadingDots';
-import Select from 'react-select'
 import { Tailwind } from '@wandb/weave/components/Tailwind';
 import { Checkbox } from '@mui/material';
-import CreatableSelect from 'react-select/creatable';
 import { FeedbackCreateReq, FeedbackCreateRes, FeedbackReplaceReq, FeedbackReplaceRes } from '../../pages/wfReactInterface/traceServerClientTypes';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import debounce from 'lodash/debounce';
+import { Autocomplete, TextField as MuiTextField } from '@mui/material';
+import { MOON_300, MOON_500 } from '@wandb/weave/common/css/color.styles';
 
 // Constants
 const STRUCTURED_FEEDBACK_TYPE = 'wandb.structuredFeedback.1';
@@ -21,11 +21,10 @@ const FEEDBACK_TYPES = {
 
 // Interfaces
 interface StructuredFeedbackProps {
-  structuredFeedbackOptions: any;
-  weaveRef: string;
+  sfData: any;
+  callRef: string;
   entity: string;
   project: string;
-  feedbackSpecRef: string;
   readOnly?: boolean;
 }
 
@@ -33,13 +32,13 @@ interface StructuredFeedbackProps {
 const createFeedbackRequest = (props: StructuredFeedbackProps, value: any, currentFeedbackId: string | null) => {
   const baseRequest = {
     project_id: `${props.entity}/${props.project}`,
-    weave_ref: props.weaveRef,
+    weave_ref: props.callRef,
     creator: null,
     feedback_type: STRUCTURED_FEEDBACK_TYPE,
     payload: {
       value,
-      ref: props.feedbackSpecRef,
-      name: props.structuredFeedbackOptions.name,
+      ref: props.sfData.ref,
+      name: props.sfData.name,
     },
     sort_by: [{ created_at: 'desc' }],
   };
@@ -52,11 +51,12 @@ const createFeedbackRequest = (props: StructuredFeedbackProps, value: any, curre
 };
 
 export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props) => {
+  console.log("StructuredFeedbackCell", props.callRef);
   const { useFeedback } = useWFHooks();
   const query = useFeedback({
     entity: props.entity,
     project: props.project,
-    weaveRef: props.weaveRef,
+    weaveRef: props.callRef,
   });
 
   const [currentFeedbackId, setCurrentFeedbackId] = useState<string | null>(null);
@@ -64,11 +64,12 @@ export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props)
   const getTsClient = useGetTraceServerClientContext();
 
   useEffect(() => {
-    if (props.weaveRef !== query?.result?.[0]?.weave_ref) {
+    if (props.callRef !== query?.result?.[0]?.weave_ref) {
+        // The call was changed without the component unmounted, we need to reset
         setFoundValue(null);
         setCurrentFeedbackId(null);
     }
-  }, [props.weaveRef]);
+  }, [props.callRef]);
 
   const onAddFeedback = async (value: any, currentFeedbackId: string | null): Promise<boolean> => {
     const tsClient = getTsClient();
@@ -115,8 +116,8 @@ export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props)
     // 3. Feedback is for this structured feedback name
 
     const feedbackTypeMatches = (feedback: any) => feedback.feedback_type === STRUCTURED_FEEDBACK_TYPE; 
-    const feedbackNameMatches = (feedback: any) => feedback.payload.name === props.structuredFeedbackOptions.name;
-    const feedbackSpecMatches = (feedback: any) => feedback.payload.ref === props.feedbackSpecRef;
+    const feedbackNameMatches = (feedback: any) => feedback.payload.name === props.sfData.name;
+    const feedbackSpecMatches = (feedback: any) => feedback.payload.ref === props.sfData.ref;
 
     const currFeedback = query.result?.find((feedback: any) => feedbackTypeMatches(feedback) && feedbackNameMatches(feedback) && feedbackSpecMatches(feedback));
     if (!currFeedback) {
@@ -125,7 +126,7 @@ export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props)
 
     setCurrentFeedbackId(currFeedback.id);
     setFoundValue(currFeedback?.payload?.value ?? null);
-  }, [query?.result, query?.loading, props.feedbackSpecRef]);
+  }, [query?.result, query?.loading, props.sfData]);
 
   if (query?.loading) return <LoadingDots />;
 
@@ -142,12 +143,12 @@ export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props)
   );
 
   function renderFeedbackComponent() {
-    switch (props.structuredFeedbackOptions.type) {
+    switch (props.sfData.type) {
       case FEEDBACK_TYPES.NUMERICAL:
         return (
           <NumericalFeedbackColumn
-            min={props.structuredFeedbackOptions.min}
-            max={props.structuredFeedbackOptions.max}
+            min={props.sfData.min}
+            max={props.sfData.max}
             onAddFeedback={onAddFeedback}
             defaultValue={foundValue as number | null}
             currentFeedbackId={currentFeedbackId}
@@ -164,12 +165,12 @@ export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props)
       case FEEDBACK_TYPES.CATEGORICAL:
         return (
           <CategoricalFeedbackColumn
-            options={props.structuredFeedbackOptions.options}
+            options={props.sfData.options}
             onAddFeedback={onAddFeedback}
             defaultValue={foundValue as string | null}
             currentFeedbackId={currentFeedbackId}
-            multiSelect={props.structuredFeedbackOptions.multi_select}
-            addNewOption={props.structuredFeedbackOptions.add_new_option}
+            multiSelect={props.sfData.multi_select}
+            addNewOption={props.sfData.add_new_option}
           />
         );
       case FEEDBACK_TYPES.BOOLEAN:
@@ -188,6 +189,7 @@ export const StructuredFeedbackCell: React.FC<StructuredFeedbackProps> = (props)
 
 export const NumericalFeedbackColumn = ({min, max, onAddFeedback, defaultValue, currentFeedbackId}: {min: number, max: number, onAddFeedback?: (value: number, currentFeedbackId: string | null) => Promise<boolean>, defaultValue: number | null, currentFeedbackId?: string | null}) => {
     const [value, setValue] = useState<number | undefined>(defaultValue ?? undefined);
+    const [error, setError] = useState<boolean>(false);
 
     useEffect(() => {
         setValue(defaultValue ?? undefined);
@@ -203,15 +205,23 @@ export const NumericalFeedbackColumn = ({min, max, onAddFeedback, defaultValue, 
     const onValueChange = (v: string) => {
         const val = parseInt(v);
         setValue(val);
+        if (val < min || val > max) {
+            setError(true);
+            return;
+        } else {
+            setError(false);
+        }
         debouncedOnAddFeedback(val);
     }
 
     return <div className='w-full'>
+        <div className='text-xs text-moon-500 mb-1'>min: {min}, max: {max}</div>
         <TextField
             type="number"
             value={value?.toString() ?? ''}
             onChange={onValueChange}
             placeholder='...'
+            errorState={error}
         />
     </div>
 }
@@ -240,13 +250,19 @@ export const TextFeedbackColumn = ({onAddFeedback, defaultValue, currentFeedback
     </div>
 }
 
+type Option = {
+  label: string;
+  value: string;
+}
+// const NEW_OPTION_VALUE = "add_new_option";
+
 export const CategoricalFeedbackColumn = ({
     options, 
     onAddFeedback, 
     defaultValue, 
     currentFeedbackId,
     multiSelect,
-    addNewOption
+    addNewOption,
 }: {
     options: string[], 
     onAddFeedback?: (value: string, currentFeedbackId: string | null) => Promise<boolean>, 
@@ -255,10 +271,18 @@ export const CategoricalFeedbackColumn = ({
     multiSelect: boolean,
     addNewOption: boolean
 }) => {
-    const [value, setValue] = useState<string>('');
+    const dropdownOptions = useMemo(() => {
+      const opts = options.map((option: string) => ({
+        label: option,
+        value: option,
+      }));
+      opts.splice(0, 0, {label: "", value: ""});
+      return opts;
+    }, [options, addNewOption]);
+    const [value, setValue] = useState<Option>(dropdownOptions[0]);
 
     useEffect(() => {
-        setValue(defaultValue ?? '');
+      setValue(dropdownOptions.find(option => option.value === defaultValue) ?? dropdownOptions[0]);
     }, [defaultValue]);
 
     const debouncedOnAddFeedback = useCallback(
@@ -268,73 +292,56 @@ export const CategoricalFeedbackColumn = ({
         [onAddFeedback, currentFeedbackId]
     );
 
-    const onValueChange = (newValue: any) => {
-        const val = newValue ? newValue.value : '';
-        setValue(val);
-        debouncedOnAddFeedback(val);
+    const onValueChange = (e: any, newValue: Option) => {
+        setValue(newValue);
+        debouncedOnAddFeedback(newValue?.value ?? '');
     }
-
-    const dropdownOptions = options.map((option: string) => ({
-        label: option,
-        value: option,
-    }));
-
-    const customStyles = {
-        control: (provided: any, state: any) => ({
-            ...provided,
-            backgroundColor: 'white',
-            borderColor: state.isFocused ? '#007AFF' : '#E2E8F0',
-            boxShadow: state.isFocused ? '0 0 0 1px #007AFF' : 'none',
-            borderRadius: '8px',
-            minHeight: '36px',
-            width: '100%', // Make the select widget full width
-            '&:hover': {
-                borderColor: '#007AFF',
-            },
-        }),
-        menu: (provided: any) => ({
-            ...provided,
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-            zIndex: 9999, // Ensure the dropdown appears above other elements
-        }),
-        option: (provided: any, state: any) => ({
-            ...provided,
-            backgroundColor: state.isSelected ? '#007AFF' : state.isFocused ? '#F0F0F0' : 'white',
-            color: state.isSelected ? 'white' : '#333',
-            '&:active': {
-                backgroundColor: '#007AFF',
-                color: 'white',
-            },
-        }),
-        singleValue: (provided: any) => ({
-            ...provided,
-            color: '#333',
-        }),
-        input: (provided: any) => ({
-            ...provided,
-            color: '#333',
-        }),
-    };
-
-    const SelectComponent = addNewOption ? CreatableSelect : Select;
 
     return (
         <Tailwind>
-            <div className="flex justify-center w-full">
-                <SelectComponent
-                    styles={customStyles}
-                    isClearable
-                    isMulti={multiSelect}
-                    onCreateOption={(inputValue: string) => {
-                        return {label: inputValue, value: inputValue};
-                    }}
-                    onChange={onValueChange}
+            <div className="flex w-full">
+                <Autocomplete
                     options={dropdownOptions}
-                    value={dropdownOptions.find(option => option.value === value)}
-                    menuPortalTarget={document.body}
-                    menuPosition="fixed"
-                    className="w-full" // Make the select component full width
+                    getOptionLabel={(option) => option.label}
+                    onChange={onValueChange}
+                    value={value}
+                    renderInput={(params) => (
+                        <MuiTextField
+                            {...params}
+                            sx={{
+                                '& .MuiInputBase-root': {
+                                    height: '38px',
+                                    minHeight: '38px',
+                                    borderColor: MOON_300,
+                                },
+                                '& .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: MOON_300,
+                                },
+                                '&:hover .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: MOON_300,
+                                },
+                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: MOON_300,
+                                },
+                            }}
+                        />
+                    )}
+                    disableClearable
+                    sx={{
+                        minWidth: '244px',
+                        width: 'auto',
+                    }}
+                    fullWidth
+                    ListboxProps={{
+                        style: {
+                            maxHeight: '200px',
+                        },
+                    }}
+                    renderOption={(props, option) => (
+                        <li {...props} style={{ minHeight: '30px' }}>
+                            {option.label || <span>&nbsp;</span>}
+                        </li>
+                    )}
                 />
             </div>
         </Tailwind>

@@ -215,6 +215,8 @@ const CallPageInnerVertical: FC<{
   }, [callComplete]);
 
   const callTabs = useCallTabs(currentCall);
+
+  // Call navigation by arrow keys and buttons
   const {getNextCallId, getPreviousCallId, nextPageNeeded} = useContext(CallIdContext);
   const onNextCall = useCallback(() => {
     const nextCallId = getNextCallId?.(currentCall.callId);
@@ -228,6 +230,23 @@ const CallPageInnerVertical: FC<{
       history.replace(currentRouter.callUIUrl(currentCall.entity, currentCall.project, currentCall.traceId, previousCallId, path, showTraceTree, showFeedbackExpand));
     }
   }, [currentCall, currentRouter, history, path, showTraceTree, showFeedbackExpand]);
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === 'ArrowDown') {
+        onNextCall();
+      } else if (event.key === 'ArrowUp') {
+        onPreviousCall();
+      }
+    },
+    [onNextCall, onPreviousCall]
+  );
+  // Attach and detach event listener
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onPreviousCall]);
 
   const nextCallRef = useRef(false);
   useEffect(() => {

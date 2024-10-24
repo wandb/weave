@@ -90,6 +90,7 @@ import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 import { ConfigureStructuredFeedbackModal } from '../../feedback/StructuredFeedback/AddColumnButton';
 import { CallIdContext } from '../../../Browse3';
+import { useStructuredFeedbackOptions } from '../../feedback/StructuredFeedback/tsStructuredFeedback';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -707,7 +708,8 @@ export const CallsTable: FC<{
   );
 
   const [structuredFeedbackModalOpen, setStructuredFeedbackModalOpen] = useState(false);
-
+  const [editStructuredFeedbackColumnName, setEditStructuredFeedbackColumnName] = useState<string | undefined>(undefined);
+  
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
@@ -896,13 +898,17 @@ export const CallsTable: FC<{
                   columnInfo={columns}
                   columnVisibilityModel={columnVisibilityModel}
                   setColumnVisibilityModel={setColumnVisibilityModel}
-                  onAddColumn={() => setStructuredFeedbackModalOpen(true)}
+                  onEditColumns={(columnName) => {
+                    setStructuredFeedbackModalOpen(true);
+                    setEditStructuredFeedbackColumnName(columnName);
+                  }}
                 />
                 {structuredFeedbackModalOpen && (
                   <ConfigureStructuredFeedbackModal
                     entity={entity}
                     project={project}
-                    existingFeedback={structuredFeedbackOptions}
+                    structuredFeedbackData={structuredFeedbackOptions}
+                    editColumnName={editStructuredFeedbackColumnName}
                     onClose={() => setStructuredFeedbackModalOpen(false)}
                   />
                 )}
@@ -1084,55 +1090,3 @@ function prepareFlattenedCallDataForTable(
 ): FlattenedCallData[] {
   return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
 }
-
-const useResolveTypeObjects = (typeRefs: string[]) => {
-  const {useRefsData} = useWFHooks();
-  const refsData = useRefsData(typeRefs);
-  return useMemo(() => {
-    if (refsData.loading || refsData.result == null) {
-      return null;
-    }
-    const refDataWithRefs = refsData.result.map((x, i) => ({
-      ...x,
-      ref: typeRefs[i],
-    }));
-    return refDataWithRefs;
-  }, [refsData.loading, refsData.result]);
-};
-
-export const useStructuredFeedbackOptions = (entity: string, project: string) => {
-  const {useRootObjectVersions} = useWFHooks();
-
-  const [latestSpec, setLatestSpec] = useState<ObjectVersionSchema | null>(null);
-  const structuredFeedbackObjects = useRootObjectVersions(
-    entity,
-    project,
-    {
-      baseObjectClasses: ['StructuredFeedback'],
-      latestOnly: true,
-    },
-    undefined,
-  );
-  const refsData = useResolveTypeObjects(latestSpec?.val.types ?? []);
-
-  useEffect(() => {
-    if (structuredFeedbackObjects.loading || structuredFeedbackObjects.result == null) {
-      return;
-    }
-    const latestSpec = structuredFeedbackObjects.result?.sort((a, b) => a.createdAtMs - b.createdAtMs).pop();
-    if (!latestSpec) {
-      return;
-    }
-    setLatestSpec(latestSpec);
-  }, [structuredFeedbackObjects.loading, structuredFeedbackObjects.result]);
-
-  return useMemo(() => {
-    if (latestSpec == null || refsData == null) {
-      return null;
-    }
-    return {
-      types: refsData,
-      ref: objectVersionKeyToRefUri(latestSpec),
-    };
-  }, [latestSpec, refsData]);
-};

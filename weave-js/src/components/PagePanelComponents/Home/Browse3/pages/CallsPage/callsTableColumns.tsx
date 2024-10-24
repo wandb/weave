@@ -206,7 +206,6 @@ function buildCallsTableColumns(
     });
 
   const simpleFeedback = !structuredFeedbackOptions || structuredFeedbackOptions?.types?.length === 0;
-  const feedbackSpecRef = structuredFeedbackOptions?.ref;
 
   const structuredFeedbackColumns = (structuredFeedbackOptions?.types ?? []).map((feedbackType: any) => ({
     field: feedbackColName(feedbackType),
@@ -221,9 +220,8 @@ function buildCallsTableColumns(
       return <StructuredFeedbackCell
         entity={entity} 
         project={project} 
-        structuredFeedbackOptions={feedbackType} 
-        weaveRef={weaveRef}
-        feedbackSpecRef={feedbackSpecRef}
+        sfData={feedbackType} 
+        callRef={weaveRef}
         readOnly={true}
       />
     },

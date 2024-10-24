@@ -10,24 +10,35 @@ import React, {useCallback, useRef, useState} from 'react';
 
 import {maybePluralize} from '../../../../../../core/util/string';
 import {Button} from '../../../../../Button';
+import {IconButton} from '../../../../../IconButton';
 import {DraggableGrow, DraggableHandle} from '../../../../../DraggablePopups';
 import {TextField} from '../../../../../Form/TextField';
 import {Tailwind} from '../../../../../Tailwind';
 import {ColumnInfo} from '../../types';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
+import {StructuredFeedbackSpec} from '../../feedback/StructuredFeedback/types';
+import {ConfigureStructuredFeedbackModal} from '../../feedback/StructuredFeedback/AddColumnButton';
 
 type ManageColumnsButtonProps = {
   columnInfo: ColumnInfo;
   columnVisibilityModel: GridColumnVisibilityModel;
   setColumnVisibilityModel: (model: GridColumnVisibilityModel) => void;
-  onAddColumn: () => void;
+  onEditColumns: (existingColumn?: string) => void;
+  structuredFeedbackData: StructuredFeedbackSpec;
+  setStructuredFeedbackData: (data: StructuredFeedbackSpec) => void;
+  entity: string;
+  project: string;
 };
 
 export const ManageColumnsButton = ({
   columnInfo,
   columnVisibilityModel,
   setColumnVisibilityModel,
-  onAddColumn,
+  onEditColumns,
+  structuredFeedbackData,
+  setStructuredFeedbackData,
+  entity,
+  project,
 }: ManageColumnsButtonProps) => {
   const [search, setSearch] = useState('');
   const lowerSearch = search.toLowerCase();
@@ -85,6 +96,12 @@ export const ManageColumnsButton = ({
     setColumnVisibilityModel(newModel);
   };
 
+
+  const handleEditColumn = (columnName: string) => {
+    onEditColumns(columnName);
+    setAnchorEl(null);
+  };
+
   return (
     <>
       <span ref={ref}>
@@ -123,9 +140,17 @@ export const ManageColumnsButton = ({
                 <div className="flex-auto text-xl font-semibold">
                   Manage columns
                 </div>
-                <div className="ml-16 text-moon-500">
-                  {maybePluralize(numHidden, 'hidden column', 's')}
-                </div>
+                <div className="flex-auto" />
+                <Button
+                  size="small"
+                  variant="ghost"
+                  icon="add-new"
+                  onClick={() => {
+                    setAnchorEl(anchorEl ? null : ref.current);
+                    onEditColumns();
+                  }}>
+                  Create column
+                </Button>
               </div>
             </DraggableHandle>
             <div className="mb-8">
@@ -178,9 +203,14 @@ export const ManageColumnsButton = ({
                       {feedbackCol && (
                         <>
                           <div className="flex-auto" />
-                          <div className="mr-6 text-moon-500 italic overflow-hidden">
-                            feedback
-                          </div>
+                          <Button
+                            variant="quiet"
+                            icon="pencil-edit"
+                            size="small"
+                            onClick={() => handleEditColumn(col.field.replace('feedback.', ''))}
+                            tooltip="Edit feedback column"
+                            className="mr-4"
+                          />
                         </>
                       )}
                     </div>
@@ -206,16 +236,9 @@ export const ManageColumnsButton = ({
                 {`Show ${buttonSuffix}`}
               </Button>
               <div className="flex-auto" />
-              <Button
-                size="small"
-                variant="ghost"
-                icon="settings"
-                onClick={() => {
-                  setAnchorEl(anchorEl ? null : ref.current);
-                  onAddColumn();
-                }}>
-                Edit feedback cols
-              </Button>
+              <div className="ml-16 text-moon-500">
+                  {maybePluralize(numHidden, 'hidden column', 's')}
+                </div>
             </div>
           </div>
         </Tailwind>
