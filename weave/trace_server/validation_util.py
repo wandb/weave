@@ -42,7 +42,8 @@ def require_base64(s: str) -> str:
 def require_internal_ref_uri(
     s: str, refClass: typing.Optional[typing.Type] = None
 ) -> str:
-    if not s.startswith(f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///"):
+    # TODO get const and also add to validation err
+    if not s.startswith(f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///") and not s.startswith("wandb-artifact:///"):
         raise CHValidationError(
             f"Invalid ref: {s}. Must start with {refs_internal.WEAVE_INTERNAL_SCHEME}:///"
         )
@@ -53,7 +54,7 @@ def require_internal_ref_uri(
         raise CHValidationError(f"Invalid ref: {s}. Must be of type {str(refClass)}")
     parsed_str = parsed.uri()
     if parsed_str != s:
-        raise CHValidationError(f"Invalid ref: {s}. Ref did not round-trip")
+        raise CHValidationError(f"Invalid ref: {s}. Ref did not round-trip. parsed_str={parsed_str}. parsed={parsed}")
     return s
 
 

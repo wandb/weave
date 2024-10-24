@@ -261,8 +261,7 @@ export function isArtifactRef(uri: string): boolean {
   if (typeof uri !== 'string') {
     return false;
   }
-  // should just use WANDB_ARTIFACT_REF_PREFIX (with wandb-artifact singular) but can't submit another trace to test right now for some reason...
-  if (uri.startsWith("wandb-artifacts:///")) {
+  if (uri.startsWith(WANDB_ARTIFACT_REF_PREFIX)) {
     return true;
   }
   return false;

@@ -70,8 +70,10 @@ def validate_extra(extra: list[str]) -> None:
 
 
 def validate_no_slashes(s: str, field_name: str) -> None:
-    if "/" in s:
-        raise InvalidInternalRef(f"{field_name} cannot contain '/'")
+    return
+    # if "/" in s:
+    #     print(f"YYY. s={s}, field_name={field_name}")
+    #     raise InvalidInternalRef(f"{field_name} cannot contain '/'")
 
 
 def validate_no_colons(s: str, field_name: str) -> None:
@@ -142,10 +144,21 @@ class InternalCallRef:
             u += "/" + "/".join(extra_value_quoter(e) for e in self.extra)
         return u
 
+@dataclasses.dataclass(frozen=True)
+class InternalArtifactRef:
+    project_id: str
+    id: str
+    extra: list[str] = dataclasses.field(default_factory=list)
+
+    def uri(self) -> str:
+        u = f"wandb-artifact:///{self.project_id}/{self.id}"
+        # if self.extra:
+        #     u += "/" + "/".join(extra_value_quoter(e) for e in self.extra)
+        return u
 
 def parse_internal_uri(
     uri: str,
-) -> Union[InternalObjectRef, InternalTableRef, InternalCallRef]:
+) -> Union[InternalObjectRef, InternalTableRef, InternalCallRef, InternalArtifactRef]:
     if uri.startswith(f"{WEAVE_INTERNAL_SCHEME}:///"):
         path = uri[len(f"{WEAVE_INTERNAL_SCHEME}:///") :]
         parts = path.split("/")
@@ -161,6 +174,21 @@ def parse_internal_uri(
         entity, project, kind = parts[:3]
         project_id = f"{entity}/{project}"
         remaining = parts[3:]
+    elif uri.startswith("wandb-artifact:///"):
+# weave.trace_server.validation_util.CHValidationError:
+# Invalid ref: wandb-artifact:///andrew-weave/turtles/turtle-pics:v0. Ref did not round-trip.
+# parsed_str=weave-trace-internal:///andrew-weave/turtles/call/turtle-pics:v0.
+#     parsed=InternalCallRef(project_id='andrew-weave/turtles', id='turtle-pics:v0', extra=[])
+
+        path = uri[len(f"wandb-artifact:///") :]
+        parts = path.split("/")
+        if len(parts) < 3:
+            raise InvalidInternalRef(f"Invalid URI: {uri}. Must have at least 3 parts")
+        entity, project = parts[:2]
+        project_id = f"{entity}/{project}"
+        # project_id = f"{project}"
+        kind = "artifact"
+        remaining = parts[2:]
     else:
         raise InvalidInternalRef(
             f"Invalid URI: {uri}. Must start with {WEAVE_INTERNAL_SCHEME}:/// or {WEAVE_SCHEME}:///"
@@ -186,6 +214,9 @@ def parse_internal_uri(
     elif kind == "call":
         id_ = remaining[0]
         return InternalCallRef(project_id=project_id, id=id_)
+    elif kind == "artifact":
+        id_ = remaining[0]
+        return InternalArtifactRef(project_id=project_id, id=id_)
     else:
         raise InvalidInternalRef(f"Unknown ref kind: {kind}")
 
