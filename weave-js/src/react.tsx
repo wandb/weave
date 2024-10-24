@@ -561,7 +561,7 @@ export const parseRef = (ref: string): ObjectRef => {
   const isWeaveRef = url.protocol.startsWith('weave');
   if (isWandbArtifact) {
     maxSplitsToMake = 4;
-    // artifact URI expected as <entity>/<project>/<artifact name>:<artifact version, i.e., v0>/<optional path>
+    // artifact URI expected as <entity>/<project>/<artifact name>:<artifact version - ie, v0>/<optional path>
     // and split length could be 3 or 4+ depending on the presence of optional path
     allowableNumSeparations = [3, 4];
   } else if (isLocalArtifact) {

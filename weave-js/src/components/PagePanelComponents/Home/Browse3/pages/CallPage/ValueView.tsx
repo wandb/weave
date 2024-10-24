@@ -65,7 +65,7 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
   }
   if (isArtifactRef(data.value)) {
-    // expects format "wandb-artifact:///<entity>/<project>/<artifact name>:<artifact version, i.e., v0>/<optional path>"
+    // expects format "wandb-artifact:///<entity>/<project>/<artifact name>:<artifact version - ie, v0>/<optional path>"
     return <SmallRef objRef={parseRef(data.value)} />;
   }
   if (isWeaveRef(data.value)) {

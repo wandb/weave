@@ -1,9 +1,3 @@
-import {
-  ApolloClient,
-  gql,
-  TypedDocumentNode,
-  useApolloClient,
-} from '@apollo/client';
 import {Box} from '@mui/material';
 import {getTypeName, Type} from '@wandb/weave/core';
 import {

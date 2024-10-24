@@ -12,6 +12,8 @@ WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
 WEAVE_PRIVATE_SCHEME = "weave-private"
 
+ARTIFACT_REF_SCHEME = "wandb-artifact"
+
 DICT_KEY_EDGE_NAME = "key"
 LIST_INDEX_EDGE_NAME = "index"
 OBJECT_ATTR_EDGE_NAME = "attr"
@@ -70,10 +72,9 @@ def validate_extra(extra: list[str]) -> None:
 
 
 def validate_no_slashes(s: str, field_name: str) -> None:
-    return
-    # if "/" in s:
-    #     print(f"YYY. s={s}, field_name={field_name}")
-    #     raise InvalidInternalRef(f"{field_name} cannot contain '/'")
+    if "/" in s:
+        print(f"YYY. s={s}, field_name={field_name}")
+        raise InvalidInternalRef(f"{field_name} cannot contain '/'")
 
 
 def validate_no_colons(s: str, field_name: str) -> None:
@@ -148,12 +149,13 @@ class InternalCallRef:
 class InternalArtifactRef:
     project_id: str
     id: str
-    extra: list[str] = dataclasses.field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        # not validating no slashes in project_id because we aren't converting to internal project_id
+        validate_no_slashes(self.id, "id")
 
     def uri(self) -> str:
-        u = f"wandb-artifact:///{self.project_id}/{self.id}"
-        # if self.extra:
-        #     u += "/" + "/".join(extra_value_quoter(e) for e in self.extra)
+        u = f"{ARTIFACT_REF_SCHEME}:///{self.project_id}/{self.id}"
         return u
 
 def parse_internal_uri(
@@ -174,19 +176,13 @@ def parse_internal_uri(
         entity, project, kind = parts[:3]
         project_id = f"{entity}/{project}"
         remaining = parts[3:]
-    elif uri.startswith("wandb-artifact:///"):
-# weave.trace_server.validation_util.CHValidationError:
-# Invalid ref: wandb-artifact:///andrew-weave/turtles/turtle-pics:v0. Ref did not round-trip.
-# parsed_str=weave-trace-internal:///andrew-weave/turtles/call/turtle-pics:v0.
-#     parsed=InternalCallRef(project_id='andrew-weave/turtles', id='turtle-pics:v0', extra=[])
-
-        path = uri[len(f"wandb-artifact:///") :]
+    elif uri.startswith(f"{ARTIFACT_REF_SCHEME}:///"):
+        path = uri[len(f"{ARTIFACT_REF_SCHEME}:///") :]
         parts = path.split("/")
         if len(parts) < 3:
             raise InvalidInternalRef(f"Invalid URI: {uri}. Must have at least 3 parts")
         entity, project = parts[:2]
         project_id = f"{entity}/{project}"
-        # project_id = f"{project}"
         kind = "artifact"
         remaining = parts[2:]
     else:
@@ -219,7 +215,6 @@ def parse_internal_uri(
         return InternalArtifactRef(project_id=project_id, id=id_)
     else:
         raise InvalidInternalRef(f"Unknown ref kind: {kind}")
-
 
 def _parse_remaining(remaining: list[str]) -> tuple[str, str, list[str]]:
     """`remaining` refers to everything after `object` or `op` in the ref.
