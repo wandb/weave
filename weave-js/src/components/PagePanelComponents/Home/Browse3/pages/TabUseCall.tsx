@@ -11,23 +11,40 @@ type TabUseCallProps = {
 };
 
 export const TabUseCall = ({call}: TabUseCallProps) => {
+  const sdkType = call.traceCall?.attributes?.weave?.source;
+  const language = sdkType === 'js-sdk' ? 'javascript' : 'python';
+
   const {entity, project, callId} = call;
-  let codeFetch = `import weave
+  let codeFetchPython = `import weave
 client = weave.init("${entity}/${project}")
 call = client.get_call("${callId}")`;
 
   const backend = (window as any).CONFIG.TRACE_BACKEND_BASE_URL;
   if (backend.endsWith('.wandb.test')) {
-    codeFetch =
+    codeFetchPython =
       `import os
 os.environ["WF_TRACE_SERVER_URL"] = "http://127.0.0.1:6345"
 
-` + codeFetch;
+` + codeFetchPython;
   }
 
-  const codeReaction = `call.feedback.add_reaction("👍")`;
-  const codeNote = `call.feedback.add_note("This is delightful!")`;
-  const codeFeedback = `call.feedback.add("correctness", {"value": 4})`;
+  let codeFetchJS = `import * as weave from 'weave';
+client = await weave.init("${entity}/${project}");
+call = await client.getCall("${callId}")`;
+
+  const codeFetch = sdkType === 'js-sdk' ? codeFetchJS : codeFetchPython;
+
+  const codeReactionPython = `call.feedback.add_reaction("👍")`;
+  const codeNotePython = `call.feedback.add_note("This is delightful!")`;
+  const codeFeedbackPython = `call.feedback.add("correctness", {"value": 4})`;
+
+  const codeReactionJS = `await call.feedback.addReaction('👍')`;
+  const codeNoteJS = `await call.feedback.addNote('This is delightful!')`;
+  const codeFeedbackJS = `await call.feedback.add({correctness: {value: 4}})`;
+
+  const codeReaction = sdkType === 'js-sdk' ? codeReactionJS : codeReactionPython;
+  const codeNote = sdkType === 'js-sdk' ? codeNoteJS : codeNotePython;
+  const codeFeedback = sdkType === 'js-sdk' ? codeFeedbackJS : codeFeedbackPython;
 
   return (
     <Box m={2} className="text-sm">
@@ -39,24 +56,32 @@ os.environ["WF_TRACE_SERVER_URL"] = "http://127.0.0.1:6345"
 
       <Box mt={2}>
         Use the following code to retrieve this call:
-        <CopyableText language="python" text={codeFetch} copyText={codeFetch} />
+        <CopyableText
+          language={language}
+          text={codeFetch}
+          copyText={codeFetch}
+        />
       </Box>
       <Box mt={2}>
         You can add a reaction like this:
         <CopyableText
-          language="python"
+          language={language}
           text={codeReaction}
           copyText={codeReaction}
         />
       </Box>
       <Box mt={2}>
         or a note like this:
-        <CopyableText language="python" text={codeNote} copyText={codeNote} />
+        <CopyableText
+          language={language}
+          text={codeNote}
+          copyText={codeNote}
+        />
       </Box>
       <Box mt={2}>
         or custom feedback like this:
         <CopyableText
-          language="python"
+          language={language}
           text={codeFeedback}
           copyText={codeFeedback}
         />
