@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import {Loading} from '@wandb/weave/components/Loading';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {FC, useCallback, useEffect, useState} from 'react';
+import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {makeRefCall} from '../../../../../../util/refs';
@@ -10,6 +10,7 @@ import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
+import {TableNavigationContext} from '../../navigationContext';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
@@ -138,6 +139,7 @@ const CallPageInnerVertical: FC<{
   path?: string;
 }> = ({call, path}) => {
   useViewTraceEvent(call);
+  const {getPreviousID, getNextID} = useContext(TableNavigationContext);
 
   const {useCall} = useWFHooks();
   const history = useHistory();
@@ -195,6 +197,57 @@ const CallPageInnerVertical: FC<{
   }, [callComplete]);
 
   const callTabs = useCallTabs(currentCall);
+
+  const navigateToCallURL = useCallback(
+    (id: string) => {
+      history.replace(
+        currentRouter.callUIUrl(
+          currentCall.entity,
+          currentCall.project,
+          currentCall.traceId,
+          id,
+          path,
+          showTraceTree
+        )
+      );
+    },
+    [
+      currentCall.entity,
+      currentCall.project,
+      currentCall.traceId,
+      currentRouter,
+      history,
+      path,
+      showTraceTree,
+    ]
+  );
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      let newID = '';
+      if (event.key === 'ArrowDown') {
+        newID = getNextID?.(currentCall.callId) ?? '';
+        console.log('ArrowDown pressed', getNextID?.(currentCall.callId));
+      } else if (event.key === 'ArrowUp') {
+        newID = getPreviousID?.(currentCall.callId) ?? '';
+        console.log('ArrowUp pressed', getPreviousID?.(currentCall.callId));
+      }
+      console.log('newID: ', newID);
+
+      if (newID !== '') {
+        navigateToCallURL(newID);
+      }
+    },
+    [currentCall.callId, getNextID, getPreviousID, navigateToCallURL]
+  );
+
+  // Attach and detach event listener
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
 
   if (loading && !assumeCallIsSelectedCall) {
     return <Loading centered />;

@@ -1,4 +1,4 @@
-import React, {FC, useCallback, useState} from 'react';
+import React, {FC, useCallback, useEffect,useState} from 'react';
 
 const DEFAULT_PAGE_SIZE = 50;
 
@@ -14,20 +14,30 @@ export const TableNavigationContext = React.createContext<{
   nextPageNeeded: false,
 });
 
-export const TableNavigationProvider: FC<{children: React.ReactNode}> = ({
-  children,
-}) => {
+export const TableNavigationProvider: FC<{
+  children: React.ReactNode;
+  resetTrigger: any; // This can be any value that changes when you want to reset
+}> = ({children, resetTrigger}) => {
   const [ids, setIDs] = useState<string[]>([]);
   const [nextPageNeeded, setNextPageNeeded] = useState(false);
 
+  // Reset IDs when resetTrigger changes
+  useEffect(() => {
+    setIDs([]);
+    setNextPageNeeded(false);
+  }, [resetTrigger]);
+
   const getNextID = useCallback(
     (currentId: string) => {
-      const currentIndex = ids.indexOf(currentId);
-      if (currentIndex === ids.length - 1 && ids.length === DEFAULT_PAGE_SIZE) {
+      const nextIDIndex = ids.indexOf(currentId) + 1;
+      if (nextIDIndex === ids.length && ids.length === DEFAULT_PAGE_SIZE) {
         setNextPageNeeded(true);
-      } else if (currentIndex !== -1) {
-        return ids[currentIndex + 1];
-      } else if (nextPageNeeded) {
+        return null;
+      }
+      if (nextIDIndex >= 0 && nextIDIndex < ids.length) {
+        return ids[nextIDIndex];
+      }
+      if (nextPageNeeded) {
         setNextPageNeeded(false);
         return ids[0];
       }
@@ -38,8 +48,11 @@ export const TableNavigationProvider: FC<{children: React.ReactNode}> = ({
 
   const getPreviousID = useCallback(
     (currentID: string) => {
-      const currentIndex = ids.indexOf(currentID);
-      return ids[currentIndex - 1];
+      const prevIDIndex = ids.indexOf(currentID) - 1;
+      if (prevIDIndex >= 0 && prevIDIndex < ids.length) {
+        return ids[prevIDIndex];
+      }
+      return null;
     },
     [ids]
   );

@@ -31,6 +31,7 @@ import {Icon} from '@wandb/weave/components/Icon';
 import React, {
   FC,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -47,6 +48,7 @@ import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
+import {TableNavigationContext} from '../../navigationContext';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
@@ -168,6 +170,8 @@ export const CallsTable: FC<{
   allowedColumnPatterns,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+
+  const tableNavigation = useContext(TableNavigationContext);
 
   const isReadonly =
     loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
@@ -461,6 +465,11 @@ export const CallsTable: FC<{
   const rowIds = useMemo(() => {
     return tableData.map(row => row.id);
   }, [tableData]);
+  // update the context with rowIDs so CallPage can navigate the table with keyboard
+  useEffect(() => {
+    tableNavigation.setIDs?.(rowIds);
+  }, [tableNavigation, rowIds]);
+
   const [rowSelectionModel, setRowSelectionModel] =
     useState<GridRowSelectionModel>([]);
   useEffect(() => {

@@ -67,6 +67,7 @@ import {
 } from './Browse3/grid/pagination';
 import {getValidPinModel, removeAlwaysLeft} from './Browse3/grid/pin';
 import {getValidSortModel} from './Browse3/grid/sort';
+import {TableNavigationProvider} from './Browse3/navigationContext';
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
@@ -101,7 +102,6 @@ import {
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
 import {useDrawerResize} from './useDrawerResize';
-import {TableNavigationProvider} from './Browse3/navigationContext';
 
 LicenseInfo.setLicenseKey(
   'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
@@ -268,7 +268,9 @@ const Browse3Mounted: FC<{
                 flexDirection: 'column',
               }}>
               <ErrorBoundary>
-                <MainPeekingLayout />
+                <TableNavigationProvider>
+                  <MainPeekingLayout />
+                </TableNavigationProvider>
               </ErrorBoundary>
             </Box>
           </Route>
@@ -414,12 +416,10 @@ const MainPeekingLayout: FC = () => {
                     </Box>
                   ),
                 }}>
-                <TableNavigationProvider>
-                  <Browse3ProjectRoot
-                    customLocation={peekLocation}
-                    projectRoot={generalProjectRoot}
-                  />
-                </TableNavigationProvider>
+                <Browse3ProjectRoot
+                  customLocation={peekLocation}
+                  projectRoot={generalProjectRoot}
+                />
               </SimplePageLayoutContext.Provider>
             </WeaveflowPeekContext.Provider>
           )}
