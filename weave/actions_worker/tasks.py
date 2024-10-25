@@ -65,8 +65,9 @@ def resolve_action_ref(configured_action_ref: str) -> ConfiguredAction:
     action_dict_res = server.refs_read_batch(
         RefsReadBatchReq(refs=[configured_action_ref])
     )
-    action_str = action_dict_res.vals[0]
-    action = ConfiguredAction.model_validate(json.loads(action_str))
+    action_dict = action_dict_res.vals[0]
+    assert isinstance(action_dict, dict)
+    action = ConfiguredAction.model_validate(action_dict)
     return action
 
 
@@ -120,8 +121,7 @@ def do_task(ctx: TaskCtx, configured_action_ref: str) -> None:
     call_input = json.dumps(call.inputs)
     call_output = call.output
     if not isinstance(call_output, str):
-        # TODO Probably log this somewhere.
-        return
+        call_output = json.dumps(call_output)
 
     if action.config.action_type == "wordcount":
         wordcount(ctx, call_input, call_output, configured_action_ref, action.config)

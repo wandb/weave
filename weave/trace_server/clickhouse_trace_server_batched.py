@@ -1606,7 +1606,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
 
         # Step 3: Normal case: enqueue the actions in CH and the worker queue.
-        prepared = TABLE_ACTIONS.insertMany(rows).prepare(database_type="clickhouse")
+        prepared = TABLE_ACTIONS.insert_many(rows).prepare(database_type="clickhouse")
         self._insert(TABLE_ACTIONS.name, prepared.data, prepared.column_names)
 
         for task_ctx in task_ctxs:
@@ -1627,7 +1627,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             }
             for call_id in req.call_ids
         ]
-        prepared = TABLE_ACTIONS.insertMany(rows).prepare(database_type="clickhouse")
+        prepared = TABLE_ACTIONS.insert_many(rows).prepare(database_type="clickhouse")
         self._insert(TABLE_ACTIONS.name, prepared.data, prepared.column_names)
 
         return tsi.ActionsAckBatchRes(
