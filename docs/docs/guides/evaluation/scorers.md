@@ -142,6 +142,9 @@ During evaluation, the scorer will be computed for each row of your dataset. To 
 
 You can override the `summarize` method on the `Scorer` class and provide your own way of computing the final scores. The `summarize` function expects:
 
+- A single parameter `score_rows`: This is a list of dictionaries, where each dictionary contains the scores returned by the `score` method for a single row of your dataset.
+- It should return a dictionary containing the summarized scores.
+
 **Why this is useful?** 
 
 When you need to score all rows before deciding on the final value of the score for the dataset.
