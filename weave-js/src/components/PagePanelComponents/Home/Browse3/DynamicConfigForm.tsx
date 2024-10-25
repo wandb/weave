@@ -15,7 +15,7 @@ import {Delete} from '@mui/icons-material';
 import React, {useEffect, useMemo} from 'react';
 import {z} from 'zod';
 
-import { parseRefMaybe } from '../Browse2/SmallRef';
+import {parseRefMaybe} from '../Browse2/SmallRef';
 
 interface DynamicConfigFormProps {
   configSchema: z.ZodType<any>;
@@ -300,25 +300,25 @@ const EnumField: React.FC<{
         onChange={e =>
           updateConfig(targetPath, e.target.value, config, setConfig)
         }>
-        {options.map((option: string) => 
-          {
-            let displayValue = option;
-            const ref = parseRefMaybe(displayValue);
-            if (ref) {
-              displayValue = `${ref.artifactName} [${ref.artifactVersion.slice(0, 8)}]`;
-            }
-            return (
-              <MenuItem key={option} value={option}>
-                {displayValue}
-              </MenuItem>
-            );
-          })}
+        {options.map((option: string) => {
+          let displayValue = option;
+          const ref = parseRefMaybe(displayValue);
+          if (ref) {
+            displayValue = `${ref.artifactName} [${ref.artifactVersion.slice(
+              0,
+              8
+            )}]`;
+          }
+          return (
+            <MenuItem key={option} value={option}>
+              {displayValue}
+            </MenuItem>
+          );
+        })}
       </Select>
     </FormControl>
   );
 };
-
-
 
 const RecordField: React.FC<{
   keyName: string;
