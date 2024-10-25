@@ -10,6 +10,7 @@ import {Tailwind} from '../../../../Tailwind';
 import {Tooltip} from '../../../../Tooltip';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
+import {ActionDispatchFilterMonitorTab} from './ActionDispatchFilterMonitorTab';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
@@ -52,6 +53,7 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Evaluation: 'benchmark-square',
   Scorer: 'type-number-alt',
   ConfiguredAction: 'rocket-launch',
+  ActionDispatchFilter: 'running-repeat',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
@@ -186,6 +188,8 @@ const ObjectVersionPageInner: React.FC<{
 
   const isDataset = baseObjectClass === 'Dataset' && refExtra == null;
   const isEvaluation = baseObjectClass === 'Evaluation' && refExtra == null;
+  const isActionDispatchFilter =
+    baseObjectClass === 'ActionDispatchFilter' && refExtra == null;
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
 
@@ -332,6 +336,20 @@ const ObjectVersionPageInner: React.FC<{
             </ScrollableTabContent>
           ),
         },
+        ...(isActionDispatchFilter
+          ? [
+              {
+                label: 'Monitor',
+                content: (
+                  <ActionDispatchFilterMonitorTab
+                    entity={entityName}
+                    project={projectName}
+                    dispatchFilterRef={refUri}
+                  />
+                ),
+              },
+            ]
+          : []),
         {
           label: 'Use',
           content: (
