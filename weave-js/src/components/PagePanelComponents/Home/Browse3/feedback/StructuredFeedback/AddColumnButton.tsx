@@ -524,17 +524,14 @@ export const ConfigureStructuredFeedbackModal = ({
   editColumnName?: string;
   onClose: () => void;
 }) => {
-  const feedbackColumn = structuredFeedbackData?.types.find(
-    t => t.name === editColumnName
-  );
-  if (!feedbackColumn) {
-    console.error(
-      `Structured feedback column not found: ${editColumnName}`,
-      structuredFeedbackData
+  if (editColumnName && structuredFeedbackData) {
+    const feedbackColumn = structuredFeedbackData?.types.find(
+      t => t.name === editColumnName
     );
-    return null;
-  }
-  if (editColumnName && structuredFeedbackData && feedbackColumn) {
+    if (!feedbackColumn) {
+      console.error(`Feedback column not found: ${editColumnName}`);
+      return null;
+    }
     return (
       <EditStructuredFeedbackModal
         entity={entity}

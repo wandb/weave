@@ -135,6 +135,10 @@ export const StructuredFeedbackCell: React.FC<
   const getTsClient = useGetTraceServerClientContext();
 
   useEffect(() => {
+    if (!props.readOnly) {
+      // We don't need to listen for feedback changes if the cell is editable
+      return;
+    }
     return getTsClient().registerOnFeedbackListener(
       props.callRef,
       query.refetch
@@ -239,7 +243,7 @@ export const StructuredFeedbackCell: React.FC<
   }
 
   return (
-    <div className="flex w-full justify-center p-6">
+    <div className="flex w-full justify-center">
       {renderFeedbackComponent(
         props,
         onAddFeedback,
@@ -394,53 +398,51 @@ export const CategoricalFeedbackColumn = ({
   };
 
   return (
-    <Tailwind>
-      <div className="flex w-full">
-        <Autocomplete
-          options={dropdownOptions}
-          getOptionLabel={option => option.label}
-          onChange={onValueChange}
-          value={value}
-          renderInput={params => (
-            <MuiTextField
-              {...params}
-              sx={{
-                '& .MuiInputBase-root': {
-                  height: '38px',
-                  minHeight: '38px',
-                  borderColor: MOON_300,
-                },
-                '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: MOON_300,
-                },
-                '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: MOON_300,
-                },
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                  borderColor: MOON_300,
-                },
-              }}
-            />
-          )}
-          disableClearable
-          sx={{
-            minWidth: '244px',
-            width: 'auto',
-          }}
-          fullWidth
-          ListboxProps={{
-            style: {
-              maxHeight: '200px',
-            },
-          }}
-          renderOption={(props, option) => (
-            <li {...props} style={{minHeight: '30px'}}>
-              {option.label || <span>&nbsp;</span>}
-            </li>
-          )}
-        />
-      </div>
-    </Tailwind>
+    <div className="flex w-full">
+      <Autocomplete
+        options={dropdownOptions}
+        getOptionLabel={option => option.label}
+        onChange={onValueChange}
+        value={value}
+        renderInput={params => (
+          <MuiTextField
+            {...params}
+            sx={{
+              '& .MuiInputBase-root': {
+                height: '38px',
+                minHeight: '38px',
+                borderColor: MOON_300,
+              },
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: MOON_300,
+              },
+              '&:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: MOON_300,
+              },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                borderColor: MOON_300,
+              },
+            }}
+          />
+        )}
+        disableClearable
+        sx={{
+          minWidth: '200px',
+          width: '100%',
+        }}
+        fullWidth
+        ListboxProps={{
+          style: {
+            maxHeight: '200px',
+          },
+        }}
+        renderOption={(props, option) => (
+          <li {...props} style={{minHeight: '30px'}}>
+            {option.label || <span>&nbsp;</span>}
+          </li>
+        )}
+      />
+    </div>
   );
 };
 
