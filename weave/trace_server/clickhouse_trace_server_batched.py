@@ -54,6 +54,12 @@ from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.action_executor import (
+    ActionExecutor,
+    TaskCtx,
+    queue_from_addr,
+)
+from weave.trace_server.actions import TABLE_ACTIONS, get_stale_actions
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -80,6 +86,7 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.base_models.action_base_models import (
+    ActionDispatchFilter,
     ConfiguredAction,
 )
 from weave.trace_server.interface.base_models.base_model_registry import (
@@ -178,6 +185,44 @@ CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
 
+@dataclasses.dataclass
+class CallBatch:
+    """Represents a batch of calls to be inserted into Clickhouse."""
+
+    calls: list[list[Any]]
+    project_id: Optional[str]
+    call_ids: list[str]  # Track IDs of calls in the batch
+
+    def __init__(self) -> None:
+        self.calls = []
+        self.project_id = None
+        self.call_ids = []
+
+    def add_call(self, ch_call: CallCHInsertable) -> None:
+        """Add a call to the batch, ensuring project_id consistency."""
+        if self.project_id is None:
+            self.project_id = ch_call.project_id
+        elif self.project_id != ch_call.project_id:
+            raise ValueError("All calls in a batch must have the same project_id")
+
+        parameters = ch_call.model_dump()
+        row = []
+        for key in all_call_insert_columns:
+            row.append(parameters.get(key, None))
+        self.calls.append(row)
+        self.call_ids.append(ch_call.id)
+
+    def clear(self) -> None:
+        """Reset the batch to empty state."""
+        self.calls = []
+        self.project_id = None
+        self.call_ids = []
+
+    def __bool__(self) -> bool:
+        """Return True if the batch has any calls."""
+        return bool(self.calls)
+
+
 class ClickHouseTraceServer(tsi.TraceServerInterface):
     def __init__(
         self,
@@ -187,6 +232,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         user: str = "default",
         password: str = "",
         database: str = "default",
+        action_executor_addr: str,
         use_async_insert: bool = False,
     ):
         super().__init__()
@@ -197,8 +243,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._password = password
         self._database = database
         self._flush_immediately = True
-        self._call_batch: list[list[Any]] = []
+        self._call_batch = CallBatch()
         self._use_async_insert = use_async_insert
+        self._action_executor_addr = action_executor_addr
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -210,6 +257,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             user=wf_env.wf_clickhouse_user(),
             password=wf_env.wf_clickhouse_pass(),
             database=wf_env.wf_clickhouse_database(),
+            action_executor_addr=wf_env.wf_action_executor(),
             use_async_insert=use_async_insert,
         )
 
@@ -221,7 +269,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             yield
             self._flush_calls()
         finally:
-            self._call_batch = []
+            self._call_batch.clear()
             self._flush_immediately = True
 
     # Creates a new call
@@ -1010,7 +1058,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 objs = self._select_objs_query(
                     project_id=project_id_scope,
                     conditions=conditions,
-                    object_id_conditions=object_id_conditions,
+                    object_id_conditions=object_id_conds,
                     parameters=parameters,
                 )
                 for obj in objs:
@@ -1424,6 +1472,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def execute_batch_action(
         self, req: tsi.ExecuteBatchActionReq
     ) -> tsi.ExecuteBatchActionRes:
+        return tsi.ExecuteBatchActionRes()
         # WARNING: THIS IS NOT GOING TO WORK IN PRODUCTION
         # UNTIL WE HAVE THE API KEY PIECE IN PLACE
         configured_action_ref = req.configured_action_ref
@@ -1512,12 +1561,120 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return tsi.ExecuteBatchActionRes()
 
+    def actions_execute_batch(
+        self, req: tsi.ActionsExecuteBatchReq
+    ) -> tsi.ActionsExecuteBatchRes:
+        # NOTE: Clients should try to generate their own ids, and retry using the same IDs in case of failures.
+        # That way we can avoid unnecessary duplicates if the server fails after inserting the batch into CH
+        # but before inserting into the action queue.
+
+        # # First look up the configured action.
+        # configured_action_ref = req.configured_action_ref
+        # action_dict_res = self.refs_read_batch(
+        #     tsi.RefsReadBatchReq(refs=[configured_action_ref])
+        # )
+
+        # # Validate (though we'll need to json dump it again. Still, good to have a validation check somewhere.)
+        # # TODO maybe remove.
+        # action_dict = action_dict_res.vals[0]
+        # action = ConfiguredAction.model_validate(action_dict)
+
+        # Step 1: Prepare data to insert into CH actions table and queue.
+        id = req.id or generate_id()
+        created_at = datetime.datetime.now(ZoneInfo("UTC"))
+        rows: list[Row] = [
+            {
+                "project_id": req.project_id,
+                "call_id": call_id,
+                "id": id,
+                "rule_matched": req.rule_matched,
+                "configured_action": req.configured_action_ref,
+                "created_at": created_at,
+            }
+            for call_id in req.call_ids
+        ]
+        task_ctxs: list[TaskCtx] = [
+            {"project_id": req.project_id, "call_id": call_id, "id": id}
+            for call_id in req.call_ids
+        ]
+        # Step 2: Potential shortcut: if there is only one call, we can do the action right away.
+        if len(req.call_ids) == 1:
+            self.action_executor.do_now(task_ctxs[0], req.configured_action_ref)
+            return tsi.ActionsExecuteBatchRes(
+                project_id=req.project_id, call_ids=[req.call_ids[0]], id=id
+            )
+
+        # Step 3: Normal case: enqueue the actions in CH and the worker queue.
+        prepared = TABLE_ACTIONS.insert_many(rows).prepare(database_type="clickhouse")
+        self._insert(TABLE_ACTIONS.name, prepared.data, prepared.column_names)
+
+        for task_ctx in task_ctxs:
+            self.action_executor.enqueue(task_ctx, req.configured_action_ref)
+        return tsi.ActionsExecuteBatchRes(
+            project_id=req.project_id, call_ids=req.call_ids, id=id
+        )
+
+    def actions_ack_batch(self, req: tsi.ActionsAckBatchReq) -> tsi.ActionsAckBatchRes:
+        received_at = datetime.datetime.now(ZoneInfo("UTC"))
+        rows: list[Row] = [
+            {
+                "project_id": req.project_id,
+                "call_id": call_id,
+                "id": req.id,
+                "finished_at": received_at if req.succeeded else None,
+                "failed_at": received_at if not req.succeeded else None,
+            }
+            for call_id in req.call_ids
+        ]
+        prepared = TABLE_ACTIONS.insert_many(rows).prepare(database_type="clickhouse")
+        self._insert(TABLE_ACTIONS.name, prepared.data, prepared.column_names)
+
+        return tsi.ActionsAckBatchRes(
+            project_id=req.project_id, call_ids=req.call_ids, id=req.id
+        )
+
+    # NOTE: This is a private admin function, meant to be invoked by an action cleaner.
+    # The action cleaner's job is to find actions that have been in the action queue for too long, and requeue them.
+    def _actions_requeue_stale(self) -> None:
+        try:
+            prepared_select = get_stale_actions(
+                older_than=datetime.datetime.now(ZoneInfo("UTC"))
+                - datetime.timedelta(hours=1)
+            )
+            query_result = self._query(prepared_select.sql, prepared_select.parameters)
+            rows = TABLE_ACTIONS.tuples_to_rows(
+                query_result.result_rows, prepared_select.fields
+            )
+            for row in rows:
+                try:
+                    self.action_executor.enqueue(
+                        {
+                            "project_id": row["project_id"],  # type: ignore
+                            "call_id": row["call_id"],  # type: ignore
+                            "id": row["id"],  # type: ignore
+                        },
+                        row["configured_action"],  # type: ignore
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to requeue action: {row}. Error: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error in _actions_requeue_stale: {str(e)}")
+            raise
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
         if not hasattr(self._thread_local, "ch_client"):
             self._thread_local.ch_client = self._mint_client()
         return self._thread_local.ch_client
+
+    @property
+    def action_executor(self) -> ActionExecutor:
+        if not hasattr(self._thread_local, "action_executor"):
+            self._thread_local.action_executor = queue_from_addr(
+                self._action_executor_addr
+            )
+        return self._thread_local.action_executor
 
     def _mint_client(self) -> CHClient:
         client = clickhouse_connect.get_client(
@@ -1531,9 +1688,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
         client.database = self._database
         return client
-
-    # def __del__(self) -> None:
-    #     self.ch_client.close()
 
     def _insert_call_batch(self, batch: list) -> None:
         if batch:
@@ -1804,23 +1958,93 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise
 
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
-        parameters = ch_call.model_dump()
-        row = []
-        for key in all_call_insert_columns:
-            row.append(parameters.get(key, None))
-        self._call_batch.append(row)
+        self._call_batch.add_call(ch_call)
         if self._flush_immediately:
             self._flush_calls()
 
+    def _get_matched_calls_for_filters(
+        self, project_id: str, call_ids: list[str]
+    ) -> list[tuple[ActionDispatchFilter, list[tsi.CallSchema]]]:
+        """Helper function to get calls that match action filters.
+
+        Returns a list of tuples containing (filter, matched_calls) pairs.
+        """
+        # Get all action filters for the project
+        filter_req = tsi.ObjQueryReq(
+            project_id=project_id,
+            filter=tsi.ObjectVersionFilter(
+                base_object_classes=[base_model_name(ActionDispatchFilter)],
+                is_op=False,
+                latest_only=True,  # IMPORTANT: Always keep this.
+            ),
+        )
+        filter_res = self.objs_query(filter_req)
+        filters: list[ActionDispatchFilter] = [
+            ActionDispatchFilter.model_validate(obj.val) for obj in filter_res.objs
+        ]
+
+        if not filters:
+            return []
+
+        # Get all finished calls from the batch
+        calls_query_filter = tsi.Query.model_validate(
+            {
+                "$expr": {
+                    "$and": [
+                        {"$in": ["$id", call_ids]},
+                        {"$ne": ["$started_at", None]},
+                        {"$ne": ["$finished_at", None]},
+                    ]
+                }
+            }
+        )
+        calls_query_req = tsi.CallsQueryReq(
+            project_id=project_id,
+            query=calls_query_filter,
+        )
+        calls_res = self.calls_query(calls_query_req)
+
+        # Match calls to filters
+        matched_filters_and_calls = []
+        for filter in filters:
+            if filter.disabled:
+                continue
+            matched_calls = [
+                call for call in calls_res.calls if filter.op_name == call.op_name
+            ]
+            if matched_calls:
+                matched_filters_and_calls.append((filter, matched_calls))
+
+        return matched_filters_and_calls
+
     def _flush_calls(self) -> None:
+        if not self._call_batch:
+            return
+        assert self._call_batch.project_id is not None
+
         try:
-            self._insert_call_batch(self._call_batch)
+            self._insert_call_batch(self._call_batch.calls)
         except InsertTooLarge:
             logger.info("Retrying with large objects stripped.")
-            batch = self._strip_large_values(self._call_batch)
+            batch = self._strip_large_values(self._call_batch.calls)
             self._insert_call_batch(batch)
 
-        self._call_batch = []
+        # Find and process matched calls for each filter
+        matched_filters_and_calls = self._get_matched_calls_for_filters(
+            self._call_batch.project_id, self._call_batch.call_ids
+        )
+
+        for filter, matched_calls in matched_filters_and_calls:
+            self.actions_execute_batch(
+                tsi.ActionsExecuteBatchReq(
+                    project_id=self._call_batch.project_id,
+                    call_ids=[call.id for call in matched_calls],
+                    rule_matched=json.dumps(filter),
+                    configured_action_ref=filter.configured_action_ref,
+                )
+            )
+
+        self._call_batch.clear()
 
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
         """
@@ -2057,21 +2281,6 @@ def _process_parameters(
         if isinstance(value, datetime.datetime):
             parameters[key] = value.timestamp()
     return parameters
-
-
-# def _partial_obj_schema_to_ch_obj(
-#     partial_obj: tsi.ObjSchemaForInsert,
-# ) -> ObjCHInsertable:
-#     version_hash = version_hash_for_object(partial_obj)
-
-#     return ObjCHInsertable(
-#         id=uuid.uuid4(),
-#         project_id=partial_obj.project_id,
-#         name=partial_obj.name,
-#         type="unknown",
-#         refs=[],
-#         val=json.dumps(partial_obj.val),
-#     )
 
 
 def get_type(val: Any) -> str:

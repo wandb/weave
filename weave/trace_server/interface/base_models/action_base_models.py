@@ -4,22 +4,29 @@ from pydantic import BaseModel
 
 
 class ConfiguredLlmJudgeAction(BaseModel):
-    action_type: Literal["llm_judge"]
+    action_type: Literal["llm_judge"] = "llm_judge"
+    model: Literal["gpt-4o", "gpt-4o-mini"]
     prompt: str
-    model: Literal["gpt-4o-mini", "gpt-4o"]
     response_format: Optional[dict[str, Any]]
 
 
+class ConfiguredContainsWordsAction(BaseModel):
+    action_type: Literal["contains_words"] = "contains_words"
+    target_words: list[str]
+
+
 class ConfiguredWordCountAction(BaseModel):
-    action_type: Literal["wordcount"]
+    action_type: Literal["wordcount"] = "wordcount"
 
 
 class ConfiguredNoopAction(BaseModel):
-    action_type: Literal["noop"]
+    action_type: Literal["noop"] = "noop"
+
 
 
 ActionConfigType = Union[
     ConfiguredLlmJudgeAction,
+    ConfiguredContainsWordsAction,
     ConfiguredWordCountAction,
     ConfiguredNoopAction,
 ]
