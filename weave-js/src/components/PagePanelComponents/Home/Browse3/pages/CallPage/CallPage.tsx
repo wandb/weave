@@ -11,6 +11,7 @@ import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {NotFoundPanel} from '../../NotFoundPanel';
+import {ENABLE_ONLINE_EVAL_UI, getFeatureFlag} from '../../windowFlags';
 import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
@@ -56,6 +57,7 @@ const useCallTabs = (call: CallSchema) => {
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
+  const enableOnlineEvalUI = getFeatureFlag(ENABLE_ONLINE_EVAL_UI);
   return [
     // Disabling Evaluation tab until it's better for single evaluation
     ...(false && isEvaluateOp(call.spanName)
@@ -124,14 +126,18 @@ const useCallTabs = (call: CallSchema) => {
         </Tailwind>
       ),
     },
-    {
-      label: 'Scores',
-      content: (
-        <Tailwind>
-          <CallActionsViewer call={call} />
-        </Tailwind>
-      ),
-    },
+    ...(enableOnlineEvalUI
+      ? [
+          {
+            label: 'Scores',
+            content: (
+              <Tailwind>
+                <CallActionsViewer call={call} />
+              </Tailwind>
+            ),
+          },
+        ]
+      : []),
     {
       label: 'Use',
       content: (

@@ -101,6 +101,7 @@ import {
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import {ENABLE_ONLINE_EVAL_UI, getFeatureFlag} from './Browse3/windowFlags';
 import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
@@ -980,6 +981,10 @@ const CompareEvaluationsBinding = () => {
 
 const ScorersPageBinding = () => {
   const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  const enableOnlineEvalUI = getFeatureFlag(ENABLE_ONLINE_EVAL_UI);
+  if (!enableOnlineEvalUI) {
+    return null;
+  }
   return <ScorersPage entity={entity} project={project} />;
 };
 

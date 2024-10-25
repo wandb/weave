@@ -4,6 +4,7 @@ import {LoadingDots} from '../../../../../LoadingDots';
 import {Tailwind} from '../../../../../Tailwind';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {OpCodeViewer} from '../../OpCodeViewer';
+import {ENABLE_ONLINE_EVAL_UI, getFeatureFlag} from '../../windowFlags';
 import {
   CallsLink,
   opNiceName,
@@ -70,6 +71,7 @@ const OpVersionPageInner: React.FC<{
     // that data available yet.
     return true;
   }, []);
+  const enableOnlineEvalUI = getFeatureFlag(ENABLE_ONLINE_EVAL_UI);
 
   return (
     <SimplePageLayoutWithHeader
@@ -132,10 +134,14 @@ const OpVersionPageInner: React.FC<{
             />
           ),
         },
-        {
-          label: 'Online Scorers',
-          content: <OpOnlineScorersTab opVersion={opVersion} />,
-        },
+        ...(enableOnlineEvalUI
+          ? [
+              {
+                label: 'Online Scorers',
+                content: <OpOnlineScorersTab opVersion={opVersion} />,
+              },
+            ]
+          : []),
         ...(useOpSupported
           ? [
               {
