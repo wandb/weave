@@ -6,6 +6,8 @@ import {
   ObjectRef,
   parseRef,
   refUri,
+  WandbArtifactRef,
+  WeaveObjectRef,
 } from '@wandb/weave/react';
 import React, {FC} from 'react';
 
@@ -76,11 +78,92 @@ export const objectRefDisplayName = (
   throw new Error('Unknown ref type');
 };
 
-export const SmallRef: FC<{
-  objRef: ObjectRef;
-  wfTable?: WFDBTableType;
+export const SmallRefBox: FC<{
+    iconName: IconName;
+    text: string;
+}> = ({ iconName, text }) => (
+    <Box display="flex" alignItems="center">
+        <Box
+            mr="4px"
+            bgcolor={hexToRGB(MOON_300, 0.48)}
+            sx={{
+                height: '22px',
+                width: '22px',
+                borderRadius: '16px',
+                display: 'flex',
+                flex: '0 0 22px',
+                justifyContent: 'center',
+                alignItems: 'center',
+            }}
+        >
+            <Icon name={iconName} width={14} height={14} />
+        </Box>
+        <Box
+            sx={{
+                height: '22px',
+                flex: 1,
+                minWidth: 0,
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+            }}
+        >
+            {text}
+        </Box>
+    </Box>
+);
+
+export const SmallArtifactRef: FC<{
+  objRef: WandbArtifactRef;
   iconOnly?: boolean;
-}> = ({objRef, wfTable, iconOnly = false}) => {
+}> = ({objRef}) => {
+  // TODO lookup the artifact by name (where name is name:version and version is "v0", or "v1", etc)
+  // so you can verify it's a valid artifact AND check that 'model' is the right type
+  /*
+  const ARTIFACT_BY_NAME_QUERY = gql`
+    query ArtifactByName(
+      $entityName: String!,
+      $projectName: String!,
+      $name: String!
+    ) {
+      project(name: $projectName, entityName: $entityName) {
+        artifact(name: $name) {
+          id
+          name
+          description
+          createdAt
+          updatedAt
+          size
+          state
+        }
+      }
+    }
+  `;
+  */
+
+
+  return (
+    <Link
+      $variant="secondary"
+      style={{
+        width: '100%',
+        minHeight: '38px',
+        display: 'flex',
+        alignItems: 'center',
+      }}
+      as="a"
+      href={`${window.location.origin}/${objRef.entityName}/${objRef.projectName}/artifacts/model/${objRef.artifactName}/${objRef.artifactVersion}`}
+      target="_blank"
+      rel="noopener noreferrer">
+      <SmallRefBox iconName={IconNames.OpenNewTab} text={`${objRef.artifactName}:${objRef.artifactVersion}`} />
+    </Link>
+  );
+};
+
+export const SmallWeaveRef: FC<{
+  objRef: WeaveObjectRef;
+  wfTable?: WFDBTableType;
+}> = ({objRef, wfTable}) => {
   const {
     useObjectVersion,
     useOpVersion,
@@ -90,40 +173,26 @@ export const SmallRef: FC<{
   let objVersionKey: ObjectVersionKey | null = null;
   let opVersionKey: OpVersionKey | null = null;
 
-  const isArtifactRef = isWandbArtifactRef(objRef);
-  const isWeaveObjRef = isWeaveObjectRef(objRef);
-
-  if (isArtifactRef) {
-    objVersionKey = {
-      scheme: 'wandb-artifact',
+  if (objRef.weaveKind === 'op') {
+    opVersionKey = {
       entity: objRef.entityName,
       project: objRef.projectName,
+      opId: objRef.artifactName,
+      versionHash: objRef.artifactVersion,
+    };
+  } else {
+    objVersionKey = {
+      scheme: 'weave',
+      entity: objRef.entityName,
+      project: objRef.projectName,
+      weaveKind: objRef.weaveKind,
       objectId: objRef.artifactName,
       versionHash: objRef.artifactVersion,
-      path: objRef.artifactPath,
+      path: '',
       refExtra: objRef.artifactRefExtra,
     };
-  } else if (isWeaveObjRef) {
-    if (objRef.weaveKind === 'op') {
-      opVersionKey = {
-        entity: objRef.entityName,
-        project: objRef.projectName,
-        opId: objRef.artifactName,
-        versionHash: objRef.artifactVersion,
-      };
-    } else {
-      objVersionKey = {
-        scheme: 'weave',
-        entity: objRef.entityName,
-        project: objRef.projectName,
-        weaveKind: objRef.weaveKind,
-        objectId: objRef.artifactName,
-        versionHash: objRef.artifactVersion,
-        path: '',
-        refExtra: objRef.artifactRefExtra,
-      };
-    }
   }
+
   const objectVersion = useObjectVersion(objVersionKey);
   const opVersion = useOpVersion(opVersionKey);
   const versionIndex =
@@ -154,41 +223,11 @@ export const SmallRef: FC<{
     icon = IconNames.JobProgramCode;
   }
   const Item = (
-    <Box display="flex" alignItems="center">
-      <Box
-        mr="4px"
-        bgcolor={hexToRGB(MOON_300, 0.48)}
-        sx={{
-          height: '22px',
-          width: '22px',
-          borderRadius: '16px',
-          display: 'flex',
-          flex: '0 0 22px',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}>
-        <Icon name={icon} width={14} height={14} />
-      </Box>
-      {!iconOnly && (
-        <Box
-          sx={{
-            height: '22px',
-            flex: 1,
-            minWidth: 0,
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-            textOverflow: 'ellipsis',
-          }}>
-          {label}
-        </Box>
-      )}
-    </Box>
+      <SmallRefBox iconName={icon} text={label} />
   );
+
   if (refTypeQuery.loading) {
     return Item;
-  }
-  if (!isArtifactRef && !isWeaveObjRef) {
-    return <div>[Error: non wandb ref]</div>;
   }
   return (
     <Link
@@ -200,6 +239,25 @@ export const SmallRef: FC<{
       {Item}
     </Link>
   );
+};
+
+export const SmallRef: FC<{
+  objRef: ObjectRef;
+  wfTable?: WFDBTableType;
+  iconOnly?: boolean;
+}> = ({objRef, wfTable, iconOnly = false}) => {
+  const isArtifactRef = isWandbArtifactRef(objRef);
+  const isWeaveObjRef = isWeaveObjectRef(objRef);
+
+  if (!isArtifactRef && !isWeaveObjRef) {
+    return <div>[Error: non wandb ref]</div>;
+  }
+
+  // There is now a dependency on the WandbArtifactRef type for the functionality of linking from weave to model artifacts
+  if (isArtifactRef) {
+    return <SmallArtifactRef objRef={objRef} />;
+  }
+  return <SmallWeaveRef objRef={objRef} />;
 };
 
 export const parseRefMaybe = (s: string): ObjectRef | null => {
