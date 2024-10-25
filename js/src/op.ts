@@ -96,6 +96,7 @@ export function op<T extends (...args: any[]) => any>(
       globalClient.finishCallWithException(
         error,
         currentCall,
+        parentCall,
         endTime,
         startCallPromise
       );
@@ -121,6 +122,9 @@ export function op<T extends (...args: any[]) => any>(
 }
 
 export function isOp(fn: any): fn is Op<any> {
+  if (fn == null) {
+    return false;
+  }
   return fn.__isOp === true;
 }
 

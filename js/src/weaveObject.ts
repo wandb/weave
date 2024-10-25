@@ -1,4 +1,10 @@
-import { isOp } from "./op";
+// Don't get this from op.ts to avoid circular import
+export function isOp(fn: any): boolean {
+  if (fn == null) {
+    return false;
+  }
+  return fn.__isOp === true;
+}
 
 export interface WeaveObjectParameters {
   id?: string;

@@ -1,4 +1,4 @@
-import { WeaveClient } from "./weaveClient";
+import { CallStackEntry, WeaveClient } from "./weaveClient";
 import { getApiKey } from "./settings";
 import { WandbServerApi } from "./wandbServerApi";
 import { Api as TraceServerApi } from "./traceServerApi";
@@ -67,4 +67,20 @@ export function initWithCustomTraceServer(
     projectName,
     true
   );
+}
+
+export function requireCurrentCallStackEntry(): CallStackEntry {
+  if (!globalClient) {
+    throw new Error("Weave client not initialized");
+  }
+  const callStackEntry = globalClient.getCallStack().peek();
+  if (!callStackEntry) {
+    throw new Error("No current call stack entry");
+  }
+  return callStackEntry;
+}
+
+export function requireCurrentChildSummary(): { [key: string]: any } {
+  const callStackEntry = requireCurrentCallStackEntry();
+  return callStackEntry.childSummary;
 }
