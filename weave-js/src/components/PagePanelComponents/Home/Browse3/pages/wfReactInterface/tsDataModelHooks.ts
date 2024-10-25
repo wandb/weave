@@ -371,7 +371,6 @@ const useCallsNoExpansion = (
 };
 
 const useCalls = (
-  // useCalls here!
   entity: string,
   project: string,
   filter: CallFilter,

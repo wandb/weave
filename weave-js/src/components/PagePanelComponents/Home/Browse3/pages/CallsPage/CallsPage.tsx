@@ -51,6 +51,7 @@ export const CallsPage: FC<{
     props.initialFilter ?? {},
     props.onFilterUpdate
   );
+
   const isEvaluationTable = useCurrentFilterIsEvaluationsFilter(
     filter,
     props.entity,
