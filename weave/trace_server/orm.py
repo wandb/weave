@@ -178,7 +178,9 @@ class Table:
             return f"DELETE FROM {self.name}"
 
     def tuple_to_row(
-        self, tup: typing.Tuple | typing.Sequence[typing.Any], fields: list[str]
+        self,
+        tup: typing.Union[typing.Tuple | typing.Sequence[typing.Any]],
+        fields: list[str],
     ) -> Row:
         d = {}
         for i, field in enumerate(fields):
@@ -193,7 +195,9 @@ class Table:
 
     def tuples_to_rows(
         self,
-        tuples: list[typing.Tuple] | typing.Sequence[typing.Sequence[typing.Any]],
+        tuples: typing.Union[
+            list[typing.Tuple], typing.Sequence[typing.Sequence[typing.Any]]
+        ],
         fields: list[str],
     ) -> Rows:
         rows = []
