@@ -1,4 +1,3 @@
-import {quantileSorted} from 'simple-statistics';
 import React, {useEffect, useMemo, useRef} from 'react';
 import * as Plotly from 'plotly.js';
 import moment from 'moment';
@@ -10,30 +9,9 @@ import {
   MOON_500,
   TEAL_400,
 } from '../../../../../../common/css/color.styles';
-import {scaleTime, scaleLinear} from '@visx/scale';
-import {LinePath} from '@visx/shape';
-import {AxisBottom, AxisLeft} from '@visx/axis';
-import {Group} from '@visx/group';
-import {curveMonotoneX} from '@visx/curve';
-import {extent, max, quantile} from 'd3-array';
-import {timeFormat} from 'd3-time-format';
-import {
-  useTooltip,
-  useTooltipInPortal,
-  TooltipWithBounds,
-  defaultStyles,
-} from '@visx/tooltip';
-import {localPoint} from '@visx/event';
-import * as d3 from 'd3';
-import {bisect} from 'd3-array';
-import {curveLinear} from '@visx/curve'; // Import curveLinear
-import {throttle} from 'lodash';
 
-type ChartData = {
-  started_at: string;
-  latency: number;
-  isError: boolean;
-};
+import {quantile} from 'd3-array';
+
 type ChartDataRequests = {
   started_at: string;
 };
@@ -56,15 +34,12 @@ export const LatencyPlotlyChart: React.FC<{
     const groupedData = _(chartData)
       .groupBy(d => {
         const date = moment(d.started_at);
-        console.log('mins', date.minutes());
         const roundedMinutes =
           Math.floor(date.minutes() / binSizeMinutes) * binSizeMinutes;
         return date.startOf('hour').add(roundedMinutes, 'minutes').format();
       })
       .map((group, date) => {
         const latenciesNonSorted = group.map(d => d.latency);
-        console.log('latenciesNonSorted', latenciesNonSorted);
-        // const latencies = _.sortBy(group.map(d => d.latency));
         const p50 = quantile(latenciesNonSorted, 0.5) ?? 0;
         const p95 = quantile(latenciesNonSorted, 0.95) ?? 0;
         const p99 = quantile(latenciesNonSorted, 0.99) ?? 0;
@@ -107,16 +82,10 @@ export const LatencyPlotlyChart: React.FC<{
   }, [chartData, binSizeMinutes]);
 
   useEffect(() => {
-    // Configure the layout for the Plotly chart with crosshairs (spikelines)
     const plotlyLayout: Partial<Plotly.Layout> = {
       height: height - 40,
-      // width: window.innerWidth / 3,
       title: {
         text: 'Latency',
-        // y: 0.9, // Adjust the y position to align with other charts
-        // font: {
-        //   size: 16,
-        // },
       },
       margin: {
         l: 50,
@@ -128,39 +97,35 @@ export const LatencyPlotlyChart: React.FC<{
       xaxis: {
         title: 'Time',
         type: 'date',
-        // tickformat: '%Y-%m-%d %H:%M:%S',
         automargin: true,
         showgrid: false,
         gridcolor: '#e0e0e0',
         linecolor: '#e0e0e0',
-        showspikes: true, // Enable spikelines on the x-axis
-        spikemode: 'across', // Show spikes across all subplots
+        showspikes: true,
+        spikemode: 'across',
         spikethickness: 1,
 
         spikecolor: '#999999',
       },
       yaxis: {
-        // title: 'Latency (ms)',
         automargin: true,
-        griddash: 'dot', // This makes the grid lines dotted
-
+        griddash: 'dot',
         showgrid: true,
         gridcolor: '#e0e0e0',
         linecolor: '#e0e0e0',
-        showspikes: false, // Enable spikelines on the y-axis
+        showspikes: false,
       },
-      hovermode: 'x unified', // Show hover information for all points sharing the same x-axis value
-      dragmode: false, // Disable zooming and panning
-      showlegend: false, // Hide the legend
+      hovermode: 'x unified',
+      dragmode: false,
+      showlegend: false,
 
       hoverlabel: {
-        bordercolor: MOON_200, // Border color of the tooltip
+        bordercolor: MOON_200,
       },
     };
     const plotlyConfig: Partial<Plotly.Config> = {
-      displayModeBar: false, // Hide the mode bar
-      // showlegend: false, // Hide the legend
-      responsive: true, // Make the chart responsive
+      displayModeBar: false,
+      responsive: true,
     };
 
     Plotly.newPlot(
@@ -182,16 +147,16 @@ export const ErrorPlotlyChart: React.FC<{
   const divRef = useRef<HTMLDivElement>(null);
 
   const plotlyData: Plotly.Data[] = useMemo(() => {
-    const errorData = chartData; //.filter(d => d.isError);
+    const errorData = chartData;
 
     return [
       {
         type: 'histogram',
-        x: errorData.map(d => d.started_at), // Use the timestamps for the x-axis
+        x: errorData.map(d => d.started_at),
         name: 'Error Count',
         marker: {color: TEAL_400},
 
-        histfunc: 'count', // Automatically count the occurrences in each bin
+        histfunc: 'count',
         hovertemplate: '%{y} errors<extra></extra>',
       },
     ];
@@ -211,11 +176,8 @@ export const ErrorPlotlyChart: React.FC<{
   // }, [chartData]);
 
   useEffect(() => {
-    // Configure the layout for the Plotly chart
     const plotlyLayout: Partial<Plotly.Layout> = {
       height: height - 40,
-      // width: window.innerWidth / 3,
-
       title: 'Errors',
       margin: {
         l: 50,
@@ -231,14 +193,12 @@ export const ErrorPlotlyChart: React.FC<{
         showgrid: false,
         gridcolor: '#e0e0e0',
         linecolor: '#e0e0e0',
-        // range: firstNonZeroBin ? [firstNonZeroBin, null] : undefined, // Start at the first non-zero timestamp
       },
       yaxis: {
-        // title: 'Error Count',
         automargin: true,
         showgrid: true,
         gridcolor: '#e0e0e0',
-        griddash: 'dot', // This makes the grid lines dotted
+        griddash: 'dot',
 
         linecolor: '#e0e0e0',
       },
@@ -248,14 +208,12 @@ export const ErrorPlotlyChart: React.FC<{
         bordercolor: MOON_200,
         font: {family: 'Arial, sans-serif'},
       },
-      // showlegend: false, // Hide the legend
-
-      dragmode: 'zoom', // Disable zooming and panning
+      dragmode: 'zoom',
     };
 
     const plotlyConfig: Partial<Plotly.Config> = {
-      displayModeBar: false, // Hide the mode bar
-      responsive: true, // Make the chart responsive
+      displayModeBar: false,
+      responsive: true,
     };
 
     Plotly.newPlot(
@@ -291,8 +249,6 @@ export const RequestsPlotlyChart: React.FC<{
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
       height: height - 40,
-      // width: window.innerWidth / 3,
-
       title: 'Requests',
       margin: {l: 50, r: 30, b: 50, t: 50, pad: 0},
       xaxis: {
@@ -307,7 +263,6 @@ export const RequestsPlotlyChart: React.FC<{
         spikecolor: '#999999',
       },
       yaxis: {
-        // title: 'Request Count',
         automargin: true,
         showgrid: true,
         gridcolor: '#e0e0e0',
@@ -315,7 +270,7 @@ export const RequestsPlotlyChart: React.FC<{
         griddash: 'dot',
         showspikes: false,
       },
-      bargap: 0, // Remove gap between bars
+      bargap: 0,
       hovermode: 'x unified',
       hoverlabel: {
         bgcolor: 'white',
@@ -326,7 +281,7 @@ export const RequestsPlotlyChart: React.FC<{
 
     const plotlyConfig: Partial<Plotly.Config> = {
       displayModeBar: false,
-      responsive: true, // Make the chart responsive
+      responsive: true,
     };
 
     Plotly.newPlot(

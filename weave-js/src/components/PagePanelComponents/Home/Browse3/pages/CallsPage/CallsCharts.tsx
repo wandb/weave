@@ -44,24 +44,19 @@ export const CallsCharts = ({
     filter,
     filterModelProp,
     0,
-    1000, // change back to 1000 later
-    columns, // need to select columns for performance. not working??
+    1000,
+    columns,
     columnSet,
     sortCalls
   );
-  console.log(calls, 'calls');
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
 
   const toggleInsights = () => {
     setIsInsightsOpen(!isInsightsOpen);
   };
-  console.log(calls.result, 'calls.result');
-  const chartData = useMemo(() => {
-    console.log('Calls loading:', calls.loading);
-    console.log('Calls result length:', calls.result?.length);
 
+  const chartData = useMemo(() => {
     if (calls.loading || !calls.result || calls.result.length === 0) {
-      console.log('Returning empty data due to loading or empty result');
       return {latency: [], errors: [], requests: []};
     }
 
@@ -77,30 +72,21 @@ export const CallsCharts = ({
 
     calls.result.forEach(call => {
       const started_at = call.traceCall?.started_at;
-      if (!started_at) return; // Skip calls without a start time
+      if (!started_at) return;
       const ended_at = call.traceCall?.ended_at;
 
-      // console.log(
-      //   'latency',
-      //   call.traceCall?.ended_at,
-      //   call.traceCall?.started_at,
-      //   latency
-      // );
       const isError =
         call.traceCall?.exception !== null &&
         call.traceCall?.exception !== undefined &&
         call.traceCall?.exception !== '';
 
       if (started_at) {
-        // Data for requests chart
         data.requests.push({started_at});
 
-        // Data for errors chart
         if (isError) {
           data.errors.push({started_at, isError});
         }
 
-        // Data for latency chart
         if (ended_at !== undefined) {
           const startTime = new Date(started_at).getTime();
           const endTime = new Date(ended_at).getTime();
@@ -109,12 +95,9 @@ export const CallsCharts = ({
         }
       }
     });
-
-    console.log('Processed data:', data);
     return data;
   }, [calls.result, calls.loading]);
 
-  console.log(chartData, 'chart data');
   const charts = useMemo(() => {
     return (
       <div className="m-10 mt-4 flex w-full">
@@ -152,5 +135,3 @@ export const CallsCharts = ({
     </Tailwind>
   );
 };
-
-// export default CallsCharts;
