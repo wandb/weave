@@ -6,7 +6,7 @@ import {z} from 'zod';
 
 import {CellValue} from '../../../Browse2/CellValue';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
-import {ConfiguredAction} from '../../collections/actionCollection';
+import {ConfiguredActionType} from '../../collections/actionCollection';
 import {useCollectionObjects} from '../../collections/getCollectionObjects';
 import {StyledDataGrid} from '../../StyledDataGrid'; // Import the StyledDataGrid component
 import {WEAVE_REF_SCHEME} from '../wfReactInterface/constants';
@@ -22,7 +22,7 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 type CallActionRow = {
   actionRef: string;
-  actionDef: ConfiguredAction;
+  actionDef: ConfiguredActionType;
   runCount: number;
   lastResult?: Record<string, unknown>;
   lastRanAt?: Date;

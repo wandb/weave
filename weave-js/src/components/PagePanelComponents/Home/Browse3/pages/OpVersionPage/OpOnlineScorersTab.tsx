@@ -6,8 +6,8 @@ import {z} from 'zod';
 
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {
-  ActionDispatchFilter,
   ActionDispatchFilterSchema,
+  ActionDispatchFilterType,
 } from '../../collections/actionCollection';
 import {collectionRegistry} from '../../collections/collectionRegistry';
 import {
@@ -25,7 +25,7 @@ import {
 import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {OpVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
-type OnlineScorerType = TraceObjSchema<ActionDispatchFilter>;
+type OnlineScorerType = TraceObjSchema<ActionDispatchFilterType>;
 
 const useOnlineScorersForOpVersion = (
   opVersion: OpVersionSchema

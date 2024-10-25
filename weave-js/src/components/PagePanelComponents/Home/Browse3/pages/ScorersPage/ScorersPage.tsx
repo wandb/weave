@@ -3,7 +3,7 @@ import {Alert} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button/Button';
 import React, {FC, useState} from 'react';
 
-import {ConfiguredAction} from '../../collections/actionCollection';
+import {ConfiguredActionType} from '../../collections/actionCollection';
 import {useCreateCollectionObject} from '../../collections/getCollectionObjects';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
@@ -84,7 +84,7 @@ const OnlineScorersTab: React.FC<{
     setIsModalOpen(true);
   };
   const handleCloseModal = () => setIsModalOpen(false);
-  const handleSaveModal = (newAction: ConfiguredAction) => {
+  const handleSaveModal = (newAction: ConfiguredActionType) => {
     let objectId = newAction.name;
     // Remove non alphanumeric characters
     objectId = objectId.replace(/[^a-zA-Z0-9]/g, '-');

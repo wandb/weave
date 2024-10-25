@@ -1441,7 +1441,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "Only builtin actions are supported for batch execution"
             )
 
-        if action.action.name != LLM_JUDGE_ACTION_NAME:
+        if action.action.name != "llm_judge":
             raise InvalidRequest("Only llm_judge is supported for batch execution")
 
         # Step 1: Get all the calls in the batch
