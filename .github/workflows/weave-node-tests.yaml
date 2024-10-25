@@ -20,7 +20,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: "pnpm"
+          cache: 'pnpm'
           cache-dependency-path: sdks/node/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install
@@ -28,3 +28,5 @@ jobs:
       - name: Run tests
         run: pnpm test
         working-directory: sdks/node
+        env:
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
