@@ -1892,9 +1892,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             {
                 "$expr": {
                     "$and": [
-                        {"$in": ["$id", call_ids]},
-                        {"$ne": ["$started_at", None]},
-                        {"$ne": ["$finished_at", None]},
+                        {
+                            "$in": [
+                                {"$getField": "id"},
+                                [{"$literal": id} for id in call_ids],
+                            ]
+                        },
+                        {
+                            "$not": (
+                                {
+                                    "$eq": [
+                                        {"$getField": "started_at"},
+                                        {"$literal": None},
+                                    ]
+                                },
+                            )
+                        },
+                        {
+                            "$not": (
+                                {
+                                    "$eq": [
+                                        {"$getField": "ended_at"},
+                                        {"$literal": None},
+                                    ]
+                                },
+                            )
+                        },
                     ]
                 }
             }
@@ -1910,9 +1933,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for filter in filters:
             if filter.disabled:
                 continue
-            matched_calls = [
-                call for call in calls_res.calls if filter.op_name == call.op_name
+            calls_with_refs = [
+                (call, ri.parse_internal_uri(call.op_name)) for call in calls_res.calls
             ]
+            matched_calls = [
+                c[0]
+                for c in calls_with_refs
+                if isinstance(c[1], ri.InternalObjectRef)
+                and c[1].name == filter.op_name
+            ]
+
             if matched_calls:
                 matched_filters_and_calls.append((filter, matched_calls))
 
