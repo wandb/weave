@@ -24,7 +24,7 @@ type CallActionRow = {
   actionRef: string;
   actionDef: ConfiguredActionType;
   runCount: number;
-  lastResult?: Record<string, unknown>;
+  lastResult?: unknown;
   lastRanAt?: Date;
 };
 // New RunButton component
@@ -95,7 +95,6 @@ export const CallActionsViewer: React.FC<{
     }),
     filter: {latest_only: true},
   }).sort((a, b) => a.val.name.localeCompare(b.val.name));
-
   const verifiedActionFeedbacks: Array<{
     data: ActionFeedback;
     feedbackRaw: Feedback;
@@ -251,7 +250,7 @@ export const CallActionsViewer: React.FC<{
 const ActionFeedbackZ = z.object({
   // _type: z.literal("ActionFeedback"),
   configured_action_ref: z.string(),
-  output: z.record(z.string(), z.unknown()),
+  output: z.unknown(),
 });
 
 type ActionFeedback = z.infer<typeof ActionFeedbackZ>;
