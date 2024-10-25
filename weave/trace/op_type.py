@@ -29,6 +29,8 @@ from weave.trace_server.trace_server_interface_util import str_digest
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
 
+CODE_DEP_ERROR_SENTINEL = "<error>"
+
 
 def type_code(type_: Any) -> str:
     if isinstance(type_, py_types.GenericAlias) or isinstance(
@@ -295,7 +297,7 @@ def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
     return missing_code_template
 
 
-def get_code_deps(
+def get_code_deps_safe(
     fn: Union[typing.Callable, type],  # A function or a class
     artifact: MemTraceFilesArtifact,
     depth: int = 0,
@@ -320,9 +322,18 @@ def get_code_deps(
         tupe: A tuple containing
             import_code: str, the code that should be included in the generated code to ensure all
                 dependencies are available for the function body.
+            code: str, the function body code.
             warnings: list[str], any warnings that occurred during the process.
     """
-    return _get_code_deps(fn, artifact, {}, depth)
+    try:
+        return _get_code_deps(fn, artifact, {}, depth)
+    except Exception as e:
+        print(f"Error getting code deps for {fn}: {e}")
+        return {
+            "import_code": [],
+            "code": [CODE_DEP_ERROR_SENTINEL],
+            "warnings": [f"Error getting code dependencies for function {fn}: {e}"],
+        }
 
 
 def _get_code_deps(
@@ -355,7 +366,13 @@ def _get_code_deps(
         var_value = None
         if isinstance(fn, py_types.FunctionType):
             var_value = resolve_var(fn, var_name)
-        if var_value == fn:
+
+        try:
+            # Some objects throw on equality comparison (like dataframes)
+            equivalent = var_value == fn
+        except ValueError:
+            equivalent = False
+        if equivalent:
             # If the variable is the function itself (recursion), we don't need to include it
             continue
         if var_value is None:
@@ -489,7 +506,7 @@ def dedupe_list(original_list: list[str]) -> list[str]:
 
 
 def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None:
-    result = get_code_deps(obj.resolve_fn, artifact)
+    result = get_code_deps_safe(obj.resolve_fn, artifact)
     import_code = result["import_code"]
     code = result["code"]
     warnings = result["warnings"]

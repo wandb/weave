@@ -42,6 +42,7 @@ def lint(session):
         "notdiamond",
         "openai",
         "scorers_tests",
+        "pandas-test",
     ],
 )
 def tests(session, shard):

@@ -241,6 +241,7 @@ jobs:
             'notdiamond',
             'openai',
             'scorers_tests',
+            'pandas-test',
           ]
       fail-fast: false
     services:
