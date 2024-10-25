@@ -430,23 +430,6 @@ class CallsQuery(BaseModel):
         if not self.select_fields:
             raise ValueError("Missing select columns")
 
-        # Important: Always inject deleted_at into the query.
-        # Note: it might be better to make this configurable.
-        self.add_condition(
-            tsi_query.EqOperation.model_validate(
-                {"$eq": [{"$getField": "deleted_at"}, {"$literal": None}]}
-            )
-        )
-
-        # Important: We must always filter out calls that have not been started
-        # This can occur when there is an out of order call part insertion or worse,
-        # when such occurance happens and the client terminates early.
-        self.add_condition(
-            tsi_query.NotOperation.model_validate(
-                {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
-            )
-        )
-
         has_heavy_fields = (
             self._has_heavy_select or self._has_heavy_filter or self._has_heavy_order
         )
@@ -464,8 +447,27 @@ class CallsQuery(BaseModel):
             has_light_filter or has_light_query or has_light_order_filter
         )
 
-        # If we don't need to optimize, return the base query
-        if not (has_heavy_fields or do_predicate_pushdown or self.include_costs):
+        # Important: Always inject deleted_at into the query.
+        # Note: it might be better to make this configurable.
+        self.add_condition(
+            tsi_query.EqOperation.model_validate(
+                {"$eq": [{"$getField": "deleted_at"}, {"$literal": None}]}
+            )
+        )
+
+        # Important: We must always filter out calls that have not been started
+        # This can occur when there is an out of order call part insertion or worse,
+        # when such occurance happens and the client terminates early.
+        self.add_condition(
+            tsi_query.NotOperation.model_validate(
+                {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
+            )
+        )
+
+        should_optimize = (
+            has_heavy_fields and do_predicate_pushdown
+        ) or self.include_costs
+        if not should_optimize:
             return [self._as_sql_base_format(pb, table_alias)]
 
         # Build the two queries
@@ -511,7 +513,7 @@ class CallsQuery(BaseModel):
         else:
             ids_param_slot = "filtered_calls"
             filter_query_sql = f"""
-                WITH {ids_param_slot} as ({filter_query._as_sql_base_format(pb, table_alias)})
+                WITH {ids_param_slot} AS ({filter_query._as_sql_base_format(pb, table_alias)})
                 """
 
         outer_raw_sql = outer_query._as_sql_base_format(
