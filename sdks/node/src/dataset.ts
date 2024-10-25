@@ -57,7 +57,7 @@ export class Dataset<R extends DatasetRow> extends WeaveObject {
   }
 
   async save(): Promise<ObjectRef> {
-    return requireGlobalClient().saveObject(this);
+    return requireGlobalClient().publish(this);
   }
 
   get length(): number {

@@ -32,7 +32,7 @@ describe('weaveObject', () => {
     const obj = new ExampleObject('test', 1);
 
     // save an object
-    client.saveObject(obj);
+    client.publish(obj);
 
     const ref = await obj.__savedRef;
     const [entity, project] = ref?.projectId.split('/') ?? [];
