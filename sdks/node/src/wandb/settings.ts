@@ -1,4 +1,4 @@
-import { getGlobalDomain } from '../urls';
+import { defaultHost } from '../urls';
 import { Netrc } from '../utils/netrc';
 
 export function getApiKey(host: string): string {
@@ -8,7 +8,8 @@ export function getApiKey(host: string): string {
     apiKey = netrc.entries.get(host)?.password;
   }
   if (!apiKey) {
-    const domain = getGlobalDomain();
+    // const domain = getGlobalDomain();
+    const domain = defaultHost;
     const apiKeyNotFoundMessage = `
     wandb API key not found.
     
