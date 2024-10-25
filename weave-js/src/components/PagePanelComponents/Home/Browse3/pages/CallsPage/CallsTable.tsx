@@ -87,6 +87,7 @@ import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
+import {CallsCharts} from './CallsCharts';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -238,8 +239,6 @@ export const CallsTable: FC<{
     },
     [expandedRefCols]
   );
-
-  // Fetch the calls
   const calls = useCallsForQuery(
     entity,
     project,
@@ -249,7 +248,6 @@ export const CallsTable: FC<{
     paginationModelResolved,
     expandedRefCols
   );
-
   // Here, we only update our local state once the calls have loaded.
   // If we were not to do this, we would see a flicker of an empty table
   // before the calls are loaded. Since the columns are data-driven, this
@@ -849,6 +847,13 @@ export const CallsTable: FC<{
           )}
         </TailwindContents>
       }>
+      <CallsCharts
+        entity={entity}
+        project={project}
+        filter={filter}
+        filterModelProp={filterModelResolved}
+        // setFilterModel={props.setFilterModel}
+      />
       <StyledDataGrid
         // Start Column Menu
         // ColumnMenu is needed to support pinning and column visibility

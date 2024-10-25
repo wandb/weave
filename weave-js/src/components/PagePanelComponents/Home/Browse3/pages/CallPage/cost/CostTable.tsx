@@ -55,7 +55,9 @@ const columns: GridColDef[] = [
   },
 ];
 
-const sumCostDataForCostTable = (costs: {[key: string]: LLMCostSchema}) => {
+export const sumCostDataForCostTable = (costs: {
+  [key: string]: LLMCostSchema;
+}) => {
   const costData: any[] = Object.entries(costs ?? {}).map(([k, v]) => {
     const promptTokens = v.input_tokens ?? v.prompt_tokens ?? 0;
     const completionTokens = v.output_tokens ?? v.completion_tokens ?? 0;
@@ -102,7 +104,8 @@ const sumCostDataForCostTable = (costs: {[key: string]: LLMCostSchema}) => {
 
 export const CostTable = ({costs}: {costs: {[key: string]: LLMCostSchema}}) => {
   const costData = sumCostDataForCostTable(costs);
-
+  console.log('HERE');
+  console.log('cost table', costData);
   return (
     <StyledDataGrid
       // For this super small table, we don't need a lot of features.

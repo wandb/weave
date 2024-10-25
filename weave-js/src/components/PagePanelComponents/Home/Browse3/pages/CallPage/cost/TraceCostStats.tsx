@@ -16,6 +16,7 @@ import {CostTotals, TokenTotals} from './costTypes';
 import {
   FORMAT_NUMBER_NO_DECIMALS,
   formatTokenCost,
+  formatTokenCostNumeric,
   formatTokenCount,
   getCostFromCellParams,
   getUsageFromCellParams,
@@ -112,12 +113,14 @@ export const getCostFromCostData = (
   }
   const costNum = metrics.inputs.cost.total + metrics.outputs.cost.total;
   const formattedCost = formatTokenCost(costNum);
+  const formattedCostNumeric = formatTokenCostNumeric(costNum);
 
   const costToolTipContent = <CostToolTip {...metrics} />;
   return {
     costNum,
     cost: formattedCost,
     costToolTipContent,
+    costNumeric: formattedCostNumeric,
   };
 };
 

@@ -12,6 +12,7 @@ import {operationConverter} from '../common/tabularListViews/operators';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {
+  CallChartsSchema,
   CallFilter,
   CallSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
@@ -51,7 +52,6 @@ export const useCallsForQuery = (
     gridFilter,
     gridSort
   );
-
   const calls = useCalls(
     entity,
     project,
@@ -66,7 +66,6 @@ export const useCallsForQuery = (
       refetchOnDelete: true,
     }
   );
-
   const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
     refetchOnDelete: true,
   });
@@ -105,10 +104,10 @@ export const useCallsForQuery = (
       includeCosts: true,
     }
   );
-
   const costResults = useMemo(() => {
     return costs.result ?? [];
   }, [costs]);
+
   const refetch = useCallback(() => {
     calls.refetch();
     costs.refetch();
@@ -129,6 +128,60 @@ export const useCallsForQuery = (
       refetch,
     };
   }, [callResults, calls.loading, total, costs.loading, costResults, refetch]);
+};
+
+export const useCallsForQueryCharts = (
+  entity: string,
+  project: string,
+  filter: WFHighLevelCallFilter,
+  gridFilter: GridFilterModel,
+  offset: number,
+  limit: number,
+  columns?: string[],
+  expandedColumns?: Set<string>,
+  gridSort?: GridSortModel
+): {
+  result: CallSchema[];
+  loading: boolean;
+  refetch: () => void;
+} => {
+  const {useCalls} = useWFHooks();
+  const {sortBy, lowLevelFilter, filterBy} = useFilterSortby(
+    filter,
+    gridFilter,
+    gridSort
+  );
+  const calls = useCalls(
+    entity,
+    project,
+    lowLevelFilter,
+    limit,
+    offset,
+    sortBy,
+    filterBy,
+    columns,
+    expandedColumns,
+    {
+      refetchOnDelete: true,
+    }
+  );
+
+  const callResults = useMemo(() => {
+    return calls.result ?? [];
+  }, [calls]);
+
+  const refetch = useCallback(() => {
+    calls.refetch();
+  }, [calls]);
+
+  return useMemo(() => {
+    return {
+      loading: calls.loading,
+      // Return faster calls query results until cost query finishes
+      result: calls.loading ? [] : callResults,
+      refetch,
+    };
+  }, [callResults, calls.loading, refetch]);
 };
 
 export const useFilterSortby = (
