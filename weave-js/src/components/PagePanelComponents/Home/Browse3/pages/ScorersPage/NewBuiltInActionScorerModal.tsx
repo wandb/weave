@@ -5,6 +5,7 @@ import {
   Select,
   TextField,
 } from '@material-ui/core';
+import _ from 'lodash';
 import React, {FC, useEffect, useState} from 'react';
 import {z} from 'zod';
 
@@ -54,7 +55,7 @@ const knownBuiltinActions = [
         } else {
           responseFormat = {
             type: 'object',
-            properties: data.response_format.schema,
+            properties: _.mapValues(data.response_format.schema, value => ({type: value})),
             additionalProperties: false,
           };
         }
