@@ -326,7 +326,7 @@ class CallsQuery(BaseModel):
         self.include_costs = include_costs
         return self
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
+    def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> list[str]:
         """
         This is the main entry point for building the query. This method will
         determine the optimal query to build based on the fields and conditions
@@ -456,7 +456,7 @@ class CallsQuery(BaseModel):
 
         # If we should not optimize, then just build the base query
         if not should_optimize and not self.include_costs:
-            return self._as_sql_base_format(pb, table_alias)
+            return [self._as_sql_base_format(pb, table_alias)]
 
         # If so, build the two queries
         filter_query = CallsQuery(project_id=self.project_id)
@@ -489,35 +489,60 @@ class CallsQuery(BaseModel):
             outer_query.limit = self.limit
             outer_query.offset = self.offset
 
-        raw_sql = f"""
-        WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
-        """
+        raw_sql_queries = []
+        if has_heavy_fields:
+            # Make two part query
+            raw_sql_queries += [filter_query._as_sql_base_format(pb, table_alias)]
 
-        if self.include_costs:
-            # TODO: We should unify the calls query order by fields to be orm sort by fields
-            order_by_fields = [
-                tsi.SortBy(
-                    field=sort_by.field.field, direction=sort_by.direction.lower()
-                )
-                for sort_by in self.order_fields
-            ]
-            raw_sql += f""",
-            all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
-            {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
-            """
-
+            # we will now expect to receive the filtered_calls as a parameter
+            outer_raw_sql = outer_query._as_sql_base_format(
+                pb,
+                table_alias,
+                ids_param_slot=_param_slot("filtered_calls", "Array(String)"),
+            )
+            if self.include_costs:
+                order_by_fields = [
+                    tsi.SortBy(
+                        field=sort_by.field.field, direction=sort_by.direction.lower()
+                    )
+                    for sort_by in self.order_fields
+                ]
+                outer_raw_sql = f"""
+                WITH all_calls AS ({outer_raw_sql}),
+                {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
+                """
+            raw_sql_queries.append(outer_raw_sql)
         else:
-            raw_sql += f"""
-            {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
+            raw_sql = f"""
+            WITH filtered_calls as ({filter_query._as_sql_base_format(pb, table_alias)})
             """
+            if self.include_costs:
+                # TODO: We should unify the calls query order by fields to be orm sort by fields
+                order_by_fields = [
+                    tsi.SortBy(
+                        field=sort_by.field.field, direction=sort_by.direction.lower()
+                    )
+                    for sort_by in self.order_fields
+                ]
 
-        return _safely_format_sql(raw_sql)
+                raw_sql += f"""
+                ,
+                all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, ids_param_slot="filtered_calls")}),
+                {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
+                """
+            else:
+                raw_sql += f"""
+                {outer_query._as_sql_base_format(pb, table_alias, ids_param_slot="filtered_calls")}
+                """
+            raw_sql_queries.append(raw_sql)
+
+        return [_safely_format_sql(raw_sql) for raw_sql in raw_sql_queries]
 
     def _as_sql_base_format(
         self,
         pb: ParamBuilder,
         table_alias: str,
-        id_subquery_name: typing.Optional[str] = None,
+        ids_param_slot: typing.Optional[str] = None,
     ) -> str:
         select_fields_sql = ", ".join(
             field.as_select_sql(pb, table_alias) for field in self.select_fields
@@ -555,8 +580,8 @@ class CallsQuery(BaseModel):
             offset_sql = f"OFFSET {self.offset}"
 
         id_subquery_sql = ""
-        if id_subquery_name is not None:
-            id_subquery_sql = f"AND (id IN {id_subquery_name})"
+        if ids_param_slot is not None:
+            id_subquery_sql = f"AND (id IN {ids_param_slot})"
 
         project_param = pb.add_param(self.project_id)
 

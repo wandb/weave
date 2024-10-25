@@ -289,11 +289,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.add_condition(req.query.expr_)
 
         pb = ParamBuilder()
-        inner_query = cq.as_sql(pb)
-        raw_res = self._query(
-            f"SELECT count() FROM ({inner_query})",
-            pb.get_params(),
-        )
+        queries = cq.as_sql(pb)
+        if len(queries) == 1:
+            raw_res = self._query(
+                f"SELECT count() FROM ({queries[0]})",
+                pb.get_params(),
+            )
+        else:
+            filtered_calls_res = self._query(
+                queries[0],
+                pb.get_params(),
+            )
+            filtered_calls = [x[0] for x in filtered_calls_res.result_rows]
+            pb.add(
+                filtered_calls, param_name="filtered_calls", param_type="Array(String)"
+            )
+            raw_res = self._query(
+                f"SELECT count() FROM ({queries[1]})",
+                pb.get_params(),
+            )
+
         rows = raw_res.result_rows
         count = 0
         if rows and len(rows) == 1 and len(rows[0]) == 1:
@@ -341,10 +356,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        raw_res = self._query_stream(
-            cq.as_sql(pb),
-            pb.get_params(),
-        )
+        queries = cq.as_sql(pb)
+        if len(queries) == 1:
+            raw_res = self._query_stream(
+                queries[0],
+                pb.get_params(),
+            )
+        else:
+            filtered_calls_res = self._query(
+                queries[0],
+                pb.get_params(),
+            )
+            filtered_calls = [x[0] for x in filtered_calls_res.result_rows]
+            pb.add(
+                filtered_calls, param_name="filtered_calls", param_type="Array(String)"
+            )
+            raw_res = self._query_stream(
+                queries[1],
+                pb.get_params(),
+            )
 
         select_columns = [c.field for c in cq.select_fields]
 
