@@ -71,7 +71,9 @@ export const CallsCharts = ({
 
     calls.result.forEach(call => {
       const started_at = call.traceCall?.started_at;
-      if (!started_at) return;
+      if (!started_at) {
+        return;
+      }
       const ended_at = call.traceCall?.ended_at;
 
       const isError =
