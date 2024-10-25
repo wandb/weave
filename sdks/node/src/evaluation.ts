@@ -16,18 +16,18 @@ interface EvaluationParameters<R extends DatasetRow, E extends DatasetRow, M> ex
   columnMapping?: ColumnMapping<R, E>;
 }
 
-interface Callable<T extends (...args: any[]) => any> {
+interface Runnable<T extends (...args: any[]) => any> {
   id: string;
-  call: (...args: Parameters<T>) => ReturnType<T>;
+  invoke: (...args: Parameters<T>) => ReturnType<T>;
 }
 
-type WeaveCallable<T extends (...args: any[]) => any> = Op<T> | Callable<T>;
+type WeaveCallable<T extends (...args: any[]) => any> = Op<T> | Runnable<T>;
 
 function callWeaveCallable<T extends (...args: any[]) => any>(callable: WeaveCallable<T>, ...args: Parameters<T>) {
   if (typeof callable === 'function') {
     return callable(...args);
   }
-  return callable.call(...args);
+  return callable.invoke(...args);
 }
 
 function weaveCallableName<T extends (...args: any[]) => any>(callable: WeaveCallable<T>) {
