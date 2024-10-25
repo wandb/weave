@@ -47,13 +47,14 @@ export default function StructuredFeedbackSidebar(props: {
             </button>
             {isExpanded && (
               <div>
-                {types?.map((type: any) => (
+                {types?.map((type: any, index: number) => (
                   <div key={type.name}>
                     <h3 className="text-gray-700 bg-gray-50 px-6 py-4 text-sm font-semibold">
                       {type.name}
                     </h3>
                     <div className="pb-8 pl-6 pr-8 pt-2">
                       <StructuredFeedbackCell
+                        focused={index === 0}
                         sfData={type}
                         callRef={callRef}
                         entity={props.entity}

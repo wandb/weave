@@ -203,7 +203,7 @@ const CallPageInnerVertical: FC<{
         call.traceId,
         call.callId,
         path,
-        showTraceTree,
+        false,
         !showFeedbackExpand
       )
     );
@@ -276,9 +276,10 @@ const CallPageInnerVertical: FC<{
   ]);
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      if (event.key === 'ArrowDown') {
+      console.log('EVENT', event);
+      if (event.key === 'ArrowDown' && event.shiftKey) {
         onNextCall();
-      } else if (event.key === 'ArrowUp') {
+      } else if (event.key === 'ArrowUp' && event.shiftKey) {
         onPreviousCall();
       }
     },

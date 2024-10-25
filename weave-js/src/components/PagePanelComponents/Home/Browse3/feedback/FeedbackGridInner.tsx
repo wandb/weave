@@ -26,7 +26,10 @@ export const FeedbackGridInner = ({
       display: 'flex',
       renderCell: params => (
         <div className="overflow-hidden">
-          <FeedbackTypeChip feedbackType={params.row.feedback_type} />
+          <FeedbackTypeChip
+            feedbackType={params.row.feedback_type}
+            feedbackRef={params.row.payload?.ref}
+          />
         </div>
       ),
     },
@@ -43,7 +46,7 @@ export const FeedbackGridInner = ({
           return params.row.payload.emoji;
         }
         if (params.row.feedback_type === 'wandb.structuredFeedback.1') {
-          return params.row.payload.value;
+          return params.row.payload.name + ': ' + params.row.payload.value;
         }
         return <CellValueString value={JSON.stringify(params.row.payload)} />;
       },

@@ -41,6 +41,7 @@ interface StructuredFeedbackProps {
   entity: string;
   project: string;
   readOnly?: boolean;
+  focused?: boolean;
 }
 
 // Utility function for creating feedback request
@@ -84,6 +85,7 @@ const renderFeedbackComponent = (
           onAddFeedback={onAddFeedback}
           defaultValue={foundValue as number | null}
           currentFeedbackId={currentFeedbackId}
+          focused={props.focused}
         />
       );
     case FEEDBACK_TYPES.TEXT:
@@ -92,6 +94,7 @@ const renderFeedbackComponent = (
           onAddFeedback={onAddFeedback}
           defaultValue={foundValue as string | null}
           currentFeedbackId={currentFeedbackId}
+          focused={props.focused}
         />
       );
     case FEEDBACK_TYPES.CATEGORICAL:
@@ -101,8 +104,9 @@ const renderFeedbackComponent = (
           onAddFeedback={onAddFeedback}
           defaultValue={foundValue as string | null}
           currentFeedbackId={currentFeedbackId}
-          multiSelect={props.sfData.multi_select}
-          addNewOption={props.sfData.add_new_option}
+          // multiSelect={props.sfData.multi_select}
+          // addNewOption={props.sfData.add_new_option}
+          focused={props.focused}
         />
       );
     case FEEDBACK_TYPES.BOOLEAN:
@@ -111,6 +115,7 @@ const renderFeedbackComponent = (
           onAddFeedback={onAddFeedback}
           defaultValue={foundValue as string | null}
           currentFeedbackId={currentFeedbackId}
+          focused={props.focused}
         />
       );
     default:
@@ -259,12 +264,15 @@ export const NumericalFeedbackColumn = ({
   max,
   onAddFeedback,
   defaultValue,
+  currentFeedbackId,
+  focused,
 }: {
   min: number;
   max: number;
-  onAddFeedback?: (value: number) => Promise<boolean>;
+  onAddFeedback?: (value: number, currentFeedbackId: string | null) => Promise<boolean>;
   defaultValue: number | null;
   currentFeedbackId?: string | null;
+  focused?: boolean;
 }) => {
   const [value, setValue] = useState<number | undefined>(
     defaultValue ?? undefined
@@ -277,9 +285,9 @@ export const NumericalFeedbackColumn = ({
 
   const debouncedOnAddFeedback = useCallback(
     debounce((val: number) => {
-      onAddFeedback?.(val);
+      onAddFeedback?.(val, currentFeedbackId ?? null);
     }, DEBOUNCE_VAL),
-    [onAddFeedback]
+    [onAddFeedback, currentFeedbackId]
   );
 
   const onValueChange = (v: string) => {
@@ -300,6 +308,7 @@ export const NumericalFeedbackColumn = ({
         min: {min}, max: {max}
       </div>
       <TextField
+        autoFocus={focused}
         type="number"
         value={value?.toString() ?? ''}
         onChange={onValueChange}
@@ -314,6 +323,7 @@ export const TextFeedbackColumn = ({
   onAddFeedback,
   defaultValue,
   currentFeedbackId,
+  focused,
 }: {
   onAddFeedback?: (
     value: string,
@@ -321,6 +331,7 @@ export const TextFeedbackColumn = ({
   ) => Promise<boolean>;
   defaultValue: string | null;
   currentFeedbackId?: string | null;
+  focused?: boolean;
 }) => {
   const [value, setValue] = useState<string>(defaultValue ?? '');
 
@@ -342,7 +353,7 @@ export const TextFeedbackColumn = ({
 
   return (
     <div className="w-full">
-      <TextField value={value} onChange={onValueChange} placeholder="..." />
+      <TextField autoFocus={focused} value={value} onChange={onValueChange} placeholder="..." />
     </div>
   );
 };
@@ -357,6 +368,7 @@ export const CategoricalFeedbackColumn = ({
   onAddFeedback,
   defaultValue,
   currentFeedbackId,
+  focused,
 }: {
   options: string[];
   onAddFeedback?: (
@@ -365,8 +377,7 @@ export const CategoricalFeedbackColumn = ({
   ) => Promise<boolean>;
   defaultValue: string | null;
   currentFeedbackId?: string | null;
-  multiSelect?: boolean;
-  addNewOption?: boolean;
+  focused?: boolean;
 }) => {
   const dropdownOptions = useMemo(() => {
     const opts = options.map((option: string) => ({
@@ -404,6 +415,8 @@ export const CategoricalFeedbackColumn = ({
         getOptionLabel={option => option.label}
         onChange={onValueChange}
         value={value}
+        openOnFocus
+        autoFocus={focused}
         renderInput={params => (
           <MuiTextField
             {...params}
@@ -450,6 +463,7 @@ export const BinaryFeedbackColumn = ({
   onAddFeedback,
   defaultValue,
   currentFeedbackId,
+  focused,
 }: {
   onAddFeedback?: (
     value: string,
@@ -457,6 +471,7 @@ export const BinaryFeedbackColumn = ({
   ) => Promise<boolean>;
   defaultValue: string | null;
   currentFeedbackId: string | null;
+  focused?: boolean;
 }) => {
   const [value, setValue] = useState<boolean | null>(null);
 
@@ -480,7 +495,11 @@ export const BinaryFeedbackColumn = ({
   return (
     <Tailwind>
       <div className="flex w-full justify-center">
-        <Checkbox checked={value ?? false} onChange={onValueChange} />
+        <Checkbox
+          autoFocus={focused}
+          checked={value ?? false}
+          onChange={onValueChange}
+        />
       </div>
     </Tailwind>
   );

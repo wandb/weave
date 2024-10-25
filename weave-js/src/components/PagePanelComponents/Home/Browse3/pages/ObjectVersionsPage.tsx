@@ -353,8 +353,6 @@ const ObjectVersionsTable: React.FC<{
     }
   }, [rowIds, peekId]);
 
-  console.log('rowIds', rowIds);
-
   return (
     <StyledDataGrid
       // Start Column Menu

@@ -475,21 +475,6 @@ export const CallsTable: FC<{
     [effectiveFilter.parentId, parentIdOptions]
   );
 
-  // useEffect(() => {
-  //   if (pinModel != null &&  setPinModel != null && structuredFeedbackOptions != null && structuredFeedbackOptions.types.length > 0) {
-  //     // do structured feedback stuff
-  //     const feedbackCols = structuredFeedbackOptions.types.map(feedbackCol => feedbackColName(feedbackCol));
-  //     // right pin feedback when we have a parent id
-  //     const currentLeft = pinModel?.left ?? [];
-  //     if (!currentLeft.find(col => feedbackCols.includes(col))) {
-  //       setPinModel({
-  //         ...pinModel,
-  //         left: [...currentLeft, ...feedbackCols],
-  //       });
-  //     }
-  //   }
-  // }, [selectedParentId, structuredFeedbackOptions, pinModel, setPinModel]);
-
   // DataGrid Model Management
   const pinModelResolved = pinModel ?? DEFAULT_PIN_CALLS;
 

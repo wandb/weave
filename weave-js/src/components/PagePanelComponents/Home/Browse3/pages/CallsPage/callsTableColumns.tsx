@@ -266,35 +266,32 @@ function buildCallsTableColumns(
         );
       },
     },
-    ...(simpleFeedback
-      ? [
-          {
-            field: 'feedback',
-            headerName: 'Feedback',
-            width: 150,
-            sortable: false,
-            filterable: false,
-            renderCell: (rowParams: GridRenderCellParams) => {
-              const rowIndex = rowParams.api.getRowIndexRelativeToVisibleRows(
-                rowParams.id
-              );
-              const callId = rowParams.row.id;
-              const weaveRef = makeRefCall(entity, project, callId);
+      {
+        field: 'feedback.emojis',
+        headerName: 'Reactions',
+        width: 150,
+        sortable: false,
+        filterable: false,
+        renderCell: (rowParams: GridRenderCellParams) => {
+          const rowIndex = rowParams.api.getRowIndexRelativeToVisibleRows(
+            rowParams.id
+          );
+          const callId = rowParams.row.id;
+          const weaveRef = makeRefCall(entity, project, callId);
 
-              return (
-                <Reactions
-                  weaveRef={weaveRef}
-                  forceVisible={rowIndex === 0}
-                  twWrapperStyles={{
-                    width: '100%',
-                    height: '100%',
-                  }}
-                />
-              );
-            },
-          },
-        ]
-      : structuredFeedbackColumns),
+          return (
+            <Reactions
+              weaveRef={weaveRef}
+              forceVisible={rowIndex === 0}
+              twWrapperStyles={{
+                width: '100%',
+                height: '100%',
+              }}
+            />
+          );
+        },
+      },
+      ...structuredFeedbackColumns,
     ...(isSingleOp && !isSingleOpVersion
       ? [
           {
@@ -365,16 +362,16 @@ function buildCallsTableColumns(
   );
   cols.push(...newCols);
 
-  if (structuredFeedbackColumns.length > 0) {
-    // add groupingModel for feedback
-    groupingModel.push({
-      headerName: 'feedback',
-      groupId: 'feedback',
-      children: structuredFeedbackOptions?.types.map((feedbackType: any) => ({
-        field: feedbackColName(feedbackType),
-      })),
-    });
-  }
+  const structuredFeedbackFields = structuredFeedbackOptions?.types.map((feedbackType: any) => ({
+    field: feedbackColName(feedbackType),
+  })) ?? [];
+  const feedbackChildren = [...structuredFeedbackFields, {field: 'feedback.emojis'}];
+
+  groupingModel.push({
+    headerName: 'Feedback',
+    groupId: 'feedback',
+    children: feedbackChildren,
+  });
 
   cols.push({
     field: 'wb_user_id',

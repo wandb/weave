@@ -90,7 +90,6 @@ export const FeedbackGrid = ({
   const currentViewerId = userInfo ? userInfo.id : null;
   return (
     <Tailwind>
-      <div className="flex flex-col gap-4">stsst</div>
       {paths.map(path => {
         return (
           <div key={path}>
