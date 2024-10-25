@@ -55,7 +55,9 @@ const knownBuiltinActions = [
         } else {
           responseFormat = {
             type: 'object',
-            properties: _.mapValues(data.response_format.schema, value => ({type: value})),
+            properties: _.mapValues(data.response_format.schema, value => ({
+              type: value,
+            })),
             additionalProperties: false,
           };
         }
