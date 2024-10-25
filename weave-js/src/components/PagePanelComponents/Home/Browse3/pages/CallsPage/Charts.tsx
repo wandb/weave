@@ -15,14 +15,17 @@ import {
 type ChartDataRequests = {
   started_at: string;
 };
+
 type ChartDataErrors = {
   started_at: string;
   isError: boolean;
 };
+
 type ChartDataLatency = {
   started_at: string;
   latency: number;
 };
+
 export const LatencyPlotlyChart: React.FC<{
   height: number;
   chartData: ChartDataLatency[];
@@ -104,7 +107,6 @@ export const LatencyPlotlyChart: React.FC<{
         showspikes: true,
         spikemode: 'across',
         spikethickness: 1,
-
         spikecolor: '#999999',
       },
       yaxis: {
@@ -118,11 +120,11 @@ export const LatencyPlotlyChart: React.FC<{
       hovermode: 'x unified',
       dragmode: false,
       showlegend: false,
-
       hoverlabel: {
         bordercolor: MOON_200,
       },
     };
+
     const plotlyConfig: Partial<Plotly.Config> = {
       displayModeBar: false,
       responsive: true,
@@ -136,14 +138,13 @@ export const LatencyPlotlyChart: React.FC<{
     );
   }, [plotlyData, height]);
 
-  return <div ref={divRef} style={{width: '100%'}}></div>;
+  return <div ref={divRef}></div>;
 };
 
 export const ErrorPlotlyChart: React.FC<{
   height: number;
   chartData: ChartDataErrors[];
-  binSizeMinutes?: number;
-}> = ({height, chartData, binSizeMinutes = 60}) => {
+}> = ({height, chartData}) => {
   const divRef = useRef<HTMLDivElement>(null);
 
   const plotlyData: Plotly.Data[] = useMemo(() => {
@@ -173,7 +174,7 @@ export const ErrorPlotlyChart: React.FC<{
         t: 50,
         pad: 0,
       },
-      bargroupgap: 0.1, // Add this line
+      bargroupgap: 0.1,
       xaxis: {
         title: 'Time',
         type: 'date',
@@ -212,7 +213,7 @@ export const ErrorPlotlyChart: React.FC<{
     );
   }, [plotlyData, height]);
 
-  return <div ref={divRef} style={{width: '100%'}}></div>;
+  return <div ref={divRef}></div>;
 };
 
 export const RequestsPlotlyChart: React.FC<{
@@ -280,5 +281,5 @@ export const RequestsPlotlyChart: React.FC<{
     );
   }, [plotlyData, height]);
 
-  return <div ref={divRef} style={{width: '100%'}}></div>;
+  return <div ref={divRef}></div>;
 };
