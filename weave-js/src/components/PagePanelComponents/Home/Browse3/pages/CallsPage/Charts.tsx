@@ -34,29 +34,40 @@ type ChartData = {
   latency: number;
   isError: boolean;
 };
+type ChartDataRequests = {
+  started_at: string;
+};
+type ChartDataErrors = {
+  started_at: string;
+  isError: boolean;
+};
+type ChartDataLatency = {
+  started_at: string;
+  latency: number;
+};
 export const LatencyPlotlyChart: React.FC<{
   height: number;
-  chartData: ChartData[];
+  chartData: ChartDataLatency[];
   binSizeMinutes?: number;
 }> = ({height, chartData, binSizeMinutes = 60}) => {
   const divRef = useRef<HTMLDivElement>(null);
 
   const plotlyData: Plotly.Data[] = useMemo(() => {
     const groupedData = _(chartData)
-      .groupBy(d =>
-        moment(d.started_at)
-          .startOf('minute')
-          .minute(
-            Math.floor(moment(d.started_at).minute() / binSizeMinutes) *
-              binSizeMinutes
-          )
-          .format()
-      )
+      .groupBy(d => {
+        const date = moment(d.started_at);
+        console.log('mins', date.minutes());
+        const roundedMinutes =
+          Math.floor(date.minutes() / binSizeMinutes) * binSizeMinutes;
+        return date.startOf('hour').add(roundedMinutes, 'minutes').format();
+      })
       .map((group, date) => {
-        const latencies = _.sortBy(group.map(d => d.latency));
-        const p50 = quantileSorted(latencies, 0.5);
-        const p95 = quantileSorted(latencies, 0.95);
-        const p99 = quantileSorted(latencies, 0.99);
+        const latenciesNonSorted = group.map(d => d.latency);
+        console.log('latenciesNonSorted', latenciesNonSorted);
+        // const latencies = _.sortBy(group.map(d => d.latency));
+        const p50 = quantile(latenciesNonSorted, 0.5) ?? 0;
+        const p95 = quantile(latenciesNonSorted, 0.95) ?? 0;
+        const p99 = quantile(latenciesNonSorted, 0.99) ?? 0;
         return {timestamp: date, p50, p95, p99};
       })
       .value();
@@ -165,21 +176,13 @@ export const LatencyPlotlyChart: React.FC<{
 
 export const ErrorPlotlyChart: React.FC<{
   height: number;
-  chartData: ChartData[];
+  chartData: ChartDataErrors[];
   binSizeMinutes?: number;
-}> = ({height, chartData, binSizeMinutes = 15}) => {
+}> = ({height, chartData, binSizeMinutes = 60}) => {
   const divRef = useRef<HTMLDivElement>(null);
 
   const plotlyData: Plotly.Data[] = useMemo(() => {
-    const errorData = chartData.filter(d => d.isError);
-    console.log('HERE', chartData, errorData);
-    const startTimestamp = moment
-      .min(errorData.map(d => moment(d.started_at)))
-      .valueOf();
-    const endTimestamp = moment
-      .max(errorData.map(d => moment(d.started_at)))
-      .valueOf();
-    // Filter for error data only
+    const errorData = chartData; //.filter(d => d.isError);
 
     return [
       {
@@ -190,32 +193,23 @@ export const ErrorPlotlyChart: React.FC<{
 
         histfunc: 'count', // Automatically count the occurrences in each bin
         hovertemplate: '%{y} errors<extra></extra>',
-        // hoverinfo: 'none',
-
-        // autobinx: true, // Enable automatic binning
-
-        // xbins: {
-        //   start: startTimestamp,
-        //   end: endTimestamp,
-        //   size: binSizeMinutes * 60 * 1000, // Convert minutes to milliseconds
-        // },
       },
     ];
   }, [chartData, binSizeMinutes]);
 
   // Find the first non-zero bin
-  const firstNonZeroBin = useMemo(() => {
-    const errorData = chartData.filter(d => d.isError);
-    if (errorData.length === 0) {
-      return null;
-    }
-    // Sort the error data by timestamp
-    const sortedErrorData = _.sortBy(errorData, d =>
-      moment(d.started_at).valueOf()
-    );
-    return moment(sortedErrorData[0].started_at).valueOf(); // First non-zero timestamp
-  }, [chartData]);
-  console.log(moment(firstNonZeroBin));
+  // const firstNonZeroBin = useMemo(() => {
+  //   const errorData = chartData.filter(d => d.isError);
+  //   if (errorData.length === 0) {
+  //     return null;
+  //   }
+  //   // Sort the error data by timestamp
+  //   const sortedErrorData = _.sortBy(errorData, d =>
+  //     moment(d.started_at).valueOf()
+  //   );
+  //   return moment(sortedErrorData[0].started_at).valueOf(); // First non-zero timestamp
+  // }, [chartData]);
+
   useEffect(() => {
     // Configure the layout for the Plotly chart
     const plotlyLayout: Partial<Plotly.Layout> = {
@@ -237,7 +231,7 @@ export const ErrorPlotlyChart: React.FC<{
         showgrid: false,
         gridcolor: '#e0e0e0',
         linecolor: '#e0e0e0',
-        range: firstNonZeroBin ? [firstNonZeroBin, null] : undefined, // Start at the first non-zero timestamp
+        // range: firstNonZeroBin ? [firstNonZeroBin, null] : undefined, // Start at the first non-zero timestamp
       },
       yaxis: {
         // title: 'Error Count',
@@ -277,7 +271,7 @@ export const ErrorPlotlyChart: React.FC<{
 
 export const RequestsPlotlyChart: React.FC<{
   height: number;
-  chartData: ChartData[];
+  chartData: ChartDataRequests[];
 }> = ({height, chartData}) => {
   const divRef = useRef<HTMLDivElement>(null);
 

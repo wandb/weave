@@ -2,17 +2,14 @@ import React, {useMemo, useState} from 'react';
 import {useCallsForQueryCharts} from './callsTableQuery';
 
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
-import {Drawer} from '@mui/material';
 
 import {WFHighLevelCallFilter} from './callsTableFilter';
-import {DEFAULT_FILTER_CALLS} from './CallsTable';
 import {
   ErrorPlotlyChart,
   LatencyPlotlyChart,
   RequestsPlotlyChart,
 } from './Charts';
 import {Tailwind} from '../../../../../Tailwind';
-import {Button} from '../../../../../Button';
 import {
   IconChevronDown,
   IconChevronNext,
@@ -20,29 +17,22 @@ import {
 } from '../../../../../Icon';
 
 type CallsChartsProps = {
-  startTime?: number;
-  endTime?: number;
   entity: string;
   project: string;
   filterModelProp: GridFilterModel;
   filter: WFHighLevelCallFilter;
-  //   setFilterModel?: (newModel: GridFilterModel) => void;
 };
 
 export const CallsCharts = ({
-  startTime,
-  endTime,
   entity,
   project,
   filter,
   filterModelProp,
-}: // filterModel,
-// filter,
-CallsChartsProps) => {
-  const [filterModel, setFilterModel] = useState<GridFilterModel>(
-    filterModelProp ?? DEFAULT_FILTER_CALLS
+}: CallsChartsProps) => {
+  const columns = useMemo(
+    () => ['started_at', 'ended_at', 'exception', 'id'],
+    []
   );
-  const columns = useMemo(() => ['summary.weave.costs', 'started_at'], []);
   const columnSet = useMemo(() => new Set(columns), [columns]);
   const sortCalls: GridSortModel = useMemo(
     () => [{field: 'started_at', sort: 'desc'}],
@@ -59,55 +49,91 @@ CallsChartsProps) => {
     columnSet,
     sortCalls
   );
-  const callsLoading = calls.loading;
-  const [callsResult, setCallsResult] = useState(calls.result);
-  const [callsTotal, setCallsTotal] = useState(calls.total);
-
-  //   const costAndTimeData = useMemo(() => {
-  //     return calls.result
-  //       .filter(
-  //         call =>
-  //           call.traceCall?.started_at !== undefined &&
-  //           getCostFromCostData(call.traceCall?.summary?.weave?.costs ?? {})
-  //             .costNumeric !== undefined
-  //       )
-  //       .map(call => ({
-  //         value: getCostFromCostData(call.traceCall?.summary?.weave?.costs ?? {})
-  //           .costNumeric,
-  //         timestamp: call.traceCall?.started_at ?? '',
-  //       }));
-  //   }, [calls.result]);
-
-  const costAndTimeData = useMemo(() => {
-    return calls.result.map(call => ({
-      started_at: call.traceCall?.started_at ?? '',
-      //   ended_at: call.traceCall?.ended_at ?? '',
-      latency: call.traceCall?.summary?.weave?.latency_ms ?? 0,
-      isError: call.traceCall?.summary?.weave?.status === 'error',
-      //   timestamp: call.traceCall?.started_at ?? '',
-    }));
-  }, [calls.result]);
-  console.log(calls.result);
-  // Sum up the cost data
-
-  console.log(
-    'Cost data:',
-    filter,
-    filterModelProp,
-    filterModel,
-    calls,
-    costAndTimeData,
-    calls
-  );
+  console.log(calls, 'calls');
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
 
   const toggleInsights = () => {
     setIsInsightsOpen(!isInsightsOpen);
   };
+  console.log(calls.result, 'calls.result');
+  const chartData = useMemo(() => {
+    console.log('Calls loading:', calls.loading);
+    console.log('Calls result length:', calls.result?.length);
 
+    if (calls.loading || !calls.result || calls.result.length === 0) {
+      console.log('Returning empty data due to loading or empty result');
+      return {latency: [], errors: [], requests: []};
+    }
+
+    const data: {
+      latency: Array<{started_at: string; latency: number}>;
+      errors: Array<{started_at: string; isError: boolean}>;
+      requests: Array<{started_at: string}>;
+    } = {
+      latency: [],
+      errors: [],
+      requests: [],
+    };
+
+    calls.result.forEach(call => {
+      const started_at = call.traceCall?.started_at;
+      if (!started_at) return; // Skip calls without a start time
+      const ended_at = call.traceCall?.ended_at;
+
+      // console.log(
+      //   'latency',
+      //   call.traceCall?.ended_at,
+      //   call.traceCall?.started_at,
+      //   latency
+      // );
+      const isError =
+        call.traceCall?.exception !== null &&
+        call.traceCall?.exception !== undefined &&
+        call.traceCall?.exception !== '';
+
+      if (started_at) {
+        // Data for requests chart
+        data.requests.push({started_at});
+
+        // Data for errors chart
+        if (isError) {
+          data.errors.push({started_at, isError});
+        }
+
+        // Data for latency chart
+        if (ended_at !== undefined) {
+          const startTime = new Date(started_at).getTime();
+          const endTime = new Date(ended_at).getTime();
+          const latency = endTime - startTime;
+          data.latency.push({started_at, latency});
+        }
+      }
+    });
+
+    console.log('Processed data:', data);
+    return data;
+  }, [calls.result, calls.loading]);
+
+  console.log(chartData, 'chart data');
+  const charts = useMemo(() => {
+    return (
+      <div className="m-10 mt-4 flex w-full">
+        <div className="mb-10 flex w-full flex-row gap-[10px]">
+          <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-[10px]">
+            <LatencyPlotlyChart chartData={chartData.latency} height={300} />
+          </div>
+          <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-[10px]">
+            <ErrorPlotlyChart chartData={chartData.errors} height={300} />
+          </div>
+          <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-[10px]">
+            <RequestsPlotlyChart chartData={chartData.requests} height={300} />
+          </div>
+        </div>
+      </div>
+    );
+  }, [chartData, calls.loading]);
   return (
     <Tailwind style={{marginRight: '20px'}}>
-      {/* Button to toggle insights */}
       <div className="mb-10 ml-10 mr-[20px] w-full rounded-lg border border-moon-250 bg-moon-50 pr-[20px]">
         <div
           className="flex cursor-pointer items-center gap-2 p-10"
@@ -121,22 +147,7 @@ CallsChartsProps) => {
           </div>
         </div>
 
-        {/* Collapsible insights section */}
-        {isInsightsOpen && (
-          <div className="m-10 mt-4 flex w-full">
-            <div className="mb-10 flex w-full flex-row gap-[10px]">
-              <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-[10px]">
-                <LatencyPlotlyChart chartData={costAndTimeData} height={300} />
-              </div>
-              <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-[10px]">
-                <ErrorPlotlyChart chartData={costAndTimeData} height={300} />
-              </div>
-              <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-[10px]">
-                <RequestsPlotlyChart chartData={costAndTimeData} height={300} />
-              </div>
-            </div>
-          </div>
-        )}
+        {isInsightsOpen && charts}
       </div>
     </Tailwind>
   );
