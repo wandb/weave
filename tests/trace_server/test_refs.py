@@ -82,3 +82,19 @@ def test_ref_parsing_internal_sanitized():
 
     parsed = refs_internal.parse_internal_uri(ref_str)
     assert parsed == ref_start
+
+
+def test_artifact_ref_parsing_internal_sanitized():
+    ref_start = refs_internal.InternalArtifactRef(
+        project_id="entity/project",
+        id=f"{sanitize_object_name(string_with_every_char())}:v0",
+    )
+
+    ref_str = ref_start.uri()
+    exp_ref = (
+        f"{refs_internal.ARTIFACT_REF_SCHEME}:///{ref_start.project_id}/{ref_start.id}"
+    )
+    assert ref_str == exp_ref
+
+    parsed = refs_internal.parse_internal_uri(ref_str)
+    assert parsed == ref_start
