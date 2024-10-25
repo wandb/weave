@@ -23,7 +23,6 @@ class ConfiguredNoopAction(BaseModel):
     action_type: Literal["noop"] = "noop"
 
 
-
 ActionConfigType = Union[
     ConfiguredLlmJudgeAction,
     ConfiguredContainsWordsAction,
