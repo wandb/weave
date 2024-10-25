@@ -66,7 +66,9 @@ export async function init(project: string, settings?: Settings): Promise<WeaveC
   try {
     host = new Netrc().getLastEntry()!.machine;
   } catch (error) {
-    throw new Error('Could not find entry in netrc file.  Please run `weave.login()`');
+    throw new Error(
+      'Could not find entry in netrc file.  Please run `weave.login({apiKey: $YOUR_API_KEY})` or `wandb login` if you have that installed.'
+    );
   }
   const resolvedApiKey = getApiKey(host);
   const { baseUrl, traceBaseUrl, domain } = getUrls(host);
