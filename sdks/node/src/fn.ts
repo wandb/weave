@@ -16,15 +16,16 @@ export abstract class CallableObject<I, O> extends WeaveObject implements Callab
   abstract run(input: I): Promise<O>;
 }
 
-export function mapArgs<I extends Record<string, any>, O extends Record<string, any>>(
-  input: I,
-  mapping: ColumnMapping<I, O>
-): O {
-  const output: Partial<O> = {};
-  for (const [inputKey, outputKey] of Object.entries(mapping) as [keyof I, keyof O][]) {
-    if (inputKey in input) {
-      output[outputKey] = input[inputKey];
+export function mapArgs<T extends Record<string, any>, M extends Record<string, keyof T>>(
+  input: T,
+  mapping: M
+): { [K in keyof M]: T[M[K]] } {
+  const result: Partial<{ [K in keyof M]: T[M[K]] }> = {};
+
+  for (const [newKey, oldKey] of Object.entries(mapping)) {
+    if (oldKey in input) {
+      result[newKey as keyof M] = input[oldKey];
     }
   }
-  return output as O;
+  return result as { [K in keyof M]: T[M[K]] };
 }

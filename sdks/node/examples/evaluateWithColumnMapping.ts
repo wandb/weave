@@ -8,9 +8,9 @@ async function main() {
     id: 'My Dataset',
     description: 'This is a dataset',
     rows: [
-      { name: 'Alice', age: 25 },
-      { name: 'Bob', age: 30 },
-      { name: 'Charlie', age: 34 },
+      { firstName: 'Alice', yearsOld: 25 },
+      { firstName: 'Bob', yearsOld: 30 },
+      { firstName: 'Charlie', yearsOld: 34 },
     ],
   });
   const evaluation = new weave.Evaluation({
@@ -20,6 +20,12 @@ async function main() {
         name: 'isEqual',
       }),
     ],
+    // Specify a column mapping to map the model inputs to dataset columns.
+    // The order is always "model input": "dataset column".
+    columnMapping: {
+      name: 'firstName',
+      age: 'yearsOld',
+    },
   });
 
   const model = weave.op(async function myModel({ datasetRow }) {

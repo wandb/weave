@@ -28,7 +28,7 @@ const createMockDatasetWithDifferentColumnNames = () =>
 const createMockModel = (failable: boolean) => {
   return op(async function mockPrediction({ datasetRow }: { datasetRow: { id: number; text: string } }) {
     if (failable && datasetRow.id === 0) throw new Error('Model failed');
-    if (failable && datasetRow.text === undefined) throw new Error('datasetRow.text is undefined');
+    if (failable && datasetRow.text === undefined) throw new Error('Model failed');
     return `Prediction for ${datasetRow.text}`;
   });
 };
@@ -118,8 +118,8 @@ describe('Evaluation', () => {
 
   test('evaluate with a valid column mapping', async () => {
     const mockEval = createMockEvaluation(true, createMockDatasetWithDifferentColumnNames(), {
-      identifier: 'id',
-      description: 'text',
+      id: 'identifier',
+      text: 'description',
     });
     const mockModel = createMockModel(true);
     const res = await mockEval.evaluate({ model: mockModel });
@@ -144,8 +144,8 @@ describe('Evaluation', () => {
   test('evaluate with an invalid column mapping', async () => {
     // These cols dont map as expected, so the model should fail
     const mockEval = createMockEvaluation(true, createMockDatasetWithDifferentColumnNames(), {
-      identifier: 'lol',
-      description: 'wtf',
+      id: 'totallyNot',
+      text: 'validMapping',
     });
     const mockModel = createMockModel(true);
 

@@ -49,7 +49,7 @@ async function* asyncParallelMap<T, U>(
   fnParams: (item: T) => any[],
   maxConcurrency: number
 ) {
-  const inProgressTasks: Map<T, Promise<{ item: T; result: Awaited<U> }>> = new Map();
+  const itemPromiseMap: Map<T, Promise<{ item: T; result: Awaited<U> }>> = new Map();
   async function runOne(item: T) {
     return {
       item,
@@ -59,26 +59,26 @@ async function* asyncParallelMap<T, U>(
   }
   let nDone = 0;
   for await (const item of asyncIterator) {
-    if (inProgressTasks.size >= maxConcurrency) {
-      const done = await Promise.race(inProgressTasks.values());
-      inProgressTasks.delete(done.item);
+    if (itemPromiseMap.size >= maxConcurrency) {
+      const done = await Promise.race(itemPromiseMap.values());
+      itemPromiseMap.delete(done.item);
       yield {
         ...done,
-        nRunning: inProgressTasks.size,
+        nRunning: itemPromiseMap.size,
         nDone: ++nDone,
       };
     }
     const prom = runOne(item);
-    inProgressTasks.set(item, prom);
+    itemPromiseMap.set(item, prom);
   }
 
   // Flush remaining items
-  while (inProgressTasks.size > 0) {
-    const done = await Promise.race(inProgressTasks.values());
-    inProgressTasks.delete(done.item);
+  while (itemPromiseMap.size > 0) {
+    const done = await Promise.race(itemPromiseMap.values());
+    itemPromiseMap.delete(done.item);
     yield {
       ...done,
-      nRunning: inProgressTasks.size,
+      nRunning: itemPromiseMap.size,
       nDone: ++nDone,
     };
   }
@@ -186,6 +186,7 @@ export class Evaluation<R extends DatasetRow, E extends DatasetRow, M> extends W
       maxConcurrency
     )) {
       const { scores } = result;
+      console.log('>>>result', result);
       results.push({
         model_success: result.model_success,
         model_output: result.model_output,
@@ -223,7 +224,7 @@ export class Evaluation<R extends DatasetRow, E extends DatasetRow, M> extends W
     let modelError = false;
     let datasetRow: E = example as unknown as E;
     if (columnMapping) {
-      datasetRow = mapArgs(example, columnMapping);
+      datasetRow = mapArgs(example, columnMapping) as E;
     }
     try {
       modelOutput = await callWeaveCallable(model, { datasetRow });
