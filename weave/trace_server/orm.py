@@ -179,7 +179,7 @@ class Table:
 
     def tuple_to_row(
         self,
-        tup: typing.Union[typing.Tuple | typing.Sequence[typing.Any]],
+        tup: typing.Union[typing.Tuple, typing.Sequence[typing.Any]],
         fields: list[str],
     ) -> Row:
         d = {}
