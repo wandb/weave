@@ -78,9 +78,9 @@ export const objectRefDisplayName = (
   throw new Error('Unknown ref type');
 };
 
-export const SmallRefItem: FC<{
+export const SmallRefBox: FC<{
     iconName: IconName;
-    text?: string;
+    text: string;
 }> = ({ iconName, text }) => (
     <Box display="flex" alignItems="center">
         <Box
@@ -117,27 +117,30 @@ export const SmallArtifactRef: FC<{
   objRef: WandbArtifactRef;
   iconOnly?: boolean;
 }> = ({objRef}) => {
-  // TODO lookup the artifact by name (where name is name:version) so you can verify it's a good link
-  // AND check that 'model' is the right type
-  // const ARTIFACT_BY_NAME_QUERY = gql`
-  //   query ArtifactByName(
-  //     $entityName: String!,
-  //     $projectName: String!,
-  //     $name: String!
-  //   ) {
-  //     project(name: $projectName, entityName: $entityName) {
-  //       artifact(name: $name) {
-  //         id
-  //         name
-  //         description
-  //         createdAt
-  //         updatedAt
-  //         size
-  //         state
-  //       }
-  //     }
-  //   }
-  // `;
+  // TODO lookup the artifact by name (where name is name:version and version is "v0", or "v1", etc)
+  // so you can verify it's a valid artifact AND check that 'model' is the right type
+  /*
+  const ARTIFACT_BY_NAME_QUERY = gql`
+    query ArtifactByName(
+      $entityName: String!,
+      $projectName: String!,
+      $name: String!
+    ) {
+      project(name: $projectName, entityName: $entityName) {
+        artifact(name: $name) {
+          id
+          name
+          description
+          createdAt
+          updatedAt
+          size
+          state
+        }
+      }
+    }
+  `;
+  */
+
 
   return (
     <Link
@@ -152,7 +155,7 @@ export const SmallArtifactRef: FC<{
       href={`${window.location.origin}/${objRef.entityName}/${objRef.projectName}/artifacts/model/${objRef.artifactName}/${objRef.artifactVersion}`}
       target="_blank"
       rel="noopener noreferrer">
-      <SmallRefItem iconName={IconNames.OpenNewTab} text={`${objRef.artifactName}:${objRef.artifactVersion}`} />
+      <SmallRefBox iconName={IconNames.OpenNewTab} text={`${objRef.artifactName}:${objRef.artifactVersion}`} />
     </Link>
   );
 };
@@ -220,7 +223,7 @@ export const SmallWeaveRef: FC<{
     icon = IconNames.JobProgramCode;
   }
   const Item = (
-      <SmallRefItem iconName={icon} text={label} />
+      <SmallRefBox iconName={icon} text={label} />
   );
 
   if (refTypeQuery.loading) {

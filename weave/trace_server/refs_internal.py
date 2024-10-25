@@ -73,7 +73,6 @@ def validate_extra(extra: list[str]) -> None:
 
 def validate_no_slashes(s: str, field_name: str) -> None:
     if "/" in s:
-        print(f"YYY. s={s}, field_name={field_name}")
         raise InvalidInternalRef(f"{field_name} cannot contain '/'")
 
 
