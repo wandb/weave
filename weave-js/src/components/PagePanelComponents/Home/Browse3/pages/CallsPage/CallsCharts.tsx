@@ -79,55 +79,52 @@ export const CallsCharts = ({
         call.traceCall?.exception !== undefined &&
         call.traceCall?.exception !== '';
 
-      if (started_at) {
-        data.requests.push({started_at});
+      data.requests.push({started_at});
 
-        if (isError) {
-          data.errors.push({started_at, isError});
-        }
+      if (isError) {
+        data.errors.push({started_at, isError});
+      }
 
-        if (ended_at !== undefined) {
-          const startTime = new Date(started_at).getTime();
-          const endTime = new Date(ended_at).getTime();
-          const latency = endTime - startTime;
-          data.latency.push({started_at, latency});
-        }
+      if (ended_at !== undefined) {
+        const startTime = new Date(started_at).getTime();
+        const endTime = new Date(ended_at).getTime();
+        const latency = endTime - startTime;
+        data.latency.push({started_at, latency});
       }
     });
     return data;
-  }, [calls.result]);
+  }, [calls.result, calls.loading]);
 
   const charts = useMemo(() => {
     return (
       <div className="m-10 mt-4 flex w-full">
-        <div className="mb-10 flex w-full flex-row gap-[10px]">
-          <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-[10px]">
+        <div className="mb-10 flex w-full flex-row gap-10">
+          <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-10">
             <LatencyPlotlyChart chartData={chartData.latency} height={300} />
           </div>
-          <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-[10px]">
+          <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-10">
             <ErrorPlotlyChart chartData={chartData.errors} height={300} />
           </div>
-          <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-[10px]">
+          <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-10">
             <RequestsPlotlyChart chartData={chartData.requests} height={300} />
           </div>
         </div>
       </div>
     );
-  }, [chartData, calls.loading]);
+  }, [chartData]);
+
   return (
     <Tailwind style={{marginRight: '20px'}}>
-      <div className="mb-10 ml-10 mr-[20px] w-full rounded-lg border border-moon-250 bg-moon-50 pr-[20px]">
+      <div className="mb-10 ml-10 w-full rounded-lg border border-moon-250 bg-moon-50 pr-[20px]">
         <div
           className="flex cursor-pointer items-center gap-2 p-10"
           onClick={toggleInsights}>
           {isInsightsOpen ? <IconChevronDown /> : <IconChevronNext />}
-
           <IconLightbulbInfo width={18} height={18} className="text-teal-500" />
           <div className="font-source-sans-pro text-[18px] font-semibold text-moon-500">
             {'Insights'}
           </div>
         </div>
-
         {isInsightsOpen && charts}
       </div>
     </Tailwind>

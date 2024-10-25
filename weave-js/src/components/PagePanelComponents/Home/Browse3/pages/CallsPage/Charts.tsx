@@ -9,6 +9,7 @@ import {
   GREEN_500,
   MOON_200,
   MOON_500,
+  MOON_750,
   TEAL_400,
 } from '../../../../../../common/css/color.styles';
 
@@ -24,6 +25,20 @@ type ChartDataErrors = {
 type ChartDataLatency = {
   started_at: string;
   latency: number;
+};
+
+const CHART_TITLE_STYLE = {
+  font: {
+    color: MOON_750,
+    family: '"Source Sans Pro", sans-serif',
+    size: 16,
+    weight: 700,
+  },
+  pad: {
+    l: 16,
+  },
+  x: 0,
+  xanchor: 'left' as const,
 };
 
 export const LatencyPlotlyChart: React.FC<{
@@ -88,7 +103,8 @@ export const LatencyPlotlyChart: React.FC<{
     const plotlyLayout: Partial<Plotly.Layout> = {
       height: height - 40,
       title: {
-        text: 'Latency',
+        text: '<span style="font-weight: 600;">Latency</span>',
+        ...CHART_TITLE_STYLE,
       },
       margin: {
         l: 50,
@@ -98,7 +114,6 @@ export const LatencyPlotlyChart: React.FC<{
         pad: 0,
       },
       xaxis: {
-        title: 'Time',
         type: 'date',
         automargin: true,
         showgrid: false,
@@ -108,6 +123,9 @@ export const LatencyPlotlyChart: React.FC<{
         spikemode: 'across',
         spikethickness: 1,
         spikecolor: '#999999',
+        tickfont: {
+          color: MOON_500,
+        },
       },
       yaxis: {
         automargin: true,
@@ -116,10 +134,13 @@ export const LatencyPlotlyChart: React.FC<{
         gridcolor: '#e0e0e0',
         linecolor: '#e0e0e0',
         showspikes: false,
+        tickfont: {color: MOON_500},
       },
       hovermode: 'x unified',
       dragmode: false,
       showlegend: false,
+      // hoverformat: '%b %d, %I:%M %p',
+
       hoverlabel: {
         bordercolor: MOON_200,
       },
@@ -166,7 +187,10 @@ export const ErrorPlotlyChart: React.FC<{
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
       height: height - 40,
-      title: 'Errors',
+      title: {
+        text: '<span style="font-weight: 600;">Errors</span>',
+        ...CHART_TITLE_STYLE,
+      },
       margin: {
         l: 50,
         r: 30,
@@ -176,20 +200,20 @@ export const ErrorPlotlyChart: React.FC<{
       },
       bargroupgap: 0.1,
       xaxis: {
-        title: 'Time',
         type: 'date',
         automargin: true,
         showgrid: false,
         gridcolor: '#e0e0e0',
         linecolor: '#e0e0e0',
+        tickfont: {color: MOON_500},
       },
       yaxis: {
         automargin: true,
         showgrid: true,
         gridcolor: '#e0e0e0',
         griddash: 'dot',
-
         linecolor: '#e0e0e0',
+        tickfont: {color: MOON_500},
       },
       hovermode: 'x unified',
       hoverlabel: {
@@ -238,10 +262,12 @@ export const RequestsPlotlyChart: React.FC<{
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
       height: height - 40,
-      title: 'Requests',
+      title: {
+        text: '<span style="font-weight: 600;">Requests</span>',
+        ...CHART_TITLE_STYLE,
+      },
       margin: {l: 50, r: 30, b: 50, t: 50, pad: 0},
       xaxis: {
-        title: 'Time',
         type: 'date',
         automargin: true,
         showgrid: false,
@@ -250,6 +276,7 @@ export const RequestsPlotlyChart: React.FC<{
         spikemode: 'across',
         spikethickness: 1,
         spikecolor: '#999999',
+        tickfont: {color: MOON_500},
       },
       yaxis: {
         automargin: true,
@@ -258,6 +285,7 @@ export const RequestsPlotlyChart: React.FC<{
         linecolor: '#e0e0e0',
         griddash: 'dot',
         showspikes: false,
+        tickfont: {color: MOON_500},
       },
       bargap: 0.2,
       hovermode: 'x unified',
