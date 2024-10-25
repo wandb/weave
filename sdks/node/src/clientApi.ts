@@ -62,9 +62,14 @@ export async function login(options?: LoginOptions) {
  * @throws {Error} If the initialization fails
  */
 export async function init(project: string, settings?: Settings): Promise<WeaveClient> {
-  const host = new Netrc().getLastEntry()?.machine;
+  let host: string;
+  try {
+    host = new Netrc().getLastEntry()!.machine;
+  } catch (error) {
+    throw new Error('Could not find entry in netrc file.  Please run `weave.login()`');
+  }
+  const resolvedApiKey = getApiKey(host);
   const { baseUrl, traceBaseUrl, domain } = getUrls(host);
-  const resolvedApiKey = getApiKey(domain);
 
   try {
     const wandbServerApi = new WandbServerApi(baseUrl, resolvedApiKey);
@@ -106,7 +111,7 @@ export async function init(project: string, settings?: Settings): Promise<WeaveC
       customFetch: concurrencyLimitedFetch,
     });
 
-    const client = new WeaveClient(traceServerApi, wandbServerApi, projectId, settings, domain);
+    const client = new WeaveClient(traceServerApi, wandbServerApi, projectId, settings);
     setGlobalClient(client);
     setGlobalDomain(domain);
     console.log(`Initializing project: ${projectId}`);

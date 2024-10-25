@@ -1,6 +1,7 @@
 import { getGlobalClient } from './clientApi';
 import { TRACE_CALL_EMOJI } from './constants';
 import { Op, OpOptions } from './opType';
+import { getGlobalDomain } from './urls';
 import { warnOnce } from './utils/warnOnce';
 
 /**
@@ -98,7 +99,8 @@ export function op<T extends (...args: any[]) => any>(
     const { currentCall, parentCall, newStack } = client.pushNewCall();
     const startTime = new Date();
     if (client.settings.shouldPrintCallLink && parentCall == null) {
-      console.log(`${TRACE_CALL_EMOJI} https://${client.urls.domain}/${client.projectId}/r/call/${currentCall.callId}`);
+      const domain = getGlobalDomain();
+      console.log(`${TRACE_CALL_EMOJI} https://${domain}/${client.projectId}/r/call/${currentCall.callId}`);
     }
     const displayName = options?.callDisplayName ? options.callDisplayName(...params) : undefined;
     const thisArg = options?.bindThis;
