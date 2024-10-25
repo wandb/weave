@@ -527,9 +527,9 @@ class CallsQuery(BaseModel):
                 )
                 for sort_by in self.order_fields
             ]
-            prefix = "" if two_step_query else ","
-            outer_raw_sql = f"""{prefix}
-                WITH all_calls AS ({outer_raw_sql}),
+            prefix = "WITH" if two_step_query else ","
+            outer_raw_sql = f"""
+                {prefix} all_calls AS ({outer_raw_sql}),
                 {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
             """
 
