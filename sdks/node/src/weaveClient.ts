@@ -149,6 +149,31 @@ export class WeaveClient {
   // be synchronous, so we can guarantee that calling savedWeaveValues
   // immediately makes __savedRef promises available.
 
+  public saveArbitrary(obj: any, objId?: string): Promise<ObjectRef> {
+    if (obj.__savedRef) {
+      return obj.__savedRef;
+    }
+
+    const ref = (async () => {
+      if (!objId) {
+        objId = uuidv7();
+      }
+
+      const serializedObj = await this.serializedVal(obj);
+      const response = await this.traceServerApi.obj.objCreateObjCreatePost({
+        obj: {
+          project_id: this.projectId,
+          object_id: objId,
+          val: serializedObj,
+        },
+      });
+      return new ObjectRef(this.projectId, objId, response.data.digest);
+    })();
+
+    obj.__savedRef = ref;
+    return ref;
+  }
+
   public saveObject(obj: WeaveObject, objId?: string): Promise<ObjectRef> {
     if (obj.__savedRef) {
       return Promise.resolve(obj.__savedRef);
