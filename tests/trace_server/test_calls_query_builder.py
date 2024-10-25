@@ -11,8 +11,6 @@ def assert_sql(cq: CallsQuery, exp_queries, exp_params):
     queries = cq.as_sql(pb)
     params = pb.get_params()
 
-    print("PARAMS", params)
-
     assert exp_params == params
     assert len(queries) == len(exp_queries)
 
