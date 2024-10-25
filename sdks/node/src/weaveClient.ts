@@ -145,10 +145,6 @@ export class WeaveClient {
     }
   }
 
-  // save* methods attached __savedRef promises to their values. These must
-  // be synchronous, so we can guarantee that calling savedWeaveValues
-  // immediately makes __savedRef promises available.
-
   public publish(obj: any, objId?: string): Promise<ObjectRef> {
     if (obj.__savedRef) {
       return obj.__savedRef;
@@ -158,6 +154,26 @@ export class WeaveClient {
       return this.saveArbitrary(obj, objId);
     }
   }
+
+  public async get(ref: ObjectRef): Promise<any> {
+    try {
+      const res = await this.traceServerApi.obj.objReadObjReadPost({
+        project_id: ref.projectId,
+        object_id: ref.objectId,
+        digest: ref.digest,
+      });
+      return res.data.obj.val;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('404')) {
+        throw new Error(`Unable to find object for ref uri: ${ref.uri()}`);
+      }
+      throw error;
+    }
+  }
+
+  // save* methods attached __savedRef promises to their values. These must
+  // be synchronous, so we can guarantee that calling savedWeaveValues
+  // immediately makes __savedRef promises available.
 
   private saveArbitrary(obj: any, objId?: string): Promise<ObjectRef> {
     if (obj.__savedRef) {
