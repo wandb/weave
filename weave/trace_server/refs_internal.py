@@ -144,6 +144,7 @@ class InternalCallRef:
             u += "/" + "/".join(extra_value_quoter(e) for e in self.extra)
         return u
 
+
 @dataclasses.dataclass(frozen=True)
 class InternalArtifactRef:
     project_id: str
@@ -156,6 +157,7 @@ class InternalArtifactRef:
     def uri(self) -> str:
         u = f"{ARTIFACT_REF_SCHEME}:///{self.project_id}/{self.id}"
         return u
+
 
 def parse_internal_uri(
     uri: str,
@@ -214,6 +216,7 @@ def parse_internal_uri(
         return InternalArtifactRef(project_id=project_id, id=id_)
     else:
         raise InvalidInternalRef(f"Unknown ref kind: {kind}")
+
 
 def _parse_remaining(remaining: list[str]) -> tuple[str, str, list[str]]:
     """`remaining` refers to everything after `object` or `op` in the ref.
