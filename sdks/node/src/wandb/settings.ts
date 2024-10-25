@@ -1,4 +1,4 @@
-import { defaultHost } from '../urls';
+import { defaultDomain, defaultHost, getUrls } from '../urls';
 import { Netrc } from '../utils/netrc';
 
 export function getApiKey(host: string): string {
@@ -27,4 +27,20 @@ export function getApiKey(host: string): string {
     throw new Error(apiKeyNotFoundMessage);
   }
   return apiKey;
+}
+
+export function getWandbConfigs() {
+  let host;
+  try {
+    host = new Netrc().getLastEntry()!.machine;
+  } catch (error) {
+    throw new Error(
+      `Could not find entry in netrc file.
+      Visit https://${defaultDomain}/authorize to get an API key and run
+      \`weave.login({apiKey: $YOUR_API_KEY})\` or \`wandb login\` if you have that installed.`
+    );
+  }
+  const apiKey = getApiKey(host);
+  const { baseUrl, traceBaseUrl, domain } = getUrls(host);
+  return { apiKey, baseUrl, traceBaseUrl, domain, host };
 }

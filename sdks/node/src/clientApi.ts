@@ -4,7 +4,7 @@ import { getUrls, setGlobalDomain } from './urls';
 import { ConcurrencyLimiter } from './utils/concurrencyLimit';
 import { Netrc } from './utils/netrc';
 import { createFetchWithRetry } from './utils/retry';
-import { getApiKey } from './wandb/settings';
+import { getWandbConfigs } from './wandb/settings';
 import { WandbServerApi } from './wandb/wandbServerApi';
 import { CallStackEntry, WeaveClient } from './weaveClient';
 
@@ -62,19 +62,9 @@ export async function login(options?: LoginOptions) {
  * @throws {Error} If the initialization fails
  */
 export async function init(project: string, settings?: Settings): Promise<WeaveClient> {
-  let host: string;
+  const { apiKey, baseUrl, traceBaseUrl, domain } = getWandbConfigs();
   try {
-    host = new Netrc().getLastEntry()!.machine;
-  } catch (error) {
-    throw new Error(
-      'Could not find entry in netrc file.  Please run `weave.login({apiKey: $YOUR_API_KEY})` or `wandb login` if you have that installed.'
-    );
-  }
-  const resolvedApiKey = getApiKey(host);
-  const { baseUrl, traceBaseUrl, domain } = getUrls(host);
-
-  try {
-    const wandbServerApi = new WandbServerApi(baseUrl, resolvedApiKey);
+    const wandbServerApi = new WandbServerApi(baseUrl, apiKey);
 
     let entityName: string | undefined;
     let projectName: string;
@@ -107,7 +97,7 @@ export async function init(project: string, settings?: Settings): Promise<WeaveC
       baseApiParams: {
         headers: {
           'User-Agent': `W&B Weave JS Client ${process.env.VERSION || 'unknown'}`,
-          Authorization: `Basic ${Buffer.from(`api:${resolvedApiKey}`).toString('base64')}`,
+          Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
         },
       },
       customFetch: concurrencyLimitedFetch,
