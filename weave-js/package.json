@@ -103,7 +103,6 @@
     "react-intersection-observer": "^8.31.0",
     "react-markdown": "^8.0.7",
     "react-measure": "^2.3.0",
-    "react-plotly.js": "^2.6.0",
     "react-redux": "^7.1.1",
     "react-resizable": "^3.0.5",
     "react-router-dom": "^5.1.2",
