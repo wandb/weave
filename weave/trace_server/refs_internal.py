@@ -188,7 +188,7 @@ def parse_internal_uri(
         remaining = parts[2:]
     else:
         raise InvalidInternalRef(
-            f"Invalid URI: {uri}. Must start with {WEAVE_INTERNAL_SCHEME}:/// or {WEAVE_SCHEME}:///"
+            f"Invalid URI: {uri}. Must start with {WEAVE_INTERNAL_SCHEME}:/// or {WEAVE_SCHEME}:/// or {ARTIFACT_REF_SCHEME}:///"
         )
     if kind == "table":
         return InternalTableRef(project_id=project_id, digest=remaining[0])
