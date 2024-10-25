@@ -133,6 +133,36 @@ class MySummarizationScorer(SummarizationScorer):
         super().score(output=output, text=news_article)
 ```
 
+### Final summarization of the scorer
+
+During evaluation, the scorer will be computed for each row of your dataset. To provide a final score for the evaluation we provide an `auto_summarize` depending on the returning type of the output.
+    - average will be computed for numerical columns
+    - count and fraction for boolean cols
+    - other col types are ignored
+
+You can override the `summarize` method on the `Scorer` class and provide your own way of computing the final scores. The `summarize` function expects:
+
+**Why this is useful?** 
+
+When you need to score all rows before deciding on the final value of the score for the dataset.
+
+```python
+class MyBinaryScorer(Scorer):
+    """
+    Returns True if the full output matches the target, False if not
+    """
+    
+    @weave.op
+    def score(output, target):
+        return {"match": if output == target}
+
+    def summarize(self, score_rows: list) -> dict:
+        full_match = all(row["match"] for row in score_rows)
+        return {"full_match": full_match}
+```
+> In this example, the default `auto_summarize` would have returned the count and proportion of True.
+
+If you want to learn more, check the implementation of [CorrectnessLLMJudge](/tutorial-rag#optional-defining-a-scorer-class).
 
 ## Predefined Scorers
 
