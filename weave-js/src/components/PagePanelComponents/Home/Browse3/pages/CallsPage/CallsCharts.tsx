@@ -120,7 +120,6 @@ export const CallsCharts = ({
       <div className="mb-10 ml-10 mr-[20px] w-full rounded-lg border border-moon-250 bg-moon-50 pr-[20px]">
         <div
           className="flex cursor-pointer items-center gap-2 p-10"
-          w-full
           onClick={toggleInsights}>
           {isInsightsOpen ? <IconChevronDown /> : <IconChevronNext />}
 
