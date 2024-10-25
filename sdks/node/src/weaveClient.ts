@@ -150,6 +150,8 @@ export class WeaveClient {
       return obj.__savedRef;
     } else if (obj instanceof WeaveObject) {
       return this.saveObject(obj, objId);
+    } else if (isOp(obj)) {
+      return this.saveOp(obj);
     } else {
       return this.saveArbitrary(obj, objId);
     }
@@ -426,23 +428,23 @@ export class WeaveClient {
     return await this.serializedVal(inputs);
   }
 
-  public async saveOp(op: Op<(...args: any[]) => any>): Promise<any> {
+  public async saveOp(op: Op<(...args: any[]) => any>, objId?: string): Promise<any> {
     if (op.__savedRef) {
       return op.__savedRef;
     }
     op.__savedRef = (async () => {
-      const objId = getOpName(op);
+      const resolvedObjId = objId || getOpName(op);
       const opFn = getOpWrappedFunction(op);
       const formattedOpFn = await maybeFormatCode(opFn.toString());
       const saveValue = await this.serializedFileBlob('Op', 'obj.py', new Blob([formattedOpFn]));
       const response = await this.traceServerApi.obj.objCreateObjCreatePost({
         obj: {
           project_id: this.projectId,
-          object_id: objId,
+          object_id: resolvedObjId,
           val: saveValue,
         },
       });
-      const ref = new OpRef(this.projectId, objId, response.data.digest);
+      const ref = new OpRef(this.projectId, resolvedObjId, response.data.digest);
 
       // console.log('Saved op: ', ref.ui_url());
       return ref;

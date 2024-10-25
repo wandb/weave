@@ -59,4 +59,8 @@ export class OpRef {
     const domain = getGlobalDomain();
     return `https://${domain}/${this.projectId}/weave/ops/${this.objectId}/versions/${this.digest}`;
   }
+
+  public async get() {
+    throw new Error('Not implemented');
+  }
 }
