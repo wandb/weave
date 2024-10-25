@@ -189,9 +189,33 @@ export class WeaveClient {
     } else if (t == 'CustomWeaveType') {
       const typeName = val.weave_type.type;
       if (typeName == 'PIL.Image.Image') {
+        let loadedFiles: { [key: string]: Buffer } = {};
+        for (const [name, digest] of Object.entries(val.files)) {
+          try {
+            const fileContent = await this.traceServerApi.file.fileContentFileContentPost({
+              project_id: this.projectId,
+              digest: digest as string,
+            });
+            loadedFiles[name] = fileContent.data?.content;
+          } catch (error) {
+            console.error('Error loading file:', error);
+          }
+        }
         // TODO: Implement getting img back as buffer
         return 'Coming soon!';
       } else if (typeName == 'wave.Wave_read') {
+        let loadedFiles: { [key: string]: Buffer } = {};
+        for (const [name, digest] of Object.entries(val.files)) {
+          try {
+            const fileContent = await this.traceServerApi.file.fileContentFileContentPost({
+              project_id: this.projectId,
+              digest: digest as string,
+            });
+            loadedFiles[name] = fileContent.data?.content;
+          } catch (error) {
+            console.error('Error loading file:', error);
+          }
+        }
         // TODO: Implement getting audio back as buffer
         return 'Coming soon!';
       }
