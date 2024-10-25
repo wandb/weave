@@ -293,7 +293,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         calls_query.set_filtered_output_param(output_param_name)
         ids_query, filtered_query = calls_query.as_sql(pb)
 
-        # actually make the ids query
+        # Hit the db to get the ids
         ids_res = self._query(ids_query, pb.get_params())
 
         ids = [x[0] for x in ids_res.result_rows]

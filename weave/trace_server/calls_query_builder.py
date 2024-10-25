@@ -465,7 +465,7 @@ class CallsQuery(BaseModel):
         )
 
         # If we don't need to optimize, return the base query
-        if not (has_heavy_fields and do_predicate_pushdown and not self.include_costs):
+        if not (has_heavy_fields or do_predicate_pushdown or self.include_costs):
             return [self._as_sql_base_format(pb, table_alias)]
 
         # Build the two queries
@@ -505,9 +505,8 @@ class CallsQuery(BaseModel):
             self.should_do_two_step_query() and self._filtered_output_param is not None
         )
         if two_step_query:
-            ids_param_slot = _param_slot(
-                pb.add_param(self._filtered_output_param), "Array(String)"
-            )
+            assert self._filtered_output_param is not None
+            ids_param_slot = _param_slot(self._filtered_output_param, "Array(String)")
             filter_query_sql = filter_query._as_sql_base_format(pb, table_alias)
         else:
             ids_param_slot = "filtered_calls"
@@ -528,8 +527,8 @@ class CallsQuery(BaseModel):
                 )
                 for sort_by in self.order_fields
             ]
-            prefix = "" if self.requires_two_step_query() else ","
-            outer_raw_sql = f"""{outer_raw_sql}{prefix}
+            prefix = "" if two_step_query else ","
+            outer_raw_sql = f"""{prefix}
                 WITH all_calls AS ({outer_raw_sql}),
                 {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
             """
