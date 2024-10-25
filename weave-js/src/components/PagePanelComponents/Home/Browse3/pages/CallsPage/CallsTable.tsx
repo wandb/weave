@@ -239,6 +239,8 @@ export const CallsTable: FC<{
     },
     [expandedRefCols]
   );
+
+  // Fetch the calls
   const calls = useCallsForQuery(
     entity,
     project,
@@ -248,6 +250,7 @@ export const CallsTable: FC<{
     paginationModelResolved,
     expandedRefCols
   );
+
   // Here, we only update our local state once the calls have loaded.
   // If we were not to do this, we would see a flicker of an empty table
   // before the calls are loaded. Since the columns are data-driven, this
@@ -852,7 +855,6 @@ export const CallsTable: FC<{
         project={project}
         filter={filter}
         filterModelProp={filterModelResolved}
-        // setFilterModel={props.setFilterModel}
       />
       <StyledDataGrid
         // Start Column Menu
