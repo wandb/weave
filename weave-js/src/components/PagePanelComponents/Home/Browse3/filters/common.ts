@@ -12,7 +12,10 @@ import {isWeaveObjectRef} from '@wandb/weave/react';
 import _ from 'lodash';
 
 import {parseRefMaybe} from '../../Browse2/SmallRef';
-import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from '../pages/wfReactInterface/constants';
+import {
+  WANDB_ARTIFACT_REF_PREFIX,
+  WEAVE_REF_PREFIX,
+} from '../pages/wfReactInterface/constants';
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
 export type FilterId = number | string | undefined;
