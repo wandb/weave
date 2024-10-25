@@ -11,10 +11,13 @@ const Dot = React.memo(
       [delay]
     );
 
-    const classes = classNames('rounded-full bg-moon-400 animate-wave', {
-      'h-8 w-8': size === 'huge',
-      'h-6 w-6 opacity-75': size === 'small',
-    });
+    const classes = classNames(
+      'rounded-full bg-moon-650 dark:bg-moon-350 animate-wave',
+      {
+        'h-8 w-8': size === 'huge',
+        'h-6 w-6': size === 'small',
+      }
+    );
     return <div className={classes} style={style} />;
   }
 );
