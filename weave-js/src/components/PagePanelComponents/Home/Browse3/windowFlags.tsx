@@ -98,3 +98,6 @@ export const initializeFlags = (flags: string[]) => {
 
 export const ENABLE_ONLINE_EVAL_UI = 'ENABLE_ONLINE_EVAL_UI';
 initializeFlags([ENABLE_ONLINE_EVAL_UI]);
+
+// Set the feature flag to true for testing
+window.setFeatureFlag('ENABLE_ONLINE_EVAL_UI', true);

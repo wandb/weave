@@ -151,9 +151,23 @@ def llm_judge(
 ) -> str:
     model = config.model
     system_prompt = config.prompt
+    if config.response_format is None:
+        raise ValueError("response_format is required for llm_judge")
+
+    response_is_not_object = config.response_format["type"] != "object"
+    dummy_key = "response"
+    if response_is_not_object:
+        schema = {
+            "type": "object",
+            "properties": {dummy_key: config.response_format},
+            "additionalProperties": False,
+        }
+    else:
+        schema = config.response_format
+
     response_format = {
         "type": "json_schema",
-        "json_schema": {"name": "response_format", "schema": config.response_format},
+        "json_schema": {"name": "response_format", "schema": schema},
     }
 
     args = {
@@ -175,7 +189,10 @@ def llm_judge(
         ],
         response_format=response_format,
     )
-    return json.loads(completion.choices[0].message.content)
+    res = json.loads(completion.choices[0].message.content)
+    if response_is_not_object:
+        res = res[dummy_key]
+    return res
 
 
 @action_task

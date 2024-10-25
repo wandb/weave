@@ -17,17 +17,26 @@ import {
 import {DynamicConfigForm} from '../../DynamicConfigForm';
 import {ReusableDrawer} from '../../ReusableDrawer';
 
+const SimpleResponseFormatSchema = z
+  .enum(['boolean', 'number', 'string'])
+  .default('boolean');
+const StructuredResponseFormatSchema = z.record(SimpleResponseFormatSchema);
+
+const ResponseFormatSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('simple'),
+    schema: SimpleResponseFormatSchema,
+  }),
+  z.object({
+    type: z.literal('structured'),
+    schema: StructuredResponseFormatSchema,
+  }),
+]);
+
 const ConfiguredLlmJudgeActionFriendlySchema = z.object({
   model: z.enum(['gpt-4o-mini', 'gpt-4o']).default('gpt-4o-mini'),
   prompt: z.string(),
-  response_format: z
-    .array(
-      z.object({
-        name: z.string(),
-        type: z.enum(['boolean', 'number', 'string']),
-      })
-    )
-    .min(1),
+  response_format: ResponseFormatSchema,
 });
 
 const knownBuiltinActions = [
@@ -39,21 +48,21 @@ const knownBuiltinActions = [
       convert: (
         data: z.infer<typeof ConfiguredLlmJudgeActionFriendlySchema>
       ): z.infer<typeof ConfiguredLlmJudgeActionSchema> => {
+        let responseFormat: any;
+        if (data.response_format.type === 'simple') {
+          responseFormat = {type: data.response_format.schema};
+        } else {
+          responseFormat = {
+            type: 'object',
+            properties: data.response_format.schema,
+            additionalProperties: false,
+          };
+        }
         return {
           action_type: 'llm_judge',
           model: data.model,
           prompt: data.prompt,
-          response_format: {
-            type: 'object',
-            properties: data.response_format.reduce<
-              Record<string, {type: string}>
-            >((acc, prop) => {
-              acc[prop.name] = {type: prop.type};
-              return acc;
-            }, {}),
-            required: data.response_format.map(prop => prop.name),
-            additionalProperties: false,
-          },
+          response_format: responseFormat,
         };
       },
     },
@@ -110,7 +119,7 @@ export const NewBuiltInActionScorerModal: FC<
   return (
     <ReusableDrawer
       open={open}
-      title="Configure new built-in action scorer"
+      title="Configure Scorer"
       onClose={onClose}
       onSave={handleSave}
       saveDisabled={!isValid}>

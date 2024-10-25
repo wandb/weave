@@ -40,13 +40,13 @@ export const ReusableDrawer: FC<ReusableDrawerProps> = ({
           flexDirection: 'column',
           overflow: 'auto',
         }}>
-        <Typography variant="h6" component="h2" gutterBottom>
+        <Typography variant="h6" component="h2">
           {title}
         </Typography>
 
         <Box sx={{flexGrow: 1, overflow: 'auto', my: 2}}>{children}</Box>
 
-        <Box sx={{display: 'flex', justifyContent: 'flex-end', mt: 2}}>
+        <Box sx={{display: 'flex', justifyContent: 'flex-end'}}>
           <Button onClick={onClose} style={{marginRight: 8}}>
             Cancel
           </Button>

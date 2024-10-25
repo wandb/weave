@@ -32,21 +32,102 @@ const isZodType = (
   if (predicate(schema)) {
     return true;
   }
-  if (schema instanceof z.ZodOptional) {
-    return isZodType(schema.unwrap(), predicate);
-  } else if (schema instanceof z.ZodDefault) {
-    return isZodType(schema._def.innerType, predicate);
+  if (schema instanceof z.ZodOptional || schema instanceof z.ZodDefault) {
+    return isZodType(unwrapSchema(schema), predicate);
+  }
+  if (schema instanceof z.ZodDiscriminatedUnion) {
+    return true;
   }
   return false;
 };
 
 const unwrapSchema = (schema: z.ZodTypeAny): z.ZodTypeAny => {
-  if (schema instanceof z.ZodOptional) {
-    return unwrapSchema(schema.unwrap());
-  } else if (schema instanceof z.ZodDefault) {
+  if (schema instanceof z.ZodOptional || schema instanceof z.ZodDefault) {
     return unwrapSchema(schema._def.innerType);
   }
+  if (schema instanceof z.ZodDiscriminatedUnion) {
+    return schema;
+  }
   return schema;
+};
+
+const DiscriminatedUnionField: React.FC<{
+  keyName: string;
+  fieldSchema: z.ZodDiscriminatedUnion<
+    string,
+    Array<z.ZodObject<any, any, any>>
+  >;
+  targetPath: string[];
+  value: any;
+  config: Record<string, any>;
+  setConfig: (config: Record<string, any>) => void;
+}> = ({keyName, fieldSchema, targetPath, value, config, setConfig}) => {
+  const discriminator = fieldSchema._def.discriminator;
+  const options = fieldSchema._def.options;
+
+  const currentType =
+    value?.[discriminator] || options[0]._def.shape()[discriminator]._def.value;
+
+  const handleTypeChange = (newType: string) => {
+    const selectedOption = options.find(
+      option => option._def.shape()[discriminator]._def.value === newType
+    );
+    if (selectedOption) {
+      const newValue = {[discriminator]: newType};
+      Object.keys(selectedOption.shape).forEach(key => {
+        if (key !== discriminator) {
+          newValue[key] =
+            selectedOption.shape[key] instanceof z.ZodDefault
+              ? selectedOption.shape[key]._def.defaultValue()
+              : undefined;
+        }
+      });
+      updateConfig(targetPath, newValue, config, setConfig);
+    }
+  };
+
+  const selectedSchema = options.find(
+    option => option._def.shape()[discriminator]._def.value === currentType
+  )!;
+
+  // Create a new schema without the discriminator field
+  const filteredSchema = z.object(
+    Object.entries(selectedSchema.shape).reduce((acc, [key, innerValue]) => {
+      if (key !== discriminator) {
+        acc[key] = innerValue as z.ZodTypeAny;
+      }
+      return acc;
+    }, {} as Record<string, z.ZodTypeAny>)
+  );
+
+  return (
+    <FormControl fullWidth margin="dense">
+      <InputLabel>{keyName}</InputLabel>
+      <Select
+        value={currentType}
+        onChange={e => handleTypeChange(e.target.value as string)}
+        fullWidth>
+        {options.map(option => (
+          <MenuItem
+            key={option._def.shape()[discriminator]._def.value}
+            value={option._def.shape()[discriminator]._def.value}>
+            {option._def.shape()[discriminator]._def.value}
+          </MenuItem>
+        ))}
+      </Select>
+      <Box mt={2}>
+        <DynamicConfigForm
+          configSchema={filteredSchema}
+          config={value || {}}
+          setConfig={newConfig => {
+            const updatedConfig = {...newConfig, [discriminator]: currentType};
+            updateConfig(targetPath, updatedConfig, config, setConfig);
+          }}
+          path={[]}
+        />
+      </Box>
+    </FormControl>
+  );
 };
 
 const NestedForm: React.FC<{
@@ -61,9 +142,22 @@ const NestedForm: React.FC<{
 
   const unwrappedSchema = unwrapSchema(fieldSchema);
 
+  if (unwrappedSchema instanceof z.ZodDiscriminatedUnion) {
+    return (
+      <DiscriminatedUnionField
+        keyName={keyName}
+        fieldSchema={unwrappedSchema}
+        targetPath={currentPath}
+        value={currentValue}
+        config={config}
+        setConfig={setConfig}
+      />
+    );
+  }
+
   if (isZodType(fieldSchema, s => s instanceof z.ZodObject)) {
     return (
-      <FormControl fullWidth margin="normal">
+      <FormControl fullWidth margin="dense">
         <InputLabel>{keyName}</InputLabel>
         <Box ml={2}>
           <DynamicConfigForm
@@ -177,7 +271,7 @@ const NestedForm: React.FC<{
       onChange={e =>
         updateConfig(currentPath, e.target.value, config, setConfig)
       }
-      margin="normal"
+      margin="dense"
     />
   );
 };
@@ -218,7 +312,7 @@ const ArrayField: React.FC<{
   }, [arrayValue, minItems, elementSchema, targetPath, config, setConfig]);
 
   return (
-    <FormControl fullWidth margin="normal">
+    <FormControl fullWidth margin="dense">
       <InputLabel>{keyName}</InputLabel>
       {arrayValue.map((item, index) => (
         <Box
@@ -284,7 +378,19 @@ const EnumField: React.FC<{
 }) => {
   const options = unwrappedSchema.options;
 
-  const selectedValue = value ?? options[0];
+  // Determine the default value
+  const defaultValue = React.useMemo(() => {
+    if (fieldSchema instanceof z.ZodDefault) {
+      return fieldSchema._def.defaultValue();
+    }
+    if (options.length > 0) {
+      return options[0];
+    }
+    return undefined;
+  }, [fieldSchema, options]);
+  // Use the default value if the current value is null or undefined
+  const selectedValue = value ?? defaultValue;
+
   useEffect(() => {
     if (value === null || value === undefined) {
       updateConfig(targetPath, selectedValue, config, setConfig);
@@ -292,11 +398,15 @@ const EnumField: React.FC<{
   }, [value, selectedValue, targetPath, config, setConfig]);
 
   return (
-    <FormControl fullWidth margin="normal">
-      <InputLabel>{keyName}</InputLabel>
+    <FormControl fullWidth margin="dense">
+      {keyName !== '' ? (
+        <InputLabel>{keyName}</InputLabel>
+      ) : (
+        <div style={{height: '1px'}} />
+      )}
       <Select
         fullWidth
-        value={selectedValue ?? undefined}
+        value={selectedValue}
         onChange={e =>
           updateConfig(targetPath, e.target.value, config, setConfig)
         }>
@@ -337,16 +447,26 @@ const RecordField: React.FC<{
   config,
   setConfig,
 }) => {
-  const recordValue = value || {};
+  const recordValue = useMemo(() => {
+    if (value && typeof value === 'object') {
+      return {
+        keys: Object.keys(value),
+        values: value,
+      };
+    }
+    return {keys: [], values: {}};
+  }, [value]);
+
+  const valueSchema = unwrappedSchema._def.valueType;
+  const unwrappedValueSchema = unwrapSchema(valueSchema);
 
   return (
-    <FormControl fullWidth margin="normal">
+    <FormControl fullWidth margin="dense">
       <InputLabel>{keyName}</InputLabel>
-      {Object.entries(recordValue).map(([recordValueKey, recordValueValue]) => (
-        <Box key={recordValueKey} display="flex" alignItems="center">
+      {recordValue.keys.map((recordValueKey, ndx) => (
+        <Box key={ndx} display="flex" alignItems="center">
           <TextField
             fullWidth
-            label={`Key: ${recordValueKey}`}
             value={recordValueKey}
             onChange={e =>
               updateRecordKey(
@@ -357,23 +477,34 @@ const RecordField: React.FC<{
                 setConfig
               )
             }
-            margin="normal"
+            margin="dense"
           />
-          <TextField
-            fullWidth
-            label={`Value: ${recordValueKey}`}
-            value={recordValueValue}
-            onChange={e =>
-              updateRecordValue(
-                targetPath,
-                recordValueKey,
-                e.target.value,
-                config,
-                setConfig
-              )
-            }
-            margin="normal"
-          />
+          {isZodType(valueSchema, s => s instanceof z.ZodEnum) ? (
+            <EnumField
+              keyName={``}
+              fieldSchema={valueSchema}
+              unwrappedSchema={unwrappedValueSchema as z.ZodEnum<any>}
+              targetPath={[...targetPath, recordValueKey]}
+              value={recordValue.values[recordValueKey]}
+              config={config}
+              setConfig={setConfig}
+            />
+          ) : (
+            <TextField
+              fullWidth
+              value={recordValue.values[recordValueKey]}
+              onChange={e =>
+                updateRecordValue(
+                  targetPath,
+                  recordValueKey,
+                  e.target.value,
+                  config,
+                  setConfig
+                )
+              }
+              margin="dense"
+            />
+          )}
           <IconButton
             onClick={() =>
               removeRecordItem(targetPath, recordValueKey, config, setConfig)
@@ -382,7 +513,10 @@ const RecordField: React.FC<{
           </IconButton>
         </Box>
       ))}
-      <Button onClick={() => addRecordItem(targetPath, config, setConfig)}>
+      <Button
+        onClick={() =>
+          addRecordItem(targetPath, config, setConfig, valueSchema)
+        }>
         Add Item
       </Button>
     </FormControl>
@@ -410,7 +544,23 @@ const updateConfig = (
     }
     current = current[targetPath[i]];
   }
-  current[targetPath[targetPath.length - 1]] = value;
+
+  // Convert OrderedRecord to plain object if necessary
+  if (
+    value &&
+    typeof value === 'object' &&
+    'keys' in value &&
+    'values' in value
+  ) {
+    const plainObject: Record<string, any> = {};
+    value.keys.forEach((key: string) => {
+      plainObject[key] = value.values[key];
+    });
+    current[targetPath[targetPath.length - 1]] = plainObject;
+  } else {
+    current[targetPath[targetPath.length - 1]] = value;
+  }
+
   setConfig(newConfig);
 };
 
@@ -453,11 +603,29 @@ const removeArrayItem = (
 const addRecordItem = (
   targetPath: string[],
   config: Record<string, any>,
-  setConfig: (config: Record<string, any>) => void
+  setConfig: (config: Record<string, any>) => void,
+  valueSchema: z.ZodTypeAny
 ) => {
   const currentRecord = getNestedValue(config, targetPath) || {};
   const newKey = `key${Object.keys(currentRecord).length + 1}`;
-  updateConfig(targetPath, {...currentRecord, [newKey]: ''}, config, setConfig);
+
+  let defaultValue: any = '';
+  if (valueSchema instanceof z.ZodDefault) {
+    defaultValue = valueSchema._def.defaultValue();
+  } else if (valueSchema instanceof z.ZodEnum) {
+    defaultValue = valueSchema.options[0];
+  } else if (valueSchema instanceof z.ZodBoolean) {
+    defaultValue = false;
+  } else if (valueSchema instanceof z.ZodNumber) {
+    defaultValue = 0;
+  }
+
+  updateConfig(
+    targetPath,
+    {...currentRecord, [newKey]: defaultValue},
+    config,
+    setConfig
+  );
 };
 
 const removeRecordItem = (
@@ -479,6 +647,10 @@ const updateRecordKey = (
   setConfig: (config: Record<string, any>) => void
 ) => {
   const currentRecord = getNestedValue(config, targetPath) || {};
+  if (newKey in currentRecord) {
+    // disallow duplicate keys
+    return;
+  }
   const {[oldKey]: value, ...rest} = currentRecord;
   updateConfig(targetPath, {...rest, [newKey]: value}, config, setConfig);
 };
@@ -543,7 +715,7 @@ const NumberField: React.FC<{
         updateConfig(targetPath, newValue, config, setConfig);
       }}
       inputProps={{min, max}}
-      margin="normal"
+      margin="dense"
     />
   );
 };
@@ -581,7 +753,7 @@ const LiteralField: React.FC<{
       InputProps={{
         readOnly: true,
       }}
-      margin="normal"
+      margin="dense"
       variant="filled"
     />
   );

@@ -274,7 +274,7 @@ export const NewOnlineOpScorerModal: FC<NewOnlineOpScorerModalProps> = ({
   return (
     <ReusableDrawer
       open={isOpen}
-      title="Configure new built-in action scorer"
+      title="Configure online scorer"
       onClose={() => onClose(false)}
       onSave={() => handleSaveModal(config)}
       saveDisabled={!isValid}>
