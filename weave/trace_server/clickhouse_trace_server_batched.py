@@ -276,6 +276,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         stream = self.calls_query_stream(req)
         return tsi.CallsQueryRes(calls=list(stream))
 
+    def _construct_query_str_maybe_do_pre_query(
+        self, calls_query: CallsQuery, pb: ParamBuilder
+    ) -> str:
+        """Helper to query the calls table if heavy. Immediately returns a formatted sql string
+        if not heavy, otherwise does a pre-query to get the filtered call ids, injects them
+        into the main query, and returns the main query str.
+        """
+        if not calls_query.should_do_two_step_query():
+            query = calls_query.as_sql(pb)[0]
+            return query
+
+        # We have to do a two-step query. Set the param for the output
+        # of the first query
+        output_param_name = "call_ids"
+        calls_query.set_filtered_output_param(output_param_name)
+        ids_query, filtered_query = calls_query.as_sql(pb)
+
+        # actually make the ids query
+        ids_res = self._query(ids_query, pb.get_params())
+
+        ids = [x[0] for x in ids_res.result_rows]
+        # add the ids param to the param builder
+        pb.add(ids, param_name=output_param_name, param_type="Array(String)")
+
+        return filtered_query
+
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
@@ -289,25 +315,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.add_condition(req.query.expr_)
 
         pb = ParamBuilder()
-        queries = cq.as_sql(pb)
-        if len(queries) == 1:
-            raw_res = self._query(
-                f"SELECT count() FROM ({queries[0]})",
-                pb.get_params(),
-            )
-        else:
-            filtered_calls_res = self._query(
-                queries[0],
-                pb.get_params(),
-            )
-            filtered_calls = [x[0] for x in filtered_calls_res.result_rows]
-            pb.add(
-                filtered_calls, param_name="filtered_calls", param_type="Array(String)"
-            )
-            raw_res = self._query(
-                f"SELECT count() FROM ({queries[1]})",
-                pb.get_params(),
-            )
+        query = self._construct_query_str_maybe_do_pre_query(cq, pb)
+        count_query_str = f"SELECT count() FROM ({query})"
+        raw_res = self._query(count_query_str, pb.get_params())
 
         rows = raw_res.result_rows
         count = 0
@@ -356,25 +366,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        queries = cq.as_sql(pb)
-        if len(queries) == 1:
-            raw_res = self._query_stream(
-                queries[0],
-                pb.get_params(),
-            )
-        else:
-            filtered_calls_res = self._query(
-                queries[0],
-                pb.get_params(),
-            )
-            filtered_calls = [x[0] for x in filtered_calls_res.result_rows]
-            pb.add(
-                filtered_calls, param_name="filtered_calls", param_type="Array(String)"
-            )
-            raw_res = self._query_stream(
-                queries[1],
-                pb.get_params(),
-            )
+        query = self._construct_query_str_maybe_do_pre_query(cq, pb)
+        raw_res = self._query_stream(query, pb.get_params())
 
         select_columns = [c.field for c in cq.select_fields]
 
