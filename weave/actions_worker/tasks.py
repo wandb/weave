@@ -1,6 +1,6 @@
 import json
 import logging
-from functools import wraps
+from functools import partial, wraps
 from typing import Any, Callable, TypeVar
 
 from weave.actions_worker.celery_app import app
@@ -149,7 +149,33 @@ def wordcount(
 def llm_judge(
     call_input: str, call_output: str, config: ConfiguredLlmJudgeAction
 ) -> str:
-    return "I'm sorry Hal, I'm afraid I can't do that."
+    model = config.model
+    system_prompt = config.prompt
+    response_format = {
+        "type": "json_schema",
+        "json_schema": {"name": "response_format", "schema": config.response_format},
+    }
+
+    args = {
+        "inputs": call_input,
+        "output": call_output,
+    }
+    from openai import OpenAI
+
+    client = OpenAI()
+    # Silly hack to get around issue in tests:
+    create = client.chat.completions.create
+    if hasattr(create, "resolve_fn"):
+        create = partial(create.resolve_fn, self=client.chat.completions)
+    completion = create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": json.dumps(args)},
+        ],
+        response_format=response_format,
+    )
+    return json.loads(completion.choices[0].message.content)
 
 
 @action_task
