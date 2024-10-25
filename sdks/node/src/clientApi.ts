@@ -31,10 +31,6 @@ export async function login(options?: LoginOptions) {
   }
   const { traceBaseUrl, domain } = getUrls(options?.host);
 
-  const netrc = new Netrc();
-  netrc.setEntry(domain, { login: 'user', password: options.apiKey });
-  netrc.save();
-
   // Test the connection to the traceServerApi
   const testTraceServerApi = new TraceServerApi({
     baseUrl: traceBaseUrl,
@@ -51,6 +47,9 @@ export async function login(options?: LoginOptions) {
     throw new Error('Unable to verify connection to the weave trace server with given API Key');
   }
 
+  const netrc = new Netrc();
+  netrc.setEntry(domain, { login: 'user', password: options.apiKey });
+  netrc.save();
   console.log(`Successfully logged in.  Credentials saved for ${domain}`);
 }
 

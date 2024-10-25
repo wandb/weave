@@ -17,7 +17,13 @@ let globalDomain: string | undefined = undefined;
 
 export function getGlobalDomain() {
   const client = requireGlobalClient();
-  return client.urls.domain;
+  const domain = client.urls.domain;
+
+  // wandb login saves the .netrc as api.wandb.ai
+  if (domain === 'api.wandb.ai') {
+    return 'wandb.ai';
+  }
+  return domain;
 }
 
 export function setGlobalDomain(domain: string) {
