@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'async_hooks';
 import { uuidv7 } from 'uuidv7';
 
+import { Dataset } from './dataset';
 import { computeDigest } from './digest';
 import {
   EndedCallSchemaForInsert,
@@ -158,19 +159,44 @@ export class WeaveClient {
   }
 
   public async get(ref: ObjectRef): Promise<any> {
+    let val: any;
     try {
       const res = await this.traceServerApi.obj.objReadObjReadPost({
         project_id: ref.projectId,
         object_id: ref.objectId,
         digest: ref.digest,
       });
-      return res.data.obj.val;
+      val = res.data.obj.val;
     } catch (error) {
       if (error instanceof Error && error.message.includes('404')) {
         throw new Error(`Unable to find object for ref uri: ${ref.uri()}`);
       }
       throw error;
     }
+
+    const t = val?._type;
+    if (t == 'Dataset') {
+      const { _baseParameters, rows } = val;
+      let obj = new Dataset({ id: _baseParameters.id, description: _baseParameters.description, rows });
+      obj.__savedRef = ref;
+      // TODO: The table row refs are not correct
+      return obj;
+    } else if (t == 'Table') {
+      const { rows } = val;
+      let obj = new Table(rows);
+      obj.__savedRef = ref;
+      return obj;
+    } else if (t == 'CustomWeaveType') {
+      const typeName = val.weave_type.type;
+      if (typeName == 'PIL.Image.Image') {
+        // TODO: Implement getting img back as buffer
+        return 'Coming soon!';
+      } else if (typeName == 'wave.Wave_read') {
+        // TODO: Implement getting audio back as buffer
+        return 'Coming soon!';
+      }
+    }
+    return val;
   }
 
   // save* methods attached __savedRef promises to their values. These must
