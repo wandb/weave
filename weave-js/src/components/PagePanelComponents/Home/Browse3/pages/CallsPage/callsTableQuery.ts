@@ -12,7 +12,6 @@ import {operationConverter} from '../common/tabularListViews/operators';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {
-  CallChartsSchema,
   CallFilter,
   CallSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
@@ -177,7 +176,6 @@ export const useCallsForQueryCharts = (
   return useMemo(() => {
     return {
       loading: calls.loading,
-      // Return faster calls query results until cost query finishes
       result: calls.loading ? [] : callResults,
       refetch,
     };

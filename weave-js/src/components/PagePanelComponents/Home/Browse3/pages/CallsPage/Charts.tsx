@@ -1,7 +1,9 @@
-import React, {useEffect, useMemo, useRef} from 'react';
-import * as Plotly from 'plotly.js';
-import moment from 'moment';
+import {quantile} from 'd3-array';
 import _ from 'lodash';
+import moment from 'moment';
+import * as Plotly from 'plotly.js';
+import React, {useEffect, useMemo, useRef} from 'react';
+
 import {
   BLUE_500,
   GREEN_500,
@@ -9,8 +11,6 @@ import {
   MOON_500,
   TEAL_400,
 } from '../../../../../../common/css/color.styles';
-
-import {quantile} from 'd3-array';
 
 type ChartDataRequests = {
   started_at: string;
@@ -160,20 +160,7 @@ export const ErrorPlotlyChart: React.FC<{
         hovertemplate: '%{y} errors<extra></extra>',
       },
     ];
-  }, [chartData, binSizeMinutes]);
-
-  // Find the first non-zero bin
-  // const firstNonZeroBin = useMemo(() => {
-  //   const errorData = chartData.filter(d => d.isError);
-  //   if (errorData.length === 0) {
-  //     return null;
-  //   }
-  //   // Sort the error data by timestamp
-  //   const sortedErrorData = _.sortBy(errorData, d =>
-  //     moment(d.started_at).valueOf()
-  //   );
-  //   return moment(sortedErrorData[0].started_at).valueOf(); // First non-zero timestamp
-  // }, [chartData]);
+  }, [chartData]);
 
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
@@ -186,6 +173,7 @@ export const ErrorPlotlyChart: React.FC<{
         t: 50,
         pad: 0,
       },
+      bargroupgap: 0.1, // Add this line
       xaxis: {
         title: 'Time',
         type: 'date',
@@ -270,7 +258,7 @@ export const RequestsPlotlyChart: React.FC<{
         griddash: 'dot',
         showspikes: false,
       },
-      bargap: 0,
+      bargap: 0.2,
       hovermode: 'x unified',
       hoverlabel: {
         bgcolor: 'white',

@@ -370,7 +370,8 @@ const useCallsNoExpansion = (
   }, [opts?.skip, callRes, columns, refetch, entity, project]);
 };
 
-const useCalls = ( // useCalls here!
+const useCalls = (
+  // useCalls here!
   entity: string,
   project: string,
   filter: CallFilter,

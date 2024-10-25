@@ -1,20 +1,19 @@
-import React, {useMemo, useState} from 'react';
-import {useCallsForQueryCharts} from './callsTableQuery';
-
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
+import React, {useMemo, useState} from 'react';
 
-import {WFHighLevelCallFilter} from './callsTableFilter';
-import {
-  ErrorPlotlyChart,
-  LatencyPlotlyChart,
-  RequestsPlotlyChart,
-} from './Charts';
-import {Tailwind} from '../../../../../Tailwind';
 import {
   IconChevronDown,
   IconChevronNext,
   IconLightbulbInfo,
 } from '../../../../../Icon';
+import {Tailwind} from '../../../../../Tailwind';
+import {WFHighLevelCallFilter} from './callsTableFilter';
+import {useCallsForQueryCharts} from './callsTableQuery';
+import {
+  ErrorPlotlyChart,
+  LatencyPlotlyChart,
+  RequestsPlotlyChart,
+} from './Charts';
 
 type CallsChartsProps = {
   entity: string;
@@ -96,7 +95,7 @@ export const CallsCharts = ({
       }
     });
     return data;
-  }, [calls.result, calls.loading]);
+  }, [calls.result]);
 
   const charts = useMemo(() => {
     return (
