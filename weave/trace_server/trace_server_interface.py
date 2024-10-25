@@ -692,26 +692,6 @@ class FeedbackPurgeRes(BaseModel):
     pass
 
 
-class ActionsReadStaleReq(BaseModel):
-    pass
-
-
-# TODO: Merge this with schema in ActionsExecuteBatchReq
-class ActionSchema(BaseModel):
-    project_id: str
-    call_id: str
-    id: str
-    rule_matched: Optional[str] = None
-    configured_action: Optional[str] = None  # Updated column name
-    created_at: datetime.datetime
-    finished_at: Optional[datetime.datetime] = None
-    failed_at: Optional[datetime.datetime] = None
-
-
-class ActionsReadStaleRes(BaseModel):
-    actions: list[ActionSchema]
-
-
 class FileCreateReq(BaseModel):
     project_id: str
     name: str
@@ -820,14 +800,14 @@ class CostPurgeRes(BaseModel):
 class ActionsExecuteBatchReq(BaseModel):
     project_id: str
     call_ids: list[str]
-    id: Optional[str] = None
-    rule_matched: Optional[str] = None
+    id: Optional[str] = (
+        None  # This is here so that clients can potentially guarantee idempotence.
+        # Repeated calls with the same id will not result in duplicate actions.
+    )
     configured_action_ref: str
 
 
 class ActionsExecuteBatchRes(BaseModel):
-    project_id: str
-    call_ids: list[str]
     id: str
 
 
@@ -900,9 +880,3 @@ class TraceServerInterface(Protocol):
     def actions_execute_batch(
         self, req: ActionsExecuteBatchReq
     ) -> ActionsExecuteBatchRes: ...
-    def actions_ack_batch(self, req: ActionsAckBatchReq) -> ActionsAckBatchRes: ...
-
-    # Tim's version
-    def execute_batch_action(
-        self, req: ExecuteBatchActionReq
-    ) -> ExecuteBatchActionRes: ...

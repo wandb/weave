@@ -30,7 +30,6 @@ import logging
 import threading
 from collections import defaultdict
 from contextlib import contextmanager
-from functools import partial
 from typing import (
     Any,
     Dict,
@@ -87,7 +86,6 @@ from weave.trace_server.feedback import (
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.base_models.action_base_models import (
     ActionDispatchFilter,
-    ConfiguredAction,
 )
 from weave.trace_server.interface.base_models.base_model_registry import (
     base_model_dump,
@@ -95,7 +93,6 @@ from weave.trace_server.interface.base_models.base_model_registry import (
     base_models,
 )
 from weave.trace_server.interface.base_models.feedback_base_model_registry import (
-    ActionScore,
     feedback_base_models,
 )
 from weave.trace_server.orm import ParamBuilder, Row
@@ -1469,97 +1466,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
 
-    def execute_batch_action(
-        self, req: tsi.ExecuteBatchActionReq
-    ) -> tsi.ExecuteBatchActionRes:
-        return tsi.ExecuteBatchActionRes()
-        # WARNING: THIS IS NOT GOING TO WORK IN PRODUCTION
-        # UNTIL WE HAVE THE API KEY PIECE IN PLACE
-        configured_action_ref = req.configured_action_ref
-
-        action_dict_res = self.refs_read_batch(
-            tsi.RefsReadBatchReq(refs=[configured_action_ref])
-        )
-
-        action_dict = action_dict_res.vals[0]
-        action = ConfiguredAction.model_validate(action_dict)
-
-        # if action.action.action_type != "builtin":
-        #     raise InvalidRequest(
-        #         "Only builtin actions are supported for batch execution"
-        #     )
-
-        # if action.action.name != "llm_judge":
-        #     raise InvalidRequest("Only llm_judge is supported for batch execution")
-
-        # Step 1: Get all the calls in the batch
-        calls = self.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=req.project_id,
-                filter=tsi.CallsFilter(
-                    call_ids=req.call_ids,
-                ),
-            )
-        )
-
-        # Normally we would dispatch here, but just hard coding for now
-        # We should do some validation here
-        config = action.config
-        model = config.model
-
-        if model not in ["gpt-4o-mini", "gpt-4o"]:
-            raise InvalidRequest("Only gpt-4o-mini and gpt-4o are supported")
-
-        system_prompt = config.prompt
-        response_format_schema = config.response_format
-        response_format = {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "response_format",
-                "schema": response_format_schema,
-            },
-        }
-
-        # mapping = mapping.input_mapping
-
-        # Step 2: For Each call, execute the action: (this needs a lot of safety checks)
-        for call in calls:
-            args = {
-                "inputs": call.inputs,
-                "output": call.output,
-            }
-            from openai import OpenAI
-
-            client = OpenAI()
-            # Silly hack to get around issue in tests:
-            create = client.chat.completions.create
-            if hasattr(create, "resolve_fn"):
-                create = partial(create.resolve_fn, self=client.chat.completions)
-            completion = create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": json.dumps(args)},
-                ],
-                response_format=response_format,
-            )
-            self.feedback_create(
-                tsi.FeedbackCreateReq(
-                    project_id=req.project_id,
-                    weave_ref=ri.InternalCallRef(
-                        project_id=req.project_id,
-                        id=call.id,
-                    ).uri(),
-                    feedback_type=base_model_name(ActionScore),
-                    wb_user_id=WEAVE_ACTION_EXECUTOR_PACEHOLDER_ID,  # - THIS IS NOT GOOD!
-                    payload=ActionScore(
-                        configured_action_ref=configured_action_ref,
-                        output=json.loads(completion.choices[0].message.content),
-                    ).model_dump(),
-                )
-            )
-
-        return tsi.ExecuteBatchActionRes()
 
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
@@ -1587,7 +1493,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "project_id": req.project_id,
                 "call_id": call_id,
                 "id": id,
-                "rule_matched": req.rule_matched,
                 "configured_action": req.configured_action_ref,
                 "created_at": created_at,
             }
@@ -1600,9 +1505,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Step 2: Potential shortcut: if there is only one call, we can do the action right away.
         if len(req.call_ids) == 1:
             self.action_executor.do_now(task_ctxs[0], req.configured_action_ref)
-            return tsi.ActionsExecuteBatchRes(
-                project_id=req.project_id, call_ids=[req.call_ids[0]], id=id
-            )
+            return tsi.ActionsExecuteBatchRes(id=id)
 
         # Step 3: Normal case: enqueue the actions in CH and the worker queue.
         prepared = TABLE_ACTIONS.insert_many(rows).prepare(database_type="clickhouse")
@@ -1610,9 +1513,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         for task_ctx in task_ctxs:
             self.action_executor.enqueue(task_ctx, req.configured_action_ref)
-        return tsi.ActionsExecuteBatchRes(
-            project_id=req.project_id, call_ids=req.call_ids, id=id
-        )
+        return tsi.ActionsExecuteBatchRes(id=id)
 
     def actions_ack_batch(self, req: tsi.ActionsAckBatchReq) -> tsi.ActionsAckBatchRes:
         received_at = datetime.datetime.now(ZoneInfo("UTC"))
@@ -2039,7 +1940,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 tsi.ActionsExecuteBatchReq(
                     project_id=self._call_batch.project_id,
                     call_ids=[call.id for call in matched_calls],
-                    rule_matched=json.dumps(filter),
                     configured_action_ref=filter.configured_action_ref,
                 )
             )

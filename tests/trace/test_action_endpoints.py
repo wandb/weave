@@ -1,3 +1,5 @@
+from typing import Optional
+
 from redis import Redis
 
 import weave
@@ -80,7 +82,6 @@ def test_actions_execute_batch(client: WeaveClient):
     SELECT project_id,
            call_id,
            id,
-           any(rule_matched),
            any(configured_action),  # Updated column name
            max(created_at),
            max(finished_at),
@@ -124,22 +125,30 @@ def test_actions_ack_batch(client: WeaveClient):
     )
     assert exec_res.id == "1"
 
+    # Another unfortunate hack...actions_ack_batch is private and not part of the public server interface.
+    ch_server: Optional[ClickHouseTraceServer] = None
+    if isinstance(server._internal_trace_server, ClickHouseTraceServer):  # type: ignore
+        ch_server = server._internal_trace_server  # type: ignore
+    else:
+        raise ValueError("Test only works with ClickHouseTraceServer")
+
+    db_project_id = client.server.server._idc.ext_to_int_project_id(  # type: ignore
+        client._project_id()
+    )
+
     # Ack call_id 3.
-    ack_res = server.actions_ack_batch(
+    ack_res = ch_server.actions_ack_batch(
         tsi.ActionsAckBatchReq(
-            project_id=client._project_id(), call_ids=["3"], id="1", succeeded=True
+            project_id=db_project_id, call_ids=["3"], id="1", succeeded=True
         )
     )
     assert ack_res.id == "1"
     ch_client = ClickHouseTraceServer.from_env().ch_client
-    db_project_id = client.server.server._idc.ext_to_int_project_id(
-        client._project_id()
-    )  # type: ignore
+
     query_res = ch_client.query(f"""
     SELECT project_id,
            call_id,
            id,
-           any(rule_matched) as rule_matched,
            any(configured_action) as configured_action,
            max(created_at) as created_at,
            max(finished_at) as finished_at,
@@ -156,9 +165,9 @@ def test_actions_ack_batch(client: WeaveClient):
     # call_id 1 should now be finished, but call_id 2 should not.
 
     # Now let's ack call_id 4.
-    ack_res = server.actions_ack_batch(
+    ack_res = ch_server.actions_ack_batch(
         tsi.ActionsAckBatchReq(
-            project_id=client._project_id(), call_ids=["4"], id="1", succeeded=False
+            project_id=db_project_id, call_ids=["4"], id="1", succeeded=False
         )
     )
     assert ack_res.id == "1"
@@ -166,7 +175,6 @@ def test_actions_ack_batch(client: WeaveClient):
     SELECT project_id,
            call_id,
            id,
-           any(rule_matched) as rule_matched,
            any(configured_action) as configured_action,
            max(created_at) as created_at,
            max(finished_at) as finished_at,

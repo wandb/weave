@@ -1,4 +1,5 @@
 import json
+import logging
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
@@ -102,8 +103,8 @@ def action_task(
             scorer_name = func.__name__
             result = func(call_input, call_output, configured_action)
             publish_results_as_feedback(ctx, result, configured_action_ref)
-            print(f"Successfully ran {func.__name__}")
-            print(f"Result: {result}")
+            logging.info(f"Successfully ran {func.__name__}")
+            logging.info(f"Result: {result}")
         except Exception as e:
             success = False
             raise e

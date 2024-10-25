@@ -41,4 +41,4 @@ class ActionDispatchFilter(BaseModel):
     op_name: str
     sample_rate: float
     configured_action_ref: str
-    disabled: Optional[bool] = None
+    disabled: Optional[bool] = False
