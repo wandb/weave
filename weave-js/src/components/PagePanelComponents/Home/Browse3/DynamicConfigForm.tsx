@@ -12,7 +12,7 @@ import {
   Typography,
 } from '@material-ui/core';
 import {Delete} from '@mui/icons-material';
-import React, {useEffect, useMemo} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {z} from 'zod';
 
 import {parseRefMaybe} from '../Browse2/SmallRef';
@@ -447,36 +447,88 @@ const RecordField: React.FC<{
   config,
   setConfig,
 }) => {
-  const recordValue = useMemo(() => {
-    if (value && typeof value === 'object') {
-      return {
-        keys: Object.keys(value),
-        values: value,
-      };
-    }
-    return {keys: [], values: {}};
-  }, [value]);
+  const [internalPairs, setInternalPairs] = useState<
+    Array<{key: string; value: any}>
+  >([]);
 
   const valueSchema = unwrappedSchema._def.valueType;
   const unwrappedValueSchema = unwrapSchema(valueSchema);
 
+  // Initialize or update internalPairs when value changes
+  useEffect(() => {
+    if (value && typeof value === 'object') {
+      setInternalPairs(
+        Object.entries(value).map(([key, val]) => ({key, value: val}))
+      );
+    } else {
+      setInternalPairs([]);
+    }
+  }, [value]);
+
+  const updateInternalPair = (index: number, newKey: string, newValue: any) => {
+    const newPairs = [...internalPairs];
+    newPairs[index] = {key: newKey, value: newValue};
+    setInternalPairs(newPairs);
+
+    // Update the actual config
+    const newRecord = newPairs.reduce((acc, {key, value: innerValue}) => {
+      acc[key] = innerValue;
+      return acc;
+    }, {} as Record<string, any>);
+    updateConfig(targetPath, newRecord, config, setConfig);
+  };
+
+  const addNewPair = () => {
+    const newKey = `key${internalPairs.length + 1}`;
+    let defaultValue: any = '';
+    if (valueSchema instanceof z.ZodDefault) {
+      defaultValue = valueSchema._def.defaultValue();
+    } else if (valueSchema instanceof z.ZodEnum) {
+      defaultValue = valueSchema.options[0];
+    } else if (valueSchema instanceof z.ZodBoolean) {
+      defaultValue = false;
+    } else if (valueSchema instanceof z.ZodNumber) {
+      defaultValue = 0;
+    }
+    setInternalPairs([...internalPairs, {key: newKey, value: defaultValue}]);
+    updateConfig(
+      targetPath,
+      {...value, [newKey]: defaultValue},
+      config,
+      setConfig
+    );
+  };
+
+  const removePair = (index: number) => {
+    const newPairs = internalPairs.filter((_, i) => i !== index);
+    setInternalPairs(newPairs);
+
+    const newRecord = newPairs.reduce((acc, {key, value: innerValue}) => {
+      acc[key] = innerValue;
+      return acc;
+    }, {} as Record<string, any>);
+    updateConfig(targetPath, newRecord, config, setConfig);
+  };
+
   return (
     <FormControl fullWidth margin="dense">
       <InputLabel>{keyName}</InputLabel>
-      {recordValue.keys.map((recordValueKey, ndx) => (
-        <Box key={ndx} display="flex" alignItems="center">
+      {internalPairs.map(({key, value: innerValue}, index) => (
+        <Box key={index} display="flex" alignItems="center">
           <TextField
             fullWidth
-            value={recordValueKey}
-            onChange={e =>
-              updateRecordKey(
-                targetPath,
-                recordValueKey,
-                e.target.value,
-                config,
-                setConfig
-              )
-            }
+            value={key}
+            onChange={e => {
+              if (
+                internalPairs.some(
+                  (pair, i) => i !== index && pair.key === e.target.value
+                )
+              ) {
+                // Prevent duplicate keys
+                return;
+              }
+              updateInternalPair(index, e.target.value, innerValue);
+            }}
             margin="dense"
           />
           {isZodType(valueSchema, s => s instanceof z.ZodEnum) ? (
@@ -484,41 +536,31 @@ const RecordField: React.FC<{
               keyName={``}
               fieldSchema={valueSchema}
               unwrappedSchema={unwrappedValueSchema as z.ZodEnum<any>}
-              targetPath={[...targetPath, recordValueKey]}
-              value={recordValue.values[recordValueKey]}
+              targetPath={[...targetPath, key]}
+              value={innerValue}
               config={config}
-              setConfig={setConfig}
+              setConfig={newConfig => {
+                const newValue = getNestedValue(newConfig, [
+                  ...targetPath,
+                  key,
+                ]);
+                updateInternalPair(index, key, newValue);
+              }}
             />
           ) : (
             <TextField
               fullWidth
-              value={recordValue.values[recordValueKey]}
-              onChange={e =>
-                updateRecordValue(
-                  targetPath,
-                  recordValueKey,
-                  e.target.value,
-                  config,
-                  setConfig
-                )
-              }
+              value={innerValue}
+              onChange={e => updateInternalPair(index, key, e.target.value)}
               margin="dense"
             />
           )}
-          <IconButton
-            onClick={() =>
-              removeRecordItem(targetPath, recordValueKey, config, setConfig)
-            }>
+          <IconButton onClick={() => removePair(index)}>
             <Delete />
           </IconButton>
         </Box>
       ))}
-      <Button
-        onClick={() =>
-          addRecordItem(targetPath, config, setConfig, valueSchema)
-        }>
-        Add Item
-      </Button>
+      <Button onClick={addNewPair}>Add Item</Button>
     </FormControl>
   );
 };
@@ -598,72 +640,6 @@ const removeArrayItem = (
       setConfig
     );
   }
-};
-
-const addRecordItem = (
-  targetPath: string[],
-  config: Record<string, any>,
-  setConfig: (config: Record<string, any>) => void,
-  valueSchema: z.ZodTypeAny
-) => {
-  const currentRecord = getNestedValue(config, targetPath) || {};
-  const newKey = `key${Object.keys(currentRecord).length + 1}`;
-
-  let defaultValue: any = '';
-  if (valueSchema instanceof z.ZodDefault) {
-    defaultValue = valueSchema._def.defaultValue();
-  } else if (valueSchema instanceof z.ZodEnum) {
-    defaultValue = valueSchema.options[0];
-  } else if (valueSchema instanceof z.ZodBoolean) {
-    defaultValue = false;
-  } else if (valueSchema instanceof z.ZodNumber) {
-    defaultValue = 0;
-  }
-
-  updateConfig(
-    targetPath,
-    {...currentRecord, [newKey]: defaultValue},
-    config,
-    setConfig
-  );
-};
-
-const removeRecordItem = (
-  targetPath: string[],
-  key: string,
-  config: Record<string, any>,
-  setConfig: (config: Record<string, any>) => void
-) => {
-  const currentRecord = getNestedValue(config, targetPath) || {};
-  const {[key]: _, ...newRecord} = currentRecord;
-  updateConfig(targetPath, newRecord, config, setConfig);
-};
-
-const updateRecordKey = (
-  targetPath: string[],
-  oldKey: string,
-  newKey: string,
-  config: Record<string, any>,
-  setConfig: (config: Record<string, any>) => void
-) => {
-  const currentRecord = getNestedValue(config, targetPath) || {};
-  if (newKey in currentRecord) {
-    // disallow duplicate keys
-    return;
-  }
-  const {[oldKey]: value, ...rest} = currentRecord;
-  updateConfig(targetPath, {...rest, [newKey]: value}, config, setConfig);
-};
-
-const updateRecordValue = (
-  targetPath: string[],
-  key: string,
-  value: any,
-  config: Record<string, any>,
-  setConfig: (config: Record<string, any>) => void
-) => {
-  const currentRecord = getNestedValue(config, targetPath) || {};
-  updateConfig(targetPath, {...currentRecord, [key]: value}, config, setConfig);
 };
 
 const NumberField: React.FC<{
