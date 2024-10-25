@@ -45,6 +45,7 @@ from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import emoji
+import xxhash
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
@@ -1474,17 +1475,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # That way we can avoid unnecessary duplicates if the server fails after inserting the batch into CH
         # but before inserting into the action queue.
 
-        # # First look up the configured action.
-        # configured_action_ref = req.configured_action_ref
-        # action_dict_res = self.refs_read_batch(
-        #     tsi.RefsReadBatchReq(refs=[configured_action_ref])
-        # )
-
-        # # Validate (though we'll need to json dump it again. Still, good to have a validation check somewhere.)
-        # # TODO maybe remove.
-        # action_dict = action_dict_res.vals[0]
-        # action = ConfiguredAction.model_validate(action_dict)
-
         # Step 1: Prepare data to insert into CH actions table and queue.
         id = req.id or generate_id()
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
@@ -1942,6 +1932,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if isinstance(c[1], ri.InternalObjectRef)
                 and c[1].name == filter.op_name
             ]
+
+            if filter.sample_rate < 1.0:
+                matched_calls = [
+                    call
+                    for call in matched_calls
+                    if abs(xxhash.xxh32(call.id).intdigest()) % 10000
+                    < filter.sample_rate * 10000
+                ]
 
             if matched_calls:
                 matched_filters_and_calls.append((filter, matched_calls))
