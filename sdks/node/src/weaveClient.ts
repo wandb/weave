@@ -149,7 +149,17 @@ export class WeaveClient {
   // be synchronous, so we can guarantee that calling savedWeaveValues
   // immediately makes __savedRef promises available.
 
-  public saveArbitrary(obj: any, objId?: string): Promise<ObjectRef> {
+  public publish(obj: any, objId?: string): Promise<ObjectRef> {
+    if (obj.__savedRef) {
+      return obj.__savedRef;
+    } else if (obj instanceof WeaveObject) {
+      return this.saveObject(obj, objId);
+    } else {
+      return this.saveArbitrary(obj, objId);
+    }
+  }
+
+  private saveArbitrary(obj: any, objId?: string): Promise<ObjectRef> {
     if (obj.__savedRef) {
       return obj.__savedRef;
     }
@@ -174,7 +184,7 @@ export class WeaveClient {
     return ref;
   }
 
-  public saveObject(obj: WeaveObject, objId?: string): Promise<ObjectRef> {
+  private saveObject(obj: WeaveObject, objId?: string): Promise<ObjectRef> {
     if (obj.__savedRef) {
       return Promise.resolve(obj.__savedRef);
     }
