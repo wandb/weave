@@ -100,7 +100,6 @@ def action_task(
     ) -> ActionResultT:
         success = True
         try:
-            scorer_name = func.__name__
             result = func(call_input, call_output, configured_action)
             publish_results_as_feedback(ctx, result, configured_action_ref)
             logging.info(f"Successfully ran {func.__name__}")
