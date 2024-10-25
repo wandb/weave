@@ -1,8 +1,7 @@
-import json
 from abc import ABC, abstractmethod
-from typing import Any, Dict
 
 from redis import Redis
+from typing_extensions import TypedDict
 
 from weave.trace_server import environment as wf_env
 
@@ -16,9 +15,12 @@ def queue_from_addr(addr: str) -> "ActionQueue":
         raise ValueError(f"Invalid action queue address: {addr}")
 
 
+TaskCtx = TypedDict("TaskCtx", {"project_id": str, "call_id": str, "id": str})
+
+
 class ActionQueue(ABC):
     @abstractmethod
-    def push(self, ctx: Dict[str, Any], effect: str) -> None:
+    def push(self, ctx: TaskCtx, configured_action_ref: str) -> None:
         pass
 
     @abstractmethod
@@ -27,19 +29,20 @@ class ActionQueue(ABC):
 
 
 class CeleryActionQueue(ActionQueue):
-    def push(self, ctx: Dict[str, Any], effect: str) -> None:
+    def push(self, ctx: TaskCtx, configured_action_ref: str) -> None:
         # TODO We put this in here to break a circular import. Fix this later.
         import weave.actions_worker.tasks as tasks
 
-        effect_dict = json.loads(effect)
-        task_name = effect_dict["task"]
-        task_kwargs = effect_dict["kwargs"]  # This should be a dict
-        if task_name == "noop":
-            tasks.noop.delay(ctx, **task_kwargs)  # type: ignore
-        elif task_name == "wordcount":
-            tasks.wordcount.delay(ctx, **task_kwargs)  # type: ignore
-        else:
-            raise ValueError(f"Unknown task: {task_name}")
+        tasks.do_task.delay(ctx, configured_action_ref)
+        # effect_dict = json.loads(configured_action_ref)
+        # task_name = effect_dict["task"]
+        # task_kwargs = effect_dict["kwargs"]  # This should be a dict
+        # if task_name == "noop":
+        #     tasks.noop.delay(ctx, **task_kwargs)  # type: ignore
+        # elif task_name == "wordcount":
+        #     tasks.wordcount.delay(ctx, **task_kwargs)  # type: ignore
+        # else:
+        #     raise ValueError(f"Unknown task: {task_name}")
 
     def _TESTONLY_clear_queue(self) -> None:
         redis = Redis.from_url(wf_env.wf_action_queue())
@@ -47,7 +50,7 @@ class CeleryActionQueue(ActionQueue):
 
 
 class NoOpActionQueue(ActionQueue):
-    def push(self, ctx: Dict[str, Any], effect: str) -> None:
+    def push(self, ctx: TaskCtx, configured_action_ref: str) -> None:
         pass
 
     def _TESTONLY_clear_queue(self) -> None:

@@ -702,7 +702,7 @@ class ActionSchema(BaseModel):
     call_id: str
     id: str
     rule_matched: Optional[str] = None
-    effect: Optional[str] = None
+    configured_action: Optional[str] = None  # Updated column name
     created_at: datetime.datetime
     finished_at: Optional[datetime.datetime] = None
     failed_at: Optional[datetime.datetime] = None
@@ -822,7 +822,7 @@ class ActionsExecuteBatchReq(BaseModel):
     call_ids: list[str]
     id: Optional[str] = None
     rule_matched: Optional[str] = None
-    effect: str
+    configured_action_ref: str
 
 
 class ActionsExecuteBatchRes(BaseModel):

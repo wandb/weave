@@ -25,7 +25,7 @@ def test_actions_execute_batch(client: WeaveClient):
             project_id=client.project,
             call_ids=["1", "2"],
             id="1",
-            effect=json.dumps(
+            configured_action_ref=json.dumps(
                 {
                     "task": "wordcount",
                     "kwargs": {
@@ -44,7 +44,7 @@ def test_actions_execute_batch(client: WeaveClient):
            call_id,
            id,
            any(rule_matched),
-           any(effect),
+           any(configured_action),  # Updated column name
            max(created_at),
            max(finished_at),
            max(failed_at)

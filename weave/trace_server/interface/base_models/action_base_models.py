@@ -1,19 +1,40 @@
-from typing import Literal
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel
 
 LLM_JUDGE_ACTION_NAME = "llm_judge"
 
 
-class _BuiltinAction(BaseModel):
-    action_type: Literal["builtin"] = "builtin"
-    name: str
+class ConfiguredLlmJudgeAction(BaseModel):
+    action_type: Literal["llm_judge"]
+    prompt: str
+    response_format: Optional[dict[str, Any]]
+
+
+class ConfiguredLevenshteinAction(BaseModel):
+    action_type: Literal["levenshtein"]
+    expected: str
+
+
+class ConfiguredWordCountAction(BaseModel):
+    action_type: Literal["wordcount"]
+
+
+class ConfiguredNoopAction(BaseModel):
+    action_type: Literal["noop"]
+
+
+ActionConfigType = Union[
+    ConfiguredLlmJudgeAction,
+    ConfiguredLevenshteinAction,
+    ConfiguredWordCountAction,
+    ConfiguredNoopAction,
+]
 
 
 class ConfiguredAction(BaseModel):
     name: str
-    action: _BuiltinAction
-    config: dict
+    config: ActionConfigType
 
 
 class ActionDispatchFilter(BaseModel):

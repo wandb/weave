@@ -3,7 +3,7 @@ CREATE TABLE actions_parts (
     call_id String,
     id String,
     rule_matched Nullable(String),
-    effect Nullable(String),
+    configured_action Nullable(String),
     created_at Nullable(DateTime64(3)),
     finished_at Nullable(DateTime64(3)),
     failed_at Nullable(DateTime64(3))
@@ -19,7 +19,7 @@ CREATE TABLE actions_merged (
     call_id String,
     id String,
     rule_matched SimpleAggregateFunction(any, Nullable(String)),
-    effect SimpleAggregateFunction(any, Nullable(String)),
+    configured_action SimpleAggregateFunction(any, Nullable(String)),
     created_at SimpleAggregateFunction(max, Nullable(DateTime64(3))),
     finished_at SimpleAggregateFunction(max, Nullable(DateTime64(3))),
     failed_at SimpleAggregateFunction(max, Nullable(DateTime64(3))),
@@ -38,7 +38,7 @@ SELECT
     call_id,
     id,
     anySimpleState(rule_matched) AS rule_matched,
-    anySimpleState(effect) AS effect,
+    anySimpleState(configured_action) AS configured_action,
     maxSimpleState(created_at) AS created_at,
     maxSimpleState(finished_at) AS finished_at,
     maxSimpleState(failed_at) AS failed_at
