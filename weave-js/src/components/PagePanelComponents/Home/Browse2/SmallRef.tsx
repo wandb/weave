@@ -81,7 +81,8 @@ export const objectRefDisplayName = (
 export const SmallRefBox: FC<{
   iconName: IconName;
   text: string;
-}> = ({iconName, text}) => (
+  iconOnly?: boolean;
+}> = ({iconName, text, iconOnly = false}) => (
   <Box display="flex" alignItems="center">
     <Box
       mr="4px"
@@ -97,17 +98,19 @@ export const SmallRefBox: FC<{
       }}>
       <Icon name={iconName} width={14} height={14} />
     </Box>
-    <Box
-      sx={{
-        height: '22px',
-        flex: 1,
-        minWidth: 0,
-        overflow: 'hidden',
-        whiteSpace: 'nowrap',
-        textOverflow: 'ellipsis',
-      }}>
-      {text}
-    </Box>
+    {!iconOnly && (
+      <Box
+        sx={{
+          height: '22px',
+          flex: 1,
+          minWidth: 0,
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          textOverflow: 'ellipsis',
+        }}>
+        {text}
+      </Box>
+    )}
   </Box>
 );
 
@@ -163,7 +166,8 @@ export const SmallArtifactRef: FC<{
 export const SmallWeaveRef: FC<{
   objRef: WeaveObjectRef;
   wfTable?: WFDBTableType;
-}> = ({objRef, wfTable}) => {
+  iconOnly?: boolean;
+}> = ({objRef, wfTable, iconOnly = false}) => {
   const {
     useObjectVersion,
     useOpVersion,
@@ -222,7 +226,7 @@ export const SmallWeaveRef: FC<{
   } else if (rootTypeName === 'OpDef') {
     icon = IconNames.JobProgramCode;
   }
-  const Item = <SmallRefBox iconName={icon} text={label} />;
+  const Item = <SmallRefBox iconName={icon} text={label} iconOnly={iconOnly} />;
 
   if (refTypeQuery.loading) {
     return Item;
@@ -255,7 +259,9 @@ export const SmallRef: FC<{
   if (isArtifactRef) {
     return <SmallArtifactRef objRef={objRef} />;
   }
-  return <SmallWeaveRef objRef={objRef} />;
+  return (
+    <SmallWeaveRef objRef={objRef} wfTable={wfTable} iconOnly={iconOnly} />
+  );
 };
 
 export const parseRefMaybe = (s: string): ObjectRef | null => {
