@@ -4,6 +4,8 @@ import { uuidv7 } from 'uuidv7';
 import { Dataset } from './dataset';
 import { computeDigest } from './digest';
 import {
+  CallSchema,
+  CallsFilter,
   EndedCallSchemaForInsert,
   StartedCallSchemaForInsert,
   Api as TraceServerApi,
@@ -143,6 +145,58 @@ export class WeaveClient {
       return this.saveOp(obj);
     } else {
       return this.saveArbitrary(obj, objId);
+    }
+  }
+
+  public async getCalls(filter: CallsFilter = {}, includeCosts: boolean = false, limit: number = 1000) {
+    const calls: CallSchema[] = [];
+    const iterator = this.getCallsIterator(filter, includeCosts, limit);
+    for await (const call of iterator) {
+      calls.push(call);
+    }
+    return calls;
+  }
+  public async *getCallsIterator(
+    filter: CallsFilter = {},
+    includeCosts: boolean = false,
+    limit: number = 1000
+  ): AsyncIterableIterator<CallSchema> {
+    const resp = await this.traceServerApi.calls.callsQueryStreamCallsStreamQueryPost({
+      project_id: this.projectId,
+      filter,
+      include_costs: includeCosts,
+      limit,
+    });
+
+    const reader = resp.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.trim()) {
+          try {
+            yield JSON.parse(line);
+          } catch (error) {
+            console.error('Error parsing JSON:', error, 'Line:', line);
+          }
+        }
+      }
+    }
+
+    if (buffer.trim()) {
+      try {
+        yield JSON.parse(buffer);
+      } catch (error) {
+        console.error('Error parsing JSON:', error, 'Remaining data:', buffer);
+      }
     }
   }
 
