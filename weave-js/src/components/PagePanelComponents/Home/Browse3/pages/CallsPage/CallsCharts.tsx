@@ -123,7 +123,7 @@ export const CallsCharts = ({
           onClick={toggleInsights}>
           {isInsightsOpen ? <IconChevronDown /> : <IconChevronNext />}
           <IconLightbulbInfo width={18} height={18} className="text-teal-500" />
-          <div className="font-source-sans-pro text-[18px] font-semibold text-moon-500">
+          <div className="font-source-sans-pro mt-[1px] text-[18px] font-semibold text-moon-500">
             {'Insights'}
           </div>
         </div>
