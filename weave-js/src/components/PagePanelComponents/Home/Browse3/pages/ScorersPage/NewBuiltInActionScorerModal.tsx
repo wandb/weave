@@ -6,7 +6,7 @@ import {
   TextField,
 } from '@material-ui/core';
 import React, {FC, useEffect, useState} from 'react';
-import { z } from 'zod';
+import {z} from 'zod';
 
 import {
   ConfiguredActionSchema,
@@ -36,7 +36,9 @@ const knownBuiltinActions = [
     actionSchema: ConfiguredLlmJudgeActionSchema,
     friendly: {
       schema: ConfiguredLlmJudgeActionFriendlySchema,
-      convert: (data: z.infer<typeof ConfiguredLlmJudgeActionFriendlySchema>): z.infer<typeof ConfiguredLlmJudgeActionSchema> => {
+      convert: (
+        data: z.infer<typeof ConfiguredLlmJudgeActionFriendlySchema>
+      ): z.infer<typeof ConfiguredLlmJudgeActionSchema> => {
         return {
           action_type: 'llm_judge',
           model: data.model,
@@ -61,7 +63,9 @@ const knownBuiltinActions = [
     actionSchema: ConfiguredWordCountActionSchema,
     friendly: {
       schema: z.object({}),
-      convert: (data: z.infer<typeof ConfiguredWordCountActionSchema>): z.infer<typeof ConfiguredWordCountActionSchema> => {
+      convert: (
+        data: z.infer<typeof ConfiguredWordCountActionSchema>
+      ): z.infer<typeof ConfiguredWordCountActionSchema> => {
         return {
           action_type: 'wordcount',
         };
@@ -91,7 +95,9 @@ export const NewBuiltInActionScorerModal: FC<
   const handleSave = () => {
     const newAction = ConfiguredActionSchema.parse({
       name,
-      config: knownBuiltinActions[selectedActionIndex].friendly.convert(config as any),
+      config: knownBuiltinActions[selectedActionIndex].friendly.convert(
+        config as any
+      ),
     });
     onSave(newAction);
     setConfig({});
@@ -131,7 +137,9 @@ export const NewBuiltInActionScorerModal: FC<
       </FormControl>
       {selectedActionIndex !== -1 && (
         <DynamicConfigForm
-          configSchema={knownBuiltinActions[selectedActionIndex].friendly.schema}
+          configSchema={
+            knownBuiltinActions[selectedActionIndex].friendly.schema
+          }
           config={config}
           setConfig={setConfig}
           onValidChange={setIsValid}
