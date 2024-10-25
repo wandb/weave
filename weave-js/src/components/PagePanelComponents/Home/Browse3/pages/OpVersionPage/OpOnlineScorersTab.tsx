@@ -4,7 +4,6 @@ import {parseRef} from '@wandb/weave/react';
 import React, {FC, useMemo, useState} from 'react';
 import {z} from 'zod';
 
-import {CellValue} from '../../../Browse2/CellValue';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {
   ActionDispatchFilter,
@@ -194,9 +193,13 @@ export const OpOnlineScorersTab: React.FC<{
         autoHeight
         columnHeaderHeight={40}
         disableRowSelectionOnClick
+        rowHeight={34}
         sx={{
           '& .MuiDataGrid-row:hover': {
             backgroundColor: 'inherit',
+          },
+          '& .MuiDataGrid-cell': {
+            lineHeight: '22px',
           },
         }}
       />
@@ -261,6 +264,7 @@ export const NewOnlineOpScorerModal: FC<NewOnlineOpScorerModalProps> = ({
         console.error(err);
       })
       .finally(() => {
+        setConfig({});
         onClose(true);
       });
   };

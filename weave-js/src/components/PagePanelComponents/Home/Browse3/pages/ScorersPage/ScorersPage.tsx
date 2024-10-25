@@ -85,10 +85,6 @@ const OnlineScorersTab: React.FC<{
   };
   const handleCloseModal = () => setIsModalOpen(false);
   const handleSaveModal = (newAction: ConfiguredAction) => {
-    // Implement save logic here
-    console.log('New action:', newAction);
-    // TODO: Save the new action to the backend or update the state
-    //
     let objectId = newAction.name;
     // Remove non alphanumeric characters
     objectId = objectId.replace(/[^a-zA-Z0-9]/g, '-');

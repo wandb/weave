@@ -162,7 +162,7 @@ export const SmallRef: FC<{
         mr="4px"
         bgcolor={hexToRGB(MOON_300, 0.48)}
         sx={{
-          // height: '22px',
+          height: '22px',
           width: '22px',
           borderRadius: '16px',
           display: 'flex',

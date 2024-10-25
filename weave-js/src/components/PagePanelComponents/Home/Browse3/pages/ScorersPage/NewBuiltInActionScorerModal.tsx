@@ -40,6 +40,9 @@ export const NewBuiltInActionScorerModal: FC<
       config: knownBuiltinActions[selectedActionIndex].convertToConfig(config),
     });
     onSave(newAction);
+    setConfig({});
+    setSelectedActionIndex(0);
+    setName('');
   };
 
   const [isValid, setIsValid] = useState(false);

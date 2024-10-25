@@ -218,7 +218,7 @@ const ArrayField: React.FC<{
   return (
     <FormControl fullWidth margin="normal">
       <InputLabel>{keyName}</InputLabel>
-      {arrayValue.map((_, index) => (
+      {arrayValue.map((item, index) => (
         <Box
           key={index}
           display="flex"
@@ -231,11 +231,15 @@ const ArrayField: React.FC<{
           }}>
           <Box flexGrow={1} width="100%">
             <NestedForm
-              keyName={`${keyName}[${index}]`}
+              keyName={`${index}`}
               fieldSchema={elementSchema}
-              config={config}
-              setConfig={setConfig}
-              path={[...targetPath, index.toString()]}
+              config={{[`${index}`]: item}}
+              setConfig={newItemConfig => {
+                const newArray = [...arrayValue];
+                newArray[index] = newItemConfig[`${index}`];
+                updateConfig(targetPath, newArray, config, setConfig);
+              }}
+              path={[]}
             />
           </Box>
           <Box mt={1}>
@@ -416,8 +420,13 @@ const removeArrayItem = (
   setConfig: (config: Record<string, any>) => void
 ) => {
   const currentArray = getNestedValue(config, targetPath) || [];
-  const fieldSchema = getNestedValue(config, targetPath.slice(0, -1));
-  const minItems = fieldSchema?._def?.minLength?.value ?? 0;
+  const unwrappedSchema = unwrapSchema(
+    getNestedValue(config, targetPath.slice(0, -1))
+  );
+  const minItems =
+    unwrappedSchema instanceof z.ZodArray
+      ? unwrappedSchema._def.minLength?.value ?? 0
+      : 0;
 
   if (currentArray.length > minItems) {
     updateConfig(
@@ -472,7 +481,6 @@ const updateRecordValue = (
   const currentRecord = getNestedValue(config, targetPath) || {};
   updateConfig(targetPath, {...currentRecord, [key]: value}, config, setConfig);
 };
-
 
 const NumberField: React.FC<{
   keyName: string;
