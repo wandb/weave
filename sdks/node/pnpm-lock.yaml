@@ -15,17 +15,17 @@ importers:
         specifier: ^4.68.4
         version: 4.68.4
       uuidv7:
-        specifier: ^1.0.2
+        specifier: ^1.0.1
         version: 1.0.2
     devDependencies:
       '@types/cli-progress':
         specifier: ^3.11.6
         version: 3.11.6
       '@types/jest':
-        specifier: ^29.5.14
+        specifier: ^29.5.13
         version: 29.5.14
       '@types/node':
-        specifier: ^22.8.0
+        specifier: ^22.5.1
         version: 22.8.0
       jest:
         specifier: ^29.7.0
