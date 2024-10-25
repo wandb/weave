@@ -315,16 +315,14 @@ export const opRunTraces = makeRunOp({
   resolveOutputType: async (inputTypes, node, executableNode, client, stack) => {
     // return node;
     // return TypeHelpers.list(TypeHelpers.typedDict({ key: "string", hello: "number"}))
-    console.log('inputs to tracesType.resolveOutputType', {inputTypes, node, executableNode, client, stack})
-    const res = await client.query(opRunTracesType(executableNode.fromOp.inputs as any))
-    console.log('@@@@res', res, node)
-    return res
-    return  {
-      ...node,
-      // type: res.value
-      type: TypeHelpers.list(TypeHelpers.list(TypeHelpers.typedDict({"id": "string"})))
-      // type: res.type,
+    let result = await client.query(opRunTracesType(executableNode.fromOp.inputs as any))
+    // todo(dom+nick): This works for multiple runs, but doesnt work for a single whne accessed
+    //                 via index
+    if (TypeHelpers.isListLike(result)) {
+      result = TypeHelpers.listObjectType(result);
+      result = nullableTaggableStrip(result);
     }
+    return result
   },
 })
 
