@@ -18,7 +18,6 @@ import {
   ObjectVersionKey,
   OpVersionKey,
 } from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
-import { useApolloClient } from '@apollo/client';
 
 const getRootType = (t: Type): Type => {
   if (

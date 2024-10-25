@@ -43,7 +43,10 @@ import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {TailwindContents} from '../../../../../Tailwind';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
+import {CallIdContext} from '../../../Browse3';
 import {useWeaveflowCurrentRouteContext} from '../../context';
+import {ConfigureStructuredFeedbackModal} from '../../feedback/StructuredFeedback/AddColumnButton';
+import {useStructuredFeedbackOptions} from '../../feedback/StructuredFeedback/tsStructuredFeedback';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
@@ -68,8 +71,8 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
-import {objectVersionKeyToRefUri, objectVersionNiceString} from '../wfReactInterface/utilities';
-import {CallSchema, ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {objectVersionNiceString} from '../wfReactInterface/utilities';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
   BulkDeleteButton,
@@ -88,9 +91,6 @@ import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
-import { ConfigureStructuredFeedbackModal } from '../../feedback/StructuredFeedback/AddColumnButton';
-import { CallIdContext } from '../../../Browse3';
-import { useStructuredFeedbackOptions } from '../../feedback/StructuredFeedback/tsStructuredFeedback';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -337,7 +337,10 @@ export const CallsTable: FC<{
   );
 
   // Hide structured feedback columns by default
-  const structuredFeedbackOptions = useStructuredFeedbackOptions(entity, project);
+  const structuredFeedbackOptions = useStructuredFeedbackOptions(
+    entity,
+    project
+  );
   useEffect(() => {
     if (setColumnVisibilityModel == null || structuredFeedbackOptions == null) {
       return;
@@ -351,7 +354,11 @@ export const CallsTable: FC<{
         });
       }
     }
-  }, [structuredFeedbackOptions, setColumnVisibilityModel]);
+  }, [
+    structuredFeedbackOptions,
+    columnVisibilityModel,
+    setColumnVisibilityModel,
+  ]);
 
   const onAddFilter: OnAddFilter | undefined =
     filterModel && setFilterModel
@@ -529,7 +536,7 @@ export const CallsTable: FC<{
         page: paginationModelResolved.page + 1,
       });
     }
-  }, [nextPageNeeded]);
+  }, [nextPageNeeded, paginationModelResolved, setPaginationModel]);
 
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {
@@ -706,9 +713,13 @@ export const CallsTable: FC<{
     [callsLoading, setPaginationModel]
   );
 
-  const [structuredFeedbackModalOpen, setStructuredFeedbackModalOpen] = useState(false);
-  const [editStructuredFeedbackColumnName, setEditStructuredFeedbackColumnName] = useState<string | undefined>(undefined);
-  
+  const [structuredFeedbackModalOpen, setStructuredFeedbackModalOpen] =
+    useState(false);
+  const [
+    editStructuredFeedbackColumnName,
+    setEditStructuredFeedbackColumnName,
+  ] = useState<string | undefined>(undefined);
+
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
@@ -897,7 +908,7 @@ export const CallsTable: FC<{
                   columnInfo={columns}
                   columnVisibilityModel={columnVisibilityModel}
                   setColumnVisibilityModel={setColumnVisibilityModel}
-                  onEditColumns={(columnName) => {
+                  onEditColumns={columnName => {
                     setStructuredFeedbackModalOpen(true);
                     setEditStructuredFeedbackColumnName(columnName);
                   }}
@@ -906,7 +917,9 @@ export const CallsTable: FC<{
                   <ConfigureStructuredFeedbackModal
                     entity={entity}
                     project={project}
-                    structuredFeedbackData={structuredFeedbackOptions ?? undefined}
+                    structuredFeedbackData={
+                      structuredFeedbackOptions ?? undefined
+                    }
                     editColumnName={editStructuredFeedbackColumnName}
                     onClose={() => setStructuredFeedbackModalOpen(false)}
                   />

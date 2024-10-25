@@ -8,7 +8,7 @@ import {
   GridColumnMenuHideItem,
   GridColumnMenuProps,
 } from '@mui/x-data-grid-pro';
-import { Button } from '@wandb/weave/components/Button';
+import {Button} from '@wandb/weave/components/Button';
 import React from 'react';
 
 type Slots = Record<string, React.JSXElementConstructor<any> | null>;
@@ -24,10 +24,9 @@ export const CallsCustomColumnMenu = (props: GridColumnMenuProps) => {
   return <GridColumnMenu {...props} slots={slots} />;
 };
 
-
 const ConfigureFeedbackMenu = () => {
   return (
-    <div className="items-center w-full justify-center">
+    <div className="w-full items-center justify-center">
       <Button variant="ghost">Configure feedback</Button>
     </div>
   );

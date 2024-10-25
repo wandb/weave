@@ -1,15 +1,24 @@
 import Box from '@mui/material/Box';
 import {Loading} from '@wandb/weave/components/Loading';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {FC, useCallback, useContext, useEffect, useRef, useState} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
+import {CallIdContext} from '../../../Browse3';
 import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
+import StructuredFeedbackSidebar from '../../feedback/StructuredFeedback/StructuredFeedbackSidebar';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
@@ -28,8 +37,6 @@ import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
-import StructuredFeedbackSidebar from '../../feedback/StructuredFeedback/StructuredFeedbackSidebar';
-import { CallIdContext } from '../../../Browse3';
 export const CallPage: FC<{
   entity: string;
   project: string;
@@ -217,19 +224,56 @@ const CallPageInnerVertical: FC<{
   const callTabs = useCallTabs(currentCall);
 
   // Call navigation by arrow keys and buttons
-  const {getNextCallId, getPreviousCallId, nextPageNeeded} = useContext(CallIdContext);
+  const {getNextCallId, getPreviousCallId, nextPageNeeded} =
+    useContext(CallIdContext);
   const onNextCall = useCallback(() => {
     const nextCallId = getNextCallId?.(currentCall.callId);
     if (nextCallId) {
-      history.replace(currentRouter.callUIUrl(currentCall.entity, currentCall.project, currentCall.traceId, nextCallId, path, showTraceTree, showFeedbackExpand));
+      history.replace(
+        currentRouter.callUIUrl(
+          currentCall.entity,
+          currentCall.project,
+          currentCall.traceId,
+          nextCallId,
+          path,
+          showTraceTree,
+          showFeedbackExpand
+        )
+      );
     }
-  }, [currentCall, currentRouter, history, path, showTraceTree, showFeedbackExpand]);
+  }, [
+    currentCall,
+    currentRouter,
+    history,
+    path,
+    showTraceTree,
+    showFeedbackExpand,
+    getNextCallId,
+  ]);
   const onPreviousCall = useCallback(() => {
     const previousCallId = getPreviousCallId?.(currentCall.callId);
     if (previousCallId) {
-      history.replace(currentRouter.callUIUrl(currentCall.entity, currentCall.project, currentCall.traceId, previousCallId, path, showTraceTree, showFeedbackExpand));
+      history.replace(
+        currentRouter.callUIUrl(
+          currentCall.entity,
+          currentCall.project,
+          currentCall.traceId,
+          previousCallId,
+          path,
+          showTraceTree,
+          showFeedbackExpand
+        )
+      );
     }
-  }, [currentCall, currentRouter, history, path, showTraceTree, showFeedbackExpand]);
+  }, [
+    currentCall,
+    currentRouter,
+    history,
+    path,
+    showTraceTree,
+    showFeedbackExpand,
+    getPreviousCallId,
+  ]);
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (event.key === 'ArrowDown') {
@@ -246,7 +290,7 @@ const CallPageInnerVertical: FC<{
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onPreviousCall]);
+  }, [handleKeyDown]);
 
   const nextCallRef = useRef(false);
   useEffect(() => {
@@ -265,7 +309,13 @@ const CallPageInnerVertical: FC<{
   return (
     <SimplePageLayoutWithHeader
       headerExtra={
-        <Box sx={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            width: '100%',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}>
           <Box>
             <Button
               icon="sort-ascending"
@@ -284,7 +334,9 @@ const CallPageInnerVertical: FC<{
           <Box>
             <Button
               icon="marker"
-              tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback sidebar`}
+              tooltip={`${
+                showFeedbackExpand ? 'Hide' : 'Show'
+              } feedback sidebar`}
               variant="ghost"
               active={showFeedbackExpand ?? false}
               onClick={onToggleFeedbackExpand}

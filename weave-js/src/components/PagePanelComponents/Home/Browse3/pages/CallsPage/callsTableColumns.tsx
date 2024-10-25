@@ -19,6 +19,7 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {Reactions} from '../../feedback/Reactions';
+import {StructuredFeedbackCell} from '../../feedback/StructuredFeedback/StructuredFeedback';
 import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../filters/common';
 import {
@@ -43,7 +44,6 @@ import {
 } from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
-import { StructuredFeedbackCell } from '../../feedback/StructuredFeedback/StructuredFeedback';
 
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.weave'];
 
@@ -205,9 +205,13 @@ function buildCallsTableColumns(
       return a.localeCompare(b);
     });
 
-  const simpleFeedback = !structuredFeedbackOptions || structuredFeedbackOptions?.types?.length === 0;
+  const simpleFeedback =
+    !structuredFeedbackOptions ||
+    structuredFeedbackOptions?.types?.length === 0;
 
-  const structuredFeedbackColumns = (structuredFeedbackOptions?.types ?? []).map((feedbackType: any) => ({
+  const structuredFeedbackColumns = (
+    structuredFeedbackOptions?.types ?? []
+  ).map((feedbackType: any) => ({
     field: feedbackColName(feedbackType),
     headerName: feedbackType.name ?? feedbackType.type,
     width: 150,
@@ -217,16 +221,17 @@ function buildCallsTableColumns(
       const callId = rowParams.row.id;
       const weaveRef = makeRefCall(entity, project, callId);
 
-      return <StructuredFeedbackCell
-        entity={entity} 
-        project={project} 
-        sfData={feedbackType} 
-        callRef={weaveRef}
-        readOnly={true}
-      />
+      return (
+        <StructuredFeedbackCell
+          entity={entity}
+          project={project}
+          sfData={feedbackType}
+          callRef={weaveRef}
+          readOnly={true}
+        />
+      );
     },
   }));
-
 
   const cols: Array<GridColDef<TraceCallSchema>> = [
     {
@@ -261,32 +266,35 @@ function buildCallsTableColumns(
         );
       },
     },
-    ...(simpleFeedback ? [{
-        field: 'feedback',
-        headerName: 'Feedback',
-        width: 150,
-        sortable: false,
-        filterable: false,
-        renderCell: (rowParams: GridRenderCellParams) => {
-          const rowIndex = rowParams.api.getRowIndexRelativeToVisibleRows(
-            rowParams.id
-          );
-          const callId = rowParams.row.id;
-          const weaveRef = makeRefCall(entity, project, callId);
+    ...(simpleFeedback
+      ? [
+          {
+            field: 'feedback',
+            headerName: 'Feedback',
+            width: 150,
+            sortable: false,
+            filterable: false,
+            renderCell: (rowParams: GridRenderCellParams) => {
+              const rowIndex = rowParams.api.getRowIndexRelativeToVisibleRows(
+                rowParams.id
+              );
+              const callId = rowParams.row.id;
+              const weaveRef = makeRefCall(entity, project, callId);
 
-          return (
-              <Reactions
-                weaveRef={weaveRef}
-                forceVisible={rowIndex === 0}
-                twWrapperStyles={{
-                  width: '100%',
-                  height: '100%',
-                }}
-              />
-          )
-        },
-      }
-    ] : structuredFeedbackColumns),
+              return (
+                <Reactions
+                  weaveRef={weaveRef}
+                  forceVisible={rowIndex === 0}
+                  twWrapperStyles={{
+                    width: '100%',
+                    height: '100%',
+                  }}
+                />
+              );
+            },
+          },
+        ]
+      : structuredFeedbackColumns),
     ...(isSingleOp && !isSingleOpVersion
       ? [
           {
@@ -356,7 +364,7 @@ function buildCallsTableColumns(
     }
   );
   cols.push(...newCols);
-  
+
   if (structuredFeedbackColumns.length > 0) {
     // add groupingModel for feedback
     groupingModel.push({
@@ -586,5 +594,5 @@ const refIsExpandable = (ref: string): boolean => {
 };
 
 export const feedbackColName = (feedbackType: any) => {
-  return "feedback." + (feedbackType.name ?? feedbackType.type);
-}
+  return 'feedback.' + (feedbackType.name ?? feedbackType.type);
+};

@@ -10,14 +10,11 @@ import React, {useCallback, useRef, useState} from 'react';
 
 import {maybePluralize} from '../../../../../../core/util/string';
 import {Button} from '../../../../../Button';
-import {IconButton} from '../../../../../IconButton';
 import {DraggableGrow, DraggableHandle} from '../../../../../DraggablePopups';
 import {TextField} from '../../../../../Form/TextField';
 import {Tailwind} from '../../../../../Tailwind';
 import {ColumnInfo} from '../../types';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
-import {StructuredFeedbackSpec} from '../../feedback/StructuredFeedback/types';
-import {ConfigureStructuredFeedbackModal} from '../../feedback/StructuredFeedback/AddColumnButton';
 
 type ManageColumnsButtonProps = {
   columnInfo: ColumnInfo;
@@ -87,7 +84,6 @@ export const ManageColumnsButton = ({
     }
     setColumnVisibilityModel(newModel);
   };
-
 
   const handleEditColumn = (columnName: string) => {
     onEditColumns(columnName);
@@ -199,7 +195,11 @@ export const ManageColumnsButton = ({
                             variant="quiet"
                             icon="pencil-edit"
                             size="small"
-                            onClick={() => handleEditColumn(col.field.replace('feedback.', ''))}
+                            onClick={() =>
+                              handleEditColumn(
+                                col.field.replace('feedback.', '')
+                              )
+                            }
                             tooltip="Edit feedback column"
                             className="mr-4"
                           />
@@ -229,8 +229,8 @@ export const ManageColumnsButton = ({
               </Button>
               <div className="flex-auto" />
               <div className="ml-16 text-moon-500">
-                  {maybePluralize(numHidden, 'hidden column', 's')}
-                </div>
+                {maybePluralize(numHidden, 'hidden column', 's')}
+              </div>
             </div>
           </div>
         </Tailwind>
