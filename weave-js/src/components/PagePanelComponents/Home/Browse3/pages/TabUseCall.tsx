@@ -29,8 +29,8 @@ os.environ["WF_TRACE_SERVER_URL"] = "http://127.0.0.1:6345"
   }
 
   let codeFetchJS = `import * as weave from 'weave';
-client = await weave.init("${entity}/${project}");
-call = await client.getCall("${callId}")`;
+const client = await weave.init("${entity}/${project}");
+const call = await client.getCall("${callId}")`;
 
   const codeFetch = sdkType === 'js-sdk' ? codeFetchJS : codeFetchPython;
 
