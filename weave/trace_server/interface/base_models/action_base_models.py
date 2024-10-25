@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class ConfiguredLlmJudgeAction(BaseModel):
     action_type: Literal["llm_judge"]
     prompt: str
+    model: Literal["gpt-4o-mini", "gpt-4o"]
     response_format: Optional[dict[str, Any]]
 
 

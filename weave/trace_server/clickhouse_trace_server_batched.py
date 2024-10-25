@@ -80,7 +80,6 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.base_models.action_base_models import (
-    LLM_JUDGE_ACTION_NAME,
     ConfiguredAction,
 )
 from weave.trace_server.interface.base_models.base_model_registry import (
@@ -1436,13 +1435,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         action_dict = action_dict_res.vals[0]
         action = ConfiguredAction.model_validate(action_dict)
 
-        if action.action.action_type != "builtin":
-            raise InvalidRequest(
-                "Only builtin actions are supported for batch execution"
-            )
+        # if action.action.action_type != "builtin":
+        #     raise InvalidRequest(
+        #         "Only builtin actions are supported for batch execution"
+        #     )
 
-        if action.action.name != "llm_judge":
-            raise InvalidRequest("Only llm_judge is supported for batch execution")
+        # if action.action.name != "llm_judge":
+        #     raise InvalidRequest("Only llm_judge is supported for batch execution")
 
         # Step 1: Get all the calls in the batch
         calls = self.calls_query_stream(
@@ -1457,13 +1456,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Normally we would dispatch here, but just hard coding for now
         # We should do some validation here
         config = action.config
-        model = config["model"]
+        model = config.model
 
         if model not in ["gpt-4o-mini", "gpt-4o"]:
             raise InvalidRequest("Only gpt-4o-mini and gpt-4o are supported")
 
-        system_prompt = config["system_prompt"]
-        response_format_schema = config["response_format_schema"]
+        system_prompt = config.prompt
+        response_format_schema = config.response_format
         response_format = {
             "type": "json_schema",
             "json_schema": {
