@@ -3,14 +3,18 @@ from functools import wraps
 from typing import Any, Callable, TypeVar
 
 from weave.actions_worker.celery_app import app
-from weave.trace_server.action_queue import TaskCtx
+from weave.trace_server.action_executor import TaskCtx
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.interface.base_models.action_base_models import (
     ConfiguredAction,
-    ConfiguredLevenshteinAction,
+    ConfiguredContainsWordsAction,
     ConfiguredLlmJudgeAction,
     ConfiguredNoopAction,
     ConfiguredWordCountAction,
+)
+from weave.trace_server.interface.base_models.base_model_registry import base_model_name
+from weave.trace_server.interface.base_models.feedback_base_model_registry import (
+    ActionScore,
 )
 from weave.trace_server.refs_internal import InternalCallRef
 from weave.trace_server.trace_server_interface import (
@@ -21,6 +25,8 @@ from weave.trace_server.trace_server_interface import (
     FeedbackCreateReq,
     RefsReadBatchReq,
 )
+
+WEAVE_ACTION_EXECUTOR_PACEHOLDER_ID = "WEAVE_ACTION_EXECUTOR"
 
 
 def ack_on_clickhouse(ctx: TaskCtx, succeeded: bool) -> None:
@@ -34,7 +40,9 @@ def ack_on_clickhouse(ctx: TaskCtx, succeeded: bool) -> None:
     )
 
 
-def publish_results_as_feedback(ctx: TaskCtx, result: dict[str, Any]) -> None:
+def publish_results_as_feedback(
+    ctx: TaskCtx, result: Any, configured_action_ref: str
+) -> None:
     project_id = ctx["project_id"]
     call_id = ctx["call_id"]
     id = ctx["id"]
@@ -43,10 +51,11 @@ def publish_results_as_feedback(ctx: TaskCtx, result: dict[str, Any]) -> None:
         FeedbackCreateReq(
             project_id=project_id,
             weave_ref=call_ref,
-            creator="actions_worker",
-            feedback_type="wandb.online_score",
-            payload=result,
-            wb_user_id="wandb",
+            feedback_type=base_model_name(ActionScore),
+            payload=ActionScore(
+                configured_action_ref=configured_action_ref, output=result
+            ).model_dump(),
+            wb_user_id=WEAVE_ACTION_EXECUTOR_PACEHOLDER_ID,
         )
     )
 
@@ -77,17 +86,21 @@ ActionResultT = TypeVar("ActionResultT")
 
 
 def action_task(
-    func: Callable[[str, ActionConfigT], ActionResultT],
-) -> Callable[[TaskCtx, str, ActionConfigT], ActionResultT]:
+    func: Callable[[str, str, ActionConfigT], ActionResultT],
+) -> Callable[[TaskCtx, str, str, str, ActionConfigT], ActionResultT]:
     @wraps(func)
     def wrapper(
-        ctx: TaskCtx, payload: str, configured_action: ActionConfigT
+        ctx: TaskCtx,
+        call_input: str,
+        call_output: str,
+        configured_action_ref: str,
+        configured_action: ActionConfigT,
     ) -> ActionResultT:
         success = True
         try:
             scorer_name = func.__name__
-            result = func(payload, configured_action)
-            publish_results_as_feedback(ctx, {scorer_name: result})
+            result = func(call_input, call_output, configured_action)
+            publish_results_as_feedback(ctx, result, configured_action_ref)
             print(f"Successfully ran {func.__name__}")
             print(f"Result: {result}")
         except Exception as e:
@@ -104,40 +117,48 @@ def action_task(
 def do_task(ctx: TaskCtx, configured_action_ref: str) -> None:
     action = resolve_action_ref(configured_action_ref)
     call = resolve_call(ctx)
-    output = call.output
-    if not isinstance(output, str):
+    call_input = json.dumps(call.inputs)
+    call_output = call.output
+    if not isinstance(call_output, str):
         # TODO Probably log this somewhere.
         return
 
     if action.config.action_type == "wordcount":
-        wordcount(ctx, output, action.config)
+        wordcount(ctx, call_input, call_output, configured_action_ref, action.config)
     elif action.config.action_type == "llm_judge":
-        llm_judge(ctx, output, action.config)
+        llm_judge(ctx, call_input, call_output, configured_action_ref, action.config)
     elif action.config.action_type == "noop":
-        noop(ctx, output, action.config)
-    elif action.config.action_type == "levenshtein":
-        levenshtein(ctx, output, action.config)
+        noop(ctx, call_input, call_output, configured_action_ref, action.config)
+    elif action.config.action_type == "contains_words":
+        contains_words(
+            ctx, call_input, call_output, configured_action_ref, action.config
+        )
     else:
         raise ValueError(f"Unknown action type: {action.config.action_type}")
 
 
 @action_task
-def wordcount(payload: str, config: ConfiguredWordCountAction) -> int:
-    return len(payload.split(" "))
+def wordcount(
+    call_input: str, call_output: str, config: ConfiguredWordCountAction
+) -> int:
+    return len(call_output.split(" "))
 
 
 @action_task
-def llm_judge(payload: str, config: ConfiguredLlmJudgeAction) -> str:
+def llm_judge(
+    call_input: str, call_output: str, config: ConfiguredLlmJudgeAction
+) -> str:
     return "I'm sorry Hal, I'm afraid I can't do that."
 
 
 @action_task
-def levenshtein(payload: str, config: ConfiguredLevenshteinAction) -> int:
-    from Levenshtein import distance
-
-    return distance(payload, config.expected)
+def contains_words(
+    call_input: str, call_output: str, config: ConfiguredContainsWordsAction
+) -> bool:
+    word_set = set(call_output.split(" "))
+    return len(set(config.target_words) & word_set) > 0
 
 
 @action_task
-def noop(payload: str, config: ConfiguredNoopAction) -> None:
+def noop(call_input: str, call_output: str, config: ConfiguredNoopAction) -> None:
     pass

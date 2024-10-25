@@ -54,8 +54,8 @@ from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.action_queue import (
-    ActionQueue,
+from weave.trace_server.action_executor import (
+    ActionExecutor,
     TaskCtx,
     queue_from_addr,
 )
@@ -233,7 +233,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         user: str = "default",
         password: str = "",
         database: str = "default",
-        action_queue_addr: str,
+        action_executor_addr: str,
         use_async_insert: bool = False,
     ):
         super().__init__()
@@ -246,7 +246,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._flush_immediately = True
         self._call_batch = CallBatch()
         self._use_async_insert = use_async_insert
-        self._action_queue_addr = action_queue_addr
+        self._action_executor_addr = action_executor_addr
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -258,7 +258,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             user=wf_env.wf_clickhouse_user(),
             password=wf_env.wf_clickhouse_pass(),
             database=wf_env.wf_clickhouse_database(),
-            action_queue_addr=wf_env.wf_action_queue(),
+            action_executor_addr=wf_env.wf_action_executor(),
             use_async_insert=use_async_insert,
         )
 
@@ -1473,6 +1473,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def execute_batch_action(
         self, req: tsi.ExecuteBatchActionReq
     ) -> tsi.ExecuteBatchActionRes:
+        return tsi.ExecuteBatchActionRes()
         # WARNING: THIS IS NOT GOING TO WORK IN PRODUCTION
         # UNTIL WE HAVE THE API KEY PIECE IN PLACE
         configured_action_ref = req.configured_action_ref
@@ -1568,39 +1569,48 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # That way we can avoid unnecessary duplicates if the server fails after inserting the batch into CH
         # but before inserting into the action queue.
 
-        # First look up the configured action.
-        configured_action_ref = req.configured_action_ref
-        action_dict_res = self.refs_read_batch(
-            tsi.RefsReadBatchReq(refs=[configured_action_ref])
-        )
+        # # First look up the configured action.
+        # configured_action_ref = req.configured_action_ref
+        # action_dict_res = self.refs_read_batch(
+        #     tsi.RefsReadBatchReq(refs=[configured_action_ref])
+        # )
 
-        # Validate (though we'll need to json dump it again. Still, good to have a validation check somewhere.)
-        # TODO maybe remove.
-        action_dict = action_dict_res.vals[0]
-        action = ConfiguredAction.model_validate(action_dict)
+        # # Validate (though we'll need to json dump it again. Still, good to have a validation check somewhere.)
+        # # TODO maybe remove.
+        # action_dict = action_dict_res.vals[0]
+        # action = ConfiguredAction.model_validate(action_dict)
 
+        # Step 1: Prepare data to insert into CH actions table and queue.
         id = req.id or generate_id()
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
         rows: list[Row] = [
             {
                 "project_id": req.project_id,
                 "call_id": call_id,
-                "id": req.id or id,
+                "id": id,
                 "rule_matched": req.rule_matched,
                 "configured_action": req.configured_action_ref,
                 "created_at": created_at,
             }
             for call_id in req.call_ids
         ]
-        prepared = TABLE_ACTIONS.insertMany(rows).prepare(database_type="clickhouse")
-        self._insert(TABLE_ACTIONS.name, prepared.data, prepared.column_names)
-
         task_ctxs: list[TaskCtx] = [
             {"project_id": req.project_id, "call_id": call_id, "id": id}
             for call_id in req.call_ids
         ]
+        # Step 2: Potential shortcut: if there is only one call, we can do the action right away.
+        if len(req.call_ids) == 1:
+            self.action_executor.do_now(task_ctxs[0], req.configured_action_ref)
+            return tsi.ActionsExecuteBatchRes(
+                project_id=req.project_id, call_ids=[req.call_ids[0]], id=id
+            )
+
+        # Step 3: Normal case: enqueue the actions in CH and the worker queue.
+        prepared = TABLE_ACTIONS.insertMany(rows).prepare(database_type="clickhouse")
+        self._insert(TABLE_ACTIONS.name, prepared.data, prepared.column_names)
+
         for task_ctx in task_ctxs:
-            self.action_queue_client.push(task_ctx, req.configured_action_ref)
+            self.action_executor.enqueue(task_ctx, req.configured_action_ref)
         return tsi.ActionsExecuteBatchRes(
             project_id=req.project_id, call_ids=req.call_ids, id=id
         )
@@ -1638,7 +1648,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
             for row in rows:
                 try:
-                    self.action_queue_client.push(
+                    self.action_executor.enqueue(
                         {
                             "project_id": row["project_id"],  # type: ignore
                             "call_id": row["call_id"],  # type: ignore
@@ -1660,12 +1670,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return self._thread_local.ch_client
 
     @property
-    def action_queue_client(self) -> ActionQueue:
-        if not hasattr(self._thread_local, "action_queue_client"):
-            self._thread_local.action_queue_client = queue_from_addr(
-                self._action_queue_addr
+    def action_executor(self) -> ActionExecutor:
+        if not hasattr(self._thread_local, "action_executor"):
+            self._thread_local.action_executor = queue_from_addr(
+                self._action_executor_addr
             )
-        return self._thread_local.action_queue_client
+        return self._thread_local.action_executor
 
     def _mint_client(self) -> CHClient:
         client = clickhouse_connect.get_client(
@@ -1964,9 +1974,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         filter_req = tsi.ObjQueryReq(
             project_id=project_id,
             filter=tsi.ObjectVersionFilter(
-                base_object_classes=["ProjectActionFilter"],
+                base_object_classes=[base_model_name(ActionDispatchFilter)],
                 is_op=False,
-                latest_only=True,
+                latest_only=True,  # IMPORTANT: Always keep this.
             ),
         )
         filter_res = self.objs_query(filter_req)
@@ -1998,6 +2008,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Match calls to filters
         matched_filters_and_calls = []
         for filter in filters:
+            if filter.disabled:
+                continue
             matched_calls = [
                 call for call in calls_res.calls if filter.op_name == call.op_name
             ]

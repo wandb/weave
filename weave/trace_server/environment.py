@@ -26,6 +26,6 @@ def wf_clickhouse_database() -> str:
     return os.environ.get("WF_CLICKHOUSE_DATABASE", "default")
 
 
-def wf_action_queue() -> str:
-    """The host of the action queue."""
-    return os.environ.get("WF_ACTION_QUEUE", "redis://localhost:6379/0")
+def wf_action_executor() -> str:
+    """The host of the action executor."""
+    return os.environ.get("WF_ACTION_EXECUTOR", "redis://localhost:6379/0")

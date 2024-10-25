@@ -7,13 +7,14 @@ LLM_JUDGE_ACTION_NAME = "llm_judge"
 
 class ConfiguredLlmJudgeAction(BaseModel):
     action_type: Literal["llm_judge"]
+    model: Literal["gpt-4o", "gpt-4o-mini"]
     prompt: str
     response_format: Optional[dict[str, Any]]
 
 
-class ConfiguredLevenshteinAction(BaseModel):
-    action_type: Literal["levenshtein"]
-    expected: str
+class ConfiguredContainsWordsAction(BaseModel):
+    action_type: Literal["contains_words"]
+    target_words: list[str]
 
 
 class ConfiguredWordCountAction(BaseModel):
@@ -26,7 +27,7 @@ class ConfiguredNoopAction(BaseModel):
 
 ActionConfigType = Union[
     ConfiguredLlmJudgeAction,
-    ConfiguredLevenshteinAction,
+    ConfiguredContainsWordsAction,
     ConfiguredWordCountAction,
     ConfiguredNoopAction,
 ]
@@ -41,3 +42,4 @@ class ActionDispatchFilter(BaseModel):
     op_name: str
     sample_rate: float
     configured_action_ref: str
+    disabled: Optional[bool]
