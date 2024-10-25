@@ -1,5 +1,7 @@
 import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
 import {Button} from '@wandb/weave/components/Button/Button';
 import React, {FC, useState} from 'react';
 
@@ -8,6 +10,7 @@ import {useCreateCollectionObject} from '../../collections/getCollectionObjects'
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
+import {actionTemplates} from './actionTemplates';
 import {NewBuiltInActionScorerModal} from './NewBuiltInActionScorerModal';
 
 export const ScorersPage: React.FC<{
@@ -77,13 +80,37 @@ const OnlineScorersTab: React.FC<{
   project: string;
 }> = ({entity, project}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState('');
   const createCollectionObject = useCreateCollectionObject('ConfiguredAction');
   const [lastUpdatedTimestamp, setLastUpdatedTimestamp] = useState(0);
 
-  const handleOpenModal = () => {
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
+
+  const handleCreateBlank = () => {
+    setSelectedTemplate('');
     setIsModalOpen(true);
   };
-  const handleCloseModal = () => setIsModalOpen(false);
+
+  const handleDropdownClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleTemplateSelect = (templateName: string) => {
+    setSelectedTemplate(templateName);
+    setIsModalOpen(true);
+    handleClose();
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedTemplate('');
+  };
+
   const handleSaveModal = (newAction: ConfiguredActionType) => {
     let objectId = newAction.name;
     // Remove non alphanumeric characters
@@ -122,7 +149,32 @@ const OnlineScorersTab: React.FC<{
           p: 2,
           width: '100%',
         }}>
-        <AddNewButton onClick={handleOpenModal} />
+        <Box sx={{display: 'flex', alignItems: 'center'}}>
+          <Button
+            className="mr-1"
+            size="medium"
+            variant="primary"
+            onClick={handleCreateBlank}
+            icon="add-new">
+            Create New
+          </Button>
+          <Button
+            size="medium"
+            variant="secondary"
+            onClick={handleDropdownClick}
+            icon="chevron-down"
+            tooltip="Select a template"
+          />
+        </Box>
+        <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
+          {actionTemplates.map(template => (
+            <MenuItem
+              key={template.name}
+              onClick={() => handleTemplateSelect(template.name)}>
+              {template.name}
+            </MenuItem>
+          ))}
+        </Menu>
       </Box>
       <FilterableObjectVersionsTable
         key={lastUpdatedTimestamp}
@@ -136,6 +188,7 @@ const OnlineScorersTab: React.FC<{
         open={isModalOpen}
         onClose={handleCloseModal}
         onSave={handleSaveModal}
+        initialTemplate={selectedTemplate}
       />
     </Box>
   );

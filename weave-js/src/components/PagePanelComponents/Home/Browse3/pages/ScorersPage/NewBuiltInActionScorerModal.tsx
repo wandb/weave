@@ -17,28 +17,10 @@ import {
 } from '../../collections/actionCollection';
 import {DynamicConfigForm} from '../../DynamicConfigForm';
 import {ReusableDrawer} from '../../ReusableDrawer';
-
-const SimpleResponseFormatSchema = z
-  .enum(['boolean', 'number', 'string'])
-  .default('boolean');
-const StructuredResponseFormatSchema = z.record(SimpleResponseFormatSchema);
-
-const ResponseFormatSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('simple'),
-    schema: SimpleResponseFormatSchema,
-  }),
-  z.object({
-    type: z.literal('structured'),
-    schema: StructuredResponseFormatSchema,
-  }),
-]);
-
-const ConfiguredLlmJudgeActionFriendlySchema = z.object({
-  model: z.enum(['gpt-4o-mini', 'gpt-4o']).default('gpt-4o-mini'),
-  prompt: z.string(),
-  response_format: ResponseFormatSchema,
-});
+import {
+  actionTemplates,
+  ConfiguredLlmJudgeActionFriendlySchema,
+} from './actionTemplates';
 
 const knownBuiltinActions = [
   {
@@ -49,7 +31,9 @@ const knownBuiltinActions = [
       convert: (
         data: z.infer<typeof ConfiguredLlmJudgeActionFriendlySchema>
       ): z.infer<typeof ConfiguredLlmJudgeActionSchema> => {
-        let responseFormat: any;
+        let responseFormat: z.infer<
+          typeof ConfiguredLlmJudgeActionSchema
+        >['response_format'];
         if (data.response_format.type === 'simple') {
           responseFormat = {type: data.response_format.schema};
         } else {
@@ -90,19 +74,28 @@ interface NewBuiltInActionScorerModalProps {
   open: boolean;
   onClose: () => void;
   onSave: (newAction: ConfiguredActionType) => void;
+  initialTemplate: string;
 }
 
 export const NewBuiltInActionScorerModal: FC<
   NewBuiltInActionScorerModalProps
-> = ({open, onClose, onSave}) => {
+> = ({open, onClose, onSave, initialTemplate}) => {
   const [name, setName] = useState('');
   const [selectedActionIndex, setSelectedActionIndex] = useState<number>(0);
   const [config, setConfig] = useState<Record<string, any>>({});
 
   useEffect(() => {
-    // Reset config when action type changes
-    setConfig({});
-  }, [selectedActionIndex]);
+    if (initialTemplate) {
+      const template = actionTemplates.find(t => t.name === initialTemplate);
+      if (template) {
+        setConfig(template.type);
+        setName(template.name);
+      }
+    } else {
+      setConfig({});
+      setName('');
+    }
+  }, [initialTemplate]);
 
   const handleSave = () => {
     const newAction = ConfiguredActionSchema.parse({

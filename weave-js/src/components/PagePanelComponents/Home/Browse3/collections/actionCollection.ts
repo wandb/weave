@@ -1,10 +1,21 @@
 import {z} from 'zod';
 
+const JSONTypeNames = z.enum(['boolean', 'number', 'string']);
+const SimpleJsonReponseFormat = z.object({type: JSONTypeNames});
+const ObjectJsonReponseFormat = z.object({
+  type: z.literal('object'),
+  properties: z.record(SimpleJsonReponseFormat),
+  additionalProperties: z.literal(false),
+});
+
 export const ConfiguredLlmJudgeActionSchema = z.object({
   action_type: z.literal('llm_judge'),
   model: z.enum(['gpt-4o-mini', 'gpt-4o']).default('gpt-4o-mini'),
   prompt: z.string(),
-  response_format: z.record(z.string(), z.any()).optional(),
+  response_format: z.discriminatedUnion('type', [
+    SimpleJsonReponseFormat,
+    ObjectJsonReponseFormat,
+  ]),
 });
 export type ConfiguredLlmJudgeActionType = z.infer<
   typeof ConfiguredLlmJudgeActionSchema
