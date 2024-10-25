@@ -464,10 +464,10 @@ class CallsQuery(BaseModel):
             )
         )
 
-        should_optimize = (
+        should_optimize = self.should_do_two_step_query() or (
             has_heavy_fields and do_predicate_pushdown
-        ) or self.include_costs
-        if not should_optimize:
+        )
+        if not should_optimize and not self.include_costs:
             return [self._as_sql_base_format(pb, table_alias)]
 
         # Build the two queries

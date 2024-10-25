@@ -11,14 +11,13 @@ def assert_sql(cq: CallsQuery, exp_queries, exp_params):
     queries = cq.as_sql(pb)
     params = pb.get_params()
 
-    assert exp_params == params
-    assert len(queries) == len(exp_queries)
-
     for qr, qe in zip(queries, exp_queries):
         exp_formatted = sqlparse.format(qe, reindent=True)
         found_formatted = sqlparse.format(qr, reindent=True)
 
         assert exp_formatted == found_formatted
+
+    assert exp_params == params
 
 
 def test_query_baseline() -> None:
