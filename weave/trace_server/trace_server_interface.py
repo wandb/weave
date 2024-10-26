@@ -797,6 +797,33 @@ class CostPurgeRes(BaseModel):
     pass
 
 
+class ActionsExecuteBatchReq(BaseModel):
+    project_id: str
+    call_ids: list[str]
+    id: Optional[str] = (
+        None  # This is here so that clients can potentially guarantee idempotence.
+        # Repeated calls with the same id will not result in duplicate actions.
+    )
+    configured_action_ref: str
+
+
+class ActionsExecuteBatchRes(BaseModel):
+    id: str
+
+
+class ActionsAckBatchReq(BaseModel):
+    project_id: str
+    call_ids: list[str]
+    id: str
+    succeeded: bool
+
+
+class ActionsAckBatchRes(BaseModel):
+    project_id: str
+    call_ids: list[str]
+    id: str
+
+
 class ExecuteBatchActionReq(BaseModel):
     project_id: str
     call_ids: list[str]
@@ -850,6 +877,6 @@ class TraceServerInterface(Protocol):
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
 
     # Action API
-    def execute_batch_action(
-        self, req: ExecuteBatchActionReq
-    ) -> ExecuteBatchActionRes: ...
+    def actions_execute_batch(
+        self, req: ActionsExecuteBatchReq
+    ) -> ActionsExecuteBatchRes: ...

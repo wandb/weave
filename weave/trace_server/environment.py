@@ -24,3 +24,8 @@ def wf_clickhouse_pass() -> str:
 def wf_clickhouse_database() -> str:
     """The name of the clickhouse database."""
     return os.environ.get("WF_CLICKHOUSE_DATABASE", "default")
+
+
+def wf_action_executor() -> str:
+    """The host of the action executor."""
+    return os.environ.get("WF_ACTION_EXECUTOR", "redis://localhost:6379/0")

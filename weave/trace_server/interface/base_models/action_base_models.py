@@ -1,22 +1,45 @@
-from typing import Literal
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel
 
 LLM_JUDGE_ACTION_NAME = "llm_judge"
 
 
-class _BuiltinAction(BaseModel):
-    action_type: Literal["builtin"] = "builtin"
-    name: str
+class ConfiguredLlmJudgeAction(BaseModel):
+    action_type: Literal["llm_judge"] = "llm_judge"
+    model: Literal["gpt-4o", "gpt-4o-mini"]
+    prompt: str
+    response_format: Optional[dict[str, Any]]
+
+
+class ConfiguredContainsWordsAction(BaseModel):
+    action_type: Literal["contains_words"] = "contains_words"
+    target_words: list[str]
+
+
+class ConfiguredWordCountAction(BaseModel):
+    action_type: Literal["wordcount"] = "wordcount"
+
+
+class ConfiguredNoopAction(BaseModel):
+    action_type: Literal["noop"] = "noop"
+
+
+ActionConfigType = Union[
+    ConfiguredLlmJudgeAction,
+    ConfiguredContainsWordsAction,
+    ConfiguredWordCountAction,
+    ConfiguredNoopAction,
+]
 
 
 class ConfiguredAction(BaseModel):
     name: str
-    action: _BuiltinAction
-    config: dict
+    config: ActionConfigType
 
 
 class ActionDispatchFilter(BaseModel):
     op_name: str
     sample_rate: float
     configured_action_ref: str
+    disabled: Optional[bool] = False
