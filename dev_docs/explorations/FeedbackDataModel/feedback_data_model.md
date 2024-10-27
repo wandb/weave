@@ -226,9 +226,7 @@ Let's consider that a call might have a number of feedbacks associated with it. 
     <td><pre>
 {
     "configured_action_ref": "my_action:digest_1",
-    "output": {
-        "grade": "A"
-    }
+    "value": PRIMTIVE OR DICT PAYLOAD
 }</pre></td>
   </tr>
     <tr>
@@ -279,8 +277,8 @@ Let's consider that a call might have a number of feedbacks associated with it. 
    * Possible problem: if we want to put more metadata about the specific feedback, it nees to be placed as siblings in the payload, which excludes primitives from ever being used/stored. Also, effectively untyped and could cause key collisions. For example:
    ```json
    {
-    _scorer_context: {"label": "ground truth"},
-    is_correct: true
+    "_scorer_context": {"label": "ground truth"},
+    "is_correct": true
    }
    ```
 3. ("RefAsKey"): For dynamic columns, we could store the "object/version" as the first two keys of the payload. For example:
@@ -301,7 +299,7 @@ Let's consider that a call might have a number of feedbacks associated with it. 
    * One very nice property of this model is that you can group by call_ref, and do a dictionary merge on the results to get a compbined feedback object for each call.
 4. ("RefAsColumns"): For dynamic columns, we could store the "object/version" as new columns in the table. This is very similar to #3, but directly encodes the object/version as columns - taking advantage of the direct indexing capabilities of clickhouse.
 
-
+Consider the following table,
 <table>
 <tr>
     <th>Solution</th>
@@ -309,12 +307,14 @@ Let's consider that a call might have a number of feedbacks associated with it. 
     <th>Type</th>
     <th>Name</th>
     <th>Version</th>
+    <th>Context</th>
     <th>Payload</th>
 </tr>
 <tr>
-    <td rowspan=2>RefAsFields</td>
+    <td rowspan=3>RefAsFields</td>
     <td>Static</td>
     <td>`wandb.score.beta.1`</td>
+    <td>N/A</td>
     <td>N/A</td>
     <td>N/A</td>
     <td><pre>
@@ -323,23 +323,32 @@ Let's consider that a call might have a number of feedbacks associated with it. 
 }</pre></td>
 </tr>
 <tr>
-    <td>Dynamic</td>
-    <td>`ActionScore`</td>
-    <td>N/A</td>
+    <td rowspan=2>Dynamic</td>
+    <td rowspan=2>`ActionScore`</td>
+    <td rowspan=2>N/A</td>
+    <td rowspan=2>N/A</td>
     <td>N/A</td>
     <td><pre>
 {
     "configured_action_ref": "my_action:digest_1",
-    "context": {...},
-    "output": {
-        "grade": "A"
-    }
+    "_additional_context_fields: "",
+    "value": PRIMTIVE OR DICT PAYLOAD
 }</pre></td>
 </tr>
 <tr>
-    <td rowspan=2>RefAsType</td>
+    <td><pre>{
+    "configured_action_ref": "my_action:digest_1",
+    "_additional_context_fields: ""
+}</pre></td>
+    <td><pre>
+{"value": PRIMTIVE OR DICT PAYLOAD}
+</pre></td>
+</tr>
+<tr>
+    <td rowspan=3>RefAsType</td>
     <td>Static</td>
     <td>`wandb.score.beta.1`</td>
+    <td>N/A</td>
     <td>N/A</td>
     <td>N/A</td>
     <td><pre>
@@ -348,22 +357,30 @@ Let's consider that a call might have a number of feedbacks associated with it. 
 }</pre></td>
 </tr>
 <tr>
-    <td>Dynamic</td>
-    <td>`my_action:digest_1`</td>
-    <td>N/A</td>
+    <td rowspan=2>Dynamic</td>
+    <td rowspan=2>`my_action:digest_1`</td>
+    <td rowspan=2>N/A</td>
+    <td rowspan=2>N/A</td>
     <td>N/A</td>
     <td><pre>
 {
-    "context": {...},
-    "output": {
-        "grade": "A"
-    }
+    "_additional_context_fields: "",
+    "value": PRIMTIVE OR DICT PAYLOAD
 }</pre></td>
 </tr>
 <tr>
-    <td rowspan=2>RefAsKey</td>
+    <td><pre>
+{
+    "_additional_context_fields: ""
+}</pre></td>
+    <td><pre>
+{"value": PRIMTIVE OR DICT PAYLOAD}</pre></td>
+</tr>
+<tr>
+    <td rowspan=3>RefAsKey</td>
     <td>Static</td>
     <td>`wandb.score.beta.1`</td>
+    <td>N/A</td>
     <td>N/A</td>
     <td>N/A</td>
     <td><pre>
@@ -372,27 +389,41 @@ Let's consider that a call might have a number of feedbacks associated with it. 
 }</pre></td>
 </tr>
 <tr>
-    <td>Dynamic</td>
-    <td>`ActionScore`</td>
-    <td>N/A</td>
+    <td rowspan=2>Dynamic</td>
+    <td rowspan=2>`ActionScore`</td>
+    <td rowspan=2>N/A</td>
+    <td rowspan=2>N/A</td>
     <td>N/A</td>
     <td><pre>
 {
     "my_action": {
         "digest_1": {
             "configured_action_ref": "my_action:digest_1",
-            "context": {...},
-            "output": {
-                "grade": "A"
-            }
+            "_additional_context_fields: "",
+            "value": PRIMTIVE OR DICT PAYLOAD
         }
     }
 }</pre></td>
 </tr>
 <tr>
-    <td rowspan=2>RefAsColumns</td>
+    <td><pre>{
+    "configured_action_ref": "my_action:digest_1",
+    "_additional_context_fields": ""
+}</pre></td>
+    <td><pre>
+{
+    "my_action": {
+        "digest_1": {
+             "value": PRIMTIVE OR DICT PAYLOAD
+        }
+    }
+}</pre></td>
+</tr>
+<tr>
+    <td rowspan=3>RefAsColumns</td>
     <td>Static</td>
     <td>`wandb.score.beta.1`</td>
+    <td>N/A</td>
     <td>N/A</td>
     <td>N/A</td>
     <td><pre>
@@ -401,19 +432,246 @@ Let's consider that a call might have a number of feedbacks associated with it. 
 }</pre></td>
 </tr>
 <tr>
-    <td>Dynamic</td>
-    <td>`ActionScore`</td>
-    <td>my_action</td>
-    <td>digest_1</td>
+    <td rowspan=2>Dynamic</td>
+    <td rowspan=2>`ActionScore`</td>
+    <td rowspan=2>my_action</td>
+    <td rowspan=2>digest_1</td>
+    <td>N/A</td>
     <td><pre>
 {
-    "context": {...},
-    "output": {
-        "grade": "A"
-    }
+    "_additional_context_fields: "",
+    "value": PRIMTIVE OR DICT PAYLOAD
 }</pre></td>
 </tr>
+<tr>
+    <td><pre>{
+    "_additional_context_fields": ""
+}</pre></td>
+    <td><pre>
+{"value": PRIMTIVE OR DICT PAYLOAD}</pre></td>
+</tr>
 </table>
+
+## Initial Observations:
+1. All feedback seems to have:
+    * Type (defines the "Extra" schema and "Value" schema)
+        * We can think of some `types` as having a generic type, and the `name + version` further narrows the value schema.
+    * Name (object id)
+    * Version (object digest) - implicitly augments the value schema
+    * "Extra" Context (additional context)
+    * Value (the output of the feedback scorer)
+2. It is probably safe to assert that all payloads are dictionaries.
+    * DynamicColumns that might produce primitives need to be stored in the value field.
+
+
+```python
+T = TypeVar("T", bound=Union[dict])
+class ScorerFeedback(Generic[T]):
+    type: str = "ScorerFeedback"
+    name: str
+    version: str
+    extra: dict
+    value: T
+```
+
+The main question is which of these fields need to be their own columns, and which go in the value field. If all non-value fields are columns, then the further question becomes do we put {"value": ...} in the value field, or just the raw value?
+
+^^ This is the big question.
+
+## Possible Lower cost solution:
+
+1. Go with `RefAsFields`
+2. Store the Pydantic mapping in `type`
+3. Store additional fields as siblings to the value field.
+4. Create a materialized view that feels like ``RefsAsColumns`.
+
+This would:
+1. Allow us to keep the current contract that: typename -> pydantic mapping defines the value schema.
+2. We don't need to migrate / change the existing feedback ground truth table
+3. We can query from a materialized view that is more optimized for querying.
+
+Why not just go straight to `RefAsColumns`?
+1. Requires a migration.
+2. Does not depend on clickhouse's experimental JSON format to work.
+
+## Alternative Option
+
+1. Start with something more like `RefAsKeys`
+2. This gets all the benefits of the above solution, with the added benefit that existing queries of `[name].version.key` will work.
+   * would probably want to use underscores for metadata keys
+3. Possible issues with name collissions.
+- Feels more complex than the above solution, still requires a materialized view for performant lookup (or JSON column)
+
+However, if we don't do this, we lose the contract that `feedback.X.Y.Z` matches the payload schema.
+
+
+---
+```python
+# This would be the feedback table schema
+class Feedback():
+    type: str = "ScorerFeedback"
+    payload_value: TypedDict({
+        "_type_spec_name": str,     # _type_spec_name: my_scorer
+        "_type_spec_version": str,  # _type_spec_version: digest_1
+        "_context": dict,           # _context: {"label": "ground truth"}
+        name: TypedDict({           # my_scorer: {"digest_1": {"grade": "A"}}
+            version: VALUE_DICT,        
+        }),
+    })
+
+# This would be the materialized view schema
+class FeedbackView():
+    type: str = "ScorerFeedback" # indexed
+    spec_name: str # indexed
+    spec_version: str # indexed
+    context: dict
+    payload_value: VALUE_DICT
+
+# How about buildins?
+class FeedbackView():
+    type: str = "Builtin" # indexed
+    spec_name: str # indexed # "note"
+    spec_version: str # indexed # "1"
+    context: dict
+    payload_value: VALUE_DICT
+
+class FeedbackView():
+    type: str = "Custom" # indexed
+    spec_name: str # indexed # ""
+    spec_version: str # indexed # ""
+    context: dict
+    payload_value: VALUE_DICT
+```
+
+Query Time
+ 
+unfortunately, somehow we have to make the distiion between specifying the feeback spec and the value. for example, do we do:
+
+* `payload.name.version.key`?
+
+Sigh, there are so many competing concerns here.
+
+1. User-space, would be nice to have a "mongo-like" field selection for feedback:
+   * `feedback.spec_name.spec_version.value.key`
+   * or maybe:
+   ```
+   {
+        $getFeedbackField: {
+            $query: {
+                $expr: {
+                    $and: [
+                        {$eq: ["$feedback_type", "ScorerFeedback"]},
+                        {$eq: ["$spec_name", "my_scorer"]},
+                        {$eq: ["$spec_version", "digest_1"]},
+                    ]
+                }
+            },
+            <!-- $userGroup: "take_last", -->
+            $field: {
+                $avg: {$getField: "$.payload_value.grade"}
+            }
+        }
+   }
+   ```
+
+
+Ok, what if we merged things and just stored more info?
+
+```python
+# Here, we would store the value 3 times. However, this would allow for:
+1. Querying using existing dot notation (feedback.payload.name.key), (feedback.payload.name:version.key)
+2. We could easily
+class Feedback():
+    type: str = "ScorerFeedback"
+    payload_value: TypedDict({
+        "_type_spec_name": str,     # _type_spec_name: my_scorer
+        "_type_spec_version": str,  # _type_spec_version: digest_1
+        "_context": dict,           # _context: {"label": "ground truth"}
+        "_value": VALUE_DICT,      # _value: {"grade": "A"}
+        name: VALUE_DICT,          # my_scorer: {"grade": "A"}
+        name: TypedDict({           # my_scorer: {"digest_1": {"grade": "A"}}
+            version: VALUE_DICT,        
+        }),
+    })
+```
+
+
+OK, i am just flip flopping now. I think ultimately, a feedback "column" is keyed by the type, name, and version. I think the existing format is wrong. it should be
+
+* HumanFeedback.ColumnName.ColumnVersion.value.key
+* ScorerScore.ScorerName.ScorerVersion.value.key
+* ActionResult.ActionName.ActionVersion.value.key
+* Builtin.BuiltinName("Reaction" | "Note").BuiltinVersion("1").value.key
+* Custom.CustomName.CustomVersion("").value.key
+
+ok, now drop the category.
+
+* ColumnName.ColumnVersion.value.key
+* ScorerName.ScorerVersion.value.key
+* ActionName.ActionVersion.value.key
+* BuiltinName("Reaction" | "Note").BuiltinVersion("1").value.key # name collission possibility
+* CustomTypeName.CustomVersion("").value.key # name collission possibility
+
+
+----
+
+Circular thinking:
+
+1. We want feedback_type to map to a pydantic structure.
+    * this implies that we likely need a materizlied view for peformance else we have to read big columns. JSON column are not available in clickhouse yet.
+2. If that is the case, then feedback_type is a small list of valid types.
+3. We also MUST store data in addition to the value field, meaning the payload has a few extra fields.
+4. If we want to maintain the existing dot notation (meaning the payload values themselves correspond to the value structure), then we want the value to be nested at the top level. However, if we want to be able to group by name and version differently, then we might need to store multiple copies, which feels wrong.
+5. Maybe we should extract name and version into their own fields. If we do this, then how do we handle theexisting types of note/emoji/custom? Custom types don't hae versions. Any dot-sperated notion is going to be flawed and have name collisions.
+6. At query time, sometimes you are going to want to get all the individual feedback rows. Would we want to return that special materialized view, or the raw view?
+    * what about the cases where you are aggregating?
+7. Call query time is a bit different
+8. Which if any of these options is easiest to migrate or change?
+
+This makes me land back on:
+
+```python
+class ScorerFeedback():
+    type: str = "ScorerFeedback"
+    value: TypedDict({
+        "_scorer_object_id": str,
+        "_scorer_digest": str,
+        # ... other metadata fields
+        "result": dict
+    })
+```
+
+We then have a materialized view that extracts the metadata fields into their own columns.
+
+* If you are listing feedback for a ref, you get the raw data back, and you see some of the underlying metadata fields.
+* We preserve the ability to migrate reliably
+* Custom feedback types can have some sentinal ersion in the materizalsed view: "_".
+* Notes and Emojies are hard... we might want to have their names be something more complicated like `weave_note` and `weave_reaction`. 
+* We shsould use the `~0` and `~1` encoding for dots and tildes.
+
+... Ok, now why not just directly store `{[name]: [version]: value}` in the value field?)
+1. Inconsistent pydantic mapping.
+    * could reduce forward risk by by data duplication using `_result` field.
+2. would save us from the immediate need of a materialized view.
+benefit: saves the nested selection. drawback: feels more complex.
+
+This would be:
+```python
+class ScorerFeedback():
+    type: str = "ScorerFeedback"
+    value: TypedDict({
+        "_metadata": TypedDict({
+            "scorer_object_id": str,
+            "scorer_digest": str,
+            # ... other metadata fields
+        }),
+        scorer_object_id: TypedDict({
+            scorer_digest: dict
+        })
+    })
+
+
+```
 
 ----
 
