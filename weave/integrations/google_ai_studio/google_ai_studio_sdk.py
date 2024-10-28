@@ -36,6 +36,8 @@ def gemini_on_finish(
         original_model_name = call.inputs["self"].model_name
     elif hasattr(call.inputs["self"], "model"):
         original_model_name = call.inputs["self"].model.model_name
+    else:
+        raise ValueError("Unknown model type")
     model_name = original_model_name.split("/")[-1]
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
