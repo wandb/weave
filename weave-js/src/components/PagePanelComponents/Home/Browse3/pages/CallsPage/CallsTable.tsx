@@ -31,6 +31,7 @@ import {Icon} from '@wandb/weave/components/Icon';
 import React, {
   FC,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -42,6 +43,7 @@ import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {TailwindContents} from '../../../../../Tailwind';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
+import {CallsTableRowSelectionContext} from '../../../Browse3';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
@@ -479,6 +481,15 @@ export const CallsTable: FC<{
       }
     }
   }, [rowIds, peekId]);
+  const {setCallIds} = useContext(CallsTableRowSelectionContext);
+  useEffect(() => {
+    // HACK, hideControls is a proxy for when the table is embedded
+    // in the peek drawer, we only want to track call IDs in the main
+    // table. Ignore call Ids if hiding controls.
+    if (!hideControls && setCallIds) {
+      setCallIds(rowIds);
+    }
+  }, [rowIds, hideControls, setCallIds]);
 
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {

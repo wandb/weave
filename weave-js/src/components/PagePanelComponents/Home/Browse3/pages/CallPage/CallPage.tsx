@@ -1,13 +1,14 @@
 import Box from '@mui/material/Box';
 import {Loading} from '@wandb/weave/components/Loading';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {FC, useCallback, useEffect, useState} from 'react';
+import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
+import {CallsTableRowSelectionContext} from '../../../Browse3';
 import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {NotFoundPanel} from '../../NotFoundPanel';
@@ -194,6 +195,64 @@ const CallPageInnerVertical: FC<{
     }
   }, [callComplete]);
 
+  // Call navigation by arrow keys and buttons
+  const {getNextCallId, getPreviousCallId} = useContext(
+    CallsTableRowSelectionContext
+  );
+  const onNextCall = useCallback(() => {
+    const nextCallId = getNextCallId?.(currentCall.callId);
+    if (nextCallId) {
+      history.replace(
+        currentRouter.callUIUrl(
+          currentCall.entity,
+          currentCall.project,
+          currentCall.traceId,
+          nextCallId,
+          path,
+          showTraceTree
+        )
+      );
+    }
+  }, [currentCall, currentRouter, history, path, showTraceTree, getNextCallId]);
+  const onPreviousCall = useCallback(() => {
+    const previousCallId = getPreviousCallId?.(currentCall.callId);
+    if (previousCallId) {
+      history.replace(
+        currentRouter.callUIUrl(
+          currentCall.entity,
+          currentCall.project,
+          currentCall.traceId,
+          previousCallId,
+          path,
+          showTraceTree
+        )
+      );
+    }
+  }, [
+    currentCall,
+    currentRouter,
+    history,
+    path,
+    showTraceTree,
+    getPreviousCallId,
+  ]);
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === 'ArrowDown' && event.shiftKey) {
+        onNextCall();
+      } else if (event.key === 'ArrowUp' && event.shiftKey) {
+        onPreviousCall();
+      }
+    },
+    [onNextCall, onPreviousCall]
+  );
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
+
   const callTabs = useCallTabs(currentCall);
 
   if (loading && !assumeCallIsSelectedCall) {
@@ -203,14 +262,37 @@ const CallPageInnerVertical: FC<{
   return (
     <SimplePageLayoutWithHeader
       headerExtra={
-        <Box>
-          <Button
-            icon="layout-tabs"
-            tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
-            variant="ghost"
-            active={showTraceTree ?? false}
-            onClick={onToggleTraceTree}
-          />
+        <Box
+          sx={{
+            display: 'flex',
+            width: '100%',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}>
+          <Box>
+            <Button
+              icon="sort-ascending"
+              tooltip={`Previous call`}
+              variant="ghost"
+              onClick={onPreviousCall}
+              className="mr-2"
+            />
+            <Button
+              icon="sort-descending"
+              tooltip={`Next call`}
+              variant="ghost"
+              onClick={onNextCall}
+            />
+          </Box>
+          <Box>
+            <Button
+              icon="layout-tabs"
+              tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
+              variant="ghost"
+              active={showTraceTree ?? false}
+              onClick={onToggleTraceTree}
+            />
+          </Box>
         </Box>
       }
       isSidebarOpen={showTraceTree}
