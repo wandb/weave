@@ -43,7 +43,6 @@ export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
   ),
 };
 
-
 export const EMPTY_PROPS_LEADERBOARDS: EmptyProps = {
   icon: 'benchmark-square' as const,
   heading: 'No leaderboards yet',

@@ -331,7 +331,6 @@ export const ObjectVersionsTable: React.FC<{
         })
       );
     }
-    
 
     if (!props.hideCreatedAtColumn) {
       cols.push(

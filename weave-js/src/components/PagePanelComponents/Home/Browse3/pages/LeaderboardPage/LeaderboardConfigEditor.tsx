@@ -15,7 +15,7 @@ import {
   ArrowUpward as MoveUpIcon,
   Delete as DeleteIcon,
   FileCopy as CloneIcon,
-} from '@material-ui/icons';
+} from '@mui/icons-material';
 import {refUri} from '@wandb/weave/react';
 import React, {useEffect, useState} from 'react';
 
