@@ -693,10 +693,10 @@ export async function disableGroupByCol(
   // We may try to sort on aggregated columns after ungrouping
   // To prevent this, disable sorting on all the columns and re-enable
   // after the ungroup
-  const initiallySortedCols = _.clone(ts.sort)
+  const initiallySortedCols = _.clone(ts.sort);
   ts.sort.forEach(sortObj => {
-    ts = disableSortByCol(ts, sortObj.columnId)
-  })
+    ts = disableSortByCol(ts, sortObj.columnId);
+  });
 
   ts = produce(ts, draft => {
     draft.autoColumns = false;
@@ -714,10 +714,13 @@ export async function disableGroupByCol(
   ts = await refreshSelectFunctions(ts, inputArrayNode, weave, stack);
 
   initiallySortedCols.forEach(sortObj => {
-    if (sortObj.columnId !== colId && canSortType(ts.columnSelectFunctions[sortObj.columnId].type)) {
-      ts = enableSortByCol(ts, sortObj.columnId, sortObj.dir === 'asc')
+    if (
+      sortObj.columnId !== colId &&
+      canSortType(ts.columnSelectFunctions[sortObj.columnId].type)
+    ) {
+      ts = enableSortByCol(ts, sortObj.columnId, sortObj.dir === 'asc');
     }
-  })
+  });
   return ts;
 }
 
