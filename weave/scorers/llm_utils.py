@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     import instructor
     from anthropic import Anthropic, AsyncAnthropic
     from google.generativeai import GenerativeModel
+    from instructor.patch import InstructorChatCompletionCreate
     from mistralai import Mistral
     from openai import AsyncOpenAI, OpenAI
 
@@ -65,7 +66,9 @@ def instructor_client(client: _LLM_CLIENTS) -> "instructor.client":  # type: ign
         raise ValueError(f"Unsupported client type: {client_type}")
 
 
-def create(client: instructor.client, *args, **kwargs) -> Any:  # type: ignore
+def create(
+    client: instructor.client, *args: Any, **kwargs: Any
+) -> InstructorChatCompletionCreate:
     # gemini has slightly different argument namings...
     # max_tokens -> max_output_tokens
     if "generativemodel" in type(client.client).__name__.lower():
@@ -84,10 +87,10 @@ def embed(
 ) -> List[List[float]]:  # type: ignore
     client_type = type(client).__name__.lower()
     if "openai" in client_type:
-        response = client.embeddings.create(model=model_id, input=texts, **kwargs)  # type: ignore
+        response = client.embeddings.create(model=model_id, input=texts, **kwargs)
         return [embedding.embedding for embedding in response.data]
     elif "mistral" in client_type:
-        response = client.embeddings.create(model=model_id, inputs=texts, **kwargs)  # type: ignore
+        response = client.embeddings.create(model=model_id, inputs=texts, **kwargs)
         return [embedding.embedding for embedding in response.data]
     else:
         raise ValueError(f"Unsupported client type: {type(client).__name__.lower()}")
