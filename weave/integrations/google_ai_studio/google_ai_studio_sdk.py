@@ -110,5 +110,12 @@ google_genai_patcher = MultiPatcher(
             "ChatSession.send_message",
             gemini_wrapper_sync(name="google.generativeai.ChatSession.send_message"),
         ),
+        SymbolPatcher(
+            lambda: importlib.import_module("google.generativeai.generative_models"),
+            "ChatSession.send_message_async",
+            gemini_wrapper_async(
+                name="google.generativeai.ChatSession.send_message_async"
+            ),
+        ),
     ]
 )
