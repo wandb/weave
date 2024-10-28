@@ -1,9 +1,5 @@
 # Costs
 
-:::info
-Custom costs are accessible via Python and REST queries. UI uptake is under development and expected to be complete by middle of October 2024
-:::
-
 ## Adding a custom cost
 
 You can add a custom cost by using the [`add_cost`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-add_cost) method.

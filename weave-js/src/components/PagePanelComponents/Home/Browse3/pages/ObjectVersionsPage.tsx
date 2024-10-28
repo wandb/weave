@@ -32,6 +32,7 @@ import {
   EMPTY_PROPS_LEADERBOARDS,
   EMPTY_PROPS_MODEL,
   EMPTY_PROPS_OBJECTS,
+  EMPTY_PROPS_PROMPTS,
 } from './common/EmptyContent';
 import {
   CustomLink,
@@ -47,7 +48,10 @@ import {
 } from './common/tabularListViews/columnBuilder';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {useControllableState, useURLSearchParamsDict} from './util';
-import {OBJECT_ATTR_EDGE_NAME} from './wfReactInterface/constants';
+import {
+  KNOWN_BASE_OBJECT_CLASSES,
+  OBJECT_ATTR_EDGE_NAME,
+} from './wfReactInterface/constants';
 import {useWFHooks} from './wfReactInterface/context';
 import {
   isTableRef,
@@ -154,8 +158,10 @@ export const FilterableObjectVersionsTable: React.FC<{
   const isEmpty = objectVersions.length === 0;
   if (isEmpty) {
     let propsEmpty = EMPTY_PROPS_OBJECTS;
-    const base = effectiveFilter.baseObjectClass;
-    if ('Model' === base) {
+    const base = props.initialFilter?.baseObjectClass;
+    if ('Prompt' === base) {
+      propsEmpty = EMPTY_PROPS_PROMPTS;
+    } else if ('Model' === base) {
       propsEmpty = EMPTY_PROPS_MODEL;
     } else if (DATASET_BASE_OBJECT_CLASS === base) {
       propsEmpty = EMPTY_PROPS_DATASETS;
@@ -317,11 +323,7 @@ export const ObjectVersionsTable: React.FC<{
           },
           renderCell: cellParams => {
             const category = cellParams.value;
-            if (
-              category === 'Model' ||
-              category === 'Dataset' ||
-              category === 'Evaluation'
-            ) {
+            if (KNOWN_BASE_OBJECT_CLASSES.includes(category)) {
               return <TypeVersionCategoryChip baseObjectClass={category} />;
             }
             return null;
@@ -329,6 +331,7 @@ export const ObjectVersionsTable: React.FC<{
         })
       );
     }
+    
 
     if (!props.hideCreatedAtColumn) {
       cols.push(

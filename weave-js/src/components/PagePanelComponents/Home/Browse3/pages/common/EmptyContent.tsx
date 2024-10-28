@@ -43,6 +43,7 @@ export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
   ),
 };
 
+
 export const EMPTY_PROPS_LEADERBOARDS: EmptyProps = {
   icon: 'benchmark-square' as const,
   heading: 'No leaderboards yet',
@@ -57,6 +58,22 @@ export const EMPTY_PROPS_LEADERBOARDS: EmptyProps = {
       or follow our tutorial to{' '}
       <TargetBlank href="http://wandb.me/weave_eval_tut">
         set up an evaluation pipeline
+      </TargetBlank>
+      .
+    </>
+  ),
+};
+
+export const EMPTY_PROPS_PROMPTS: EmptyProps = {
+  icon: 'forum-chat-bubble' as const,
+  heading: 'No prompts yet',
+  description:
+    'You can use prompts to try different instructions for your LLM, tracking edits and their impact on performance.',
+  moreInformation: (
+    <>
+      Learn{' '}
+      <TargetBlank href="http://wandb.me/weave_prompts">
+        prompt basics
       </TargetBlank>
       .
     </>
