@@ -22,8 +22,8 @@ import {
   LeaderboardColumnOrderType,
   LeaderboardGrid,
 } from '../../views/Leaderboard/LeaderboardGrid';
-import {usePythonLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
-import {PythonLeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
+import {useSavedLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
+import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
@@ -141,9 +141,7 @@ const useUpdateLeaderboard = (
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
 
-  const updateLeaderboard = async (
-    leaderboardVal: PythonLeaderboardObjectVal
-  ) => {
+  const updateLeaderboard = async (leaderboardVal: LeaderboardObjectVal) => {
     return await client.objCreate({
       obj: {
         project_id: projectIdFromParts({entity, project}),
@@ -167,7 +165,7 @@ export const LeaderboardPageContentInner: React.FC<
     isEditing: boolean;
     setIsEditing: (isEditing: boolean) => void;
   } & {
-    leaderboardVal: PythonLeaderboardObjectVal;
+    leaderboardVal: LeaderboardObjectVal;
   }
 > = props => {
   const updateLeaderboard = useUpdateLeaderboard(
@@ -181,7 +179,7 @@ export const LeaderboardPageContentInner: React.FC<
   useEffect(() => {
     props.setName(workingLeaderboardValCopy.name);
   }, [props, workingLeaderboardValCopy.name]);
-  const {loading, data, evalData} = usePythonLeaderboardData(
+  const {loading, data, evalData} = useSavedLeaderboardData(
     props.entity,
     props.project,
     workingLeaderboardValCopy
@@ -325,7 +323,7 @@ export const ToggleLeaderboardConfig: React.FC<{
 
 const parseLeaderboardVal = (
   leaderboardVal: any
-): PythonLeaderboardObjectVal | null => {
+): LeaderboardObjectVal | null => {
   if (typeof leaderboardVal !== 'object' || leaderboardVal == null) {
     return null;
   }
@@ -376,7 +374,7 @@ const parseLeaderboardVal = (
         summary_metric_path_parts: summaryMetricParts,
       };
     })
-    .filter(column => column != null) as PythonLeaderboardObjectVal['columns'];
+    .filter(column => column != null) as LeaderboardObjectVal['columns'];
 
   return {
     name,

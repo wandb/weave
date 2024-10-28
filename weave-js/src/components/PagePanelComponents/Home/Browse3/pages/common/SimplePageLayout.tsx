@@ -24,7 +24,7 @@ export const SimplePageLayoutContext =
   createContext<SimplePageLayoutContextType>({});
 
 export const SimplePageLayout: FC<{
-  title: ReactNode;
+  title: string;
   tabs: Array<{
     label: string;
     content: ReactNode;

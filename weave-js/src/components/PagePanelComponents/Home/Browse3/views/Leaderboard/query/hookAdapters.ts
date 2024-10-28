@@ -4,13 +4,13 @@ import {useEffect, useState} from 'react';
 import {useGetTraceServerClientContext} from '../../../pages/wfReactInterface/traceServerClientContext';
 import {
   FilterAndGroupSpec,
-  PythonLeaderboardObjectVal,
+  LeaderboardObjectVal,
 } from '../types/leaderboardConfigType';
 import {
   getLeaderboardData,
   getPythonLeaderboardData,
   GroupedLeaderboardData,
-  PythonLeaderboardEvalData,
+  LeaderboardObjectEvalData,
 } from './leaderboardQuery';
 
 type LeaderboardDataState = {
@@ -45,14 +45,14 @@ export const useLeaderboardData = (
   return state;
 };
 
-export const usePythonLeaderboardData = (
+export const useSavedLeaderboardData = (
   entity: string,
   project: string,
-  val: PythonLeaderboardObjectVal
-): LeaderboardDataState & {evalData: PythonLeaderboardEvalData} => {
+  val: LeaderboardObjectVal
+): LeaderboardDataState & {evalData: LeaderboardObjectEvalData} => {
   const getTraceServerClient = useGetTraceServerClientContext();
   const [state, setState] = useState<
-    LeaderboardDataState & {evalData: PythonLeaderboardEvalData}
+    LeaderboardDataState & {evalData: LeaderboardObjectEvalData}
   >({
     loading: true,
     data: {modelGroups: {}},

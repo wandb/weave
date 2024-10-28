@@ -23,7 +23,7 @@ import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {
   ALL_VALUE,
-  PythonLeaderboardObjectVal,
+  LeaderboardObjectVal,
 } from '../../views/Leaderboard/types/leaderboardConfigType';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
@@ -34,10 +34,10 @@ import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
 export const LeaderboardConfigEditor: React.FC<{
   entity: string;
   project: string;
-  leaderboardVal: PythonLeaderboardObjectVal;
+  leaderboardVal: LeaderboardObjectVal;
   saving: boolean;
   isDirty: boolean;
-  setWorkingCopy: (leaderboardVal: PythonLeaderboardObjectVal) => void;
+  setWorkingCopy: (leaderboardVal: LeaderboardObjectVal) => void;
   discardChanges: () => void;
   commitChanges: () => void;
 }> = ({
@@ -188,7 +188,7 @@ export const LeaderboardConfigEditor: React.FC<{
 };
 
 const ColumnEditor: React.FC<{
-  column: PythonLeaderboardObjectVal['columns'][0];
+  column: LeaderboardObjectVal['columns'][0];
   index: number;
   evalObjs: EvaluationHelperObj[];
   entity: string;

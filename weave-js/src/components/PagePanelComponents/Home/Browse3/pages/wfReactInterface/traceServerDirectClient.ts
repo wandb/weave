@@ -257,6 +257,8 @@ export class DirectTraceServerClient {
     const initialObjectId = req.obj.object_id;
     const sanitizedObjectId = sanitizeObjectId(initialObjectId);
     if (sanitizedObjectId !== initialObjectId) {
+      // Caller is expected to sanitize the object id. We should be doing this
+      // on the server, but it is currently disabled.
       throw new Error(
         `Invalid object name: ${initialObjectId}, sanitized to ${sanitizedObjectId}`
       );

@@ -17,7 +17,7 @@ import {
 import {
   ALL_VALUE,
   FilterAndGroupSpec,
-  PythonLeaderboardObjectVal,
+  LeaderboardObjectVal,
 } from '../types/leaderboardConfigType';
 
 export type LeaderboardValueRecord = {
@@ -42,10 +42,12 @@ export type LeaderboardValueRecord = {
   createdAt: Date;
   sourceEvaluationCallId: string;
   sourceEvaluationObjectRef: string;
-  shouldMinimize?: boolean; // hack to put this here
+  // A bit hacky to denormalize `shouldMinimize` here, but it's convenient
+  // for the caller and not externally visible
+  shouldMinimize?: boolean;
 };
 
-export type GroupableLeaderboardValueRecord = {
+type GroupableLeaderboardValueRecord = {
   modelGroup: string;
   datasetGroup: string;
   scorerGroup: string;
@@ -76,7 +78,7 @@ export type GroupedLeaderboardModelGroup<
   };
 };
 
-export const getEvaluationObjectsForSpec = async (
+const getEvaluationObjectsForSpec = async (
   client: TraceServerClient,
   entity: string,
   project: string,
@@ -117,7 +119,7 @@ export const getEvaluationObjectsForSpec = async (
   return allEvaluationObjectsRes;
 };
 
-export const getLeaderboardGroupableData = async (
+const getLeaderboardGroupableData = async (
   client: TraceServerClient,
   entity: string,
   project: string,
@@ -492,12 +494,12 @@ export const getPythonLeaderboardData = async (
   client: TraceServerClient,
   entity: string,
   project: string,
-  val: PythonLeaderboardObjectVal
+  val: LeaderboardObjectVal
 ): Promise<{
   finalData: GroupedLeaderboardData;
-  evalData: PythonLeaderboardEvalData;
+  evalData: LeaderboardObjectEvalData;
 }> => {
-  const {groupableData, evalData} = await getPythonLeaderboardGroupableData(
+  const {groupableData, evalData} = await getLeaderboardObjectGroupableData(
     client,
     entity,
     project,
@@ -537,7 +539,7 @@ export const getPythonLeaderboardData = async (
   return {finalData, evalData};
 };
 
-export type PythonLeaderboardEvalData = {
+export type LeaderboardObjectEvalData = {
   [evalRefUri: string]: {
     datasetGroup: string;
     scorers: {
@@ -546,14 +548,14 @@ export type PythonLeaderboardEvalData = {
   };
 };
 
-const getPythonLeaderboardGroupableData = async (
+const getLeaderboardObjectGroupableData = async (
   client: TraceServerClient,
   entity: string,
   project: string,
-  val: PythonLeaderboardObjectVal
+  val: LeaderboardObjectVal
 ): Promise<{
   groupableData: GroupableLeaderboardValueRecord[];
-  evalData: PythonLeaderboardEvalData;
+  evalData: LeaderboardObjectEvalData;
 }> => {
   const evalObjectRefs = _.uniq(
     val.columns.map(col => col.evaluation_object_ref)
@@ -587,7 +589,7 @@ const getPythonLeaderboardGroupableData = async (
   const allEvaluationCallsRes = await allEvaluationCallsProm;
 
   const data: GroupableLeaderboardValueRecord[] = [];
-  const evalData: PythonLeaderboardEvalData = {};
+  const evalData: LeaderboardObjectEvalData = {};
   allEvaluationCallsRes.calls.forEach(call => {
     val.columns.forEach(col => {
       const evalObjRefUri = call.inputs.self;

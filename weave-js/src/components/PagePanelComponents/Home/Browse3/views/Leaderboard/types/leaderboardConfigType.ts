@@ -44,7 +44,9 @@ export type FilterAndGroupModelSpec = {
   groupAllVersions?: boolean;
 };
 
-export type PythonLeaderboardObjectVal = {
+// TODO: Merge into weave-js/src/components/PagePanelComponents/Home/Browse3/collections/collectionRegistry.ts after
+// Online evals lands
+export type LeaderboardObjectVal = {
   name: string;
   description: string;
   columns: Array<{
