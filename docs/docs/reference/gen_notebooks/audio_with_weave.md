@@ -1,3 +1,6 @@
+---
+title: Log Audio With Weave
+---
 
 
 :::tip[This is a notebook]
@@ -8,6 +11,9 @@
 
 :::
 
+
+
+<!--- @wandbcode{feedback-colab} -->
 
 # How to use Weave with Audio Data: An OpenAI Example
 
@@ -39,6 +45,7 @@ Next, load the required API keys for OpenAI and Weave. Here, we use set_env whic
 
 ```python
 # Set environment variables.
+from set_env import set_env
 
 _ = set_env("OPENAI_API_KEY")
 _ = set_env("WANDB_API_KEY")
@@ -152,7 +159,7 @@ prompt_endpoint_and_log_trace(
 display(Audio("output.wav", rate=SAMPLE_RATE, autoplay=True))
 ```
 
-# Advanced Usage: Realtime Audio API with Weave #TODO: Record video of weave traces and me chatting with it w/ the terminal output side by side. 
+# Advanced Usage: Realtime Audio API with Weave
 <img src="https://i.imgur.com/ZiW3IVu.png"/>
 <details>
 <summary> (Advanced) Realtime Audio API with Weave </summary>
