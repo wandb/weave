@@ -92,6 +92,7 @@ class YourModel(Model):
             "usage": {
                 "input_tokens": prompt_tokens,
                 "output_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
             },
             "model": "your_model_name",
             "output": prediction,
