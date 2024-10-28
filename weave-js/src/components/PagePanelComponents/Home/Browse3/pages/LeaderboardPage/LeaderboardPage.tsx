@@ -13,6 +13,8 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import ReactMarkdown from 'react-markdown';
+import styled from 'styled-components';
 
 import {WeaveflowPeekContext} from '../../context';
 import {NotFoundPanel} from '../../NotFoundPanel';
@@ -26,7 +28,6 @@ import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
-import {StyledReactMarkdown} from './EditableMarkdown';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
 
 type LeaderboardPageProps = {
@@ -427,3 +428,33 @@ export const useIsEditor = (entity: string) => {
     };
   }, [entity, loadingUserInfo, userInfo]);
 };
+
+export const StyledReactMarkdown = styled(ReactMarkdown)`
+  > *:first-child {
+    margin-top: 0;
+  }
+  h1 {
+    font-weight: 600;
+    font-size: 1.2rem;
+  }
+  h2 {
+    font-weight: 600;
+    font-size: 1.15rem;
+  }
+  h3 {
+    font-weight: 600;
+    font-size: 1.1rem;
+  }
+  h4 {
+    font-weight: 600;
+    font-size: 1.05rem;
+  }
+  h5 {
+    font-weight: 600;
+    font-size: 1rem;
+  }
+  h6 {
+    font-weight: 600;
+    font-size: 1rem;
+  }
+`;

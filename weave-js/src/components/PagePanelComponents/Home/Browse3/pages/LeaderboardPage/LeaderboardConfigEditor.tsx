@@ -437,8 +437,6 @@ const useMetrics = (
     }
 
     let mounted = true;
-    // TODO: Implement the actual API call to fetch metrics for the given evaluation object and scorer
-    // This is a placeholder implementation
     client
       .callsStreamQuery({
         project_id: projectIdFromParts({entity, project}),
