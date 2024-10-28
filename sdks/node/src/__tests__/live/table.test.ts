@@ -1,7 +1,11 @@
-import {init} from '../clientApi';
-import {Table} from '../table';
+import {init, login} from '../../clientApi';
+import {Table} from '../../table';
 
 describe('table', () => {
+  beforeEach(async () => {
+    await login({apiKey: process.env.WANDB_API_KEY ?? ''});
+  });
+
   test('example', async () => {
     // Table behaves like a container of rows
     const rows = [

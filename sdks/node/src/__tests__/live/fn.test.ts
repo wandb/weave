@@ -1,7 +1,7 @@
-import {init} from '../clientApi';
-import {CallableObject} from '../fn';
-import {op} from '../op';
-import {WeaveObjectParameters} from '../weaveObject';
+import {init, login} from '../../clientApi';
+import {CallableObject} from '../../fn';
+import {op} from '../../op';
+import {WeaveObjectParameters} from '../../weaveObject';
 
 interface ParametrizedFunctionOptions extends WeaveObjectParameters {
   magicNumber?: number;
@@ -28,6 +28,10 @@ class ParametrizedFunction extends CallableObject<
 }
 
 describe('Fn', () => {
+  beforeEach(async () => {
+    await login({apiKey: process.env.WANDB_API_KEY ?? ''});
+  });
+
   test('use fn', async () => {
     const client = await init('test-project');
 

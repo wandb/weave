@@ -1,7 +1,11 @@
-import {init} from '../clientApi';
-import {Dataset} from '../dataset';
+import {init, login} from '../../clientApi';
+import {Dataset} from '../../dataset';
 
 describe('Dataset', () => {
+  beforeEach(async () => {
+    await login({apiKey: process.env.WANDB_API_KEY ?? ''});
+  });
+
   test('should save a dataset', async () => {
     const client = await init('test-project');
     const data = [

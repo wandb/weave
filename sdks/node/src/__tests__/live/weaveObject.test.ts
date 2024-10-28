@@ -1,6 +1,6 @@
-import {init} from '../clientApi';
-import {op} from '../op';
-import {WeaveObject} from '../weaveObject';
+import {init, login} from '../../clientApi';
+import {op} from '../../op';
+import {WeaveObject} from '../../weaveObject';
 
 class ExampleObject extends WeaveObject {
   constructor(
@@ -18,6 +18,10 @@ class ExampleObject extends WeaveObject {
 }
 
 describe('weaveObject', () => {
+  beforeEach(async () => {
+    await login({apiKey: process.env.WANDB_API_KEY ?? ''});
+  });
+
   test('basic-example', async () => {
     // TODO: Do we support saving  basic objects?
     // const client = await init('test-project');
