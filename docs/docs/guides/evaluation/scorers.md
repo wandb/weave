@@ -212,37 +212,32 @@ from openai import OpenAI
 import weave
 from weave.scorers import HallucinationFreeScorer
 
+# Initialize clients and scorers
 llm_client = OpenAI()
-
 hallucination_scorer = HallucinationFreeScorer(
     client=llm_client, 
     model_id="gpt-4o",
-    temperature=0.7,
-    max_tokens=4096,
     column_map={"context": "input", "output": "other_col"}
 )
+
+# Create dataset
 dataset = [
-        {
-            "input": "John likes various types of cheese.",
-            "other_col": "John's favorite cheese is cheddar.",
-        },
-        {
-            "input": "Pepe likes various types of cheese.",
-            "other_col": "Pepe's favorite cheese is gouda.",
-        },
-    ]
+    {"input": "John likes various types of cheese."},
+    {"input": "Pepe likes various types of cheese."},
+]
 
 @weave.op
-def model(input):
+def model(input: str) -> str:
     return "The person's favorite cheese is cheddar."
 
+# Run evaluation
 evaluation = weave.Evaluation(
     dataset=dataset,
     scorers=[hallucination_scorer],
 )
 result = asyncio.run(evaluation.evaluate(model))
-# result["HallucinationFreeScorer"]["has_hallucination"]["true_count"] == 2
-# result["HallucinationFreeScorer"]["has_hallucination"]["true_fraction"] == 1.0
+print(result)
+# {'HallucinationFreeScorer': {'has_hallucination': {'true_count': 2, 'true_fraction': 1.0}}, 'model_latency': {'mean': 1.4395725727081299}}
 ```
 ---
 
@@ -286,29 +281,28 @@ import weave
 from weave.scorers import SummarizationScorer
 
 class SummarizationModel(weave.Model):
-    """
-    A model that generates a summary of the input text.
-    """
     @weave.op()
     async def predict(self, input: str) -> str:
         return "This is a summary of the input text."
 
+# Initialize clients and scorers
 llm_client = OpenAI()
 model = SummarizationModel()
 summarization_scorer = SummarizationScorer(
     client=llm_client, 
     model_id="gpt-4o",
-    temperature=0.7,
-    max_tokens=1024,
 )
+# Create dataset
 dataset = [
     {"input": "The quick brown fox jumps over the lazy dog."},
-    {"input": "Artificial Intelligence is revolutionizing various industries, from healthcare to finance."}
+    {"input": "Artificial Intelligence is revolutionizing various industries."}
 ]
 
+# Run evaluation
 evaluation = weave.Evaluation(dataset=dataset, scorers=[summarization_scorer])
 results = asyncio.run(evaluation.evaluate(model))
 print(results)
+# {'SummarizationScorer': {'is_entity_dense': {'true_count': 0, 'true_fraction': 0.0}, 'summarization_eval_score': {'mean': 0.0}, 'entity_density': {'mean': 0.0}}, 'model_latency': {'mean': 6.210803985595703e-05}}
 ```
 
 ---
@@ -345,17 +339,27 @@ from openai import OpenAI
 import weave
 from weave.scorers import OpenAIModerationScorer
 
+class MyModel(weave.Model):
+    @weave.op
+    async def predict(self, input: str) -> str:
+        return input
+
+# Initialize clients and scorers
 client = OpenAI()
+model = MyModel()
 moderation_scorer = OpenAIModerationScorer(client=client)
 
+# Create dataset
 dataset = [
     {"input": "I love puppies and kittens!"},
     {"input": "I hate everyone and want to hurt them."}
 ]
 
-evaluation = Evaluation(dataset=dataset, scorers=[moderation_scorer])
+# Run evaluation
+evaluation = weave.Evaluation(dataset=dataset, scorers=[moderation_scorer])
 results = asyncio.run(evaluation.evaluate(model))
 print(results)
+# {'OpenAIModerationScorer': {'flagged': {'true_count': 1, 'true_fraction': 0.5}, 'categories': {'violence': {'true_count': 1, 'true_fraction': 1.0}}}, 'model_latency': {'mean': 9.500980377197266e-05}}
 ```
 
 ---
@@ -395,34 +399,39 @@ from openai import OpenAI
 import weave
 from weave.scorers import EmbeddingSimilarityScorer
 
-
+# Initialize clients and scorers
+client = OpenAI()
 similarity_scorer = EmbeddingSimilarityScorer(
-    client=llm_client,
+    client=client,
     threshold=0.7,
-    column_map={"target": "other_col"}
+    column_map={"target": "reference"}
 )
 
+# Create dataset
 dataset = [
     {
         "input": "He's name is John",
-        "other_col": "John likes various types of cheese.",
+        "reference": "John likes various types of cheese.",
     },
     {
         "input": "He's name is Pepe.",
-        "other_col": "Pepe likes various types of cheese.",
+        "reference": "Pepe likes various types of cheese.",
     },
 ]
 
+# Define model
 @weave.op
-def model(input):
+def model(input: str) -> str:
     return "John likes various types of cheese."
 
+# Run evaluation
 evaluation = weave.Evaluation(
     dataset=dataset,
     scorers=[similarity_scorer],
 )
 result = asyncio.run(evaluation.evaluate(model))
 print(result)
+# {'EmbeddingSimilarityScorer': {'is_similar': {'true_count': 1, 'true_fraction': 0.5}, 'similarity_score': {'mean': 0.8448514031462045}}, 'model_latency': {'mean': 0.45862746238708496}}
 ```
 
 ---
@@ -462,6 +471,7 @@ dataset = [
 evaluation = weave.Evaluation(dataset=dataset, scorers=[json_scorer])
 results = asyncio.run(evaluation.evaluate(model))
 print(results)
+# {'ValidJSONScorer': {'json_valid': {'true_count': 2, 'true_fraction': 1.0}}, 'model_latency': {'mean': 8.58306884765625e-05}}
 ```
 
 
@@ -502,6 +512,7 @@ dataset = [
 evaluation = weave.Evaluation(dataset=dataset, scorers=[xml_scorer])
 results = asyncio.run(evaluation.evaluate(model))
 print(results)
+# {'ValidXMLScorer': {'xml_valid': {'true_count': 2, 'true_fraction': 1.0}}, 'model_latency': {'mean': 8.20159912109375e-05}}
 ```
 
 ---
@@ -548,38 +559,6 @@ entity_recall_scorer = ContextEntityRecallScorer(
 
 - Expects a `context` column in your dataset, use `column_map` to map `context` to another dataset column if needed.
 
-
-Here you have an example usage of the `ContextEntityRecallScorer` in the context of an evaluation:
-
-```python
-import asyncio
-from openai import OpenAI
-import weave
-from weave.scorers import ContextEntityRecallScorer
-
-class RAGModel(weave.Model):
-    @weave.op()
-    async def predict(self, question: str) -> str:
-        "Retrieve relevant context"
-        return "Paris is the capital of France."
-
-llm_client = OpenAI()
-model = RAGModel()
-entity_recall_scorer = ContextEntityRecallScorer(
-    client=llm_client,
-    model_id="gpt-4o",
-    column_map={"context": "answer"}
-)
-
-dataset = [
-    {"question": "What is the capital of France?", "answer": "The capital city of France is Paris."},
-    {"question": "Who wrote Romeo and Juliet?", "answer": "William Shakespeare wrote many famous plays, including Romeo and Juliet."}
-]
-
-evaluation = weave.Evaluation(dataset=dataset, scorers=[entity_recall_scorer])
-results = asyncio.run(evaluation.evaluate(model))
-print(results)
-```
 ---
 
 ### RAGAS - `ContextRelevancyScorer`
@@ -608,14 +587,14 @@ relevancy_scorer = ContextRelevancyScorer(
 - Customize the `relevancy_prompt` to define how relevancy is assessed.
 
 
-Here you have an example usage of the `ContextRelevancyScorer` in the context of an evaluation:
+Here you have an example usage of `ContextEntityRecallScorer` and `ContextRelevancyScorer` in the context of an evaluation:
 
 ```python
 import asyncio
 from textwrap import dedent
 from openai import OpenAI
 import weave
-from weave.scorers import ContextRelevancyScorer
+from weave.scorers import ContextEntityRecallScorer, ContextRelevancyScorer
 
 class RAGModel(weave.Model):
     @weave.op()
@@ -623,9 +602,10 @@ class RAGModel(weave.Model):
         "Retrieve relevant context"
         return "Paris is the capital of France."
 
-llm_client = OpenAI()
+
 model = RAGModel()
 
+# Define prompts
 relevancy_prompt: str = dedent("""
     Given the following question and context, rate the relevancy of the context to the question on a scale from 0 to 1.
 
@@ -634,6 +614,12 @@ relevancy_prompt: str = dedent("""
     Relevancy Score (0-1):
     """)
 
+# Initialize clients and scorers
+llm_client = OpenAI()
+entity_recall_scorer = ContextEntityRecallScorer(
+    client=client,
+    model_id="gpt-4o",
+)
 
 relevancy_scorer = ContextRelevancyScorer(
     client=llm_client,
@@ -641,12 +627,25 @@ relevancy_scorer = ContextRelevancyScorer(
     relevancy_prompt=relevancy_prompt
 )
 
+# Create dataset
 dataset = [
-    {"question": "What is the capital of France?", "context": "Paris is the capital city of France."},
-    {"question": "Who wrote Romeo and Juliet?", "context": "The Eiffel Tower is located in Paris, France."}
+    {
+        "question": "What is the capital of France?", 
+        "context": "Paris is the capital city of France."
+    },
+    {
+        "question": "Who wrote Romeo and Juliet?", 
+        "context": "William Shakespeare wrote many famous plays."
+    }
 ]
 
-evaluation = weave.Evaluation(dataset=dataset, scorers=[relevancy_scorer])
+# Run evaluation
+evaluation = weave.Evaluation(
+    dataset=dataset, 
+    scorers=[entity_recall_scorer, relevancy_scorer]
+)
 results = asyncio.run(evaluation.evaluate(model))
 print(results)
+# {'ContextEntityRecallScorer': {'recall': {'mean': 0.3333333333333333}}, 'ContextRelevancyScorer': {'relevancy_score': {'mean': 0.5}}, 'model_latency': {'mean': 9.393692016601562e-05}}
 ```
+
