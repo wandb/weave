@@ -101,7 +101,7 @@ export const CallsCharts = ({
     'mb-4 flex-1 rounded-lg border border-moon-250 bg-white p-10';
 
   const charts = (
-    <div className="mb-10 flex flex-row gap-10">
+    <div className="mb-10 flex flex-row gap-10 px-10">
       <div className={chartWrapper}>
         <LatencyPlotlyChart chartData={chartData.latency} height={300} />
       </div>
@@ -116,7 +116,7 @@ export const CallsCharts = ({
 
   return (
     <Tailwind>
-      <div className="mx-10 mb-10 rounded-lg border border-moon-250 bg-moon-50 px-10">
+      <div className="mx-10 mb-10 rounded-lg border border-moon-250 bg-moon-50 ">
         <div
           className="flex cursor-pointer items-center gap-2 p-10"
           onClick={toggleInsights}>
