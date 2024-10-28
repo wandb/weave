@@ -101,6 +101,9 @@ const LeaderboardTable: React.FC<{
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
   const {useRootObjectVersions} = useWFHooks();
+
+  // TODO: One `useCollectionObjects` lands from the online
+  // evals project, switch to that (much more type safe)
   const leaderboardObjectVersions = useRootObjectVersions(
     props.entity,
     props.project,
@@ -147,14 +150,20 @@ const LeaderboardTable: React.FC<{
   );
 };
 
+const generateLeaderboardId = () => {
+  const timestamp = new Date().getTime();
+  const timestampHex = timestamp.toString(36);
+  return `leaderboard-${timestampHex}`;
+};
+
 const useCreateLeaderboard = (entity: string, project: string) => {
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
 
+  // TODO: One `useCreateCollectionObject` lands from the online
+  // evals project, switch to that (much more type safe)
   const createLeaderboard = async () => {
-    const objectId = `leaderboard-${new Date()
-      .toISOString()
-      .replace(/[:.]/g, '-')}`;
+    const objectId = generateLeaderboardId();
     await client.objCreate({
       obj: {
         project_id: projectIdFromParts({entity, project}),
