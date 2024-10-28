@@ -205,31 +205,42 @@ scorer = HallucinationFreeScorer(
 Here you have an example in the context of an evaluation:
 
 ```python
-from weave.scorers import HallucinationFreeScorer
+import asyncio
 from openai import OpenAI
 import weave
-
-class SimpleModel(weave.Model):
-    @weave.op()
-    async def predict(self, question: str) -> str:
-        return "The Earth is the third planet from the Sun."
+from weave.scorers import HallucinationFreeScorer
 
 llm_client = OpenAI()
-model = SimpleModel()
+
 hallucination_scorer = HallucinationFreeScorer(
     client=llm_client, 
     model_id="gpt-4o",
-    column_map={"context": "background_info"}
+    temperature=0.7,
+    max_tokens=4096,
+    column_map={"context": "input", "output": "other_col"}
 )
-
 dataset = [
-    {"background_info": "The Earth is the third planet from the Sun.", "question": "What is the position of Earth in the solar system?"},
-    {"background_info": "Paris is the capital of France.", "question": "What is the capital of Germany?"}
-]
+        {
+            "input": "John likes various types of cheese.",
+            "other_col": "John's favorite cheese is cheddar.",
+        },
+        {
+            "input": "Pepe likes various types of cheese.",
+            "other_col": "Pepe's favorite cheese is gouda.",
+        },
+    ]
 
-evaluation = weave.Evaluation(dataset=dataset, scorers=[hallucination_scorer])
-results = asyncio.run(evaluation.evaluate(model))
-print(results)
+@weave.op
+def model(input):
+    return "The person's favorite cheese is cheddar."
+
+evaluation = weave.Evaluation(
+    dataset=dataset,
+    scorers=[hallucination_scorer],
+)
+result = asyncio.run(evaluation.evaluate(model))
+# result["HallucinationFreeScorer"]["has_hallucination"]["true_count"] == 2
+# result["HallucinationFreeScorer"]["has_hallucination"]["true_fraction"] == 1.0
 ```
 ---
 
@@ -267,22 +278,30 @@ This scorer evaluates summaries in two ways:
 Here you have an example usage of the `SummarizationScorer` in the context of an evaluation:
 
 ```python
-from weave.scorers import SummarizationScorer
+import asyncio
 from openai import OpenAI
 import weave
+from weave.scorers import SummarizationScorer
 
 class SummarizationModel(weave.Model):
+    """
+    A model that generates a summary of the input text.
+    """
     @weave.op()
     async def predict(self, input: str) -> str:
         return "This is a summary of the input text."
 
 llm_client = OpenAI()
 model = SummarizationModel()
-summarization_scorer = SummarizationScorer(client=llm_client, model_id="gpt-4o")
-
+summarization_scorer = SummarizationScorer(
+    client=llm_client, 
+    model_id="gpt-4o",
+    temperature=0.7,
+    max_tokens=1024,
+)
 dataset = [
-    {"input": "The quick brown fox jumps over the lazy dog. This sentence contains every letter of the alphabet.", "expected": "A sentence with all alphabet letters."},
-    {"input": "Artificial Intelligence is revolutionizing various industries, from healthcare to finance.", "expected": "AI's impact on different sectors."}
+    {"input": "The quick brown fox jumps over the lazy dog."},
+    {"input": "Artificial Intelligence is revolutionizing various industries, from healthcare to finance."}
 ]
 
 evaluation = weave.Evaluation(dataset=dataset, scorers=[summarization_scorer])
@@ -319,8 +338,10 @@ scorer = OpenAIModerationScorer(
 
 Here you have an example in the context of an evaluation:
 ```python
-from weave.scorers import OpenAIModerationScorer
+import asyncio
 from openai import OpenAI
+import weave
+from weave.scorers import OpenAIModerationScorer
 
 client = OpenAI()
 moderation_scorer = OpenAIModerationScorer(client=client)
@@ -367,31 +388,39 @@ The correct cosine similarity threshold to set can fluctuate quite a lot dependi
 Here you have an example usage of the `EmbeddingSimilarityScorer` in the context of an evaluation:
 
 ```python
-from weave.scorers import EmbeddingSimilarityScorer
+import asyncio
 from openai import OpenAI
 import weave
+from weave.scorers import EmbeddingSimilarityScorer
 
-class AnswerModel(weave.Model):
-    @weave.op()
-    async def predict(self, question: str) -> str:
-        return "The capital of France is Paris."
 
-llm_client = OpenAI()
-model = AnswerModel()
 similarity_scorer = EmbeddingSimilarityScorer(
     client=llm_client,
     threshold=0.7,
-    column_map={"target": "reference_answer"}
+    column_map={"target": "other_col"}
 )
 
 dataset = [
-    {"question": "What is the capital of France?", "reference_answer": "The capital of France is Paris."},
-    {"question": "Who wrote Romeo and Juliet?", "reference_answer": "Shakespeare wrote Romeo and Juliet."}
+    {
+        "input": "He's name is John",
+        "other_col": "John likes various types of cheese.",
+    },
+    {
+        "input": "He's name is Pepe.",
+        "other_col": "Pepe likes various types of cheese.",
+    },
 ]
 
-evaluation = weave.Evaluation(dataset=dataset, scorers=[similarity_scorer])
-results = asyncio.run(evaluation.evaluate(model))
-print(results)
+@weave.op
+def model(input):
+    return "John likes various types of cheese."
+
+evaluation = weave.Evaluation(
+    dataset=dataset,
+    scorers=[similarity_scorer],
+)
+result = asyncio.run(evaluation.evaluate(model))
+print(result)
 ```
 
 ---
@@ -409,8 +438,9 @@ json_scorer = ValidJSONScorer()
 Here you have an example usage of the `ValidJSONScorer` in the context of an evaluation:
 
 ```python
-from weave.scorers import ValidJSONScorer
+import asyncio
 import weave
+from weave.scorers import ValidJSONScorer
 
 class JSONModel(weave.Model):
     @weave.op()
@@ -449,8 +479,9 @@ xml_scorer = ValidXMLScorer()
 Here you have an example usage of the `ValidXMLScorer` in the context of an evaluation:
 
 ```python
-from weave.scorers import ValidXMLScorer
+import asyncio
 import weave
+from weave.scorers import ValidXMLScorer
 
 class XMLModel(weave.Model):
     @weave.op()
@@ -519,13 +550,15 @@ entity_recall_scorer = ContextEntityRecallScorer(
 Here you have an example usage of the `ContextEntityRecallScorer` in the context of an evaluation:
 
 ```python
-from weave.scorers import ContextEntityRecallScorer
+import asyncio
 from openai import OpenAI
 import weave
+from weave.scorers import ContextEntityRecallScorer
 
 class RAGModel(weave.Model):
     @weave.op()
-    async def predict(self, question: str, context: str) -> str:
+    async def predict(self, question: str) -> str:
+        "Retrieve relevant context"
         return "Paris is the capital of France."
 
 llm_client = OpenAI()
@@ -576,14 +609,16 @@ relevancy_scorer = ContextRelevancyScorer(
 Here you have an example usage of the `ContextRelevancyScorer` in the context of an evaluation:
 
 ```python
-from weave.scorers import ContextRelevancyScorer
+import asyncio
+from textwrap import dedent
 from openai import OpenAI
 import weave
-from textwrap import dedent
+from weave.scorers import ContextRelevancyScorer
 
 class RAGModel(weave.Model):
     @weave.op()
-    async def predict(self, question: str, context: str) -> str:
+    async def predict(self, question: str) -> str:
+        "Retrieve relevant context"
         return "Paris is the capital of France."
 
 llm_client = OpenAI()
