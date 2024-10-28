@@ -115,7 +115,7 @@ class SummarizationScorer(InstructorLLMScorer):
         evaluate_summary(input: str, summary: str) -> SummarizationEvaluationResponse:
             Evaluates the quality of a summary using an LLM.
 
-        score(input: str, output: str, **kwargs: Any) -> dict:
+        score(input: str, output: str) -> dict:
             Calculates summarization score and entity density score for the given input and output.
     """
 
@@ -177,7 +177,7 @@ class SummarizationScorer(InstructorLLMScorer):
         return text.split()
 
     @weave.op
-    async def score(self, input: str, output: str, **kwargs: Any) -> dict:
+    async def score(self, input: str, output: str) -> dict:
         extract_task = asyncio.to_thread(self.extract_entities, text=str(output))
         evaluate_task = asyncio.to_thread(
             self.evaluate_summary, input=str(input), summary=str(output)
