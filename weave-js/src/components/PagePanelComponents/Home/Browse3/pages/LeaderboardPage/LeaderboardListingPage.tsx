@@ -13,6 +13,7 @@ import {SimplePageLayout} from '../common/SimplePageLayout';
 import {ObjectVersionsTable} from '../ObjectVersionsPage';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import {sanitizeObjectId} from '../wfReactInterface/traceServerDirectClient';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {useIsEditor} from './LeaderboardPage';
@@ -163,7 +164,7 @@ const useCreateLeaderboard = (entity: string, project: string) => {
   // TODO: One `useCreateCollectionObject` lands from the online
   // evals project, switch to that (much more type safe)
   const createLeaderboard = async () => {
-    const objectId = generateLeaderboardId();
+    const objectId = sanitizeObjectId(generateLeaderboardId());
     await client.objCreate({
       obj: {
         project_id: projectIdFromParts({entity, project}),
