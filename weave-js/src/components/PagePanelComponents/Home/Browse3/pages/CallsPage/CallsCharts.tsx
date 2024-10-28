@@ -97,25 +97,26 @@ export const CallsCharts = ({
     return data;
   }, [calls.result, calls.loading]);
 
+  const chartWrapper =
+    'mb-4 flex-1 rounded-lg border border-moon-250 bg-white p-10';
+
   const charts = (
-    <div className="m-10 mt-4 flex w-full">
-      <div className="mb-10 flex w-full flex-row gap-10">
-        <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-10">
-          <LatencyPlotlyChart chartData={chartData.latency} height={300} />
-        </div>
-        <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-10">
-          <ErrorPlotlyChart chartData={chartData.errors} height={300} />
-        </div>
-        <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-10">
-          <RequestsPlotlyChart chartData={chartData.requests} height={300} />
-        </div>
+    <div className="mb-10 flex flex-row gap-10">
+      <div className={chartWrapper}>
+        <LatencyPlotlyChart chartData={chartData.latency} height={300} />
+      </div>
+      <div className={chartWrapper}>
+        <ErrorPlotlyChart chartData={chartData.errors} height={300} />
+      </div>
+      <div className={chartWrapper}>
+        <RequestsPlotlyChart chartData={chartData.requests} height={300} />
       </div>
     </div>
   );
 
   return (
-    <Tailwind style={{marginRight: '20px'}}>
-      <div className="mb-10 ml-10 w-full rounded-lg border border-moon-250 bg-moon-50 pr-[20px]">
+    <Tailwind>
+      <div className="mx-10 mb-10 rounded-lg border border-moon-250 bg-moon-50 px-10">
         <div
           className="flex cursor-pointer items-center gap-2 p-10"
           onClick={toggleInsights}>

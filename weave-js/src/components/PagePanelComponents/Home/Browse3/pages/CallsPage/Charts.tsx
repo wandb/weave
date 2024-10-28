@@ -70,6 +70,7 @@ const Y_AXIS_STYLE: Partial<Plotly.LayoutAxis> = {
   linecolor: MOON_300,
   showspikes: false,
   tickfont: {color: MOON_500},
+  zeroline: false,
 };
 
 export const LatencyPlotlyChart: React.FC<{
@@ -191,7 +192,7 @@ export const ErrorPlotlyChart: React.FC<{
       margin: CHART_MARGIN_STYLE,
       bargroupgap: 0.1,
       xaxis: X_AXIS_STYLE,
-      yaxis: {...Y_AXIS_STYLE, zeroline: false},
+      yaxis: Y_AXIS_STYLE,
       hovermode: 'x unified',
       hoverlabel: {
         bordercolor: MOON_200,
@@ -240,7 +241,7 @@ export const RequestsPlotlyChart: React.FC<{
       },
       margin: CHART_MARGIN_STYLE,
       xaxis: X_AXIS_STYLE,
-      yaxis: {...Y_AXIS_STYLE, zeroline: false},
+      yaxis: Y_AXIS_STYLE,
       bargap: 0.2,
       hovermode: 'x unified',
       hoverlabel: {
