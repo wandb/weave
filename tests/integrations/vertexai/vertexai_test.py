@@ -40,9 +40,7 @@ def test_content_generation_stream(client):
 
     vertexai.init(project="wandb-growth", location="us-central1")
     model = GenerativeModel("gemini-1.5-flash")
-    response = model.generate_content(
-        "What is the capital of France?", stream=True
-    )
+    response = model.generate_content("What is the capital of France?", stream=True)
     chunks = [chunk.text for chunk in response]
     assert len(chunks) > 1
 
