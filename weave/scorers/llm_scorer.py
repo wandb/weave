@@ -25,7 +25,7 @@ class LLMScorer(Scorer):
     model_id: str = Field(description="The model to use")
 
     @field_validator("client")
-    def validate_client(cls, v):
+    def validate_client(cls, v: _LLM_CLIENTS) -> _LLM_CLIENTS:
         client_type_name = type(v).__name__
         if client_type_name not in _LLM_CLIENTS_NAMES:
             raise ValueError(
@@ -61,7 +61,7 @@ class InstructorLLMScorer(Scorer):
     )
 
     @field_validator("client")
-    def validate_client(cls, v):
+    def validate_client(cls, v: _LLM_CLIENTS) -> _LLM_CLIENTS:
         client_type_name = type(v).__name__
         if client_type_name not in _LLM_CLIENTS_NAMES:
             raise ValueError(

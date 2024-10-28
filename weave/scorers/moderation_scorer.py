@@ -4,7 +4,7 @@ from pydantic import field_validator
 
 import weave
 from weave.scorers.llm_scorer import LLMScorer
-from weave.scorers.llm_utils import OPENAI_DEFAULT_MODERATION_MODEL
+from weave.scorers.llm_utils import _LLM_CLIENTS, OPENAI_DEFAULT_MODERATION_MODEL
 
 
 class OpenAIModerationScorer(LLMScorer):
@@ -17,7 +17,7 @@ class OpenAIModerationScorer(LLMScorer):
     model_id: str = OPENAI_DEFAULT_MODERATION_MODEL
 
     @field_validator("client")
-    def validate_openai_client(cls, v):
+    def validate_openai_client(cls, v: _LLM_CLIENTS) -> _LLM_CLIENTS:
         # Method implementation
         try:
             from openai import (  # Ensure these are the correct imports
