@@ -17,7 +17,8 @@ class OpenAIModerationScorer(LLMScorer):
     model_id: str = OPENAI_DEFAULT_MODERATION_MODEL
 
     @field_validator("client")
-    def validate_openai_client(cls, v):  # type: ignore
+    def validate_openai_client(cls, v):
+        # Method implementation
         try:
             from openai import (  # Ensure these are the correct imports
                 AsyncOpenAI,
