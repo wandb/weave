@@ -241,6 +241,7 @@ jobs:
             'notdiamond',
             'openai',
             'vertexai',
+            'pandas-test',
           ]
       fail-fast: false
     services:
