@@ -119,5 +119,10 @@ vertexai_patcher = MultiPatcher(
                 name="vertexai.GenerativeModel.generate_content_async"
             ),
         ),
+        SymbolPatcher(
+            lambda: importlib.import_module("vertexai.preview.vision_models"),
+            "ImageGenerationModel.generate_images",
+            vertexai_wrapper_sync(name="vertexai.ImageGenerationModel.generate_images"),
+        ),
     ]
 )
