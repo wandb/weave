@@ -9,7 +9,15 @@ from weave.scorers.llm_utils import (
 
 
 class LLMScorer(Scorer):
-    """Score a model output using an LLM"""
+    """Score model outputs using a Language Learning Model (LLM).
+
+    This scorer leverages LLMs to evaluate and score model outputs. It provides a flexible
+    way to use different LLM providers for scoring purposes.
+
+    Attributes:
+        client: An instantiated LLM client with valid API credentials
+        model_id: The specific model identifier to use for scoring
+    """
 
     client: _LLM_CLIENTS = Field(
         description="The LLM client to use, has to be instantiated with an api_key"
@@ -27,7 +35,18 @@ class LLMScorer(Scorer):
 
 
 class InstructorLLMScorer(Scorer):
-    """Score a model output using an LLM"""
+    """Score model outputs using an LLM with instructor-guided evaluation.
+
+    This scorer extends the base LLM scoring capability by adding temperature and
+    token control for more precise scoring behavior. It automatically wraps the
+    provided client with instructor functionality for structured outputs.
+
+    Attributes:
+        client: An instantiated LLM client with valid API credentials
+        model_id: The specific model identifier to use for scoring
+        temperature: Controls randomness in the LLM's responses (0.0 to 1.0)
+        max_tokens: Maximum number of tokens allowed in the LLM's response
+    """
 
     client: _LLM_CLIENTS = Field(
         description="The LLM client to use, has to be instantiated with an api_key"
