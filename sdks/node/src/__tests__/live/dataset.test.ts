@@ -24,8 +24,7 @@ describe('Dataset', () => {
     expect(dataset.length).toBe(3);
     let i = 0;
     for await (const row of dataset) {
-      // need to do this because the row has a __savedRef on it that data wont
-      expect({id: row.id, value: row.value}).toEqual(data[i]);
+      expect(row).toEqual(data[i]);
       const rowRef = await row?.__savedRef;
       const [rowEntity, rowProject] = rowRef?.projectId.split('/') ?? [];
 
