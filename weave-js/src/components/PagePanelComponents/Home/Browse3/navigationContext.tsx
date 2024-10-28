@@ -5,12 +5,12 @@ const DEFAULT_PAGE_SIZE = 50;
 export const TableNavigationContext = React.createContext<{
   setIDs?: (ids: string[]) => void;
   getNextID?: (currentID: string) => string | null;
-  getPreviousID?: (currentID: string) => string | null;
+  getPrevID?: (currentID: string) => string | null;
   nextPageNeeded: boolean;
 }>({
   setIDs: () => {},
   getNextID: () => null,
-  getPreviousID: () => null,
+  getPrevID: () => null,
   nextPageNeeded: false,
 });
 
@@ -44,7 +44,7 @@ export const TableNavigationProvider: FC<{children: React.ReactNode}> = ({
     [ids, nextPageNeeded]
   );
 
-  const getPreviousID = useCallback(
+  const getPrevID = useCallback(
     (currentID: string) => {
       const prevIDIndex = ids.indexOf(currentID) - 1;
       if (prevIDIndex >= 0 && prevIDIndex < ids.length) {
@@ -58,7 +58,7 @@ export const TableNavigationProvider: FC<{children: React.ReactNode}> = ({
 
   return (
     <TableNavigationContext.Provider
-      value={{setIDs, getNextID, getPreviousID, nextPageNeeded}}>
+      value={{setIDs, getNextID, getPrevID, nextPageNeeded}}>
       {children}
     </TableNavigationContext.Provider>
   );

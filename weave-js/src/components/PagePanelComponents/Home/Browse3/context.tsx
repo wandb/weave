@@ -128,6 +128,9 @@ export const browse2Context = {
   ) => {
     throw new Error('Not implemented');
   },
+  objectVersionUIUrlToRefUri: (path: string) => {
+    throw new Error('Not implemented');
+  },
   opVersionsUIUrl: (
     entityName: string,
     projectName: string,
@@ -283,13 +286,39 @@ export const browse3ContextGen = (
       filePath?: string,
       refExtra?: string
     ) => {
-      const path = filePath ? `path=${encodeURIComponent(filePath)}` : '';
-      const extra = refExtra ? `extra=${encodeURIComponent(refExtra)}` : '';
-
-      return `${projectRoot(
+      let url = `${projectRoot(
         entityName,
         projectName
-      )}/objects/${objectName}/versions/${objectVersionHash}?${path}&${extra}`;
+      )}/objects/${objectName}/versions/${objectVersionHash}`;
+      const params = new URLSearchParams();
+      if (filePath !== undefined) {
+        params.set(PATH_PARAM, encodeURIComponent(filePath));
+      }
+      if (refExtra !== undefined) {
+        params.set(EXTRA_PARAM, encodeURIComponent(refExtra));
+      }
+      if (params.toString()) {
+        url += '?' + params.toString();
+      }
+      return url;
+    },
+    objectVersionUIUrlToRefUri: (path: string) => {
+      // parse the path to match objectVersionUIUrl
+      console.log(path);
+      // const parsed = parseRef(path);
+      // console.log({parsed});
+
+      // return parsed;
+      return path;
+      // return objectVersionKeyToRefUri({
+      //   scheme: 'weave',
+      //   entity: entityName,
+      //   project: projectName,
+      //   objectId: objectName,
+      //   versionHash: objectVersionHash,
+      //   path: filePath,
+      //   refExtra,
+      // });
     },
     opVersionsUIUrl: (
       entityName: string,
@@ -453,6 +482,7 @@ type RouteType = {
     filePath?: string,
     refExtra?: string
   ) => string;
+  objectVersionUIUrlToRefUri: (path: string) => string;
   opVersionsUIUrl: (
     entityName: string,
     projectName: string,
@@ -529,6 +559,7 @@ const useSetSearchParam = () => {
 export const PEEK_PARAM = 'peekPath';
 export const TRACETREE_PARAM = 'tracetree';
 export const PATH_PARAM = 'path';
+export const EXTRA_PARAM = 'extra';
 
 export const baseContext = browse3ContextGen(
   (entityName: string, projectName: string) => {
@@ -565,6 +596,11 @@ const useMakePeekingRouter = (): RouteType => {
         PEEK_PARAM,
         baseContext.objectVersionUIUrl(...args)
       );
+    },
+    objectVersionUIUrlToRefUri: (
+      ...args: Parameters<typeof baseContext.objectVersionUIUrlToRefUri>
+    ) => {
+      throw new Error('Not implemented');
     },
     opVersionsUIUrl: (
       ...args: Parameters<typeof baseContext.opVersionsUIUrl>

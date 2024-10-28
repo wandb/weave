@@ -139,7 +139,7 @@ const CallPageInnerVertical: FC<{
   path?: string;
 }> = ({call, path}) => {
   useViewTraceEvent(call);
-  const {getPreviousID, getNextID} = useContext(TableNavigationContext);
+  const {getPrevID, getNextID} = useContext(TableNavigationContext);
 
   const {useCall} = useWFHooks();
   const history = useHistory();
@@ -227,18 +227,15 @@ const CallPageInnerVertical: FC<{
       let newID = '';
       if (event.key === 'ArrowDown') {
         newID = getNextID?.(currentCall.callId) ?? '';
-        console.log('ArrowDown pressed', getNextID?.(currentCall.callId));
       } else if (event.key === 'ArrowUp') {
-        newID = getPreviousID?.(currentCall.callId) ?? '';
-        console.log('ArrowUp pressed', getPreviousID?.(currentCall.callId));
+        newID = getPrevID?.(currentCall.callId) ?? '';
       }
-      console.log('newID: ', newID);
 
       if (newID !== '') {
         navigateToCallURL(newID);
       }
     },
-    [currentCall.callId, getNextID, getPreviousID, navigateToCallURL]
+    [currentCall.callId, getNextID, getPrevID, navigateToCallURL]
   );
 
   // Attach and detach event listener

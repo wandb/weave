@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import numeral from 'numeral';
-import React, {useMemo} from 'react';
+import React, {useMemo, useContext, useEffect, useCallback} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
 import {Icon, IconName} from '../../../../Icon';
@@ -41,6 +41,9 @@ import {
   KnownBaseObjectClassType,
   ObjectVersionSchema,
 } from './wfReactInterface/wfDataModelHooksInterface';
+import {TableNavigationContext} from '../navigationContext';
+import {useHistory} from 'react-router-dom';
+import {useWeaveflowCurrentRouteContext} from '../context';
 
 type ObjectIconProps = {
   baseObjectClass: KnownBaseObjectClassType;
@@ -77,6 +80,7 @@ export const ObjectVersionPage: React.FC<{
   refExtra?: string;
 }> = props => {
   const {useObjectVersion} = useWFHooks();
+  console.log('filePath: ', props.filePath);
 
   const objectVersion = useObjectVersion({
     // Blindly assume this is weave object?
@@ -98,17 +102,20 @@ export const ObjectVersionPage: React.FC<{
     <ObjectVersionPageInner {...props} objectVersion={objectVersion.result} />
   );
 };
+
 const ObjectVersionPageInner: React.FC<{
   objectVersion: ObjectVersionSchema;
 }> = ({objectVersion}) => {
   useObjectViewEvent(objectVersion);
 
   const tableNavigation = useContext(TableNavigationContext);
+  const history = useHistory();
 
   const {useRootObjectVersions, useCalls, useRefsData} = useWFHooks();
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
   const objectName = objectVersion.objectId;
+  const objectHash = objectVersion.versionHash;
   const objectVersionIndex = objectVersion.versionIndex;
   const refExtra = objectVersion.refExtra;
   const objectVersions = useRootObjectVersions(
@@ -194,10 +201,74 @@ const ObjectVersionPageInner: React.FC<{
     [data.result]
   );
 
-  // keyboard navigation logic (go up and down the table)
+  /*
+  ObjectVersion:
+    {
+      baseObjectClass: "Dataset",
+      createdAtMs: 1729708872349,
+      entity: "haruka",
+      objectId: "grammar-2",
+      path: "obj",
+      project: "test-weave",
+      refExtra: undefined,
+      scheme: "weave",
+      val: {
+        _type: 'Dataset',
+        name: 'grammar-2',
+        description: null,
+        rows: 'weave:///haruka/test-weave/table/b8dfcb84974c481fd98fd9878e56be02ebef3e2da44becb59d1863cd643b83fe',
+        _class_name: 'Dataset',
+        // ... other properties
+      },
+      versionHash: "g0gwGI0XeI3GxZY7TT56tyWVpy8Np29FmJMNL32mlAM",
+      versionIndex: 0,
+      weaveKind: "object"
+    }
+  */
 
-  // attach
-  useEffect(() => {}, []);
+  const router = useWeaveflowCurrentRouteContext();
+
+  const navigateToObjectVersionURL = useCallback(
+    (id: string) => {
+      history.replace(
+        router.objectVersionUIUrl(
+          entityName,
+          projectName,
+          objectName,
+          objectHash,
+          'obj',
+          refExtra
+        )
+      );
+    },
+    [history, router, entityName, projectName, objectName, objectHash, refExtra]
+  );
+
+  // keyboard navigation logic (go up and down the table)
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === 'ArrowDown') {
+        const nextID = tableNavigation.getNextID?.(refUri);
+        if (nextID) {
+          navigateToObjectVersionURL(nextID);
+        }
+      } else if (event.key === 'ArrowUp') {
+        const prevID = tableNavigation.getPrevID?.(refUri);
+        if (prevID) {
+          navigateToObjectVersionURL(prevID);
+        }
+      }
+    },
+    [tableNavigation, refUri, navigateToObjectVersionURL]
+  );
+
+  // attach and detach event listener
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
 
   if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;

@@ -302,3 +302,45 @@ export const useParentCall = (
   }
   return useCall(parentCall);
 };
+
+export function parseUrlPathToRefUri(
+  urlPath: string | undefined,
+  baseRouter: any
+): string | null {
+  if (!urlPath) {
+    return null;
+  }
+
+  // Remove leading and trailing slashes
+  const cleanPath = urlPath.replace(/^\/|\/$/g, '');
+
+  // Split the path into segments
+  const segments = cleanPath.split('/');
+
+  console.log('parseUrlPathToRefUri: ', {cleanPath, segments});
+  // Check if we have enough segments for a valid object version path
+  if (segments.length < 6) {
+    return null;
+  }
+
+  // Extract relevant parts
+  const entity = segments[0];
+  const project = segments[1];
+  const objectId = segments[3];
+  const versionHash = segments[5];
+
+  // Reconstruct the path in the format expected by objectVersionUIUrlToRefUri
+  // const reconstructedPath = `/${entity}/${project}/objects/${objectId}/versions/${versionHash}`;
+
+  // Use baseRouter to convert the URL to a refUri
+  return objectVersionKeyToRefUri({
+    scheme: 'weave',
+    entity,
+    project,
+    objectId,
+    versionHash,
+    path: '',
+    refExtra: '',
+    weaveKind: 'object',
+  });
+}

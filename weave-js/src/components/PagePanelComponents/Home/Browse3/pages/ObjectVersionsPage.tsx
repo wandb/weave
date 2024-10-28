@@ -52,11 +52,15 @@ import {
   isTableRef,
   makeRefExpandedPayload,
 } from './wfReactInterface/tsDataModelHooksCallRefExpansion';
-import {objectVersionKeyToRefUri} from './wfReactInterface/utilities';
+import {
+  objectVersionKeyToRefUri,
+  parseUrlPathToRefUri,
+} from './wfReactInterface/utilities';
 import {
   KnownBaseObjectClassType,
   ObjectVersionSchema,
 } from './wfReactInterface/wfDataModelHooksInterface';
+import {useHistory} from 'react-router-dom';
 
 const DATASET_BASE_OBJECT_CLASS = 'Dataset';
 
@@ -333,7 +337,10 @@ const ObjectVersionsTable: React.FC<{
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();
   const {peekPath} = query;
-  const peekId = peekPath ? peekPath.split('/').pop() : null;
+  const {baseRouter} = useWeaveflowRouteContext();
+
+  const peekId = parseUrlPathToRefUri(peekPath, baseRouter);
+
   const rowIds = useMemo(() => {
     return rows.map(row => row.id);
   }, [rows]);
@@ -356,7 +363,6 @@ const ObjectVersionsTable: React.FC<{
     }
   }, [rowIds, peekId]);
 
-  console.log('rowIDs in ObjectVersionsPage: ', rowIds);
   const {setIDs} = useContext(TableNavigationContext);
   useEffect(() => {
     setIDs?.(rowIds);
