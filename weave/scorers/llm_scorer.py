@@ -39,7 +39,7 @@ class InstructorLLMScorer(Scorer):
 
     This scorer extends the base LLM scoring capability by adding temperature and
     token control for more precise scoring behavior. It automatically wraps the
-    provided client with [instructor](https://github.com/instructor-ai/instructor) 
+    provided client with [instructor](https://github.com/instructor-ai/instructor)
     functionality for structured outputs.
 
     Attributes:

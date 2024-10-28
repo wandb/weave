@@ -23,8 +23,8 @@ class ContextEntityRecallScorer(InstructorLLMScorer):
     Note:
         - This Scorer uses the `InstructorLLMScorer` class to generate structured outputs from the LLM
         provider's response; you will have to install the `instructor` python package to use it.
-        - The `score` method expects two arguments: 'output' (the model's response) and 'context' 
-        (the reference text). If your dataset columns have different names, use the `column_map` 
+        - The `score` method expects two arguments: 'output' (the model's response) and 'context'
+        (the reference text). If your dataset columns have different names, use the `column_map`
         argument when initializing the scorer.
         - Entity extraction is performed using an LLM, so results may vary based on the model used.
 
@@ -94,8 +94,8 @@ class ContextRelevancyScorer(InstructorLLMScorer):
     Note:
         - This Scorer uses the `InstructorLLMScorer` class to generate structured outputs from the LLM
         provider's response; you will have to install the `instructor` python package to use it.
-        - The `score` method expects two arguments: 'output' (treated as the question) and 'context' 
-        (the reference text). If your dataset columns have different names, use the `column_map` 
+        - The `score` method expects two arguments: 'output' (treated as the question) and 'context'
+        (the reference text). If your dataset columns have different names, use the `column_map`
         argument when initializing the scorer.
         - The relevancy score is binary (0 or 1) where 1 indicates relevant context.
 
