@@ -85,11 +85,9 @@ async def test_evaluate_summary_scorer(summarization_scorer):
     dataset = [
         {
             "input": "This is the original text.",
-            "output": "This is the summary.",
         },
         {
             "input": "This is another original text.",
-            "output": "This is another summary.",
         },
     ]
     evaluation = weave.Evaluation(dataset=dataset, scorers=[summarization_scorer])
