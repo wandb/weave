@@ -1,13 +1,15 @@
 import xml.etree.ElementTree as ET
 from typing import Union
 
+import weave
 from weave.scorers.base_scorer import Scorer
 
 
 class ValidXMLScorer(Scorer):
     """Score an XML string."""
 
-    def score(self, output: Union[str, dict]) -> dict:  # type: ignore
+    @weave.op
+    def score(self, output: Union[str, dict]) -> dict:
         if isinstance(output, dict):
             xml_string = output.get("output", "")
         else:

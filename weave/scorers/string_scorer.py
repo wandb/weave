@@ -9,7 +9,8 @@ from weave.scorers.base_scorer import Scorer
 class StringMatchScorer(Scorer):
     """Scorer that checks if the model output string is found in the search columns of the dataset row."""
 
-    def score(self, output: str, target: str) -> dict:  # type: ignore
+    @weave.op
+    def score(self, output: str, target: str) -> dict:
         string_in_input = output.lower() in target.lower()
         return {"string_in_input": string_in_input}
 
@@ -20,7 +21,7 @@ class LevenshteinScorer(Scorer):
     )
 
     @model_validator(mode="after")
-    def check_levenshtein(self):  # type: ignore
+    def check_levenshtein(self) -> "LevenshteinScorer":
         try:
             from Levenshtein import distance
 

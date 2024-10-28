@@ -1,13 +1,15 @@
 import json
 from typing import Any
 
+import weave
 from weave.scorers.base_scorer import Scorer
 
 
 class ValidJSONScorer(Scorer):
     """Validate whether a string is valid JSON."""
 
-    def score(self, output: Any) -> dict:  # type: ignore
+    @weave.op
+    def score(self, output: Any) -> dict:
         try:
             _ = json.loads(output)
             return {"json_valid": True}
