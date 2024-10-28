@@ -11,7 +11,7 @@ def test_content_generation(client):
 
     vertexai.init(project="wandb-growth", location="us-central1")
     model = GenerativeModel("gemini-1.5-flash")
-    model.generate_content("Explain how AI works in simple terms")
+    model.generate_content("What is the capital of France?")
 
     calls = list(client.calls())
     assert len(calls) == 1
@@ -21,7 +21,7 @@ def test_content_generation(client):
 
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "vertexai.GenerativeModel.generate_content"
-    assert call.output is not None
+    assert "paris" in str(call.output).lower()
 
 
 @pytest.mark.retry(max_attempts=5)
@@ -33,7 +33,7 @@ def test_content_generation_stream(client):
     vertexai.init(project="wandb-growth", location="us-central1")
     model = GenerativeModel("gemini-1.5-flash")
     response = model.generate_content(
-        "Explain how AI works in simple terms", stream=True
+        "What is the capital of France?", stream=True
     )
     chunks = [chunk.text for chunk in response]
     assert len(chunks) > 1
@@ -46,7 +46,7 @@ def test_content_generation_stream(client):
 
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "vertexai.GenerativeModel.generate_content"
-    assert call.output is not None
+    assert "paris" in str(call.output).lower()
 
 
 @pytest.mark.retry(max_attempts=5)
@@ -58,7 +58,7 @@ async def test_content_generation_async(client):
 
     vertexai.init(project="wandb-growth", location="us-central1")
     model = GenerativeModel("gemini-1.5-flash")
-    _ = await model.generate_content_async("Explain how AI works in simple terms")
+    _ = await model.generate_content_async("What is the capital of France?")
 
     calls = list(client.calls())
     assert len(calls) == 1
@@ -68,7 +68,7 @@ async def test_content_generation_async(client):
 
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "vertexai.GenerativeModel.generate_content_async"
-    assert call.output is not None
+    assert "paris" in str(call.output).lower()
 
 
 @pytest.mark.retry(max_attempts=5)
@@ -84,7 +84,7 @@ async def test_content_generation_async_stream(client):
     async def get_response():
         chunks = []
         async for chunk in await model.generate_content_async(
-            "Explain how AI works in simple terms", stream=True
+            "What is the capital of France?", stream=True
         ):
             if chunk.text:
                 chunks.append(chunk.text)
@@ -100,4 +100,4 @@ async def test_content_generation_async_stream(client):
 
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "vertexai.GenerativeModel.generate_content_async"
-    assert call.output is not None
+    assert "paris" in str(call.output).lower()
