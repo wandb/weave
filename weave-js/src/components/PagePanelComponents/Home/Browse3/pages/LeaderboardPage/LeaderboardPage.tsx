@@ -429,7 +429,7 @@ export const useIsEditor = (entity: string) => {
   }, [entity, loadingUserInfo, userInfo]);
 };
 
-export const StyledReactMarkdown = styled(ReactMarkdown)`
+const StyledReactMarkdown = styled(ReactMarkdown)`
   > *:first-child {
     margin-top: 0;
   }
