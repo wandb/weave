@@ -9,7 +9,7 @@ from weave.scorers.llm_utils import (
 
 
 class LLMScorer(Scorer):
-    """Score model outputs using a Language Learning Model (LLM).
+    """Score model outputs using a Large Language Model (LLM).
 
     This scorer leverages LLMs to evaluate and score model outputs. It provides a flexible
     way to use different LLM providers for scoring purposes.
@@ -35,11 +35,12 @@ class LLMScorer(Scorer):
 
 
 class InstructorLLMScorer(Scorer):
-    """Score model outputs using an LLM with instructor-guided evaluation.
+    """Score a model using an LLM with structured outputs.
 
     This scorer extends the base LLM scoring capability by adding temperature and
     token control for more precise scoring behavior. It automatically wraps the
-    provided client with instructor functionality for structured outputs.
+    provided client with [instructor](https://github.com/instructor-ai/instructor) 
+    functionality for structured outputs.
 
     Attributes:
         client: An instantiated LLM client with valid API credentials
