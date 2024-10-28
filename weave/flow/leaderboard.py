@@ -15,7 +15,8 @@ class LeaderboardColumn(BaseModel):
     summary_metric_path_parts: list[str] = field(default_factory=list)
     should_minimize: Optional[bool] = None
 
-
+# TODO: Merge `Leaderboard` into weave/trace_server/interface/base_models/base_model_registry.py after
+# Online evals lands
 class Leaderboard(weave.Object):
     columns: list[LeaderboardColumn]
 
@@ -54,7 +55,9 @@ def get_leaderboard_results(
 
     res_map: dict[str, LeaderboardModelResult] = {}
     for call in calls:
-        # Frustrating that we have to get the ref like this (such a waste of network calls)
+        # Frustrating that we have to get the ref like this. Since the 
+        # `Call` object auto-derefs the inputs (making a network request),
+        # we have to manually get the ref here... waste of network calls.
         call_ref = get_ref(call)
         if call_ref is None:
             continue
