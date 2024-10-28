@@ -97,23 +97,21 @@ export const CallsCharts = ({
     return data;
   }, [calls.result, calls.loading]);
 
-  const charts = useMemo(() => {
-    return (
-      <div className="m-10 mt-4 flex w-full">
-        <div className="mb-10 flex w-full flex-row gap-10">
-          <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-10">
-            <LatencyPlotlyChart chartData={chartData.latency} height={300} />
-          </div>
-          <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-10">
-            <ErrorPlotlyChart chartData={chartData.errors} height={300} />
-          </div>
-          <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-10">
-            <RequestsPlotlyChart chartData={chartData.requests} height={300} />
-          </div>
+  const charts = (
+    <div className="m-10 mt-4 flex w-full">
+      <div className="mb-10 flex w-full flex-row gap-10">
+        <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-10">
+          <LatencyPlotlyChart chartData={chartData.latency} height={300} />
+        </div>
+        <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-10">
+          <ErrorPlotlyChart chartData={chartData.errors} height={300} />
+        </div>
+        <div className="mb-4 w-full flex-1 rounded-lg border border-moon-250 bg-white p-10">
+          <RequestsPlotlyChart chartData={chartData.requests} height={300} />
         </div>
       </div>
-    );
-  }, [chartData]);
+    </div>
+  );
 
   return (
     <Tailwind style={{marginRight: '20px'}}>

@@ -8,6 +8,7 @@ import {
   BLUE_500,
   GREEN_500,
   MOON_200,
+  MOON_300,
   MOON_500,
   MOON_750,
   TEAL_400,
@@ -39,6 +40,36 @@ const CHART_TITLE_STYLE = {
   },
   x: 0,
   xanchor: 'left' as const,
+};
+
+const CHART_MARGIN_STYLE = {
+  l: 50,
+  r: 30,
+  b: 50,
+  t: 50,
+  pad: 0,
+};
+
+const X_AXIS_STYLE: Partial<Plotly.LayoutAxis> = {
+  type: 'date' as const,
+  automargin: true,
+  showgrid: false,
+  linecolor: MOON_300,
+  showspikes: true,
+  spikemode: 'across',
+  spikethickness: 1,
+  spikecolor: MOON_300,
+  tickfont: {color: MOON_500},
+};
+
+const Y_AXIS_STYLE: Partial<Plotly.LayoutAxis> = {
+  automargin: true,
+  griddash: 'dot',
+  showgrid: true,
+  gridcolor: MOON_300,
+  linecolor: MOON_300,
+  showspikes: false,
+  tickfont: {color: MOON_500},
 };
 
 export const LatencyPlotlyChart: React.FC<{
@@ -106,41 +137,11 @@ export const LatencyPlotlyChart: React.FC<{
         text: '<span style="font-weight: 600;">Latency</span>',
         ...CHART_TITLE_STYLE,
       },
-      margin: {
-        l: 50,
-        r: 30,
-        b: 50,
-        t: 50,
-        pad: 0,
-      },
-      xaxis: {
-        type: 'date',
-        automargin: true,
-        showgrid: false,
-        gridcolor: '#e0e0e0',
-        linecolor: '#e0e0e0',
-        showspikes: true,
-        spikemode: 'across',
-        spikethickness: 1,
-        spikecolor: '#999999',
-        tickfont: {
-          color: MOON_500,
-        },
-      },
-      yaxis: {
-        automargin: true,
-        griddash: 'dot',
-        showgrid: true,
-        gridcolor: '#e0e0e0',
-        linecolor: '#e0e0e0',
-        showspikes: false,
-        tickfont: {color: MOON_500},
-      },
+      margin: CHART_MARGIN_STYLE,
+      xaxis: X_AXIS_STYLE,
+      yaxis: Y_AXIS_STYLE,
       hovermode: 'x unified',
-      dragmode: false,
       showlegend: false,
-      // hoverformat: '%b %d, %I:%M %p',
-
       hoverlabel: {
         bordercolor: MOON_200,
       },
@@ -177,7 +178,6 @@ export const ErrorPlotlyChart: React.FC<{
         x: errorData.map(d => d.started_at),
         name: 'Error Count',
         marker: {color: TEAL_400},
-
         histfunc: 'count',
         hovertemplate: '%{y} errors<extra></extra>',
       },
@@ -191,35 +191,13 @@ export const ErrorPlotlyChart: React.FC<{
         text: '<span style="font-weight: 600;">Errors</span>',
         ...CHART_TITLE_STYLE,
       },
-      margin: {
-        l: 50,
-        r: 30,
-        b: 50,
-        t: 50,
-        pad: 0,
-      },
+      margin: CHART_MARGIN_STYLE,
       bargroupgap: 0.1,
-      xaxis: {
-        type: 'date',
-        automargin: true,
-        showgrid: false,
-        gridcolor: '#e0e0e0',
-        linecolor: '#e0e0e0',
-        tickfont: {color: MOON_500},
-      },
-      yaxis: {
-        automargin: true,
-        showgrid: true,
-        gridcolor: '#e0e0e0',
-        griddash: 'dot',
-        linecolor: '#e0e0e0',
-        tickfont: {color: MOON_500},
-      },
+      xaxis: X_AXIS_STYLE,
+      yaxis: {...Y_AXIS_STYLE, zeroline: false},
       hovermode: 'x unified',
       hoverlabel: {
-        bgcolor: 'white',
         bordercolor: MOON_200,
-        font: {family: 'Arial, sans-serif'},
       },
       dragmode: 'zoom',
     };
@@ -253,7 +231,7 @@ export const RequestsPlotlyChart: React.FC<{
         x: chartData.map(d => d.started_at),
         name: 'Requests',
         marker: {color: TEAL_400},
-        hovertemplate: 'Requests: %{y}<extra></extra>',
+        hovertemplate: '%{y} requests<extra></extra>',
       },
     ],
     [chartData]
@@ -266,33 +244,13 @@ export const RequestsPlotlyChart: React.FC<{
         text: '<span style="font-weight: 600;">Requests</span>',
         ...CHART_TITLE_STYLE,
       },
-      margin: {l: 50, r: 30, b: 50, t: 50, pad: 0},
-      xaxis: {
-        type: 'date',
-        automargin: true,
-        showgrid: false,
-        linecolor: '#e0e0e0',
-        showspikes: true,
-        spikemode: 'across',
-        spikethickness: 1,
-        spikecolor: '#999999',
-        tickfont: {color: MOON_500},
-      },
-      yaxis: {
-        automargin: true,
-        showgrid: true,
-        gridcolor: '#e0e0e0',
-        linecolor: '#e0e0e0',
-        griddash: 'dot',
-        showspikes: false,
-        tickfont: {color: MOON_500},
-      },
+      margin: CHART_MARGIN_STYLE,
+      xaxis: X_AXIS_STYLE,
+      yaxis: {...Y_AXIS_STYLE, zeroline: false},
       bargap: 0.2,
       hovermode: 'x unified',
       hoverlabel: {
-        bgcolor: 'white',
         bordercolor: MOON_200,
-        font: {family: 'Arial, sans-serif'},
       },
     };
 
