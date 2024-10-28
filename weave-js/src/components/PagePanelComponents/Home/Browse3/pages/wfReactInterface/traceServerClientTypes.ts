@@ -190,6 +190,16 @@ export type FeedbackPurgeError = {
   detail: string;
 };
 export type FeedbackPurgeRes = FeedbackPurgeSuccess | FeedbackPurgeError;
+
+export type FeedbackReplaceReq = FeedbackCreateReq & {
+  feedback_id: string;
+};
+export type FeedbackReplaceSuccess = {};
+export type FeedbackReplaceError = {
+  detail: string;
+};
+export type FeedbackReplaceRes = FeedbackCreateRes;
+
 interface TraceObjectsFilter {
   base_object_classes?: string[];
   object_ids?: string[];

@@ -5,6 +5,8 @@ import {
   FeedbackCreateRes,
   FeedbackPurgeReq,
   FeedbackPurgeRes,
+  FeedbackReplaceReq,
+  FeedbackReplaceRes,
   TraceCallsDeleteReq,
   TraceCallUpdateReq,
   TraceRefsReadBatchReq,
@@ -23,7 +25,13 @@ export class TraceServerClient extends DirectTraceServerClient {
   }> = [];
   private onDeleteListeners: Array<() => void>;
   private onRenameListeners: Array<() => void>;
-  private onFeedbackListeners: Record<string, Array<() => void>>;
+  // weave_ref -> feedback_ref -> callback
+  // For feedback without a feedback_ref, (the default case)
+  // the key is the empty string (this.FEEDBACK_REF_DEFAULT).
+  private onFeedbackListeners: Record<
+    string,
+    Record<string, Array<() => void>>
+  >;
 
   constructor(baseUrl: string) {
     super(baseUrl);
@@ -33,6 +41,8 @@ export class TraceServerClient extends DirectTraceServerClient {
     this.onRenameListeners = [];
     this.onFeedbackListeners = {};
   }
+
+  private FEEDBACK_REF_DEFAULT = '';
 
   /**
    * Registers a callback to be called when a delete operation occurs.
@@ -60,20 +70,25 @@ export class TraceServerClient extends DirectTraceServerClient {
   }
   public registerOnFeedbackListener(
     weaveRef: string,
-    callback: () => void
+    callback: () => void,
+    feedbackRef?: string
   ): () => void {
-    if (!(weaveRef in this.onFeedbackListeners)) {
-      this.onFeedbackListeners[weaveRef] = [];
+    const feedbackRefResolved = feedbackRef ?? this.FEEDBACK_REF_DEFAULT;
+    if (!(feedbackRefResolved in this.onFeedbackListeners)) {
+      this.onFeedbackListeners[feedbackRefResolved] = {};
     }
-    this.onFeedbackListeners[weaveRef].push(callback);
+    if (!(weaveRef in this.onFeedbackListeners[feedbackRefResolved])) {
+      this.onFeedbackListeners[feedbackRefResolved][weaveRef] = [];
+    }
+    this.onFeedbackListeners[feedbackRefResolved][weaveRef].push(callback);
     return () => {
-      const newListeners = this.onFeedbackListeners[weaveRef].filter(
-        listener => listener !== callback
-      );
+      const newListeners = this.onFeedbackListeners[feedbackRefResolved][
+        weaveRef
+      ].filter(listener => listener !== callback);
       if (newListeners.length) {
-        this.onFeedbackListeners[weaveRef] = newListeners;
+        this.onFeedbackListeners[feedbackRefResolved][weaveRef] = newListeners;
       } else {
-        delete this.onFeedbackListeners[weaveRef];
+        delete this.onFeedbackListeners[feedbackRefResolved][weaveRef];
       }
     };
   }
@@ -94,7 +109,10 @@ export class TraceServerClient extends DirectTraceServerClient {
 
   public feedbackCreate(req: FeedbackCreateReq): Promise<FeedbackCreateRes> {
     const res = super.feedbackCreate(req).then(createRes => {
-      const listeners = this.onFeedbackListeners[req.weave_ref] ?? [];
+      const feedbackRefResolved =
+        req.payload?.feedback_ref ?? this.FEEDBACK_REF_DEFAULT;
+      const listeners =
+        this.onFeedbackListeners[feedbackRefResolved][req.weave_ref] ?? [];
       listeners.forEach(listener => listener());
       return createRes;
     });
@@ -106,9 +124,23 @@ export class TraceServerClient extends DirectTraceServerClient {
       //       information about the refs that were modified.
       //       For now, just call all registered feedback listeners.
       for (const listeners of Object.values(this.onFeedbackListeners)) {
-        listeners.forEach(listener => listener());
+        for (const listenersForWeaveRef of Object.values(listeners)) {
+          listenersForWeaveRef.forEach(listener => listener());
+        }
       }
       return purgeRes;
+    });
+    return res;
+  }
+
+  public feedbackReplace(req: FeedbackReplaceReq): Promise<FeedbackReplaceRes> {
+    const res = super.feedbackReplace(req).then(replaceRes => {
+      const feedbackRefResolved =
+        req.payload?.feedback_ref ?? this.FEEDBACK_REF_DEFAULT;
+      const listeners =
+        this.onFeedbackListeners[feedbackRefResolved][req.weave_ref] ?? [];
+      listeners.forEach(listener => listener());
+      return replaceRes;
     });
     return res;
   }
