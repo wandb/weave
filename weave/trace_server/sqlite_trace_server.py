@@ -1041,7 +1041,32 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         with self.lock:
             cursor.execute(prepared.sql, prepared.parameters)
             conn.commit()
-        return tsi.FeedbackPurgeRes()
+        return tsi.FeedbackPurgeRes(num_deleted=cursor.rowcount)
+
+    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+        purge_request = tsi.FeedbackPurgeReq(
+            project_id=req.project_id,
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "id"},
+                        {"$literal": req.feedback_id},
+                    ],
+                }
+            },
+        )
+        purge_result = self.feedback_purge(purge_request)
+        if purge_result.num_deleted == 0:
+            raise InvalidRequest(f"Failed to purge feedback with id {req.feedback_id}")
+        if purge_result.num_deleted > 1:
+            raise InvalidRequest(
+                f"Purged more than one feedback with id {req.feedback_id}"
+            )
+
+        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
+        create_result = self.feedback_create(create_req)
+
+        return tsi.FeedbackReplaceRes(**create_result.model_dump())
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1080,13 +1105,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
         print("COST PURGE is not implemented for local sqlite", req)
         return tsi.CostPurgeRes()
-
-    def execute_batch_action(
-        self, req: tsi.ExecuteBatchActionReq
-    ) -> tsi.ExecuteBatchActionRes:
-        raise NotImplementedError(
-            "EXECUTE BATCH ACTION is not implemented for local sqlite"
-        )
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)

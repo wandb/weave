@@ -1,5 +1,11 @@
 import pytest
 
+from weave.trace_server.trace_server_interface import (
+    FeedbackCreateReq,
+    FeedbackQueryReq,
+    FeedbackReplaceReq,
+)
+
 
 def test_client_feedback(client) -> None:
     feedbacks = client.get_feedback()
@@ -62,3 +68,68 @@ def test_custom_feedback(client) -> None:
 
     with pytest.raises(ValueError):
         trace_object.feedback.add("wandb.trying_to_use_reserved_prefix", value=1)
+
+
+def test_feedback_replace(client) -> None:
+    # Create initial feedback
+    create_req = FeedbackCreateReq(
+        project_id="test/project",
+        weave_ref="weave:///test/project/obj/123:abc",
+        feedback_type="reaction",
+        payload={"emoji": "👍"},
+    )
+    initial_feedback = client.server.feedback_create(create_req)
+
+    # Create another feedback with different type
+    note_feedback = client.server.feedback_create(
+        FeedbackCreateReq(
+            project_id="test/project",
+            weave_ref="weave:///test/project/obj/456:def",
+            feedback_type="note",
+            payload={"note": "This is a test note"},
+        )
+    )
+
+    # Replace the first feedback with new content
+    replace_req = FeedbackReplaceReq(
+        project_id="test/project",
+        weave_ref="weave:///test/project/obj/123:abc",
+        feedback_type="note",
+        payload={"note": "Updated feedback"},
+        feedback_id=initial_feedback.id,
+    )
+    replaced_feedback = client.server.feedback_replace(replace_req)
+
+    # Verify the replacement
+    assert replaced_feedback.id == initial_feedback.id
+    assert replaced_feedback.feedback_type == "note"
+    assert replaced_feedback.payload == {"note": "Updated feedback"}
+
+    # Verify the other feedback remains unchanged
+    query_res = client.server.feedback_query(
+        FeedbackQueryReq(
+            project_id="test/project", fields=["id", "feedback_type", "payload"]
+        )
+    )
+
+    feedbacks = query_res.result
+    assert len(feedbacks) == 2
+
+    # Find the non-replaced feedback and verify it's unchanged
+    other_feedback = next(f for f in feedbacks if f["id"] == note_feedback.id)
+    assert other_feedback["feedback_type"] == "note"
+    assert other_feedback["payload"] == {"note": "This is a test note"}
+
+    # now replace the replaced feedback with the original content
+    replace_req = FeedbackReplaceReq(
+        project_id="test/project",
+        weave_ref="weave:///test/project/obj/123:abc",
+        feedback_type="reaction",
+        payload={"emoji": "👍"},
+        feedback_id=replaced_feedback.id,
+    )
+    replaced_feedback = client.server.feedback_replace(replace_req)
+
+    assert replaced_feedback.id == replaced_feedback.id
+    assert replaced_feedback.feedback_type == "reaction"
+    assert replaced_feedback.payload == {"emoji": "👍"}
