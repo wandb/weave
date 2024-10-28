@@ -5,6 +5,10 @@ from weave.integrations.integration_utilities import op_name_from_ref
 
 @pytest.mark.retry(max_attempts=5)
 @pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
 def test_content_generation(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel
@@ -26,6 +30,10 @@ def test_content_generation(client):
 
 @pytest.mark.retry(max_attempts=5)
 @pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
 def test_content_generation_stream(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel
@@ -52,6 +60,10 @@ def test_content_generation_stream(client):
 @pytest.mark.retry(max_attempts=5)
 @pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
 async def test_content_generation_async(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel
@@ -74,6 +86,10 @@ async def test_content_generation_async(client):
 @pytest.mark.retry(max_attempts=5)
 @pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
 async def test_content_generation_async_stream(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel
