@@ -5,7 +5,7 @@ from pydantic import Field
 
 import weave
 from weave.scorers.llm_scorer import LLMScorer
-from weave.scorers.llm_utils import embed
+from weave.scorers.llm_utils import OPENAI_DEFAULT_EMBEDDING_MODEL, embed
 
 
 class EmbeddingSimilarityScorer(LLMScorer):
@@ -18,6 +18,7 @@ class EmbeddingSimilarityScorer(LLMScorer):
     """
 
     threshold: float = Field(0.5, description="The threshold for the similarity score")
+    model_id: str = OPENAI_DEFAULT_EMBEDDING_MODEL
 
     @weave.op
     def score(self, output: str, target: str) -> Any:
