@@ -42,5 +42,5 @@ export function getWandbConfigs() {
   }
   const apiKey = getApiKey(host);
   const {baseUrl, traceBaseUrl, domain} = getUrls(host);
-  return {apiKey, baseUrl, traceBaseUrl, domain, host};
+  return {apiKey, baseUrl, traceBaseUrl, domain};
 }

@@ -2,7 +2,8 @@ import {weaveImage} from '../media';
 import {op} from '../op';
 import {OpOptions} from '../opType';
 
-const openAIStreamReducer = {
+// exported just for testing
+export const openAIStreamReducer = {
   initialState: {
     id: '',
     object: 'chat.completion',

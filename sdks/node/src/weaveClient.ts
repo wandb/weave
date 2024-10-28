@@ -76,6 +76,7 @@ export class WeaveClient {
   private callQueue: Array<{mode: 'start' | 'end'; data: any}> = [];
   private batchProcessTimeout: NodeJS.Timeout | null = null;
   private isBatchProcessing: boolean = false;
+  private batchProcessingPromises: Set<Promise<void>> = new Set();
   private readonly BATCH_INTERVAL: number = 200;
 
   constructor(
@@ -85,7 +86,6 @@ export class WeaveClient {
     public settings: Settings = new Settings()
   ) {}
 
-  private batchProcessingPromises: Set<Promise<void>> = new Set();
   private scheduleBatchProcessing() {
     if (this.batchProcessTimeout || this.isBatchProcessing) return;
     const promise = new Promise<void>(resolve => {
@@ -146,6 +146,8 @@ export class WeaveClient {
       );
     } catch (error) {
       console.error('Error processing batch:', error);
+      // Put failed items back at the front of the queue
+      this.callQueue.unshift(...batchToProcess);
     } finally {
       this.isBatchProcessing = false;
       this.batchProcessTimeout = null;

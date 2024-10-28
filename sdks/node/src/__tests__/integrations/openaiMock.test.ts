@@ -1,4 +1,4 @@
-import {makeMockOpenAIChat} from './openaiMock';
+import {makeMockOpenAIChat} from '../openaiMock';
 
 describe('OpenAI Mock', () => {
   const mockResponse = (messages: any[]) => ({

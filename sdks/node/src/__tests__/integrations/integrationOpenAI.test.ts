@@ -1,7 +1,7 @@
-import {InMemoryTraceServer} from '../inMemoryTraceServer';
-import {wrapOpenAI} from '../integrations/openai';
-import {initWithCustomTraceServer} from './clientMock';
-import {makeMockOpenAIChat} from './openaiMock';
+import {InMemoryTraceServer} from '../../inMemoryTraceServer';
+import {wrapOpenAI} from '../../integrations/openai';
+import {initWithCustomTraceServer} from '../clientMock';
+import {makeMockOpenAIChat} from '../openaiMock';
 
 // Helper function to get calls
 async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {
