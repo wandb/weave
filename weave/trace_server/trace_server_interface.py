@@ -1,5 +1,4 @@
 import datetime
-import httpx
 from enum import Enum
 from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Type, Union
 

@@ -1398,7 +1398,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not model_info:
             raise InvalidRequest(f"No secret name found for model {model_name}")
         secret_name = model_info.get("api_key_name")
-        api_key = secret_fetcher.fetch(secret_name)
+        api_key = secret_fetcher.fetch(secret_name).get('secrets', {}).get(secret_name)
+        if not api_key:
+            raise InvalidRequest(f"No API key found for model {model_name}")
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
             wb_user_id=req.wb_user_id,
