@@ -1,3 +1,6 @@
+---
+title: Log Audio With Weave
+---
 
 
 :::tip[This is a notebook]
@@ -8,6 +11,9 @@
 
 :::
 
+
+
+<!--- @wandbcode{feedback-colab} -->
 
 # How to use Weave with Audio Data: An OpenAI Example
 
@@ -85,7 +91,6 @@ Here, we define the function `prompt_endpont_and_log_trace`. This function has t
 ```python
 SAMPLE_RATE = 22050
 
-
 @weave.op()
 def prompt_endpoint_and_log_trace(system_prompt=None, user_prompt=None):
     if not system_prompt:
@@ -152,7 +157,7 @@ prompt_endpoint_and_log_trace(
 display(Audio("output.wav", rate=SAMPLE_RATE, autoplay=True))
 ```
 
-# Advanced Usage: Realtime Audio API with Weave #TODO: Record video of weave traces and me chatting with it w/ the terminal output side by side. 
+# Advanced Usage: Realtime Audio API with Weave
 <img src="https://i.imgur.com/ZiW3IVu.png"/>
 <details>
 <summary> (Advanced) Realtime Audio API with Weave </summary>
