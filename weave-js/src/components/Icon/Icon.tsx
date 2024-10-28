@@ -631,12 +631,6 @@ export const IconLogOut = (props: SVGIconProps) => (
 export const IconLogoColab = (props: SVGIconProps) => (
   <ImportLogoColab {...updateIconProps(props)} />
 );
-export const IconMarker = (props: SVGIconProps) => (
-  <ImportMarker {...updateIconProps(props)} />
-);
-export const IconReloadRefresh = (props: SVGIconProps) => (
-  <ImportReloadRefresh {...updateIconProps(props)} />
-);
 export const IconMagicWandStar = (props: SVGIconProps) => (
   <ImportMagicWandStar {...updateIconProps(props)} />
 );
@@ -645,6 +639,9 @@ export const IconMagicWandStick = (props: SVGIconProps) => (
 );
 export const IconMarkdown = (props: SVGIconProps) => (
   <ImportMarkdown {...updateIconProps(props)} />
+);
+export const IconMarker = (props: SVGIconProps) => (
+  <ImportMarker {...updateIconProps(props)} />
 );
 export const IconMenu = (props: SVGIconProps) => (
   <ImportMenu {...updateIconProps(props)} />
@@ -780,6 +777,9 @@ export const IconRegex = (props: SVGIconProps) => (
 );
 export const IconRegistries = (props: SVGIconProps) => (
   <ImportRegistries {...updateIconProps(props)} />
+);
+export const IconReloadRefresh = (props: SVGIconProps) => (
+  <ImportReloadRefresh {...updateIconProps(props)} />
 );
 export const IconRemove = (props: SVGIconProps) => (
   <ImportRemove {...updateIconProps(props)} />
@@ -1071,7 +1071,6 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'cube-container': IconCubeContainer,
   'dashboard-blackboard': IconDashboardBlackboard,
   'database-artifacts': IconDatabaseArtifacts,
-  'reload-refresh': IconReloadRefresh,
   date: IconDate,
   delete: IconDelete,
   diamond: IconDiamond,
@@ -1145,8 +1144,8 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'logo-colab': IconLogoColab,
   'magic-wand-star': IconMagicWandStar,
   'magic-wand-stick': IconMagicWandStick,
-  marker: IconMarker,
   markdown: IconMarkdown,
+  marker: IconMarker,
   menu: IconMenu,
   'microphone-audio': IconMicrophoneAudio,
   'miller-columns': IconMillerColumns,
@@ -1192,6 +1191,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   redo: IconRedo,
   regex: IconRegex,
   registries: IconRegistries,
+  'reload-refresh': IconReloadRefresh,
   remove: IconRemove,
   'remove-alt': IconRemoveAlt,
   report: IconReport,
