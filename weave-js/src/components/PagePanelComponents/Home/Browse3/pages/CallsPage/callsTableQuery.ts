@@ -66,6 +66,7 @@ export const useCallsForQuery = (
       refetchOnDelete: true,
     }
   );
+  
   const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
     refetchOnDelete: true,
   });

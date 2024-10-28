@@ -122,7 +122,7 @@ export const CallsCharts = ({
           {isInsightsOpen ? <IconChevronDown /> : <IconChevronNext />}
           <IconLightbulbInfo width={18} height={18} className="text-teal-500" />
           <div className="font-source-sans-pro mt-[1px] text-[18px] font-semibold text-moon-500">
-            {'Insights'}
+            Insights
           </div>
         </div>
         {isInsightsOpen && charts}

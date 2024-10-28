@@ -132,7 +132,7 @@ export const LatencyPlotlyChart: React.FC<{
 
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
-      height: height - 40,
+      height: height,
       title: {
         text: '<span style="font-weight: 600;">Latency</span>',
         ...CHART_TITLE_STYLE,
@@ -152,12 +152,9 @@ export const LatencyPlotlyChart: React.FC<{
       responsive: true,
     };
 
-    Plotly.newPlot(
-      divRef.current as any,
-      plotlyData,
-      plotlyLayout,
-      plotlyConfig
-    );
+    if (divRef.current) {
+      Plotly.newPlot(divRef.current, plotlyData, plotlyLayout, plotlyConfig);
+    }
   }, [plotlyData, height]);
 
   return <div ref={divRef}></div>;
@@ -186,7 +183,7 @@ export const ErrorPlotlyChart: React.FC<{
 
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
-      height: height - 40,
+      height: height,
       title: {
         text: '<span style="font-weight: 600;">Errors</span>',
         ...CHART_TITLE_STYLE,
@@ -207,12 +204,9 @@ export const ErrorPlotlyChart: React.FC<{
       responsive: true,
     };
 
-    Plotly.newPlot(
-      divRef.current as any,
-      plotlyData,
-      plotlyLayout,
-      plotlyConfig
-    );
+    if (divRef.current) {
+      Plotly.newPlot(divRef.current, plotlyData, plotlyLayout, plotlyConfig);
+    }
   }, [plotlyData, height]);
 
   return <div ref={divRef}></div>;
@@ -239,7 +233,7 @@ export const RequestsPlotlyChart: React.FC<{
 
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
-      height: height - 40,
+      height: height,
       title: {
         text: '<span style="font-weight: 600;">Requests</span>',
         ...CHART_TITLE_STYLE,
@@ -259,12 +253,9 @@ export const RequestsPlotlyChart: React.FC<{
       responsive: true,
     };
 
-    Plotly.newPlot(
-      divRef.current as any,
-      plotlyData,
-      plotlyLayout,
-      plotlyConfig
-    );
+    if (divRef.current) {
+      Plotly.newPlot(divRef.current, plotlyData, plotlyLayout, plotlyConfig);
+    }
   }, [plotlyData, height]);
 
   return <div ref={divRef}></div>;
