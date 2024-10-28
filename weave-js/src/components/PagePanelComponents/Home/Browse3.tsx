@@ -338,7 +338,7 @@ const MainPeekingLayout: FC = () => {
     <WFDataModelAutoProvider
       entityName={params.entity!}
       projectName={params.project!}>
-      <CallsTableRowSelectionProvider>
+      <TableRowSelectionProvider>
         <Box
           sx={{
             flex: '1 1 auto',
@@ -423,7 +423,7 @@ const MainPeekingLayout: FC = () => {
             )}
           </Drawer>
         </Box>
-      </CallsTableRowSelectionProvider>
+      </TableRowSelectionProvider>
     </WFDataModelAutoProvider>
   );
 };
@@ -1083,48 +1083,48 @@ const Browse3Breadcrumbs: FC = props => {
   );
 };
 
-export const CallsTableRowSelectionContext = React.createContext<{
-  setCallIds?: (callIds: string[]) => void;
-  getNextCallId?: (currentId: string) => string | null;
-  getPreviousCallId?: (currentId: string) => string | null;
+export const TableRowSelectionContext = React.createContext<{
+  setRowIds?: (rowIds: string[]) => void;
+  getNextRowId?: (currentId: string) => string | null;
+  getPreviousRowId?: (currentId: string) => string | null;
 }>({
-  setCallIds: () => {},
-  getNextCallId: () => null,
-  getPreviousCallId: () => null,
+  setRowIds: () => {},
+  getNextRowId: () => null,
+  getPreviousRowId: () => null,
 });
 
-const CallsTableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
+const TableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
   children,
 }) => {
-  const [callIds, setCallIds] = useState<string[]>([]);
+  const [rowIds, setRowIds] = useState<string[]>([]);
 
-  const getNextCallId = useCallback(
+  const getNextRowId = useCallback(
     (currentId: string) => {
-      console.log('getNextCallId', currentId, callIds);
-      const currentIndex = callIds.indexOf(currentId);
+      console.log('getNextRowId', currentId, rowIds);
+      const currentIndex = rowIds.indexOf(currentId);
       if (currentIndex !== -1) {
-        return callIds[currentIndex + 1];
+        return rowIds[currentIndex + 1];
       }
       return null;
     },
-    [callIds]
+    [rowIds]
   );
 
-  const getPreviousCallId = useCallback(
+  const getPreviousRowId = useCallback(
     (currentId: string) => {
-      const currentIndex = callIds.indexOf(currentId);
+      const currentIndex = rowIds.indexOf(currentId);
       if (currentIndex !== -1) {
-        return callIds[currentIndex - 1];
+        return rowIds[currentIndex - 1];
       }
       return null;
     },
-    [callIds]
+    [rowIds]
   );
 
   return (
-    <CallsTableRowSelectionContext.Provider
-      value={{setCallIds, getNextCallId, getPreviousCallId}}>
+    <TableRowSelectionContext.Provider
+      value={{setRowIds, getNextRowId, getPreviousRowId}}>
       {children}
-    </CallsTableRowSelectionContext.Provider>
+    </TableRowSelectionContext.Provider>
   );
 };

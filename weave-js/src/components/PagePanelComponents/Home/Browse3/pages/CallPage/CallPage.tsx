@@ -8,7 +8,7 @@ import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {CallsTableRowSelectionContext} from '../../../Browse3';
+import {TableRowSelectionContext} from '../../../Browse3';
 import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {NotFoundPanel} from '../../NotFoundPanel';
@@ -196,11 +196,9 @@ const CallPageInnerVertical: FC<{
   }, [callComplete]);
 
   // Call navigation by arrow keys and buttons
-  const {getNextCallId, getPreviousCallId} = useContext(
-    CallsTableRowSelectionContext
-  );
+  const {getNextRowId, getPreviousRowId} = useContext(TableRowSelectionContext);
   const onNextCall = useCallback(() => {
-    const nextCallId = getNextCallId?.(currentCall.callId);
+    const nextCallId = getNextRowId?.(currentCall.callId);
     if (nextCallId) {
       history.replace(
         currentRouter.callUIUrl(
@@ -213,16 +211,16 @@ const CallPageInnerVertical: FC<{
         )
       );
     }
-  }, [currentCall, currentRouter, history, path, showTraceTree, getNextCallId]);
+  }, [currentCall, currentRouter, history, path, showTraceTree, getNextRowId]);
   const onPreviousCall = useCallback(() => {
-    const previousCallId = getPreviousCallId?.(currentCall.callId);
-    if (previousCallId) {
+    const previousRowId = getPreviousRowId?.(currentCall.callId);
+    if (previousRowId) {
       history.replace(
         currentRouter.callUIUrl(
           currentCall.entity,
           currentCall.project,
           currentCall.traceId,
-          previousCallId,
+          previousRowId,
           path,
           showTraceTree
         )
@@ -234,7 +232,7 @@ const CallPageInnerVertical: FC<{
     history,
     path,
     showTraceTree,
-    getPreviousCallId,
+    getPreviousRowId,
   ]);
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
