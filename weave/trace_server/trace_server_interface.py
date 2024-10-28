@@ -189,6 +189,7 @@ class ObjSchema(BaseModel):
 class ObjSchemaForInsert(BaseModel):
     project_id: str
     object_id: str
+    base_object_class: Optional[str] = None
     val: Any
 
 
