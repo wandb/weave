@@ -198,6 +198,7 @@ class TableSchemaForInsert(BaseModel):
     rows: list[dict[str, Any]]
 
 
+
 class CallStartReq(BaseModel):
     start: StartedCallSchemaForInsert
 
@@ -235,7 +236,6 @@ class CallsDeleteReq(BaseModel):
 
 class CallsDeleteRes(BaseModel):
     pass
-
 
 class CallsFilter(BaseModel):
     op_names: Optional[List[str]] = None
@@ -796,6 +796,16 @@ class CostPurgeReq(BaseModel):
 class CostPurgeRes(BaseModel):
     pass
 
+class CallsLLMReq(BaseModel):
+    project_id: str
+    secret_name: str # TODO: base on model name
+    model_name: str
+    messages: List[str]
+    api_key: Optional[str] = None
+    wb_user_id: Optional[str] = None
+
+class CallsLLMRes(BaseModel):
+    response: Dict[str, Any]
 
 class ExecuteBatchActionReq(BaseModel):
     project_id: str
@@ -822,6 +832,9 @@ class TraceServerInterface(Protocol):
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
+
+      # Calls LLM API
+    def calls_llm(self, req: CallsLLMReq) -> CallsLLMRes: ...
 
     # Op API
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...

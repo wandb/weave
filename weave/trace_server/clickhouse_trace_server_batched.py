@@ -21,7 +21,7 @@
 # subqueries, and put the project_id predicate in the innermost subquery, which fixes
 # the problem.
 
-
+import base64
 import dataclasses
 import datetime
 import hashlib
@@ -51,9 +51,12 @@ from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
+from weave.trace_server import llm_completion
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace.op import op as op_deco
+
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -113,6 +116,7 @@ from weave.trace_server.trace_server_common import (
     make_derived_summary_fields,
     make_feedback_query_req,
     set_nested_key,
+    parse_messages
 )
 from weave.trace_server.trace_server_interface_util import (
     assert_non_null_wb_user_id,
@@ -120,6 +124,7 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
     str_digest,
 )
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -275,6 +280,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         stream = self.calls_query_stream(req)
         return tsi.CallsQueryRes(calls=list(stream))
+
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         """Returns a stats object for the given query. This is useful for counts or other
@@ -539,6 +545,50 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._insert_call(renamed_insertable)
 
         return tsi.CallUpdateRes()
+    
+    def calls_llm(self, req: tsi.CallsLLMReq) -> tsi.CallsLLMRes:
+        messages = parse_messages(req.messages)
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=req.project_id,
+            wb_user_id=req.wb_user_id,
+            op_name="call_llm",
+            started_at=datetime.datetime.now(),
+            inputs={"messages": messages, "model_name": req.model_name},
+            attributes={}
+        )
+        ch_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+
+        # Inserts the call into the clickhouse database, verifying that
+        # the call does not already exist
+        self._insert_call(ch_call)
+
+        res = llm_completion.call_llm(req.api_key, req.model_name, messages)
+
+
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=req.project_id,
+            id=ch_call.id,
+            ended_at=datetime.datetime.now(),
+            output=res.response,
+            summary={}
+        )
+
+        if "usage" in res.response:
+            end.summary["usage"] = {req.model_name: res.response["usage"]}
+
+        if "error" in res.response:
+            end.exception = res.response["error"]
+        
+
+        # Converts the user-provided call details into a clickhouse schema.
+        # This does validation and conversion of the input data as well
+        # as enforcing business rules and defaults
+        ch_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+
+        # Inserts the call into the clickhouse database, verifying that
+        # the call does not already exist
+        self._insert_call(ch_call)
+        return res
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
