@@ -103,7 +103,7 @@ const LeaderboardTable: React.FC<{
   const {peekingRouter} = useWeaveflowRouteContext();
   const {useRootObjectVersions} = useWFHooks();
 
-  // TODO: One `useCollectionObjects` lands from the online
+  // TODO: Once `useCollectionObjects` lands from the online
   // evals project, switch to that (much more type safe)
   const leaderboardObjectVersions = useRootObjectVersions(
     props.entity,
@@ -161,7 +161,7 @@ const useCreateLeaderboard = (entity: string, project: string) => {
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
 
-  // TODO: One `useCreateCollectionObject` lands from the online
+  // TODO: Once `useCreateCollectionObject` lands from the online
   // evals project, switch to that (much more type safe)
   const createLeaderboard = async () => {
     const objectId = sanitizeObjectId(generateLeaderboardId());

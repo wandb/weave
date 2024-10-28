@@ -43,7 +43,7 @@ export const Link = styled(LinkComp)<LinkProps>`
 `;
 Link.displayName = 'S.Link';
 
-export const FakeLink = styled.div<LinkProps>`
+const FakeLink = styled.div<LinkProps>`
   font-weight: 600;
   color: ${p => (p.$variant === 'secondary' ? MOON_700 : TEAL_600)};
   &:hover {
@@ -351,6 +351,7 @@ export const CustomLink: React.FC<{
   variant?: LinkVariant;
   icon?: React.ReactNode;
 }> = props => {
+  // Used to look like our other links, but delegate to a custom onClick
   return (
     <LinkWrapper
       onClick={props.onClick}

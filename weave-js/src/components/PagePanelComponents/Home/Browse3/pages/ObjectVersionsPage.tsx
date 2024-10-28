@@ -244,7 +244,9 @@ export const ObjectVersionsTable: React.FC<{
               ? obj.objectId
               : objectVersionText(obj.objectId, obj.versionIndex);
 
-            // Maybe this should be conditional?
+            // This allows us to use the object name as the link text
+            // if it is available. Probably should make this workfor
+            // the object version link as well.
             if (obj.val.name) {
               text = obj.val.name;
             }
