@@ -125,6 +125,7 @@ import {ReactComponent as ImportLogoColab} from '../../assets/icons/icon-logo-co
 import {ReactComponent as ImportMagicWandStar} from '../../assets/icons/icon-magic-wand-star.svg';
 import {ReactComponent as ImportMagicWandStick} from '../../assets/icons/icon-magic-wand-stick.svg';
 import {ReactComponent as ImportMarkdown} from '../../assets/icons/icon-markdown.svg';
+import {ReactComponent as ImportMarker} from '../../assets/icons/icon-marker.svg';
 import {ReactComponent as ImportMenu} from '../../assets/icons/icon-menu.svg';
 import {ReactComponent as ImportMicrophoneAudio} from '../../assets/icons/icon-microphone-audio.svg';
 import {ReactComponent as ImportMillerColumns} from '../../assets/icons/icon-miller-columns.svg';
@@ -170,6 +171,7 @@ import {ReactComponent as ImportRedditSocial} from '../../assets/icons/icon-redd
 import {ReactComponent as ImportRedo} from '../../assets/icons/icon-redo.svg';
 import {ReactComponent as ImportRegex} from '../../assets/icons/icon-regex.svg';
 import {ReactComponent as ImportRegistries} from '../../assets/icons/icon-registries.svg';
+import {ReactComponent as ImportReloadRefresh} from '../../assets/icons/icon-reload-refresh.svg';
 import {ReactComponent as ImportRemove} from '../../assets/icons/icon-remove.svg';
 import {ReactComponent as ImportRemoveAlt} from '../../assets/icons/icon-remove-alt.svg';
 import {ReactComponent as ImportReport} from '../../assets/icons/icon-report.svg';
@@ -629,6 +631,12 @@ export const IconLogOut = (props: SVGIconProps) => (
 export const IconLogoColab = (props: SVGIconProps) => (
   <ImportLogoColab {...updateIconProps(props)} />
 );
+export const IconMarker = (props: SVGIconProps) => (
+  <ImportMarker {...updateIconProps(props)} />
+);
+export const IconReloadRefresh = (props: SVGIconProps) => (
+  <ImportReloadRefresh {...updateIconProps(props)} />
+);
 export const IconMagicWandStar = (props: SVGIconProps) => (
   <ImportMagicWandStar {...updateIconProps(props)} />
 );
@@ -1063,6 +1071,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'cube-container': IconCubeContainer,
   'dashboard-blackboard': IconDashboardBlackboard,
   'database-artifacts': IconDatabaseArtifacts,
+  'reload-refresh': IconReloadRefresh,
   date: IconDate,
   delete: IconDelete,
   diamond: IconDiamond,
@@ -1136,6 +1145,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'logo-colab': IconLogoColab,
   'magic-wand-star': IconMagicWandStar,
   'magic-wand-stick': IconMagicWandStick,
+  marker: IconMarker,
   markdown: IconMarkdown,
   menu: IconMenu,
   'microphone-audio': IconMicrophoneAudio,
