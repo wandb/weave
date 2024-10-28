@@ -91,6 +91,7 @@ Here, we define the function `prompt_endpont_and_log_trace`. This function has t
 ```python
 SAMPLE_RATE = 22050
 
+
 @weave.op()
 def prompt_endpoint_and_log_trace(system_prompt=None, user_prompt=None):
     if not system_prompt:
