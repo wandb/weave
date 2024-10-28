@@ -133,7 +133,7 @@ export const LatencyPlotlyChart: React.FC<{
 
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
-      height: height,
+      height,
       title: {
         text: '<span style="font-weight: 600;">Latency</span>',
         ...CHART_TITLE_STYLE,
@@ -184,7 +184,7 @@ export const ErrorPlotlyChart: React.FC<{
 
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
-      height: height,
+      height,
       title: {
         text: '<span style="font-weight: 600;">Errors</span>',
         ...CHART_TITLE_STYLE,
@@ -234,7 +234,7 @@ export const RequestsPlotlyChart: React.FC<{
 
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
-      height: height,
+      height,
       title: {
         text: '<span style="font-weight: 600;">Requests</span>',
         ...CHART_TITLE_STYLE,
