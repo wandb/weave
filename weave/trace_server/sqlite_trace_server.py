@@ -1105,7 +1105,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
         print("COST PURGE is not implemented for local sqlite", req)
         return tsi.CostPurgeRes()
-    
+
     def execute_batch_action(
         self, req: tsi.ExecuteBatchActionReq
     ) -> tsi.ExecuteBatchActionRes:

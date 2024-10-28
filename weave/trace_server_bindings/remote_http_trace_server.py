@@ -555,7 +555,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return self._generic_request(
             "/cost/purge", req, tsi.CostPurgeReq, tsi.CostPurgeRes
         )
-    
+
     def execute_batch_action(
         self, req: tsi.ExecuteBatchActionReq
     ) -> tsi.ExecuteBatchActionRes:

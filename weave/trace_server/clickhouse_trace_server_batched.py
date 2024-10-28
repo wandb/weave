@@ -1421,7 +1421,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes(num_deleted=query_result.rowcount)
-    
+
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
         # To replace, first purge, then if successful, create.
         query = tsi.Query(
