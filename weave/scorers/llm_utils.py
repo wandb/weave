@@ -84,7 +84,7 @@ def create(
 
 def embed(
     client: _LLM_CLIENTS, model_id: str, texts: Union[str, List[str]], **kwargs: Any
-) -> List[List[float]]:  # type: ignore
+) -> List[List[float]]:
     client_type = type(client).__name__.lower()
     if "openai" in client_type:
         response = client.embeddings.create(model=model_id, input=texts, **kwargs)
