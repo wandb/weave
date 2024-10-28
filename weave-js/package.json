@@ -88,7 +88,7 @@
     "onchange": "^7.1.0",
     "pako": "^2.1.0",
     "pca-js": "^1.0.2",
-    "plotly.js": "^2.35.2",
+    "plotly.js": "2.23.2",
     "plotly.js-dist-min": "^2.6.3",
     "prismjs": "1.29.0",
     "query-string": "^8.1.0",
