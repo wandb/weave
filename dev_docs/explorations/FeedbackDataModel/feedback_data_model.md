@@ -684,3 +684,62 @@ Cleanups:
 * [ ] Add scorer feedback type to this formal definition.
 * [ ] wb_user_id should be nullable (for actions)
 * [ ] Could migrate the types to explude dots(.) - to avoid conflict with json selectors.
+
+--- What about query notions
+
+* Calls Query
+    * `feedback[ScorerFeedback].name.version.key`
+
+
+{
+    feedback: {
+        "my_scorer": {
+            "digest_1": {
+                "grade": "A"
+            }
+        },
+        "my_action": {
+            "digest_1": {
+                "value": "some_value"
+            }
+        },
+        "my_column": {
+            "digest_1": {
+                "value": "some_value"
+            }
+        },
+        "custom_field": 3,
+        "note": "some note",
+        "emoji": "👍"
+    }
+}
+
+{
+    feedback: {
+        my_scorer.avg: 3.14
+        my_action.avg: 3.14
+        my_column.avg: 3.14
+        custom_field.avg: 3.14
+        emoji.value_counts: {
+            "👍": 10,
+            "👎": 5
+        }
+    }
+}
+
+{
+    feedback_query: {
+        my_scorer.avg: {"$avg": "$feedback.payload.my_scorer.*.grade", $query: {$eq: ["$feedback_type", "ScorerFeedback"]}},
+        emoji.👍: {"$count": "$feedback.payload.emoji.👍"},
+    }
+}
+
+{
+    field_selector: "payload.my_scorer.*.grade",
+    query_filter: {
+        $eq: ["$feedback_type", "ScorerFeedback"],
+        $eq: ["scorer_object_id", "digest_1"],
+    },
+    user_group: "take_last"
+    aggregation: "avg"
+}
