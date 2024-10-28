@@ -41,6 +41,7 @@ Example:
 
 
 ```python
+import weave
 from openai import OpenAI
 from weave import Scorer
 
@@ -112,6 +113,7 @@ If you're using a class-based scorer, pass a dictionary to the `column_map` attr
 Example:
 
 ```python
+import weave
 from weave import Scorer
 
 # A dataset with news articles to be summarised
@@ -141,6 +143,9 @@ Now, the `text` argument in the `score` method will receive data from the `news_
 - Another equivalent option to map your columns is to subclass the `Scorer` and overload the `score` method mapping the columns explicitly.
 
 ```python
+import weave
+from weave import Scorer
+
 class MySummarizationScorer(SummarizationScorer):
     
     @weave.op
