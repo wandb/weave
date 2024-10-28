@@ -1,8 +1,9 @@
-import { requireGlobalClient } from './clientApi';
-import { Table } from './table';
-import { ObjectRef, WeaveObject, WeaveObjectParameters } from './weaveObject';
+import {requireGlobalClient} from './clientApi';
+import {Table} from './table';
+import {ObjectRef, WeaveObject, WeaveObjectParameters} from './weaveObject';
 
-interface DatasetParameters<R extends DatasetRow> extends WeaveObjectParameters {
+interface DatasetParameters<R extends DatasetRow>
+  extends WeaveObjectParameters {
   rows: R[];
 }
 
@@ -72,10 +73,18 @@ export class Dataset<R extends DatasetRow> extends WeaveObject {
 
   getRow(index: number): R {
     const tableRow = this.rows.row(index);
-    const datasetRow: R = { ...tableRow, __savedRef: undefined };
+    const datasetRow: R = {...tableRow, __savedRef: undefined};
     if (this.__savedRef && tableRow.__savedRef) {
-      datasetRow.__savedRef = Promise.all([this.__savedRef, tableRow.__savedRef]).then(([ref, tableRowRef]) => {
-        return new DatasetRowRef(ref.projectId, ref.objectId, ref.digest, tableRowRef.rowDigest);
+      datasetRow.__savedRef = Promise.all([
+        this.__savedRef,
+        tableRow.__savedRef,
+      ]).then(([ref, tableRowRef]) => {
+        return new DatasetRowRef(
+          ref.projectId,
+          ref.objectId,
+          ref.digest,
+          tableRowRef.rowDigest
+        );
       });
     }
     return datasetRow;

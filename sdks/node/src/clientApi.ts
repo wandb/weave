@@ -1,12 +1,12 @@
-import { Api as TraceServerApi } from './generated/traceServerApi';
-import { Settings } from './settings';
-import { getUrls, setGlobalDomain } from './urls';
-import { ConcurrencyLimiter } from './utils/concurrencyLimit';
-import { Netrc } from './utils/netrc';
-import { createFetchWithRetry } from './utils/retry';
-import { getWandbConfigs } from './wandb/settings';
-import { WandbServerApi } from './wandb/wandbServerApi';
-import { CallStackEntry, WeaveClient } from './weaveClient';
+import {Api as TraceServerApi} from './generated/traceServerApi';
+import {Settings} from './settings';
+import {getUrls, setGlobalDomain} from './urls';
+import {ConcurrencyLimiter} from './utils/concurrencyLimit';
+import {Netrc} from './utils/netrc';
+import {createFetchWithRetry} from './utils/retry';
+import {getWandbConfigs} from './wandb/settings';
+import {WandbServerApi} from './wandb/wandbServerApi';
+import {CallStackEntry, WeaveClient} from './weaveClient';
 
 export interface LoginOptions {
   apiKey: string;
@@ -29,7 +29,7 @@ export async function login(options?: LoginOptions) {
   if (!options?.apiKey) {
     throw Error('API Key must be specified');
   }
-  const { traceBaseUrl, domain } = getUrls(options?.host);
+  const {traceBaseUrl, domain} = getUrls(options?.host);
 
   // Test the connection to the traceServerApi
   const testTraceServerApi = new TraceServerApi({
@@ -44,11 +44,13 @@ export async function login(options?: LoginOptions) {
   try {
     await testTraceServerApi.health.readRootHealthGet({});
   } catch (error) {
-    throw new Error('Unable to verify connection to the weave trace server with given API Key');
+    throw new Error(
+      'Unable to verify connection to the weave trace server with given API Key'
+    );
   }
 
   const netrc = new Netrc();
-  netrc.setEntry(domain, { login: 'user', password: options.apiKey });
+  netrc.setEntry(domain, {login: 'user', password: options.apiKey});
   netrc.save();
   console.log(`Successfully logged in.  Credentials saved for ${domain}`);
 }
@@ -61,8 +63,11 @@ export async function login(options?: LoginOptions) {
  * @returns A promise that resolves to the initialized Weave client.
  * @throws {Error} If the initialization fails
  */
-export async function init(project: string, settings?: Settings): Promise<WeaveClient> {
-  const { apiKey, baseUrl, traceBaseUrl, domain } = getWandbConfigs();
+export async function init(
+  project: string,
+  settings?: Settings
+): Promise<WeaveClient> {
+  const {apiKey, baseUrl, traceBaseUrl, domain} = getWandbConfigs();
   try {
     const wandbServerApi = new WandbServerApi(baseUrl, apiKey);
 
@@ -80,7 +85,8 @@ export async function init(project: string, settings?: Settings): Promise<WeaveC
       baseDelay: 1000,
       maxDelay: 5 * 60 * 1000, // 5 minutes
       maxRetryTime: 12 * 60 * 60 * 1000, // 12 hours
-      retryOnStatus: (status: number) => status === 429 || (status >= 500 && status < 600),
+      retryOnStatus: (status: number) =>
+        status === 429 || (status >= 500 && status < 600),
     });
     const concurrencyLimiter = new ConcurrencyLimiter(20);
     const concurrencyLimitedFetch = concurrencyLimiter.limitFunction(
@@ -103,7 +109,12 @@ export async function init(project: string, settings?: Settings): Promise<WeaveC
       customFetch: concurrencyLimitedFetch,
     });
 
-    const client = new WeaveClient(traceServerApi, wandbServerApi, projectId, settings);
+    const client = new WeaveClient(
+      traceServerApi,
+      wandbServerApi,
+      projectId,
+      settings
+    );
     setGlobalClient(client);
     setGlobalDomain(domain);
     console.log(`Initializing project: ${projectId}`);
@@ -126,7 +137,7 @@ export function requireCurrentCallStackEntry(): CallStackEntry {
   return callStackEntry;
 }
 
-export function requireCurrentChildSummary(): { [key: string]: any } {
+export function requireCurrentChildSummary(): {[key: string]: any} {
   const callStackEntry = requireCurrentCallStackEntry();
   return callStackEntry.childSummary;
 }

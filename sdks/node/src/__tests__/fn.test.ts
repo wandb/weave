@@ -1,13 +1,16 @@
-import { init } from '../clientApi';
-import { CallableObject } from '../fn';
-import { op } from '../op';
-import { WeaveObjectParameters } from '../weaveObject';
+import {init} from '../clientApi';
+import {CallableObject} from '../fn';
+import {op} from '../op';
+import {WeaveObjectParameters} from '../weaveObject';
 
 interface ParametrizedFunctionOptions extends WeaveObjectParameters {
   magicNumber?: number;
 }
 
-class ParametrizedFunction extends CallableObject<{ input: number }, { output: number }> {
+class ParametrizedFunction extends CallableObject<
+  {input: number},
+  {output: number}
+> {
   private magicNumber: number;
 
   constructor(options: ParametrizedFunctionOptions = {}) {
@@ -19,8 +22,8 @@ class ParametrizedFunction extends CallableObject<{ input: number }, { output: n
     });
   }
 
-  async run(input: { input: number }): Promise<{ output: number }> {
-    return { output: input.input + this.magicNumber };
+  async run(input: {input: number}): Promise<{output: number}> {
+    return {output: input.input + this.magicNumber};
   }
 }
 
@@ -28,8 +31,8 @@ describe('Fn', () => {
   test('use fn', async () => {
     const client = await init('test-project');
 
-    const fn = new ParametrizedFunction({ magicNumber: 7 });
-    const res = await fn.run({ input: 1 });
-    expect(res).toEqual({ output: 8 });
+    const fn = new ParametrizedFunction({magicNumber: 7});
+    const res = await fn.run({input: 1});
+    expect(res).toEqual({output: 8});
   });
 });

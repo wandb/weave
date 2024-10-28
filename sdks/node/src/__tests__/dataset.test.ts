@@ -1,16 +1,16 @@
-import { init } from '../clientApi';
-import { Dataset } from '../dataset';
+import {init} from '../clientApi';
+import {Dataset} from '../dataset';
 
 describe('Dataset', () => {
   test('should save a dataset', async () => {
     const client = await init('test-project');
     const data = [
-      { id: 1, value: 2 },
-      { id: 2, value: 3 },
-      { id: 3, value: 4 },
+      {id: 1, value: 2},
+      {id: 2, value: 3},
+      {id: 3, value: 4},
     ];
 
-    const dataset = new Dataset({ rows: data });
+    const dataset = new Dataset({rows: data});
     const ref = await dataset.save();
 
     const [entity, project] = ref.projectId.split('/') ?? [];

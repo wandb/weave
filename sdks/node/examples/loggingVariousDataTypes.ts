@@ -6,24 +6,30 @@ const primitiveOp = weave.op(async function primitive(input: string) {
 });
 
 const jsonOp = weave.op(async function json(name: string, age: number) {
-  return { name, age };
+  return {name, age};
 });
 
 const imageOp = weave.op(async function image() {
-  return weave.weaveImage({ data: fs.readFileSync('logs.png'), imageType: 'png' });
+  return weave.weaveImage({
+    data: fs.readFileSync('logs.png'),
+    imageType: 'png',
+  });
 });
 
 const audioOp = weave.op(async function audio() {
-  return weave.weaveAudio({ data: fs.readFileSync('CantinaBand3.wav'), audioType: 'wav' });
+  return weave.weaveAudio({
+    data: fs.readFileSync('CantinaBand3.wav'),
+    audioType: 'wav',
+  });
 });
 
 const datasetOp = weave.op(async function dataset() {
   return new weave.Dataset({
     id: 'my-dataset',
     rows: [
-      { name: 'Alice', age: 10 },
-      { name: 'Bob', age: 20 },
-      { name: 'Charlie', age: 30 },
+      {name: 'Alice', age: 10},
+      {name: 'Bob', age: 20},
+      {name: 'Charlie', age: 30},
     ],
   });
 });

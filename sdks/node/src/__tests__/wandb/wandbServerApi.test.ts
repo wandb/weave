@@ -1,19 +1,21 @@
-import { WandbServerApi } from '../../wandb/wandbServerApi';
+import {WandbServerApi} from '../../wandb/wandbServerApi';
 
 const originalFetch = global.fetch;
 const api = new WandbServerApi('https://api.wandb.ai', 'abcdef123456');
 
 const mockGoodResponse = {
   ok: true,
-  json: jest.fn().mockResolvedValue({ data: { viewer: { defaultEntity: { name: 'test' } } } }),
+  json: jest
+    .fn()
+    .mockResolvedValue({data: {viewer: {defaultEntity: {name: 'test'}}}}),
 };
 const mockInvalidEntityResponse = {
   ok: true,
-  json: jest.fn().mockResolvedValue({ data: { viewer: { defaultEntity: {} } } }),
+  json: jest.fn().mockResolvedValue({data: {viewer: {defaultEntity: {}}}}),
 };
 const mockBadGQLResponse = {
   ok: true,
-  json: jest.fn().mockResolvedValue({ errors: [{ message: 'problem' }] }),
+  json: jest.fn().mockResolvedValue({errors: [{message: 'problem'}]}),
 };
 
 describe('wandbServerApi', () => {

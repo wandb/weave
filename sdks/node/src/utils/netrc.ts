@@ -1,6 +1,6 @@
-import { readFileSync, writeFileSync } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
+import {readFileSync, writeFileSync} from 'fs';
+import {homedir} from 'os';
+import {join} from 'path';
 
 interface NetrcEntry {
   machine: string;
@@ -34,7 +34,7 @@ export class Netrc {
               this.entries.set(currentMachine, currentEntry as NetrcEntry);
             }
             currentMachine = value;
-            currentEntry = { machine: value };
+            currentEntry = {machine: value};
             break;
           case 'login':
           case 'password':
@@ -65,7 +65,7 @@ export class Netrc {
       })
       .join('\n');
 
-    writeFileSync(this.path, content, { mode: 0o600 });
+    writeFileSync(this.path, content, {mode: 0o600});
   }
 
   getEntry(machine: string): NetrcEntry | undefined {
@@ -73,8 +73,8 @@ export class Netrc {
   }
 
   setEntry(machine: string, entry: Partial<NetrcEntry>): void {
-    const existingEntry = this.entries.get(machine) || { machine };
-    const updatedEntry = { ...existingEntry, ...entry } as NetrcEntry;
+    const existingEntry = this.entries.get(machine) || {machine};
+    const updatedEntry = {...existingEntry, ...entry} as NetrcEntry;
     this.entries.delete(machine);
     this.entries.set(machine, updatedEntry);
   }

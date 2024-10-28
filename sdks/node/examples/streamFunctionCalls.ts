@@ -27,7 +27,8 @@ async function extractDinos(input: string) {
         properties: {
           location: {
             type: 'string',
-            description: 'The name of the city or location to get the current time for.',
+            description:
+              'The name of the city or location to get the current time for.',
           },
         },
         required: ['location'],

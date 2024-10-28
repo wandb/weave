@@ -1,8 +1,8 @@
-import { AsyncLocalStorage } from 'async_hooks';
-import { uuidv7 } from 'uuidv7';
+import {AsyncLocalStorage} from 'async_hooks';
+import {uuidv7} from 'uuidv7';
 
-import { Dataset } from './dataset';
-import { computeDigest } from './digest';
+import {Dataset} from './dataset';
+import {computeDigest} from './digest';
 import {
   CallSchema,
   CallsFilter,
@@ -10,13 +10,27 @@ import {
   StartedCallSchemaForInsert,
   Api as TraceServerApi,
 } from './generated/traceServerApi';
-import { AudioType, DEFAULT_AUDIO_TYPE, DEFAULT_IMAGE_TYPE, ImageType, isWeaveAudio, isWeaveImage } from './media';
-import { Op, OpRef, ParameterNamesOption, getOpName, getOpWrappedFunction, isOp } from './opType';
-import { Settings } from './settings';
-import { Table, TableRef, TableRowRef } from './table';
-import { packageVersion } from './utils/userAgent';
-import { WandbServerApi } from './wandb/wandbServerApi';
-import { ObjectRef, WeaveObject, getClassChain } from './weaveObject';
+import {
+  AudioType,
+  DEFAULT_AUDIO_TYPE,
+  DEFAULT_IMAGE_TYPE,
+  ImageType,
+  isWeaveAudio,
+  isWeaveImage,
+} from './media';
+import {
+  Op,
+  OpRef,
+  ParameterNamesOption,
+  getOpName,
+  getOpWrappedFunction,
+  isOp,
+} from './opType';
+import {Settings} from './settings';
+import {Table, TableRef, TableRowRef} from './table';
+import {packageVersion} from './utils/userAgent';
+import {WandbServerApi} from './wandb/wandbServerApi';
+import {ObjectRef, WeaveObject, getClassChain} from './weaveObject';
 
 export type CallStackEntry = {
   callId: string;
@@ -48,9 +62,9 @@ class CallStack {
 
     const callId = generateCallId();
     const traceId = parentCall?.traceId ?? generateTraceId();
-    const newCall: CallStackEntry = { callId, traceId, childSummary: {} };
+    const newCall: CallStackEntry = {callId, traceId, childSummary: {}};
     const newStack = new CallStack([...this.stack, newCall]);
-    return { currentCall: newCall, parentCall, newStack };
+    return {currentCall: newCall, parentCall, newStack};
   }
 }
 
@@ -59,7 +73,7 @@ type CallEndParams = EndedCallSchemaForInsert;
 
 export class WeaveClient {
   private stackContext = new AsyncLocalStorage<CallStack>();
-  private callQueue: Array<{ mode: 'start' | 'end'; data: any }> = [];
+  private callQueue: Array<{mode: 'start' | 'end'; data: any}> = [];
   private batchProcessTimeout: NodeJS.Timeout | null = null;
   private isBatchProcessing: boolean = false;
   private readonly BATCH_INTERVAL: number = 200;
@@ -75,7 +89,10 @@ export class WeaveClient {
   private scheduleBatchProcessing() {
     if (this.batchProcessTimeout || this.isBatchProcessing) return;
     const promise = new Promise<void>(resolve => {
-      this.batchProcessTimeout = setTimeout(() => this.processBatch().then(resolve), this.BATCH_INTERVAL);
+      this.batchProcessTimeout = setTimeout(
+        () => this.processBatch().then(resolve),
+        this.BATCH_INTERVAL
+      );
     });
     this.batchProcessingPromises.add(promise);
     promise.finally(() => {
@@ -124,7 +141,9 @@ export class WeaveClient {
     };
 
     try {
-      await this.traceServerApi.call.callStartBatchCallUpsertBatchPost(batchReq);
+      await this.traceServerApi.call.callStartBatchCallUpsertBatchPost(
+        batchReq
+      );
     } catch (error) {
       console.error('Error processing batch:', error);
     } finally {
@@ -148,7 +167,11 @@ export class WeaveClient {
     }
   }
 
-  public async getCalls(filter: CallsFilter = {}, includeCosts: boolean = false, limit: number = 1000) {
+  public async getCalls(
+    filter: CallsFilter = {},
+    includeCosts: boolean = false,
+    limit: number = 1000
+  ) {
     const calls: CallSchema[] = [];
     const iterator = this.getCallsIterator(filter, includeCosts, limit);
     for await (const call of iterator) {
@@ -161,22 +184,23 @@ export class WeaveClient {
     includeCosts: boolean = false,
     limit: number = 1000
   ): AsyncIterableIterator<CallSchema> {
-    const resp = await this.traceServerApi.calls.callsQueryStreamCallsStreamQueryPost({
-      project_id: this.projectId,
-      filter,
-      include_costs: includeCosts,
-      limit,
-    });
+    const resp =
+      await this.traceServerApi.calls.callsQueryStreamCallsStreamQueryPost({
+        project_id: this.projectId,
+        filter,
+        include_costs: includeCosts,
+        limit,
+      });
 
     const reader = resp.body!.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
 
     while (true) {
-      const { value, done } = await reader.read();
+      const {value, done} = await reader.read();
       if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, {stream: true});
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
 
@@ -218,26 +242,31 @@ export class WeaveClient {
 
     const t = val?._type;
     if (t == 'Dataset') {
-      const { _baseParameters, rows } = val;
-      let obj = new Dataset({ id: _baseParameters.id, description: _baseParameters.description, rows });
+      const {_baseParameters, rows} = val;
+      let obj = new Dataset({
+        id: _baseParameters.id,
+        description: _baseParameters.description,
+        rows,
+      });
       obj.__savedRef = ref;
       // TODO: The table row refs are not correct
       return obj;
     } else if (t == 'Table') {
-      const { rows } = val;
+      const {rows} = val;
       let obj = new Table(rows);
       obj.__savedRef = ref;
       return obj;
     } else if (t == 'CustomWeaveType') {
       const typeName = val.weave_type.type;
       if (typeName == 'PIL.Image.Image') {
-        let loadedFiles: { [key: string]: Buffer } = {};
+        let loadedFiles: {[key: string]: Buffer} = {};
         for (const [name, digest] of Object.entries(val.files)) {
           try {
-            const fileContent = await this.traceServerApi.file.fileContentFileContentPost({
-              project_id: this.projectId,
-              digest: digest as string,
-            });
+            const fileContent =
+              await this.traceServerApi.file.fileContentFileContentPost({
+                project_id: this.projectId,
+                digest: digest as string,
+              });
             loadedFiles[name] = fileContent.data?.content;
           } catch (error) {
             console.error('Error loading file:', error);
@@ -246,13 +275,14 @@ export class WeaveClient {
         // TODO: Implement getting img back as buffer
         return 'Coming soon!';
       } else if (typeName == 'wave.Wave_read') {
-        let loadedFiles: { [key: string]: Buffer } = {};
+        let loadedFiles: {[key: string]: Buffer} = {};
         for (const [name, digest] of Object.entries(val.files)) {
           try {
-            const fileContent = await this.traceServerApi.file.fileContentFileContentPost({
-              project_id: this.projectId,
-              digest: digest as string,
-            });
+            const fileContent =
+              await this.traceServerApi.file.fileContentFileContentPost({
+                project_id: this.projectId,
+                digest: digest as string,
+              });
             loadedFiles[name] = fileContent.data?.content;
           } catch (error) {
             console.error('Error loading file:', error);
@@ -344,24 +374,26 @@ export class WeaveClient {
 
     table.__savedRef = (async () => {
       const rowsWithoutRefs = table.rows.map(row => {
-        return { ...row, __savedRef: undefined };
+        return {...row, __savedRef: undefined};
       });
       const rows = await this.serializedVal(rowsWithoutRefs);
-      const response = await this.traceServerApi.table.tableCreateTableCreatePost({
-        table: {
-          project_id: this.projectId,
-          rows,
-        },
-      });
+      const response =
+        await this.traceServerApi.table.tableCreateTableCreatePost({
+          table: {
+            project_id: this.projectId,
+            rows,
+          },
+        });
       const ref = new TableRef(this.projectId, response.data.digest);
       return ref;
     })();
     const tableQueryPromise = (async () => {
       const tableRef = await table.__savedRef;
-      const tableQueryRes = await this.traceServerApi.table.tableQueryTableQueryPost({
-        project_id: this.projectId,
-        digest: tableRef?.digest!,
-      });
+      const tableQueryRes =
+        await this.traceServerApi.table.tableQueryTableQueryPost({
+          project_id: this.projectId,
+          digest: tableRef?.digest!,
+        });
       return {
         tableDigest: tableRef?.digest!,
         tableQueryResult: tableQueryRes.data,
@@ -370,8 +402,12 @@ export class WeaveClient {
     for (let i = 0; i < table.rows.length; i++) {
       const row = table.rows[i];
       row.__savedRef = (async () => {
-        const { tableDigest, tableQueryResult } = await tableQueryPromise;
-        return new TableRowRef(this.projectId, tableDigest, tableQueryResult.rows[i].digest);
+        const {tableDigest, tableQueryResult} = await tableQueryPromise;
+        return new TableRowRef(
+          this.projectId,
+          tableDigest,
+          tableQueryResult.rows[i].digest
+        );
       })();
     }
   }
@@ -407,13 +443,17 @@ export class WeaveClient {
   // serialize* methods are async, and return the serialized value
   // of a Weave value.
 
-  private async serializedFileBlob(typeName: string, fileName: string, fileContent: Blob): Promise<any> {
+  private async serializedFileBlob(
+    typeName: string,
+    fileName: string,
+    fileContent: Blob
+  ): Promise<any> {
     const buffer = await fileContent.arrayBuffer().then(Buffer.from);
     const digest = computeDigest(buffer);
 
     const placeholder = {
       _type: 'CustomWeaveType',
-      weave_type: { type: typeName },
+      weave_type: {type: typeName},
       files: {
         [fileName]: digest,
       },
@@ -433,13 +473,19 @@ export class WeaveClient {
     return placeholder;
   }
 
-  private async serializedImage(imageData: Buffer, imageType: ImageType = DEFAULT_IMAGE_TYPE): Promise<any> {
-    const blob = new Blob([imageData], { type: `image/${imageType}` });
+  private async serializedImage(
+    imageData: Buffer,
+    imageType: ImageType = DEFAULT_IMAGE_TYPE
+  ): Promise<any> {
+    const blob = new Blob([imageData], {type: `image/${imageType}`});
     return this.serializedFileBlob('PIL.Image.Image', 'image.png', blob);
   }
 
-  private async serializedAudio(audioData: Buffer, audioType: AudioType = DEFAULT_AUDIO_TYPE): Promise<any> {
-    const blob = new Blob([audioData], { type: `audio/${audioType}` });
+  private async serializedAudio(
+    audioData: Buffer,
+    audioType: AudioType = DEFAULT_AUDIO_TYPE
+  ): Promise<any> {
+    const blob = new Blob([audioData], {type: `audio/${audioType}`});
     return this.serializedFileBlob('wave.Wave_read', 'audio.wav', blob);
   }
 
@@ -466,7 +512,7 @@ export class WeaveClient {
     } else if (isOp(val)) {
       throw new Error('Programming error: Op not saved');
     } else if (typeof val === 'object' && val !== null) {
-      const result: { [key: string]: any } = {};
+      const result: {[key: string]: any} = {};
       for (const [key, value] of Object.entries(val)) {
         result[key] = await this.serializedVal(value);
       }
@@ -477,12 +523,12 @@ export class WeaveClient {
   }
 
   private saveCallStart(callStart: CallStartParams) {
-    this.callQueue.push({ mode: 'start', data: { start: callStart } });
+    this.callQueue.push({mode: 'start', data: {start: callStart}});
     this.scheduleBatchProcessing();
   }
 
   private saveCallEnd(callEnd: CallEndParams) {
-    this.callQueue.push({ mode: 'end', data: { end: callEnd } });
+    this.callQueue.push({mode: 'end', data: {end: callEnd}});
     this.scheduleBatchProcessing();
   }
 
@@ -498,7 +544,11 @@ export class WeaveClient {
     return this.stackContext.run(callStack, fn);
   }
 
-  private async paramsToCallInputs(params: any[], thisArg: any, parameterNames: ParameterNamesOption) {
+  private async paramsToCallInputs(
+    params: any[],
+    thisArg: any,
+    parameterNames: ParameterNamesOption
+  ) {
     let inputs: Record<string, any> = {};
 
     // Add 'self' first if thisArg is a WeaveObject
@@ -506,7 +556,7 @@ export class WeaveClient {
       inputs['self'] = thisArg;
     }
     if (parameterNames === 'useParam0Object') {
-      inputs = { ...inputs, ...params[0] };
+      inputs = {...inputs, ...params[0]};
     } else if (parameterNames) {
       params.forEach((arg, index) => {
         inputs[parameterNames[index]] = arg;
@@ -520,7 +570,10 @@ export class WeaveClient {
     return await this.serializedVal(inputs);
   }
 
-  public async saveOp(op: Op<(...args: any[]) => any>, objId?: string): Promise<any> {
+  public async saveOp(
+    op: Op<(...args: any[]) => any>,
+    objId?: string
+  ): Promise<any> {
     if (op.__savedRef) {
       return op.__savedRef;
     }
@@ -528,7 +581,11 @@ export class WeaveClient {
       const resolvedObjId = objId || getOpName(op);
       const opFn = getOpWrappedFunction(op);
       const formattedOpFn = await maybeFormatCode(opFn.toString());
-      const saveValue = await this.serializedFileBlob('Op', 'obj.py', new Blob([formattedOpFn]));
+      const saveValue = await this.serializedFileBlob(
+        'Op',
+        'obj.py',
+        new Blob([formattedOpFn])
+      );
       const response = await this.traceServerApi.obj.objCreateObjCreatePost({
         obj: {
           project_id: this.projectId,
@@ -536,7 +593,11 @@ export class WeaveClient {
           val: saveValue,
         },
       });
-      const ref = new OpRef(this.projectId, resolvedObjId, response.data.digest);
+      const ref = new OpRef(
+        this.projectId,
+        resolvedObjId,
+        response.data.digest
+      );
 
       // console.log('Saved op: ', ref.ui_url());
       return ref;
@@ -554,7 +615,11 @@ export class WeaveClient {
     startTime: Date,
     displayName?: string
   ) {
-    const inputs = await this.paramsToCallInputs(params, thisArg, parameterNames);
+    const inputs = await this.paramsToCallInputs(
+      params,
+      thisArg,
+      parameterNames
+    );
     if (isOp(opRef)) {
       this.saveOp(opRef);
       opRef = await opRef.__savedRef;
@@ -588,7 +653,12 @@ export class WeaveClient {
   ) {
     // Important to do this first before any awaiting, so we're guaranteed that children
     // summaries are processed before parents!
-    const mergedSummary = processSummary(result, summarize, currentCall, parentCall);
+    const mergedSummary = processSummary(
+      result,
+      summarize,
+      currentCall,
+      parentCall
+    );
     // ensure end is logged after start is logged
     await startCallPromise;
     this.saveWeaveValues(result);
@@ -609,7 +679,12 @@ export class WeaveClient {
     endTime: Date,
     startCallPromise: Promise<void>
   ) {
-    const mergedSummary = processSummary(null, undefined, currentCall, parentCall);
+    const mergedSummary = processSummary(
+      null,
+      undefined,
+      currentCall,
+      parentCall
+    );
     // ensure end is logged after start is logged
     await startCallPromise;
     await this.saveCallEnd({
@@ -641,12 +716,15 @@ type Summary = Record<string, any>;
  * - For other types, the left value "wins".
  */
 function mergeSummaries(left: Summary, right: Summary): Summary {
-  const result: Summary = { ...right };
+  const result: Summary = {...right};
   for (const [key, leftValue] of Object.entries(left)) {
     if (key in result) {
       if (typeof leftValue === 'number' && typeof result[key] === 'number') {
         result[key] = leftValue + result[key];
-      } else if (typeof leftValue === 'object' && typeof result[key] === 'object') {
+      } else if (
+        typeof leftValue === 'object' &&
+        typeof result[key] === 'object'
+      ) {
         result[key] = mergeSummaries(leftValue, result[key]);
       } else {
         result[key] = leftValue;
@@ -680,7 +758,10 @@ function processSummary(
   const mergedSummary = mergeSummaries(ownSummary, currentCall.childSummary);
 
   if (parentCall) {
-    parentCall.childSummary = mergeSummaries(mergedSummary, parentCall.childSummary);
+    parentCall.childSummary = mergeSummaries(
+      mergedSummary,
+      parentCall.childSummary
+    );
   }
 
   return mergedSummary;

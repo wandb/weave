@@ -1,4 +1,4 @@
-import { uuidv7 } from 'uuidv7';
+import {uuidv7} from 'uuidv7';
 
 // This is mostly used for testing
 // TODO: Maybe move the interfaces to something like trace_server_interface.py
@@ -50,7 +50,9 @@ export class InMemoryTraceServer {
   private _files: File[] = [];
 
   call = {
-    callStartBatchCallUpsertBatchPost: async (batchReq: { batch: Array<{ mode: 'start' | 'end'; req: any }> }) => {
+    callStartBatchCallUpsertBatchPost: async (batchReq: {
+      batch: Array<{mode: 'start' | 'end'; req: any}>;
+    }) => {
       for (const item of batchReq.batch) {
         if (item.mode === 'start') {
           this._calls.push(item.req.start);
@@ -66,20 +68,26 @@ export class InMemoryTraceServer {
 
   calls = {
     callsStreamQueryPost: async (queryParams: QueryParams) => {
-      let filteredCalls = this._calls.filter(call => call.project_id === queryParams.project_id);
+      let filteredCalls = this._calls.filter(
+        call => call.project_id === queryParams.project_id
+      );
 
       // Apply filters if any
       if (queryParams.filters) {
         filteredCalls = filteredCalls.filter(call => {
-          return Object.entries(queryParams.filters || {}).every(([key, value]) => call[key] === value);
+          return Object.entries(queryParams.filters || {}).every(
+            ([key, value]) => call[key] === value
+          );
         });
       }
 
       // Apply ordering
       if (queryParams.order_by) {
         filteredCalls.sort((a, b) => {
-          if (a[queryParams.order_by!] < b[queryParams.order_by!]) return queryParams.order_dir === 'asc' ? -1 : 1;
-          if (a[queryParams.order_by!] > b[queryParams.order_by!]) return queryParams.order_dir === 'asc' ? 1 : -1;
+          if (a[queryParams.order_by!] < b[queryParams.order_by!])
+            return queryParams.order_dir === 'asc' ? -1 : 1;
+          if (a[queryParams.order_by!] > b[queryParams.order_by!])
+            return queryParams.order_dir === 'asc' ? 1 : -1;
           return 0;
         });
       }
@@ -97,7 +105,9 @@ export class InMemoryTraceServer {
   };
 
   obj = {
-    objCreateObjCreatePost: async (req: { obj: { project_id: string; object_id: string; val: any } }) => {
+    objCreateObjCreatePost: async (req: {
+      obj: {project_id: string; object_id: string; val: any};
+    }) => {
       const now = new Date().toISOString();
       const digest = this.generateDigest(req.obj.val);
 
@@ -116,7 +126,9 @@ export class InMemoryTraceServer {
 
       // Update version_index and is_latest for existing objects
       const existingObjs = this._objs.filter(
-        obj => obj.project_id === req.obj.project_id && obj.object_id === req.obj.object_id
+        obj =>
+          obj.project_id === req.obj.project_id &&
+          obj.object_id === req.obj.object_id
       );
       if (existingObjs.length > 0) {
         newObj.version_index = existingObjs.length;
@@ -134,7 +146,10 @@ export class InMemoryTraceServer {
   };
 
   file = {
-    fileCreateFileCreatePost: async (data: { project_id: string; file: Blob }) => {
+    fileCreateFileCreatePost: async (data: {
+      project_id: string;
+      file: Blob;
+    }) => {
       const digest = this.generateDigest(await data.file.arrayBuffer());
 
       const newFile: File = {

@@ -25,7 +25,7 @@ interface WeaveImage extends WeaveImageInput {
  * const imageBuffer = fs.readFileSync('path/to/image.png');
  * const weaveImage = weaveImage({ data: imageBuffer });
  */
-export function weaveImage({ data, imageType }: WeaveImageInput): WeaveImage {
+export function weaveImage({data, imageType}: WeaveImageInput): WeaveImage {
   const resolvedImageType = imageType ?? DEFAULT_IMAGE_TYPE;
   return {
     _weaveType: 'Image',
@@ -59,7 +59,7 @@ export interface WeaveAudio extends WeaveAudioInput {
  * const audioBuffer = fs.readFileSync('path/to/audio.wav');
  * const weaveAudio = weaveAudio({ data: audioBuffer });
  */
-export function weaveAudio({ data, audioType }: WeaveAudioInput): WeaveAudio {
+export function weaveAudio({data, audioType}: WeaveAudioInput): WeaveAudio {
   const resolvedAudioType = audioType ?? DEFAULT_AUDIO_TYPE;
   return {
     _weaveType: 'Audio',

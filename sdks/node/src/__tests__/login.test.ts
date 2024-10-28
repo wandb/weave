@@ -1,7 +1,7 @@
-import { login } from '../clientApi';
-import { Api as TraceServerApi } from '../generated/traceServerApi';
-import { getUrls } from '../urls';
-import { Netrc } from '../utils/netrc';
+import {login} from '../clientApi';
+import {Api as TraceServerApi} from '../generated/traceServerApi';
+import {getUrls} from '../urls';
+import {Netrc} from '../utils/netrc';
 
 // Mock dependencies
 jest.mock('../utils/netrc');
@@ -33,11 +33,16 @@ describe('login', () => {
       },
     }));
 
-    await login({ apiKey: 'test-api-key' });
+    await login({apiKey: 'test-api-key'});
 
-    expect(mockSetEntry).toHaveBeenCalledWith('wandb.ai', { login: 'user', password: 'test-api-key' });
+    expect(mockSetEntry).toHaveBeenCalledWith('wandb.ai', {
+      login: 'user',
+      password: 'test-api-key',
+    });
     expect(mockSave).toHaveBeenCalled();
-    expect(console.log).toHaveBeenCalledWith('Successfully logged in.  Credentials saved for wandb.ai');
+    expect(console.log).toHaveBeenCalledWith(
+      'Successfully logged in.  Credentials saved for wandb.ai'
+    );
   });
 
   it('should throw an error if API key is not provided', async () => {
@@ -52,11 +57,13 @@ describe('login', () => {
 
     (TraceServerApi as jest.Mock).mockImplementation(() => ({
       health: {
-        readRootHealthGet: jest.fn().mockRejectedValue(new Error('Connection failed')),
+        readRootHealthGet: jest
+          .fn()
+          .mockRejectedValue(new Error('Connection failed')),
       },
     }));
 
-    await expect(login({ apiKey: 'test-api-key' })).rejects.toThrow(
+    await expect(login({apiKey: 'test-api-key'})).rejects.toThrow(
       'Unable to verify connection to the weave trace server with given API Key'
     );
   });

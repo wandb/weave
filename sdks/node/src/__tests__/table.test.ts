@@ -1,13 +1,13 @@
-import { init } from '../clientApi';
-import { Table } from '../table';
+import {init} from '../clientApi';
+import {Table} from '../table';
 
 describe('table', () => {
   test('example', async () => {
     // Table behaves like a container of rows
     const rows = [
-      { a: 1, b: 2 },
-      { a: 3, b: 4 },
-      { a: 5, b: 6 },
+      {a: 1, b: 2},
+      {a: 3, b: 4},
+      {a: 5, b: 6},
     ];
 
     const table = new Table(rows);

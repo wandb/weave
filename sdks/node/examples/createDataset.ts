@@ -8,9 +8,9 @@ const sentences = [
   'Finally, there are fruits called glowls, which have a very sour and bitter taste which is acidic and caustic, and a pale orange tinge to them.',
 ];
 const labels = [
-  { fruit: 'neoskizzles', color: 'purple', flavor: 'candy' },
-  { fruit: 'pounits', color: 'bright green', flavor: 'savory' },
-  { fruit: 'glowls', color: 'pale orange', flavor: 'sour and bitter' },
+  {fruit: 'neoskizzles', color: 'purple', flavor: 'candy'},
+  {fruit: 'pounits', color: 'bright green', flavor: 'savory'},
+  {fruit: 'glowls', color: 'pale orange', flavor: 'sour and bitter'},
 ];
 const logsPng = fs.readFileSync('logs.png');
 const audioClip = fs.readFileSync('CantinaBand3.wav');
@@ -19,22 +19,22 @@ const examples = [
     id: '0',
     sentence: sentences[0],
     target: labels[0],
-    image: weave.weaveImage({ data: logsPng, imageType: 'png' }),
-    audio: weave.weaveAudio({ data: audioClip, audioType: 'wav' }),
+    image: weave.weaveImage({data: logsPng, imageType: 'png'}),
+    audio: weave.weaveAudio({data: audioClip, audioType: 'wav'}),
   },
   {
     id: '1',
     sentence: sentences[1],
     target: labels[1],
-    image: weave.weaveImage({ data: logsPng, imageType: 'png' }),
-    audio: weave.weaveAudio({ data: audioClip, audioType: 'wav' }),
+    image: weave.weaveImage({data: logsPng, imageType: 'png'}),
+    audio: weave.weaveAudio({data: audioClip, audioType: 'wav'}),
   },
   {
     id: '2',
     sentence: sentences[2],
     target: labels[2],
-    image: weave.weaveImage({ data: logsPng, imageType: 'png' }),
-    audio: weave.weaveAudio({ data: audioClip, audioType: 'wav' }),
+    image: weave.weaveImage({data: logsPng, imageType: 'png'}),
+    audio: weave.weaveAudio({data: audioClip, audioType: 'wav'}),
   },
 ];
 

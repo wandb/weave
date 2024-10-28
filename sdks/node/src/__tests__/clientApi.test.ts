@@ -1,6 +1,6 @@
-import { init, requireGlobalClient } from '../clientApi';
-import { getApiKey } from '../wandb/settings';
-import { WandbServerApi } from '../wandb/wandbServerApi';
+import {init, requireGlobalClient} from '../clientApi';
+import {getApiKey} from '../wandb/settings';
+import {WandbServerApi} from '../wandb/wandbServerApi';
 
 jest.mock('../wandb/wandbServerApi');
 jest.mock('../wandb/settings');
@@ -22,7 +22,10 @@ describe('Client API', () => {
 
     expect(gottenClient).toBeDefined();
     expect(gottenClient).toBe(client);
-    expect(WandbServerApi).toHaveBeenCalledWith('https://api.wandb.ai', 'mock-api-key');
+    expect(WandbServerApi).toHaveBeenCalledWith(
+      'https://api.wandb.ai',
+      'mock-api-key'
+    );
     expect(gottenClient.projectId).toEqual('test-entity/test-project');
   });
 });

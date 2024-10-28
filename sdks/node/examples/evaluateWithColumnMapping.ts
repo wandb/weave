@@ -8,15 +8,15 @@ async function main() {
     id: 'My Dataset',
     description: 'This is a dataset',
     rows: [
-      { firstName: 'Alice', yearsOld: 25 },
-      { firstName: 'Bob', yearsOld: 30 },
-      { firstName: 'Charlie', yearsOld: 34 },
+      {firstName: 'Alice', yearsOld: 25},
+      {firstName: 'Bob', yearsOld: 30},
+      {firstName: 'Charlie', yearsOld: 34},
     ],
   });
   const evaluation = new weave.Evaluation({
     dataset: ds,
     scorers: [
-      weave.op(({ modelOutput, datasetItem }) => modelOutput == datasetItem.age, {
+      weave.op(({modelOutput, datasetItem}) => modelOutput == datasetItem.age, {
         name: 'isEqual',
       }),
     ],
@@ -28,11 +28,11 @@ async function main() {
     },
   });
 
-  const model = weave.op(async function myModel({ datasetRow }) {
+  const model = weave.op(async function myModel({datasetRow}) {
     return datasetRow.age >= 30;
   });
 
-  const results = await evaluation.evaluate({ model });
+  const results = await evaluation.evaluate({model});
   console.log('Evaluation results:', JSON.stringify(results, null, 2));
 }
 

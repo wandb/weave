@@ -1,4 +1,4 @@
-import { ConcurrencyLimiter } from '../../utils/concurrencyLimit';
+import {ConcurrencyLimiter} from '../../utils/concurrencyLimit';
 
 describe('concurrency limiting', () => {
   test('it works', async () => {

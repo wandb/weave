@@ -1,7 +1,7 @@
-import { InMemoryTraceServer } from '../inMemoryTraceServer';
-import { wrapOpenAI } from '../integrations/openai';
-import { initWithCustomTraceServer } from './clientMock';
-import { makeMockOpenAIChat } from './openaiMock';
+import {InMemoryTraceServer} from '../inMemoryTraceServer';
+import {wrapOpenAI} from '../integrations/openai';
+import {initWithCustomTraceServer} from './clientMock';
+import {makeMockOpenAIChat} from './openaiMock';
 
 // Helper function to get calls
 async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {
@@ -33,7 +33,7 @@ describe('OpenAI Integration', () => {
 
     mockOpenAI = {
       chat: {
-        completions: { create: mockOpenAIChat },
+        completions: {create: mockOpenAIChat},
       },
       beta: {
         chat: {
@@ -54,13 +54,13 @@ describe('OpenAI Integration', () => {
   });
 
   test('non-streaming chat completion', async () => {
-    const messages = [{ role: 'user', content: 'Hello, AI!' }];
+    const messages = [{role: 'user', content: 'Hello, AI!'}];
 
     // Direct API call
-    const directResult = await mockOpenAI.chat.completions.create({ messages });
+    const directResult = await mockOpenAI.chat.completions.create({messages});
 
     // Op-wrapped API call
-    const opResult = await patchedOpenAI.chat.completions.create({ messages });
+    const opResult = await patchedOpenAI.chat.completions.create({messages});
 
     // Wait for any pending batch processing
     await wait(300);
@@ -81,7 +81,7 @@ describe('OpenAI Integration', () => {
     const calls = await getCalls(inMemoryTraceServer, testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('openai.chat.completions.create');
-    expect(calls[0].inputs).toEqual({ messages });
+    expect(calls[0].inputs).toEqual({messages});
     expect(calls[0].output).toMatchObject({
       object: opResult.object,
       model: opResult.model,
@@ -106,7 +106,7 @@ describe('OpenAI Integration', () => {
   });
 
   test('streaming chat completion basic', async () => {
-    const messages = [{ role: 'user', content: 'Hello, streaming AI!' }];
+    const messages = [{role: 'user', content: 'Hello, streaming AI!'}];
 
     // Direct API call
     const directStream = await mockOpenAI.chat.completions.create({
@@ -150,7 +150,7 @@ describe('OpenAI Integration', () => {
     const calls = await getCalls(inMemoryTraceServer, testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('openai.chat.completions.create');
-    expect(calls[0].inputs).toEqual({ messages, stream: true });
+    expect(calls[0].inputs).toEqual({messages, stream: true});
     expect(calls[0].output).toMatchObject({
       choices: [
         {
@@ -174,13 +174,15 @@ describe('OpenAI Integration', () => {
 
   // Add a new test for streaming with explicit usage request
   test('streaming chat completion with explicit usage request', async () => {
-    const messages = [{ role: 'user', content: 'Hello, streaming AI with usage!' }];
+    const messages = [
+      {role: 'user', content: 'Hello, streaming AI with usage!'},
+    ];
 
     // Op-wrapped API call with explicit usage request
     const opStream = await patchedOpenAI.chat.completions.create({
       messages,
       stream: true,
-      stream_options: { include_usage: true },
+      stream_options: {include_usage: true},
     });
     let opContent = '';
     let usageChunkSeen = false;
@@ -216,7 +218,7 @@ describe('OpenAI Integration', () => {
   });
 
   test('chat completion with function call', async () => {
-    const messages = [{ role: 'user', content: "What's the weather in London?" }];
+    const messages = [{role: 'user', content: "What's the weather in London?"}];
     const functions = [
       {
         name: 'get_weather',
@@ -224,7 +226,7 @@ describe('OpenAI Integration', () => {
         parameters: {
           type: 'object',
           properties: {
-            location: { type: 'string' },
+            location: {type: 'string'},
           },
           required: ['location'],
         },
@@ -237,7 +239,7 @@ describe('OpenAI Integration', () => {
       functionCalls: [
         {
           name: 'get_weather',
-          arguments: { location: 'London' },
+          arguments: {location: 'London'},
         },
       ],
     }));
@@ -277,7 +279,7 @@ describe('OpenAI Integration', () => {
     const calls = await getCalls(inMemoryTraceServer, testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('openai.chat.completions.create');
-    expect(calls[0].inputs).toEqual({ messages, functions });
+    expect(calls[0].inputs).toEqual({messages, functions});
     expect(calls[0].output).toMatchObject({
       object: opResult.object,
       model: opResult.model,

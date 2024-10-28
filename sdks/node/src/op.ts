@@ -1,8 +1,8 @@
-import { getGlobalClient } from './clientApi';
-import { TRACE_CALL_EMOJI } from './constants';
-import { Op, OpOptions } from './opType';
-import { getGlobalDomain } from './urls';
-import { warnOnce } from './utils/warnOnce';
+import {getGlobalClient} from './clientApi';
+import {TRACE_CALL_EMOJI} from './constants';
+import {Op, OpOptions} from './opType';
+import {getGlobalDomain} from './urls';
+import {warnOnce} from './utils/warnOnce';
 
 /**
  * A wrapper to weave op-ify a function or method that works on sync and async functions.
@@ -82,10 +82,12 @@ export function op<T extends (...args: any[]) => any>(
     options = maybeOptions;
 
     const boundFn = fn.bind(bindThis) as T;
-    return op(boundFn, { originalFunction: fn, bindThis, ...options });
+    return op(boundFn, {originalFunction: fn, bindThis, ...options});
   }
 
-  const opWrapper = async function (...params: Parameters<T>): Promise<ReturnType<T>> {
+  const opWrapper = async function (
+    ...params: Parameters<T>
+  ): Promise<ReturnType<T>> {
     const client = getGlobalClient();
 
     if (!client) {
@@ -96,13 +98,17 @@ export function op<T extends (...args: any[]) => any>(
       return await fn(...params);
     }
 
-    const { currentCall, parentCall, newStack } = client.pushNewCall();
+    const {currentCall, parentCall, newStack} = client.pushNewCall();
     const startTime = new Date();
     if (client.settings.shouldPrintCallLink && parentCall == null) {
       const domain = getGlobalDomain();
-      console.log(`${TRACE_CALL_EMOJI} https://${domain}/${client.projectId}/r/call/${currentCall.callId}`);
+      console.log(
+        `${TRACE_CALL_EMOJI} https://${domain}/${client.projectId}/r/call/${currentCall.callId}`
+      );
     }
-    const displayName = options?.callDisplayName ? options.callDisplayName(...params) : undefined;
+    const displayName = options?.callDisplayName
+      ? options.callDisplayName(...params)
+      : undefined;
     const thisArg = options?.bindThis;
     const startCallPromise = client.createCall(
       opWrapper,
@@ -121,7 +127,7 @@ export function op<T extends (...args: any[]) => any>(
       });
 
       if (options?.streamReducer && Symbol.asyncIterator in result) {
-        const { initialState, reduceFn } = options.streamReducer;
+        const {initialState, reduceFn} = options.streamReducer;
         let state = initialState;
 
         const wrappedIterator = {
@@ -135,7 +141,14 @@ export function op<T extends (...args: any[]) => any>(
               if (client) {
                 // Check if globalClient still exists
                 const endTime = new Date();
-                await client.finishCall(state, currentCall, parentCall, options?.summarize, endTime, startCallPromise);
+                await client.finishCall(
+                  state,
+                  currentCall,
+                  parentCall,
+                  options?.summarize,
+                  endTime,
+                  startCallPromise
+                );
               }
             }
           },
@@ -144,21 +157,37 @@ export function op<T extends (...args: any[]) => any>(
         return wrappedIterator as unknown as ReturnType<T>;
       } else {
         const endTime = new Date();
-        await client.finishCall(result, currentCall, parentCall, options?.summarize, endTime, startCallPromise);
+        await client.finishCall(
+          result,
+          currentCall,
+          parentCall,
+          options?.summarize,
+          endTime,
+          startCallPromise
+        );
         return result;
       }
     } catch (error) {
       // console.error(`Op ${actualOpName} failed:`, error);
       const endTime = new Date();
-      await client.finishCallWithException(error, currentCall, parentCall, endTime, startCallPromise);
+      await client.finishCallWithException(
+        error,
+        currentCall,
+        parentCall,
+        endTime,
+        startCallPromise
+      );
       await client.waitForBatchProcessing();
       throw error;
     }
   };
 
   const fnName = options?.originalFunction?.name || fn.name || 'anonymous';
-  const className = options?.bindThis && Object.getPrototypeOf(options.bindThis).constructor.name;
-  const actualOpName = options?.name || (className ? `${className}.${fnName}` : fnName);
+  const className =
+    options?.bindThis &&
+    Object.getPrototypeOf(options.bindThis).constructor.name;
+  const actualOpName =
+    options?.name || (className ? `${className}.${fnName}` : fnName);
 
   opWrapper.__name = actualOpName;
   opWrapper.__isOp = true as true;

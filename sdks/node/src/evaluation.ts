@@ -1,17 +1,18 @@
 import cliProgress from 'cli-progress';
-import { Dataset, DatasetRow } from './dataset';
-import { ColumnMapping, mapArgs } from './fn';
-import { isMedia } from './media';
-import { op } from './op';
-import { Op, getOpName } from './opType';
-import { WeaveObject, WeaveObjectParameters } from './weaveObject';
+import {Dataset, DatasetRow} from './dataset';
+import {ColumnMapping, mapArgs} from './fn';
+import {isMedia} from './media';
+import {op} from './op';
+import {Op, getOpName} from './opType';
+import {WeaveObject, WeaveObjectParameters} from './weaveObject';
 
 const PROGRESS_BAR = false;
 
 // Column mapping takes a dataset row of type R and maps it to a scorer's dataset row of type E
-interface EvaluationParameters<R extends DatasetRow, E extends DatasetRow, M> extends WeaveObjectParameters {
+interface EvaluationParameters<R extends DatasetRow, E extends DatasetRow, M>
+  extends WeaveObjectParameters {
   dataset: Dataset<R>;
-  scorers: WeaveCallable<(...args: [{ datasetRow: E; modelOutput: M }]) => any>[];
+  scorers: WeaveCallable<(...args: [{datasetRow: E; modelOutput: M}]) => any>[];
   maxConcurrency?: number;
   columnMapping?: ColumnMapping<R, E>;
 }
@@ -23,21 +24,29 @@ interface Runnable<T extends (...args: any[]) => any> {
 
 type WeaveCallable<T extends (...args: any[]) => any> = Op<T> | Runnable<T>;
 
-function callWeaveCallable<T extends (...args: any[]) => any>(callable: WeaveCallable<T>, ...args: Parameters<T>) {
+function callWeaveCallable<T extends (...args: any[]) => any>(
+  callable: WeaveCallable<T>,
+  ...args: Parameters<T>
+) {
   if (typeof callable === 'function') {
     return callable(...args);
   }
   return callable.invoke(...args);
 }
 
-function weaveCallableName<T extends (...args: any[]) => any>(callable: WeaveCallable<T>) {
+function weaveCallableName<T extends (...args: any[]) => any>(
+  callable: WeaveCallable<T>
+) {
   if (typeof callable === 'function') {
     return getOpName(callable);
   }
   return callable.id;
 }
 
-async function* repeatAsyncIterator<T>(asyncIterator: AsyncIterable<T>, repeatCount: number) {
+async function* repeatAsyncIterator<T>(
+  asyncIterator: AsyncIterable<T>,
+  repeatCount: number
+) {
   for (let i = 0; i < repeatCount; i++) {
     yield* asyncIterator;
   }
@@ -49,7 +58,10 @@ async function* asyncParallelMap<T, U>(
   fnParams: (item: T) => any[],
   maxConcurrency: number
 ) {
-  const itemPromiseMap: Map<T, Promise<{ item: T; result: Awaited<U> }>> = new Map();
+  const itemPromiseMap: Map<
+    T,
+    Promise<{item: T; result: Awaited<U>}>
+  > = new Map();
   async function runOne(item: T) {
     return {
       item,
@@ -122,9 +134,15 @@ async function* asyncParallelMap<T, U>(
  *
  * const results = await evaluation.evaluate({ model });
  */
-export class Evaluation<R extends DatasetRow, E extends DatasetRow, M> extends WeaveObject {
+export class Evaluation<
+  R extends DatasetRow,
+  E extends DatasetRow,
+  M,
+> extends WeaveObject {
   private dataset: Dataset<R>;
-  private scorers: WeaveCallable<(...args: [{ datasetRow: E; modelOutput: M }]) => any>[];
+  private scorers: WeaveCallable<
+    (...args: [{datasetRow: E; modelOutput: M}]) => any
+  >[];
   private columnMapping?: ColumnMapping<R, E>;
 
   constructor(parameters: EvaluationParameters<R, E, M>) {
@@ -133,7 +151,8 @@ export class Evaluation<R extends DatasetRow, E extends DatasetRow, M> extends W
     this.scorers = parameters.scorers;
     this.evaluate = op(this, this.evaluate, {
       parameterNames: 'useParam0Object',
-      callDisplayName: inputs => `${this.id}_${weaveCallableName(inputs.model)}`,
+      callDisplayName: inputs =>
+        `${this.id}_${weaveCallableName(inputs.model)}`,
     });
     this.predictAndScore = op(this, this.predictAndScore, {
       parameterNames: 'useParam0Object',
@@ -146,7 +165,7 @@ export class Evaluation<R extends DatasetRow, E extends DatasetRow, M> extends W
     nTrials = 1,
     maxConcurrency = 5,
   }: {
-    model: WeaveCallable<(...args: [{ datasetRow: R }]) => Promise<M>>;
+    model: WeaveCallable<(...args: [{datasetRow: R}]) => Promise<M>>;
     nTrials?: number;
     maxConcurrency?: number;
   }) {
@@ -179,13 +198,13 @@ export class Evaluation<R extends DatasetRow, E extends DatasetRow, M> extends W
       datasetExamples = repeatAsyncIterator(this.dataset, nTrials);
     }
 
-    for await (const { result, nRunning, nDone } of asyncParallelMap(
+    for await (const {result, nRunning, nDone} of asyncParallelMap(
       datasetExamples,
       this.predictAndScore,
-      item => [{ model, example: item, columnMapping: this.columnMapping }],
+      item => [{model, example: item, columnMapping: this.columnMapping}],
       maxConcurrency
     )) {
-      const { scores } = result;
+      const {scores} = result;
       console.log('>>>result', result);
       results.push({
         model_success: result.model_success,
@@ -195,7 +214,7 @@ export class Evaluation<R extends DatasetRow, E extends DatasetRow, M> extends W
       });
       modelErrors += result.model_success ? 0 : 1;
       if (PROGRESS_BAR) {
-        progressBar.update(nDone, { running: nRunning, modelErrors });
+        progressBar.update(nDone, {running: nRunning, modelErrors});
       } else {
         console.log(
           `Evaluating ${nDone}/${this.dataset.length * nTrials} examples (${nRunning} running, ${modelErrors} errors)`
@@ -215,7 +234,7 @@ export class Evaluation<R extends DatasetRow, E extends DatasetRow, M> extends W
     example,
     columnMapping,
   }: {
-    model: WeaveCallable<(...args: [{ datasetRow: E }]) => Promise<M>>;
+    model: WeaveCallable<(...args: [{datasetRow: E}]) => Promise<M>>;
     example: R;
     columnMapping?: ColumnMapping<R, E>;
   }) {
@@ -227,7 +246,7 @@ export class Evaluation<R extends DatasetRow, E extends DatasetRow, M> extends W
       datasetRow = mapArgs(example, columnMapping) as E;
     }
     try {
-      modelOutput = await callWeaveCallable(model, { datasetRow });
+      modelOutput = await callWeaveCallable(model, {datasetRow});
     } catch (e) {
       console.error(e);
       modelError = true;
@@ -235,12 +254,12 @@ export class Evaluation<R extends DatasetRow, E extends DatasetRow, M> extends W
     const endTime = new Date();
     const modelLatency = (endTime.getTime() - startTime.getTime()) / 1000; // Convert to seconds
 
-    const scores: { [key: string]: any } = {};
+    const scores: {[key: string]: any} = {};
     if (!modelError) {
       for (const scorer of this.scorers) {
         let score = undefined;
         try {
-          score = await callWeaveCallable(scorer, { datasetRow, modelOutput });
+          score = await callWeaveCallable(scorer, {datasetRow, modelOutput});
         } catch (e) {
           console.error(e);
         }
@@ -264,15 +283,27 @@ export class Evaluation<R extends DatasetRow, E extends DatasetRow, M> extends W
       [key: string]: any;
     }>
   ) {
-    const summarizeNestedObject = (results: Array<any>): Record<string, any> => {
+    const summarizeNestedObject = (
+      results: Array<any>
+    ): Record<string, any> => {
       const nestedSummary: Record<string, any> = {};
 
       // Get all unique keys from all results
       const allKeys = new Set(results.flatMap(obj => Object.keys(obj ?? {})));
 
       for (const key of allKeys) {
-        const values = results.map(result => (result == null ? null : result[key]));
-        if (values.some(v => typeof v === 'object' && v !== null && !Array.isArray(v) && !isMedia(v))) {
+        const values = results.map(result =>
+          result == null ? null : result[key]
+        );
+        if (
+          values.some(
+            v =>
+              typeof v === 'object' &&
+              v !== null &&
+              !Array.isArray(v) &&
+              !isMedia(v)
+          )
+        ) {
           const result = summarizeNestedObject(values);
           if (Object.keys(result).length > 0) {
             nestedSummary[key] = result;

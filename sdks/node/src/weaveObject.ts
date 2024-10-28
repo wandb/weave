@@ -1,6 +1,6 @@
-import { requireGlobalClient } from './clientApi';
-import { isOp } from './op';
-import { getGlobalDomain } from './urls';
+import {requireGlobalClient} from './clientApi';
+import {isOp} from './op';
+import {getGlobalDomain} from './urls';
 
 export interface Callable {}
 
@@ -43,9 +43,11 @@ export class WeaveObject {
   }
 
   saveAttrs() {
-    const attrs: { [key: string]: any } = {};
+    const attrs: {[key: string]: any} = {};
 
-    const nonUnderscoreKeys = Object.keys(this).filter(key => !key.startsWith('_'));
+    const nonUnderscoreKeys = Object.keys(this).filter(
+      key => !key.startsWith('_')
+    );
 
     // Include values first (non-functions)
     for (const key of Object.keys(this)) {
@@ -82,7 +84,10 @@ export function getClassChain(instance: WeaveObject): string[] {
   let currentProto = Object.getPrototypeOf(instance);
 
   while (currentProto && currentProto.constructor.name !== 'Object') {
-    const className = currentProto.constructor.name === 'WeaveObject' ? 'Object' : currentProto.constructor.name;
+    const className =
+      currentProto.constructor.name === 'WeaveObject'
+        ? 'Object'
+        : currentProto.constructor.name;
     bases.push(className);
     currentProto = Object.getPrototypeOf(currentProto);
   }

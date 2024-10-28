@@ -32,17 +32,23 @@ export function makeMockOpenAIChat(responseFn: ResponseFn) {
     messages: any[];
     stream?: boolean;
     model?: string;
-    stream_options?: { include_usage?: boolean };
+    stream_options?: {include_usage?: boolean};
     [key: string]: any;
   }) {
     const response = responseFn(messages);
-    const { content, functionCalls = [] } = response;
+    const {content, functionCalls = []} = response;
 
-    const promptTokens = messages.reduce((acc, msg) => acc + estimateTokenCount(msg.content), 0);
+    const promptTokens = messages.reduce(
+      (acc, msg) => acc + estimateTokenCount(msg.content),
+      0
+    );
     const completionTokens =
       estimateTokenCount(content) +
       functionCalls.reduce(
-        (acc, fc) => acc + estimateTokenCount(fc.name) + estimateTokenCount(JSON.stringify(fc.arguments)),
+        (acc, fc) =>
+          acc +
+          estimateTokenCount(fc.name) +
+          estimateTokenCount(JSON.stringify(fc.arguments)),
         0
       );
     const totalTokens = promptTokens + completionTokens;
@@ -103,7 +109,7 @@ function* generateChunks(
   promptTokens: number,
   completionTokens: number,
   totalTokens: number,
-  stream_options?: { include_usage?: boolean }
+  stream_options?: {include_usage?: boolean}
 ) {
   const id = generateId();
   const systemFingerprint = generateSystemFingerprint();
@@ -125,12 +131,12 @@ function* generateChunks(
     choices: [
       {
         index: 0,
-        delta: { role: 'assistant', content: '', refusal: null },
+        delta: {role: 'assistant', content: '', refusal: null},
         logprobs: null,
         finish_reason: null,
       },
     ],
-    ...(includeUsage && { usage: null }),
+    ...(includeUsage && {usage: null}),
   };
 
   // Content chunks
@@ -141,12 +147,12 @@ function* generateChunks(
       choices: [
         {
           index: 0,
-          delta: { content: words[i] + (i < words.length - 1 ? ' ' : '') },
+          delta: {content: words[i] + (i < words.length - 1 ? ' ' : '')},
           logprobs: null,
           finish_reason: null,
         },
       ],
-      ...(includeUsage && { usage: null }),
+      ...(includeUsage && {usage: null}),
     };
   }
 
@@ -157,12 +163,12 @@ function* generateChunks(
       choices: [
         {
           index: 0,
-          delta: { function_call: { name: functionCall.name, arguments: '' } },
+          delta: {function_call: {name: functionCall.name, arguments: ''}},
           logprobs: null,
           finish_reason: null,
         },
       ],
-      ...(includeUsage && { usage: null }),
+      ...(includeUsage && {usage: null}),
     };
 
     const args = JSON.stringify(functionCall.arguments);
@@ -172,12 +178,12 @@ function* generateChunks(
         choices: [
           {
             index: 0,
-            delta: { function_call: { arguments: args.slice(i, i + 10) } },
+            delta: {function_call: {arguments: args.slice(i, i + 10)}},
             logprobs: null,
             finish_reason: null,
           },
         ],
-        ...(includeUsage && { usage: null }),
+        ...(includeUsage && {usage: null}),
       };
     }
   }
@@ -193,7 +199,7 @@ function* generateChunks(
         finish_reason: functionCalls.length > 0 ? 'function_call' : 'stop',
       },
     ],
-    ...(includeUsage && { usage: null }),
+    ...(includeUsage && {usage: null}),
   };
 
   // Final chunk with usage information (only if include_usage is true)

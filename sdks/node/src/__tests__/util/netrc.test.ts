@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { Netrc } from '../../utils/netrc';
+import {Netrc} from '../../utils/netrc';
 
 jest.mock('fs');
 jest.mock('os');
@@ -54,8 +54,12 @@ describe('Netrc', () => {
 
   test('save writes entries correctly', () => {
     const netrc = new Netrc();
-    netrc.setEntry('example.com', { login: 'user1', password: 'pass1' });
-    netrc.setEntry('api.example.com', { login: 'user2', password: 'pass2', account: 'acc2' });
+    netrc.setEntry('example.com', {login: 'user1', password: 'pass1'});
+    netrc.setEntry('api.example.com', {
+      login: 'user2',
+      password: 'pass2',
+      account: 'acc2',
+    });
 
     netrc.save();
 
@@ -69,13 +73,17 @@ machine api.example.com
   account acc2
 `;
 
-    expect(fs.writeFileSync).toHaveBeenCalledWith(mockNetrcPath, expectedContent, { mode: 0o600 });
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      mockNetrcPath,
+      expectedContent,
+      {mode: 0o600}
+    );
   });
 
   test('getLastEntry returns the last entry', () => {
     const netrc = new Netrc();
-    netrc.setEntry('example1.com', { login: 'user1', password: 'pass1' });
-    netrc.setEntry('example2.com', { login: 'user2', password: 'pass2' });
+    netrc.setEntry('example1.com', {login: 'user1', password: 'pass1'});
+    netrc.setEntry('example2.com', {login: 'user2', password: 'pass2'});
 
     expect(netrc.getLastEntry()).toEqual({
       machine: 'example2.com',

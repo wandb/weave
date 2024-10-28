@@ -1,4 +1,4 @@
-import { Buffer } from 'buffer';
+import {Buffer} from 'buffer';
 import crypto from 'crypto';
 
 export function computeDigest(data: Buffer): string {
@@ -7,7 +7,10 @@ export function computeDigest(data: Buffer): string {
   hasher.update(data);
   const hashBytes = hasher.digest();
   const base64EncodedHash = hashBytes.toString('base64url');
-  return base64EncodedHash.replace(/-/g, 'X').replace(/_/g, 'Y').replace(/=/g, '');
+  return base64EncodedHash
+    .replace(/-/g, 'X')
+    .replace(/_/g, 'Y')
+    .replace(/=/g, '');
 }
 
 export function stringDigest(data: string): string {

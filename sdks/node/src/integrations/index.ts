@@ -1,1 +1,1 @@
-export { wrapOpenAI } from './openai';
+export {wrapOpenAI} from './openai';

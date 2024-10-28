@@ -1,6 +1,6 @@
-import { init } from '../clientApi';
-import { op } from '../op';
-import { WeaveObject } from '../weaveObject';
+import {init} from '../clientApi';
+import {op} from '../op';
+import {WeaveObject} from '../weaveObject';
 
 class ExampleObject extends WeaveObject {
   constructor(

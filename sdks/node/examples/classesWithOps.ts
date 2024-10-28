@@ -12,7 +12,7 @@ class ExampleModel {
   async invoke(input: string) {
     const response = await this.oaiClient.chat.completions.create({
       model: 'gpt-4o',
-      messages: [{ role: 'user', content: input }],
+      messages: [{role: 'user', content: input}],
     });
     return response.choices[0].message.content;
   }

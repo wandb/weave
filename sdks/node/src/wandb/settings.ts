@@ -1,5 +1,5 @@
-import { defaultDomain, defaultHost, getUrls } from '../urls';
-import { Netrc } from '../utils/netrc';
+import {defaultDomain, defaultHost, getUrls} from '../urls';
+import {Netrc} from '../utils/netrc';
 
 export function getApiKey(host: string): string {
   let apiKey = process.env.WANDB_API_KEY;
@@ -41,6 +41,6 @@ export function getWandbConfigs() {
     );
   }
   const apiKey = getApiKey(host);
-  const { baseUrl, traceBaseUrl, domain } = getUrls(host);
-  return { apiKey, baseUrl, traceBaseUrl, domain, host };
+  const {baseUrl, traceBaseUrl, domain} = getUrls(host);
+  return {apiKey, baseUrl, traceBaseUrl, domain, host};
 }
