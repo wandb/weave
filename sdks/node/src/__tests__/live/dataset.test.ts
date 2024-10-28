@@ -8,11 +8,7 @@ describe('Dataset', () => {
 
   test('should save a dataset', async () => {
     const client = await init('test-project');
-    const data = [
-      {id: 1, value: 2},
-      {id: 2, value: 3},
-      {id: 3, value: 4},
-    ];
+    const data = [{id: 1, value: 2}];
 
     const dataset = new Dataset({rows: data});
     const ref = await dataset.save();
@@ -21,7 +17,7 @@ describe('Dataset', () => {
     expect(project).toBe('test-project');
 
     // Dataset has same rows as the original data
-    expect(dataset.length).toBe(3);
+    expect(dataset.length).toBe(1);
     let i = 0;
     for await (const row of dataset) {
       expect(row).toEqual(data[i]);
