@@ -1,8 +1,16 @@
 import {Box} from '@material-ui/core';
+import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {Button} from '@wandb/weave/components/Button/Button';
-import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {Select} from '@wandb/weave/components/Form/Select';
 import {TextField} from '@wandb/weave/components/Form/TextField';
+import {
+  IconChevronDown,
+  IconChevronUp,
+  IconCopy,
+  IconDelete,
+  IconSortAscending,
+  IconSortDescending,
+} from '@wandb/weave/components/Icon';
 import {refUri} from '@wandb/weave/react';
 import React, {useEffect, useMemo, useState} from 'react';
 
@@ -120,21 +128,37 @@ export const LeaderboardConfigEditor: React.FC<{
           onChange={handleDescriptionChange}
         />
         <Label>Columns</Label>
-        {leaderboardVal.columns.map((column, index) => (
-          <ColumnEditor
-            key={index}
-            column={column}
-            index={index}
-            evalObjs={evalObjs}
-            entity={entity}
-            project={project}
-            handleColumnChange={handleColumnChange}
-            moveColumn={moveColumn}
-            cloneColumn={cloneColumn}
-            removeColumn={removeColumn}
-            totalColumns={leaderboardVal.columns.length}
-          />
-        ))}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr auto',
+            gridGap: 3,
+            mb: 2,
+            width: '100%',
+          }}>
+          <Box sx={{color: 'text.secondary', fontSize: '0.875rem'}}>
+            Evaluation
+          </Box>
+          <Box sx={{color: 'text.secondary', fontSize: '0.875rem'}}>Scorer</Box>
+          <Box sx={{color: 'text.secondary', fontSize: '0.875rem'}}>Metric</Box>
+          <Box sx={{color: 'text.secondary', fontSize: '0.875rem'}}></Box>
+          {leaderboardVal.columns.map((column, index) => (
+            <ColumnEditor
+              key={index}
+              column={column}
+              index={index}
+              evalObjs={evalObjs}
+              entity={entity}
+              project={project}
+              handleColumnChange={handleColumnChange}
+              moveColumn={moveColumn}
+              cloneColumn={cloneColumn}
+              removeColumn={removeColumn}
+              totalColumns={leaderboardVal.columns.length}
+            />
+          ))}
+        </Box>
+
         <Button icon="add-new" variant="ghost" onClick={addColumn}>
           Add Column
         </Button>
@@ -212,84 +236,99 @@ const ColumnEditor: React.FC<{
     () => ({val: column.summary_metric_path_parts.join('.')}),
     [column.summary_metric_path_parts]
   );
+  const shouldMinimize = column.should_minimize ?? false;
   return (
-    <Box flexGrow={1} display="flex" flexWrap="wrap" alignItems="center">
-      <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
-        <Select<EvaluationHelperObj>
-          value={selectedEvalObj}
-          placeholder="Evaluation Definition"
-          onChange={newVal =>
-            handleColumnChange(index, 'evaluation_object_ref', newVal?.ref)
-          }
-          options={evalObjs}
-          getOptionLabel={obj =>
-            `${obj.name}:v${obj.versionIndex} (${obj.digest.slice(0, 6)})`
-          }
-          getOptionValue={obj => obj.ref}
-        />
-      </Box>
-      <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
-        <Select<{val: string}>
-          value={selectedScorer}
-          onChange={newVal =>
-            handleColumnChange(index, 'scorer_name', newVal?.val)
-          }
-          options={scorers.map(scorer => ({val: scorer}))}
-          isDisabled={!column.evaluation_object_ref}
-          getOptionLabel={scorer => scorer.val}
-          getOptionValue={scorer => scorer.val}
-        />
-      </Box>
-      <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
-        <Select<{val: string}>
-          value={selectedMetricPath}
-          onChange={newVal =>
-            handleColumnChange(
-              index,
-              'summary_metric_path_parts',
-              newVal?.val.split('.')
-            )
-          }
-          options={metrics.map(metric => ({val: metric}))}
-          isDisabled={!column.evaluation_object_ref || !column.scorer_name}
-          getOptionLabel={metric => metric.val}
-          getOptionValue={metric => metric.val}
-        />
-      </Box>
-      <Box display="flex" alignItems="center" mb={2} sx={{gridGap: 4}}>
-        <Checkbox
-          checked={column.should_minimize ?? false}
-          onCheckedChange={checked =>
-            handleColumnChange(index, 'should_minimize', !!checked)
-          }
-        />
-        <span>Minimize</span>
-      </Box>
-      <Box display="flex" justifyContent="flex-end" mb={2}>
-        <Button
-          size="small"
-          icon="chevron-up"
-          variant="quiet"
-          onClick={() => moveColumn(index, index - 1)}
-          disabled={index === 0}></Button>
-        <Button
-          size="small"
-          icon="chevron-down"
-          variant="quiet"
-          onClick={() => moveColumn(index, index + 1)}
-          disabled={index === totalColumns - 1}></Button>
-        <Button
-          icon="copy"
-          variant="quiet"
-          size="small"
-          onClick={() => cloneColumn(index)}></Button>
-        <Button
-          icon="delete"
-          variant="quiet"
-          size="small"
-          onClick={() => removeColumn(index)}></Button>
-      </Box>
-    </Box>
+    <>
+      <Select<EvaluationHelperObj>
+        value={selectedEvalObj}
+        placeholder="Evaluation Definition"
+        onChange={newVal =>
+          handleColumnChange(index, 'evaluation_object_ref', newVal?.ref)
+        }
+        options={evalObjs}
+        getOptionLabel={obj =>
+          `${obj.name}:v${obj.versionIndex} (${obj.digest.slice(0, 6)})`
+        }
+        getOptionValue={obj => obj.ref}
+      />
+      <Select<{val: string}>
+        value={selectedScorer}
+        onChange={newVal =>
+          handleColumnChange(index, 'scorer_name', newVal?.val)
+        }
+        options={scorers.map(scorer => ({val: scorer}))}
+        isDisabled={!column.evaluation_object_ref}
+        getOptionLabel={scorer => scorer.val}
+        getOptionValue={scorer => scorer.val}
+      />
+      <Select<{val: string}>
+        value={selectedMetricPath}
+        onChange={newVal =>
+          handleColumnChange(
+            index,
+            'summary_metric_path_parts',
+            newVal?.val.split('.')
+          )
+        }
+        options={metrics.map(metric => ({val: metric}))}
+        isDisabled={!column.evaluation_object_ref || !column.scorer_name}
+        getOptionLabel={metric => metric.val}
+        getOptionValue={metric => metric.val}
+      />
+      <PopupDropdown
+        sections={[
+          [
+            {
+              key: 'moveBefore',
+              text: 'Move Before',
+              icon: <IconChevronUp style={{marginRight: '4px'}} />,
+              onClick: () => moveColumn(index, index - 1),
+              disabled: index === 0,
+            },
+            {
+              key: 'moveAfter',
+              text: 'Move After',
+              icon: <IconChevronDown style={{marginRight: '4px'}} />,
+              onClick: () => moveColumn(index, index + 1),
+              disabled: index === totalColumns - 1,
+            },
+            {
+              key: 'duplicate',
+              text: 'Duplicate',
+              icon: <IconCopy style={{marginRight: '4px'}} />,
+              onClick: () => cloneColumn(index),
+            },
+            {
+              key: 'delete',
+              text: 'Delete',
+              icon: <IconDelete style={{marginRight: '4px'}} />,
+              onClick: () => removeColumn(index),
+            },
+            {
+              key: 'changeSortDirection',
+              text: shouldMinimize ? 'Sort Descending' : 'Sort Ascending',
+              icon: shouldMinimize ? (
+                <IconSortDescending style={{marginRight: '4px'}} />
+              ) : (
+                <IconSortAscending style={{marginRight: '4px'}} />
+              ),
+              onClick: () =>
+                handleColumnChange(index, 'should_minimize', !shouldMinimize),
+            },
+          ],
+        ]}
+        trigger={
+          <Button
+            className="row-actions-button"
+            icon="overflow-horizontal"
+            size="medium"
+            variant="ghost"
+            style={{marginLeft: '4px'}}
+          />
+        }
+        offset="-78px, -16px"
+      />
+    </>
   );
 };
 
