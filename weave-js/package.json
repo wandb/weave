@@ -145,7 +145,8 @@
     "wavesurfer.js": "^2.0.0",
     "web-tree-sitter": "^0.20.5",
     "yet-another-react-lightbox": "^3.17.5",
-    "zen-observable": "^0.10.0"
+    "zen-observable": "^0.10.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@babel/core": "^7.23.2",

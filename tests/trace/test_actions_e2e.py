@@ -1,19 +1,15 @@
-import os
-from typing import Any
-
 import pytest
-from pydantic import BaseModel
 
 import weave
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.interface.base_models.action_base_models import (
     ConfiguredAction,
-    _BuiltinAction,
+    ConfiguredContainsWordsAction,
 )
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from weave.trace_server.trace_server_interface import (
-    ExecuteBatchActionReq,
+    ActionsExecuteBatchReq,
     FeedbackCreateReq,
     ObjCreateReq,
     ObjQueryReq,
@@ -21,16 +17,12 @@ from weave.trace_server.trace_server_interface import (
 
 
 def test_action_execute_workflow(client: WeaveClient):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
+    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)  # type: ignore
     if is_sqlite:
         # dont run this test for sqlite
         return
 
     # part 1: create the action
-    class ExampleResponse(BaseModel):
-        score: int
-        reason: str
-
     digest = client.server.obj_create(
         ObjCreateReq.model_validate(
             {
@@ -40,12 +32,9 @@ def test_action_execute_workflow(client: WeaveClient):
                     "base_object_class": "ConfiguredAction",
                     "val": ConfiguredAction(
                         name="test_action",
-                        action=_BuiltinAction(name="llm_judge"),
-                        config={
-                            "system_prompt": "you are a judge",
-                            "model": "gpt-4o-mini",
-                            "response_format_schema": ExampleResponse.model_json_schema(),
-                        },
+                        config=ConfiguredContainsWordsAction(
+                            target_words=["mindful", "demure"]
+                        ),
                     ).model_dump(),
                 }
             }
@@ -75,7 +64,7 @@ def test_action_execute_workflow(client: WeaveClient):
     def example_op(input: str) -> str:
         return input[::-1]
 
-    _, call1 = example_op.call("hello")
+    _, call1 = example_op.call("i've been very mindful today")
     with pytest.raises(Exception):
         client.server.feedback_create(
             FeedbackCreateReq.model_validate(
@@ -83,12 +72,7 @@ def test_action_execute_workflow(client: WeaveClient):
                     "project_id": client._project_id(),
                     "weave_ref": call1.ref.uri(),
                     "feedback_type": "ActionScore",
-                    "payload": {
-                        "output": {
-                            "score": 1,
-                            "reason": "because",
-                        }
-                    },
+                    "payload": True,
                 }
             )
         )
@@ -99,13 +83,7 @@ def test_action_execute_workflow(client: WeaveClient):
                 "project_id": client._project_id(),
                 "weave_ref": call1.ref.uri(),
                 "feedback_type": "ActionScore",
-                "payload": {
-                    "configured_action_ref": action_ref_uri,
-                    "output": {
-                        "score": 1,
-                        "reason": "because",
-                    },
-                },
+                "payload": {"configured_action_ref": action_ref_uri, "output": True},
             }
         )
     )
@@ -114,21 +92,15 @@ def test_action_execute_workflow(client: WeaveClient):
     assert len(feedbacks) == 1
     assert feedbacks[0].payload == {
         "configured_action_ref": action_ref_uri,
-        "output": {
-            "score": 1,
-            "reason": "because",
-        },
+        "output": True,
     }
 
-    # Step 3: execute the action
-    if os.environ.get("CI"):
-        # skip this test in CI for now
-        return
+    # Step 3: test that we can in-place execute one action at a time.
 
-    _, call2 = example_op.call("hello")
+    _, call2 = example_op.call("i've been very meditative today")
 
-    res = client.server.execute_batch_action(
-        ExecuteBatchActionReq.model_validate(
+    res = client.server.actions_execute_batch(
+        ActionsExecuteBatchReq.model_validate(
             {
                 "project_id": client._project_id(),
                 "call_ids": [call2.id],
@@ -141,18 +113,5 @@ def test_action_execute_workflow(client: WeaveClient):
     assert len(feedbacks) == 1
     assert feedbacks[0].payload == {
         "configured_action_ref": action_ref_uri,
-        "output": {
-            "score": MatchesAnyNumber(),
-            "reason": MatchesAnyStr(),
-        },
+        "output": False,
     }
-
-
-class MatchesAnyStr:
-    def __eq__(self, other: Any) -> bool:
-        return isinstance(other, str)
-
-
-class MatchesAnyNumber(BaseModel):
-    def __eq__(self, other: Any) -> bool:
-        return isinstance(other, (int, float))
