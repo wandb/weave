@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import logging
 import textwrap
 import time
 import traceback
@@ -28,7 +29,7 @@ from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, get_ref
 
 console = Console()
-
+logger = logging.getLogger(__name__)
 
 INVALID_MODEL_ERROR = (
     "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
@@ -339,7 +340,13 @@ class Evaluation(Object):
                     raise ValueError(
                         f"{score_fn} expects arguments: {score_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
                     )
-            score_args["output"] = model_output
+            if "model_output" in score_arg_names:
+                util.warn_once(
+                    logger, "model_output is deprecated, please use output instead"
+                )
+                score_args["model_output"] = model_output
+            else:
+                score_args["output"] = model_output
 
             try:
                 if is_op(score_fn) and model_call:
