@@ -1,6 +1,7 @@
 import os
 from contextlib import contextmanager
 from unittest.mock import patch
+
 from litellm.types.utils import ModelResponse
 
 from tests.trace.util import client_is_sqlite
@@ -34,7 +35,33 @@ def test_completions_create(client):
         "model": model_name,
         "messages": [{"role": "user", "content": "Hello, world!"}],
     }
-    mock_response = {'id': 'chatcmpl-ANnboqjHwrm6uWcubQma9pzxye0Cm', 'choices': [{'finish_reason': 'stop', 'index': 0, 'message': {'content': 'Hello! How can I assist you today?', 'role': 'assistant', 'tool_calls': None, 'function_call': None}}], 'created': 1730235604, 'model': 'gpt-4o-2024-08-06', 'object': 'chat.completion', 'system_fingerprint': 'fp_90354628f2', 'usage': {'completion_tokens': 9, 'prompt_tokens': 11, 'total_tokens': 20, 'completion_tokens_details': {'audio_tokens': None, 'reasoning_tokens': 0}, 'prompt_tokens_details': {'audio_tokens': None, 'cached_tokens': 0}}, 'service_tier': None}
+    mock_response = {
+        "id": "chatcmpl-ANnboqjHwrm6uWcubQma9pzxye0Cm",
+        "choices": [
+            {
+                "finish_reason": "stop",
+                "index": 0,
+                "message": {
+                    "content": "Hello! How can I assist you today?",
+                    "role": "assistant",
+                    "tool_calls": None,
+                    "function_call": None,
+                },
+            }
+        ],
+        "created": 1730235604,
+        "model": "gpt-4o-2024-08-06",
+        "object": "chat.completion",
+        "system_fingerprint": "fp_90354628f2",
+        "usage": {
+            "completion_tokens": 9,
+            "prompt_tokens": 11,
+            "total_tokens": 20,
+            "completion_tokens_details": {"audio_tokens": None, "reasoning_tokens": 0},
+            "prompt_tokens_details": {"audio_tokens": None, "cached_tokens": 0},
+        },
+        "service_tier": None,
+    }
 
     class DummySecretFetcher:
         def fetch(self, secret_name: str) -> dict:
@@ -49,7 +76,9 @@ def test_completions_create(client):
     with with_tracing_disabled():
         with secret_fetcher_context(DummySecretFetcher()):
             with patch("litellm.completion") as mock_completion:
-                mock_completion.return_value = ModelResponse.model_validate(mock_response)
+                mock_completion.return_value = ModelResponse.model_validate(
+                    mock_response
+                )
                 res = client.server.completions_create(
                     tsi.CompletionsCreateReq.model_validate(
                         {
