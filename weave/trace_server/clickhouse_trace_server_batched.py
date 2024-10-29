@@ -1967,24 +1967,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _flush_calls(self) -> None:
         if not self._call_batch:
             return
-        assert self._call_batch.project_id is not None
+        calls = self._call_batch.calls
+        if not calls:
+            return
+        project_id = self._call_batch.project_id
+
+        assert project_id is not None
 
         try:
-            self._insert_call_batch(self._call_batch.calls)
+            self._insert_call_batch(calls)
         except InsertTooLarge:
             logger.info("Retrying with large objects stripped.")
-            batch = self._strip_large_values(self._call_batch.calls)
+            batch = self._strip_large_values(calls)
             self._insert_call_batch(batch)
 
         # Find and process matched calls for each filter
         matched_filters_and_calls = self._get_matched_calls_for_filters(
-            self._call_batch.project_id, self._call_batch.call_ids
+            project_id, self._call_batch.call_ids
         )
 
         for filter, filter_ref, matched_calls in matched_filters_and_calls:
             self.actions_execute_batch(
                 tsi.ActionsExecuteBatchReq(
-                    project_id=self._call_batch.project_id,
+                    project_id=project_id,
                     call_ids=[call.id for call in matched_calls],
                     configured_action_ref=filter.configured_action_ref,
                     trigger_ref=filter_ref,
