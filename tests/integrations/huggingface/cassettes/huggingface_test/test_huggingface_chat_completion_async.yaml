@@ -1,0 +1,38 @@
+interactions:
+- request:
+    body: null
+    headers:
+      user-agent:
+      - unknown/None; hf_hub/0.26.2; python/3.9.12; torch/2.4.1
+    method: POST
+    uri: https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1/chat/completions
+  response:
+    body:
+      string: '{"object":"chat.completion","id":"","created":1730223736,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.3.1-dev0-sha-de90261","choices":[{"index":0,"message":{"role":"assistant","content":"The
+        image shows the Statue of Liberty, an iconic monument symbolizing freedom
+        and democracy in the city of New York, USA."},"logprobs":null,"finish_reason":"stop"}],"usage":{"prompt_tokens":44,"completion_tokens":26,"total_tokens":70}}'
+    headers:
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '452'
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 29 Oct 2024 17:51:12 GMT
+      Vary:
+      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+      x-compute-time:
+      - '2.186847565'
+      x-compute-type:
+      - cache
+      x-request-id:
+      - 6hX8mv6YF99wfUe2DciQt
+      x-sha:
+      - cee5b78e6faed15d5f2e6d8a654fd5b247c0d5ca
+    status:
+      code: 200
+      message: OK
+version: 1
