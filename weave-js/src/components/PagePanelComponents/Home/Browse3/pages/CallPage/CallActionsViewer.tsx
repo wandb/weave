@@ -43,7 +43,7 @@ const RunButton: React.FC<{
     setIsRunning(true);
     setError(null);
     try {
-      await getClient().executeBatchAction({
+      await getClient().actionsExecuteBatch({
         project_id: projectIdFromParts({entity, project}),
         call_ids: [callId],
         configured_action_ref: actionRef,

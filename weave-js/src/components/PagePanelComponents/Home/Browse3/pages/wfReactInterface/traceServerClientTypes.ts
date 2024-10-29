@@ -301,10 +301,10 @@ export const fileExtensions = {
   [ContentType.json]: 'json',
 };
 
-export type ExecuteBatchActionReq = {
+export type ActionsExecuteBatchReq = {
   project_id: string;
   call_ids: string[];
   configured_action_ref: string;
 };
 
-export type ExecuteBatchActionRes = {};
+export type ActionsExecuteBatchRes = {};

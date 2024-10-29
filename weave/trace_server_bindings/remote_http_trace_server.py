@@ -567,16 +567,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/cost/purge", req, tsi.CostPurgeReq, tsi.CostPurgeRes
         )
 
-    def execute_batch_action(
-        self, req: tsi.ExecuteBatchActionReq
-    ) -> tsi.ExecuteBatchActionRes:
-        return self._generic_request(
-            "/actions/execute_batch",
-            req,
-            tsi.ExecuteBatchActionReq,
-            tsi.ExecuteBatchActionRes,
-        )
-
 
 __docspec__ = [
     RemoteHTTPTraceServer,
