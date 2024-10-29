@@ -1,5 +1,5 @@
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 import {
   IconChevronDown,
@@ -14,6 +14,8 @@ import {
   LatencyPlotlyChart,
   RequestsPlotlyChart,
 } from './Charts';
+import {Box} from '@mui/material';
+import {fancyPageSidebarWidth} from '../../../../../../common/css/globals_deprecated.styles';
 
 type CallsChartsProps = {
   entity: string;
@@ -85,6 +87,8 @@ export const CallsCharts = ({
 
       if (isError) {
         data.errors.push({started_at, isError});
+      } else {
+        data.errors.push({started_at, isError: false});
       }
 
       if (ended_at !== undefined) {
@@ -97,11 +101,10 @@ export const CallsCharts = ({
     return data;
   }, [calls.result, calls.loading]);
 
-  const chartWrapper =
-    'mb-4 flex-1 rounded-lg border border-moon-250 bg-white p-10';
+  const chartWrapper = 'flex-1 rounded-lg border border-moon-250 bg-white p-10';
 
   const charts = (
-    <div className="mb-10 flex flex-row gap-10 px-10">
+    <div className="m-10 flex flex-row gap-10">
       <div className={chartWrapper}>
         <LatencyPlotlyChart chartData={chartData.latency} height={300} />
       </div>
@@ -116,17 +119,26 @@ export const CallsCharts = ({
 
   return (
     <Tailwind>
-      <div className="mx-10 mb-10 rounded-lg border border-moon-250 bg-moon-50 ">
-        <div
-          className="flex cursor-pointer items-center gap-2 p-10"
-          onClick={toggleInsights}>
-          {isInsightsOpen ? <IconChevronDown /> : <IconChevronNext />}
-          <IconLightbulbInfo width={18} height={18} className="text-teal-500" />
-          <div className="font-source-sans-pro mt-[1px] text-[18px] font-semibold text-moon-500">
-            Insights
+      {/* setting the width to the width of the screen minus the sidebar width because of overflow: 'hidden' properties in SimplePageLayout causing issues */}
+      <div className="md:w-[calc(100vw-56px)]">
+        <div className="m-10">
+          <div className="w-full rounded-lg border border-moon-250 bg-moon-50 p-10">
+            <div
+              className="flex cursor-pointer items-center gap-2"
+              onClick={toggleInsights}>
+              {isInsightsOpen ? <IconChevronDown /> : <IconChevronNext />}
+              <IconLightbulbInfo
+                width={18}
+                height={18}
+                className="text-teal-500"
+              />
+              <div className="font-source-sans-pro mt-[1px] text-[18px] font-semibold text-moon-500">
+                Insights
+              </div>
+            </div>
+            {isInsightsOpen && charts}
           </div>
         </div>
-        {isInsightsOpen && charts}
       </div>
     </Tailwind>
   );

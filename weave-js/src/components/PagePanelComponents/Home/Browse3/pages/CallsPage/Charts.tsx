@@ -11,6 +11,7 @@ import {
   MOON_300,
   MOON_500,
   MOON_750,
+  RED_400,
   TEAL_400,
 } from '../../../../../../common/css/color.styles';
 
@@ -55,11 +56,16 @@ const X_AXIS_STYLE: Partial<Plotly.LayoutAxis> = {
   automargin: true,
   showgrid: false,
   linecolor: MOON_300,
+  tickfont: {color: MOON_500},
+  showspikes: false,
+};
+
+const X_AXIS_STYLE_WITH_SPIKES: Partial<Plotly.LayoutAxis> = {
+  ...X_AXIS_STYLE,
   showspikes: true,
   spikemode: 'across',
   spikethickness: 1,
   spikecolor: MOON_300,
-  tickfont: {color: MOON_500},
 };
 
 const Y_AXIS_STYLE: Partial<Plotly.LayoutAxis> = {
@@ -139,7 +145,7 @@ export const LatencyPlotlyChart: React.FC<{
         ...CHART_TITLE_STYLE,
       },
       margin: CHART_MARGIN_STYLE,
-      xaxis: X_AXIS_STYLE,
+      xaxis: X_AXIS_STYLE_WITH_SPIKES,
       yaxis: Y_AXIS_STYLE,
       hovermode: 'x unified',
       showlegend: false,
@@ -168,15 +174,24 @@ export const ErrorPlotlyChart: React.FC<{
   const divRef = useRef<HTMLDivElement>(null);
 
   const plotlyData: Plotly.Data[] = useMemo(() => {
-    const errorData = chartData;
+    const groupedData = _(chartData)
+      .groupBy(d => {
+        const date = moment(d.started_at);
+        return date.startOf('hour').format();
+      })
+      .map((group, date) => ({
+        timestamp: date,
+        count: group.filter(d => d.isError).length,
+      }))
+      .value();
 
     return [
       {
-        type: 'histogram',
-        x: errorData.map(d => d.started_at),
+        type: 'bar',
+        x: groupedData.map(d => d.timestamp),
+        y: groupedData.map(d => d.count),
         name: 'Error Count',
-        marker: {color: TEAL_400},
-        histfunc: 'count',
+        marker: {color: RED_400},
         hovertemplate: '%{y} errors<extra></extra>',
       },
     ];
@@ -190,7 +205,7 @@ export const ErrorPlotlyChart: React.FC<{
         ...CHART_TITLE_STYLE,
       },
       margin: CHART_MARGIN_STYLE,
-      bargroupgap: 0.1,
+      bargap: 0.2,
       xaxis: X_AXIS_STYLE,
       yaxis: Y_AXIS_STYLE,
       hovermode: 'x unified',
@@ -218,19 +233,29 @@ export const RequestsPlotlyChart: React.FC<{
   chartData: ChartDataRequests[];
 }> = ({height, chartData}) => {
   const divRef = useRef<HTMLDivElement>(null);
+  const plotlyData: Plotly.Data[] = useMemo(() => {
+    const groupedData = _(chartData)
+      .groupBy(d => {
+        const date = moment(d.started_at);
+        return date.startOf('hour').format();
+      })
+      .map((group, date) => ({
+        timestamp: date,
+        count: group.length,
+      }))
+      .value();
 
-  const plotlyData: Plotly.Data[] = useMemo(
-    () => [
+    return [
       {
-        type: 'histogram',
-        x: chartData.map(d => d.started_at),
+        type: 'bar',
+        x: groupedData.map(d => d.timestamp),
+        y: groupedData.map(d => d.count),
         name: 'Requests',
         marker: {color: TEAL_400},
         hovertemplate: '%{y} requests<extra></extra>',
       },
-    ],
-    [chartData]
-  );
+    ];
+  }, [chartData]);
 
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
