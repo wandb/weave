@@ -1,9 +1,10 @@
-import {Box, MenuItem, Select} from '@material-ui/core';
+import {Box} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
+import {Select} from '@wandb/weave/components/Form/Select';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {refUri} from '@wandb/weave/react';
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
@@ -103,7 +104,6 @@ export const LeaderboardConfigEditor: React.FC<{
         sx={{
           mr: 4,
           ml: 4,
-
           mb: 2,
           paddingLeft: 2,
           paddingRight: 2,
@@ -201,71 +201,60 @@ const ColumnEditor: React.FC<{
     column.evaluation_object_ref,
     column.scorer_name
   );
-
+  const selectedEvalObj = evalObjs.find(
+    obj => obj.ref === column.evaluation_object_ref
+  );
+  const selectedScorer = useMemo(
+    () => (column.scorer_name ? {val: column.scorer_name} : undefined),
+    [column.scorer_name]
+  );
+  const selectedMetricPath = useMemo(
+    () => ({val: column.summary_metric_path_parts.join('.')}),
+    [column.summary_metric_path_parts]
+  );
   return (
     <Box flexGrow={1} display="flex" flexWrap="wrap" alignItems="center">
       <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
-        <Select
-          fullWidth
-          value={column.evaluation_object_ref}
-          onChange={e =>
-            handleColumnChange(index, 'evaluation_object_ref', e.target.value)
+        <Select<EvaluationHelperObj>
+          value={selectedEvalObj}
+          placeholder="Evaluation Definition"
+          onChange={newVal =>
+            handleColumnChange(index, 'evaluation_object_ref', newVal?.ref)
           }
-          displayEmpty
-          margin="dense">
-          <MenuItem value="">
-            <em>Select Evaluation Object</em>
-          </MenuItem>
-          {evalObjs.map(obj => (
-            <MenuItem key={obj.ref} value={obj.ref}>
-              {`${obj.name}:v${obj.versionIndex} (${obj.digest.slice(0, 6)})`}
-            </MenuItem>
-          ))}
-        </Select>
+          options={evalObjs}
+          getOptionLabel={obj =>
+            `${obj.name}:v${obj.versionIndex} (${obj.digest.slice(0, 6)})`
+          }
+          getOptionValue={obj => obj.ref}
+        />
       </Box>
       <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
-        <Select
-          fullWidth
-          value={column.scorer_name}
-          onChange={e =>
-            handleColumnChange(index, 'scorer_name', e.target.value)
+        <Select<{val: string}>
+          value={selectedScorer}
+          onChange={newVal =>
+            handleColumnChange(index, 'scorer_name', newVal?.val)
           }
-          displayEmpty
-          margin="dense"
-          disabled={!column.evaluation_object_ref}>
-          <MenuItem value="">
-            <em>Select Scorer</em>
-          </MenuItem>
-          {scorers.map(scorer => (
-            <MenuItem key={scorer} value={scorer}>
-              {scorer}
-            </MenuItem>
-          ))}
-        </Select>
+          options={scorers.map(scorer => ({val: scorer}))}
+          isDisabled={!column.evaluation_object_ref}
+          getOptionLabel={scorer => scorer.val}
+          getOptionValue={scorer => scorer.val}
+        />
       </Box>
       <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
-        <Select
-          fullWidth
-          value={column.summary_metric_path_parts.join('.')}
-          onChange={e =>
+        <Select<{val: string}>
+          value={selectedMetricPath}
+          onChange={newVal =>
             handleColumnChange(
               index,
               'summary_metric_path_parts',
-              (e.target.value as string).split('.')
+              newVal?.val.split('.')
             )
           }
-          displayEmpty
-          margin="dense"
-          disabled={!column.evaluation_object_ref || !column.scorer_name}>
-          <MenuItem value="">
-            <em>Select Metric Path</em>
-          </MenuItem>
-          {metrics.map(path => (
-            <MenuItem key={path} value={path}>
-              {path}
-            </MenuItem>
-          ))}
-        </Select>
+          options={metrics.map(metric => ({val: metric}))}
+          isDisabled={!column.evaluation_object_ref || !column.scorer_name}
+          getOptionLabel={metric => metric.val}
+          getOptionValue={metric => metric.val}
+        />
       </Box>
       <Box display="flex" alignItems="center" mb={2} sx={{gridGap: 4}}>
         <Checkbox
