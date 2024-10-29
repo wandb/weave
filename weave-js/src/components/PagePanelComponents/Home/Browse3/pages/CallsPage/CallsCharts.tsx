@@ -1,5 +1,5 @@
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
-import React, {useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
 
 import {Tailwind} from '../../../../../Tailwind';
 import {WFHighLevelCallFilter} from './callsTableFilter';
@@ -9,16 +9,67 @@ import {
   LatencyPlotlyChart,
   RequestsPlotlyChart,
 } from './Charts';
-import {WeaveLoader} from '../../../../../../common/components/WeaveLoader';
-import WandbLoader from '../../../../../../common/components/WandbLoader';
-import {LoadingDots} from '../../../../../LoadingDots';
 import {WaveLoader} from '../../../../../Loaders/WaveLoader';
+import {IconInfo} from '../../../../../Icon';
+import {MOON_400} from '../../../../../../common/css/color.styles';
 
 type CallsChartsProps = {
   entity: string;
   project: string;
   filterModelProp: GridFilterModel;
   filter: WFHighLevelCallFilter;
+};
+
+const Chart = ({
+  isLoading,
+  chartData,
+  title,
+}: {
+  isLoading: boolean;
+  chartData: any;
+  title: string;
+}) => {
+  const chartWrapper = 'flex-1 rounded-lg border border-moon-250 bg-white p-10';
+  const chartTitle = 'ml-12 mt-8 text-base font-semibold text-moon-750';
+  const chartSkeleton = 'flex h-[300px] items-center justify-center';
+
+  let chart = null;
+  if (isLoading) {
+    chart = (
+      <div className={chartSkeleton}>
+        <WaveLoader size="small" />
+      </div>
+    );
+  } else if (chartData.length > 0) {
+    switch (title) {
+      case 'Latency':
+        chart = <LatencyPlotlyChart chartData={chartData} height={300} />;
+        break;
+      case 'Errors':
+        chart = <ErrorPlotlyChart chartData={chartData} height={300} />;
+        break;
+      case 'Requests':
+        chart = <RequestsPlotlyChart chartData={chartData} height={300} />;
+        break;
+    }
+  } else {
+    chart = (
+      <div className={chartSkeleton}>
+        <div className="flex flex-col items-center justify-center">
+          <IconInfo color={MOON_400} />
+          <div className="text-moon-500">
+            No data available for the selected time frame
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className={chartWrapper}>
+      <div className={chartTitle}>{title}</div>
+      {chart}
+    </div>
+  );
 };
 
 export const CallsCharts = ({
@@ -48,11 +99,6 @@ export const CallsCharts = ({
     0,
     1000
   );
-  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
-
-  const toggleInsights = () => {
-    setIsInsightsOpen(!isInsightsOpen);
-  };
 
   const chartData = useMemo(() => {
     if (calls.loading || !calls.result || calls.result.length === 0) {
@@ -99,47 +145,23 @@ export const CallsCharts = ({
     return data;
   }, [calls.result, calls.loading]);
 
-  const chartWrapper =
-    'flex-1 rounded-lg border border-moon-250 bg-white p-10 ';
-
   const charts = (
     <div className="m-10 flex flex-row gap-10">
-      <div className={chartWrapper}>
-        <div className="ml-12 mt-8 text-base font-semibold text-moon-750">
-          Latency
-        </div>
-        {calls.loading ? (
-          <div className="flex h-[300px] items-center justify-center">
-            <WaveLoader size="small" />
-          </div>
-        ) : (
-          <LatencyPlotlyChart chartData={chartData.latency} height={300} />
-        )}
-      </div>
-      <div className={chartWrapper}>
-        <div className="ml-12 mt-8 text-base font-semibold text-moon-750">
-          Errors
-        </div>
-        {calls.loading ? (
-          <div className="flex h-[300px] items-center justify-center">
-            <WaveLoader size="small" />
-          </div>
-        ) : (
-          <ErrorPlotlyChart chartData={chartData.errors} height={300} />
-        )}
-      </div>
-      <div className={chartWrapper}>
-        <div className="ml-12 mt-8 text-base font-semibold text-moon-750">
-          Requests
-        </div>
-        {calls.loading ? (
-          <div className="flex h-[300px] items-center justify-center">
-            <WaveLoader size="small" />
-          </div>
-        ) : (
-          <RequestsPlotlyChart chartData={chartData.requests} height={300} />
-        )}
-      </div>
+      <Chart
+        isLoading={calls.loading}
+        chartData={chartData.latency}
+        title="Latency"
+      />
+      <Chart
+        isLoading={calls.loading}
+        chartData={chartData.errors}
+        title="Errors"
+      />
+      <Chart
+        isLoading={calls.loading}
+        chartData={chartData.requests}
+        title="Requests"
+      />
     </div>
   );
 
