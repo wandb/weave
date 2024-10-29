@@ -113,7 +113,8 @@ export const useCallsTableColumns = (
   const preservePath = useMemo(
     () =>
       effectiveFilter.opVersionRefs?.length === 1 &&
-      effectiveFilter.opVersionRefs[0].includes('predict_and_score:'),
+      (effectiveFilter.opVersionRefs[0].includes('predict_and_score:') ||
+        effectiveFilter.opVersionRefs[0].includes('predictAndScore:')),
     [effectiveFilter.opVersionRefs]
   );
 
