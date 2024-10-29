@@ -209,10 +209,8 @@ export const HumanFeedbackCell: React.FC<
       [feedback.creator ?? '']: feedback.payload.value,
       ...acc,
     };
-  }, {});
+  }, {}) as Record<string, Record<string, Record<string, string>>>;
   
-  console.log('combinedFeedback', combinedFeedback);
-
   // rawValues is an array of values from the feedback
   const parsedRef = parseRef(props.sfData.ref);
   
@@ -223,10 +221,9 @@ export const HumanFeedbackCell: React.FC<
       values.push(pRecord[parsedRef.artifactName]?.[parsedRef.artifactVersion]);
     }
     return values;
-  }, [combinedFeedback, parsedRef])
+  }, [combinedFeedback, parsedRef]);
 
-  console.log('rawValues', rawValues);
-
+  const viewerFeedbackVal = props.viewer ? combinedFeedback[props.viewer]?.[parsedRef.artifactName]?.[parsedRef.artifactVersion] : null;
 
   if (query?.loading) {
     return <LoadingDots />;
@@ -239,24 +236,9 @@ export const HumanFeedbackCell: React.FC<
     </div>;
   }
 
-  // TODO: fix, we want only one callsite for renderFeedbackComponent
-  if (Object.keys(combinedFeedback).length === 0) {
-    return <div className="flex w-full justify-center">
-      {renderFeedbackComponent(props, onAddFeedback, null)}
-    </div>;
-  }
-
   return (
     <div className="w-full py-4">
-      {rawValues?.map(val => renderFeedbackComponent(props, onAddFeedback, val))}
-      {/* {Object.entries(combinedFeedback)
-        .map(([userId, value]) => {
-          return renderFeedbackComponent(
-            props,
-            onAddFeedback,
-            value[0]?.[parsedRef.artifactName]?.[parsedRef.artifactVersion]
-          )
-        })} */}
+      {renderFeedbackComponent(props, onAddFeedback, viewerFeedbackVal)}
     </div>
   );
 };
