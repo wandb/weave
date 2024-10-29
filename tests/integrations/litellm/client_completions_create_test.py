@@ -1,16 +1,12 @@
-
-from contextlib import contextmanager
 import os
+from contextlib import contextmanager
+from unittest.mock import patch
+from litellm.types.utils import ModelResponse
+
 from tests.trace.util import client_is_sqlite
 from weave.trace.settings import _context_vars
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
-
-class TypeMatch:
-    def __init__(self, type):
-        self.type = type
-
-    def __eq__(self, other):
-        return isinstance(other, self.type)
 
 
 @contextmanager
@@ -38,6 +34,7 @@ def test_completions_create(client):
         "model": model_name,
         "messages": [{"role": "user", "content": "Hello, world!"}],
     }
+    mock_response = {'id': 'chatcmpl-ANnboqjHwrm6uWcubQma9pzxye0Cm', 'choices': [{'finish_reason': 'stop', 'index': 0, 'message': {'content': 'Hello! How can I assist you today?', 'role': 'assistant', 'tool_calls': None, 'function_call': None}}], 'created': 1730235604, 'model': 'gpt-4o-2024-08-06', 'object': 'chat.completion', 'system_fingerprint': 'fp_90354628f2', 'usage': {'completion_tokens': 9, 'prompt_tokens': 11, 'total_tokens': 20, 'completion_tokens_details': {'audio_tokens': None, 'reasoning_tokens': 0}, 'prompt_tokens_details': {'audio_tokens': None, 'cached_tokens': 0}}, 'service_tier': None}
 
     class DummySecretFetcher:
         def fetch(self, secret_name: str) -> dict:
@@ -51,49 +48,18 @@ def test_completions_create(client):
     # and the inner litellm gets patched!
     with with_tracing_disabled():
         with secret_fetcher_context(DummySecretFetcher()):
-            res = client.server.completions_create(
-                tsi.CompletionsCreateReq.model_validate(
-                    {
-                        "project_id": client._project_id(),
-                        "inputs": inputs,
-                    }
+            with patch("litellm.completion") as mock_completion:
+                mock_completion.return_value = ModelResponse.model_validate(mock_response)
+                res = client.server.completions_create(
+                    tsi.CompletionsCreateReq.model_validate(
+                        {
+                            "project_id": client._project_id(),
+                            "inputs": inputs,
+                        }
+                    )
                 )
-            )
 
-    assert res.response == {
-        "id": TypeMatch(str),
-        "choices": [
-            {
-                "finish_reason": "stop",
-                "index": 0,
-                "message": {
-                    "content": "Hello! How can I assist you today?",
-                    "role": "assistant",
-                    "tool_calls": None,
-                    "function_call": None,
-                },
-            }
-        ],
-        "created": TypeMatch(int),
-        "model": TypeMatch(str),
-        "object": "chat.completion",
-        "system_fingerprint": TypeMatch(str),
-        "usage": {
-            "completion_tokens": TypeMatch(int),
-            "prompt_tokens": TypeMatch(int),
-            "total_tokens": TypeMatch(int),
-            "completion_tokens_details": {
-                "audio_tokens": None,
-                "reasoning_tokens": TypeMatch(int),
-            },
-            "prompt_tokens_details": {
-                "audio_tokens": None,
-                "cached_tokens": TypeMatch(int),
-            },
-        },
-        "service_tier": None,
-    }
-
+    assert res.response == mock_response
     calls = list(client.get_calls())
     assert len(calls) == 1
     assert calls[0].output == res.response
