@@ -269,13 +269,13 @@ class ExecuteLLMCompletionRequestInputs(BaseModel):
 
 
 
-class ExecuteLLMCompletionReq(BaseModel):
+class CompletionsCreateReq(BaseModel):
     project_id: str
     model_name: str
     inputs: ExecuteLLMCompletionRequestInputs
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
-class ExecuteLLMCompletionRes(BaseModel):
+class CompletionsCreateRes(BaseModel):
     response: Dict[str, Any]
 
 class CallsFilter(BaseModel):
@@ -880,4 +880,4 @@ class TraceServerInterface(Protocol):
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
 
     # Execute LLM API
-    def execute_llm_completion(self, req: ExecuteLLMCompletionReq) -> ExecuteLLMCompletionRes: ...
+    def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...

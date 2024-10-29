@@ -346,7 +346,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                 cost["pricing_level_id"] = original_project_id
         return res
     
-    def execute_llm_completion(self, req: tsi.ExecuteLLMCompletionReq) -> tsi.ExecuteLLMCompletionRes:
+    def completions_create(self, req: tsi.CompletionsCreateReq) -> tsi.CompletionsCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        res = self._ref_apply(self._internal_trace_server.execute_llm_completion, req)
+        res = self._ref_apply(self._internal_trace_server.completions_create, req)
         return res
