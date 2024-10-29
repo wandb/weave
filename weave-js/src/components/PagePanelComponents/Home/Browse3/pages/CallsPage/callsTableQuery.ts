@@ -32,12 +32,10 @@ export const useCallsForQuery = (
   project: string,
   filter: WFHighLevelCallFilter,
   gridFilter: GridFilterModel,
+  gridPage: GridPaginationModel,
   gridSort?: GridSortModel,
-  gridPage?: GridPaginationModel,
   expandedColumns?: Set<string>,
-  columns?: string[],
-  offset?: number,
-  limit?: number
+  columns?: string[]
 ): {
   costsLoading: boolean;
   result: CallSchema[];
@@ -46,9 +44,8 @@ export const useCallsForQuery = (
   refetch: () => void;
 } => {
   const {useCalls, useCallsStats} = useWFHooks();
-  const effectiveOffset =
-    offset ?? (gridPage?.page ?? 0) * (gridPage?.pageSize ?? 0);
-  const effectiveLimit = limit ?? gridPage?.pageSize ?? 0;
+  const effectiveOffset = gridPage?.page * gridPage?.pageSize;
+  const effectiveLimit = gridPage.pageSize;
   const {sortBy, lowLevelFilter, filterBy} = useFilterSortby(
     filter,
     gridFilter,

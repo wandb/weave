@@ -95,17 +95,23 @@ export const CallsCharts = ({
     () => [{field: 'started_at', sort: 'desc'}],
     []
   );
+  const page = useMemo(
+    () => ({
+      pageSize: 1000,
+      page: 0,
+    }),
+    []
+  );
+
   const calls = useCallsForQuery(
     entity,
     project,
     filter,
     filterModelProp,
+    page,
     sortCalls,
-    undefined,
     columnSet,
-    columns,
-    0,
-    1000
+    columns
   );
 
   const chartData = useMemo(() => {
