@@ -270,6 +270,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Set pyo3 forward compatibility environment variable
+        run: |
+          if [ "${{ matrix.python-version-minor }}" -ge "13" ]; then
+            echo "PYO3_PYTHON_FORWARD_COMPATIBILITY=1" >> $GITHUB_ENV
+          fi
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
