@@ -32,10 +32,12 @@ export const useCallsForQuery = (
   project: string,
   filter: WFHighLevelCallFilter,
   gridFilter: GridFilterModel,
-  gridSort: GridSortModel,
-  gridPage: GridPaginationModel,
-  expandedColumns: Set<string>,
-  columns?: string[]
+  gridSort?: GridSortModel,
+  gridPage?: GridPaginationModel,
+  expandedColumns?: Set<string>,
+  columns?: string[],
+  offset?: number,
+  limit?: number
 ): {
   costsLoading: boolean;
   result: CallSchema[];
@@ -44,8 +46,9 @@ export const useCallsForQuery = (
   refetch: () => void;
 } => {
   const {useCalls, useCallsStats} = useWFHooks();
-  const offset = gridPage.page * gridPage.pageSize;
-  const limit = gridPage.pageSize;
+  const effectiveOffset =
+    offset ?? (gridPage?.page ?? 0) * (gridPage?.pageSize ?? 0);
+  const effectiveLimit = limit ?? gridPage?.pageSize ?? 0;
   const {sortBy, lowLevelFilter, filterBy} = useFilterSortby(
     filter,
     gridFilter,
@@ -56,8 +59,8 @@ export const useCallsForQuery = (
     entity,
     project,
     lowLevelFilter,
-    limit,
-    offset,
+    effectiveLimit,
+    effectiveOffset,
     sortBy,
     filterBy,
     columns,
@@ -77,11 +80,16 @@ export const useCallsForQuery = (
 
   const total = useMemo(() => {
     if (callsStats.loading || callsStats.result == null) {
-      return offset + callResults.length;
+      return effectiveOffset + callResults.length;
     } else {
       return callsStats.result.count;
     }
-  }, [callResults.length, callsStats.loading, callsStats.result, offset]);
+  }, [
+    callResults.length,
+    callsStats.loading,
+    callsStats.result,
+    effectiveOffset,
+  ]);
 
   const costFilter: CallFilter = useMemo(
     () => ({
@@ -94,7 +102,7 @@ export const useCallsForQuery = (
     entity,
     project,
     costFilter,
-    limit,
+    effectiveLimit,
     undefined,
     sortBy,
     undefined,
@@ -129,59 +137,6 @@ export const useCallsForQuery = (
       refetch,
     };
   }, [callResults, calls.loading, total, costs.loading, costResults, refetch]);
-};
-
-export const useCallsForQueryCharts = (
-  entity: string,
-  project: string,
-  filter: WFHighLevelCallFilter,
-  gridFilter: GridFilterModel,
-  offset: number,
-  limit: number,
-  columns?: string[],
-  expandedColumns?: Set<string>,
-  gridSort?: GridSortModel
-): {
-  result: CallSchema[];
-  loading: boolean;
-  refetch: () => void;
-} => {
-  const {useCalls} = useWFHooks();
-  const {sortBy, lowLevelFilter, filterBy} = useFilterSortby(
-    filter,
-    gridFilter,
-    gridSort
-  );
-  const calls = useCalls(
-    entity,
-    project,
-    lowLevelFilter,
-    limit,
-    offset,
-    sortBy,
-    filterBy,
-    columns,
-    expandedColumns,
-    {
-      refetchOnDelete: true,
-    }
-  );
-
-  const callResults = useMemo(() => {
-    return calls.result ?? [];
-  }, [calls]);
-
-  const refetch = useCallback(() => {
-    calls.refetch();
-  }, [calls]);
-
-  return useMemo(() => {
-    return {
-      loading: calls.loading,
-      result: calls.loading ? [] : callResults,
-      refetch,
-    };
-  }, [callResults, calls.loading, refetch]);
 };
 
 export const useFilterSortby = (

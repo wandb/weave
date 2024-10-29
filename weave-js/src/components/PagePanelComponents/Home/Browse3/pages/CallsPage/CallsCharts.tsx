@@ -8,8 +8,9 @@ import {
 } from '../../../../../Icon';
 import {Tailwind} from '../../../../../Tailwind';
 import {WFHighLevelCallFilter} from './callsTableFilter';
-import {useCallsForQueryCharts} from './callsTableQuery';
+import {useCallsForQuery, useCallsForQueryCharts} from './callsTableQuery';
 import {
+  calculateBinSize,
   ErrorPlotlyChart,
   LatencyPlotlyChart,
   RequestsPlotlyChart,
@@ -37,16 +38,17 @@ export const CallsCharts = ({
     () => [{field: 'started_at', sort: 'desc'}],
     []
   );
-  const calls = useCallsForQueryCharts(
+  const calls = useCallsForQuery(
     entity,
     project,
     filter,
     filterModelProp,
-    0,
-    1000,
-    columns,
+    sortCalls,
+    undefined,
     columnSet,
-    sortCalls
+    columns,
+    0,
+    1000
   );
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
 
