@@ -193,7 +193,10 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                       if (inner == null) {
                         inner = <NotApplicable />;
                       } else if (typeof inner === 'number') {
-                        if ((0 < inner && inner < 1) || metricPathGroupName.includes('fraction')) {
+                        if (
+                          (0 < inner && inner < 1) ||
+                          metricPathGroupName.includes('fraction')
+                        ) {
                           inner = `${(inner * 100).toFixed(2)}%`;
                         } else {
                           inner = `${inner.toFixed(2)}`;
