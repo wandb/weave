@@ -2,10 +2,6 @@ import datetime
 from enum import Enum
 from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Type, Union
 
-from litellm.types.llms.openai import (
-    ChatCompletionAudioParam,
-    ChatCompletionModality,
-)
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
 
@@ -239,6 +235,7 @@ class CallsDeleteReq(BaseModel):
 class CallsDeleteRes(BaseModel):
     pass
 
+
 class CompletionsCreateRequestInputs(BaseModel):
     messages: List = []
     # timeout: Optional[Union[float, str]]
@@ -268,15 +265,16 @@ class CompletionsCreateRequestInputs(BaseModel):
     api_version: Optional[str] = None
 
 
-
 class CompletionsCreateReq(BaseModel):
     project_id: str
     model_name: str
     inputs: CompletionsCreateRequestInputs
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
+
 class CompletionsCreateRes(BaseModel):
     response: Dict[str, Any]
+
 
 class CallsFilter(BaseModel):
     op_names: Optional[List[str]] = None
@@ -836,6 +834,7 @@ class CostPurgeReq(BaseModel):
 
 class CostPurgeRes(BaseModel):
     pass
+
 
 class TraceServerInterface(Protocol):
     def ensure_project_exists(

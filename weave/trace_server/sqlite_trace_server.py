@@ -1080,8 +1080,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
         print("COST PURGE is not implemented for local sqlite", req)
         return tsi.CostPurgeRes()
-    
-    def completions_create(self, req: tsi.CompletionsCreateReq) -> tsi.CompletionsCreateRes:
+
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
         print("COMPLETIONS CREATE is not implemented for local sqlite", req)
         return tsi.CompletionsCreateRes()
 
