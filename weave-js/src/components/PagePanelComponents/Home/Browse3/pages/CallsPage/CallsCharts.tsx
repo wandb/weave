@@ -29,32 +29,40 @@ const Chart = ({
   chartData: any;
   title: string;
 }) => {
-  const chartWrapper = 'flex-1 rounded-lg border border-moon-250 bg-white p-10';
-  const chartTitle = 'ml-12 mt-8 text-base font-semibold text-moon-750';
-  const chartSkeleton = 'flex h-[300px] items-center justify-center';
+  const CHART_CONTAINER_STYLES =
+    'flex-1 rounded-lg border border-moon-250 bg-white p-10';
+  const CHART_TITLE_STYLES = 'ml-12 mt-8 text-base font-semibold text-moon-750';
+  const CHART_HEIGHT = 250;
+  const LOADING_CONTAINER_STYLES = `flex h-[${CHART_HEIGHT}px] items-center justify-center`;
 
   let chart = null;
   if (isLoading) {
     chart = (
-      <div className={chartSkeleton}>
+      <div className={LOADING_CONTAINER_STYLES}>
         <WaveLoader size="small" />
       </div>
     );
   } else if (chartData.length > 0) {
     switch (title) {
       case 'Latency':
-        chart = <LatencyPlotlyChart chartData={chartData} height={300} />;
+        chart = (
+          <LatencyPlotlyChart chartData={chartData} height={CHART_HEIGHT} />
+        );
         break;
       case 'Errors':
-        chart = <ErrorPlotlyChart chartData={chartData} height={300} />;
+        chart = (
+          <ErrorPlotlyChart chartData={chartData} height={CHART_HEIGHT} />
+        );
         break;
       case 'Requests':
-        chart = <RequestsPlotlyChart chartData={chartData} height={300} />;
+        chart = (
+          <RequestsPlotlyChart chartData={chartData} height={CHART_HEIGHT} />
+        );
         break;
     }
   } else {
     chart = (
-      <div className={chartSkeleton}>
+      <div className={LOADING_CONTAINER_STYLES}>
         <div className="flex flex-col items-center justify-center">
           <IconInfo color={MOON_400} />
           <div className="text-moon-500">
@@ -65,8 +73,8 @@ const Chart = ({
     );
   }
   return (
-    <div className={chartWrapper}>
-      <div className={chartTitle}>{title}</div>
+    <div className={CHART_CONTAINER_STYLES}>
+      <div className={CHART_TITLE_STYLES}>{title}</div>
       {chart}
     </div>
   );

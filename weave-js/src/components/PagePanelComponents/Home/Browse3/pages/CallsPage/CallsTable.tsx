@@ -171,7 +171,7 @@ export const CallsTable: FC<{
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [isMetricsChecked, setMetricsChecked] = useState(false);
-
+  console.log(isMetricsChecked);
   const isReadonly =
     loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
 
