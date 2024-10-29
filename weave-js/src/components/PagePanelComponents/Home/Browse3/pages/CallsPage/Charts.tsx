@@ -10,7 +10,6 @@ import {
   MOON_200,
   MOON_300,
   MOON_500,
-  MOON_750,
   RED_400,
   TEAL_400,
 } from '../../../../../../common/css/color.styles';
