@@ -57,7 +57,7 @@ export class OpRef {
     return `weave:///${this.projectId}/op/${this.objectId}:${this.digest}`;
   }
 
-  public ui_url() {
+  public uiUrl() {
     const domain = getGlobalDomain();
     return `https://${domain}/${this.projectId}/weave/ops/${this.objectId}/versions/${this.digest}`;
   }
