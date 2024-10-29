@@ -275,3 +275,54 @@ def test_huggingface_visual_question_answering_async(client):
     )
     output = call.output
     assert output[0].answer == "laying down"
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_huggingface_fill_mask(client):
+    from huggingface_hub import InferenceClient
+
+    InferenceClient(
+        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+    ).fill_mask("The goal of life is <mask>.")
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.InferenceClient.fill_mask"
+    output = call.output
+    assert output[0].token_str in output[0].sequence
+    assert output[0].score > 0
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_huggingface_fill_mask_async(client):
+    from huggingface_hub import AsyncInferenceClient
+
+    asyncio.run(
+        AsyncInferenceClient(
+            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+        ).fill_mask("The goal of life is <mask>.")
+    )
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert (
+        op_name_from_ref(call.op_name)
+        == "huggingface_hub.AsyncInferenceClient.fill_mask"
+    )
+    output = call.output
+    assert output[0].token_str in output[0].sequence
+    assert output[0].score > 0
