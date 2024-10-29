@@ -1,5 +1,6 @@
 import importlib
-from typing import TYPE_CHECKING, Callable, Optional, Union
+from functools import wraps
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
@@ -75,6 +76,28 @@ def huggingface_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
     return wrapper
 
 
+def huggingface_wrapper_async(name: str) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
+        def _fn_wrapper(fn: Callable) -> Callable:
+            @wraps(fn)
+            async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                return await fn(*args, **kwargs)
+
+            return _async_wrapper
+
+        "We need to do this so we can check if `stream` is used"
+        op = weave.op()(_fn_wrapper(fn))
+        op.name = name  # type: ignore
+        return add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: huggingface_accumulator,
+            should_accumulate=lambda inputs: isinstance(inputs, dict)
+            and bool(inputs.get("stream")),
+        )
+
+    return wrapper
+
+
 huggingface_patcher = MultiPatcher(
     [
         SymbolPatcher(
@@ -82,6 +105,13 @@ huggingface_patcher = MultiPatcher(
             "InferenceClient.chat_completion",
             huggingface_wrapper_sync(
                 name="huggingface_hub.InferenceClient.chat_completion"
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "AsyncInferenceClient.chat_completion",
+            huggingface_wrapper_async(
+                name="huggingface_hub.AsyncInferenceClient.chat_completion"
             ),
         ),
     ]
