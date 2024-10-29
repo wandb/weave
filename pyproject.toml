@@ -43,7 +43,7 @@ dependencies = [
   "numpy>1.21.0",            # Used in box.py and scorer.py (should be made optional)
   "rich",                    # Used for special formatting of tables (should be made optional)
   "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
-  "litellm>=1.50.2",         # Used in llm_completion.py
+  "litellm<=1.49.1",         # Used in llm_completion.py
 ]
 
 [project.optional-dependencies]
