@@ -19,7 +19,35 @@ def gemini_accumulator(
 
     for i, value_candidate in enumerate(value.candidates):
         for j, value_part in enumerate(value_candidate.content.parts):
-            acc.candidates[i].content.parts[j].text += value_part.text
+            if len(value_part.text) > 0:
+                acc.candidates[i].content.parts[j].text += value_part.text
+            elif len(value_part.executable_code.code) > 0:
+                if len(acc.candidates[i].content.parts[j].executable_code.code) == 0:
+                    acc.candidates[i].content.parts.append(value_part)
+                else:
+                    acc.candidates[i].content.parts[
+                        j
+                    ].executable_code.code += value_part.executable_code.code
+                    acc.candidates[i].content.parts[
+                        j
+                    ].executable_code.language = value_part.executable_code.language
+            elif len(value_part.code_execution_result.output) > 0:
+                if (
+                    len(acc.candidates[i].content.parts[j].code_execution_result.output)
+                    == 0
+                ):
+                    acc.candidates[i].content.parts.append(value_part)
+                else:
+                    acc.candidates[i].content.parts[
+                        j
+                    ].code_execution_result.output += (
+                        value_part.code_execution_result.output
+                    )
+                    acc.candidates[i].content.parts[
+                        j
+                    ].code_execution_result.status = (
+                        value_part.code_execution_result.status
+                    )
 
     acc.usage_metadata.prompt_token_count += value.usage_metadata.prompt_token_count
     acc.usage_metadata.candidates_token_count += (

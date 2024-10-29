@@ -151,6 +151,39 @@ def test_send_message(client):
 
 
 @pytest.mark.retry(max_attempts=5)
+@pytest.mark.skip_clickhouse_client
+def test_send_message_stream(client):
+    import google.generativeai as genai
+
+    genai.configure(api_key=os.getenv("GOOGLE_GENAI_KEY"))
+    model = genai.GenerativeModel(model_name="gemini-1.5-pro", tools="code_execution")
+    chat = model.start_chat()
+    response = chat.send_message(
+        (
+            "What is the sum of the first 50 prime numbers? "
+            "Generate and run code for the calculation, and make sure you get all 50."
+        ),
+        stream=True,
+    )
+    _ = [r for r in response]
+
+    calls = list(client.calls())
+    assert len(calls) == 2
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "google.generativeai.ChatSession.send_message"
+    assert "executable_code" in str(call.output).lower()
+
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "google.generativeai.GenerativeModel.generate_content"
+    assert "executable_code" in str(call.output).lower()
+
+
+@pytest.mark.retry(max_attempts=5)
 @pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
 async def test_send_message_async(client):
