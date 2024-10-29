@@ -9,6 +9,10 @@ import {
   LatencyPlotlyChart,
   RequestsPlotlyChart,
 } from './Charts';
+import {WeaveLoader} from '../../../../../../common/components/WeaveLoader';
+import WandbLoader from '../../../../../../common/components/WandbLoader';
+import {LoadingDots} from '../../../../../LoadingDots';
+import {WaveLoader} from '../../../../../Loaders/WaveLoader';
 
 type CallsChartsProps = {
   entity: string;
@@ -95,18 +99,46 @@ export const CallsCharts = ({
     return data;
   }, [calls.result, calls.loading]);
 
-  const chartWrapper = 'flex-1 rounded-lg border border-moon-250 bg-white p-10';
+  const chartWrapper =
+    'flex-1 rounded-lg border border-moon-250 bg-white p-10 ';
 
   const charts = (
     <div className="m-10 flex flex-row gap-10">
       <div className={chartWrapper}>
-        <LatencyPlotlyChart chartData={chartData.latency} height={300} />
+        <div className="ml-12 mt-8 text-base font-semibold text-moon-750">
+          Latency
+        </div>
+        {calls.loading ? (
+          <div className="flex h-[300px] items-center justify-center">
+            <WaveLoader size="small" />
+          </div>
+        ) : (
+          <LatencyPlotlyChart chartData={chartData.latency} height={300} />
+        )}
       </div>
       <div className={chartWrapper}>
-        <ErrorPlotlyChart chartData={chartData.errors} height={300} />
+        <div className="ml-12 mt-8 text-base font-semibold text-moon-750">
+          Errors
+        </div>
+        {calls.loading ? (
+          <div className="flex h-[300px] items-center justify-center">
+            <WaveLoader size="small" />
+          </div>
+        ) : (
+          <ErrorPlotlyChart chartData={chartData.errors} height={300} />
+        )}
       </div>
       <div className={chartWrapper}>
-        <RequestsPlotlyChart chartData={chartData.requests} height={300} />
+        <div className="ml-12 mt-8 text-base font-semibold text-moon-750">
+          Requests
+        </div>
+        {calls.loading ? (
+          <div className="flex h-[300px] items-center justify-center">
+            <WaveLoader size="small" />
+          </div>
+        ) : (
+          <RequestsPlotlyChart chartData={chartData.requests} height={300} />
+        )}
       </div>
     </div>
   );
