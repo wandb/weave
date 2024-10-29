@@ -6,6 +6,23 @@ import React, {FC} from 'react';
 import {Alert} from '../../../Alert';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 
+function detectLanguage(uri: string, code: string) {
+  // Simple language detection based on file extension or content
+  if (uri.endsWith('.py')) {
+    return 'python';
+  }
+  if (uri.endsWith('.js') || uri.endsWith('.ts')) {
+    return 'javascript';
+  }
+  if (code.includes('def ') || code.includes('import ')) {
+    return 'python';
+  }
+  if (code.includes('function ') || code.includes('const ')) {
+    return 'javascript';
+  }
+  return 'plaintext';
+}
+
 export const Browse2OpDefCode: FC<{uri: string; maxRowsInView?: number}> = ({
   uri,
   maxRowsInView,
@@ -37,24 +54,7 @@ export const Browse2OpDefCode: FC<{uri: string; maxRowsInView?: number}> = ({
     );
   }
 
-  const detectLanguage = (code: string) => {
-    // Simple language detection based on file extension or content
-    if (uri.endsWith('.py')) {
-      return 'python';
-    }
-    if (uri.endsWith('.js') || uri.endsWith('.ts')) {
-      return 'javascript';
-    }
-    if (code.includes('def ') || code.includes('import ')) {
-      return 'python';
-    }
-    if (code.includes('function ') || code.includes('const ')) {
-      return 'javascript';
-    }
-    return 'plaintext';
-  };
-
-  const detectedLanguage = detectLanguage(text.result ?? '');
+  const detectedLanguage = detectLanguage(uri, text.result ?? '');
 
   const inner = (
     <Editor
