@@ -120,8 +120,8 @@ def action_task(
         try:
             result = func(call_input, call_output, configured_action)
             publish_results_as_feedback(ctx, result, configured_action_ref, trigger_ref)
-            logging.info(f"Successfully ran {func.__name__}")
-            logging.info(f"Result: {result}")
+            # logging.info(f"Successfully ran {func.__name__}")
+            # logging.info(f"Result: {result}")
         except Exception as e:
             success = False
             raise e

@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from redis import Redis
 from typing_extensions import TypedDict
 
 from weave.trace_server import environment as wf_env
@@ -11,6 +10,7 @@ def queue_from_addr(addr: str) -> "ActionExecutor":
     if addr == "noop://":
         return NoOpActionQueue()
     elif addr.startswith("redis://"):
+        # Seems odd that we are not passing in the address to the queue.
         return CeleryActionQueue()
     else:
         raise ValueError(f"Invalid action queue address: {addr}")
@@ -66,6 +66,10 @@ class CeleryActionQueue(ActionExecutor):
         tasks.do_task(ctx, configured_action_ref, trigger_ref)
 
     def _TESTONLY_clear_queue(self) -> None:
+        # Again, this can be hoisted to the top once core
+        # has the dep.
+        from redis import Redis
+
         redis = Redis.from_url(wf_env.wf_action_executor())
         redis.delete("celery")
 
