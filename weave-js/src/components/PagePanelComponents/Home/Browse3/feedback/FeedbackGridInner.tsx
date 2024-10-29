@@ -9,6 +9,7 @@ import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {FeedbackGridActions} from './FeedbackGridActions';
 import {FeedbackTypeChip} from './FeedbackTypeChip';
+import {extractValFromHumanAnnotationPayload} from './HumanFeedback/tsHumanFeedback';
 
 type FeedbackGridInnerProps = {
   feedback: Feedback[];
@@ -19,7 +20,6 @@ export const FeedbackGridInner = ({
   feedback,
   currentViewerId,
 }: FeedbackGridInnerProps) => {
-  console.log('feedback', feedback);
   const columns: GridColDef[] = [
     {
       field: 'feedback_type',
@@ -44,9 +44,8 @@ export const FeedbackGridInner = ({
           return params.row.payload.emoji;
         }
         if (params.row.feedback_type === 'wandb.human_annotation.1') {
-          // TODO: make this a helper function
-          const val = Object.values(Object.values(params.row.payload.value)[0])[0];
-          return <CellValueString value={JSON.stringify(val)} />;
+          const val = extractValFromHumanAnnotationPayload(params.row.payload);
+          return <CellValueString value={JSON.stringify(val ?? null)} />;
         }
         return <CellValueString value={JSON.stringify(params.row.payload)} />;
       },

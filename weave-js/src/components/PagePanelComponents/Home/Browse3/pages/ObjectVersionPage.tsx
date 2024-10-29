@@ -50,7 +50,7 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Model: 'model',
   Dataset: 'table',
   Evaluation: 'benchmark-square',
-  HumanFeedback: 'forum-chat-bubble',
+  HumanAnnotationColumn: 'forum-chat-bubble',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {

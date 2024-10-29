@@ -10,6 +10,8 @@ import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
+import {HumanFeedbackSidebar} from '../../feedback/HumanFeedback/HumanFeedbackSidebar';
+import {useHumanFeedbackOptions} from '../../feedback/HumanFeedback/tsHumanFeedback';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
@@ -28,8 +30,6 @@ import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
-import { useHumanFeedbackOptions } from '../../feedback/HumanFeedback/tsHumanFeedback';
-import { HumanFeedbackSidebar } from '../../feedback/HumanFeedback/HumanFeedbackSidebar';
 export const CallPage: FC<{
   entity: string;
   project: string;
@@ -189,7 +189,7 @@ const CallPageInnerVertical: FC<{
     );
   }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
   const feedbackOptions = useHumanFeedbackOptions(call.entity, call.project);
-  
+
   const tree = useCallFlattenedTraceTree(call, path ?? null);
   const {rows, expandKeys, loading, costLoading, selectedCall} = tree;
   const callComplete = useCall({
@@ -226,7 +226,9 @@ const CallPageInnerVertical: FC<{
           {feedbackOptions && (
             <Button
               icon="marker"
-              tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback sidebar`}
+              tooltip={`${
+                showFeedbackExpand ? 'Hide' : 'Show'
+              } feedback sidebar`}
               variant="ghost"
               active={showFeedbackExpand ?? false}
               onClick={onToggleFeedbackExpand}

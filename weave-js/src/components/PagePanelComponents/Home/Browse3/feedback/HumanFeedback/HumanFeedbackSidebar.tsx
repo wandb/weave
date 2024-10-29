@@ -1,3 +1,4 @@
+import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useState} from 'react';
@@ -5,7 +6,6 @@ import React, {useState} from 'react';
 import {Icon} from '../../../../../Icon';
 import {HumanFeedbackCell} from './HumanFeedback';
 import {tsHumanFeedbackColumn} from './humanFeedbackTypes';
-import { useViewerInfo } from '@wandb/weave/common/hooks/useViewerInfo';
 
 type HumanFeedbackSidebarProps = {
   feedbackColumns: tsHumanFeedbackColumn[];
@@ -31,7 +31,7 @@ export const HumanFeedbackSidebar = ({
   }
 
   const viewer = userInfo ? userInfo.id : null;
-  
+
   return (
     <Tailwind>
       <div className="flex h-full flex-col bg-white">
@@ -55,11 +55,11 @@ export const HumanFeedbackSidebar = ({
               <div>
                 {feedbackColumns?.map((field, index) => (
                   <div key={field.ref}>
-                    <h3 className="text-gray-700 bg-gray-50 px-6 py-4 text-sm font-semibold">
+                    <h3 className="bg-gray-50 px-6 py-4 text-sm font-semibold text-moon-700">
                       {field.name}
                     </h3>
                     {field.description && (
-                      <p className="text-gray-700 bg-gray-50 px-6 py-4 text-sm font-italic ">
+                      <p className="bg-gray-50 font-italic px-6 py-4 text-sm text-moon-700 ">
                         {field.description}
                       </p>
                     )}

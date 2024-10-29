@@ -1,28 +1,31 @@
 import {Checkbox} from '@mui/material';
 import {Autocomplete, TextField as MuiTextField} from '@mui/material';
-import { toast } from '@wandb/weave/common/components/elements/Toast';
+import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {MOON_300} from '@wandb/weave/common/css/color.styles';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {parseRef} from '@wandb/weave/react';
 import debounce from 'lodash/debounce';
 import React, {
   SyntheticEvent,
-  useCallback,
   useEffect,
   useMemo,
   useState,
 } from 'react';
 
-import { CellValueString } from '../../../Browse2/CellValueString';
+import {CellValueString} from '../../../Browse2/CellValueString';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../../pages/wfReactInterface/traceServerClientContext';
 import {
   FeedbackCreateError,
   FeedbackCreateSuccess,
 } from '../../pages/wfReactInterface/traceServerClientTypes';
-import { HumanAnnotationPayload, HumanFeedback, tsHumanFeedbackColumn} from './humanFeedbackTypes';
-import { parseRef } from '@wandb/weave/react';
+import {
+  HumanAnnotationPayload,
+  HumanFeedback,
+  tsHumanFeedbackColumn,
+} from './humanFeedbackTypes';
 
 // Constants
 const HUMAN_FEEDBACK_TYPE = 'wandb.human_annotation.1';
@@ -31,7 +34,7 @@ const MAGIC_FEEDBACK_TYPES = {
   TEXT: 'text',
   BOOLEAN: 'boolean',
   CATEGORICAL: 'categorical',
-}
+};
 const DEBOUNCE_VAL = 200;
 
 // Interfaces
@@ -46,19 +49,16 @@ interface HumanFeedbackProps {
 }
 
 // Utility function for creating feedback request
-const createFeedbackRequest = (
-  props: HumanFeedbackProps,
-  value: any,
-) => {
+const createFeedbackRequest = (props: HumanFeedbackProps, value: any) => {
   const ref = props.hfColumn.ref;
   const parsedRef = parseRef(ref);
   const humanAnnotationPayload: HumanAnnotationPayload = {
     annotation_column_ref: ref,
     value: {
       [parsedRef.artifactName]: {
-        [parsedRef?.artifactVersion]: value
-      }
-    }
+        [parsedRef?.artifactVersion]: value,
+      },
+    },
   };
 
   const baseRequest = {
@@ -76,7 +76,7 @@ const createFeedbackRequest = (
 const renderFeedbackComponent = (
   props: HumanFeedbackProps,
   onAddFeedback: (value: any) => Promise<boolean>,
-  foundValue: string | number | null,
+  foundValue: string | number | null
 ) => {
   // TODO validation on json_schema
   switch (props.hfColumn.json_schema.type) {
@@ -122,9 +122,7 @@ const renderFeedbackComponent = (
   }
 };
 
-export const HumanFeedbackCell: React.FC<
-  HumanFeedbackProps
-> = props => {
+export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
   const {useFeedback} = useWFHooks();
   const query = useFeedback({
     entity: props.entity,
@@ -133,6 +131,7 @@ export const HumanFeedbackCell: React.FC<
   });
   const [foundFeedback, setFoundFeedback] = useState<HumanFeedback[]>([]);
   const getTsClient = useGetTraceServerClientContext();
+  const tsClient = getTsClient();
 
   useEffect(() => {
     if (!props.readOnly) {
@@ -155,13 +154,6 @@ export const HumanFeedbackCell: React.FC<
   }, [props.callRef, query?.result]);
 
   const onAddFeedback = async (value: number | string): Promise<boolean> => {
-    const tsClient = getTsClient();
-
-    if (!tsClient) {
-      console.error('Failed to get trace server client');
-      return false;
-    }
-
     try {
       const createRequest = createFeedbackRequest(props, value);
       const res = await tsClient.feedbackCreate(createRequest);
@@ -193,9 +185,8 @@ export const HumanFeedbackCell: React.FC<
     const feedbackRefMatches = (feedback: HumanFeedback) =>
       feedback.payload.annotation_column_ref === props.hfColumn.ref;
 
-    const currFeedback = query.result?.filter(
-      (feedback: HumanFeedback) =>
-        feedbackRefMatches(feedback)
+    const currFeedback = query.result?.filter((feedback: HumanFeedback) =>
+      feedbackRefMatches(feedback)
     );
     if (!currFeedback || currFeedback.length === 0) {
       return;
@@ -211,27 +202,35 @@ export const HumanFeedbackCell: React.FC<
       ...acc,
     };
   }, {}) as Record<string, Record<string, Record<string, string>>>;
-  
+
   const parsedRef = parseRef(props.hfColumn.ref);
   const rawValues = useMemo(() => {
-    let values = [];
+    const values = [];
     for (const payload of Object.values(combinedFeedback)) {
-      const pRecord = payload as Record<string, Record<string, string>>;
+      const pRecord = payload as Record<
+        string,
+        Record<string, string | number>
+      >;
       values.push(pRecord[parsedRef.artifactName]?.[parsedRef.artifactVersion]);
     }
     return values;
   }, [combinedFeedback, parsedRef]);
 
-  const viewerFeedbackVal = props.viewer ? combinedFeedback[props.viewer]?.[parsedRef.artifactName]?.[parsedRef.artifactVersion] : null;
+  const viewerFeedbackVal =
+    combinedFeedback[props.viewer ?? '']?.[parsedRef.artifactName]?.[
+      parsedRef.artifactVersion
+    ];
   if (query?.loading) {
     return <LoadingDots />;
   }
 
   if (props.readOnly) {
     // TODO: make this prettier, for now just join with commas
-    return <div className="flex w-full justify-center">
-      <CellValueString value={rawValues?.join(', ')} />
-    </div>;
+    return (
+      <div className="flex w-full justify-center">
+        <CellValueString value={rawValues?.join(', ')} />
+      </div>
+    );
   }
 
   return (
@@ -251,31 +250,29 @@ export const NumericalFeedbackColumn = ({
 }: {
   min: number;
   max: number;
-  onAddFeedback?: (value: number) => Promise<boolean>;
+  onAddFeedback?: (value: number | null) => Promise<boolean>;
   defaultValue: number | null;
   focused?: boolean;
   isInteger?: boolean;
 }) => {
-  const [value, setValue] = useState<number | undefined>(
-    defaultValue ?? undefined
-  );
+  const [value, setValue] = useState<number | null>(defaultValue ?? null);
   const [error, setError] = useState<boolean>(false);
 
   useEffect(() => {
-    setValue(defaultValue ?? undefined);
+    setValue(defaultValue ?? null);
   }, [defaultValue]);
 
-  const debouncedOnAddFeedback = useCallback(
-    debounce((val: number) => {
-      onAddFeedback?.(val);
-    }, DEBOUNCE_VAL),
-    [onAddFeedback]
-  );
+  const debouncedOnAddFeedback = debounce((val: number | null) => {
+    onAddFeedback?.(val);
+  }, DEBOUNCE_VAL);
 
   const onValueChange = (v: string) => {
-    const val = parseInt(v);
+    const val = v !== '' ? parseInt(v) : null;
+    if (val === value) {
+      return;
+    }
     setValue(val);
-    if (val < min || val > max) {
+    if (val && (val < min || val > max)) {
       setError(true);
       return;
     } else {
@@ -307,9 +304,7 @@ export const TextFeedbackColumn = ({
   defaultValue,
   focused,
 }: {
-  onAddFeedback?: (
-    value: string,
-  ) => Promise<boolean>;
+  onAddFeedback?: (value: string) => Promise<boolean>;
   defaultValue: string | null;
   focused?: boolean;
 }) => {
@@ -319,12 +314,9 @@ export const TextFeedbackColumn = ({
     setValue(defaultValue ?? '');
   }, [defaultValue]);
 
-  const debouncedOnAddFeedback = useCallback(
-    debounce((val: string) => {
-      onAddFeedback?.(val);
-    }, DEBOUNCE_VAL),
-    [onAddFeedback]
-  );
+  const debouncedOnAddFeedback = debounce((val: string) => {
+    onAddFeedback?.(val);
+  }, DEBOUNCE_VAL);
 
   const onValueChange = (newValue: string) => {
     setValue(newValue);
@@ -355,9 +347,7 @@ export const CategoricalFeedbackColumn = ({
   focused,
 }: {
   options: string[];
-  onAddFeedback?: (
-    value: string,
-  ) => Promise<boolean>;
+  onAddFeedback?: (value: string) => Promise<boolean>;
   defaultValue: string | null;
   focused?: boolean;
 }) => {
@@ -378,14 +368,14 @@ export const CategoricalFeedbackColumn = ({
     );
   }, [defaultValue, dropdownOptions]);
 
-  const debouncedOnAddFeedback = useCallback(
-    debounce((val: string) => {
-      onAddFeedback?.(val);
-    }, DEBOUNCE_VAL),
-    [onAddFeedback]
-  );
+  const debouncedOnAddFeedback = debounce((val: string) => {
+    onAddFeedback?.(val);
+  }, DEBOUNCE_VAL);
 
   const onValueChange = (e: any, newValue: Option) => {
+    if (newValue?.value === value?.value) {
+      return;
+    }
     setValue(newValue);
     debouncedOnAddFeedback(newValue?.value ?? '');
   };
@@ -446,9 +436,7 @@ export const BinaryFeedbackColumn = ({
   defaultValue,
   focused,
 }: {
-  onAddFeedback?: (
-    value: string,
-  ) => Promise<boolean>;
+  onAddFeedback?: (value: string) => Promise<boolean>;
   defaultValue: string | null;
   focused?: boolean;
 }) => {
@@ -458,15 +446,15 @@ export const BinaryFeedbackColumn = ({
     setValue(defaultValue === 'true');
   }, [defaultValue]);
 
-  const debouncedOnAddFeedback = useCallback(
-    debounce((val: string) => {
-      onAddFeedback?.(val);
-    }, DEBOUNCE_VAL),
-    [onAddFeedback]
-  );
+  const debouncedOnAddFeedback = debounce((val: string) => {
+    onAddFeedback?.(val);
+  }, DEBOUNCE_VAL);
 
   const onValueChange = (e: SyntheticEvent<HTMLInputElement>) => {
     const val = (e.target as HTMLInputElement).checked ? 'true' : 'false';
+    if ((val === 'true') === value) {
+      return;
+    }
     setValue(val === 'true');
     debouncedOnAddFeedback(val);
   };

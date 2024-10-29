@@ -3,24 +3,10 @@ import {useEffect, useMemo, useState} from 'react';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {objectVersionKeyToRefUri} from '../../pages/wfReactInterface/utilities';
 import {ObjectVersionSchema} from '../../pages/wfReactInterface/wfDataModelHooksInterface';
-import {tsHumanFeedbackColumn} from './humanFeedbackTypes';
-
-
-// const useResolveTypeObjects = (typeRefs: string[]) => {
-//   const {useRefsData} = useWFHooks();
-//   const refsData = useRefsData(typeRefs);
-//   return useMemo(() => {
-//     if (refsData.loading || refsData.result == null) {
-//       return null;
-//     }
-//     const refDataWithRefs = refsData.result.map((x, i) => ({
-//       ...x,
-//       ref: typeRefs[i],
-//     }));
-//     return refDataWithRefs;
-//   }, [refsData.loading, refsData.result]);
-// };
-
+import {
+  HumanAnnotationPayload,
+  tsHumanFeedbackColumn,
+} from './humanFeedbackTypes';
 
 export const useHumanFeedbackOptions = (
   entity: string,
@@ -28,9 +14,7 @@ export const useHumanFeedbackOptions = (
 ): tsHumanFeedbackColumn[] => {
   const {useRootObjectVersions} = useWFHooks();
 
-  const [cols, setCols] = useState<ObjectVersionSchema[] | null>(
-    null
-  );
+  const [cols, setCols] = useState<ObjectVersionSchema[] | null>(null);
   const humanAnnotationColumns = useRootObjectVersions(
     entity,
     project,
@@ -43,7 +27,10 @@ export const useHumanFeedbackOptions = (
   );
 
   useEffect(() => {
-    if (humanAnnotationColumns.loading || humanAnnotationColumns.result == null) {
+    if (
+      humanAnnotationColumns.loading ||
+      humanAnnotationColumns.result == null
+    ) {
       return;
     }
     setCols(humanAnnotationColumns.result);
@@ -53,9 +40,20 @@ export const useHumanFeedbackOptions = (
     if (cols == null) {
       return [];
     }
-    return cols.map((col) => ({
+    return cols.map(col => ({
       ...col.val,
+      // attach object refs to the columns
       ref: objectVersionKeyToRefUri(col),
     }));
   }, [cols]);
+};
+
+export const extractValFromHumanAnnotationPayload = (
+  payload: HumanAnnotationPayload
+) => {
+  if (payload.value == null) {
+    return null;
+  }
+  const val = Object.values(Object.values(payload.value)[0])[0];
+  return val;
 };
