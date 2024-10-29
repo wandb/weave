@@ -1,21 +1,13 @@
 import {
   Box,
-  Button,
-  Checkbox,
   FormControlLabel,
-  IconButton,
   MenuItem,
   Select,
   TextField,
   Typography,
 } from '@material-ui/core';
-import {
-  Add as AddIcon,
-  ArrowDownward as MoveDownIcon,
-  ArrowUpward as MoveUpIcon,
-  Delete as DeleteIcon,
-  FileCopy as CloneIcon,
-} from '@mui/icons-material';
+import { Button } from '@wandb/weave/components/Button/Button';
+import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {refUri} from '@wandb/weave/react';
 import React, {useEffect, useState} from 'react';
 
@@ -153,7 +145,10 @@ export const LeaderboardConfigEditor: React.FC<{
             totalColumns={leaderboardVal.columns.length}
           />
         ))}
-        <Button startIcon={<AddIcon />} onClick={addColumn}>
+        <Button
+          icon="add-new"
+          variant="ghost"
+          onClick={addColumn}>
           Add Column
         </Button>
       </Box>
@@ -167,21 +162,17 @@ export const LeaderboardConfigEditor: React.FC<{
         alignItems="center"
         justifyContent="flex-end">
         <Button
-          variant="outlined"
+          variant="ghost"
           onClick={discardChanges}
           disabled={saving}
           style={{marginRight: 8}}>
           {isDirty ? 'Discard' : 'Close'}
         </Button>
-        {isDirty && (
           <Button
-            variant="contained"
-            color="primary"
             onClick={commitChanges}
-            disabled={saving}>
-            Save
+            disabled={!isDirty || saving}>
+            {saving ? 'Saving...' : isDirty ? 'Save' : 'Saved'}
           </Button>
-        )}
       </Box>
     </Box>
   );
@@ -224,10 +215,7 @@ const ColumnEditor: React.FC<{
       flexWrap="wrap"
       alignItems="center"
       mb={2}
-      p={2}
-      border={1}
-      borderColor="divider"
-      borderRadius={4}>
+      p={2}>
       <Box flexGrow={1} display="flex" flexWrap="wrap" alignItems="center">
         <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
           <Select
@@ -292,40 +280,45 @@ const ColumnEditor: React.FC<{
             ))}
           </Select>
         </Box>
-        <Box display="flex" alignItems="center" mb={2} mr={2}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={column.should_minimize}
-                onChange={e =>
-                  handleColumnChange(index, 'should_minimize', e.target.checked)
+        <Box display="flex" alignItems="center" mb={2} sx={{gap: 4}}>
+          <Checkbox
+                checked={column.should_minimize ?? false}
+                onCheckedChange={checked =>
+                  handleColumnChange(index, 'should_minimize', !!checked)
                 }
-              />
-            }
-            label="Minimize"
-          />
+            />
+          <span>Minimize</span>
         </Box>
-      </Box>
-      <Box display="flex" justifyContent="flex-end" mb={2}>
-        <IconButton
+        <Box display="flex" justifyContent="flex-end" mb={2}>
+        <Button
           size="small"
+          icon="chevron-up"
+          variant='quiet'
           onClick={() => moveColumn(index, index - 1)}
           disabled={index === 0}>
-          <MoveUpIcon />
-        </IconButton>
-        <IconButton
+        </Button>
+        <Button
           size="small"
+          icon="chevron-down"
+          variant="quiet"
           onClick={() => moveColumn(index, index + 1)}
           disabled={index === totalColumns - 1}>
-          <MoveDownIcon />
-        </IconButton>
-        <IconButton size="small" onClick={() => cloneColumn(index)}>
-          <CloneIcon />
-        </IconButton>
-        <IconButton size="small" onClick={() => removeColumn(index)}>
-          <DeleteIcon />
-        </IconButton>
+        </Button>
+        <Button
+          icon="copy"
+          variant="quiet"
+          size="small"
+          onClick={() => cloneColumn(index)}>
+        </Button>
+        <Button
+          icon="delete"
+          variant="quiet"
+          size="small"
+          onClick={() => removeColumn(index)}>
+        </Button>
       </Box>
+      </Box>
+      
     </Box>
   );
 };
@@ -402,7 +395,6 @@ const useScorers = (
 
     let mounted = true;
     client.readBatch({refs: [evaluationObjectRef]}).then(res => {
-      console.log(res);
       if (mounted) {
         setScorers(
           (res.vals[0].scorers ?? [])
