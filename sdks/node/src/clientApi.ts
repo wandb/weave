@@ -67,7 +67,7 @@ export async function init(
   project: string,
   settings?: Settings
 ): Promise<WeaveClient> {
-  const {apiKey, baseUrl, traceBaseUrl, urlDomain} = getWandbConfigs();
+  const {apiKey, baseUrl, traceBaseUrl, domain} = getWandbConfigs();
   try {
     const wandbServerApi = new WandbServerApi(baseUrl, apiKey);
 
@@ -116,7 +116,7 @@ export async function init(
       settings
     );
     setGlobalClient(client);
-    setGlobalDomain(urlDomain);
+    setGlobalDomain(domain);
     console.log(`Initializing project: ${projectId}`);
     return client;
   } catch (error) {
