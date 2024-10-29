@@ -101,6 +101,9 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
 
     ref = client._save_object(obj, save_name, "latest")
 
+    # Avoid circular import
+    from weave.flow.leaderboard import Leaderboard
+
     if isinstance(ref, weave_client.ObjectRef):
         if isinstance(ref, weave_client.OpRef):
             url = urls.op_version_path(
@@ -108,6 +111,12 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
                 ref.project,
                 ref.name,
                 ref.digest,
+            )
+        elif isinstance(obj, Leaderboard):
+            url = urls.leaderboard_path(
+                ref.entity,
+                ref.project,
+                ref.name,
             )
         # TODO(gst): once frontend has direct dataset/model links
         # elif isinstance(obj, weave_client.Dataset):
