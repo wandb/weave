@@ -801,6 +801,7 @@ class ActionsExecuteBatchReq(BaseModel):
     project_id: str
     call_ids: list[str]
     configured_action_ref: str
+    trigger_ref: Optional[str] = None
     # `id` is here so that clients can potentially guarantee idempotence.
     # Repeated calls with the same id will not result in duplicate actions.
     id: Optional[str] = None

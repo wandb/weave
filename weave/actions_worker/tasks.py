@@ -1,7 +1,7 @@
 import json
 import logging
 from functools import partial, wraps
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 
 from weave.actions_worker.celery_app import app
 from weave.trace_server.action_executor import TaskCtx
@@ -49,7 +49,10 @@ def ack_on_clickhouse(ctx: TaskCtx, succeeded: bool) -> None:
 
 
 def publish_results_as_feedback(
-    ctx: TaskCtx, result: Any, configured_action_ref: str
+    ctx: TaskCtx,
+    result: Any,
+    configured_action_ref: str,
+    trigger_ref: Optional[str] = None,
 ) -> None:
     project_id = ctx["project_id"]
     call_id = ctx["call_id"]
@@ -68,6 +71,7 @@ def publish_results_as_feedback(
             payload=MachineScore(
                 runnable_ref=configured_action_ref,
                 value={action_name: {digest: result}},
+                trigger_ref=trigger_ref,
             ).model_dump(),
             wb_user_id=WEAVE_ACTION_EXECUTOR_PACEHOLDER_ID,
         )
@@ -102,7 +106,7 @@ ActionResultT = TypeVar("ActionResultT")
 
 def action_task(
     func: Callable[[str, str, ActionConfigT], ActionResultT],
-) -> Callable[[TaskCtx, str, str, str, ActionConfigT], ActionResultT]:
+) -> Callable[[TaskCtx, str, str, str, ActionConfigT, Optional[str]], ActionResultT]:
     @wraps(func)
     def wrapper(
         ctx: TaskCtx,
@@ -110,11 +114,12 @@ def action_task(
         call_output: str,
         configured_action_ref: str,
         configured_action: ActionConfigT,
+        trigger_ref: Optional[str] = None,
     ) -> ActionResultT:
         success = True
         try:
             result = func(call_input, call_output, configured_action)
-            publish_results_as_feedback(ctx, result, configured_action_ref)
+            publish_results_as_feedback(ctx, result, configured_action_ref, trigger_ref)
             logging.info(f"Successfully ran {func.__name__}")
             logging.info(f"Result: {result}")
         except Exception as e:
@@ -128,7 +133,9 @@ def action_task(
 
 
 @app.task()
-def do_task(ctx: TaskCtx, configured_action_ref: str) -> None:
+def do_task(
+    ctx: TaskCtx, configured_action_ref: str, trigger_ref: Optional[str] = None
+) -> None:
     action = resolve_action_ref(configured_action_ref)
     call = resolve_call(ctx)
     call_input = json.dumps(call.inputs)
@@ -137,14 +144,40 @@ def do_task(ctx: TaskCtx, configured_action_ref: str) -> None:
         call_output = json.dumps(call_output)
 
     if action.config.action_type == "wordcount":
-        wordcount(ctx, call_input, call_output, configured_action_ref, action.config)
+        wordcount(
+            ctx,
+            call_input,
+            call_output,
+            configured_action_ref,
+            action.config,
+            trigger_ref,
+        )
     elif action.config.action_type == "llm_judge":
-        llm_judge(ctx, call_input, call_output, configured_action_ref, action.config)
+        llm_judge(
+            ctx,
+            call_input,
+            call_output,
+            configured_action_ref,
+            action.config,
+            trigger_ref,
+        )
     elif action.config.action_type == "noop":
-        noop(ctx, call_input, call_output, configured_action_ref, action.config)
+        noop(
+            ctx,
+            call_input,
+            call_output,
+            configured_action_ref,
+            action.config,
+            trigger_ref,
+        )
     elif action.config.action_type == "contains_words":
         contains_words(
-            ctx, call_input, call_output, configured_action_ref, action.config
+            ctx,
+            call_input,
+            call_output,
+            configured_action_ref,
+            action.config,
+            trigger_ref,
         )
     else:
         raise ValueError(f"Unknown action type: {action.config.action_type}")

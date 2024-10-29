@@ -3,6 +3,7 @@ CREATE TABLE actions_parts (
     call_id String,
     id String,
     configured_action Nullable(String),
+    trigger_ref Nullable(String),
     created_at Nullable(DateTime64(3)),
     finished_at Nullable(DateTime64(3)),
     failed_at Nullable(DateTime64(3))
@@ -15,6 +16,7 @@ CREATE TABLE actions_merged (
     call_id String,
     id String,
     configured_action SimpleAggregateFunction(any, Nullable(String)),
+    trigger_ref SimpleAggregateFunction(any, Nullable(String)),
     created_at SimpleAggregateFunction(max, Nullable(DateTime64(3))),
     finished_at SimpleAggregateFunction(max, Nullable(DateTime64(3))),
     failed_at SimpleAggregateFunction(max, Nullable(DateTime64(3))),
@@ -33,6 +35,7 @@ SELECT
     call_id,
     id,
     anySimpleState(configured_action) AS configured_action,
+    anySimpleState(trigger_ref) AS trigger_ref,
     maxSimpleState(created_at) AS created_at,
     maxSimpleState(finished_at) AS finished_at,
     maxSimpleState(failed_at) AS failed_at

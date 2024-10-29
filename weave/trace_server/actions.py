@@ -9,7 +9,7 @@ TABLE_ACTIONS = Table(
         Column("project_id", "string"),
         Column("call_id", "string"),
         Column("id", "string"),
-        Column("rule_matched", "string", nullable=True),
+        Column("trigger_ref", "string", nullable=True),
         Column("configured_action", "string", nullable=True),  # Updated column name
         Column("created_at", "datetime", nullable=True),
         Column("finished_at", "datetime", nullable=True),
@@ -23,7 +23,7 @@ TABLE_ACTIONS_MERGED = Table(
         Column("project_id", "string"),
         Column("call_id", "string"),
         Column("id", "string"),
-        Column("rule_matched", "string", nullable=True),
+        Column("trigger_ref", "string", nullable=True),
         Column("configured_action", "string", nullable=True),  # Updated column name
         Column("created_at", "datetime", nullable=True),
         Column("finished_at", "datetime", nullable=True),
@@ -56,7 +56,7 @@ def get_stale_actions(older_than: datetime.datetime) -> PreparedSelect:
                 "project_id",
                 "call_id",
                 "id",
-                "any(rule_matched) as rule_matched",
+                "any(trigger_ref) as trigger_ref",
                 "any(configured_action) as configured_action",
                 "max(created_at) as created_at",
                 "max(finished_at) as finished_at",

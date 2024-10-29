@@ -1554,6 +1554,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             "id": row["id"],  # type: ignore
                         },
                         row["configured_action"],  # type: ignore
+                        row.get("trigger_ref"),  # type: ignore
                     )
                 except Exception as e:
                     logger.error(f"Failed to requeue action: {row}. Error: {str(e)}")
@@ -1864,7 +1865,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _get_matched_calls_for_filters(
         self, project_id: str, call_ids: list[str]
-    ) -> list[tuple[ActionDispatchFilter, list[tsi.CallSchema]]]:
+    ) -> list[tuple[ActionDispatchFilter, str, list[tsi.CallSchema]]]:
         """Helper function to get calls that match action filters.
 
         Returns a list of tuples containing (filter, matched_calls) pairs.
@@ -1879,8 +1880,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             ),
         )
         filter_res = self.objs_query(filter_req)
-        filters: list[ActionDispatchFilter] = [
-            ActionDispatchFilter.model_validate(obj.val) for obj in filter_res.objs
+        filters: list[tuple[ActionDispatchFilter, str]] = [
+            (
+                ActionDispatchFilter.model_validate(obj.val),
+                ri.InternalObjectRef(
+                    project_id=project_id,
+                    name=obj.object_id,
+                    version=obj.digest,
+                ).uri(),
+            )
+            for obj in filter_res.objs
         ]
 
         if not filters:
@@ -1929,7 +1938,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Match calls to filters
         matched_filters_and_calls = []
-        for filter in filters:
+        for filter, filter_ref in filters:
             if filter.disabled:
                 continue
             calls_with_refs = [
@@ -1951,7 +1960,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 ]
 
             if matched_calls:
-                matched_filters_and_calls.append((filter, matched_calls))
+                matched_filters_and_calls.append((filter, filter_ref, matched_calls))
 
         return matched_filters_and_calls
 
@@ -1972,12 +1981,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._call_batch.project_id, self._call_batch.call_ids
         )
 
-        for filter, matched_calls in matched_filters_and_calls:
+        for filter, filter_ref, matched_calls in matched_filters_and_calls:
             self.actions_execute_batch(
                 tsi.ActionsExecuteBatchReq(
                     project_id=self._call_batch.project_id,
                     call_ids=[call.id for call in matched_calls],
                     configured_action_ref=filter.configured_action_ref,
+                    trigger_ref=filter_ref,
                 )
             )
 

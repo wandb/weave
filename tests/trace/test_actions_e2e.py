@@ -97,6 +97,8 @@ def test_action_execute_workflow(client: WeaveClient):
     assert feedbacks[0].payload == {
         "runnable_ref": action_ref_uri,
         "value": {action_name: {digest: True}},
+        "call_ref": None,
+        "trigger_ref": None,
     }
 
     # Step 3: test that we can in-place execute one action at a time.
@@ -118,4 +120,6 @@ def test_action_execute_workflow(client: WeaveClient):
     assert feedbacks[0].payload == {
         "runnable_ref": action_ref_uri,
         "value": {action_name: {digest: False}},
+        "call_ref": None,
+        "trigger_ref": None,
     }
