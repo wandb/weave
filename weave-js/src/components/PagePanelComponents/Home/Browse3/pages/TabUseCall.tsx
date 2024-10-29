@@ -64,26 +64,39 @@ const call = await client.getCall("${callId}")`;
           copyText={codeFetch}
         />
       </Box>
-      <Box mt={2}>
-        You can add a reaction like this:
-        <CopyableText
-          language={language}
-          text={codeReaction}
-          copyText={codeReaction}
-        />
-      </Box>
-      <Box mt={2}>
-        or a note like this:
-        <CopyableText language={language} text={codeNote} copyText={codeNote} />
-      </Box>
-      <Box mt={2}>
-        or custom feedback like this:
-        <CopyableText
-          language={language}
-          text={codeFeedback}
-          copyText={codeFeedback}
-        />
-      </Box>
+      {sdkType !== 'js-sdk' && (
+        // TODO: Update this when feedback is available on JS client
+        <Box mt={2}>
+          You can add a reaction like this:
+          <CopyableText
+            language={language}
+            text={codeReaction}
+            copyText={codeReaction}
+          />
+        </Box>
+      )}
+      {sdkType !== 'js-sdk' && (
+        // TODO: Update this when feedback is available on JS client
+        <Box mt={2}>
+          or a note like this:
+          <CopyableText
+            language={language}
+            text={codeNote}
+            copyText={codeNote}
+          />
+        </Box>
+      )}
+      {sdkType !== 'js-sdk' && (
+        // TODO: Update this when feedback is available on JS client
+        <Box mt={2}>
+          or custom feedback like this:
+          <CopyableText
+            language={language}
+            text={codeFeedback}
+            copyText={codeFeedback}
+          />
+        </Box>
+      )}
     </Box>
   );
 };
