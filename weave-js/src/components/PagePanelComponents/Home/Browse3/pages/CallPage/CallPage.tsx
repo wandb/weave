@@ -10,6 +10,8 @@ import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
+import {HumanFeedbackSidebar} from '../../feedback/HumanFeedback/HumanFeedbackSidebar';
+import {useHumanFeedbackOptions} from '../../feedback/HumanFeedback/tsHumanFeedback';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
@@ -171,6 +173,23 @@ const CallPageInnerVertical: FC<{
     showTraceTree,
   ]);
 
+  const [showFeedbackExpand, setShowFeedbackExpand] = useState(false);
+  const onToggleFeedbackExpand = useCallback(() => {
+    setShowFeedbackExpand(!showFeedbackExpand);
+    history.replace(
+      currentRouter.callUIUrl(
+        call.entity,
+        call.project,
+        call.traceId,
+        call.callId,
+        path,
+        showTraceTree,
+        !showFeedbackExpand
+      )
+    );
+  }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
+  const feedbackOptions = useHumanFeedbackOptions(call.entity, call.project);
+
   const tree = useCallFlattenedTraceTree(call, path ?? null);
   const {rows, expandKeys, loading, costLoading, selectedCall} = tree;
   const callComplete = useCall({
@@ -205,15 +224,34 @@ const CallPageInnerVertical: FC<{
       headerExtra={
         <Box>
           <Button
-            icon="layout-tabs"
-            tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
+            icon="marker"
+            tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback sidebar`}
             variant="ghost"
-            active={showTraceTree ?? false}
-            onClick={onToggleTraceTree}
+            active={showFeedbackExpand ?? false}
+            onClick={onToggleFeedbackExpand}
+            className="mr-4"
           />
+          {feedbackOptions && (
+            <Button
+              icon="layout-tabs"
+              tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
+              variant="ghost"
+              active={showTraceTree ?? false}
+              onClick={onToggleTraceTree}
+            />
+          )}
         </Box>
       }
       isSidebarOpen={showTraceTree}
+      isFeedbackSidebarOpen={showFeedbackExpand}
+      feedbackSidebarContent={
+        <HumanFeedbackSidebar
+          feedbackOptions={feedbackOptions}
+          callID={currentCall.callId}
+          entity={currentCall.entity}
+          project={currentCall.project}
+        />
+      }
       headerContent={<CallOverview call={currentCall} />}
       leftSidebar={
         <Tailwind style={{display: 'contents'}}>

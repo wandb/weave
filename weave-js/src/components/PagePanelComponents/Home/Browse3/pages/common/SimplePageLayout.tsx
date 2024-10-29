@@ -169,6 +169,8 @@ export const SimplePageLayoutWithHeader: FC<{
   leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
   isSidebarOpen?: boolean;
+  isFeedbackSidebarOpen?: boolean;
+  feedbackSidebarContent?: ReactNode;
 }> = props => {
   const {tabs} = props;
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
@@ -230,7 +232,7 @@ export const SimplePageLayoutWithHeader: FC<{
         {props.headerExtra}
         {simplePageLayoutContextValue.headerSuffix}
       </Box>
-      <div style={{flex: '1 1 auto', overflow: 'hidden'}}>
+      <div style={{flex: '1 1 auto', overflow: 'hidden', display: 'flex'}}>
         <SplitPanel
           minWidth={150}
           defaultWidth={200}
@@ -287,6 +289,20 @@ export const SimplePageLayoutWithHeader: FC<{
             </Box>
           }
         />
+        {props.isFeedbackSidebarOpen && (
+          <Box
+            sx={{
+              width: '35%',
+              flex: '0 0 35%',
+              overflow: 'hidden',
+              height: '100%',
+              maxHeight: '100%',
+              borderLeft: '1px solid #e0e0e0',
+              backgroundColor: 'white',
+            }}>
+            {props.feedbackSidebarContent}
+          </Box>
+        )}
       </div>
     </Box>
   );
