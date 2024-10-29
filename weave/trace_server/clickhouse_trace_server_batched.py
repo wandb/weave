@@ -1068,7 +1068,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 objs = self._select_objs_query(
                     project_id=project_id_scope,
                     conditions=conditions,
-                    object_id_conditions=object_id_conds,
+                    object_id_conditions=object_id_conditions,
                     parameters=parameters,
                 )
                 for obj in objs:
@@ -1404,13 +1404,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         validate_feedback_create_req(req)
 
         feedback_type = req.feedback_type
-        res_payload = req.payload
+        req_payload = req.payload
 
         for feedback_base_model in feedback_base_models:
             if base_model_name(feedback_base_model) == feedback_type:
-                res_payload = base_model_dump(
-                    feedback_base_model.model_validate(res_payload)
-                )
+                req_payload = feedback_base_model.model_validate(
+                    req_payload
+                ).model_dump()
                 break
 
         # Augment emoji with alias.
@@ -1424,12 +1424,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             detoned = detone_emojis(em)
             req.payload["detoned"] = detoned
             req.payload["detoned_alias"] = emoji.demojize(detoned)
-            res_payload = req.payload
+            req_payload = req.payload
 
         feedback_id = generate_id()
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
         # TODO: Any validation on weave_ref?
-        payload = _dict_value_to_dump(req.payload)
+        payload = _dict_value_to_dump(req_payload)
         MAX_PAYLOAD = 1024
         if len(payload) > MAX_PAYLOAD:
             raise InvalidRequest("Feedback payload too large")
@@ -1440,7 +1440,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             "wb_user_id": req.wb_user_id,
             "creator": req.creator,
             "feedback_type": req.feedback_type,
-            "payload": req.payload,
+            "payload": req_payload,
             "created_at": created_at,
         }
         prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
@@ -1449,7 +1449,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             id=feedback_id,
             created_at=created_at,
             wb_user_id=req.wb_user_id,
-            payload=res_payload,
+            payload=req_payload,
         )
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
