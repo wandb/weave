@@ -1,45 +1,16 @@
 import {Feedback} from '../../pages/wfReactInterface/traceServerClientTypes';
 
-export type FeedbackType =
-  | BinaryFeedback
-  | TextFeedback
-  | CategoricalFeedback
-  | NumericalFeedback;
-
-export type tsFeedbackType = FeedbackType & {
-  ref: string;
-  object_id: string;
-};
-
-export type HumanFeedbackSpec = {
-  feedback_fields: FeedbackType[];
-};
-
-export type tsHumanFeedbackSpec = {
-  feedback_fields: tsFeedbackType[];
+export type tsHumanFeedbackColumn = HumanFeedbackColumn & {
   ref: string;
 };
 
-export type BinaryFeedback = FeedbackField & {};
+export type HumanFeedbackColumn = {
+  name: string;
+  description: string;
 
-export type TextFeedback = FeedbackField & {
-  max_length: number;
-};
-
-export type CategoricalFeedback = FeedbackField & {
-  options: string[];
-};
-
-export type NumericalFeedback = FeedbackField & {
-  min: number;
-  max: number;
-};
-
-type FeedbackField = {
-  display_name: string;
-  feedback_type: string;
-
-  _type: string;
+  json_schema: Record<string, any>;
+  unique_among_creators?: boolean;
+  op_scope?: string[];
 };
 
 export type HumanAnnotationPayload = {

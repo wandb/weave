@@ -4,18 +4,18 @@ import React, {useState} from 'react';
 
 import {Icon} from '../../../../../Icon';
 import {HumanFeedbackCell} from './HumanFeedback';
-import {tsHumanFeedbackSpec} from './humanFeedbackTypes';
+import {tsHumanFeedbackColumn} from './humanFeedbackTypes';
 import { useViewerInfo } from '@wandb/weave/common/hooks/useViewerInfo';
 
 type HumanFeedbackSidebarProps = {
-  feedbackOptions: tsHumanFeedbackSpec | null;
+  feedbackColumns: tsHumanFeedbackColumn[];
   callID: string;
   entity: string;
   project: string;
 };
 
 export const HumanFeedbackSidebar = ({
-  feedbackOptions,
+  feedbackColumns,
   callID,
   entity,
   project,
@@ -24,12 +24,9 @@ export const HumanFeedbackSidebar = ({
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
 
   const [isExpanded, setIsExpanded] = useState(true);
+  const feedbackCellCount = feedbackColumns.length ?? 0;
 
-  const feedbackFields = feedbackOptions?.feedback_fields;
-  const feedbackSpecRef = feedbackOptions?.ref;
-  const feedbackCellCount = feedbackFields?.length ?? 0;
-
-  if (loadingUserInfo || !feedbackSpecRef) {
+  if (loadingUserInfo) {
     return null;
   }
 
@@ -56,15 +53,20 @@ export const HumanFeedbackSidebar = ({
             </button>
             {isExpanded && (
               <div>
-                {feedbackFields?.map((field, index) => (
+                {feedbackColumns?.map((field, index) => (
                   <div key={field.ref}>
                     <h3 className="text-gray-700 bg-gray-50 px-6 py-4 text-sm font-semibold">
-                      {field.display_name}
+                      {field.name}
                     </h3>
+                    {field.description && (
+                      <p className="text-gray-700 bg-gray-50 px-6 py-4 text-sm font-italic ">
+                        {field.description}
+                      </p>
+                    )}
                     <div className="pb-8 pl-6 pr-8 pt-2">
                       <HumanFeedbackCell
                         focused={index === 0}
-                        sfData={field}
+                        hfColumn={field}
                         callRef={callRef}
                         entity={entity}
                         project={project}

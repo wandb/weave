@@ -15,23 +15,22 @@ import React, {
 } from 'react';
 
 import { CellValueString } from '../../../Browse2/CellValueString';
-import { parseRefMaybe } from '../../../Browse2/SmallRef';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../../pages/wfReactInterface/traceServerClientContext';
 import {
   FeedbackCreateError,
   FeedbackCreateSuccess,
 } from '../../pages/wfReactInterface/traceServerClientTypes';
-import { CategoricalFeedback, HumanAnnotationPayload, HumanFeedback,NumericalFeedback, tsFeedbackType} from './humanFeedbackTypes';
+import { HumanAnnotationPayload, HumanFeedback, tsHumanFeedbackColumn} from './humanFeedbackTypes';
 import { parseRef } from '@wandb/weave/react';
 
 // Constants
-const STRUCTURED_FEEDBACK_TYPE = 'wandb.human_annotation.1';
+const HUMAN_FEEDBACK_TYPE = 'wandb.human_annotation.1';
 const MAGIC_FEEDBACK_TYPES = {
-  NUMERICAL: 'NumericalFeedback',
-  TEXT: 'TextFeedback',
-  BOOLEAN: 'BinaryFeedback',
-  CATEGORICAL: 'CategoricalFeedback',
+  NUMERICAL: 'number',
+  TEXT: 'text',
+  BOOLEAN: 'boolean',
+  CATEGORICAL: 'categorical',
 }
 const DEBOUNCE_VAL = 200;
 
@@ -40,7 +39,7 @@ interface HumanFeedbackProps {
   entity: string;
   project: string;
   viewer: string | null;
-  sfData: tsFeedbackType;
+  hfColumn: tsHumanFeedbackColumn;
   callRef: string;
   readOnly?: boolean;
   focused?: boolean;
@@ -51,9 +50,10 @@ const createFeedbackRequest = (
   props: HumanFeedbackProps,
   value: any,
 ) => {
-  const parsedRef = parseRef(props.sfData.ref);
+  const ref = props.hfColumn.ref;
+  const parsedRef = parseRef(ref);
   const humanAnnotationPayload: HumanAnnotationPayload = {
-    annotation_column_ref: props.sfData.ref,
+    annotation_column_ref: ref,
     value: {
       [parsedRef.artifactName]: {
         [parsedRef?.artifactVersion]: value
@@ -65,7 +65,7 @@ const createFeedbackRequest = (
     project_id: `${props.entity}/${props.project}`,
     weave_ref: props.callRef,
     creator: props.viewer,
-    feedback_type: STRUCTURED_FEEDBACK_TYPE,
+    feedback_type: HUMAN_FEEDBACK_TYPE,
     payload: humanAnnotationPayload,
     sort_by: [{created_at: 'desc'}],
   };
@@ -78,9 +78,10 @@ const renderFeedbackComponent = (
   onAddFeedback: (value: any) => Promise<boolean>,
   foundValue: string | number | null,
 ) => {
-  switch (props.sfData._type) {
+  // TODO validation on json_schema
+  switch (props.hfColumn.json_schema.type) {
     case MAGIC_FEEDBACK_TYPES.NUMERICAL:
-      const numericalFeedback = props.sfData as NumericalFeedback;
+      const numericalFeedback = props.hfColumn.json_schema;
       return (
         <NumericalFeedbackColumn
           min={numericalFeedback.min}
@@ -99,7 +100,7 @@ const renderFeedbackComponent = (
         />
       );
     case MAGIC_FEEDBACK_TYPES.CATEGORICAL:
-      const categoricalFeedback = props.sfData as CategoricalFeedback;
+      const categoricalFeedback = props.hfColumn.json_schema;
       return (
         <CategoricalFeedbackColumn
           options={categoricalFeedback.options}
@@ -190,7 +191,7 @@ export const HumanFeedbackCell: React.FC<
     }
 
     const feedbackRefMatches = (feedback: HumanFeedback) =>
-      feedback.payload.annotation_column_ref === props.sfData.ref;
+      feedback.payload.annotation_column_ref === props.hfColumn.ref;
 
     const currFeedback = query.result?.filter(
       (feedback: HumanFeedback) =>
@@ -201,7 +202,7 @@ export const HumanFeedbackCell: React.FC<
     }
 
     setFoundFeedback(currFeedback);
-  }, [query?.result, query?.loading, props.sfData]);
+  }, [query?.result, query?.loading, props.hfColumn]);
 
   // userId -> objectId -> objectHash : value
   const combinedFeedback = foundFeedback.reduce((acc, feedback) => {
@@ -211,9 +212,7 @@ export const HumanFeedbackCell: React.FC<
     };
   }, {}) as Record<string, Record<string, Record<string, string>>>;
   
-  // rawValues is an array of values from the feedback
-  const parsedRef = parseRef(props.sfData.ref);
-  
+  const parsedRef = parseRef(props.hfColumn.ref);
   const rawValues = useMemo(() => {
     let values = [];
     for (const payload of Object.values(combinedFeedback)) {
@@ -224,7 +223,6 @@ export const HumanFeedbackCell: React.FC<
   }, [combinedFeedback, parsedRef]);
 
   const viewerFeedbackVal = props.viewer ? combinedFeedback[props.viewer]?.[parsedRef.artifactName]?.[parsedRef.artifactVersion] : null;
-
   if (query?.loading) {
     return <LoadingDots />;
   }
@@ -249,12 +247,14 @@ export const NumericalFeedbackColumn = ({
   onAddFeedback,
   defaultValue,
   focused,
+  isInteger,
 }: {
   min: number;
   max: number;
   onAddFeedback?: (value: number) => Promise<boolean>;
   defaultValue: number | null;
   focused?: boolean;
+  isInteger?: boolean;
 }) => {
   const [value, setValue] = useState<number | undefined>(
     defaultValue ?? undefined
@@ -295,6 +295,7 @@ export const NumericalFeedbackColumn = ({
         value={value?.toString() ?? ''}
         onChange={onValueChange}
         placeholder="..."
+        step={isInteger ? 1 : 0.001}
         errorState={error}
       />
     </div>
