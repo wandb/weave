@@ -4,7 +4,7 @@ import logging
 import textwrap
 import time
 import traceback
-from typing import Any, Callable, Coroutine, Optional, Union, cast
+from typing import Any, Callable, Coroutine, Literal, Optional, Union, cast
 
 from pydantic import PrivateAttr
 from rich import print
@@ -98,7 +98,7 @@ class Evaluation(Object):
 
     # Score your examples using scoring functions
     evaluation = Evaluation(
-        dataset=examples, scorers=[match_score1], output_key="generated_text"
+        dataset=examples, scorers=[match_score1]
     )
 
     # Start tracking the evaluation
@@ -113,7 +113,8 @@ class Evaluation(Object):
     preprocess_model_input: Optional[Callable] = None
     trials: int = 1
 
-    _output_key: str = PrivateAttr("output")
+    # internal attr to track whether to use the new `output` or old `model_output` key for outputs
+    _output_key: Literal["output", "model_output"] = PrivateAttr("output")
 
     def model_post_init(self, __context: Any) -> None:
         scorers: list[Union[Callable, Scorer, Op]] = []
