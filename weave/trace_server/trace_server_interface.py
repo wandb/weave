@@ -238,8 +238,9 @@ class CallsDeleteRes(BaseModel):
 
 
 class CompletionsCreateRequestInputs(BaseModel):
+    model: str
     messages: List = []
-    # timeout: Optional[Union[float, str]]
+    timeout: Optional[Union[float, str]] = None
     temperature: Optional[float] = None
     top_p: Optional[float] = None
     n: Optional[int] = None
@@ -268,7 +269,6 @@ class CompletionsCreateRequestInputs(BaseModel):
 
 class CompletionsCreateReq(BaseModel):
     project_id: str
-    model_name: str
     inputs: CompletionsCreateRequestInputs
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 

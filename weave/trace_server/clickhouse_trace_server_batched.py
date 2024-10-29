@@ -71,6 +71,7 @@ from weave.trace_server.clickhouse_schema import (
     SelectableCHCallSchema,
     SelectableCHObjSchema,
 )
+from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InsertTooLarge, InvalidRequest, RequestTooLarge
 from weave.trace_server.feedback import (
@@ -1525,7 +1526,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
-        model_name = req.model_name
+        model_name = req.inputs.model
         model_info = self._model_to_provider_info_map.get(model_name)
         if not model_info:
             raise InvalidRequest(f"No model info found for model {model_name}")
@@ -1540,34 +1541,44 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
         if not api_key:
             raise InvalidRequest(f"No API key found for model {model_name}")
+
+        start_time = datetime.datetime.now()
+        res = lite_llm_completion(api_key, req.inputs)
+        end_time = datetime.datetime.now()
+
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
             wb_user_id=req.wb_user_id,
-            op_name="call_llm",
-            started_at=datetime.datetime.now(),
-            inputs={**req.inputs.model_dump(), "model_name": req.model_name},
+            op_name=COMPLETIONS_CREATE_OP_NAME,
+            started_at=start_time,
+            inputs={**req.inputs.model_dump()},
             attributes={},
         )
-        ch_call = _start_call_for_insert_to_ch_insertable_start_call(start)
-        self._insert_call(ch_call)
-        res = lite_llm_completion(api_key, model_name, req.inputs)
+        start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
         end = tsi.EndedCallSchemaForInsert(
             project_id=req.project_id,
-            id=ch_call.id,
-            ended_at=datetime.datetime.now(),
+            id=start_call.id,
+            ended_at=end_time,
             output=res.response,
             summary={},
         )
         if "usage" in res.response:
-            end.summary["usage"] = {req.model_name: res.response["usage"]}
+            end.summary["usage"] = {req.inputs.model: res.response["usage"]}
 
         if "error" in res.response:
             end.exception = res.response["error"]
-        ch_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+        end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+        calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
+            start_call,
+            end_call,
+        ]
+        batch_data = []
+        for call in calls:
+            call_dict = call.model_dump()
+            values = [call_dict.get(col) for col in all_call_insert_columns]
+            batch_data.append(values)
 
-        # Inserts the call into the clickhouse database, verifying that
-        # the call does not already exist
-        self._insert_call(ch_call)
+        self._insert_call_batch(batch_data)
         return res
 
     # Private Methods

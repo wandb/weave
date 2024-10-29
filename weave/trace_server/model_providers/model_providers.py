@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict, Optional, TypedDict
+from typing import Dict, TypedDict
 
 import requests
 
@@ -22,12 +22,12 @@ class LLMModelProviderInfo(TypedDict):
 
 
 def fetch_model_to_provider_info_map(
-    cached_file_path: Optional[str] = None,
+    cached_file_name: str = MODEL_PROVIDERS_FILE,
 ) -> Dict[str, LLMModelProviderInfo]:
-    if cached_file_path:
-        if os.path.exists(cached_file_path):
-            with open(cached_file_path, "r") as f:
-                return json.load(f)
+    full_path = os.path.join(os.path.dirname(__file__), cached_file_name)
+    if os.path.exists(full_path):
+        with open(full_path, "r") as f:
+            return json.load(f)
     try:
         req = requests.get(model_providers_url)
         req.raise_for_status()
@@ -43,4 +43,7 @@ def fetch_model_to_provider_info_map(
             providers[k] = LLMModelProviderInfo(
                 litellm_provider=provider, api_key_name=api_key_name
             )
+
+    with open(full_path, "w") as f:
+        json.dump(providers, f)
     return providers
