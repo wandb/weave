@@ -126,6 +126,7 @@ import {ReactComponent as ImportLogoColab} from '../../assets/icons/icon-logo-co
 import {ReactComponent as ImportMagicWandStar} from '../../assets/icons/icon-magic-wand-star.svg';
 import {ReactComponent as ImportMagicWandStick} from '../../assets/icons/icon-magic-wand-stick.svg';
 import {ReactComponent as ImportMarkdown} from '../../assets/icons/icon-markdown.svg';
+import {ReactComponent as ImportMarker} from '../../assets/icons/icon-marker.svg';
 import {ReactComponent as ImportMenu} from '../../assets/icons/icon-menu.svg';
 import {ReactComponent as ImportMicrophoneAudio} from '../../assets/icons/icon-microphone-audio.svg';
 import {ReactComponent as ImportMillerColumns} from '../../assets/icons/icon-miller-columns.svg';
@@ -171,6 +172,7 @@ import {ReactComponent as ImportRedditSocial} from '../../assets/icons/icon-redd
 import {ReactComponent as ImportRedo} from '../../assets/icons/icon-redo.svg';
 import {ReactComponent as ImportRegex} from '../../assets/icons/icon-regex.svg';
 import {ReactComponent as ImportRegistries} from '../../assets/icons/icon-registries.svg';
+import {ReactComponent as ImportReloadRefresh} from '../../assets/icons/icon-reload-refresh.svg';
 import {ReactComponent as ImportRemove} from '../../assets/icons/icon-remove.svg';
 import {ReactComponent as ImportRemoveAlt} from '../../assets/icons/icon-remove-alt.svg';
 import {ReactComponent as ImportReport} from '../../assets/icons/icon-report.svg';
@@ -644,6 +646,9 @@ export const IconMagicWandStick = (props: SVGIconProps) => (
 export const IconMarkdown = (props: SVGIconProps) => (
   <ImportMarkdown {...updateIconProps(props)} />
 );
+export const IconMarker = (props: SVGIconProps) => (
+  <ImportMarker {...updateIconProps(props)} />
+);
 export const IconMenu = (props: SVGIconProps) => (
   <ImportMenu {...updateIconProps(props)} />
 );
@@ -778,6 +783,9 @@ export const IconRegex = (props: SVGIconProps) => (
 );
 export const IconRegistries = (props: SVGIconProps) => (
   <ImportRegistries {...updateIconProps(props)} />
+);
+export const IconReloadRefresh = (props: SVGIconProps) => (
+  <ImportReloadRefresh {...updateIconProps(props)} />
 );
 export const IconRemove = (props: SVGIconProps) => (
   <ImportRemove {...updateIconProps(props)} />
@@ -1150,6 +1158,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'magic-wand-star': IconMagicWandStar,
   'magic-wand-stick': IconMagicWandStick,
   markdown: IconMarkdown,
+  marker: IconMarker,
   menu: IconMenu,
   'microphone-audio': IconMicrophoneAudio,
   'miller-columns': IconMillerColumns,
@@ -1195,6 +1204,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   redo: IconRedo,
   regex: IconRegex,
   registries: IconRegistries,
+  'reload-refresh': IconReloadRefresh,
   remove: IconRemove,
   'remove-alt': IconRemoveAlt,
   report: IconReport,
