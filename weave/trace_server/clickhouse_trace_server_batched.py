@@ -1865,9 +1865,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _get_matched_calls_for_filters(
         self, project_id: str, call_ids: list[str]
     ) -> list[tuple[ActionDispatchFilter, str, list[tsi.CallSchema]]]:
-        # TODO: this can be lifted to the top once core's deps are updated
-        import xxhash
-
         """Helper function to get calls that match action filters.
 
         Returns a list of tuples containing (filter, matched_calls) pairs.
@@ -1937,6 +1934,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             query=calls_query_filter,
         )
         calls_res = self.calls_query(calls_query_req)
+
+        # TODO: this can be lifted to the top once core's deps are updated
+        import xxhash
 
         # Match calls to filters
         matched_filters_and_calls = []
