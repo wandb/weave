@@ -43,6 +43,7 @@ def lint(session):
         "openai",
         "scorers_tests",
         "pandas-test",
+        "huggingface",
     ],
 )
 def tests(session, shard):

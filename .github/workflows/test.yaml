@@ -242,6 +242,7 @@ jobs:
             'openai',
             'scorers_tests',
             'pandas-test',
+            'huggingface',
           ]
       fail-fast: false
     services:
