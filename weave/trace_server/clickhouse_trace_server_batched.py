@@ -45,7 +45,6 @@ from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import emoji
-import xxhash
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
@@ -1866,6 +1865,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _get_matched_calls_for_filters(
         self, project_id: str, call_ids: list[str]
     ) -> list[tuple[ActionDispatchFilter, str, list[tsi.CallSchema]]]:
+        # TODO: this can be lifted to the top once core's deps are updated
+        import xxhash
+
         """Helper function to get calls that match action filters.
 
         Returns a list of tuples containing (filter, matched_calls) pairs.
