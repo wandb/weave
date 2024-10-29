@@ -29,7 +29,7 @@ export async function login(options?: LoginOptions) {
   if (!options?.apiKey) {
     throw Error('API Key must be specified');
   }
-  const {traceBaseUrl, domain} = getUrls(options?.host);
+  const {traceBaseUrl, host} = getUrls(options?.host);
 
   // Test the connection to the traceServerApi
   const testTraceServerApi = new TraceServerApi({
@@ -50,9 +50,9 @@ export async function login(options?: LoginOptions) {
   }
 
   const netrc = new Netrc();
-  netrc.setEntry(domain, {login: 'user', password: options.apiKey});
+  netrc.setEntry(host, {login: 'user', password: options.apiKey});
   netrc.save();
-  console.log(`Successfully logged in.  Credentials saved for ${domain}`);
+  console.log(`Successfully logged in.  Credentials saved for ${host}`);
 }
 
 /**
@@ -67,7 +67,7 @@ export async function init(
   project: string,
   settings?: Settings
 ): Promise<WeaveClient> {
-  const {apiKey, baseUrl, traceBaseUrl, domain} = getWandbConfigs();
+  const {apiKey, baseUrl, traceBaseUrl, urlDomain} = getWandbConfigs();
   try {
     const wandbServerApi = new WandbServerApi(baseUrl, apiKey);
 
@@ -116,7 +116,7 @@ export async function init(
       settings
     );
     setGlobalClient(client);
-    setGlobalDomain(domain);
+    setGlobalDomain(urlDomain);
     console.log(`Initializing project: ${projectId}`);
     return client;
   } catch (error) {
