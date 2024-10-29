@@ -585,16 +585,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         req_obj = req.obj
         dict_val = req_obj.val
 
-        if req.obj.base_object_class:
+        match_required = req.obj.base_object_class is not None
+        base_object_class = req.obj.base_object_class or get_base_object_class(dict_val)
+
+        if base_object_class:
             for base_model in base_models:
-                if base_model_name(base_model) == req.obj.base_object_class:
+                if base_model_name(base_model) == base_object_class:
                     # 1. Validate the object against the base model & re-dump to a dict
                     dict_val = base_model_dump(base_model.model_validate(dict_val))
                     break
             else:
-                raise ValueError(
-                    f"Unknown base object class: {req.obj.base_object_class}"
-                )
+                if match_required:
+                    raise ValueError(
+                        f"Unknown base object class: {base_object_class}"
+                    )
 
         json_val = json.dumps(dict_val)
         digest = str_digest(json_val)
@@ -602,7 +606,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             project_id=req_obj.project_id,
             object_id=req_obj.object_id,
             kind=get_kind(dict_val),
-            base_object_class=get_base_object_class(dict_val),
+            base_object_class=base_object_class,
             refs=extract_refs_from_values(dict_val),
             val_dump=json_val,
             digest=digest,
