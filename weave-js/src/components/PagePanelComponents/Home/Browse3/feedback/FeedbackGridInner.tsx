@@ -19,6 +19,7 @@ export const FeedbackGridInner = ({
   feedback,
   currentViewerId,
 }: FeedbackGridInnerProps) => {
+  console.log('feedback', feedback);
   const columns: GridColDef[] = [
     {
       field: 'feedback_type',
@@ -41,6 +42,11 @@ export const FeedbackGridInner = ({
         }
         if (params.row.feedback_type === 'wandb.reaction.1') {
           return params.row.payload.emoji;
+        }
+        if (params.row.feedback_type === 'wandb.human_annotation.1') {
+          // TODO: make this a helper function
+          const val = Object.values(Object.values(params.row.payload.value)[0])[0];
+          return <CellValueString value={JSON.stringify(val)} />;
         }
         return <CellValueString value={JSON.stringify(params.row.payload)} />;
       },

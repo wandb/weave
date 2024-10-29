@@ -5,6 +5,23 @@ import {objectVersionKeyToRefUri} from '../../pages/wfReactInterface/utilities';
 import {ObjectVersionSchema} from '../../pages/wfReactInterface/wfDataModelHooksInterface';
 import {tsHumanFeedbackSpec} from './humanFeedbackTypes';
 
+
+const useResolveTypeObjects = (typeRefs: string[]) => {
+  const {useRefsData} = useWFHooks();
+  const refsData = useRefsData(typeRefs);
+  return useMemo(() => {
+    if (refsData.loading || refsData.result == null) {
+      return null;
+    }
+    const refDataWithRefs = refsData.result.map((x, i) => ({
+      ...x,
+      ref: typeRefs[i],
+    }));
+    return refDataWithRefs;
+  }, [refsData.loading, refsData.result]);
+};
+
+
 export const useHumanFeedbackOptions = (
   entity: string,
   project: string
@@ -24,13 +41,12 @@ export const useHumanFeedbackOptions = (
     undefined, // limit
     false // metadataOnly
   );
-
   // TODO: this is not actually tsHumanFeedbackSpec, it's HumanFeedbackSpec
   // we need to add the refs for each of the feedback fields
-  const val: tsHumanFeedbackSpec | null = latestSpec?.val;
-  const feedbackFields = val?.feedback_fields;
+  const feedbackFieldRefs = latestSpec?.val?.feedback_fields ?? []
+  const feedbackFields = useResolveTypeObjects(feedbackFieldRefs);
 
-  // TODO: how do we get the refs for the sub-objects here?
+  console.log('feedbackFields', feedbackFields);
 
   useEffect(() => {
     if (humanFeedbackObjects.loading || humanFeedbackObjects.result == null) {

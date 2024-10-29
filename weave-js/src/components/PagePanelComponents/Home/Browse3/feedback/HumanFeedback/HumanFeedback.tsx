@@ -23,6 +23,8 @@ import {
   FeedbackCreateSuccess,
 } from '../../pages/wfReactInterface/traceServerClientTypes';
 import { CategoricalFeedback, HumanAnnotationPayload, HumanFeedback,NumericalFeedback, tsFeedbackType} from './humanFeedbackTypes';
+import { parseRef } from '@wandb/weave/react';
+
 // Constants
 const STRUCTURED_FEEDBACK_TYPE = 'wandb.human_annotation.1';
 const MAGIC_FEEDBACK_TYPES = {
@@ -31,42 +33,38 @@ const MAGIC_FEEDBACK_TYPES = {
   BOOLEAN: 'BinaryFeedback',
   CATEGORICAL: 'CategoricalFeedback',
 }
-const DEBOUNCE_VAL = 100;
+const DEBOUNCE_VAL = 200;
 
 // Interfaces
-interface StructuredFeedbackProps {
-  sfData: tsFeedbackType;
-  callRef: string;
+interface HumanFeedbackProps {
   entity: string;
   project: string;
+  viewer: string | null;
+  sfData: tsFeedbackType;
+  callRef: string;
   readOnly?: boolean;
   focused?: boolean;
 }
 
 // Utility function for creating feedback request
 const createFeedbackRequest = (
-  props: StructuredFeedbackProps,
+  props: HumanFeedbackProps,
   value: any,
 ) => {
-  const parsedRef = parseRefMaybe(props.sfData.ref);
-  if (!parsedRef || !parsedRef?.artifactVersion) {
-    throw new Error('Invalid feedback ref');
-  }
-
-  const humanAnnotationPayload = {
+  const parsedRef = parseRef(props.sfData.ref);
+  const humanAnnotationPayload: HumanAnnotationPayload = {
     annotation_column_ref: props.sfData.ref,
     value: {
-      [props.sfData.object_id]: {
+      [parsedRef.artifactName]: {
         [parsedRef?.artifactVersion]: value
       }
     }
-  } as HumanAnnotationPayload;
-  console.log('humanAnnotationPayload', humanAnnotationPayload);
+  };
 
   const baseRequest = {
     project_id: `${props.entity}/${props.project}`,
     weave_ref: props.callRef,
-    creator: null,
+    creator: props.viewer,
     feedback_type: STRUCTURED_FEEDBACK_TYPE,
     payload: humanAnnotationPayload,
     sort_by: [{created_at: 'desc'}],
@@ -76,7 +74,7 @@ const createFeedbackRequest = (
 };
 
 const renderFeedbackComponent = (
-  props: StructuredFeedbackProps,
+  props: HumanFeedbackProps,
   onAddFeedback: (value: any) => Promise<boolean>,
   foundValue: string | number | null,
 ) => {
@@ -123,8 +121,8 @@ const renderFeedbackComponent = (
   }
 };
 
-export const StructuredFeedbackCell: React.FC<
-  StructuredFeedbackProps
+export const HumanFeedbackCell: React.FC<
+  HumanFeedbackProps
 > = props => {
   const {useFeedback} = useWFHooks();
   const query = useFeedback({
@@ -132,13 +130,13 @@ export const StructuredFeedbackCell: React.FC<
     project: props.project,
     weaveRef: props.callRef,
   });
-
   const [foundFeedback, setFoundFeedback] = useState<HumanFeedback[]>([]);
   const getTsClient = useGetTraceServerClientContext();
 
   useEffect(() => {
     if (!props.readOnly) {
       // We don't need to listen for feedback changes if the cell is editable
+      // it is being controlled by local state
       return;
     }
     return getTsClient().registerOnFeedbackListener(
@@ -205,25 +203,60 @@ export const StructuredFeedbackCell: React.FC<
     setFoundFeedback(currFeedback);
   }, [query?.result, query?.loading, props.sfData]);
 
+  // userId -> objectId -> objectHash : value
+  const combinedFeedback = foundFeedback.reduce((acc, feedback) => {
+    return {
+      [feedback.creator ?? '']: feedback.payload.value,
+      ...acc,
+    };
+  }, {});
+  
+  console.log('combinedFeedback', combinedFeedback);
+
+  // rawValues is an array of values from the feedback
+  const parsedRef = parseRef(props.sfData.ref);
+  
+  const rawValues = useMemo(() => {
+    let values = [];
+    for (const payload of Object.values(combinedFeedback)) {
+      const pRecord = payload as Record<string, Record<string, string>>;
+      values.push(pRecord[parsedRef.artifactName]?.[parsedRef.artifactVersion]);
+    }
+    return values;
+  }, [combinedFeedback, parsedRef])
+
+  console.log('rawValues', rawValues);
+
+
   if (query?.loading) {
     return <LoadingDots />;
   }
 
-  console.log('foundFeedback', foundFeedback);
-
-  const values = foundFeedback?.map(feedback => feedback.payload.value[props.sfData.object_id][props.sfData.ref]);
-  console.log('values', values);
-
   if (props.readOnly) {
     // TODO: make this prettier, for now just join with commas
     return <div className="flex w-full justify-center">
-      <CellValueString value={values?.join(', ')} />
+      <CellValueString value={rawValues?.join(', ')} />
+    </div>;
+  }
+
+  // TODO: fix, we want only one callsite for renderFeedbackComponent
+  if (Object.keys(combinedFeedback).length === 0) {
+    return <div className="flex w-full justify-center">
+      {renderFeedbackComponent(props, onAddFeedback, null)}
     </div>;
   }
 
   return (
-    <div className="flex w-full justify-center">
-      {values?.map(val => renderFeedbackComponent(props, onAddFeedback, val))}
+    <div className="w-full py-4">
+      {rawValues?.map(val => renderFeedbackComponent(props, onAddFeedback, val))}
+      {/* {Object.entries(combinedFeedback)
+        .map(([userId, value]) => {
+          return renderFeedbackComponent(
+            props,
+            onAddFeedback,
+            value[0]?.[parsedRef.artifactName]?.[parsedRef.artifactVersion]
+          )
+        })} */}
     </div>
   );
 };
@@ -316,7 +349,7 @@ export const TextFeedbackColumn = ({
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full pb-4">
       <TextField
         autoFocus={focused}
         value={value}

@@ -223,23 +223,23 @@ const CallPageInnerVertical: FC<{
     <SimplePageLayoutWithHeader
       headerExtra={
         <Box>
-          <Button
-            icon="marker"
-            tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback sidebar`}
-            variant="ghost"
-            active={showFeedbackExpand ?? false}
-            onClick={onToggleFeedbackExpand}
-            className="mr-4"
-          />
           {feedbackOptions && (
             <Button
-              icon="layout-tabs"
-              tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
+              icon="marker"
+              tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback sidebar`}
               variant="ghost"
-              active={showTraceTree ?? false}
-              onClick={onToggleTraceTree}
+              active={showFeedbackExpand ?? false}
+              onClick={onToggleFeedbackExpand}
+              className="mr-4"
             />
           )}
+          <Button
+            icon="layout-tabs"
+            tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
+            variant="ghost"
+            active={showTraceTree ?? false}
+            onClick={onToggleTraceTree}
+          />
         </Box>
       }
       isSidebarOpen={showTraceTree}

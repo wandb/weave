@@ -3,8 +3,9 @@ import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useState} from 'react';
 
 import {Icon} from '../../../../../Icon';
-import {StructuredFeedbackCell} from './HumanFeedback';
+import {HumanFeedbackCell} from './HumanFeedback';
 import {tsHumanFeedbackSpec} from './humanFeedbackTypes';
+import { useViewerInfo } from '@wandb/weave/common/hooks/useViewerInfo';
 
 type HumanFeedbackSidebarProps = {
   feedbackOptions: tsHumanFeedbackSpec | null;
@@ -19,17 +20,21 @@ export const HumanFeedbackSidebar = ({
   entity,
   project,
 }: HumanFeedbackSidebarProps) => {
-  const feedbackFields = feedbackOptions?.feedback_fields;
-  const feedbackSpecRef = feedbackOptions?.ref;
   const callRef = makeRefCall(entity, project, callID);
+  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const feedbackCount = feedbackFields?.length ?? 0;
+  const feedbackFields = feedbackOptions?.feedback_fields;
+  const feedbackSpecRef = feedbackOptions?.ref;
+  const feedbackCellCount = feedbackFields?.length ?? 0;
 
-  if (!feedbackSpecRef) {
+  if (loadingUserInfo || !feedbackSpecRef) {
     return null;
   }
 
+  const viewer = userInfo ? userInfo.id : null;
+  
   return (
     <Tailwind>
       <div className="flex h-full flex-col bg-white">
@@ -44,7 +49,7 @@ export const HumanFeedbackSidebar = ({
               <div className="flex items-center">
                 <span className="">Human scores</span>
                 <span className="text-gray-600 bg-gray-200 ml-4 mt-2 rounded-full px-2 text-xs font-medium">
-                  {feedbackCount}
+                  {feedbackCellCount}
                 </span>
               </div>
               <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} />
@@ -57,12 +62,13 @@ export const HumanFeedbackSidebar = ({
                       {field.display_name}
                     </h3>
                     <div className="pb-8 pl-6 pr-8 pt-2">
-                      <StructuredFeedbackCell
+                      <HumanFeedbackCell
                         focused={index === 0}
                         sfData={field}
                         callRef={callRef}
                         entity={entity}
                         project={project}
+                        viewer={viewer}
                         readOnly={false}
                       />
                     </div>
