@@ -5,7 +5,10 @@ from typing import Any, Callable, TypeVar
 
 from weave.actions_worker.celery_app import app
 from weave.trace_server.action_executor import TaskCtx
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.clickhouse_trace_server_batched import (
+    ActionsAckBatchReq,
+    ClickHouseTraceServer,
+)
 from weave.trace_server.interface.base_models.action_base_models import (
     ConfiguredAction,
     ConfiguredContainsWordsAction,
@@ -19,7 +22,6 @@ from weave.trace_server.interface.base_models.feedback_base_model_registry impor
 )
 from weave.trace_server.refs_internal import InternalCallRef
 from weave.trace_server.trace_server_interface import (
-    ActionsAckBatchReq,
     CallSchema,
     CallsFilter,
     CallsQueryReq,

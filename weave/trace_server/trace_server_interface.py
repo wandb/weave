@@ -800,27 +800,13 @@ class CostPurgeRes(BaseModel):
 class ActionsExecuteBatchReq(BaseModel):
     project_id: str
     call_ids: list[str]
-    id: Optional[str] = (
-        None  # This is here so that clients can potentially guarantee idempotence.
-        # Repeated calls with the same id will not result in duplicate actions.
-    )
     configured_action_ref: str
+    # `id` is here so that clients can potentially guarantee idempotence.
+    # Repeated calls with the same id will not result in duplicate actions.
+    id: Optional[str] = None
 
 
 class ActionsExecuteBatchRes(BaseModel):
-    id: str
-
-
-class ActionsAckBatchReq(BaseModel):
-    project_id: str
-    call_ids: list[str]
-    id: str
-    succeeded: bool
-
-
-class ActionsAckBatchRes(BaseModel):
-    project_id: str
-    call_ids: list[str]
     id: str
 
 

@@ -49,6 +49,7 @@ import xxhash
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
+from pydantic import BaseModel
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
@@ -219,6 +220,17 @@ class CallBatch:
     def __bool__(self) -> bool:
         """Return True if the batch has any calls."""
         return bool(self.calls)
+
+
+class ActionsAckBatchReq(BaseModel):
+    project_id: str
+    call_ids: list[str]
+    id: str
+    succeeded: bool
+
+
+class ActionsAckBatchRes(BaseModel):
+    id: str
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
@@ -1504,7 +1516,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self.action_executor.enqueue(task_ctx, req.configured_action_ref)
         return tsi.ActionsExecuteBatchRes(id=id)
 
-    def actions_ack_batch(self, req: tsi.ActionsAckBatchReq) -> tsi.ActionsAckBatchRes:
+    def actions_ack_batch(self, req: ActionsAckBatchReq) -> ActionsAckBatchRes:
         received_at = datetime.datetime.now(ZoneInfo("UTC"))
         rows: list[Row] = [
             {
@@ -1519,9 +1531,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = TABLE_ACTIONS.insert_many(rows).prepare(database_type="clickhouse")
         self._insert(TABLE_ACTIONS.name, prepared.data, prepared.column_names)
 
-        return tsi.ActionsAckBatchRes(
-            project_id=req.project_id, call_ids=req.call_ids, id=req.id
-        )
+        return ActionsAckBatchRes(id=req.id)
 
     # NOTE: This is a private admin function, meant to be invoked by an action cleaner.
     # The action cleaner's job is to find actions that have been in the action queue for too long, and requeue them.
