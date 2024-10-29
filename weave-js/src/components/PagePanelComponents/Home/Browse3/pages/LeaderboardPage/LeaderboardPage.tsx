@@ -173,9 +173,9 @@ export const LeaderboardPageContentInner: React.FC<
     props.project,
     props.leaderboardName
   );
-  const [workingLeaderboardValCopy, setWorkingLeaderboardValCopy] = useState(
-    props.leaderboardVal
-  );
+  const [leaderboardVal, setLeaderboardVal] = useState(props.leaderboardVal);
+  const [workingLeaderboardValCopy, setWorkingLeaderboardValCopy] =
+    useState(leaderboardVal);
   useEffect(() => {
     props.setName(workingLeaderboardValCopy.name);
   }, [props, workingLeaderboardValCopy.name]);
@@ -186,9 +186,9 @@ export const LeaderboardPageContentInner: React.FC<
   );
   const [saving, setSaving] = useState(false);
   const discardChanges = useCallback(() => {
-    setWorkingLeaderboardValCopy(props.leaderboardVal);
+    setWorkingLeaderboardValCopy(leaderboardVal);
     props.setIsEditing(false);
-  }, [props]);
+  }, [leaderboardVal, props]);
   const commitChanges = useCallback(() => {
     const mounted = true;
     setSaving(true);
@@ -196,20 +196,22 @@ export const LeaderboardPageContentInner: React.FC<
       .then(() => {
         if (mounted) {
           props.setIsEditing(false);
+          setLeaderboardVal(workingLeaderboardValCopy);
+          setWorkingLeaderboardValCopy(workingLeaderboardValCopy);
           setSaving(false);
         }
       })
       .catch(e => {
         console.error(e);
         if (mounted) {
-          setWorkingLeaderboardValCopy(props.leaderboardVal);
+          setWorkingLeaderboardValCopy(leaderboardVal);
           setSaving(false);
         }
       });
-  }, [props, updateLeaderboard, workingLeaderboardValCopy]);
+  }, [leaderboardVal, props, updateLeaderboard, workingLeaderboardValCopy]);
   const isDirty = useMemo(() => {
-    return !_.isEqual(props.leaderboardVal, workingLeaderboardValCopy);
-  }, [props.leaderboardVal, workingLeaderboardValCopy]);
+    return !_.isEqual(leaderboardVal, workingLeaderboardValCopy);
+  }, [leaderboardVal, workingLeaderboardValCopy]);
   const columnOrder = useMemo(() => {
     return workingLeaderboardValCopy.columns
       .map(col => {
