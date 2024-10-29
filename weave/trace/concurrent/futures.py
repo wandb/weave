@@ -35,7 +35,7 @@ from contextvars import ContextVar
 from threading import Lock
 from typing import Any, Callable, List, Optional, TypeVar
 
-from weave.trace.context import get_raise_on_captured_errors
+from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.util import ContextAwareThreadPoolExecutor
 
 logger = logging.getLogger(__name__)

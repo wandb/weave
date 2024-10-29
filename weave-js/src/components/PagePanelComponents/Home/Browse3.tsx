@@ -463,7 +463,7 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route
           path={[
-            `${projectRoot}/:tab(datasets|models|objects)`,
+            `${projectRoot}/:tab(prompts|datasets|models|objects)`,
             `${projectRoot}/object-versions`,
           ]}>
           <ObjectVersionsPageBinding />
@@ -818,12 +818,12 @@ const ObjectVersionsPageBinding = () => {
       }
     }
 
-    // If the tab is models or datasets, set the baseObjectClass filter
-    // directly from the tab
-    if (tab === 'models') {
+    // Set the baseObjectClass filter based on the tab
+    if (tab === 'prompts') {
+      queryFilter.baseObjectClass = 'Prompt';
+    } else if (tab === 'models') {
       queryFilter.baseObjectClass = 'Model';
-    }
-    if (tab === 'datasets') {
+    } else if (tab === 'datasets') {
       queryFilter.baseObjectClass = 'Dataset';
     }
     return queryFilter;
@@ -921,16 +921,54 @@ const OpPageBinding = () => {
 };
 
 const CompareEvaluationsBinding = () => {
+  const history = useHistory();
+  const routerContext = useWeaveflowCurrentRouteContext();
   const {entity, project} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
   const evaluationCallIds = useMemo(() => {
     return JSON.parse(query.evaluationCallIds);
   }, [query.evaluationCallIds]);
+  const selectedMetrics: Record<string, boolean> | null = useMemo(() => {
+    try {
+      return JSON.parse(query.metrics);
+    } catch (e) {
+      return null;
+    }
+  }, [query.metrics]);
+  const onEvaluationCallIdsUpdate = useCallback(
+    (newEvaluationCallIds: string[]) => {
+      history.push(
+        routerContext.compareEvaluationsUri(
+          entity,
+          project,
+          newEvaluationCallIds,
+          selectedMetrics
+        )
+      );
+    },
+    [history, entity, project, routerContext, selectedMetrics]
+  );
+  const setSelectedMetrics = useCallback(
+    (newModel: Record<string, boolean>) => {
+      history.push(
+        routerContext.compareEvaluationsUri(
+          entity,
+          project,
+          evaluationCallIds,
+          newModel
+        )
+      );
+    },
+    [history, entity, project, routerContext, evaluationCallIds]
+  );
   return (
     <CompareEvaluationsPage
       entity={entity}
       project={project}
       evaluationCallIds={evaluationCallIds}
+      onEvaluationCallIdsUpdate={onEvaluationCallIdsUpdate}
+      selectedMetrics={selectedMetrics}
+      setSelectedMetrics={setSelectedMetrics}
     />
   );
 };

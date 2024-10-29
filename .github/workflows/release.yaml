@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       is_test:
-        description: 'Use Test Pypi'
+        description: "Use Test Pypi"
         required: true
         type: boolean
         default: true

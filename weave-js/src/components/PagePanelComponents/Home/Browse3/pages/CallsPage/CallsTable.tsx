@@ -40,7 +40,7 @@ import {useHistory} from 'react-router-dom';
 
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
-import {Tailwind} from '../../../../../Tailwind';
+import {TailwindContents} from '../../../../../Tailwind';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
@@ -373,7 +373,8 @@ export const CallsTable: FC<{
     onExpand,
     columnIsRefExpanded,
     allowedColumnPatterns,
-    onAddFilter
+    onAddFilter,
+    calls.costsLoading
   );
 
   // This contains columns which are suitable for selection and raw data
@@ -663,7 +664,7 @@ export const CallsTable: FC<{
         alignItems: 'center',
       }}
       filterListItems={
-        <Tailwind style={{display: 'contents'}}>
+        <TailwindContents>
           <RefreshButton onClick={() => calls.refetch()} />
           {!hideOpSelector && (
             <div className="flex-none">
@@ -782,7 +783,12 @@ export const CallsTable: FC<{
             <CompareEvaluationsTableButton
               onClick={() => {
                 history.push(
-                  router.compareEvaluationsUri(entity, project, selectedCalls)
+                  router.compareEvaluationsUri(
+                    entity,
+                    project,
+                    selectedCalls,
+                    null
+                  )
                 );
               }}
               disabled={selectedCalls.length === 0}
@@ -841,7 +847,7 @@ export const CallsTable: FC<{
               </div>
             </>
           )}
-        </Tailwind>
+        </TailwindContents>
       }>
       <StyledDataGrid
         // Start Column Menu
@@ -906,6 +912,9 @@ export const CallsTable: FC<{
           // This moves the pagination controls to the left
           '& .MuiDataGrid-footerContainer': {
             justifyContent: 'flex-start',
+          },
+          '& .MuiDataGrid-main:focus-visible': {
+            outline: 'none',
           },
         }}
         slots={{

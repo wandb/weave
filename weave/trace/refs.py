@@ -148,7 +148,7 @@ class ObjectRef(RefWithExtra):
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
         # that should be removed.
-        from weave.trace.client_context.weave_client import get_weave_client
+        from weave.trace.context.weave_client_context import get_weave_client
         from weave.trace.weave_init import init_weave
 
         gc = get_weave_client()
@@ -159,15 +159,14 @@ class ObjectRef(RefWithExtra):
         # yet initialized the client, we can initialize a client to
         # fetch the object. It is critical to reset the client after fetching the
         # object to avoid any side effects in user code.
-        if gc is None:
-            init_client = init_weave(
-                f"{self.entity}/{self.project}", ensure_project_exists=False
-            )
-            try:
-                res = init_client.client.get(self)
-            finally:
-                init_client.reset()
-            return res
+        init_client = init_weave(
+            f"{self.entity}/{self.project}", ensure_project_exists=False
+        )
+        try:
+            res = init_client.client.get(self)
+        finally:
+            init_client.reset()
+        return res
 
     def is_descended_from(self, potential_ancestor: "ObjectRef") -> bool:
         if self.entity != potential_ancestor.entity:
@@ -224,6 +223,13 @@ class CallRef(RefWithExtra):
 AnyRef = Union[ObjectRef, TableRef, CallRef, OpRef]
 
 
+def parse_name_version(name_version: str) -> tuple[str, str]:
+    if ":" in name_version:
+        name, version = name_version.rsplit(":", maxsplit=1)
+        return name, version
+    return name_version, "latest"
+
+
 def parse_uri(uri: str) -> AnyRef:
     if not uri.startswith("weave:///"):
         raise ValueError(f"Invalid URI: {uri}")
@@ -239,12 +245,12 @@ def parse_uri(uri: str) -> AnyRef:
     if kind == "call":
         return CallRef(entity=entity, project=project, id=remaining[0], _extra=extra)
     elif kind == "object":
-        name, version = remaining[0].split(":")
+        name, version = parse_name_version(remaining[0])
         return ObjectRef(
             entity=entity, project=project, name=name, _digest=version, _extra=extra
         )
     elif kind == "op":
-        name, version = remaining[0].split(":")
+        name, version = parse_name_version(remaining[0])
         return OpRef(
             entity=entity, project=project, name=name, _digest=version, _extra=extra
         )

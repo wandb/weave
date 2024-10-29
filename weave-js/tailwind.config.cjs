@@ -188,6 +188,19 @@ module.exports = {
       },
     },
     extend: {
+      animation: {
+        'wave': 'wave 3s linear  infinite'
+      },
+      keyframes: {
+        "wave": {
+          "0%, 30%, 100%": {
+            transform: "initial"
+          },
+          "15%": {
+            transform: "translateY(-10px)"
+          }
+        }
+      },
       opacity: {
         35: '.35',
       },
