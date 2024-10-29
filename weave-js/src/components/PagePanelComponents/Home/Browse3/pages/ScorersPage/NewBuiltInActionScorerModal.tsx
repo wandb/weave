@@ -40,7 +40,7 @@ const knownBuiltinActions = [
           responseFormat = {
             type: 'object',
             properties: _.mapValues(data.response_format.schema, value => ({
-              type: value,
+              type: value as 'boolean' | 'number' | 'string',
             })),
             additionalProperties: false,
           };
