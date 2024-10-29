@@ -29,6 +29,11 @@ def score_oldstyle(model_output, target):
 
 
 @weave.op()
+def score_newstyle(output, target):
+    return output == target
+
+
+@weave.op()
 def example_to_model_input(example):
     return {"input": example["input"]}
 
@@ -91,6 +96,21 @@ def test_evaluate_rows_only(client):
     model = EvalModel()
     result = asyncio.run(evaluation.evaluate(model))
     assert result == expected_eval_result
+
+
+def test_evaluate_both_styles(client):
+    evaluation = Evaluation(
+        dataset=dataset_rows,
+        scorers=[score_oldstyle, score_newstyle],
+    )
+    model = EvalModel()
+    result = asyncio.run(evaluation.evaluate(model))
+    assert result == {
+        "model_output": {"mean": 9.5},
+        "score_oldstyle": {"true_count": 1, "true_fraction": 0.5},
+        "score_newstyle": {"true_count": 1, "true_fraction": 0.5},
+        "model_latency": {"mean": pytest.approx(0, abs=1)},
+    }
 
 
 def test_evaluate_other_model_method_names():
