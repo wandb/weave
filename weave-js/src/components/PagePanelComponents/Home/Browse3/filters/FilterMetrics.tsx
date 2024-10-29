@@ -11,12 +11,12 @@ export const FilterMetrics = ({
   setMetricsChecked,
 }: FilterMetricsProps) => {
   return (
-    <div className="flex gap-6">
+    <div className="flex items-center gap-6">
       <Switch.Root
-        size="medium"
+        size="small"
         checked={isMetricsChecked}
         onCheckedChange={setMetricsChecked}>
-        <Switch.Thumb size="medium" checked={isMetricsChecked} />
+        <Switch.Thumb size="small" checked={isMetricsChecked} />
       </Switch.Root>
       Metrics
     </div>
