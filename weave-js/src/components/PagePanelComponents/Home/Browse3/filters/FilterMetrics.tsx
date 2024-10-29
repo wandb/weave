@@ -1,5 +1,5 @@
-import React, {useState} from 'react';
 import {Switch} from '@wandb/weave/components';
+import React from 'react';
 
 type FilterMetricsProps = {
   isMetricsChecked: boolean;

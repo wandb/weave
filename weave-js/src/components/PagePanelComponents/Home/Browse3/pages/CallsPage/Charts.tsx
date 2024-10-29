@@ -29,20 +29,6 @@ type ChartDataLatency = {
   latency: number;
 };
 
-const CHART_TITLE_STYLE = {
-  font: {
-    color: MOON_750,
-    family: '"Source Sans Pro", sans-serif',
-    size: 16,
-    weight: 700,
-  },
-  pad: {
-    l: 16,
-  },
-  x: 0,
-  xanchor: 'left' as const,
-};
-
 const CHART_MARGIN_STYLE = {
   l: 50,
   r: 30,
@@ -165,10 +151,6 @@ export const LatencyPlotlyChart: React.FC<{
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
       height,
-      // title: {
-      //   text: '<span style="font-weight: 600;">Latency</span>',
-      //   ...CHART_TITLE_STYLE,
-      // },
       margin: CHART_MARGIN_STYLE,
       xaxis: X_AXIS_STYLE_WITH_SPIKES,
       yaxis: Y_AXIS_STYLE,
@@ -228,10 +210,6 @@ export const ErrorPlotlyChart: React.FC<{
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
       height,
-      // title: {
-      //   text: '<span style="font-weight: 600;">Errors</span>',
-      //   ...CHART_TITLE_STYLE,
-      // },
       margin: CHART_MARGIN_STYLE,
       bargap: 0.2,
       xaxis: X_AXIS_STYLE,
@@ -292,10 +270,6 @@ export const RequestsPlotlyChart: React.FC<{
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
       height,
-      // title: {
-      //   text: '<span style="font-weight: 600;">Requests</span>',
-      //   ...CHART_TITLE_STYLE,
-      // },
       margin: CHART_MARGIN_STYLE,
       xaxis: X_AXIS_STYLE,
       yaxis: Y_AXIS_STYLE,

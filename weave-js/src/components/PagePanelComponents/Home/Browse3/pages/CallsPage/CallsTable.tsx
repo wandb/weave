@@ -45,6 +45,7 @@ import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
+import {FilterMetrics} from '../../filters/FilterMetrics';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledPaper} from '../../StyledAutocomplete';
@@ -88,7 +89,6 @@ import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
-import {FilterMetrics} from '../../filters/FilterMetrics';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 

@@ -1,6 +1,9 @@
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
 import React, {useMemo} from 'react';
 
+import {MOON_400} from '../../../../../../common/css/color.styles';
+import {IconInfo} from '../../../../../Icon';
+import {WaveLoader} from '../../../../../Loaders/WaveLoader';
 import {Tailwind} from '../../../../../Tailwind';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
@@ -9,9 +12,6 @@ import {
   LatencyPlotlyChart,
   RequestsPlotlyChart,
 } from './Charts';
-import {WaveLoader} from '../../../../../Loaders/WaveLoader';
-import {IconInfo} from '../../../../../Icon';
-import {MOON_400} from '../../../../../../common/css/color.styles';
 
 type CallsChartsProps = {
   entity: string;
