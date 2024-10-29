@@ -182,7 +182,7 @@ export const LeaderboardPageContentInner: React.FC<
   const {loading, data, evalData} = useSavedLeaderboardData(
     props.entity,
     props.project,
-    workingLeaderboardValCopy
+    workingLeaderboardValCopy.columns
   );
   const [saving, setSaving] = useState(false);
   const discardChanges = useCallback(() => {

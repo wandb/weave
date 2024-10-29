@@ -494,7 +494,7 @@ export const getPythonLeaderboardData = async (
   client: TraceServerClient,
   entity: string,
   project: string,
-  val: LeaderboardObjectVal
+  columns: LeaderboardObjectVal['columns']
 ): Promise<{
   finalData: GroupedLeaderboardData;
   evalData: LeaderboardObjectEvalData;
@@ -503,7 +503,7 @@ export const getPythonLeaderboardData = async (
     client,
     entity,
     project,
-    val
+    columns
   );
 
   const finalData: GroupedLeaderboardData = {
@@ -552,13 +552,13 @@ const getLeaderboardObjectGroupableData = async (
   client: TraceServerClient,
   entity: string,
   project: string,
-  val: LeaderboardObjectVal
+  columns: LeaderboardObjectVal['columns']
 ): Promise<{
   groupableData: GroupableLeaderboardValueRecord[];
   evalData: LeaderboardObjectEvalData;
 }> => {
   const evalObjectRefs = _.uniq(
-    val.columns.map(col => col.evaluation_object_ref)
+    columns.map(col => col.evaluation_object_ref)
   ).filter(ref => parseRefMaybe(ref)?.scheme === 'weave');
 
   if (evalObjectRefs.length === 0) {
@@ -591,7 +591,7 @@ const getLeaderboardObjectGroupableData = async (
   const data: GroupableLeaderboardValueRecord[] = [];
   const evalData: LeaderboardObjectEvalData = {};
   allEvaluationCallsRes.calls.forEach(call => {
-    val.columns.forEach(col => {
+    columns.forEach(col => {
       const evalObjRefUri = call.inputs.self;
       if (col.evaluation_object_ref === evalObjRefUri) {
         const evalVal = evalMap[evalObjRefUri];

@@ -48,7 +48,7 @@ export const useLeaderboardData = (
 export const useSavedLeaderboardData = (
   entity: string,
   project: string,
-  val: LeaderboardObjectVal
+  columns: LeaderboardObjectVal['columns']
 ): LeaderboardDataState & {evalData: LeaderboardObjectEvalData} => {
   const getTraceServerClient = useGetTraceServerClientContext();
   const [state, setState] = useState<
@@ -58,14 +58,14 @@ export const useSavedLeaderboardData = (
     data: {modelGroups: {}},
     evalData: {},
   });
-  const deepVal = useDeepMemo(val);
+  const deepColumns = useDeepMemo(columns);
   useEffect(() => {
     let mounted = true;
     getPythonLeaderboardData(
       getTraceServerClient(),
       entity,
       project,
-      deepVal
+      deepColumns
     ).then(data => {
       if (mounted) {
         setState({
@@ -78,6 +78,6 @@ export const useSavedLeaderboardData = (
     return () => {
       mounted = false;
     };
-  }, [entity, project, getTraceServerClient, deepVal]);
+  }, [entity, project, getTraceServerClient, deepColumns]);
   return state;
 };
