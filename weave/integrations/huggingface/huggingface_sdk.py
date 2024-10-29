@@ -114,5 +114,33 @@ huggingface_patcher = MultiPatcher(
                 name="huggingface_hub.AsyncInferenceClient.chat_completion"
             ),
         ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "InferenceClient.document_question_answering",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.InferenceClient.document_question_answering"
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "AsyncInferenceClient.document_question_answering",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.AsyncInferenceClient.document_question_answering"
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "InferenceClient.visual_question_answering",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.InferenceClient.visual_question_answering"
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "AsyncInferenceClient.visual_question_answering",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.AsyncInferenceClient.visual_question_answering"
+            ),
+        ),
     ]
 )
