@@ -8,5 +8,3 @@ def lite_llm_completion(api_key: str, model_name: str, inputs: tsi.CompletionsCr
         return tsi.CompletionsCreateRes(response=res.model_dump())
     except Exception as e:
         return tsi.CompletionsCreateRes(response={"error": e.message})
-    
-        
