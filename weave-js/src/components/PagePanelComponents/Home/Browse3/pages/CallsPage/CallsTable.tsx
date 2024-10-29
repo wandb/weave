@@ -88,6 +88,7 @@ import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
+import {FilterMetrics} from '../../filters/FilterMetrics';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -169,6 +170,7 @@ export const CallsTable: FC<{
   allowedColumnPatterns,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+  const [isMetricsChecked, setMetricsChecked] = useState(false);
 
   const isReadonly =
     loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
@@ -743,6 +745,10 @@ export const CallsTable: FC<{
               clearSelectedCalls={clearSelectedCalls}
             />
           )}
+          <FilterMetrics
+            isMetricsChecked={isMetricsChecked}
+            setMetricsChecked={setMetricsChecked}
+          />
           {selectedInputObjectVersion && (
             <Chip
               label={`Input: ${objectVersionNiceString(
@@ -850,12 +856,14 @@ export const CallsTable: FC<{
           )}
         </TailwindContents>
       }>
-      <CallsCharts
-        entity={entity}
-        project={project}
-        filter={filter}
-        filterModelProp={filterModelResolved}
-      />
+      {isMetricsChecked && (
+        <CallsCharts
+          entity={entity}
+          project={project}
+          filter={filter}
+          filterModelProp={filterModelResolved}
+        />
+      )}
       <StyledDataGrid
         // Start Column Menu
         // ColumnMenu is needed to support pinning and column visibility

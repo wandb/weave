@@ -1,11 +1,6 @@
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
 import React, {useMemo, useState} from 'react';
 
-import {
-  IconChevronDown,
-  IconChevronNext,
-  IconLightbulbInfo,
-} from '../../../../../Icon';
 import {Tailwind} from '../../../../../Tailwind';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
@@ -120,24 +115,7 @@ export const CallsCharts = ({
     <Tailwind>
       {/* setting the width to the width of the screen minus the sidebar width because of overflow: 'hidden' properties in SimplePageLayout causing issues */}
       <div className="md:w-[calc(100vw-56px)]">
-        <div className="m-10">
-          <div className="w-full rounded-lg border border-moon-250 bg-moon-50 p-10">
-            <div
-              className="flex cursor-pointer items-center gap-2"
-              onClick={toggleInsights}>
-              {isInsightsOpen ? <IconChevronDown /> : <IconChevronNext />}
-              <IconLightbulbInfo
-                width={18}
-                height={18}
-                className="text-teal-500"
-              />
-              <div className="font-source-sans-pro mt-[1px] text-[18px] font-semibold text-moon-500">
-                Insights
-              </div>
-            </div>
-            {isInsightsOpen && charts}
-          </div>
-        </div>
+        <div className="mb-20 mt-10">{charts}</div>
       </div>
     </Tailwind>
   );

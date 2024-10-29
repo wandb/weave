@@ -21,7 +21,7 @@ type FilterPanelProps = {
 
 export const FilterPanel = (props: FilterPanelProps) => {
   return (
-    <div className="min-w-90 flex-auto self-stretch">
+    <div className="min-w-90 flex-auto ">
       <LocalizationProvider dateAdapter={AdapterMoment}>
         <AutoSizer
           className="ml-2 flex items-center"
