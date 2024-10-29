@@ -1568,7 +1568,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if "error" in res.response:
             end.exception = res.response["error"]
         end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
-        calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
+        calls: list[Union[CallStartCHInsertable, CallEndCHInsertable]] = [
             start_call,
             end_call,
         ]
