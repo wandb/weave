@@ -79,19 +79,42 @@ const Y_AXIS_STYLE: Partial<Plotly.LayoutAxis> = {
   zeroline: false,
 };
 
+export const calculateBinSize = (
+  data: ChartDataLatency[] | ChartDataErrors[] | ChartDataRequests[],
+  targetBinCount = 15
+) => {
+  if (data.length === 0) return 60; // default to 60 minutes if no data
+
+  const startTime = moment(_.minBy(data, 'started_at')?.started_at);
+  const endTime = moment(_.maxBy(data, 'started_at')?.started_at);
+
+  const minutesInRange = endTime.diff(startTime, 'minutes');
+
+  // Calculate bin size in minutes, rounded to a nice number
+  const rawBinSize = Math.max(1, Math.ceil(minutesInRange / targetBinCount));
+  const niceNumbers = [1, 2, 5, 10, 15, 30, 60, 120, 240, 360, 720, 1440];
+
+  // Find the closest nice number
+  return niceNumbers.reduce((prev, curr) => {
+    return Math.abs(curr - rawBinSize) < Math.abs(prev - rawBinSize)
+      ? curr
+      : prev;
+  }, niceNumbers[0]);
+};
+
 export const LatencyPlotlyChart: React.FC<{
   height: number;
   chartData: ChartDataLatency[];
-  binSizeMinutes?: number;
-}> = ({height, chartData, binSizeMinutes = 60}) => {
+  targetBinCount?: number;
+}> = ({height, chartData, targetBinCount}) => {
   const divRef = useRef<HTMLDivElement>(null);
+  const binSize = calculateBinSize(chartData, targetBinCount);
 
   const plotlyData: Plotly.Data[] = useMemo(() => {
     const groupedData = _(chartData)
       .groupBy(d => {
         const date = moment(d.started_at);
-        const roundedMinutes =
-          Math.floor(date.minutes() / binSizeMinutes) * binSizeMinutes;
+        const roundedMinutes = Math.floor(date.minutes() / binSize) * binSize;
         return date.startOf('hour').add(roundedMinutes, 'minutes').format();
       })
       .map((group, date) => {
@@ -135,7 +158,7 @@ export const LatencyPlotlyChart: React.FC<{
         hovertemplate: '%{data.name}: %{y:.2f} ms<extra></extra>',
       },
     ];
-  }, [chartData, binSizeMinutes]);
+  }, [chartData, binSize]);
 
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
@@ -170,14 +193,17 @@ export const LatencyPlotlyChart: React.FC<{
 export const ErrorPlotlyChart: React.FC<{
   height: number;
   chartData: ChartDataErrors[];
-}> = ({height, chartData}) => {
+  targetBinCount?: number;
+}> = ({height, chartData, targetBinCount}) => {
   const divRef = useRef<HTMLDivElement>(null);
+  const binSize = calculateBinSize(chartData, targetBinCount);
 
   const plotlyData: Plotly.Data[] = useMemo(() => {
     const groupedData = _(chartData)
       .groupBy(d => {
         const date = moment(d.started_at);
-        return date.startOf('hour').format();
+        const roundedMinutes = Math.floor(date.minutes() / binSize) * binSize;
+        return date.startOf('hour').add(roundedMinutes, 'minutes').format();
       })
       .map((group, date) => ({
         timestamp: date,
@@ -231,13 +257,17 @@ export const ErrorPlotlyChart: React.FC<{
 export const RequestsPlotlyChart: React.FC<{
   height: number;
   chartData: ChartDataRequests[];
-}> = ({height, chartData}) => {
+  targetBinCount?: number;
+}> = ({height, chartData, targetBinCount}) => {
   const divRef = useRef<HTMLDivElement>(null);
+  const binSize = calculateBinSize(chartData, targetBinCount);
+
   const plotlyData: Plotly.Data[] = useMemo(() => {
     const groupedData = _(chartData)
       .groupBy(d => {
         const date = moment(d.started_at);
-        return date.startOf('hour').format();
+        const roundedMinutes = Math.floor(date.minutes() / binSize) * binSize;
+        return date.startOf('hour').add(roundedMinutes, 'minutes').format();
       })
       .map((group, date) => ({
         timestamp: date,
