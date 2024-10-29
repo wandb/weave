@@ -83,6 +83,8 @@
     "swagger-typescript-api": "^13.0.22",
     "ts-jest": "^29.2.5",
     "tsconfig-paths": "^4.2.0",
-    "tsx": "^4.19.1"
+    "tsx": "^4.19.1",
+    "typedoc": "^0.26.10",
+    "typedoc-plugin-markdown": "^4.2.9"
   }
 }
