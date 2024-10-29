@@ -43,6 +43,7 @@ dependencies = [
   "numpy>1.21.0",            # Used in box.py and scorer.py (should be made optional)
   "rich",                    # Used for special formatting of tables (should be made optional)
   "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
+  "litellm>=1.49.1",         # Used in llm_completion.py
 ]
 
 [project.optional-dependencies]
@@ -62,7 +63,6 @@ langchain = [
   "pysqlite3",
   "opentelemetry-exporter-otlp",
 ]
-litellm = ["litellm>=1.36.1"]
 llamaindex = ["llama-index>=0.10.35"]
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
