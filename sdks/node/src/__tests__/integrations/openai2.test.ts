@@ -1,5 +1,10 @@
 import {Api as TraceServerApi} from '../../generated/traceServerApi';
-import {openAIStreamReducer, wrapOpenAI} from '../../integrations/openai';
+import {
+  makeOpenAIImagesGenerateOp,
+  openAIStreamReducer,
+  wrapOpenAI,
+} from '../../integrations/openai';
+import {isWeaveImage} from '../../media';
 import {WandbServerApi} from '../../wandb/wandbServerApi';
 import {WeaveClient} from '../../weaveClient';
 
@@ -199,5 +204,38 @@ describe('OpenAI Integration', () => {
       // Verify wrapped matches unwrapped
       expect(wrappedResult).toEqual(unwrappedResult);
     });
+  });
+});
+
+describe('makeOpenAIImagesGenerateOp', () => {
+  it('converts b64_json images to WeaveImage objects and preserves other items', async () => {
+    const mockGenerate = jest.fn().mockResolvedValue({
+      data: [
+        {
+          url: 'https://example.com/image.png',
+        },
+        {
+          b64_json:
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+        },
+      ],
+    });
+
+    const wrappedGenerate = makeOpenAIImagesGenerateOp(mockGenerate);
+    const result = await wrappedGenerate({prompt: 'draw a picture'});
+
+    // Verify the result structure
+    expect(result.data).toHaveLength(2);
+
+    // First item should remain unchanged
+    expect(result.data[0]).toEqual({url: 'https://example.com/image.png'});
+
+    // Second item should be converted to WeaveImage
+    expect(isWeaveImage(result.data[1])).toBe(true);
+    expect(result.data[1].imageType).toBe('png');
+    expect(Buffer.isBuffer(result.data[1].data)).toBe(true);
+
+    // Verify the original function was called with correct args
+    expect(mockGenerate).toHaveBeenCalledWith({prompt: 'draw a picture'});
   });
 });
