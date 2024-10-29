@@ -850,15 +850,12 @@ export const CallsTable: FC<{
           )}
         </TailwindContents>
       }>
-      <div className="relative overflow-visible">
-        {/* Add this wrapper */}
-        <CallsCharts
-          entity={entity}
-          project={project}
-          filter={filter}
-          filterModelProp={filterModelResolved}
-        />
-      </div>
+      <CallsCharts
+        entity={entity}
+        project={project}
+        filter={filter}
+        filterModelProp={filterModelResolved}
+      />
       <StyledDataGrid
         // Start Column Menu
         // ColumnMenu is needed to support pinning and column visibility
