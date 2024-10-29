@@ -5,6 +5,7 @@ import logging
 import sys
 import traceback
 import typing
+from dataclasses import dataclass
 from functools import partial, wraps
 from types import MethodType
 from typing import (
@@ -84,6 +85,21 @@ def print_call_link(call: "Call") -> None:
         print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
+@dataclass
+class ProcessedInputs:
+    # What the user passed to the function
+    original_args: tuple
+    original_kwargs: dict[str, Any]
+
+    # What should get passed to the interior function
+    args: tuple
+    kwargs: dict[str, Any]
+
+    # What should get sent to the Weave server
+    inputs: dict[str, Any]
+
+
+OnInputHandlerType = Callable[["Op", tuple, dict], Optional[ProcessedInputs]]
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
 OnOutputHandlerType = Callable[[Any, FinishCallbackType, Dict], Any]
 # Call, original function output, exception if occurred
@@ -155,6 +171,9 @@ class Op(Protocol):
     call: Callable[..., Any]
     calls: Callable[..., "CallsIter"]
 
+    _set_on_input_handler: Callable[[OnInputHandlerType], None]
+    _on_input_handler: Optional[OnInputHandlerType]
+
     # not sure if this is the best place for this, but kept for compat
     _set_on_output_handler: Callable[[OnOutputHandlerType], None]
     _on_output_handler: Optional[OnOutputHandlerType]
@@ -173,6 +192,12 @@ class Op(Protocol):
     # should consider a more user-friendly API (perhaps a setter/getter) & whether
     # it disables child ops as well.
     _tracing_enabled: bool
+
+
+def _set_on_input_handler(func: Op, on_input: OnInputHandlerType) -> None:
+    if func._on_input_handler is not None:
+        raise ValueError("Cannot set on_input_handler multiple times")
+    func._on_input_handler = on_input
 
 
 def _set_on_output_handler(func: Op, on_output: OnOutputHandlerType) -> None:
@@ -203,16 +228,32 @@ def _is_unbound_method(func: Callable) -> bool:
     return bool(is_method)
 
 
-def _create_call(
-    func: Op, *args: Any, __weave: Optional[WeaveKwargs] = None, **kwargs: Any
-) -> "Call":
-    client = weave_client_context.require_weave_client()
-
+def default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
     try:
         inputs = func.signature.bind(*args, **kwargs).arguments
     except TypeError as e:
         raise OpCallError(f"Error calling {func.name}: {e}")
     inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
+    return ProcessedInputs(
+        original_args=args,
+        original_kwargs=kwargs,
+        args=args,
+        kwargs=kwargs,
+        inputs=inputs_with_defaults,
+    )
+
+
+def _create_call(
+    func: Op, *args: Any, __weave: Optional[WeaveKwargs] = None, **kwargs: Any
+) -> "Call":
+    client = weave_client_context.require_weave_client()
+
+    pargs = None
+    if func._on_input_handler is not None:
+        pargs = func._on_input_handler(func, args, kwargs)
+    if not pargs:
+        pargs = default_on_input_handler(func, args, kwargs)
+    inputs_with_defaults = pargs.inputs
 
     # This should probably be configurable, but for now we redact the api_key
     if "api_key" in inputs_with_defaults:
@@ -368,12 +409,19 @@ def _do_call(
 ) -> tuple[Any, "Call"]:
     func = op.resolve_fn
     call = _placeholder_call()
+
+    pargs = None
+    if op._on_input_handler is not None:
+        pargs = op._on_input_handler(op, args, kwargs)
+    if not pargs:
+        pargs = default_on_input_handler(op, args, kwargs)
+
     if settings.should_disable_weave():
-        res = func(*args, **kwargs)
+        res = func(*pargs.args, **pargs.kwargs)
     elif weave_client_context.get_weave_client() is None:
-        res = func(*args, **kwargs)
+        res = func(*pargs.args, **pargs.kwargs)
     elif not op._tracing_enabled:
-        res = func(*args, **kwargs)
+        res = func(*pargs.args, **pargs.kwargs)
     else:
         try:
             # This try/except allows us to fail gracefully and
@@ -388,10 +436,10 @@ def _do_call(
                 logger.error,
                 CALL_CREATE_MSG.format(traceback.format_exc()),
             )
-            res = func(*args, **kwargs)
+            res = func(*pargs.args, **pargs.kwargs)
         else:
             execute_result = _execute_call(
-                op, call, *args, __should_raise=__should_raise, **kwargs
+                op, call, *pargs.args, __should_raise=__should_raise, **pargs.kwargs
             )
             if inspect.iscoroutine(execute_result):
                 raise Exception(
@@ -599,6 +647,9 @@ def op(
 
             wrapper.__call__ = wrapper  # type: ignore
             wrapper.__self__ = wrapper  # type: ignore
+
+            wrapper._set_on_input_handler = partial(_set_on_input_handler, wrapper)  # type: ignore
+            wrapper._on_input_handler = None  # type: ignore
 
             wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
             wrapper._on_output_handler = None  # type: ignore
