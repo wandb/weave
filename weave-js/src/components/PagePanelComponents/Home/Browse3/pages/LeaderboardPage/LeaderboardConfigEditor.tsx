@@ -12,6 +12,7 @@ import {
   IconSortDescending,
 } from '@wandb/weave/components/Icon';
 import {refUri} from '@wandb/weave/react';
+import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
@@ -85,7 +86,7 @@ export const LeaderboardConfigEditor: React.FC<{
   };
 
   const removeColumn = (index: number) => {
-    const newColumns = leaderboardVal.columns.filter((_, i) => i !== index);
+    const newColumns = leaderboardVal.columns.filter((v, i) => i !== index);
     setWorkingCopy({...leaderboardVal, columns: newColumns});
   };
 
@@ -245,7 +246,9 @@ const ColumnEditor: React.FC<{
         onChange={newVal =>
           handleColumnChange(index, 'evaluation_object_ref', newVal?.ref)
         }
-        options={evalObjs}
+        options={Object.entries(_.groupBy(evalObjs, 'name')).map(
+          ([name, objs]) => ({options: objs, label: name})
+        )}
         getOptionLabel={obj =>
           `${obj.name}:v${obj.versionIndex} (${obj.digest.slice(0, 6)})`
         }
