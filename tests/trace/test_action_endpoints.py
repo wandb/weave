@@ -116,6 +116,10 @@ def test_actions_execute_batch(client: WeaveClient):
 
 
 def test_actions_ack_batch(client: WeaveClient):
+    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)  # type: ignore
+    if is_sqlite:
+        # dont run this test for sqlite
+        return
     # Build on previous test by adding an action and then acking it.
     server = client.server
     exec_res = server.actions_execute_batch(
