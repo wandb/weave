@@ -100,7 +100,6 @@ from weave.trace_server.trace_server_common import (
     make_derived_summary_fields,
     make_feedback_query_req,
     set_nested_key,
-    parse_messages
 )
 from weave.trace_server.trace_server_interface_util import (
     assert_non_null_wb_user_id,
