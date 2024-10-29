@@ -21,17 +21,17 @@ class MachineScore(BaseModel):
                      we should store the `Op`'s reference instead. This will allow us to have a uniform feedback schema
                      for Scorers, regardless of if they are executed by user or by the backend system.
     """
-    call_ref: Optional[str]
-    """
-    Reference to the call that generated this score. Not all runnables generate a call, but when they do, we want to store the reference.
-    """
-    trigger_ref: Optional[str]
-    """
-    Reference to the trigger that generated this score. Not all MachineScores are triggered (some are manual), but when they are, we want to store the reference.
-    """
     value: dict[str, dict[str, Any]]
     """
     The result of the runnable, nested by the runnable's object id and digest.
+    """
+    call_ref: Optional[str] = None
+    """
+    Reference to the call that generated this score. Not all runnables generate a call, but when they do, we want to store the reference.
+    """
+    trigger_ref: Optional[str] = None
+    """
+    Reference to the trigger that generated this score. Not all MachineScores are triggered (some are manual), but when they are, we want to store the reference.
     """
 
     def model_post_init(self, __context: Any) -> None:
