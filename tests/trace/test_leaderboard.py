@@ -59,8 +59,8 @@ def test_leaderboard_mis_configured(client):
 
 async def do_evaluations():
     @weave.op
-    def my_scorer(target, model_output):
-        return target == model_output
+    def my_scorer(target, output):
+        return target == output
 
     evaluation_obj_1 = weave.Evaluation(
         name="test_evaluation_name",
