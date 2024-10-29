@@ -239,7 +239,7 @@ class CallsDeleteReq(BaseModel):
 class CallsDeleteRes(BaseModel):
     pass
 
-class ExecuteLLMCompletionRequestInputs(BaseModel):
+class CompletionsCreateRequestInputs(BaseModel):
     messages: List = []
     # timeout: Optional[Union[float, str]]
     temperature: Optional[float] = None
@@ -272,7 +272,7 @@ class ExecuteLLMCompletionRequestInputs(BaseModel):
 class CompletionsCreateReq(BaseModel):
     project_id: str
     model_name: str
-    inputs: ExecuteLLMCompletionRequestInputs
+    inputs: CompletionsCreateRequestInputs
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 class CompletionsCreateRes(BaseModel):
