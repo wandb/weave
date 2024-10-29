@@ -72,6 +72,7 @@ export const SimpleCodeLikeTextArea = ({
 
   useEffect(() => {
     adjustHeight();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, isManuallyResized]);
 
   // Handle resize drag start
