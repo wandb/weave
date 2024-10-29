@@ -1551,7 +1551,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             wb_user_id=req.wb_user_id,
             op_name=COMPLETIONS_CREATE_OP_NAME,
             started_at=start_time,
-            inputs={**req.inputs.model_dump()},
+            inputs={**req.inputs.model_dump(exclude_none=True)},
             attributes={},
         )
         start_call = _start_call_for_insert_to_ch_insertable_start_call(start)

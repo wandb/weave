@@ -1,5 +1,6 @@
 import contextvars
-from typing import Optional, Protocol
+from contextlib import contextmanager
+from typing import Generator, Optional, Protocol
 
 
 class SecretFetcher(Protocol):
@@ -9,3 +10,12 @@ class SecretFetcher(Protocol):
 _secret_fetcher_context: contextvars.ContextVar[Optional[SecretFetcher]] = (
     contextvars.ContextVar("secret_fetcher", default=None)
 )
+
+
+@contextmanager
+def secret_fetcher_context(sf: SecretFetcher) -> Generator[None, None, None]:
+    token = _secret_fetcher_context.set(sf)
+    try:
+        yield
+    finally:
+        _secret_fetcher_context.reset(token)
