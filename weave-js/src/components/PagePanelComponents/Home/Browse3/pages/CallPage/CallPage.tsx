@@ -270,14 +270,14 @@ const CallPageInnerVertical: FC<{
           <Box>
             <Button
               icon="sort-ascending"
-              tooltip={`Previous call`}
+              tooltip="Previous call. (Shift + Arrow Up)"
               variant="ghost"
               onClick={onPreviousCall}
               className="mr-2"
             />
             <Button
               icon="sort-descending"
-              tooltip={`Next call`}
+              tooltip="Next call. (Shift + Arrow Down)"
               variant="ghost"
               onClick={onNextCall}
             />
