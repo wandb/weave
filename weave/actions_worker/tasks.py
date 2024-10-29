@@ -20,7 +20,12 @@ from weave.trace_server.interface.base_models.base_model_registry import base_mo
 from weave.trace_server.interface.base_models.feedback_base_model_registry import (
     MachineScore,
 )
-from weave.trace_server.refs_internal import InternalCallRef
+from weave.trace_server.refs_internal import (
+    InternalCallRef,
+    InternalObjectRef,
+    InternalOpRef,
+    parse_internal_uri,
+)
 from weave.trace_server.trace_server_interface import (
     CallSchema,
     CallsFilter,
@@ -50,13 +55,19 @@ def publish_results_as_feedback(
     call_id = ctx["call_id"]
     id = ctx["id"]
     call_ref = InternalCallRef(project_id, call_id).uri()
+    parsed_action_ref = parse_internal_uri(configured_action_ref)
+    if not isinstance(parsed_action_ref, (InternalObjectRef, InternalOpRef)):
+        raise ValueError(f"Invalid action ref: {configured_action_ref}")
+    action_name = parsed_action_ref.name
+    digest = parsed_action_ref.version
     ClickHouseTraceServer.from_env().feedback_create(
         FeedbackCreateReq(
             project_id=project_id,
             weave_ref=call_ref,
             feedback_type=base_model_name(MachineScore),
             payload=MachineScore(
-                runnable_ref=configured_action_ref, value={result: {}}
+                runnable_ref=configured_action_ref,
+                value={action_name: {digest: result}},
             ).model_dump(),
             wb_user_id=WEAVE_ACTION_EXECUTOR_PACEHOLDER_ID,
         )

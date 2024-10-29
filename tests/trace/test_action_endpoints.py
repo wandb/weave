@@ -7,7 +7,10 @@ from weave.actions_worker.celery_app import app as celery_app
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.clickhouse_trace_server_batched import (
+    ActionsAckBatchReq,
+    ClickHouseTraceServer,
+)
 from weave.trace_server.interface.base_models.action_base_models import (
     ConfiguredAction,
     ConfiguredContainsWordsAction,
@@ -138,7 +141,7 @@ def test_actions_ack_batch(client: WeaveClient):
 
     # Ack call_id 3.
     ack_res = ch_server.actions_ack_batch(
-        tsi.ActionsAckBatchReq(
+        ActionsAckBatchReq(
             project_id=db_project_id, call_ids=["3"], id="1", succeeded=True
         )
     )
@@ -166,7 +169,7 @@ def test_actions_ack_batch(client: WeaveClient):
 
     # Now let's ack call_id 4.
     ack_res = ch_server.actions_ack_batch(
-        tsi.ActionsAckBatchReq(
+        ActionsAckBatchReq(
             project_id=db_project_id, call_ids=["4"], id="1", succeeded=False
         )
     )
