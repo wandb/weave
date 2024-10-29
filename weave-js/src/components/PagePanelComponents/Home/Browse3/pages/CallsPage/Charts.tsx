@@ -83,7 +83,9 @@ export const calculateBinSize = (
   data: ChartDataLatency[] | ChartDataErrors[] | ChartDataRequests[],
   targetBinCount = 15
 ) => {
-  if (data.length === 0) return 60; // default to 60 minutes if no data
+  if (data.length === 0) {
+    return 60;
+  } // default to 60 minutes if no data
 
   const startTime = moment(_.minBy(data, 'started_at')?.started_at);
   const endTime = moment(_.maxBy(data, 'started_at')?.started_at);
@@ -221,7 +223,7 @@ export const ErrorPlotlyChart: React.FC<{
         hovertemplate: '%{y} errors<extra></extra>',
       },
     ];
-  }, [chartData]);
+  }, [chartData, binSize]);
 
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {
@@ -285,7 +287,7 @@ export const RequestsPlotlyChart: React.FC<{
         hovertemplate: '%{y} requests<extra></extra>',
       },
     ];
-  }, [chartData]);
+  }, [chartData, binSize]);
 
   useEffect(() => {
     const plotlyLayout: Partial<Plotly.Layout> = {

@@ -8,9 +8,8 @@ import {
 } from '../../../../../Icon';
 import {Tailwind} from '../../../../../Tailwind';
 import {WFHighLevelCallFilter} from './callsTableFilter';
-import {useCallsForQuery, useCallsForQueryCharts} from './callsTableQuery';
+import {useCallsForQuery} from './callsTableQuery';
 import {
-  calculateBinSize,
   ErrorPlotlyChart,
   LatencyPlotlyChart,
   RequestsPlotlyChart,
