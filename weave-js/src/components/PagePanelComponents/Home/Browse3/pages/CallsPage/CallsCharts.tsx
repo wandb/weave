@@ -1,5 +1,5 @@
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useMemo, useState} from 'react';
 
 import {
   IconChevronDown,
@@ -14,8 +14,6 @@ import {
   LatencyPlotlyChart,
   RequestsPlotlyChart,
 } from './Charts';
-import {Box} from '@mui/material';
-import {fancyPageSidebarWidth} from '../../../../../../common/css/globals_deprecated.styles';
 
 type CallsChartsProps = {
   entity: string;

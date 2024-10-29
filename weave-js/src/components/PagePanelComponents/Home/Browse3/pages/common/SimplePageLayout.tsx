@@ -58,7 +58,7 @@ export const SimplePageLayout: FC<{
         flexDirection: 'column',
         flexGrow: 1,
         height: '100%',
-        overflow: 'hidden', // here
+        overflow: 'hidden',
       }}>
       <Box
         sx={{
@@ -126,7 +126,7 @@ export const SimplePageLayout: FC<{
       </Box>
       <Box
         sx={{
-          overflow: 'hidden', // here
+          overflow: 'hidden',
           display: 'flex',
           flexDirection: 'row',
           flex: '1 1 auto',
