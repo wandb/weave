@@ -1,13 +1,7 @@
-import {
-  Box,
-  FormControlLabel,
-  MenuItem,
-  Select,
-  TextField,
-  Typography,
-} from '@material-ui/core';
-import { Button } from '@wandb/weave/components/Button/Button';
+import {Box, MenuItem, Select} from '@material-ui/core';
+import {Button} from '@wandb/weave/components/Button/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
+import {TextField} from '@wandb/weave/components/Form/TextField';
 import {refUri} from '@wandb/weave/react';
 import React, {useEffect, useState} from 'react';
 
@@ -22,6 +16,7 @@ import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerCli
 import {TraceObjSchema} from '../wfReactInterface/traceServerClientTypes';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
+import {SimpleCodeLikeTextArea} from './SimpleCodeLikeTextArea';
 
 export const LeaderboardConfigEditor: React.FC<{
   entity: string;
@@ -42,14 +37,12 @@ export const LeaderboardConfigEditor: React.FC<{
   discardChanges,
   commitChanges,
 }) => {
-  const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setWorkingCopy({...leaderboardVal, name: event.target.value});
+  const handleNameChange = (value: string) => {
+    setWorkingCopy({...leaderboardVal, name: value});
   };
 
-  const handleDescriptionChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setWorkingCopy({...leaderboardVal, description: event.target.value});
+  const handleDescriptionChange = (value: string) => {
+    setWorkingCopy({...leaderboardVal, description: value});
   };
 
   const handleColumnChange = (index: number, field: string, value: any) => {
@@ -104,32 +97,29 @@ export const LeaderboardConfigEditor: React.FC<{
 
   return (
     <Box display="flex" flexDirection="column" height="100%" width="100%">
-      <Box flexGrow={1} overflow="auto" p={2}>
-        <Typography variant="h6" gutterBottom>
-          Display Name
-        </Typography>
+      <Box
+        flexGrow={1}
+        overflow="auto"
+        sx={{
+          mr: 4,
+          ml: 4,
+
+          mb: 2,
+          paddingLeft: 2,
+          paddingRight: 2,
+        }}>
+        <Label>Leaderboard Title</Label>
         <TextField
-          fullWidth
+          icon="layout-grid"
           value={leaderboardVal.name}
           onChange={handleNameChange}
-          margin="normal"
         />
-        <Typography variant="h6" gutterBottom style={{marginTop: 16}}>
-          Description
-        </Typography>
-        <TextField
-          fullWidth
+        <Label>Description</Label>
+        <SimpleCodeLikeTextArea
           value={leaderboardVal.description}
           onChange={handleDescriptionChange}
-          margin="normal"
-          multiline
-          minRows={1}
-          maxRows={10}
-          InputProps={{style: {fontFamily: 'monospace', fontSize: '14px'}}}
         />
-        <Typography variant="h6" gutterBottom style={{marginTop: 16}}>
-          Columns
-        </Typography>
+        <Label>Columns</Label>
         {leaderboardVal.columns.map((column, index) => (
           <ColumnEditor
             key={index}
@@ -145,10 +135,7 @@ export const LeaderboardConfigEditor: React.FC<{
             totalColumns={leaderboardVal.columns.length}
           />
         ))}
-        <Button
-          icon="add-new"
-          variant="ghost"
-          onClick={addColumn}>
+        <Button icon="add-new" variant="ghost" onClick={addColumn}>
           Add Column
         </Button>
       </Box>
@@ -168,12 +155,18 @@ export const LeaderboardConfigEditor: React.FC<{
           style={{marginRight: 8}}>
           {isDirty ? 'Discard' : 'Close'}
         </Button>
-          <Button
-            onClick={commitChanges}
-            disabled={!isDirty || saving}>
-            {saving ? 'Saving...' : isDirty ? 'Save' : 'Saved'}
-          </Button>
+        <Button onClick={commitChanges} disabled={!isDirty || saving}>
+          {saving ? 'Saving...' : isDirty ? 'Save' : 'Saved'}
+        </Button>
       </Box>
+    </Box>
+  );
+};
+
+const Label: React.FC<{children: React.ReactNode}> = ({children}) => {
+  return (
+    <Box sx={{fontSize: '14px', fontWeight: 'bold', mb: 1, mt: 3}}>
+      {children}
     </Box>
   );
 };
@@ -210,115 +203,103 @@ const ColumnEditor: React.FC<{
   );
 
   return (
-    <Box
-      display="flex"
-      flexWrap="wrap"
-      alignItems="center"
-      mb={2}
-      p={2}>
-      <Box flexGrow={1} display="flex" flexWrap="wrap" alignItems="center">
-        <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
-          <Select
-            fullWidth
-            value={column.evaluation_object_ref}
-            onChange={e =>
-              handleColumnChange(index, 'evaluation_object_ref', e.target.value)
-            }
-            displayEmpty
-            margin="dense">
-            <MenuItem value="">
-              <em>Select Evaluation Object</em>
+    <Box flexGrow={1} display="flex" flexWrap="wrap" alignItems="center">
+      <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
+        <Select
+          fullWidth
+          value={column.evaluation_object_ref}
+          onChange={e =>
+            handleColumnChange(index, 'evaluation_object_ref', e.target.value)
+          }
+          displayEmpty
+          margin="dense">
+          <MenuItem value="">
+            <em>Select Evaluation Object</em>
+          </MenuItem>
+          {evalObjs.map(obj => (
+            <MenuItem key={obj.ref} value={obj.ref}>
+              {`${obj.name}:v${obj.versionIndex} (${obj.digest.slice(0, 6)})`}
             </MenuItem>
-            {evalObjs.map(obj => (
-              <MenuItem key={obj.ref} value={obj.ref}>
-                {`${obj.name}:v${obj.versionIndex} (${obj.digest.slice(0, 6)})`}
-              </MenuItem>
-            ))}
-          </Select>
-        </Box>
-        <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
-          <Select
-            fullWidth
-            value={column.scorer_name}
-            onChange={e =>
-              handleColumnChange(index, 'scorer_name', e.target.value)
-            }
-            displayEmpty
-            margin="dense"
-            disabled={!column.evaluation_object_ref}>
-            <MenuItem value="">
-              <em>Select Scorer</em>
+          ))}
+        </Select>
+      </Box>
+      <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
+        <Select
+          fullWidth
+          value={column.scorer_name}
+          onChange={e =>
+            handleColumnChange(index, 'scorer_name', e.target.value)
+          }
+          displayEmpty
+          margin="dense"
+          disabled={!column.evaluation_object_ref}>
+          <MenuItem value="">
+            <em>Select Scorer</em>
+          </MenuItem>
+          {scorers.map(scorer => (
+            <MenuItem key={scorer} value={scorer}>
+              {scorer}
             </MenuItem>
-            {scorers.map(scorer => (
-              <MenuItem key={scorer} value={scorer}>
-                {scorer}
-              </MenuItem>
-            ))}
-          </Select>
-        </Box>
-        <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
-          <Select
-            fullWidth
-            value={column.summary_metric_path_parts.join('.')}
-            onChange={e =>
-              handleColumnChange(
-                index,
-                'summary_metric_path_parts',
-                (e.target.value as string).split('.')
-              )
-            }
-            displayEmpty
-            margin="dense"
-            disabled={!column.evaluation_object_ref || !column.scorer_name}>
-            <MenuItem value="">
-              <em>Select Metric Path</em>
+          ))}
+        </Select>
+      </Box>
+      <Box flexGrow={1} minWidth={200} mr={2} mb={2}>
+        <Select
+          fullWidth
+          value={column.summary_metric_path_parts.join('.')}
+          onChange={e =>
+            handleColumnChange(
+              index,
+              'summary_metric_path_parts',
+              (e.target.value as string).split('.')
+            )
+          }
+          displayEmpty
+          margin="dense"
+          disabled={!column.evaluation_object_ref || !column.scorer_name}>
+          <MenuItem value="">
+            <em>Select Metric Path</em>
+          </MenuItem>
+          {metrics.map(path => (
+            <MenuItem key={path} value={path}>
+              {path}
             </MenuItem>
-            {metrics.map(path => (
-              <MenuItem key={path} value={path}>
-                {path}
-              </MenuItem>
-            ))}
-          </Select>
-        </Box>
-        <Box display="flex" alignItems="center" mb={2} sx={{gap: 4}}>
-          <Checkbox
-                checked={column.should_minimize ?? false}
-                onCheckedChange={checked =>
-                  handleColumnChange(index, 'should_minimize', !!checked)
-                }
-            />
-          <span>Minimize</span>
-        </Box>
-        <Box display="flex" justifyContent="flex-end" mb={2}>
+          ))}
+        </Select>
+      </Box>
+      <Box display="flex" alignItems="center" mb={2} sx={{gridGap: 4}}>
+        <Checkbox
+          checked={column.should_minimize ?? false}
+          onCheckedChange={checked =>
+            handleColumnChange(index, 'should_minimize', !!checked)
+          }
+        />
+        <span>Minimize</span>
+      </Box>
+      <Box display="flex" justifyContent="flex-end" mb={2}>
         <Button
           size="small"
           icon="chevron-up"
-          variant='quiet'
+          variant="quiet"
           onClick={() => moveColumn(index, index - 1)}
-          disabled={index === 0}>
-        </Button>
+          disabled={index === 0}></Button>
         <Button
           size="small"
           icon="chevron-down"
           variant="quiet"
           onClick={() => moveColumn(index, index + 1)}
-          disabled={index === totalColumns - 1}>
-        </Button>
+          disabled={index === totalColumns - 1}></Button>
         <Button
           icon="copy"
           variant="quiet"
           size="small"
-          onClick={() => cloneColumn(index)}>
-        </Button>
+          onClick={() => cloneColumn(index)}></Button>
         <Button
           icon="delete"
           variant="quiet"
           size="small"
-          onClick={() => removeColumn(index)}>
-        </Button>
+          onClick={() => removeColumn(index)}></Button>
       </Box>
-      </Box>
-      
     </Box>
   );
 };
