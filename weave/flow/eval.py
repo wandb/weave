@@ -6,6 +6,7 @@ import time
 import traceback
 from typing import Any, Callable, Coroutine, Optional, Union, cast
 
+from pydantic import PrivateAttr
 from rich import print
 from rich.console import Console
 
@@ -97,7 +98,7 @@ class Evaluation(Object):
 
     # Score your examples using scoring functions
     evaluation = Evaluation(
-        dataset=examples, scorers=[match_score1]
+        dataset=examples, scorers=[match_score1], output_key="generated_text"
     )
 
     # Start tracking the evaluation
@@ -111,6 +112,8 @@ class Evaluation(Object):
     scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None
     trials: int = 1
+
+    _output_key: str = PrivateAttr("output")
 
     def model_post_init(self, __context: Any) -> None:
         scorers: list[Union[Callable, Scorer, Op]] = []
@@ -344,9 +347,8 @@ class Evaluation(Object):
                 util.warn_once(
                     logger, "model_output is deprecated, please use output instead"
                 )
-                score_args["model_output"] = model_output
-            else:
-                score_args["output"] = model_output
+                self._output_key = "model_output"
+            score_args[self._output_key] = model_output
 
             try:
                 if is_op(score_fn) and model_call:
@@ -377,7 +379,7 @@ class Evaluation(Object):
                     for param in score_signature.parameters.values()
                     if param.default == inspect.Parameter.empty
                 ]
-                required_arg_names.remove("output")
+                required_arg_names.remove(self._output_key)
 
                 message = textwrap.dedent(
                     f"""
@@ -404,7 +406,7 @@ class Evaluation(Object):
             scores[scorer_name] = result
 
         return {
-            "output": model_output,
+            self._output_key: model_output,
             "scores": scores,
             "model_latency": model_latency,
         }
@@ -428,7 +430,6 @@ class Evaluation(Object):
                 model_output_summary = auto_summarize(vals)
                 if model_output_summary:
                     summary[name] = model_output_summary
-
         return summary
 
     async def get_eval_results(
@@ -448,7 +449,7 @@ class Evaluation(Object):
             except Exception as e:
                 print("Predict and score failed")
                 traceback.print_exc()
-                return {"output": None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
             return eval_row
 
         n_complete = 0
@@ -465,7 +466,7 @@ class Evaluation(Object):
             #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
             # )
             if eval_row is None:
-                eval_row = {"output": None, "scores": {}}
+                eval_row = {self._output_key: None, "scores": {}}
             else:
                 eval_row["scores"] = eval_row.get("scores", {})
             for scorer in self.scorers or []:
