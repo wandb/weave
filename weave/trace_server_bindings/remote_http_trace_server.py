@@ -559,6 +559,16 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             tsi.ExecuteBatchActionRes,
         )
 
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        return self._generic_request(
+            "/completions/create",
+            req,
+            tsi.CompletionsCreateReq,
+            tsi.CompletionsCreateRes,
+        )
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,
