@@ -18,7 +18,7 @@ from weave.trace_server.interface.base_models.action_base_models import (
 )
 from weave.trace_server.interface.base_models.base_model_registry import base_model_name
 from weave.trace_server.interface.base_models.feedback_base_model_registry import (
-    ActionScore,
+    MachineScore,
 )
 from weave.trace_server.refs_internal import InternalCallRef
 from weave.trace_server.trace_server_interface import (
@@ -54,9 +54,9 @@ def publish_results_as_feedback(
         FeedbackCreateReq(
             project_id=project_id,
             weave_ref=call_ref,
-            feedback_type=base_model_name(ActionScore),
-            payload=ActionScore(
-                configured_action_ref=configured_action_ref, output=result
+            feedback_type=base_model_name(MachineScore),
+            payload=MachineScore(
+                runnable_ref=configured_action_ref, value={result: {}}
             ).model_dump(),
             wb_user_id=WEAVE_ACTION_EXECUTOR_PACEHOLDER_ID,
         )

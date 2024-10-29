@@ -1,5 +1,6 @@
 import {Button} from '@wandb/weave/components/Button/Button';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
+import {parseRef} from '@wandb/weave/react';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useCallback, useMemo, useState} from 'react';
 import {z} from 'zod';
@@ -96,25 +97,30 @@ export const CallActionsViewer: React.FC<{
     filter: {latest_only: true},
   }).sort((a, b) => a.val.name.localeCompare(b.val.name));
   const verifiedActionFeedbacks: Array<{
-    data: ActionFeedback;
+    data: MachineScoreFeedbackPayloadType;
     feedbackRaw: Feedback;
   }> = useMemo(() => {
     return (feedbackQuery.result ?? [])
       .map(feedback => {
-        const res = ActionFeedbackZ.safeParse(feedback.payload);
+        const res = MachineScoreFeedbackPayloadSchema.safeParse(
+          feedback.payload
+        );
         return {res, feedbackRaw: feedback};
       })
       .filter(result => result.res.success)
       .map(result => ({
         data: result.res.data,
         feedbackRaw: result.feedbackRaw,
-      })) as Array<{data: ActionFeedback; feedbackRaw: Feedback}>;
+      })) as Array<{
+      data: MachineScoreFeedbackPayloadType;
+      feedbackRaw: Feedback;
+    }>;
   }, [feedbackQuery.result]);
 
   const getFeedbackForAction = useCallback(
     (actionRef: string) => {
       return verifiedActionFeedbacks.filter(
-        feedback => feedback.data.configured_action_ref === actionRef
+        feedback => feedback.data.runnable_ref === actionRef
       );
     },
     [verifiedActionFeedbacks]
@@ -144,7 +150,9 @@ export const CallActionsViewer: React.FC<{
           lastRanAt: selectedFeedback
             ? convertISOToDate(selectedFeedback.feedbackRaw.created_at + 'Z')
             : undefined,
-          lastResult: selectedFeedback?.data.output,
+          lastResult: selectedFeedback
+            ? getValueFromMachineScoreFeedbackPayload(selectedFeedback.data)
+            : undefined,
         };
       }) ?? []
     );
@@ -247,10 +255,23 @@ export const CallActionsViewer: React.FC<{
   );
 };
 
-const ActionFeedbackZ = z.object({
+const MachineScoreFeedbackPayloadSchema = z.object({
   // _type: z.literal("ActionFeedback"),
-  configured_action_ref: z.string(),
-  output: z.unknown(),
+  runnable_ref: z.string(),
+  call_ref: z.string().optional(),
+  trigger_ref: z.string().optional(),
+  value: z.record(z.string(), z.record(z.string(), z.boolean())),
 });
 
-type ActionFeedback = z.infer<typeof ActionFeedbackZ>;
+type MachineScoreFeedbackPayloadType = z.infer<
+  typeof MachineScoreFeedbackPayloadSchema
+>;
+
+const getValueFromMachineScoreFeedbackPayload = (
+  payload: MachineScoreFeedbackPayloadType
+) => {
+  const ref = parseRef(payload.runnable_ref);
+  const name = ref.artifactName;
+  const digest = ref.artifactVersion;
+  return payload.value[name][digest];
+};

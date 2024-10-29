@@ -22,13 +22,14 @@ def test_action_execute_workflow(client: WeaveClient):
         # dont run this test for sqlite
         return
 
+    action_name = "test_action"
     # part 1: create the action
     digest = client.server.obj_create(
         ObjCreateReq.model_validate(
             {
                 "obj": {
                     "project_id": client._project_id(),
-                    "object_id": "test_object",
+                    "object_id": action_name,
                     "base_object_class": "ConfiguredAction",
                     "val": ConfiguredAction(
                         name="test_action",
@@ -55,7 +56,7 @@ def test_action_execute_workflow(client: WeaveClient):
     action_ref_uri = ObjectRef(
         entity=client.entity,
         project=client.project,
-        name="test_object",
+        name=action_name,
         _digest=digest,
     ).uri()
 
@@ -71,7 +72,7 @@ def test_action_execute_workflow(client: WeaveClient):
                 {
                     "project_id": client._project_id(),
                     "weave_ref": call1.ref.uri(),
-                    "feedback_type": "ActionScore",
+                    "feedback_type": "MachineScore",
                     "payload": True,
                 }
             )
@@ -82,8 +83,11 @@ def test_action_execute_workflow(client: WeaveClient):
             {
                 "project_id": client._project_id(),
                 "weave_ref": call1.ref.uri(),
-                "feedback_type": "ActionScore",
-                "payload": {"configured_action_ref": action_ref_uri, "output": True},
+                "feedback_type": "MachineScore",
+                "payload": {
+                    "runnable_ref": action_ref_uri,
+                    "value": {action_name: {digest: True}},
+                },
             }
         )
     )
@@ -91,8 +95,8 @@ def test_action_execute_workflow(client: WeaveClient):
     feedbacks = list(call1.feedback)
     assert len(feedbacks) == 1
     assert feedbacks[0].payload == {
-        "configured_action_ref": action_ref_uri,
-        "output": True,
+        "runnable_ref": action_ref_uri,
+        "value": {action_name: {digest: True}},
     }
 
     # Step 3: test that we can in-place execute one action at a time.
@@ -112,6 +116,6 @@ def test_action_execute_workflow(client: WeaveClient):
     feedbacks = list(call2.feedback)
     assert len(feedbacks) == 1
     assert feedbacks[0].payload == {
-        "configured_action_ref": action_ref_uri,
-        "output": False,
+        "runnable_ref": action_ref_uri,
+        "value": {action_name: {digest: False}},
     }
