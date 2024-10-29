@@ -1,3 +1,4 @@
+import inspect
 from numbers import Number
 from typing import Any, Callable, Optional, Sequence, Tuple, Union
 
@@ -107,3 +108,18 @@ def get_scorer_attributes(
     else:
         raise ValueError(f"Unknown scorer type: {scorer}")
     return (scorer_name, score_fn, summarize_fn)  # type: ignore
+
+
+def has_oldstyle_scorers(scorers: list[Union[Callable, Op, Scorer]]) -> bool:
+    """Check if any scorers use the deprecated 'model_output' parameter."""
+    for scorer in scorers or []:
+        _, score_fn, _ = get_scorer_attributes(scorer)
+        if is_op(score_fn):
+            score_fn = as_op(score_fn)
+            score_signature = score_fn.signature
+        else:
+            score_signature = inspect.signature(score_fn)
+        score_arg_names = list(score_signature.parameters.keys())
+        if "model_output" in score_arg_names:
+            return True
+    return False

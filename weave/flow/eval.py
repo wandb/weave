@@ -19,6 +19,7 @@ from weave.scorers import (
     Scorer,
     auto_summarize,
     get_scorer_attributes,
+    has_oldstyle_scorers,
     transpose,
 )
 from weave.trace.context.weave_client_context import get_weave_client
@@ -132,6 +133,20 @@ class Evaluation(Object):
             else:
                 raise ValueError(f"Invalid scorer: {scorer}")
             scorers.append(scorer)
+
+        # Determine output key based on scorer types
+        if has_oldstyle_scorers(scorers):
+            self._output_key = "model_output"
+            util.warn_once(
+                logger,
+                "Using 'model_output' key for compatibility with older scorers. Please update scorers to use 'output' parameter.",
+            )
+        else:
+            self._output_key = "output"
+            util.warn_once(
+                logger,
+                "Using 'output' key for model results. Make sure your scorers expect an 'output' parameter.",
+            )
         self.scorers = scorers
 
         if isinstance(self.dataset, list):
@@ -230,6 +245,7 @@ class Evaluation(Object):
 
         scores = {}  # TODO: Consider moving scorer setup and checks out of `predict_and_score`
         scorers = cast(list[Union[Op, Scorer]], self.scorers or [])
+
         for scorer in scorers:
             scorer_self = None
             if weave_isinstance(scorer, Scorer):
@@ -242,10 +258,12 @@ class Evaluation(Object):
                 score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
 
-            if (
-                "model_output" not in score_arg_names
-                and "output" not in score_arg_names
-            ):
+            # the actual kwarg name depends on the scorer
+            if "output" in score_arg_names:
+                score_output_name = "output"
+            elif "model_output" in score_arg_names:
+                score_output_name = "model_output"
+            else:
                 message = textwrap.dedent(
                     f"""
                     Scorer {scorer_name} must have an `output` or `model_output` argument, to receive the
@@ -344,12 +362,7 @@ class Evaluation(Object):
                     raise ValueError(
                         f"{score_fn} expects arguments: {score_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
                     )
-            if "model_output" in score_arg_names:
-                util.warn_once(
-                    logger, "model_output is deprecated, please use output instead"
-                )
-                self._output_key = "model_output"
-            score_args[self._output_key] = model_output
+            score_args[score_output_name] = model_output
 
             try:
                 if is_op(score_fn) and model_call:
