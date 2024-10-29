@@ -28,7 +28,7 @@ os.environ["WF_TRACE_SERVER_URL"] = "http://127.0.0.1:6345"
 ` + codeFetchPython;
   }
 
-  let codeFetchJS = `import * as weave from 'weave';
+  const codeFetchJS = `import * as weave from 'weave';
 const client = await weave.init("${entity}/${project}");
 const call = await client.getCall("${callId}")`;
 
@@ -42,9 +42,11 @@ const call = await client.getCall("${callId}")`;
   const codeNoteJS = `await call.feedback.addNote('This is delightful!')`;
   const codeFeedbackJS = `await call.feedback.add({correctness: {value: 4}})`;
 
-  const codeReaction = sdkType === 'js-sdk' ? codeReactionJS : codeReactionPython;
+  const codeReaction =
+    sdkType === 'js-sdk' ? codeReactionJS : codeReactionPython;
   const codeNote = sdkType === 'js-sdk' ? codeNoteJS : codeNotePython;
-  const codeFeedback = sdkType === 'js-sdk' ? codeFeedbackJS : codeFeedbackPython;
+  const codeFeedback =
+    sdkType === 'js-sdk' ? codeFeedbackJS : codeFeedbackPython;
 
   return (
     <Box m={2} className="text-sm">
@@ -72,11 +74,7 @@ const call = await client.getCall("${callId}")`;
       </Box>
       <Box mt={2}>
         or a note like this:
-        <CopyableText
-          language={language}
-          text={codeNote}
-          copyText={codeNote}
-        />
+        <CopyableText language={language} text={codeNote} copyText={codeNote} />
       </Box>
       <Box mt={2}>
         or custom feedback like this:
