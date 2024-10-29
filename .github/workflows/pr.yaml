@@ -30,6 +30,7 @@ jobs:
           scopes: |
             ui
             weave
+            weave-ts
             weave_query
           wip: false
           requireScope: true
