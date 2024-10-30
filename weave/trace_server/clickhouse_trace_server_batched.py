@@ -1329,8 +1329,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req)
 
-        res_payload = req.payload
-
         # Augment emoji with alias.
         res_payload = {}
         if req.feedback_type == "wandb.reaction.1":
