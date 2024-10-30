@@ -146,6 +146,13 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
+            name: 'Prompts',
+            slug: 'weave/prompts',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.ForumChatBubble,
+          },
+          {
+            type: 'button' as const,
             name: 'Models',
             slug: 'weave/models',
             isShown: showWeaveSidebarItems || isShowAll,
