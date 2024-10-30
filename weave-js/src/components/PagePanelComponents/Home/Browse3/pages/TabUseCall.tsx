@@ -48,7 +48,7 @@ os.environ["WF_TRACE_SERVER_URL"] = "http://127.0.0.1:6345"
     selectedTab === 'javascript' ? codeFeedbackJS : codeFeedbackPython;
 
   return (
-    <Box m={2} className="text-sm">
+    <Box className="text-sm">
       <Tabs.Root
         value={selectedTab}
         onValueChange={value => setSelectedTab(value)}>

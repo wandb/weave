@@ -64,6 +64,7 @@ const sidebars: SidebarsConfig = {
             "guides/evaluation/scorers",
           ],
         },
+        "guides/core-types/prompts",
         "guides/core-types/models",
         "guides/core-types/datasets",
         "guides/tracking/feedback",
