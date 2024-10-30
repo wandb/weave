@@ -1332,6 +1332,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         res_payload = req.payload
 
         # Augment emoji with alias.
+        res_payload = {}
         if req.feedback_type == "wandb.reaction.1":
             em = req.payload["emoji"]
             if emoji.emoji_count(em) != 1:
