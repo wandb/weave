@@ -266,6 +266,23 @@ class CallsQuery(BaseModel):
     offset: typing.Optional[int] = None
     include_costs: bool = False
 
+    # Optional param name for the output of a filtered query.
+    # This is used for two-step queries. If CallsQuery is used
+    # to build a two-step query, this value must be set.
+    _filtered_output_param: typing.Optional[str] = None
+
+    @property
+    def _has_heavy_select(self) -> bool:
+        return any(field.is_heavy() for field in self.select_fields)
+
+    @property
+    def _has_heavy_filter(self) -> bool:
+        return any(condition.is_heavy() for condition in self.query_conditions)
+
+    @property
+    def _has_heavy_order(self) -> bool:
+        return any(order_field.field.is_heavy() for order_field in self.order_fields)
+
     def add_field(self, field: str) -> "CallsQuery":
         self.select_fields.append(get_field_by_name(field))
         return self
@@ -326,7 +343,19 @@ class CallsQuery(BaseModel):
         self.include_costs = include_costs
         return self
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
+    def should_do_two_step_query(self) -> bool:
+        """Returns True if the query should be a forced two step query.
+        When heavy fields are filtered or ordered, we can't push down to subquery.
+        Two-step query ensures that the subquery to return the filtered call IDs
+        is executed first, and then the main query can be executed with the
+        filtered IDs.
+        """
+        return self._has_heavy_filter or self._has_heavy_order
+
+    def set_filtered_output_param(self, param_name: str) -> None:
+        self._filtered_output_param = param_name
+
+    def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> list[str]:
         """
         This is the main entry point for building the query. This method will
         determine the optimal query to build based on the fields and conditions
@@ -401,41 +430,22 @@ class CallsQuery(BaseModel):
         if not self.select_fields:
             raise ValueError("Missing select columns")
 
-        # Determine if the query `has_heavy_fields` by checking
-        # if it `has_heavy_select or has_heavy_filter or has_heavy_order`
-        has_heavy_select = any(field.is_heavy() for field in self.select_fields)
-
-        has_heavy_filter = any(
-            condition.is_heavy() for condition in self.query_conditions
+        has_heavy_fields = (
+            self._has_heavy_select or self._has_heavy_filter or self._has_heavy_order
         )
-
-        has_heavy_order = any(
-            order_field.field.is_heavy() for order_field in self.order_fields
-        )
-
-        has_heavy_fields = has_heavy_select or has_heavy_filter or has_heavy_order
-
-        # Determine if `predicate_pushdown_possible` which is
-        # if it `has_light_filter or has_light_query or has_light_order_filter`
         has_light_filter = self.hardcoded_filter and self.hardcoded_filter.is_useful()
-
         has_light_query = any(
             not condition.is_heavy() for condition in self.query_conditions
         )
-
         has_light_order_filter = (
             self.order_fields
             and self.limit
-            and not has_heavy_filter
-            and not has_heavy_order
+            and not self._has_heavy_filter
+            and not self._has_heavy_order
         )
-
-        predicate_pushdown_possible = (
+        do_predicate_pushdown = (
             has_light_filter or has_light_query or has_light_order_filter
         )
-
-        # Determine if we should optimize!
-        should_optimize = has_heavy_fields and predicate_pushdown_possible
 
         # Important: Always inject deleted_at into the query.
         # Note: it might be better to make this configurable.
@@ -454,11 +464,13 @@ class CallsQuery(BaseModel):
             )
         )
 
-        # If we should not optimize, then just build the base query
+        should_optimize = self.should_do_two_step_query() or (
+            has_heavy_fields and do_predicate_pushdown
+        )
         if not should_optimize and not self.include_costs:
-            return self._as_sql_base_format(pb, table_alias)
+            return [self._as_sql_base_format(pb, table_alias)]
 
-        # If so, build the two queries
+        # Build the two queries
         filter_query = CallsQuery(project_id=self.project_id)
         outer_query = CallsQuery(project_id=self.project_id)
 
@@ -489,35 +501,51 @@ class CallsQuery(BaseModel):
             outer_query.limit = self.limit
             outer_query.offset = self.offset
 
-        raw_sql = f"""
-        WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
-        """
+        # If we have heavy fields in filter/order, and we have a filtered output param,
+        # we should do a two-step query.
+        two_step_query = (
+            self.should_do_two_step_query() and self._filtered_output_param is not None
+        )
+        if two_step_query:
+            assert self._filtered_output_param is not None
+            ids_param_slot = _param_slot(self._filtered_output_param, "Array(String)")
+            filter_query_sql = filter_query._as_sql_base_format(pb, table_alias)
+        else:
+            ids_param_slot = "filtered_calls"
+            filter_query_sql = f"""
+                WITH {ids_param_slot} AS ({filter_query._as_sql_base_format(pb, table_alias)})
+                """
+
+        outer_raw_sql = outer_query._as_sql_base_format(
+            pb,
+            table_alias,
+            ids_param_slot=ids_param_slot,
+        )
 
         if self.include_costs:
-            # TODO: We should unify the calls query order by fields to be orm sort by fields
             order_by_fields = [
                 tsi.SortBy(
                     field=sort_by.field.field, direction=sort_by.direction.lower()
                 )
                 for sort_by in self.order_fields
             ]
-            raw_sql += f""",
-            all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
-            {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
+            prefix = "WITH" if two_step_query else ","
+            outer_raw_sql = f"""
+                {prefix} all_calls AS ({outer_raw_sql}),
+                {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
             """
 
-        else:
-            raw_sql += f"""
-            {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
-            """
+        if not two_step_query:
+            # Join the two queries together, return a single query
+            return [_safely_format_sql("".join([filter_query_sql, outer_raw_sql]))]
 
-        return _safely_format_sql(raw_sql)
+        return [_safely_format_sql(filter_query_sql), _safely_format_sql(outer_raw_sql)]
 
     def _as_sql_base_format(
         self,
         pb: ParamBuilder,
         table_alias: str,
-        id_subquery_name: typing.Optional[str] = None,
+        ids_param_slot: typing.Optional[str] = None,
     ) -> str:
         select_fields_sql = ", ".join(
             field.as_select_sql(pb, table_alias) for field in self.select_fields
@@ -555,8 +583,8 @@ class CallsQuery(BaseModel):
             offset_sql = f"OFFSET {self.offset}"
 
         id_subquery_sql = ""
-        if id_subquery_name is not None:
-            id_subquery_sql = f"AND (id IN {id_subquery_name})"
+        if ids_param_slot is not None:
+            id_subquery_sql = f"AND (id IN {ids_param_slot})"
 
         project_param = pb.add_param(self.project_id)
 

@@ -70,6 +70,7 @@ from weave.trace_server.clickhouse_schema import (
     SelectableCHCallSchema,
     SelectableCHObjSchema,
 )
+from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InsertTooLarge, InvalidRequest, RequestTooLarge
 from weave.trace_server.feedback import (
@@ -78,7 +79,13 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.ids import generate_id
+from weave.trace_server.llm_completion import lite_llm_completion
+from weave.trace_server.model_providers.model_providers import (
+    MODEL_PROVIDERS_FILE,
+    fetch_model_to_provider_info_map,
+)
 from weave.trace_server.orm import ParamBuilder, Row
+from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
     TABLE_ROWS_ALIAS,
@@ -184,6 +191,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._flush_immediately = True
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
+        self._model_to_provider_info_map = fetch_model_to_provider_info_map(
+            MODEL_PROVIDERS_FILE
+        )
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -260,6 +270,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         stream = self.calls_query_stream(req)
         return tsi.CallsQueryRes(calls=list(stream))
 
+    def _construct_query_str_maybe_do_pre_query(
+        self, calls_query: CallsQuery, pb: ParamBuilder
+    ) -> str:
+        """Helper to query the calls table if heavy. Immediately returns a formatted sql string
+        if not heavy, otherwise does a pre-query to get the filtered call ids, injects them
+        into the main query, and returns the main query str.
+        """
+        if not calls_query.should_do_two_step_query():
+            query = calls_query.as_sql(pb)[0]
+            return query
+
+        # We have to do a two-step query. Set the param for the output
+        # of the first query
+        output_param_name = "call_ids"
+        calls_query.set_filtered_output_param(output_param_name)
+        ids_query, filtered_query = calls_query.as_sql(pb)
+
+        # Hit the db to get the ids
+        ids_res = self._query(ids_query, pb.get_params())
+
+        ids = [x[0] for x in ids_res.result_rows]
+        # add the ids param to the param builder
+        pb.add(ids, param_name=output_param_name, param_type="Array(String)")
+
+        return filtered_query
+
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
@@ -273,11 +309,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.add_condition(req.query.expr_)
 
         pb = ParamBuilder()
-        inner_query = cq.as_sql(pb)
-        raw_res = self._query(
-            f"SELECT count() FROM ({inner_query})",
-            pb.get_params(),
-        )
+        query = self._construct_query_str_maybe_do_pre_query(cq, pb)
+        count_query_str = f"SELECT count() FROM ({query})"
+        raw_res = self._query(count_query_str, pb.get_params())
+
         rows = raw_res.result_rows
         count = 0
         if rows and len(rows) == 1 and len(rows[0]) == 1:
@@ -325,10 +360,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        raw_res = self._query_stream(
-            cq.as_sql(pb),
-            pb.get_params(),
-        )
+        query = self._construct_query_str_maybe_do_pre_query(cq, pb)
+        raw_res = self._query_stream(query, pb.get_params())
 
         select_columns = [c.field for c in cq.select_fields]
 
@@ -1410,6 +1443,64 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         create_result = self.feedback_create(create_req)
 
         return tsi.FeedbackReplaceRes(**create_result.model_dump())
+
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        model_name = req.inputs.model
+        model_info = self._model_to_provider_info_map.get(model_name)
+        if not model_info:
+            raise InvalidRequest(f"No model info found for model {model_name}")
+        secret_fetcher = _secret_fetcher_context.get()
+        if not secret_fetcher:
+            raise InvalidRequest(
+                f"No secret fetcher found, cannot fetch API key for model {model_name}"
+            )
+        secret_name = model_info.get("api_key_name")
+        if not secret_name:
+            raise InvalidRequest(f"No secret name found for model {model_name}")
+        api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
+        if not api_key:
+            raise InvalidRequest(f"No API key found for model {model_name}")
+
+        start_time = datetime.datetime.now()
+        res = lite_llm_completion(api_key, req.inputs)
+        end_time = datetime.datetime.now()
+
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=req.project_id,
+            wb_user_id=req.wb_user_id,
+            op_name=COMPLETIONS_CREATE_OP_NAME,
+            started_at=start_time,
+            inputs={**req.inputs.model_dump(exclude_none=True)},
+            attributes={},
+        )
+        start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=req.project_id,
+            id=start_call.id,
+            ended_at=end_time,
+            output=res.response,
+            summary={},
+        )
+        if "usage" in res.response:
+            end.summary["usage"] = {req.inputs.model: res.response["usage"]}
+
+        if "error" in res.response:
+            end.exception = res.response["error"]
+        end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+        calls: list[Union[CallStartCHInsertable, CallEndCHInsertable]] = [
+            start_call,
+            end_call,
+        ]
+        batch_data = []
+        for call in calls:
+            call_dict = call.model_dump()
+            values = [call_dict.get(col) for col in all_call_insert_columns]
+            batch_data.append(values)
+
+        self._insert_call_batch(batch_data)
+        return res
 
     # Private Methods
     @property

@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "es2018",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "outDir": "./dist",
+    "paths": {
+      "weave": ["./src/index.ts"]
+    }
+  },
+  "exclude": ["src", "examples", "dist", "node_modules"],
+  "references": [
+    {
+      "path": "./src/tsconfig.src.json"
+    },
+    {
+      "path": "./examples/tsconfig.examples.json"
+    }
+  ]
+}
