@@ -33,7 +33,7 @@ describe('login', () => {
       },
     }));
 
-    await login({apiKey: 'test-api-key'});
+    await login('test-api-key');
 
     expect(mockSetEntry).toHaveBeenCalledWith('wandb.ai', {
       login: 'user',
@@ -43,10 +43,6 @@ describe('login', () => {
     expect(console.log).toHaveBeenCalledWith(
       'Successfully logged in.  Credentials saved for wandb.ai'
     );
-  });
-
-  it('should throw an error if API key is not provided', async () => {
-    await expect(login()).rejects.toThrow('API Key must be specified');
   });
 
   it('should throw an error if connection verification fails', async () => {
@@ -63,7 +59,7 @@ describe('login', () => {
       },
     }));
 
-    await expect(login({apiKey: 'test-api-key'})).rejects.toThrow(
+    await expect(login('test-api-key')).rejects.toThrow(
       'Unable to verify connection to the weave trace server with given API Key'
     );
   });
