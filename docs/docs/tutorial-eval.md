@@ -9,6 +9,9 @@ To iterate on an application, we need a way to evaluate if it's improving. To do
 
 ## 1. Build a `Model`
 
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+
 `Model`s store and version information about your system, such as prompts, temperatures, and more.
 Weave automatically captures when they are used and updates the version when there are changes.
 
@@ -20,8 +23,6 @@ Weave automatically captures when they are used and updates the version when the
 
 :::
 
-<Tabs groupId="programming-language">
-  <TabItem value="python" label="Python" default>
     ```python
     import json
     import openai
@@ -51,18 +52,8 @@ Weave automatically captures when they are used and updates the version when the
             return parsed
     ```
 
-  </TabItem>
-  <TabItem value="typescript" label="TypeScript">
-    ```plaintext
-    This feature is not available in TypeScript yet.  Stay tuned!
-    ```
-  </TabItem>
-</Tabs>
+    You can instantiate `Model` objects as normal like this:
 
-You can instantiate `Model` objects as normal like this:
-
-<Tabs groupId="programming-language">
-  <TabItem value="python" label="Python" default>
     ```python
     import asyncio
     import weave
@@ -77,22 +68,40 @@ You can instantiate `Model` objects as normal like this:
     # await model.predict(sentence)
     ```
 
-  </TabItem>
-  <TabItem value="typescript" label="TypeScript">
-    ```plaintext
-    This feature is not available in TypeScript yet.  Stay tuned!
-    ```
-  </TabItem>
-</Tabs>
-
 :::note
 Checkout the [Models](/guides/core-types/models) guide to learn more.
 :::
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+
+    `weave.Model` is not supported in TypeScript yet.  Instead, you can just wrap your model-like function with `weave.op`
+
+    ```typescript
+    // highlight-next-line
+    const model = weave.op(async function myModel({datasetRow}) {
+      const prompt = `Extract fields ("fruit": <str>, "color": <str>, "flavor") from the following text, as json: ${datasetRow.sentence}`;
+      const response = await openaiClient.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [{role: 'user', content: prompt}],
+        response_format: {type: 'json_object'},
+      });
+      const result = response?.choices?.[0]?.message?.content;
+      if (result == null) {
+        throw new Error('No response from model');
+      }
+      return JSON.parse(result);
+    });
+    ```
+
+  </TabItem>
+</Tabs>
 
 ## 2. Collect some examples
 
 <Tabs groupId="programming-language">
   <TabItem value="python" label="Python" default>
+
     ```python
     sentences = [
         "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.",
@@ -110,24 +119,45 @@ Checkout the [Models](/guides/core-types/models) guide to learn more.
         {'id': '2', 'sentence': sentences[2], 'target': labels[2]}
     ]
     ```
+
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-    ```plaintext
-    This feature is not available in TypeScript yet.  Stay tuned!
+  
+    ```typescript
+    const sentences = [
+      'There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.',
+      'Pounits are a bright green color and are more savory than sweet.',
+      'Finally, there are fruits called glowls, which have a very sour and bitter taste which is acidic and caustic, and a pale orange tinge to them.',
+    ];
+    const labels = [
+      {fruit: 'neoskizzles', color: 'purple', flavor: 'candy'},
+      {fruit: 'pounits', color: 'bright green', flavor: 'savory'},
+      {fruit: 'glowls', color: 'pale orange', flavor: 'sour and bitter'},
+    ];
+    const examples = [
+      {id: '0', sentence: sentences[0], target: labels[0]},
+      {id: '1', sentence: sentences[1], target: labels[1]},
+      {id: '2', sentence: sentences[2], target: labels[2]},
+    ];
+    const dataset = new weave.Dataset({
+      id: 'Fruit Dataset',
+      rows: examples,
+    });
     ```
   </TabItem>
 </Tabs>
 
 ## 3. Evaluate a `Model`
 
-`Evaluation`s assess a `Model`s performance on a set of examples using a list of specified scoring functions or `weave.flow.scorer.Scorer` classes.
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+
+`Evaluation`s assess a `Model`s performance on a set of examples using a list of specified scoring functions or `weave.scorer.Scorer` classes.
 
 Here, we'll use a default scoring class `MultiTaskBinaryClassificationF1` and we'll also define our own `fruit_name_score` scoring function.
 
 Here `sentence` is passed to the model's predict function, and `target` is used in the scoring function, these are inferred based on the argument names of the `predict` and scoring functions. The `fruit` key needs to be outputted by the model's predict function and must also be existing as a column in the dataset (or outputted by the `preprocess_model_input` function if defined).
 
-<Tabs groupId="programming-language">
-  <TabItem value="python" label="Python" default>
     ```python
     import weave
     from weave.scorers import MultiTaskBinaryClassificationF1
@@ -160,9 +190,33 @@ Here `sentence` is passed to the model's predict function, and `target` is used 
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-    ```plaintext
-    This feature is not available in TypeScript yet.  Stay tuned!
+`Evaluation`s assess a model's performance on a set of examples using a list of specified scoring functions.
+
+For this example, we'll define a few simple scoring functions.
+
+Here, `sentence` is passed to the model and `...` is used in the scoring function. These are defined...
+
+    ```typescript
+    import * as weave from 'weave';
+    import {OpenAI} from 'openai';
+
+    const client = await weave.init('intro-example');
+    const openaiClient = weave.wrapOpenAI(new OpenAI());
+
+    const fruitNameScorer = weave.op(
+      ({modelOutput, datasetRow}) => datasetRow.target.fruit == modelOutput.fruit,
+      {name: 'fruitNameScore'}
+    );
+
+    const evaluation = new weave.Evaluation({
+      dataset: ds,
+      scorers: [fruitNameScorer],
+    });
+
+    const results = await evaluation.evaluate(model);
+    console.log(JSON.stringify(results, null, 2));
     ```
+
   </TabItem>
 </Tabs>
 
@@ -172,6 +226,7 @@ In some applications we want to create custom `Scorer` classes - where for examp
 
 <Tabs groupId="programming-language">
   <TabItem value="python" label="Python" default>
+  
     ```python
     import json
     import asyncio
@@ -253,9 +308,69 @@ In some applications we want to create custom `Scorer` classes - where for examp
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-    ```plaintext
-    This feature is not available in TypeScript yet.  Stay tuned!
+
+    ```typescript
+    import {OpenAI} from 'openai';
+    import 'source-map-support/register';
+    import * as weave from 'weave';
+
+    const sentences = [
+      'There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.',
+      'Pounits are a bright green color and are more savory than sweet.',
+      'Finally, there are fruits called glowls, which have a very sour and bitter taste which is acidic and caustic, and a pale orange tinge to them.',
+      'There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.',
+    ];
+    const labels = [
+      {fruit: 'neoskizzles', color: 'purple', flavor: 'candy'},
+      {fruit: 'pounits', color: 'bright green', flavor: 'savory'},
+      {fruit: 'glowls', color: 'pale orange', flavor: 'sour and bitter'},
+    ];
+    const examples = [
+      {id: '0', sentence: sentences[0], target: labels[0]},
+      {id: '1', sentence: sentences[1], target: labels[1]},
+      {id: '2', sentence: sentences[2], target: labels[2]},
+    ];
+    const dataset = new weave.Dataset({
+      id: 'Fruit Dataset',
+      rows: examples,
+    });
+
+    const openaiClient = weave.wrapOpenAI(new OpenAI());
+
+    const model = weave.op(async function myModel({datasetRow}) {
+      const prompt = `Extract fields ("fruit": <str>, "color": <str>, "flavor") from the following text, as json: ${datasetRow.sentence}`;
+      const response = await openaiClient.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [{role: 'user', content: prompt}],
+        response_format: {type: 'json_object'},
+      });
+      const result = response?.choices?.[0]?.message?.content;
+      if (result == null) {
+        throw new Error('No response from model');
+      }
+      return JSON.parse(result);
+    });
+
+    const fruitNameScorer = weave.op(
+      ({modelOutput, datasetRow}) => datasetRow.target.fruit == modelOutput.fruit,
+      {name: 'fruitNameScore'}
+    );
+
+    async function main() {
+      await weave.init('examples');
+      const evaluation = new weave.Evaluation({
+        dataset,
+        scorers: [fruitNameScorer],
+      });
+
+      const results = await evaluation.evaluate({model});
+      console.log(JSON.stringify(results, null, 2));
+    }
+
+    main();
+
     ```
+
   </TabItem>
 </Tabs>
 
