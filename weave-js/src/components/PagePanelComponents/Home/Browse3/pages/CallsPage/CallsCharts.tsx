@@ -181,10 +181,8 @@ export const CallsCharts = ({
 
   return (
     <Tailwind>
-      {/* setting the width to the width of the screen minus the sidebar width because of overflow: 'hidden' properties in SimplePageLayout causing issues */}
-      <div className="md:w-[calc(100vw-56px)]">
-        <div className="mb-20 mt-10">{charts}</div>
-      </div>
+      {/* adding extra right margin because SimplePageLayout causes issues with overflow = hidden */}
+      <div className="mb-20 mr-[5px] mt-10">{charts}</div>
     </Tailwind>
   );
 };
