@@ -357,32 +357,35 @@ You can also manually create Calls using the API directly.
 
 <Tabs groupId="programming-language">
     <TabItem value="python" label="Python" default>
-    ```python showLineNumbers
-    import weave
 
-    # Initialize Weave Tracing
-    weave.init('intro-example')
+        ```python showLineNumbers
+        import weave
 
-    def my_function(name: str):
-        # Start a call
-        call = weave.create_call(op="my_function", inputs={"name": name})
+        # Initialize Weave Tracing
+        weave.init('intro-example')
 
-        # ... your function code ...
+        def my_function(name: str):
+            # Start a call
+            call = weave.create_call(op="my_function", inputs={"name": name})
 
-        # End a call
-        weave.finish_call(call, output="Hello, World!")
+            # ... your function code ...
 
-    # Call your function
-    print(my_function("World"))
-    ```
+            # End a call
+            weave.finish_call(call, output="Hello, World!")
+
+        # Call your function
+        print(my_function("World"))
+        ```
+
     </TabItem>
     <TabItem value="typescript" label="TypeScript">
-    ```typescript showLineNumbers
-    import * as weave from 'weave'
 
-    const client =await weave.init('intro-example')
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
     ```
+
     </TabItem>
+
     <TabItem value="service_api" label="HTTP API">
     * Start a call: [POST `/call/start`](../../reference/service-api/call-start-call-start-post.api.mdx)
     * End a call: [POST `/call/end`](../../reference/service-api/call-end-call-end-post.api.mdx)
