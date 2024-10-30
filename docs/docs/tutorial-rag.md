@@ -3,6 +3,12 @@ import TabItem from '@theme/TabItem';
 
 # Tutorial: Model-Based Evaluation of RAG applications
 
+:::warning
+
+This tutorial is currently only available for Python!
+
+:::
+
 Retrieval Augmented Generation (RAG) is a common way of building Generative AI applications that have access to custom knowledge bases.
 
 In this example, we'll show an example that has a retrieval step to get documents. By tracking this, you can debug your app and see what documents were pulled into the LLM context.
