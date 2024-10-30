@@ -141,12 +141,6 @@ class Evaluation(Object):
                 logger,
                 "Using 'model_output' key for compatibility with older scorers. Please update scorers to use 'output' parameter.",
             )
-        else:
-            self._output_key = "output"
-            util.warn_once(
-                logger,
-                "Using 'output' key for model results. Make sure your scorers expect an 'output' parameter.",
-            )
         self.scorers = scorers
 
         if isinstance(self.dataset, list):
