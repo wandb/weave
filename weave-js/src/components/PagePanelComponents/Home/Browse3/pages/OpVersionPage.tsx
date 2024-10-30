@@ -1,9 +1,14 @@
-import React, {useMemo} from 'react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import {Button} from '@wandb/weave/components/Button';
+import React, {useMemo, useState} from 'react';
 
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
+import {useClosePeek} from '../context';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {OpCodeViewer} from '../OpCodeViewer';
+import {DeleteModal} from './common/DeleteModal';
 import {
   CallsLink,
   opNiceName,
@@ -46,9 +51,13 @@ export const OpVersionPage: React.FC<{
 const OpVersionPageInner: React.FC<{
   opVersion: OpVersionSchema;
 }> = ({opVersion}) => {
-  const {useOpVersions, useCallsStats} = useWFHooks();
+  const {useOpVersions, useCallsStats, useObjectDeleteFunc} = useWFHooks();
   const uri = opVersionKeyToRefUri(opVersion);
   const {entity, project, opId, versionIndex} = opVersion;
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const closePeek = useClosePeek();
+  const objectDelete = useObjectDeleteFunc();
 
   const opVersions = useOpVersions(
     entity,
@@ -75,49 +84,72 @@ const OpVersionPageInner: React.FC<{
     <SimplePageLayoutWithHeader
       title={opVersionText(opId, versionIndex)}
       headerContent={
-        <SimpleKeyValueTable
-          data={{
-            Name: (
-              <>
-                {opId}{' '}
-                {opVersions.loading ? (
-                  <LoadingDots />
-                ) : (
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="flex-start"
+          width="100%">
+          <Box flexGrow={1}>
+            <SimpleKeyValueTable
+              data={{
+                Name: (
                   <>
-                    [
-                    <OpVersionsLink
+                    {opId}{' '}
+                    {opVersions.loading ? (
+                      <LoadingDots />
+                    ) : (
+                      <>
+                        [
+                        <OpVersionsLink
+                          entity={entity}
+                          project={project}
+                          filter={{
+                            opName: opId,
+                          }}
+                          versionCount={opVersionCount}
+                          neverPeek
+                          variant="secondary"
+                        />
+                        ]
+                      </>
+                    )}
+                  </>
+                ),
+                Version: <>{versionIndex}</>,
+                Calls:
+                  !callsStats.loading || opVersionCallCount > 0 ? (
+                    <CallsLink
                       entity={entity}
                       project={project}
+                      callCount={opVersionCallCount}
                       filter={{
-                        opName: opId,
+                        opVersionRefs: [uri],
                       }}
-                      versionCount={opVersionCount}
                       neverPeek
                       variant="secondary"
                     />
-                    ]
-                  </>
-                )}
-              </>
-            ),
-            Version: <>{versionIndex}</>,
-            Calls:
-              !callsStats.loading || opVersionCallCount > 0 ? (
-                <CallsLink
-                  entity={entity}
-                  project={project}
-                  callCount={opVersionCallCount}
-                  filter={{
-                    opVersionRefs: [uri],
-                  }}
-                  neverPeek
-                  variant="secondary"
-                />
-              ) : (
-                <></>
-              ),
-          }}
-        />
+                  ) : (
+                    <></>
+                  ),
+              }}
+            />
+          </Box>
+
+          <Box mr={1}>
+            <Button
+              icon="delete"
+              variant="ghost"
+              onClick={() => setDeleteModalOpen(true)}
+            />
+          </Box>
+          <DeleteModal
+            open={deleteModalOpen}
+            onClose={() => setDeleteModalOpen(false)}
+            deleteTargetStr={`${opVersion.opId}:v${opVersion.versionIndex}`}
+            onDelete={() => objectDelete(opVersion)}
+            onSuccess={closePeek}
+          />
+        </Stack>
       }
       tabs={[
         {

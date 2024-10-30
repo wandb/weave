@@ -1,16 +1,9 @@
-import {
-  Dialog,
-  DialogActions as MaterialDialogActions,
-  DialogContent as MaterialDialogContent,
-  DialogTitle as MaterialDialogTitle,
-} from '@material-ui/core';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import {Button} from '@wandb/weave/components/Button';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import numeral from 'numeral';
 import React, {useMemo, useState} from 'react';
-import styled from 'styled-components';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
 import {Icon, IconName} from '../../../../Icon';
@@ -23,6 +16,7 @@ import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatc
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
+import {DeleteModal} from './common/DeleteModal';
 import {
   CallLink,
   CallsLink,
@@ -117,7 +111,10 @@ const ObjectVersionPageInner: React.FC<{
 }> = ({objectVersion}) => {
   useObjectViewEvent(objectVersion);
 
-  const {useRootObjectVersions, useCalls, useRefsData} = useWFHooks();
+  const closePeek = useClosePeek();
+  const {useRootObjectVersions, useCalls, useRefsData, useObjectDeleteFunc} =
+    useWFHooks();
+  const objectDelete = useObjectDeleteFunc();
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
   const objectName = objectVersion.objectId;
@@ -292,9 +289,11 @@ const ObjectVersionPageInner: React.FC<{
             />
           </Box>
           <DeleteModal
-            object={objectVersion}
             open={deleteModalOpen}
             onClose={() => setDeleteModalOpen(false)}
+            deleteTargetStr={`${objectVersion.objectId}:v${objectVersion.versionIndex}`}
+            onDelete={() => objectDelete(objectVersion)}
+            onSuccess={closePeek}
           />
         </Stack>
       }
@@ -665,98 +664,5 @@ const OpVersionCallsLink: React.FC<{
       />
       ]
     </>
-  );
-};
-
-const DialogContent = styled(MaterialDialogContent)`
-  padding: 0 32px !important;
-`;
-DialogContent.displayName = 'S.DialogContent';
-
-const DialogTitle = styled(MaterialDialogTitle)`
-  padding: 32px 32px 16px 32px !important;
-
-  h2 {
-    font-weight: 600;
-    font-size: 24px;
-    line-height: 30px;
-  }
-`;
-DialogTitle.displayName = 'S.DialogTitle';
-
-const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
-  justify-content: ${({$align}) =>
-    $align === 'left' ? 'flex-start' : 'flex-end'} !important;
-  padding: 32px 32px 32px 32px !important;
-`;
-DialogActions.displayName = 'S.DialogActions';
-
-const DeleteModal: React.FC<{
-  object: ObjectVersionSchema;
-  open: boolean;
-  onClose: () => void;
-}> = ({object, open, onClose}) => {
-  const {useObjectDeleteFunc} = useWFHooks();
-  const objectDelete = useObjectDeleteFunc();
-  const closePeek = useClosePeek();
-
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const deleteTargetStr = `${object.objectId}:v${object.versionIndex}`;
-
-  const onDelete = () => {
-    setDeleteLoading(true);
-    objectDelete(object)
-      .then(() => {
-        onClose();
-        closePeek();
-      })
-      .catch(err => {
-        setError(err.message);
-      })
-      .finally(() => {
-        setDeleteLoading(false);
-      });
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onClose={() => {
-        onClose();
-        setError(null);
-      }}
-      maxWidth="xs"
-      fullWidth>
-      <DialogTitle>Delete {deleteTargetStr}</DialogTitle>
-      <DialogContent style={{overflow: 'hidden'}}>
-        {error != null ? (
-          <p style={{color: 'red'}}>{error}</p>
-        ) : (
-          <p>Are you sure you want to delete?</p>
-        )}
-        <span style={{fontSize: '16px', fontWeight: '600'}}>
-          {deleteTargetStr}
-        </span>
-      </DialogContent>
-      <DialogActions $align="left">
-        <Button
-          variant="destructive"
-          disabled={error != null || deleteLoading}
-          onClick={onDelete}>
-          {`Delete ${deleteTargetStr}`}
-        </Button>
-        <Button
-          variant="ghost"
-          disabled={deleteLoading}
-          onClick={() => {
-            onClose();
-            setError(null);
-          }}>
-          Cancel
-        </Button>
-      </DialogActions>
-    </Dialog>
   );
 };

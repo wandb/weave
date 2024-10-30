@@ -757,10 +757,90 @@ const useOpVersion = (
   }, [cachedOpVersion, key, opVersionRes, error]);
 };
 
+const useOpVersions = (
+  entity: string,
+  project: string,
+  filter: OpVersionFilter,
+  limit?: number,
+  metadataOnly?: boolean,
+  opts?: {skip?: boolean}
+): LoadableWithError<OpVersionSchema[]> => {
+  const getTsClient = useGetTraceServerClientContext();
+  const loadingRef = useRef(false);
+  const [opVersionRes, setOpVersionRes] = useState<
+    LoadableWithError<OpVersionSchema[]>
+  >({
+    loading: false,
+    error: null,
+    result: null,
+  });
+  const deepFilter = useDeepMemo(filter);
+
+  const doFetch = useCallback(() => {
+    if (opts?.skip) {
+      return;
+    }
+    setOpVersionRes({loading: true, error: null, result: null});
+    loadingRef.current = true;
+
+    const req: traceServerTypes.TraceObjQueryReq = {
+      project_id: projectIdFromParts({entity, project}),
+      filter: {
+        object_ids: deepFilter.opIds,
+        latest_only: deepFilter.latestOnly,
+        is_op: true,
+      },
+      limit,
+      metadata_only: metadataOnly,
+    };
+    const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
+      loadingRef.current = false;
+      setOpVersionRes({
+        loading: false,
+        error: null,
+        result: res.objs.map(convertTraceServerObjectVersionToOpSchema),
+      });
+    };
+    const onError = (e: any) => {
+      loadingRef.current = false;
+      console.error(e);
+      setOpVersionRes({loading: false, error: e, result: null});
+    };
+    getTsClient().objsQuery(req).then(onSuccess).catch(onError);
+  }, [
+    deepFilter,
+    getTsClient,
+    opts?.skip,
+    entity,
+    project,
+    limit,
+    metadataOnly,
+  ]);
+
+  useEffect(() => {
+    doFetch();
+  }, [doFetch]);
+
+  useEffect(() => {
+    return getTsClient().registerOnObjectListener(doFetch);
+  }, [getTsClient, doFetch]);
+
+  return useMemo(() => {
+    if (opts?.skip) {
+      return {loading: false, error: null, result: null};
+    }
+    if (opVersionRes == null || loadingRef.current) {
+      return {loading: true, error: null, result: null};
+    }
+    return opVersionRes;
+  }, [opVersionRes, opts?.skip]);
+};
+
+// Helper function to convert trace server object version to op schema
 const convertTraceServerObjectVersionToOpSchema = (
   obj: traceServerTypes.TraceObjSchema
 ): OpVersionSchema => {
-  const [entity, project] = obj.project_id.split('/');
+  const {entity, project} = projectIdToParts(obj.project_id);
   return {
     entity,
     project,
@@ -770,36 +850,6 @@ const convertTraceServerObjectVersionToOpSchema = (
     versionIndex: obj.version_index,
   };
 };
-
-const useOpVersions = makeTraceServerEndpointHook<
-  'objsQuery',
-  [string, string, OpVersionFilter, number?, boolean?, {skip?: boolean}?],
-  OpVersionSchema[]
->(
-  'objsQuery',
-  (
-    entity: string,
-    project: string,
-    filter: OpVersionFilter,
-    limit?: number,
-    metadataOnly?: boolean,
-    opts?: {skip?: boolean}
-  ) => ({
-    params: {
-      project_id: projectIdFromParts({entity, project}),
-      filter: {
-        object_ids: filter.opIds,
-        latest_only: filter.latestOnly,
-        is_op: true,
-      },
-      limit,
-      metadata_only: metadataOnly,
-    },
-    skip: opts?.skip,
-  }),
-  (res): OpVersionSchema[] =>
-    res.objs.map(convertTraceServerObjectVersionToOpSchema)
-);
 
 const useFileContent = makeTraceServerEndpointHook<
   'fileContent',
@@ -1025,13 +1075,19 @@ const useObjectDeleteFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
   const objectDelete = useCallback(
-    (key: ObjectVersionKey) => {
+    (key: ObjectVersionKey | OpVersionKey) => {
+      let objectId = '';
+      if ('objectId' in key) {
+        objectId = key.objectId;
+      } else {
+        objectId = key.opId;
+      }
       return getTsClient().objectDelete({
         project_id: projectIdFromParts({
           entity: key.entity,
           project: key.project,
         }),
-        object_id: key.objectId,
+        object_id: objectId,
         digest: key.versionHash,
       });
     },
