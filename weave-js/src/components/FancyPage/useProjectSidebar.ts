@@ -163,7 +163,7 @@ export const useProjectSidebar = (
             name: 'Mods',
             slug: 'weave/mods',
             isShown: showWeaveSidebarItems || isShowAll,
-            iconName: IconNames.DockerWhale,
+            iconName: IconNames.LayoutGrid,
           },
           {
             type: 'divider' as const,

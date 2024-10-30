@@ -3,11 +3,10 @@ import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
-import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid2';
 import TextField from '@mui/material/TextField';
 import React, {useState} from 'react';
-import {Link, useHistory, useSearchParams} from 'react-router-dom';
+import {Link} from 'react-router-dom';
 
 import {SimplePageLayout} from './common/SimplePageLayout';
 
@@ -39,9 +38,9 @@ const mods: ModCategories = {
   ],
   Analysis: [
     {
-      id: 'coding-agents',
-      name: 'Coding Agents',
-      description: 'Analyize the effectiveness of code generation agents',
+      id: 'agi',
+      name: 'AGI Agent',
+      description: 'Run an agent that can interact with a computer',
     },
     {
       id: 'embedding-classifier',
@@ -80,13 +79,13 @@ const ModCategory: React.FC<{
       <h5
         style={{
           fontWeight: 600,
-          fontSize: '1.2rem',
+          opacity: 0.8,
+          fontSize: '1.1rem',
           padding: '0.5em 1em',
           marginBottom: 0,
         }}>
         {category}
       </h5>
-      <Divider />
       <ModCards mods={mods} entity={entity} project={project} />
     </Box>
   );
@@ -97,8 +96,7 @@ const ModCards: React.FC<{mods: Mod[]; entity: string; project: string}> = ({
   entity,
   project,
 }) => {
-  const history = useHistory();
-  const [searchParams] = useSearchParams();
+  const searchParams = new URLSearchParams(window.location.search);
   const [gistId, setGistId] = useState('');
 
   const purl =
@@ -108,7 +106,7 @@ const ModCards: React.FC<{mods: Mod[]; entity: string; project: string}> = ({
     <Grid container spacing={2} sx={{padding: '1em'}}>
       {mods.map(mod => (
         <Grid size={3} key={mod.id}>
-          <Card variant="outlined">
+          <Card variant="outlined" sx={{height: 180}}>
             <CardContent>
               <h5 style={{fontWeight: 600, fontSize: '1.15rem'}}>{mod.name}</h5>
               <p>{mod.description}</p>
@@ -145,6 +143,8 @@ const ModFrame: React.FC<{entity: string; project: string; modId: string}> = ({
   project,
   modId,
 }) => {
+  const searchParams = new URLSearchParams(window.location.search);
+  const purl = searchParams.get('purl');
   return (
     <iframe
       style={{width: '100%', height: '100vh', border: 'none'}}
@@ -153,7 +153,7 @@ const ModFrame: React.FC<{entity: string; project: string; modId: string}> = ({
       sandbox="allow-downloads allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-storage-access-by-user-activation"
       src={`/service-redirect/${entity}/${project}/${encodeURIComponent(
         modId
-      )}/mod`}
+      )}/mod?purl=${purl}`}
     />
   );
 };
@@ -167,34 +167,32 @@ export const ModsPage: React.FC<{
     <ModFrame entity={entity} project={project} modId={itemName} />
   ) : (
     <SimplePageLayout
-      title={'Weave Mods'}
+      title={'Mods'}
       hideTabsIfSingle
       tabs={[
         {
           label: '',
           content: (
-            <>
+            <div style={{paddingTop: '1em'}}>
               <ModCategory
                 entity={entity}
                 project={project}
                 category="Labeling"
                 mods={mods.Labeling}
               />
-              <Divider />
               <ModCategory
                 entity={entity}
                 project={project}
                 category="Analysis"
                 mods={mods.Analysis}
               />
-              <Divider />
               <ModCategory
                 entity={entity}
                 project={project}
                 category="Demos"
                 mods={mods.Demos}
               />
-            </>
+            </div>
           ),
         },
       ]}
