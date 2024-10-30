@@ -402,19 +402,6 @@ export const ObjectViewer = ({
           return null;
         }
 
-        // Hack to show the object name with a strikethrough if deleted
-        if (params.row.value?._weave_is_deleted_ref) {
-          return (
-            <Box
-              sx={{
-                textOverflow: 'ellipsis',
-                textDecoration: 'line-through',
-              }}>
-              {params.row.value?._weave_is_deleted_ref}
-            </Box>
-          );
-        }
-
         return (
           <ObjectViewerGroupingCell
             {...params}
