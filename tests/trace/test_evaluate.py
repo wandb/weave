@@ -155,7 +155,35 @@ def test_score_with_custom_summarize(client):
 
 
 @pytest.mark.asyncio
-async def test_basic_evaluation_with_mixed_scorer_styles(client):
+@pytest.mark.parametrize(
+    "scorers,expected_output_key",
+    [
+        # All scorer styles
+        (
+            ["fn_old", "fn_new", "class_old", "class_new"],
+            "model_output",
+        ),
+        # Only old class style
+        (
+            ["fn_new", "class_old", "class_new"],
+            "model_output",
+        ),
+        # Only old fn style
+        (
+            ["fn_old", "fn_new", "class_new"],
+            "model_output",
+        ),
+        # Only new styles
+        (
+            ["fn_new", "class_new"],
+            "output",
+        ),
+    ],
+)
+async def test_basic_evaluation_with_scorer_styles(
+    client, scorers, expected_output_key
+):
+    # Define all possible scorers
     @weave.op
     def fn_scorer_with_old_style(col_a, col_b, model_output, target):
         return col_a + col_b == model_output == target
@@ -174,25 +202,32 @@ async def test_basic_evaluation_with_mixed_scorer_styles(client):
         def score(self, a, b, output, c):
             return a + b == output == c
 
+    # Map scorer keys to actual scorer instances
+    scorer_map = {
+        "fn_old": fn_scorer_with_old_style,
+        "fn_new": fn_scorer_with_new_style,
+        "class_old": ClassScorerWithOldStyle(),
+        "class_new": ClassScorerWithNewStyle(
+            column_map={
+                "a": "col_a",
+                "b": "col_b",
+                "c": "target",
+            }
+        ),
+    }
+
     dataset = [
         {"col_a": 1, "col_b": 2, "target": 3},
         {"col_a": 1, "col_b": 2, "target": 3},
         {"col_a": 1, "col_b": 2, "target": 3},
     ]
+
+    # Get actual scorer instances based on parameter
+    actual_scorers = [scorer_map[s] for s in scorers]
+
     evaluation = Evaluation(
         dataset=dataset,
-        scorers=[
-            fn_scorer_with_old_style,
-            fn_scorer_with_new_style,
-            ClassScorerWithOldStyle(),
-            ClassScorerWithNewStyle(
-                column_map={
-                    "a": "col_a",
-                    "b": "col_b",
-                    "c": "target",
-                }
-            ),
-        ],
+        scorers=actual_scorers,
     )
 
     @weave.op
@@ -201,30 +236,31 @@ async def test_basic_evaluation_with_mixed_scorer_styles(client):
 
     result = await evaluation.evaluate(model)
     assert result.pop("model_latency").get("mean") == pytest.approx(0, abs=1)
-    assert result == {
-        # Should now be `output` even if there are scorers that use `model_output`
-        "output": {"mean": 3.0},
-        "fn_scorer_with_old_style": {"true_count": 3, "true_fraction": 1.0},
-        "fn_scorer_with_new_style": {"true_count": 3, "true_fraction": 1.0},
-        "ClassScorerWithOldStyle": {"true_count": 3, "true_fraction": 1.0},
-        "ClassScorerWithNewStyle": {"true_count": 3, "true_fraction": 1.0},
-    }
 
+    # Build expected result dynamically
+    expected_result = {
+        expected_output_key: {"mean": 3.0},
+    }
+    scorer_results = {
+        "fn_old": "fn_scorer_with_old_style",
+        "fn_new": "fn_scorer_with_new_style",
+        "class_old": "ClassScorerWithOldStyle",
+        "class_new": "ClassScorerWithNewStyle",
+    }
+    for s in scorers:
+        expected_result[scorer_results[s]] = {"true_count": 3, "true_fraction": 1.0}
+
+    assert result == expected_result
+
+    # Verify individual prediction outputs
     predict_and_score_calls = list(evaluation.predict_and_score.calls())
     assert len(predict_and_score_calls) == 3
     outputs = [c.output for c in predict_and_score_calls]
     assert all(o.pop("model_latency") == pytest.approx(0, abs=1) for o in outputs)
-    assert all(
-        o
-        == {
-            # Should now be `output` even if there are scorers that use `model_output`
-            "output": 3.0,
-            "scores": {
-                "fn_scorer_with_old_style": True,
-                "fn_scorer_with_new_style": True,
-                "ClassScorerWithOldStyle": True,
-                "ClassScorerWithNewStyle": True,
-            },
-        }
-        for o in outputs
-    )
+
+    # Build expected output dynamically
+    expected_output = {
+        expected_output_key: 3.0,
+        "scores": {scorer_results[s]: True for s in scorers},
+    }
+    assert all(o == expected_output for o in outputs)
