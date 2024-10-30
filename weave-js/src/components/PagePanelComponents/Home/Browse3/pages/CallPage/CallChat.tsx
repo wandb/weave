@@ -2,12 +2,14 @@
  * Get normalized version of call data in chat format and display it.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 
 import {LoadingDots} from '../../../../../LoadingDots';
 import {ChatView} from '../ChatView/ChatView';
 import {useCallAsChat} from '../ChatView/hooks';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
+
+const DRAWER_ANIMATION_BUFFER_TIME = 400;
 
 type CallChatProps = {call: TraceCallSchema};
 
@@ -19,7 +21,7 @@ export const CallChat = ({call}: CallChatProps) => {
   useEffect(() => {
     setTimeout(() => {
       setDrawerAnimationBuffer(false);
-    }, 300);
+    }, DRAWER_ANIMATION_BUFFER_TIME);
   }, []);
 
   if (chat.loading || drawerAnimationBuffer) {
