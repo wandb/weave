@@ -470,10 +470,10 @@ class ObjDeleteReq(BaseModel):
     object_id: str
     digest: str
 
-    purge_value: Optional[bool] = Field(
+    include_children: Optional[bool] = Field(
         default=False,
-        description="If true, the object value will be permanently deleted "
-        "from the database. This action is irreversible.",
+        description="Recursively delete children of this object that are not "
+        "used by other objects"
     )
 
 

@@ -233,6 +233,7 @@ export type TraceObjDeleteReq = {
   project_id: string;
   object_id: string;
   digest: string;
+  include_children?: boolean;
 };
 
 export type TraceRefsReadBatchReq = {

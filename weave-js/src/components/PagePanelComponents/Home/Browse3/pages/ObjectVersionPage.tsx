@@ -292,7 +292,9 @@ const ObjectVersionPageInner: React.FC<{
             open={deleteModalOpen}
             onClose={() => setDeleteModalOpen(false)}
             deleteTargetStr={`${objectVersion.objectId}:v${objectVersion.versionIndex}`}
-            onDelete={() => objectDelete(objectVersion)}
+            onDelete={(includeChildren) =>
+              objectDelete(objectVersion, includeChildren)
+            }
             onSuccess={closePeek}
           />
         </Stack>

@@ -711,31 +711,76 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         #    - This object should be IDENTICAL to the original, including
         #      the created_at time, this will become the only copy of the
         #      object when the db deduplicates on primary key
-        #    - If purge_value is True, set val_dump to "<DELETED>"
         db_obj = self._obj_read(
             req.project_id,
             req.object_id,
             req.digest,
-            # If purging, don't read the value from the db
-            metadata_only=bool(req.purge_value),
+            metadata_only=False
         )
-        val = "<DELETED>" if req.purge_value else db_obj.val_dump
-        ch_obj = ObjDeleteCHInsertable(
+
+        delete_insertables: list[ObjDeleteCHInsertable] = []
+
+        print("DELETING OBJECT", req.project_id, db_obj.kind, db_obj.object_id, db_obj.digest)
+
+        # if req.include_children:
+        if True:
+            obj_refs = db_obj.refs
+
+            # for each child ref, find all objects that also reference it
+            for obj_ref in obj_refs:
+                dependents = self._select_objs_query(
+                    req.project_id,
+                    conditions=["has(refs, {ref: String})"],
+                    parameters={"ref": obj_ref},
+                    metadata_only=True,
+                    limit=1000,
+                )
+                print("REF", obj_ref, "DEPENDENTS\n", dependents)
+
+                if len(dependents) > 0:
+                    print("CHILD HAS DEPENDENTS, SKIPPING CHILD DELETE")
+                    continue
+
+                # no dependents, so we can delete this object
+                # read from db
+                child_obj = ri.parse_internal_uri(obj_ref)
+                if not isinstance(child_obj, ri.InternalObjectRef):
+                    raise ValueError(f"Expected InternalObjectRef, got {type(child_obj)}")
+                
+                child_ch_obj = self._obj_read(
+                    child_obj.project_id,
+                    child_obj.name,
+                    child_obj.version,
+                    metadata_only=False,
+                )
+                delete_insertables.append(ObjDeleteCHInsertable(
+                    project_id=child_ch_obj.project_id,
+                    object_id=child_ch_obj.object_id,
+                    digest=child_ch_obj.digest,
+                    kind=child_ch_obj.kind,
+                    val_dump=child_ch_obj.val_dump,
+                    refs=child_ch_obj.refs,
+                    base_object_class=child_ch_obj.base_object_class,
+                    deleted_at=datetime.datetime.now(datetime.timezone.utc),
+                    created_at=_ensure_datetimes_have_tz_strict(child_ch_obj.created_at),
+                ))
+
+        delete_insertables.append(ObjDeleteCHInsertable(
             project_id=req.project_id,
             object_id=req.object_id,
             digest=req.digest,
             kind=db_obj.kind,
-            val_dump=val,
+            val_dump=db_obj.val_dump,
             refs=db_obj.refs,
             base_object_class=db_obj.base_object_class,
             deleted_at=datetime.datetime.now(datetime.timezone.utc),
-            # Use the original created_at time
-            created_at=_ensure_datetimes_have_tz(db_obj.created_at),
-        )
+            # ! Use the original created_at time !
+            created_at=_ensure_datetimes_have_tz_strict(db_obj.created_at),
+        ))
         self._insert(
             "object_versions",
-            data=[list(ch_obj.model_dump().values())],
-            column_names=list(ch_obj.model_fields.keys()),
+            data=[list(ch_obj.model_dump().values()) for ch_obj in delete_insertables],
+            column_names=list(delete_insertables[0].model_fields.keys()),
         )
         return tsi.ObjDeleteRes()
 
@@ -1947,6 +1992,14 @@ def _ensure_datetimes_have_tz(
     if dt.tzinfo is None:
         return dt.replace(tzinfo=datetime.timezone.utc)
     return dt
+
+def _ensure_datetimes_have_tz_strict(
+    dt: datetime.datetime,
+) -> datetime.datetime:
+    res = _ensure_datetimes_have_tz(dt)
+    if res is None:
+        raise ValueError(f"Datetime is None: {dt}")
+    return res
 
 
 def _nullable_dict_dump_to_dict(

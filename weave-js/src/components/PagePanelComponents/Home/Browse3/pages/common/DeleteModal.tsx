@@ -4,14 +4,16 @@ import {
   DialogContent as MaterialDialogContent,
   DialogTitle as MaterialDialogTitle,
 } from '@material-ui/core';
+import { Switch } from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
+import { Tailwind } from '@wandb/weave/components/Tailwind';
 import React, {useState} from 'react';
 import styled from 'styled-components';
 
 interface DeleteModalProps {
   open: boolean;
   onClose: () => void;
-  onDelete: () => Promise<void>;
+  onDelete: (includeChildren: boolean) => Promise<void>;
   deleteTargetStr: string;
   onSuccess?: () => void;
 }
@@ -25,10 +27,11 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
 }) => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [includeChildren, setIncludeChildren] = useState(false);
 
   const handleDelete = () => {
     setDeleteLoading(true);
-    onDelete()
+    onDelete(includeChildren)
       .then(() => {
         onClose();
         onSuccess?.();
@@ -50,16 +53,31 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
       }}
       maxWidth="xs"
       fullWidth>
+      <Tailwind>
       <DialogTitle>Delete {deleteTargetStr}</DialogTitle>
       <DialogContent style={{overflow: 'hidden'}}>
-        {error != null ? (
-          <p style={{color: 'red'}}>{error}</p>
-        ) : (
-          <p>Are you sure you want to delete?</p>
-        )}
-        <span style={{fontSize: '16px', fontWeight: '600'}}>
+        <div className="mb-16">
+          {error != null ? (
+            <p style={{color: 'red'}}>{error}</p>
+          ) : (
+            <p>Are you sure you want to delete?</p>
+          )}
+        </div>
+        <span className="text-md font-semibold mt-10">
           {deleteTargetStr}
         </span>
+        {/* <div className="flex items-center mt-10">
+        <label htmlFor="include-children" className="mr-10 pb-2">
+          Include children
+        </label>
+        <Switch.Root
+          id="include-children"
+          size="small"
+          checked={includeChildren}
+          onCheckedChange={setIncludeChildren}>
+          <Switch.Thumb size="small" checked={includeChildren} />
+        </Switch.Root>
+      </div> */}
       </DialogContent>
       <DialogActions $align="left">
         <Button
@@ -77,7 +95,20 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
           }}>
           Cancel
         </Button>
+        <div className="flex items-center">
+        <label htmlFor="include-children" className="mr-8">
+          Recurse
+        </label>
+        <Switch.Root
+          id="include-children"
+          size="small"
+          checked={includeChildren}
+          onCheckedChange={setIncludeChildren}>
+          <Switch.Thumb size="small" checked={includeChildren} />
+        </Switch.Root>
+      </div>
       </DialogActions>
+      </Tailwind>
     </Dialog>
   );
 };

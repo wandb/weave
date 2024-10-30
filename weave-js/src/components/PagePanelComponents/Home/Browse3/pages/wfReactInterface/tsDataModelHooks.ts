@@ -1075,7 +1075,7 @@ const useObjectDeleteFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
   const objectDelete = useCallback(
-    (key: ObjectVersionKey | OpVersionKey) => {
+    (key: ObjectVersionKey | OpVersionKey, includeChildren: boolean) => {
       let objectId = '';
       if ('objectId' in key) {
         objectId = key.objectId;
@@ -1089,6 +1089,7 @@ const useObjectDeleteFunc = () => {
         }),
         object_id: objectId,
         digest: key.versionHash,
+        include_children: includeChildren,
       });
     },
     [getTsClient]
