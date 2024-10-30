@@ -580,7 +580,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         digest = str_digest(json_val)
 
         req_obj = req.obj
-
         ch_obj = ObjCHInsertable(
             project_id=req_obj.project_id,
             object_id=req_obj.object_id,
