@@ -351,3 +351,10 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     ) -> tsi.ExecuteBatchActionRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.execute_batch_action, req)
+
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        res = self._ref_apply(self._internal_trace_server.completions_create, req)
+        return res

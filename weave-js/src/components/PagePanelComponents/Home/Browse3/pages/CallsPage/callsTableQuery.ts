@@ -32,9 +32,9 @@ export const useCallsForQuery = (
   project: string,
   filter: WFHighLevelCallFilter,
   gridFilter: GridFilterModel,
-  gridSort: GridSortModel,
   gridPage: GridPaginationModel,
-  expandedColumns: Set<string>,
+  gridSort?: GridSortModel,
+  expandedColumns?: Set<string>,
   columns?: string[]
 ): {
   costsLoading: boolean;
@@ -44,8 +44,8 @@ export const useCallsForQuery = (
   refetch: () => void;
 } => {
   const {useCalls, useCallsStats} = useWFHooks();
-  const offset = gridPage.page * gridPage.pageSize;
-  const limit = gridPage.pageSize;
+  const effectiveOffset = gridPage?.page * gridPage?.pageSize;
+  const effectiveLimit = gridPage.pageSize;
   const {sortBy, lowLevelFilter, filterBy} = useFilterSortby(
     filter,
     gridFilter,
@@ -56,8 +56,8 @@ export const useCallsForQuery = (
     entity,
     project,
     lowLevelFilter,
-    limit,
-    offset,
+    effectiveLimit,
+    effectiveOffset,
     sortBy,
     filterBy,
     columns,
@@ -77,11 +77,16 @@ export const useCallsForQuery = (
 
   const total = useMemo(() => {
     if (callsStats.loading || callsStats.result == null) {
-      return offset + callResults.length;
+      return effectiveOffset + callResults.length;
     } else {
       return callsStats.result.count;
     }
-  }, [callResults.length, callsStats.loading, callsStats.result, offset]);
+  }, [
+    callResults.length,
+    callsStats.loading,
+    callsStats.result,
+    effectiveOffset,
+  ]);
 
   const costFilter: CallFilter = useMemo(
     () => ({
@@ -94,7 +99,7 @@ export const useCallsForQuery = (
     entity,
     project,
     costFilter,
-    limit,
+    effectiveLimit,
     undefined,
     sortBy,
     undefined,
