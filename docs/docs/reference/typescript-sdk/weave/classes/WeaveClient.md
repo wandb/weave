@@ -2,7 +2,7 @@
 
 ***
 
-[weave](../globals.md) / WeaveClient
+[weave](../README.md) / WeaveClient
 
 # Class: WeaveClient
 
@@ -28,7 +28,7 @@
 
 #### Defined in
 
-[weaveClient.ts:82](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L82)
+[weaveClient.ts:82](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L82)
 
 ## Properties
 
@@ -38,7 +38,7 @@
 
 #### Defined in
 
-[weaveClient.ts:85](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L85)
+[weaveClient.ts:85](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L85)
 
 ***
 
@@ -48,7 +48,7 @@
 
 #### Defined in
 
-[weaveClient.ts:86](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L86)
+[weaveClient.ts:86](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L86)
 
 ***
 
@@ -58,7 +58,7 @@
 
 #### Defined in
 
-[weaveClient.ts:83](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L83)
+[weaveClient.ts:83](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L83)
 
 ## Methods
 
@@ -90,7 +90,7 @@
 
 #### Defined in
 
-[weaveClient.ts:610](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L610)
+[weaveClient.ts:610](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L610)
 
 ***
 
@@ -118,7 +118,7 @@
 
 #### Defined in
 
-[weaveClient.ts:648](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L648)
+[weaveClient.ts:648](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L648)
 
 ***
 
@@ -144,7 +144,7 @@
 
 #### Defined in
 
-[weaveClient.ts:677](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L677)
+[weaveClient.ts:677](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L677)
 
 ***
 
@@ -162,7 +162,7 @@
 
 #### Defined in
 
-[weaveClient.ts:229](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L229)
+[weaveClient.ts:229](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L229)
 
 ***
 
@@ -184,7 +184,7 @@
 
 #### Defined in
 
-[weaveClient.ts:172](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L172)
+[weaveClient.ts:172](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L172)
 
 ***
 
@@ -206,7 +206,7 @@
 
 #### Defined in
 
-[weaveClient.ts:184](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L184)
+[weaveClient.ts:184](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L184)
 
 ***
 
@@ -220,7 +220,7 @@
 
 #### Defined in
 
-[weaveClient.ts:537](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L537)
+[weaveClient.ts:537](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L537)
 
 ***
 
@@ -240,7 +240,7 @@
 
 #### Defined in
 
-[weaveClient.ts:160](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L160)
+[weaveClient.ts:160](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L160)
 
 ***
 
@@ -266,7 +266,7 @@
 
 #### Defined in
 
-[weaveClient.ts:541](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L541)
+[weaveClient.ts:541](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L541)
 
 ***
 
@@ -290,7 +290,7 @@
 
 #### Defined in
 
-[weaveClient.ts:545](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L545)
+[weaveClient.ts:545](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L545)
 
 ***
 
@@ -310,7 +310,7 @@
 
 #### Defined in
 
-[weaveClient.ts:575](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L575)
+[weaveClient.ts:575](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L575)
 
 ***
 
@@ -324,4 +324,4 @@
 
 #### Defined in
 
-[weaveClient.ts:103](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveClient.ts#L103)
+[weaveClient.ts:103](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L103)

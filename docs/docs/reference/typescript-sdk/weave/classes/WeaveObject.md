@@ -2,7 +2,7 @@
 
 ***
 
-[weave](../globals.md) / WeaveObject
+[weave](../README.md) / WeaveObject
 
 # Class: WeaveObject
 
@@ -27,7 +27,7 @@
 
 #### Defined in
 
-[weaveObject.ts:51](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L51)
+[weaveObject.ts:51](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L51)
 
 ## Properties
 
@@ -37,7 +37,7 @@
 
 #### Defined in
 
-[weaveObject.ts:49](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L49)
+[weaveObject.ts:49](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L49)
 
 ***
 
@@ -47,7 +47,7 @@
 
 #### Defined in
 
-[weaveObject.ts:51](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L51)
+[weaveObject.ts:51](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L51)
 
 ## Accessors
 
@@ -61,7 +61,7 @@
 
 #### Defined in
 
-[weaveObject.ts:89](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L89)
+[weaveObject.ts:89](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L89)
 
 ***
 
@@ -75,7 +75,7 @@
 
 #### Defined in
 
-[weaveObject.ts:85](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L85)
+[weaveObject.ts:85](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L85)
 
 ## Methods
 
@@ -89,7 +89,7 @@
 
 #### Defined in
 
-[weaveObject.ts:53](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L53)
+[weaveObject.ts:53](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L53)
 
 ***
 
@@ -103,4 +103,4 @@
 
 #### Defined in
 
-[weaveObject.ts:57](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L57)
+[weaveObject.ts:57](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L57)

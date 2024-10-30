@@ -2,7 +2,7 @@
 
 ***
 
-[weave](../globals.md) / Evaluation
+[weave](../README.md) / Evaluation
 
 # Class: Evaluation\<R, E, M\>
 
@@ -78,7 +78,7 @@ const results = await evaluation.evaluate({ model });
 
 #### Defined in
 
-[evaluation.ts:148](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/evaluation.ts#L148)
+[evaluation.ts:148](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/evaluation.ts#L148)
 
 ## Properties
 
@@ -92,7 +92,7 @@ const results = await evaluation.evaluate({ model });
 
 #### Defined in
 
-[weaveObject.ts:49](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L49)
+[weaveObject.ts:49](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L49)
 
 ***
 
@@ -106,7 +106,7 @@ const results = await evaluation.evaluate({ model });
 
 #### Defined in
 
-[weaveObject.ts:51](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L51)
+[weaveObject.ts:51](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L51)
 
 ## Accessors
 
@@ -124,7 +124,7 @@ const results = await evaluation.evaluate({ model });
 
 #### Defined in
 
-[weaveObject.ts:89](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L89)
+[weaveObject.ts:89](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L89)
 
 ***
 
@@ -142,7 +142,7 @@ const results = await evaluation.evaluate({ model });
 
 #### Defined in
 
-[weaveObject.ts:85](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L85)
+[weaveObject.ts:85](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L85)
 
 ## Methods
 
@@ -160,7 +160,7 @@ const results = await evaluation.evaluate({ model });
 
 #### Defined in
 
-[weaveObject.ts:53](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L53)
+[weaveObject.ts:53](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L53)
 
 ***
 
@@ -184,7 +184,7 @@ const results = await evaluation.evaluate({ model });
 
 #### Defined in
 
-[evaluation.ts:163](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/evaluation.ts#L163)
+[evaluation.ts:163](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/evaluation.ts#L163)
 
 ***
 
@@ -228,7 +228,7 @@ const results = await evaluation.evaluate({ model });
 
 #### Defined in
 
-[evaluation.ts:232](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/evaluation.ts#L232)
+[evaluation.ts:232](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/evaluation.ts#L232)
 
 ***
 
@@ -246,4 +246,4 @@ const results = await evaluation.evaluate({ model });
 
 #### Defined in
 
-[weaveObject.ts:57](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L57)
+[weaveObject.ts:57](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L57)

@@ -2,7 +2,7 @@
 
 ***
 
-[weave](../globals.md) / CallSchema
+[weave](../README.md) / CallSchema
 
 # Interface: CallSchema
 
@@ -18,7 +18,7 @@ Attributes
 
 #### Defined in
 
-[generated/traceServerApi.ts:119](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L119)
+[generated/traceServerApi.ts:119](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L119)
 
 ***
 
@@ -30,7 +30,7 @@ Deleted At
 
 #### Defined in
 
-[generated/traceServerApi.ts:134](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L134)
+[generated/traceServerApi.ts:134](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L134)
 
 ***
 
@@ -42,7 +42,7 @@ Display Name
 
 #### Defined in
 
-[generated/traceServerApi.ts:108](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L108)
+[generated/traceServerApi.ts:108](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L108)
 
 ***
 
@@ -54,7 +54,7 @@ Ended At
 
 #### Defined in
 
-[generated/traceServerApi.ts:123](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L123)
+[generated/traceServerApi.ts:123](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L123)
 
 ***
 
@@ -66,7 +66,7 @@ Exception
 
 #### Defined in
 
-[generated/traceServerApi.ts:125](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L125)
+[generated/traceServerApi.ts:125](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L125)
 
 ***
 
@@ -78,7 +78,7 @@ Id
 
 #### Defined in
 
-[generated/traceServerApi.ts:102](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L102)
+[generated/traceServerApi.ts:102](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L102)
 
 ***
 
@@ -90,7 +90,7 @@ Inputs
 
 #### Defined in
 
-[generated/traceServerApi.ts:121](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L121)
+[generated/traceServerApi.ts:121](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L121)
 
 ***
 
@@ -102,7 +102,7 @@ Op Name
 
 #### Defined in
 
-[generated/traceServerApi.ts:106](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L106)
+[generated/traceServerApi.ts:106](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L106)
 
 ***
 
@@ -114,7 +114,7 @@ Output
 
 #### Defined in
 
-[generated/traceServerApi.ts:127](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L127)
+[generated/traceServerApi.ts:127](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L127)
 
 ***
 
@@ -126,7 +126,7 @@ Parent Id
 
 #### Defined in
 
-[generated/traceServerApi.ts:112](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L112)
+[generated/traceServerApi.ts:112](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L112)
 
 ***
 
@@ -138,7 +138,7 @@ Project Id
 
 #### Defined in
 
-[generated/traceServerApi.ts:104](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L104)
+[generated/traceServerApi.ts:104](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L104)
 
 ***
 
@@ -154,7 +154,7 @@ date-time
 
 #### Defined in
 
-[generated/traceServerApi.ts:117](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L117)
+[generated/traceServerApi.ts:117](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L117)
 
 ***
 
@@ -164,7 +164,7 @@ date-time
 
 #### Defined in
 
-[generated/traceServerApi.ts:128](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L128)
+[generated/traceServerApi.ts:128](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L128)
 
 ***
 
@@ -176,7 +176,7 @@ Trace Id
 
 #### Defined in
 
-[generated/traceServerApi.ts:110](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L110)
+[generated/traceServerApi.ts:110](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L110)
 
 ***
 
@@ -188,7 +188,7 @@ Wb Run Id
 
 #### Defined in
 
-[generated/traceServerApi.ts:132](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L132)
+[generated/traceServerApi.ts:132](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L132)
 
 ***
 
@@ -200,4 +200,4 @@ Wb User Id
 
 #### Defined in
 
-[generated/traceServerApi.ts:130](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L130)
+[generated/traceServerApi.ts:130](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L130)

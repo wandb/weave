@@ -2,7 +2,7 @@
 
 ***
 
-[weave](../globals.md) / op
+[weave](../README.md) / op
 
 # Function: op()
 
@@ -81,7 +81,7 @@ const res = await model.invoke();
 
 ### Defined in
 
-[op.ts:58](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/op.ts#L58)
+[op.ts:58](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/op.ts#L58)
 
 ## op(thisArg, fn, options)
 
@@ -105,4 +105,4 @@ const res = await model.invoke();
 
 ### Defined in
 
-[op.ts:62](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/op.ts#L62)
+[op.ts:62](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/op.ts#L62)

@@ -2,7 +2,7 @@
 
 ***
 
-[weave](../globals.md) / CallsFilter
+[weave](../README.md) / CallsFilter
 
 # Interface: CallsFilter
 
@@ -18,7 +18,7 @@ Call Ids
 
 #### Defined in
 
-[generated/traceServerApi.ts:197](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L197)
+[generated/traceServerApi.ts:197](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L197)
 
 ***
 
@@ -30,7 +30,7 @@ Input Refs
 
 #### Defined in
 
-[generated/traceServerApi.ts:189](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L189)
+[generated/traceServerApi.ts:189](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L189)
 
 ***
 
@@ -42,7 +42,7 @@ Op Names
 
 #### Defined in
 
-[generated/traceServerApi.ts:187](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L187)
+[generated/traceServerApi.ts:187](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L187)
 
 ***
 
@@ -54,7 +54,7 @@ Output Refs
 
 #### Defined in
 
-[generated/traceServerApi.ts:191](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L191)
+[generated/traceServerApi.ts:191](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L191)
 
 ***
 
@@ -66,7 +66,7 @@ Parent Ids
 
 #### Defined in
 
-[generated/traceServerApi.ts:193](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L193)
+[generated/traceServerApi.ts:193](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L193)
 
 ***
 
@@ -78,7 +78,7 @@ Trace Ids
 
 #### Defined in
 
-[generated/traceServerApi.ts:195](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L195)
+[generated/traceServerApi.ts:195](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L195)
 
 ***
 
@@ -90,7 +90,7 @@ Trace Roots Only
 
 #### Defined in
 
-[generated/traceServerApi.ts:199](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L199)
+[generated/traceServerApi.ts:199](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L199)
 
 ***
 
@@ -102,7 +102,7 @@ Wb Run Ids
 
 #### Defined in
 
-[generated/traceServerApi.ts:203](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L203)
+[generated/traceServerApi.ts:203](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L203)
 
 ***
 
@@ -114,4 +114,4 @@ Wb User Ids
 
 #### Defined in
 
-[generated/traceServerApi.ts:201](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/generated/traceServerApi.ts#L201)
+[generated/traceServerApi.ts:201](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L201)

@@ -2,7 +2,7 @@
 
 ***
 
-[weave](../globals.md) / wrapOpenAI
+[weave](../README.md) / wrapOpenAI
 
 # Function: wrapOpenAI()
 
@@ -34,4 +34,4 @@ const result = await openai.chat.completions.create({
 
 ## Defined in
 
-[integrations/openai.ts:159](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/integrations/openai.ts#L159)
+[integrations/openai.ts:159](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/integrations/openai.ts#L159)

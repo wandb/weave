@@ -2,7 +2,7 @@
 
 ***
 
-[weave](../globals.md) / weaveImage
+[weave](../README.md) / weaveImage
 
 # Function: weaveImage()
 
@@ -31,4 +31,4 @@ const weaveImage = weaveImage({ data: imageBuffer });
 
 ## Defined in
 
-[media.ts:28](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/media.ts#L28)
+[media.ts:28](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/media.ts#L28)

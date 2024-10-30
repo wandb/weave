@@ -2,7 +2,7 @@
 
 ***
 
-[weave](../globals.md) / Op
+[weave](../README.md) / Op
 
 # Type Alias: Op\<T\>
 
@@ -36,4 +36,4 @@
 
 ## Defined in
 
-[opType.ts:6](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/opType.ts#L6)
+[opType.ts:6](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/opType.ts#L6)

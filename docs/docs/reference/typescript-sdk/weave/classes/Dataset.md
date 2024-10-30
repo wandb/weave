@@ -2,7 +2,7 @@
 
 ***
 
-[weave](../globals.md) / Dataset
+[weave](../README.md) / Dataset
 
 # Class: Dataset\<R\>
 
@@ -56,7 +56,7 @@ const ref = await dataset.save()
 
 #### Defined in
 
-[dataset.ts:51](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/dataset.ts#L51)
+[dataset.ts:51](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/dataset.ts#L51)
 
 ## Properties
 
@@ -70,7 +70,7 @@ const ref = await dataset.save()
 
 #### Defined in
 
-[weaveObject.ts:49](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L49)
+[weaveObject.ts:49](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L49)
 
 ***
 
@@ -84,7 +84,7 @@ const ref = await dataset.save()
 
 #### Defined in
 
-[weaveObject.ts:51](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L51)
+[weaveObject.ts:51](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L51)
 
 ***
 
@@ -94,7 +94,7 @@ const ref = await dataset.save()
 
 #### Defined in
 
-[dataset.ts:49](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/dataset.ts#L49)
+[dataset.ts:49](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/dataset.ts#L49)
 
 ## Accessors
 
@@ -112,7 +112,7 @@ const ref = await dataset.save()
 
 #### Defined in
 
-[weaveObject.ts:89](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L89)
+[weaveObject.ts:89](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L89)
 
 ***
 
@@ -130,7 +130,7 @@ const ref = await dataset.save()
 
 #### Defined in
 
-[weaveObject.ts:85](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L85)
+[weaveObject.ts:85](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L85)
 
 ***
 
@@ -144,7 +144,7 @@ const ref = await dataset.save()
 
 #### Defined in
 
-[dataset.ts:64](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/dataset.ts#L64)
+[dataset.ts:64](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/dataset.ts#L64)
 
 ## Methods
 
@@ -158,7 +158,7 @@ const ref = await dataset.save()
 
 #### Defined in
 
-[dataset.ts:68](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/dataset.ts#L68)
+[dataset.ts:68](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/dataset.ts#L68)
 
 ***
 
@@ -176,7 +176,7 @@ const ref = await dataset.save()
 
 #### Defined in
 
-[weaveObject.ts:53](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L53)
+[weaveObject.ts:53](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L53)
 
 ***
 
@@ -194,7 +194,7 @@ const ref = await dataset.save()
 
 #### Defined in
 
-[dataset.ts:74](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/dataset.ts#L74)
+[dataset.ts:74](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/dataset.ts#L74)
 
 ***
 
@@ -208,7 +208,7 @@ const ref = await dataset.save()
 
 #### Defined in
 
-[dataset.ts:60](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/dataset.ts#L60)
+[dataset.ts:60](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/dataset.ts#L60)
 
 ***
 
@@ -226,4 +226,4 @@ const ref = await dataset.save()
 
 #### Defined in
 
-[weaveObject.ts:57](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/weaveObject.ts#L57)
+[weaveObject.ts:57](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L57)

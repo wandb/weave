@@ -2,7 +2,7 @@
 
 ***
 
-[weave](../globals.md) / login
+[weave](../README.md) / login
 
 # Function: login()
 
@@ -31,4 +31,4 @@ If the API key is not specified or if the connection to the weave trace server c
 
 ## Defined in
 
-[clientApi.ts:22](https://github.com/wandb/weave/blob/f0de86a1943f1d5c6c828f42faab64acc924c307/sdks/node/src/clientApi.ts#L22)
+[clientApi.ts:22](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/clientApi.ts#L22)
