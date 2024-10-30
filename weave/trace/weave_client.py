@@ -1232,7 +1232,7 @@ class WeaveClient:
         # Case 1: Object:
         # Here we recurse into each of the properties of the object
         # and save them, and then save the object itself.
-        if isinstance(obj, Object): # TODO: add the generic object here
+        if isinstance(obj, Object):  # TODO: add the generic object here
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
