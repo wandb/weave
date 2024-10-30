@@ -7,6 +7,7 @@ import {
   GridRowId,
 } from '@mui/x-data-grid-pro';
 import {Button} from '@wandb/weave/components/Button';
+import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {
   Dispatch,
@@ -20,7 +21,7 @@ import React, {
 
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {parseRefMaybe} from '../../../Browse2/SmallRef';
+import {objectRefDisplayName, parseRefMaybe} from '../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../filters/common';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
@@ -151,8 +152,15 @@ export const ObjectViewer = ({
 
     const refValues: RefValues = {};
     for (const [r, v] of _.zip(refs, resolvedRefData)) {
-      if (!r || !v) {
+      if (!r) {
         // Shouldn't be possible
+        continue;
+      }
+      if (!v) {
+        // Value for ref not found, probably deleted
+        refValues[r] = {
+          _weave_is_deleted_ref: objectRefDisplayName(parseRef(r)).label,
+        };
         continue;
       }
       let val = r;
@@ -392,6 +400,19 @@ export const ObjectViewer = ({
         const isTruncated = params.row?.value?.[TRUNCATION_KEY];
         if (isTruncated) {
           return null;
+        }
+
+        // Hack to show the object name with a strikethrough if deleted
+        if (params.row.value?._weave_is_deleted_ref) {
+          return (
+            <Box
+              sx={{
+                textOverflow: 'ellipsis',
+                textDecoration: 'line-through',
+              }}>
+              {params.row.value?._weave_is_deleted_ref}
+            </Box>
+          );
         }
 
         return (

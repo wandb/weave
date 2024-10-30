@@ -653,8 +653,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(objs) == 0:
             raise NotFoundError(f"Obj {object_id}:{digest} not found")
 
-        print(objs)
-
         if objs[0].deleted_at is not None:
             raise ObjectDeletedError(
                 f"Obj {object_id}:v{objs[0].version_index} was deleted at {objs[0].deleted_at}"

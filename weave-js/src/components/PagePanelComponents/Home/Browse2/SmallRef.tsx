@@ -127,7 +127,9 @@ export const SmallRef: FC<{
   const objectVersion = useObjectVersion(objVersionKey);
   const opVersion = useOpVersion(opVersionKey);
 
-  const isDeleted = objectVersion?.error || opVersion?.error;
+  const isDeleted =
+    isObjDeleteError(objectVersion?.error) ||
+    isObjDeleteError(opVersion?.error);
 
   const versionIndex =
     objectVersion.result?.versionIndex ?? opVersion.result?.versionIndex;
@@ -211,4 +213,13 @@ export const parseRefMaybe = (s: string): ObjectRef | null => {
   } catch (e) {
     return null;
   }
+};
+
+export const isObjDeleteError = (e: any): boolean => {
+  if (e == null) {
+    return false;
+  }
+  const errorStr = String(e);
+  const regex = /Obj .* was deleted at .*/;
+  return regex.test(errorStr);
 };
