@@ -189,7 +189,6 @@ class ObjSchema(BaseModel):
 class ObjSchemaForInsert(BaseModel):
     project_id: str
     object_id: str
-    base_object_class: Optional[str] = None
     val: Any
 
 
@@ -888,10 +887,6 @@ class TraceServerInterface(Protocol):
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
-    # Action API
-    def execute_batch_action(
-        self, req: ExecuteBatchActionReq
-    ) -> ExecuteBatchActionRes: ...
 
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...
