@@ -7,6 +7,7 @@ import {useCallback, useMemo} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {isValuelessOperator} from '../../filters/common';
+import {addCostsToCallResults} from '../CallPage/cost';
 import {operationConverter} from '../common/tabularListViews/operators';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
@@ -31,19 +32,20 @@ export const useCallsForQuery = (
   project: string,
   filter: WFHighLevelCallFilter,
   gridFilter: GridFilterModel,
-  gridSort: GridSortModel,
   gridPage: GridPaginationModel,
-  expandedColumns: Set<string>,
+  gridSort?: GridSortModel,
+  expandedColumns?: Set<string>,
   columns?: string[]
 ): {
+  costsLoading: boolean;
   result: CallSchema[];
   loading: boolean;
   total: number;
   refetch: () => void;
 } => {
   const {useCalls, useCallsStats} = useWFHooks();
-  const offset = gridPage.page * gridPage.pageSize;
-  const limit = gridPage.pageSize;
+  const effectiveOffset = gridPage?.page * gridPage?.pageSize;
+  const effectiveLimit = gridPage.pageSize;
   const {sortBy, lowLevelFilter, filterBy} = useFilterSortby(
     filter,
     gridFilter,
@@ -54,8 +56,8 @@ export const useCallsForQuery = (
     entity,
     project,
     lowLevelFilter,
-    limit,
-    offset,
+    effectiveLimit,
+    effectiveOffset,
     sortBy,
     filterBy,
     columns,
@@ -75,25 +77,63 @@ export const useCallsForQuery = (
 
   const total = useMemo(() => {
     if (callsStats.loading || callsStats.result == null) {
-      return offset + callResults.length;
+      return effectiveOffset + callResults.length;
     } else {
       return callsStats.result.count;
     }
-  }, [callResults.length, callsStats.loading, callsStats.result, offset]);
+  }, [
+    callResults.length,
+    callsStats.loading,
+    callsStats.result,
+    effectiveOffset,
+  ]);
 
+  const costFilter: CallFilter = useMemo(
+    () => ({
+      callIds: calls.result?.map(call => call.traceCall?.id || '') || [],
+    }),
+    [calls.result]
+  );
+
+  const costs = useCalls(
+    entity,
+    project,
+    costFilter,
+    effectiveLimit,
+    undefined,
+    sortBy,
+    undefined,
+    undefined,
+    expandedColumns,
+    {
+      skip: calls.loading,
+      includeCosts: true,
+    }
+  );
+
+  const costResults = useMemo(() => {
+    return costs.result ?? [];
+  }, [costs]);
   const refetch = useCallback(() => {
     calls.refetch();
+    costs.refetch();
     callsStats.refetch();
-  }, [calls, callsStats]);
+  }, [calls, callsStats, costs]);
 
   return useMemo(() => {
     return {
+      costsLoading: costs.loading,
       loading: calls.loading,
-      result: calls.loading ? [] : callResults,
+      // Return faster calls query results until cost query finishes
+      result: calls.loading
+        ? []
+        : costResults.length > 0
+        ? addCostsToCallResults(callResults, costResults)
+        : callResults,
       total,
       refetch,
     };
-  }, [callResults, calls.loading, total, refetch]);
+  }, [callResults, calls.loading, total, costs.loading, costResults, refetch]);
 };
 
 export const useFilterSortby = (

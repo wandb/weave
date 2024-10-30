@@ -91,8 +91,8 @@ def build_evaluation():
         return "I don't know"
 
     @weave.op()
-    def score(question: str, expected: str, model_output: str):
-        return model_output == expected
+    def score(question: str, expected: str, output: str):
+        return output == expected
 
     evaluation = weave.Evaluation(
         name="My Evaluation",
@@ -133,6 +133,7 @@ async def test_evaluation_performance(client: WeaveClient):
             "file_create": 10,  # 4 images, 6 ops
             "call_start": 14,  # Eval, summary, 4 predict and score sequences of 3 calls each
             "call_end": 14,  # Eval, summary, 4 predict and score sequences of 3 calls each
+            "feedback_create": 4,  # 4 predict feedbacks
         }
     )
 

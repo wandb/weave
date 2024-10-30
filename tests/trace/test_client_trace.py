@@ -1443,7 +1443,7 @@ def test_named_reuse(client):
     dataset = weave.ref(d_ref.uri()).get()
 
     @weave.op()
-    async def dummy_score(model_output):
+    async def dummy_score(output):
         return 1
 
     class SimpleModel(weave.Model):
@@ -1477,25 +1477,23 @@ def test_named_reuse(client):
 
 
 def test_unknown_input_and_output_types(client):
-    class MyUnserializableClassA:
+    class MyUnknownClassA:
         a_val: float
 
         def __init__(self, a_val) -> None:
             self.a_val = a_val
 
-    class MyUnserializableClassB:
+    class MyUnknownClassB:
         b_val: float
 
         def __init__(self, b_val) -> None:
             self.b_val = b_val
 
     @weave.op()
-    def op_with_unknown_types(
-        a: MyUnserializableClassA, b: float
-    ) -> MyUnserializableClassB:
-        return MyUnserializableClassB(a.a_val + b)
+    def op_with_unknown_types(a: MyUnknownClassA, b: float) -> MyUnknownClassB:
+        return MyUnknownClassB(a.a_val + b)
 
-    a = MyUnserializableClassA(3)
+    a = MyUnknownClassA(3)
     res = op_with_unknown_types(a, 0.14)
 
     assert res.b_val == 3.14
@@ -1515,18 +1513,18 @@ def test_unknown_input_and_output_types(client):
 
 
 def test_unknown_attribute(client):
-    class MyUnserializableClass:
+    class MyUnknownClass:
         val: int
 
         def __init__(self, a_val) -> None:
             self.a_val = a_val
 
     class MySerializableClass(weave.Object):
-        obj: MyUnserializableClass
+        obj: MyUnknownClass
 
-    a_obj = MyUnserializableClass(1)
+    a_obj = MyUnknownClass(1)
     a = MySerializableClass(obj=a_obj)
-    b_obj = MyUnserializableClass(2)
+    b_obj = MyUnknownClass(2)
     b = MySerializableClass(obj=b_obj)
 
     ref_a = weave.publish(a)

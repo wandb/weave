@@ -7,9 +7,6 @@ __pycache__
 .idea
 *.egg-info/
 build/
-MNIST
-food-101
-food-101.tar.gz
 gha-creds-*.json
 .vscode
 .mypy_cache
@@ -21,3 +18,4 @@ gha-creds-*.json
 .nox
 *.log
 */file::memory:?cache=shared
+weave/trace_server/model_providers

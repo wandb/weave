@@ -148,7 +148,8 @@ def sum_costs(data: Dict[str, List[CostDetails]]) -> float:
     return total_costs
 
 
-def insert_costs(client: Client) -> None:
+def insert_costs(client: Client, target_db: str) -> None:
+    client.database = target_db
     # Get costs from json
     try:
         new_costs = load_costs_from_json()

@@ -112,7 +112,6 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
     sentiment='Positive'
 )"""
     )
-
     call_2, _ = flattened_calls[1]
     assert call_2.exception is None and call_2.ended_at is not None
     output_2 = call_2.output
