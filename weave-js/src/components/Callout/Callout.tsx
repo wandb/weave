@@ -18,6 +18,7 @@ export const Callout = ({className, color, icon, size}: CalloutProps) => {
     <Tailwind>
       <div
         className={twMerge(
+          'night-aware',
           getTagColorClass(color),
           'flex items-center justify-center rounded-full',
           size === 'x-small' && 'h-[40px] w-[40px]',
