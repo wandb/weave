@@ -1,9 +1,12 @@
 import asyncio
+import logging
 import multiprocessing
 from typing import Any, AsyncIterator, Awaitable, Callable, Iterable, Tuple, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
+
+_shown_warnings = set()
 
 
 async def async_foreach(
@@ -70,3 +73,10 @@ async def run_in_process_with_timeout(
         raise ValueError(
             "Unhandled exception in subprocess. Exitcode: " + str(process.exitcode)
         )
+
+
+def warn_once(logger: logging.Logger, message: str) -> None:
+    """Display a warning message only once. If the message has already been shown, do nothing."""
+    if message not in _shown_warnings:
+        logger.warning(message)
+        _shown_warnings.add(message)

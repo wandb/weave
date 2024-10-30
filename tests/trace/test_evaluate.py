@@ -4,14 +4,13 @@ import pytest
 
 import weave
 from weave import Dataset, Evaluation, Model
-from weave.flow.scorer import MultiTaskBinaryClassificationF1
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 dataset = Dataset(rows=dataset_rows)
 
 
 expected_eval_result = {
-    "model_output": {"mean": 9.5},
+    "output": {"mean": 9.5},
     "score": {"true_count": 1, "true_fraction": 0.5},
     "model_latency": {"mean": pytest.approx(0, abs=1)},
 }
@@ -24,8 +23,8 @@ class EvalModel(Model):
 
 
 @weave.op()
-def score(target, model_output):
-    return target == model_output
+def score(target, output):
+    return target == output
 
 
 @weave.op()
@@ -57,7 +56,7 @@ def test_predict_can_receive_other_params(client):
     )
     result = asyncio.run(evaluation.evaluate(model_predict))
     assert result == {
-        "model_output": {"mean": 18.5},
+        "output": {"mean": 18.5},
         "score": {"true_count": 0, "true_fraction": 0.0},
         "model_latency": {
             "mean": pytest.approx(0, abs=1),
@@ -111,8 +110,8 @@ def test_evaluate_other_model_method_names():
 def test_score_as_class(client):
     class MyScorer(weave.Scorer):
         @weave.op()
-        def score(self, target, model_output):
-            return target == model_output
+        def score(self, target, output):
+            return target == output
 
     evaluation = Evaluation(
         dataset=dataset_rows,
@@ -121,7 +120,7 @@ def test_score_as_class(client):
     model = EvalModel()
     result = asyncio.run(evaluation.evaluate(model))
     assert result == {
-        "model_output": {"mean": 9.5},
+        "output": {"mean": 9.5},
         "MyScorer": {"true_count": 1, "true_fraction": 0.5},
         "model_latency": {
             "mean": pytest.approx(0, abs=1),
@@ -137,8 +136,8 @@ def test_score_with_custom_summarize(client):
             return {"awesome": 3}
 
         @weave.op()
-        def score(self, target, model_output):
-            return target == model_output
+        def score(self, target, output):
+            return target == output
 
     evaluation = Evaluation(
         dataset=dataset_rows,
@@ -147,7 +146,7 @@ def test_score_with_custom_summarize(client):
     model = EvalModel()
     result = asyncio.run(evaluation.evaluate(model))
     assert result == {
-        "model_output": {"mean": 9.5},
+        "output": {"mean": 9.5},
         "MyScorer": {"awesome": 3},
         "model_latency": {
             "mean": pytest.approx(0, abs=1),
@@ -155,27 +154,113 @@ def test_score_with_custom_summarize(client):
     }
 
 
-def test_multiclass_f1_score(client):
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "scorers,expected_output_key",
+    [
+        # All scorer styles
+        (
+            ["fn_old", "fn_new", "class_old", "class_new"],
+            "model_output",
+        ),
+        # Only old class style
+        (
+            ["fn_new", "class_old", "class_new"],
+            "model_output",
+        ),
+        # Only old fn style
+        (
+            ["fn_old", "fn_new", "class_new"],
+            "model_output",
+        ),
+        # Only new styles
+        (
+            ["fn_new", "class_new"],
+            "output",
+        ),
+    ],
+)
+async def test_basic_evaluation_with_scorer_styles(
+    client, scorers, expected_output_key
+):
+    # Define all possible scorers
+    @weave.op
+    def fn_scorer_with_old_style(col_a, col_b, model_output, target):
+        return col_a + col_b == model_output == target
+
+    @weave.op
+    def fn_scorer_with_new_style(col_a, col_b, output, target):
+        return col_a + col_b == output == target
+
+    class ClassScorerWithOldStyle(weave.Scorer):
+        @weave.op
+        def score(self, col_a, col_b, model_output, target):
+            return col_a + col_b == model_output == target
+
+    class ClassScorerWithNewStyle(weave.Scorer):
+        @weave.op
+        def score(self, a, b, output, c):
+            return a + b == output == c
+
+    # Map scorer keys to actual scorer instances
+    scorer_map = {
+        "fn_old": fn_scorer_with_old_style,
+        "fn_new": fn_scorer_with_new_style,
+        "class_old": ClassScorerWithOldStyle(),
+        "class_new": ClassScorerWithNewStyle(
+            column_map={
+                "a": "col_a",
+                "b": "col_b",
+                "c": "target",
+            }
+        ),
+    }
+
+    dataset = [
+        {"col_a": 1, "col_b": 2, "target": 3},
+        {"col_a": 1, "col_b": 2, "target": 3},
+        {"col_a": 1, "col_b": 2, "target": 3},
+    ]
+
+    # Get actual scorer instances based on parameter
+    actual_scorers = [scorer_map[s] for s in scorers]
+
     evaluation = Evaluation(
-        dataset=[{"target": {"a": False, "b": True}, "pred": {"a": True, "b": False}}],
-        scorers=[MultiTaskBinaryClassificationF1(class_names=["a", "b"])],
+        dataset=dataset,
+        scorers=actual_scorers,
     )
 
-    @weave.op()
-    def return_pred(pred):
-        return pred
+    @weave.op
+    def model(col_a, col_b):
+        return col_a + col_b
 
-    result = asyncio.run(evaluation.evaluate(return_pred))
-    assert result == {
-        "model_output": {
-            "a": {"true_count": 1, "true_fraction": 1.0},
-            "b": {"true_count": 0, "true_fraction": 0.0},
-        },
-        "MultiTaskBinaryClassificationF1": {
-            "a": {"f1": 0, "precision": 0.0, "recall": 0},
-            "b": {"f1": 0, "precision": 0, "recall": 0.0},
-        },
-        "model_latency": {
-            "mean": pytest.approx(0, abs=1),
-        },
+    result = await evaluation.evaluate(model)
+    assert result.pop("model_latency").get("mean") == pytest.approx(0, abs=1)
+
+    # Build expected result dynamically
+    expected_result = {
+        expected_output_key: {"mean": 3.0},
     }
+    scorer_results = {
+        "fn_old": "fn_scorer_with_old_style",
+        "fn_new": "fn_scorer_with_new_style",
+        "class_old": "ClassScorerWithOldStyle",
+        "class_new": "ClassScorerWithNewStyle",
+    }
+    for s in scorers:
+        expected_result[scorer_results[s]] = {"true_count": 3, "true_fraction": 1.0}
+
+    assert result == expected_result
+
+    # Verify individual prediction outputs
+    predict_and_score_calls = list(evaluation.predict_and_score.calls())
+    assert len(predict_and_score_calls) == 3
+    outputs = [c.output for c in predict_and_score_calls]
+    assert all(o.pop("model_latency") == pytest.approx(0, abs=1) for o in outputs)
+
+    # Build expected output dynamically
+    expected_output = {
+        expected_output_key: 3.0,
+        "scores": {scorer_results[s]: True for s in scorers},
+    }
+    assert all(o == expected_output for o in outputs)

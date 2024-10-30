@@ -16,7 +16,7 @@ export const TabUseOp = ({name, uri}: TabUseOpProps) => {
   const pythonName = isValidVarName(name) ? name : 'op';
 
   return (
-    <Box m={2} className="text-sm">
+    <Box className="text-sm">
       <TabUseBanner>
         See <DocLink path="guides/tracking/ops" text="Weave docs on ops" /> for
         more information.

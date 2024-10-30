@@ -144,6 +144,19 @@ class ObjectRef(RefWithExtra):
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
+    def objectify(self, obj: Any) -> Any:
+        """Convert back to higher level object."""
+        class_name = getattr(obj, "_class_name", None)
+        if "EasyPrompt" == class_name:
+            from weave.flow.prompt.prompt import EasyPrompt
+
+            prompt = EasyPrompt.from_obj(obj)
+            # We want to use the ref on the object (and not self) as it will have had
+            # version number or latest alias resolved to a specific digest.
+            prompt.__dict__["ref"] = obj.ref
+            return prompt
+        return obj
+
     def get(self) -> Any:
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
@@ -153,21 +166,20 @@ class ObjectRef(RefWithExtra):
 
         gc = get_weave_client()
         if gc is not None:
-            return gc.get(self)
+            return self.objectify(gc.get(self))
 
         # Special case: If the user is attempting to fetch an object but has not
         # yet initialized the client, we can initialize a client to
         # fetch the object. It is critical to reset the client after fetching the
         # object to avoid any side effects in user code.
-        if gc is None:
-            init_client = init_weave(
-                f"{self.entity}/{self.project}", ensure_project_exists=False
-            )
-            try:
-                res = init_client.client.get(self)
-            finally:
-                init_client.reset()
-            return res
+        init_client = init_weave(
+            f"{self.entity}/{self.project}", ensure_project_exists=False
+        )
+        try:
+            res = init_client.client.get(self)
+        finally:
+            init_client.reset()
+        return self.objectify(res)
 
     def is_descended_from(self, potential_ancestor: "ObjectRef") -> bool:
         if self.entity != potential_ancestor.entity:
@@ -224,6 +236,13 @@ class CallRef(RefWithExtra):
 AnyRef = Union[ObjectRef, TableRef, CallRef, OpRef]
 
 
+def parse_name_version(name_version: str) -> tuple[str, str]:
+    if ":" in name_version:
+        name, version = name_version.rsplit(":", maxsplit=1)
+        return name, version
+    return name_version, "latest"
+
+
 def parse_uri(uri: str) -> AnyRef:
     if not uri.startswith("weave:///"):
         raise ValueError(f"Invalid URI: {uri}")
@@ -239,12 +258,12 @@ def parse_uri(uri: str) -> AnyRef:
     if kind == "call":
         return CallRef(entity=entity, project=project, id=remaining[0], _extra=extra)
     elif kind == "object":
-        name, version = remaining[0].split(":")
+        name, version = parse_name_version(remaining[0])
         return ObjectRef(
             entity=entity, project=project, name=name, _digest=version, _extra=extra
         )
     elif kind == "op":
-        name, version = remaining[0].split(":")
+        name, version = parse_name_version(remaining[0])
         return OpRef(
             entity=entity, project=project, name=name, _digest=version, _extra=extra
         )
