@@ -110,7 +110,7 @@ def get_scorer_attributes(
     return (scorer_name, score_fn, summarize_fn)  # type: ignore
 
 
-def has_oldstyle_scorers(scorers: list[Union[Callable, Op, Scorer]]) -> bool:
+def _has_oldstyle_scorers(scorers: list[Union[Callable, Op, Scorer]]) -> bool:
     """Check if any scorers use the deprecated 'model_output' parameter."""
     for scorer in scorers or []:
         _, score_fn, _ = get_scorer_attributes(scorer)

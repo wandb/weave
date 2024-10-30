@@ -17,9 +17,9 @@ from weave.flow.model import Model, get_infer_method
 from weave.flow.obj import Object
 from weave.scorers import (
     Scorer,
+    _has_oldstyle_scorers,
     auto_summarize,
     get_scorer_attributes,
-    has_oldstyle_scorers,
     transpose,
 )
 from weave.trace.context.weave_client_context import get_weave_client
@@ -135,7 +135,7 @@ class Evaluation(Object):
             scorers.append(scorer)
 
         # Determine output key based on scorer types
-        if has_oldstyle_scorers(scorers):
+        if _has_oldstyle_scorers(scorers):
             self._output_key = "model_output"
             util.warn_once(
                 logger,
