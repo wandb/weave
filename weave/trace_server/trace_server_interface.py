@@ -1,6 +1,6 @@
 import datetime
 from enum import Enum
-from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Union
+from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Type, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
@@ -235,6 +235,46 @@ class CallsDeleteReq(BaseModel):
 
 class CallsDeleteRes(BaseModel):
     pass
+
+
+class CompletionsCreateRequestInputs(BaseModel):
+    model: str
+    messages: List = []
+    timeout: Optional[Union[float, str]] = None
+    temperature: Optional[float] = None
+    top_p: Optional[float] = None
+    n: Optional[int] = None
+    stop: Optional[Union[str, List]] = None
+    max_completion_tokens: Optional[int] = None
+    max_tokens: Optional[int] = None
+    modalities: Optional[List] = None
+    presence_penalty: Optional[float] = None
+    frequency_penalty: Optional[float] = None
+    logit_bias: Optional[dict] = None
+    user: Optional[str] = None
+    # openai v1.0+ new params
+    response_format: Optional[Union[dict, Type[BaseModel]]] = None
+    seed: Optional[int] = None
+    tools: Optional[List] = None
+    tool_choice: Optional[Union[str, dict]] = None
+    logprobs: Optional[bool] = None
+    top_logprobs: Optional[int] = None
+    parallel_tool_calls: Optional[bool] = None
+    extra_headers: Optional[dict] = None
+    # soon to be deprecated params by OpenAI
+    functions: Optional[List] = None
+    function_call: Optional[str] = None
+    api_version: Optional[str] = None
+
+
+class CompletionsCreateReq(BaseModel):
+    project_id: str
+    inputs: CompletionsCreateRequestInputs
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class CompletionsCreateRes(BaseModel):
+    response: Dict[str, Any]
 
 
 class CallsFilter(BaseModel):
@@ -848,8 +888,10 @@ class TraceServerInterface(Protocol):
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
-
     # Action API
     def execute_batch_action(
         self, req: ExecuteBatchActionReq
     ) -> ExecuteBatchActionRes: ...
+
+    # Execute LLM API
+    def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...
