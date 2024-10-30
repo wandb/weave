@@ -264,3 +264,25 @@ async def test_basic_evaluation_with_scorer_styles(
         "scores": {scorer_results[s]: True for s in scorers},
     }
     assert all(o == expected_output for o in outputs)
+
+
+@pytest.mark.parametrize(
+    "scorer_name",
+    ["my scorer", "my-scorer()*&^%$@#/", "my-scorer", "       my scorer     "],
+)
+def test_scorer_name_sanitization(scorer_name):
+    class MyScorer(weave.Scorer):
+        name: str
+
+        @weave.op()
+        def score(self, target, model_output):
+            return target == model_output
+
+    evaluation = Evaluation(
+        dataset=dataset_rows,
+        scorers=[MyScorer(name=scorer_name)],
+    )
+    model = EvalModel()
+
+    result = asyncio.run(evaluation.evaluate(model))
+    assert result["my-scorer"] == {"true_count": 1, "true_fraction": 0.5}
