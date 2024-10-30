@@ -1,11 +1,12 @@
 import json
+import logging
 import os
 from typing import Dict, TypedDict
 
 import requests
 
 model_providers_url = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
-MODEL_PROVIDERS_FILE = "/tmp/model_providers/model_providers.json"
+MODEL_PROVIDER_INFO_FILE = "model_providers.json"
 
 
 PROVIDER_TO_API_KEY_NAME_MAP = {
@@ -22,12 +23,27 @@ class LLMModelProviderInfo(TypedDict):
     api_key_name: str
 
 
-def fetch_model_to_provider_info_map(
-    cached_file_path: str = MODEL_PROVIDERS_FILE,
+logger = logging.getLogger(__name__)
+
+
+def read_model_to_provider_info_map(
+    file_name: str = MODEL_PROVIDER_INFO_FILE,
 ) -> Dict[str, LLMModelProviderInfo]:
-    if os.path.exists(cached_file_path):
-        with open(cached_file_path, "r") as f:
+    full_path = os.path.join(os.path.dirname(__file__), file_name)
+    try:
+        with open(full_path, "r") as f:
             return json.load(f)
+    except Exception as e:
+        logger.error(
+            f"Failed to read model to provider info file at: {full_path}", exc_info=e
+        )
+        return {}
+
+
+def main(
+    file_name: str = MODEL_PROVIDER_INFO_FILE,
+) -> Dict[str, LLMModelProviderInfo]:
+    full_path = os.path.join(os.path.dirname(__file__), file_name)
     try:
         req = requests.get(model_providers_url)
         req.raise_for_status()
@@ -43,7 +59,14 @@ def fetch_model_to_provider_info_map(
             providers[k] = LLMModelProviderInfo(
                 litellm_provider=provider, api_key_name=api_key_name
             )
-    os.makedirs(os.path.dirname(cached_file_path), exist_ok=True)
-    with open(cached_file_path, "w") as f:
+    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+    with open(full_path, "w") as f:
         json.dump(providers, f)
+    print(
+        f"Updated model to model provider info file at: {full_path}. {len(providers)} models updated."
+    )
     return providers
+
+
+if __name__ == "__main__":
+    main()
