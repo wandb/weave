@@ -1081,13 +1081,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         print("COST PURGE is not implemented for local sqlite", req)
         return tsi.CostPurgeRes()
 
-    def execute_batch_action(
-        self, req: tsi.ExecuteBatchActionReq
-    ) -> tsi.ExecuteBatchActionRes:
-        raise NotImplementedError(
-            "EXECUTE BATCH ACTION is not implemented for local sqlite"
-        )
-
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
