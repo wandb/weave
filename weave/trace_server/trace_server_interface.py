@@ -836,16 +836,6 @@ class CostPurgeRes(BaseModel):
     pass
 
 
-class ExecuteBatchActionReq(BaseModel):
-    project_id: str
-    call_ids: list[str]
-    configured_action_ref: str
-
-
-class ExecuteBatchActionRes(BaseModel):
-    pass
-
-
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
