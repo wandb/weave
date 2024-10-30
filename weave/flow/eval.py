@@ -1,10 +1,12 @@
 import asyncio
 import inspect
+import logging
 import textwrap
 import time
 import traceback
-from typing import Any, Callable, Coroutine, Optional, Union, cast
+from typing import Any, Callable, Coroutine, Literal, Optional, Union, cast
 
+from pydantic import PrivateAttr
 from rich import print
 from rich.console import Console
 
@@ -15,6 +17,7 @@ from weave.flow.model import Model, get_infer_method
 from weave.flow.obj import Object
 from weave.scorers import (
     Scorer,
+    _has_oldstyle_scorers,
     auto_summarize,
     get_scorer_attributes,
     transpose,
@@ -28,7 +31,7 @@ from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, get_ref
 
 console = Console()
-
+logger = logging.getLogger(__name__)
 
 INVALID_MODEL_ERROR = (
     "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
@@ -111,6 +114,9 @@ class Evaluation(Object):
     preprocess_model_input: Optional[Callable] = None
     trials: int = 1
 
+    # internal attr to track whether to use the new `output` or old `model_output` key for outputs
+    _output_key: Literal["output", "model_output"] = PrivateAttr("output")
+
     def model_post_init(self, __context: Any) -> None:
         scorers: list[Union[Callable, Scorer, Op]] = []
         for scorer in self.scorers or []:
@@ -127,6 +133,14 @@ class Evaluation(Object):
             else:
                 raise ValueError(f"Invalid scorer: {scorer}")
             scorers.append(scorer)
+
+        # Determine output key based on scorer types
+        if _has_oldstyle_scorers(scorers):
+            self._output_key = "model_output"
+            util.warn_once(
+                logger,
+                "Using 'model_output' key for compatibility with older scorers. Please update scorers to use 'output' parameter.",
+            )
         self.scorers = scorers
 
         if isinstance(self.dataset, list):
@@ -225,6 +239,7 @@ class Evaluation(Object):
 
         scores = {}  # TODO: Consider moving scorer setup and checks out of `predict_and_score`
         scorers = cast(list[Union[Op, Scorer]], self.scorers or [])
+
         for scorer in scorers:
             scorer_self = None
             if weave_isinstance(scorer, Scorer):
@@ -237,10 +252,12 @@ class Evaluation(Object):
                 score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
 
-            if (
-                "model_output" not in score_arg_names
-                and "output" not in score_arg_names
-            ):
+            # the actual kwarg name depends on the scorer
+            if "output" in score_arg_names:
+                score_output_name = "output"
+            elif "model_output" in score_arg_names:
+                score_output_name = "model_output"
+            else:
                 message = textwrap.dedent(
                     f"""
                     Scorer {scorer_name} must have an `output` or `model_output` argument, to receive the
@@ -339,7 +356,7 @@ class Evaluation(Object):
                     raise ValueError(
                         f"{score_fn} expects arguments: {score_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
                     )
-            score_args["output"] = model_output
+            score_args[score_output_name] = model_output
 
             try:
                 if is_op(score_fn) and model_call:
@@ -370,7 +387,7 @@ class Evaluation(Object):
                     for param in score_signature.parameters.values()
                     if param.default == inspect.Parameter.empty
                 ]
-                required_arg_names.remove("output")
+                required_arg_names.remove(self._output_key)
 
                 message = textwrap.dedent(
                     f"""
@@ -397,7 +414,7 @@ class Evaluation(Object):
             scores[scorer_name] = result
 
         return {
-            "output": model_output,
+            self._output_key: model_output,
             "scores": scores,
             "model_latency": model_latency,
         }
@@ -421,7 +438,6 @@ class Evaluation(Object):
                 model_output_summary = auto_summarize(vals)
                 if model_output_summary:
                     summary[name] = model_output_summary
-
         return summary
 
     async def get_eval_results(
@@ -441,7 +457,7 @@ class Evaluation(Object):
             except Exception as e:
                 print("Predict and score failed")
                 traceback.print_exc()
-                return {"output": None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
             return eval_row
 
         n_complete = 0
@@ -458,7 +474,7 @@ class Evaluation(Object):
             #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
             # )
             if eval_row is None:
-                eval_row = {"output": None, "scores": {}}
+                eval_row = {self._output_key: None, "scores": {}}
             else:
                 eval_row["scores"] = eval_row.get("scores", {})
             for scorer in self.scorers or []:

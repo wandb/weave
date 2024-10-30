@@ -71,6 +71,7 @@ from weave.trace_server.clickhouse_schema import (
     SelectableCHCallSchema,
     SelectableCHObjSchema,
 )
+from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InsertTooLarge, InvalidRequest, RequestTooLarge
 from weave.trace_server.feedback import (
@@ -92,7 +93,13 @@ from weave.trace_server.interface.base_models.feedback_base_model_registry impor
     ActionScore,
     feedback_base_models,
 )
+from weave.trace_server.llm_completion import lite_llm_completion
+from weave.trace_server.model_providers.model_providers import (
+    MODEL_PROVIDERS_FILE,
+    fetch_model_to_provider_info_map,
+)
 from weave.trace_server.orm import ParamBuilder, Row
+from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
     TABLE_ROWS_ALIAS,
@@ -200,6 +207,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._flush_immediately = True
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
+        self._model_to_provider_info_map = fetch_model_to_provider_info_map(
+            MODEL_PROVIDERS_FILE
+        )
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -1512,6 +1522,64 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
 
         return tsi.ExecuteBatchActionRes()
+
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        model_name = req.inputs.model
+        model_info = self._model_to_provider_info_map.get(model_name)
+        if not model_info:
+            raise InvalidRequest(f"No model info found for model {model_name}")
+        secret_fetcher = _secret_fetcher_context.get()
+        if not secret_fetcher:
+            raise InvalidRequest(
+                f"No secret fetcher found, cannot fetch API key for model {model_name}"
+            )
+        secret_name = model_info.get("api_key_name")
+        if not secret_name:
+            raise InvalidRequest(f"No secret name found for model {model_name}")
+        api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
+        if not api_key:
+            raise InvalidRequest(f"No API key found for model {model_name}")
+
+        start_time = datetime.datetime.now()
+        res = lite_llm_completion(api_key, req.inputs)
+        end_time = datetime.datetime.now()
+
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=req.project_id,
+            wb_user_id=req.wb_user_id,
+            op_name=COMPLETIONS_CREATE_OP_NAME,
+            started_at=start_time,
+            inputs={**req.inputs.model_dump(exclude_none=True)},
+            attributes={},
+        )
+        start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=req.project_id,
+            id=start_call.id,
+            ended_at=end_time,
+            output=res.response,
+            summary={},
+        )
+        if "usage" in res.response:
+            end.summary["usage"] = {req.inputs.model: res.response["usage"]}
+
+        if "error" in res.response:
+            end.exception = res.response["error"]
+        end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+        calls: list[Union[CallStartCHInsertable, CallEndCHInsertable]] = [
+            start_call,
+            end_call,
+        ]
+        batch_data = []
+        for call in calls:
+            call_dict = call.model_dump()
+            values = [call_dict.get(col) for col in all_call_insert_columns]
+            batch_data.append(values)
+
+        self._insert_call_batch(batch_data)
+        return res
 
     # Private Methods
     @property
