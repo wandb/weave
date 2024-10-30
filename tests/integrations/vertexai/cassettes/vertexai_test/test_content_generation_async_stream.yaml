@@ -1,0 +1,59 @@
+interactions:
+- request:
+    body: grant_type=refresh_token&client_id=764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com&client_secret=d-FL95Q19q7MQmFpd7hHD0Ty&refresh_token=1%2F%2F0gLiyt963b8sOCgYIARAAGBASNwF-L9Ir7IWWSZUm-v0s2idDS4EYVX45KS8GZ0v9e0Ykjq8V8oMGXrcCohA6WFBUlBNSpkdOH_Y
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '268'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      User-Agent:
+      - python-requests/2.32.3
+      x-goog-api-client:
+      - gl-python/3.9.12 auth/2.35.0 cred-type/u
+    method: POST
+    uri: https://oauth2.googleapis.com/token
+  response:
+    body:
+      string: "{\n  \"access_token\": \"ya29.a0AeDClZB3Y3dmQNSdSh1JquBqC6YlhbgHqCix4civq2GYwDk8SppuSx853hJSZzBqW0kI_Lq1lqnxcE7EgGoqF3tZS9EGK8V8esMork6ii_qx__C4ac8V7Jobm_C7t9lmvSbmqED1OO1A887bxSFQf8wKS-JGoHCqOnvXa1Xj0gaCgYKAWoSARESFQHGX2MiE1fTNI5Pq9FRb6hkD7SIfg0177\",\n
+        \ \"expires_in\": 3599,\n  \"scope\": \"https://www.googleapis.com/auth/sqlservice.login
+        https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/cloud-platform
+        openid\",\n  \"token_type\": \"Bearer\",\n  \"id_token\": \"eyJhbGciOiJSUzI1NiIsImtpZCI6ImM4OGQ4MDlmNGRiOTQzZGY1M2RhN2FjY2ZkNDc3NjRkMDViYTM5MWYiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI3NjQwODYwNTE4NTAtNnFyNHA2Z3BpNmhuNTA2cHQ4ZWp1cTgzZGkzNDFodXIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI3NjQwODYwNTE4NTAtNnFyNHA2Z3BpNmhuNTA2cHQ4ZWp1cTgzZGkzNDFodXIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTI5OTYyMDUzOTczMDQ4ODIzNTciLCJoZCI6IndhbmRiLmNvbSIsImVtYWlsIjoic291bWlrLnJha3NoaXRAd2FuZGIuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImF0X2hhc2giOiJXVXBVQjZLaEJZSnJ2ZGdTa2hUSE1nIiwiaWF0IjoxNzMwMjY0MDc1LCJleHAiOjE3MzAyNjc2NzV9.si22Fdiud05WQglgEx6TLCFz7WLhnyFhLszlm6-G1wa4roteWRQufet4GIXhUXjDdWGLoMP27SffPXFoJ6tT4j4BHWnh7bndM2zWCtMAtub2fDkL7wBIwjarI3Xe8mCo9Zqv0FgDTGbxqIQJ33FKBr2d99gfYGJ6dYQznyy6OonuHEUYv_q8XD5s9oMDJ3ejpLDyGhx4pOI7RIiKSlyiszrCAtJdzqFZvKci8Ak1xfOCmrCN74nGOdD8PobDgaT7ZDkfqGLs7OXNuW-6S0hNNRSFadG3Zi9TTakxlcYeojlZnpzxuS9uaObAp8oDDuZ68TC4c0ajMjmLblfXlKfI_w\"\n}"
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Cache-Control:
+      - no-cache, no-store, max-age=0, must-revalidate
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Wed, 30 Oct 2024 04:54:35 GMT
+      Expires:
+      - Mon, 01 Jan 1990 00:00:00 GMT
+      Pragma:
+      - no-cache
+      Server:
+      - scaffolding on HTTPServer2
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Origin
+      - X-Origin
+      - Referer
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-XSS-Protection:
+      - '0'
+    status:
+      code: 200
+      message: OK
+version: 1

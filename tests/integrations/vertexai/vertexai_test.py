@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from weave.integrations.integration_utilities import op_name_from_ref
@@ -56,19 +58,18 @@ def test_content_generation_stream(client):
 
 
 @pytest.mark.retry(max_attempts=5)
-@pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-async def test_content_generation_async(client):
+def test_content_generation_async(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel
 
     vertexai.init(project="wandb-growth", location="us-central1")
     model = GenerativeModel("gemini-1.5-flash")
-    _ = await model.generate_content_async("What is the capital of France?")
+    asyncio.run(model.generate_content_async("What is the capital of France?"))
 
     calls = list(client.calls())
     assert len(calls) == 1
@@ -82,13 +83,12 @@ async def test_content_generation_async(client):
 
 
 @pytest.mark.retry(max_attempts=5)
-@pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-async def test_content_generation_async_stream(client):
+def test_content_generation_async_stream(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel
 
@@ -104,7 +104,7 @@ async def test_content_generation_async_stream(client):
                 chunks.append(chunk.text)
         return chunks
 
-    _ = await get_response()
+    asyncio.run(get_response())
 
     calls = list(client.calls())
     assert len(calls) == 1
