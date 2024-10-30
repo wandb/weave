@@ -265,7 +265,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 req_as_obj = tsi.CallStartReq.model_validate(req)
             else:
                 req_as_obj = req
-            if req_as_obj.start.id is None or req_as_obj.start.trace_id is None:
+            if req_as_obj.start.id == None or req_as_obj.start.trace_id == None:
                 raise ValueError(
                     "CallStartReq must have id and trace_id when batching."
                 )
@@ -549,14 +549,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/cost/purge", req, tsi.CostPurgeReq, tsi.CostPurgeRes
         )
 
-    def execute_batch_action(
-        self, req: tsi.ExecuteBatchActionReq
-    ) -> tsi.ExecuteBatchActionRes:
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
         return self._generic_request(
-            "/execute/batch_action",
+            "/completions/create",
             req,
-            tsi.ExecuteBatchActionReq,
-            tsi.ExecuteBatchActionRes,
+            tsi.CompletionsCreateReq,
+            tsi.CompletionsCreateRes,
         )
 
 
