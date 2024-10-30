@@ -47,15 +47,15 @@ This will result in an on-disk payload that looks like:
 }
 ```
 
-And additionally, the user can query for all objects of the `ModelConfig` class using the `base_model_classes` filter in `objs_query` or `POST objs/query`.
+And additionally, the user can query for all objects of the `ModelConfig` class using the `base_object_classes` filter in `objs_query` or `POST objs/query`.
 Effectively, this is like creating a virtual table for that class.
 
 **Terminology**: We use the term "weave Object" (capital "O") to refer to instances of classes that subclass `weave.Object`.
 
-**Technical note**: the "base_model_class" is the first subtype of "Object", not the _class_name. 
+**Technical note**: the "base_object_class" is the first subtype of "Object", not the _class_name. 
 For example, let's say the class heirarchy is:
-* `A -> Object -> BaseModel`, then the `base_model_class` filter will be "A".
-* `B -> A -> Object -> BaseModel`, then the `base_model_class` filter will still be "A"!
+* `A -> Object -> BaseModel`, then the `base_object_class` filter will be "A".
+* `B -> A -> Object -> BaseModel`, then the `base_object_class` filter will still be "A"!
 
 Finally, the Weave library itself utilizes this mechanism for common objects like `Model`, `Dataset`, `Evaluation`, etc...
 This allows the user to subclass these objects to add additional metadata or functionality, while categorizing them in the same virtual table.
@@ -95,4 +95,21 @@ We want to be able to store & query `Leaderboards` efficiently and ensure they a
 
 And all of the above should be generated from a single source of truth: the pydantic schema.
 
-
+### Solution
+1. We define a set of "validated base object classes" in a common location.
+2. We use that:
+    1. At the DB layer to validate insertion schemas
+    2. Can be published from the python sdk
+       * Note: figuring out the interplay with `weave.Object` is tricky here. There are a few issues:
+            1. We don't want to depend on the weave sdk inside the common interface, meaning the class heirarchy is inherently divergent
+            2. Without `weave.Object`:
+                * Our python serialization layer's `is_instance` checks will not maintain behavior
+                * (Seems fine?) No ref tracing or nested deserialization. Actually, i think we do want to avoid this.
+                * (Seems fine?) No "handle_relocatable_object" behavior
+            3. We still want to have the same bases array in the final payload
+            - I think all of this can be resolved by extended the base_object_class to also look for `BaseObject` (objects that are pure data schema: only fields)
+    3. Can be used in the frontend UI layer
+        * via generated Zod types & hooks
+    4. Future: Exposed in the OpenAPI schema
+    5. Future: Generates Typescript SDK types
+    
