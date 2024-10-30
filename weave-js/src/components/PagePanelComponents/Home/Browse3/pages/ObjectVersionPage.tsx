@@ -8,10 +8,9 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import {Button} from '@wandb/weave/components/Button';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
+import numeral from 'numeral';
 import React, {useMemo, useState} from 'react';
 import styled from 'styled-components';
-import numeral from 'numeral';
-import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
 import {Icon, IconName} from '../../../../Icon';
@@ -704,7 +703,7 @@ const DeleteModal: React.FC<{
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const deleteTargetStr = object.baseObjectClass ?? 'object';
+  const deleteTargetStr = `${object.objectId}:v${object.versionIndex}`;
 
   const onDelete = () => {
     setDeleteLoading(true);
@@ -738,7 +737,7 @@ const DeleteModal: React.FC<{
           <p>Are you sure you want to delete?</p>
         )}
         <span style={{fontSize: '16px', fontWeight: '600'}}>
-          {object.objectId}:v{object.versionIndex}
+          {deleteTargetStr}
         </span>
       </DialogContent>
       <DialogActions $align="left">

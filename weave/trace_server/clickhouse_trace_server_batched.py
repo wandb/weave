@@ -1682,18 +1682,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 FROM (
                     SELECT project_id,
                         object_id,
-                        created_at,
+                        MIN(created_at) AS created_at,
+                        MIN(deleted_at) AS deleted_at,
                         kind,
-                        base_object_class,
-                        refs,
+                        MIN(base_object_class) AS base_object_class,
+                        MIN(refs) AS refs,
                         digest,
-                        deleted_at,
-                        if (kind = 'op', 1, 0) AS is_op,
+                        IF(kind = 'op', 1, 0) AS is_op
                     FROM object_versions
                     WHERE project_id = {{project_id: String}} AND
                         {object_id_conditions_part}
-                    ORDER by created_at DESC
-                    LIMIT 1
+                    GROUP BY project_id, kind, object_id, digest
                 )
             )
             WHERE {conditions_part} AND
