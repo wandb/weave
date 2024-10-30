@@ -728,6 +728,14 @@ class FeedbackPurgeReq(BaseModel):
 
 
 class FeedbackPurgeRes(BaseModel):
+    num_deleted: int
+
+
+class FeedbackReplaceReq(FeedbackCreateReq):
+    feedback_id: str
+
+
+class FeedbackReplaceRes(FeedbackCreateRes):
     pass
 
 
@@ -877,5 +885,6 @@ class TraceServerInterface(Protocol):
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
+    def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes: ...
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...

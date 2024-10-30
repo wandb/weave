@@ -20,12 +20,14 @@ type ManageColumnsButtonProps = {
   columnInfo: ColumnInfo;
   columnVisibilityModel: GridColumnVisibilityModel;
   setColumnVisibilityModel: (model: GridColumnVisibilityModel) => void;
+  onEditColumns: (existingColumn?: string) => void;
 };
 
 export const ManageColumnsButton = ({
   columnInfo,
   columnVisibilityModel,
   setColumnVisibilityModel,
+  onEditColumns,
 }: ManageColumnsButtonProps) => {
   const [search, setSearch] = useState('');
   const lowerSearch = search.toLowerCase();
@@ -83,6 +85,11 @@ export const ManageColumnsButton = ({
     setColumnVisibilityModel(newModel);
   };
 
+  const handleEditColumn = (columnName: string) => {
+    onEditColumns(columnName);
+    setAnchorEl(null);
+  };
+
   return (
     <>
       <span ref={ref}>
@@ -121,9 +128,17 @@ export const ManageColumnsButton = ({
                 <div className="flex-auto text-xl font-semibold">
                   Manage columns
                 </div>
-                <div className="ml-16 text-moon-500">
-                  {maybePluralize(numHidden, 'hidden column', 's')}
-                </div>
+                <div className="flex-auto" />
+                <Button
+                  size="small"
+                  variant="ghost"
+                  icon="add-new"
+                  onClick={() => {
+                    setAnchorEl(anchorEl ? null : ref.current);
+                    onEditColumns();
+                  }}>
+                  Create column
+                </Button>
               </div>
             </DraggableHandle>
             <div className="mb-8">
@@ -141,6 +156,7 @@ export const ManageColumnsButton = ({
                 const checked = columnVisibilityModel[col.field] ?? true;
                 const label = col.headerName ?? value;
                 const disabled = !(col.hideable ?? true);
+                const feedbackCol = col.field.startsWith('feedback.');
                 if (
                   search &&
                   !label.toLowerCase().includes(search.toLowerCase())
@@ -172,6 +188,23 @@ export const ManageColumnsButton = ({
                         )}>
                         {label}
                       </label>
+                      {feedbackCol && (
+                        <>
+                          <div className="flex-auto" />
+                          <Button
+                            variant="quiet"
+                            icon="pencil-edit"
+                            size="small"
+                            onClick={() =>
+                              handleEditColumn(
+                                col.field.replace('feedback.', '')
+                              )
+                            }
+                            tooltip="Edit feedback column"
+                            className="mr-4"
+                          />
+                        </>
+                      )}
                     </div>
                   </div>
                 );
@@ -186,7 +219,6 @@ export const ManageColumnsButton = ({
                 onClick={onHideAll}>
                 {`Hide ${buttonSuffix}`}
               </Button>
-              <div className="flex-auto" />
               <Button
                 size="small"
                 variant="quiet"
@@ -195,6 +227,10 @@ export const ManageColumnsButton = ({
                 onClick={onShowAll}>
                 {`Show ${buttonSuffix}`}
               </Button>
+              <div className="flex-auto" />
+              <div className="ml-16 text-moon-500">
+                {maybePluralize(numHidden, 'hidden column', 's')}
+              </div>
             </div>
           </div>
         </Tailwind>

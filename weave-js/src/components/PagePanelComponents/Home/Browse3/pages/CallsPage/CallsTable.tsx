@@ -32,6 +32,7 @@ import {Icon} from '@wandb/weave/components/Icon';
 import React, {
   FC,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -43,7 +44,10 @@ import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {TailwindContents} from '../../../../../Tailwind';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
+import {CallIdContext} from '../../../Browse3';
 import {useWeaveflowCurrentRouteContext} from '../../context';
+import {ConfigureStructuredFeedbackModal} from '../../feedback/StructuredFeedback/AddColumnButton';
+import {useStructuredFeedbackOptions} from '../../feedback/StructuredFeedback/tsStructuredFeedback';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
@@ -79,7 +83,7 @@ import {
   PaginationButtons,
   RefreshButton,
 } from './CallsTableButtons';
-import {useCallsTableColumns} from './callsTableColumns';
+import {feedbackColName, useCallsTableColumns} from './callsTableColumns';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {getEffectiveFilter} from './callsTableFilter';
 import {useOpVersionOptions} from './callsTableFilter';
@@ -335,6 +339,30 @@ export const CallsTable: FC<{
     [callsResult, columnIsRefExpanded, expandedRefCols]
   );
 
+  // Hide structured feedback columns by default
+  const structuredFeedbackOptions = useStructuredFeedbackOptions(
+    entity,
+    project
+  );
+  useEffect(() => {
+    if (setColumnVisibilityModel == null || structuredFeedbackOptions == null) {
+      return;
+    }
+    for (const feedback of structuredFeedbackOptions.types) {
+      const name = feedbackColName(feedback);
+      if (columnVisibilityModel?.[name] == null) {
+        setColumnVisibilityModel({
+          ...columnVisibilityModel,
+          [name]: false,
+        });
+      }
+    }
+  }, [
+    structuredFeedbackOptions,
+    columnVisibilityModel,
+    setColumnVisibilityModel,
+  ]);
+
   const onAddFilter: OnAddFilter | undefined =
     filterModel && setFilterModel
       ? (field: string, operator: string | null, value: any, rowId: string) => {
@@ -377,7 +405,8 @@ export const CallsTable: FC<{
     columnIsRefExpanded,
     allowedColumnPatterns,
     onAddFilter,
-    calls.costsLoading
+    calls.costsLoading,
+    structuredFeedbackOptions
   );
 
   // This contains columns which are suitable for selection and raw data
@@ -482,6 +511,20 @@ export const CallsTable: FC<{
       }
     }
   }, [rowIds, peekId]);
+  const {setCallIds, nextPageNeeded} = useContext(CallIdContext);
+  useEffect(() => {
+    if (setCallIds) {
+      setCallIds(rowIds);
+    }
+  }, [rowIds, setCallIds]);
+  useEffect(() => {
+    if (nextPageNeeded && setPaginationModel) {
+      setPaginationModel({
+        ...paginationModelResolved,
+        page: paginationModelResolved.page + 1,
+      });
+    }
+  }, [nextPageNeeded, paginationModelResolved, setPaginationModel]);
 
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {
@@ -657,6 +700,13 @@ export const CallsTable: FC<{
     },
     [callsLoading, setPaginationModel]
   );
+
+  const [structuredFeedbackModalOpen, setStructuredFeedbackModalOpen] =
+    useState(false);
+  const [
+    editStructuredFeedbackColumnName,
+    setEditStructuredFeedbackColumnName,
+  ] = useState<string | undefined>(undefined);
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
@@ -855,7 +905,22 @@ export const CallsTable: FC<{
                   columnInfo={columns}
                   columnVisibilityModel={columnVisibilityModel}
                   setColumnVisibilityModel={setColumnVisibilityModel}
+                  onEditColumns={columnName => {
+                    setStructuredFeedbackModalOpen(true);
+                    setEditStructuredFeedbackColumnName(columnName);
+                  }}
                 />
+                {structuredFeedbackModalOpen && (
+                  <ConfigureStructuredFeedbackModal
+                    entity={entity}
+                    project={project}
+                    structuredFeedbackData={
+                      structuredFeedbackOptions ?? undefined
+                    }
+                    editColumnName={editStructuredFeedbackColumnName}
+                    onClose={() => setStructuredFeedbackModalOpen(false)}
+                  />
+                )}
               </div>
             </>
           )}

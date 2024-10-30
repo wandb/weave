@@ -162,6 +162,58 @@ const browse3Paths = (projectRoot: string) => [
   `${projectRoot}`,
 ];
 
+// Create a context for managing call IDs
+export const CallIdContext = React.createContext<{
+  setCallIds?: (callIds: string[]) => void;
+  getNextCallId?: (currentId: string) => string | null;
+  getPreviousCallId?: (currentId: string) => string | null;
+  nextPageNeeded: boolean;
+}>({
+  setCallIds: () => {},
+  getNextCallId: () => null,
+  getPreviousCallId: () => null,
+  nextPageNeeded: false,
+});
+
+const CallIdProvider: FC<{children: React.ReactNode}> = ({children}) => {
+  const [callIds, setCallIds] = useState<string[]>([]);
+  const [nextPageNeeded, setNextPageNeeded] = useState(false);
+
+  const getNextCallId = useCallback(
+    (currentId: string) => {
+      const currentIndex = callIds.indexOf(currentId);
+      if (
+        currentIndex === callIds.length - 1 &&
+        callIds.length === DEFAULT_PAGE_SIZE
+      ) {
+        setNextPageNeeded(true);
+      } else if (currentIndex !== -1) {
+        return callIds[currentIndex + 1];
+      } else if (nextPageNeeded) {
+        setNextPageNeeded(false);
+        return callIds[0];
+      }
+      return null;
+    },
+    [callIds, nextPageNeeded]
+  );
+
+  const getPreviousCallId = useCallback(
+    (currentId: string) => {
+      const currentIndex = callIds.indexOf(currentId);
+      return callIds[currentIndex - 1];
+    },
+    [callIds]
+  );
+
+  return (
+    <CallIdContext.Provider
+      value={{setCallIds, getNextCallId, getPreviousCallId, nextPageNeeded}}>
+      {children}
+    </CallIdContext.Provider>
+  );
+};
+
 export const Browse3: FC<{
   hideHeader?: boolean;
   headerOffset?: number;
@@ -338,90 +390,92 @@ const MainPeekingLayout: FC = () => {
     <WFDataModelAutoProvider
       entityName={params.entity!}
       projectName={params.project!}>
-      <Box
-        sx={{
-          flex: '1 1 auto',
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          overflow: 'hidden',
-          flexDirection: 'row',
-          alignContent: 'stretch',
-        }}>
+      <CallIdProvider>
         <Box
           sx={{
-            flex: '1 1 40%',
-            overflow: 'hidden',
+            flex: '1 1 auto',
+            width: '100%',
+            height: '100%',
             display: 'flex',
-            marginRight: !isDrawerOpen ? 0 : `${drawerWidthPx}px`,
+            overflow: 'hidden',
+            flexDirection: 'row',
+            alignContent: 'stretch',
           }}>
-          <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
-        </Box>
-
-        <Drawer
-          variant="persistent"
-          anchor="right"
-          open={isDrawerOpen}
-          onClose={closePeek}
-          PaperProps={{
-            ref: drawerRef,
-            style: {
+          <Box
+            sx={{
+              flex: '1 1 40%',
               overflow: 'hidden',
-              display: isDrawerOpen ? 'flex' : 'none',
-              zIndex: 1,
-              width: isDrawerOpen ? `${drawerWidthPx}px` : 0,
-              height: '100%',
-              borderLeft: '1px solid #e0e0e0',
-              position: 'absolute',
-              pointerEvents: isDragging ? 'none' : 'auto',
-            },
-          }}
-          ModalProps={{
-            keepMounted: true,
-          }}>
-          <div
-            id="dragger"
-            onMouseDown={handleDragStart}
-            style={{
-              position: 'absolute',
-              top: 0,
-              bottom: 0,
-              left: 0,
-              width: '5px',
-              cursor: 'col-resize',
-              zIndex: 2,
+              display: 'flex',
+              marginRight: !isDrawerOpen ? 0 : `${drawerWidthPx}px`,
+            }}>
+            <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
+          </Box>
+
+          <Drawer
+            variant="persistent"
+            anchor="right"
+            open={isDrawerOpen}
+            onClose={closePeek}
+            PaperProps={{
+              ref: drawerRef,
+              style: {
+                overflow: 'hidden',
+                display: isDrawerOpen ? 'flex' : 'none',
+                zIndex: 1,
+                width: isDrawerOpen ? `${drawerWidthPx}px` : 0,
+                height: '100%',
+                borderLeft: '1px solid #e0e0e0',
+                position: 'absolute',
+                pointerEvents: isDragging ? 'none' : 'auto',
+              },
             }}
-          />
-          {peekLocation && (
-            <WeaveflowPeekContext.Provider value={{isPeeking: true}}>
-              <SimplePageLayoutContext.Provider
-                value={{
-                  headerSuffix: (
-                    <Box sx={{flex: '0 0 auto'}}>
-                      <FullPageButton
-                        query={query}
-                        generalBase={generalBase}
-                        targetBase={targetBase}
-                      />
-                      <Button
-                        tooltip="Close drawer"
-                        icon="close"
-                        variant="ghost"
-                        className="ml-4"
-                        onClick={closePeek}
-                      />
-                    </Box>
-                  ),
-                }}>
-                <Browse3ProjectRoot
-                  customLocation={peekLocation}
-                  projectRoot={generalProjectRoot}
-                />
-              </SimplePageLayoutContext.Provider>
-            </WeaveflowPeekContext.Provider>
-          )}
-        </Drawer>
-      </Box>
+            ModalProps={{
+              keepMounted: true,
+            }}>
+            <div
+              id="dragger"
+              onMouseDown={handleDragStart}
+              style={{
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                left: 0,
+                width: '5px',
+                cursor: 'col-resize',
+                zIndex: 2,
+              }}
+            />
+            {peekLocation && (
+              <WeaveflowPeekContext.Provider value={{isPeeking: true}}>
+                <SimplePageLayoutContext.Provider
+                  value={{
+                    headerSuffix: (
+                      <Box sx={{flex: '0 0 auto'}}>
+                        <FullPageButton
+                          query={query}
+                          generalBase={generalBase}
+                          targetBase={targetBase}
+                        />
+                        <Button
+                          tooltip="Close drawer"
+                          icon="close"
+                          variant="ghost"
+                          className="ml-4"
+                          onClick={closePeek}
+                        />
+                      </Box>
+                    ),
+                  }}>
+                  <Browse3ProjectRoot
+                    customLocation={peekLocation}
+                    projectRoot={generalProjectRoot}
+                  />
+                </SimplePageLayoutContext.Provider>
+              </WeaveflowPeekContext.Provider>
+            )}
+          </Drawer>
+        </Box>
+      </CallIdProvider>
     </WFDataModelAutoProvider>
   );
 };

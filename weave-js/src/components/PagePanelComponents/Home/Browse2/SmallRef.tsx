@@ -124,6 +124,7 @@ export const SmallRef: FC<{
       };
     }
   }
+  // if a wandb artifact
   const objectVersion = useObjectVersion(objVersionKey);
   const opVersion = useOpVersion(opVersionKey);
   const versionIndex =

@@ -527,6 +527,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
         )
 
+    def feedback_replace(
+        self, req: Union[tsi.FeedbackReplaceReq, dict[str, Any]]
+    ) -> tsi.FeedbackReplaceRes:
+        return self._generic_request(
+            "/feedback/replace", req, tsi.FeedbackReplaceReq, tsi.FeedbackReplaceRes
+        )
+
     # Cost API
     def cost_query(
         self, req: Union[tsi.CostQueryReq, dict[str, Any]]

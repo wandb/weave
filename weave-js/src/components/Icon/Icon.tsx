@@ -637,6 +637,12 @@ export const IconLogOut = (props: SVGIconProps) => (
 export const IconLogoColab = (props: SVGIconProps) => (
   <ImportLogoColab {...updateIconProps(props)} />
 );
+export const IconMarker = (props: SVGIconProps) => (
+  <ImportMarker {...updateIconProps(props)} />
+);
+export const IconReloadRefresh = (props: SVGIconProps) => (
+  <ImportReloadRefresh {...updateIconProps(props)} />
+);
 export const IconMagicWandStar = (props: SVGIconProps) => (
   <ImportMagicWandStar {...updateIconProps(props)} />
 );
@@ -1083,6 +1089,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'cube-container': IconCubeContainer,
   'dashboard-blackboard': IconDashboardBlackboard,
   'database-artifacts': IconDatabaseArtifacts,
+  'reload-refresh': IconReloadRefresh,
   date: IconDate,
   delete: IconDelete,
   diamond: IconDiamond,
@@ -1157,6 +1164,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'logo-colab': IconLogoColab,
   'magic-wand-star': IconMagicWandStar,
   'magic-wand-stick': IconMagicWandStick,
+  marker: IconMarker,
   markdown: IconMarkdown,
   marker: IconMarker,
   menu: IconMenu,
