@@ -42,6 +42,7 @@ This will result in an on-disk payload that looks like:
 {
     "model_name": "my_model",
     "model_version": "1.0",
+    "_type": "ModelConfig",
     "_class_name": "ModelConfig",
     "_bases": ["Object", "BaseModel"]
 }
@@ -53,63 +54,166 @@ Effectively, this is like creating a virtual table for that class.
 **Terminology**: We use the term "weave Object" (capital "O") to refer to instances of classes that subclass `weave.Object`.
 
 **Technical note**: the "base_object_class" is the first subtype of "Object", not the _class_name. 
-For example, let's say the class heirarchy is:
+For example, let's say the class hierarchy is:
 * `A -> Object -> BaseModel`, then the `base_object_class` filter will be "A".
 * `B -> A -> Object -> BaseModel`, then the `base_object_class` filter will still be "A"!
 
 Finally, the Weave library itself utilizes this mechanism for common objects like `Model`, `Dataset`, `Evaluation`, etc...
 This allows the user to subclass these objects to add additional metadata or functionality, while categorizing them in the same virtual table.
 
-## The need for validation
-Objects, like people, sometimes need validation. Many of our Objects (eg. `Model`) don't really need validation as they are completely free-form and up to the user to definie the properties.
-However, there is an increasing need to have a well-defined schema for certain configuration objects - where those objects are tightly defined by Weave, not the user.
-In such cases, it is important to have a standard, validated schema that can be shared across the python sdk, the http api, the DB, the frontend UI, and the typescript sdk.
+## Validated Base Objects
 
-### Motivating example:
-Let's consider that we are defining a new concept "Leaderboard". We want to store this as a configuration object in Weave.
-Let's say that it's pydantic representation is:
+While many Weave Objects are free-form and user-defined, there is often a need for well-defined schemas for configuration objects that are tightly defined by Weave itself. The BaseObject system provides a way to define these schemas once and use them consistently across the entire stack.
+
+### Key Features
+
+1. **Single Source of Truth**: Define your schema once using Pydantic models
+2. **Full Stack Integration**: The schema is used for:
+   - Python SDK validation
+   - Server-side HTTP API validation
+   - Frontend UI validation with generated TypeScript types
+   - Future: OpenAPI schema generation
+   - Future: TypeScript SDK type generation
+
+### Usage Example
+
+Here's how to define and use a validated base object:
+
+1. **Define your schema** (in `weave/trace_server/interface/base_object_classes/your_schema.py`):
 
 ```python
-class LeaderboardColumn(BaseModel):
-    name: str
-    description: str
-    evaluation_obj: str # <- reference to an Evaluation object
-    metric_name: str
-    lower_is_better: bool
+from pydantic import BaseModel
+from weave.trace_server.interface.base_object_classes import base_object_def
 
-class Leaderboard(BaseModel):
+class NestedConfig(BaseModel):
+    setting_a: int
+
+class MyConfig(base_object_def.BaseObject):
     name: str
-    description: str
-    columns: List[LeaderboardColumn]
+    nested: NestedConfig
+    reference: base_object_def.RefStr
+
+__all__ = ["MyConfig"]
 ```
 
-We want to be able to store & query `Leaderboards` efficiently and ensure they always have a well-defined schema. Therefore we need:
-1. An ability to validate the schema at insertion time
-2. An ability to create such objects view the REST API
-3. An ability to construct, publish, & query these objects:
-    * via the HTTP API (future: would be nice to have these types inside the openapi schema)
-    * from Python SDK (need a `weave.Object` subclass)
-    * from Typescript SDK (TBD - not yet supported, but need the ability to generate the correct utilities)
-    * from Frontend UI (need a generated Zod schema & hooks to validate the data)
-        * Ideally, with static type-safety.
+2. **Use in Python**:
+```python
+# Publishing
+ref = weave.publish(MyConfig(...))
 
-And all of the above should be generated from a single source of truth: the pydantic schema.
+# Fetching (maintains type)
+config = ref.get()
+assert isinstance(config, MyConfig)
+```
 
-### Solution
-1. We define a set of "validated base object classes" in a common location.
-2. We use that:
-    1. At the DB layer to validate insertion schemas
-    2. Can be published from the python sdk
-       * Note: figuring out the interplay with `weave.Object` is tricky here. There are a few issues:
-            1. We don't want to depend on the weave sdk inside the common interface, meaning the class heirarchy is inherently divergent
-            2. Without `weave.Object`:
-                * Our python serialization layer's `is_instance` checks will not maintain behavior
-                * (Seems fine?) No ref tracing or nested deserialization. Actually, i think we do want to avoid this.
-                * (Seems fine?) No "handle_relocatable_object" behavior
-            3. We still want to have the same bases array in the final payload
-            - I think all of this can be resolved by extended the base_object_class to also look for `BaseObject` (objects that are pure data schema: only fields)
-    3. Can be used in the frontend UI layer
-        * via generated Zod types & hooks
-    4. Future: Exposed in the OpenAPI schema
-    5. Future: Generates Typescript SDK types
-    
+3. **Use via HTTP API**:
+```bash
+# Creating
+curl -X POST 'https://trace.wandb.ai/obj/create' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "obj": {
+      "project_id": "user/project",
+      "object_id": "my_config",
+      "val": {...},
+      "set_base_object_class": "MyConfig"
+    }
+  }'
+
+# Querying
+curl -X POST 'https://trace.wandb.ai/objs/query' \
+  -d '{
+    "project_id": "user/project",
+    "filter": {
+      "base_object_classes": ["MyConfig"]
+    }
+  }'
+```
+
+4. **Use in React**:
+```typescript
+// Read with type safety
+const result = useBaseObjectInstances("MyConfig", ...);
+
+// Write with validation
+const createFn = useCreateBaseObjectInstance("MyConfig");
+createFn({...}); // TypeScript enforced schema
+```
+
+### Keeping Frontend Types in Sync
+
+Run `make synchronize-base-object-schemas` to ensure the frontend TypeScript types are up to date with your Pydantic schemas.
+
+### Implementation Notes
+
+- Base objects are pure data schemas (fields only)
+- The system is designed to work independently of the weave SDK to maintain clean separation of concerns
+- Server-side validation ensures data integrity
+- Client-side validation (both Python and TypeScript) provides early feedback
+- Generated TypeScript types ensure type safety in the frontend
+
+### Architecture Flow
+
+1. Define your schema in a python file in the `weave/trace_server/interface/base_object_classes/test_only_example.py` directory. See `weave/trace_server/interface/base_object_classes/test_only_example.py` as an example.
+2. Make sure to register your schemas in `weave/trace_server/interface/base_object_classes/base_object_registry.py` by calling `register_base_object`.
+3. Run `make synchronize-base-object-schemas` to generate the frontend types.
+    * The first step (`make generate_base_object_schemas`) will run `weave/scripts/generate_base_object_schemas.py` to generate a JSON schema in `weave/scripts/generated_base_object_class_schemas.json`.
+    * The second step (yarn `generate-schemas`) will read this file and use it to generate the frontend types located in `weave-js/src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBaseObjectClasses.zod.ts`.
+        * Note, you need to run prettier to fix the output. These files should be checked in.
+4. Now, each use case uses different parts:
+    1. `Python Writing`. Users can directly import these classes and use them as normal Pydantic models, which get published with `weave.publish`. The python client correct builds the requisite payload.
+    2. `Python Reading`. Users can `weave.ref().get()` and the weave python SDK will return the instance with the correct type. Note: we do some special handling such that the returned object is not a WeaveObject, but literally the exact pydantic class.
+    3. `HTTP Writing`. In cases where the client/user does not want to add the special type information, users can publish base objects by setting the `set_base_object_class` setting on `POST obj/create` to the name of the class. The weave server will validate the object against the schema, update the metadata fields, and store the object.
+    4. `HTTP Reading`. When querying for objects, the server will return the object with the correct type if the `base_object_class` metadata field is set.
+    5. `Frontend`. The frontend will read the zod schema from `weave-js/src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBaseObjectClasses.zod.ts` and use that to provide compile time type safety when using `useBaseObjectInstances` and runtime type safety when using `useCreateBaseObjectInstance`.
+* Note: it is critical that all techniques produce the same digest for the same data - which is tested in the tests. This way versions are not thrashed by different clients/users.
+
+```mermaid
+graph TD
+    subgraph Schema Definition
+        F["weave/trace_server/interface/<br>base_object_classes/your_schema.py"] --> |defines| P[Pydantic BaseObject]
+        P --> |register_base_object| R["base_object_registry.py"]
+    end
+
+    subgraph Schema Generation
+        M["make synchronize-base-object-schemas"] --> G["make generate_base_object_schemas"]
+        G --> |runs| S["weave/scripts/<br>generate_base_object_schemas.py"]
+        R --> |import registered classes| S
+        S --> |generates| J["generated_base_object_class_schemas.json"]
+        M --> |yarn generate-schemas| Z["generatedBaseObjectClasses.zod.ts"]
+        J --> Z
+    end
+
+    subgraph "Trace Server"
+        subgraph "HTTP API"
+            R --> |validates using| HW["POST obj/create<br>set_base_object_class"]
+            HW --> DB[(Weave Object Store)]
+            HR["POST objs/query<br>base_object_classes"] --> |Filters base_object_class| DB
+        end
+    end
+
+    subgraph "Python SDK"
+        PW[Client Code] --> |import & publish| W[weave.publish]
+        W --> |store| HW
+        R --> |validates using| W
+        PR["weave ref get()"] --> |queries| HR
+        R --> |deserializes using| PR
+    end
+
+    subgraph "Frontend"
+        Z --> |import| UBI["useBaseObjectInstances"]
+        Z --> |import| UCI["useCreateBaseObjectInstance"]
+        UBI --> |Filters base_object_class| HR
+        UCI --> |set_base_object_class| HW
+        UI[React UI] --> UBI
+        UI --> UCI
+    end
+
+    style F fill:#f9f,stroke:#333,stroke-width:2px
+    style P fill:#f9f,stroke:#333,stroke-width:2px
+    style R fill:#bbf,stroke:#333,stroke-width:2px
+    style DB fill:#dfd,stroke:#333,stroke-width:2px
+    style J fill:#ffd,stroke:#333,stroke-width:2px
+    style Z fill:#ffd,stroke:#333,stroke-width:2px
+    style M fill:#faa,stroke:#333,stroke-width:4px
+```
