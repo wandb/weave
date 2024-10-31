@@ -3,7 +3,7 @@
 # Exit on error
 set -e
 
-SCHEMA_INPUT_PATH="../weave/scripts/generated_base_object_class_schemas.json"
+SCHEMA_INPUT_PATH="../weave/generated/generated_base_object_class_schemas.json"
 SCHEMA_OUTPUT_PATH="./src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBaseObjectClasses.zod.ts"
 
 echo "Generating schemas..."
