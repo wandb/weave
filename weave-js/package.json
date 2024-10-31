@@ -19,9 +19,10 @@
     "generate:watch": "graphql-codegen -w",
     "prettier": "prettier --config .prettierrc --check \"src/**/*.ts\" \"src/**/*.tsx\"",
     "prettier-fix": "prettier --loglevel warn --config .prettierrc --write \"src/**/*.ts\" \"src/**/*.tsx\"",
+    "direct-prettier": "prettier",
     "lint": "yarn eslint & yarn tslint & yarn prettier & wait",
     "lint-fix": "yarn eslint-fix & yarn tslint-fix & yarn prettier-fix & wait",
-    "generate-schemas": "yarn quicktype -s schema  ../weave/scripts/generated_base_object_class_schemas.json -o ./src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBaseObjectClasses.zod.ts --lang typescript-zod && prettier --write ./src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBaseObjectClasses.zod.ts"
+    "generate-schemas": "bash scripts/generate-schemas.sh"
   },
   "dependencies": {
     "@apollo/client": "^3.8.4",
