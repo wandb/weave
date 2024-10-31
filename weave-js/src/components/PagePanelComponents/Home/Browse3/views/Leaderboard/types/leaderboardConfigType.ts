@@ -1,3 +1,5 @@
+import {Leaderboard} from '../../../pages/wfReactInterface/generatedBaseObjectClasses.zod';
+
 export const ALL_VALUE = '*';
 
 export type LeaderboardConfigType = {
@@ -44,15 +46,5 @@ export type FilterAndGroupModelSpec = {
   groupAllVersions?: boolean;
 };
 
-// TODO: Merge into weave-js/src/components/PagePanelComponents/Home/Browse3/collections/collectionRegistry.ts after
-// Online evals lands
-export type LeaderboardObjectVal = {
-  name: string;
-  description: string;
-  columns: Array<{
-    evaluation_object_ref: string;
-    scorer_name: string;
-    should_minimize?: boolean;
-    summary_metric_path_parts: string[];
-  }>;
-};
+// This alias could go away, just here to make refactoring easier
+export type LeaderboardObjectVal = Leaderboard;

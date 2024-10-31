@@ -619,7 +619,7 @@ const getLeaderboardObjectGroupableData = async (
         } else {
           value = (value as any)[col.scorer_name];
         }
-        col.summary_metric_path_parts.forEach(part => {
+        col.summary_metric_path.split('.').forEach(part => {
           if (value == null) {
             return;
           }
@@ -642,7 +642,7 @@ const getLeaderboardObjectGroupableData = async (
           modelGroup,
           datasetGroup,
           scorerGroup,
-          metricPathGroup: col.summary_metric_path_parts.join('.'),
+          metricPathGroup: col.summary_metric_path,
           sortKey: -convertISOToDate(call.started_at).getTime(),
           row: {
             datasetName: datasetRef.artifactName,
@@ -650,7 +650,7 @@ const getLeaderboardObjectGroupableData = async (
             metricType: 'scorerMetric',
             scorerName: scorerRef.artifactName,
             scorerVersion: scorerRef.artifactVersion,
-            metricPath: col.summary_metric_path_parts.join('.'),
+            metricPath: col.summary_metric_path,
             metricValue: value as any,
             modelName: modelRef.artifactName,
             modelVersion: modelRef.artifactVersion,
@@ -659,7 +659,7 @@ const getLeaderboardObjectGroupableData = async (
             createdAt: convertISOToDate(call.started_at),
             sourceEvaluationCallId: call.id,
             sourceEvaluationObjectRef: col.evaluation_object_ref,
-            shouldMinimize: col.should_minimize,
+            shouldMinimize: col.should_minimize ?? false,
           },
         };
         data.push(row);

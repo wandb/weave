@@ -177,7 +177,7 @@ export const LeaderboardPageContentInner: React.FC<
   const [workingLeaderboardValCopy, setWorkingLeaderboardValCopy] =
     useState(leaderboardVal);
   useEffect(() => {
-    props.setName(workingLeaderboardValCopy.name);
+    props.setName(workingLeaderboardValCopy.name ?? '');
   }, [props, workingLeaderboardValCopy.name]);
   const {loading, data, evalData} = useSavedLeaderboardData(
     props.entity,
@@ -218,7 +218,7 @@ export const LeaderboardPageContentInner: React.FC<
         const datasetGroup = evalData[col.evaluation_object_ref]?.datasetGroup;
         const scorerGroup =
           evalData[col.evaluation_object_ref]?.scorers[col.scorer_name];
-        const metricGroup = col.summary_metric_path_parts.join('.');
+        const metricGroup = col.summary_metric_path;
 
         if (datasetGroup && scorerGroup && metricGroup) {
           return {
@@ -346,36 +346,36 @@ const parseLeaderboardVal = (
   }
 
   const finalColumns = columns
-    .map(column => {
-      const evaluationObjectRef = column.evaluation_object_ref;
-      if (typeof evaluationObjectRef !== 'string') {
-        return null;
-      }
+    // .map(column => {
+    //   const evaluationObjectRef = column.evaluation_object_ref;
+    //   if (typeof evaluationObjectRef !== 'string') {
+    //     return null;
+    //   }
 
-      const scorerName = column.scorer_name;
-      if (typeof scorerName !== 'string') {
-        return null;
-      }
+    //   const scorerName = column.scorer_name;
+    //   if (typeof scorerName !== 'string') {
+    //     return null;
+    //   }
 
-      const shouldMinimize = column.should_minimize;
-      if (shouldMinimize != null && typeof shouldMinimize !== 'boolean') {
-        return null;
-      }
+    //   const shouldMinimize = column.should_minimize;
+    //   if (shouldMinimize != null && typeof shouldMinimize !== 'boolean') {
+    //     return null;
+    //   }
 
-      const summaryMetricParts = column.summary_metric_path_parts;
-      if (!Array.isArray(summaryMetricParts)) {
-        return null;
-      } else if (summaryMetricParts.some(part => typeof part !== 'string')) {
-        return null;
-      }
+    //   const summaryMetricParts = column.summary_metric_path_parts;
+    //   if (!Array.isArray(summaryMetricParts)) {
+    //     return null;
+    //   } else if (summaryMetricParts.some(part => typeof part !== 'string')) {
+    //     return null;
+    //   }
 
-      return {
-        evaluation_object_ref: evaluationObjectRef,
-        scorer_name: scorerName,
-        should_minimize: shouldMinimize,
-        summary_metric_path_parts: summaryMetricParts,
-      };
-    })
+    //   return {
+    //     evaluation_object_ref: evaluationObjectRef,
+    //     scorer_name: scorerName,
+    //     should_minimize: shouldMinimize,
+    //     summary_metric_path_parts: summaryMetricParts,
+    //   };
+    // })
     .filter(column => column != null) as LeaderboardObjectVal['columns'];
 
   return {

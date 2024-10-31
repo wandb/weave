@@ -62,9 +62,9 @@ export const LeaderboardConfigEditor: React.FC<{
     // Reset dependent fields when changing evaluation_object_ref or scorer_name
     if (field === 'evaluation_object_ref') {
       newColumns[index].scorer_name = '';
-      newColumns[index].summary_metric_path_parts = [];
+      newColumns[index].summary_metric_path = '';
     } else if (field === 'scorer_name') {
-      newColumns[index].summary_metric_path_parts = [];
+      newColumns[index].summary_metric_path = '';
     }
 
     setWorkingCopy({...leaderboardVal, columns: newColumns});
@@ -79,7 +79,7 @@ export const LeaderboardConfigEditor: React.FC<{
           evaluation_object_ref: '',
           scorer_name: '',
           should_minimize: false,
-          summary_metric_path_parts: [],
+          summary_metric_path: '',
         },
       ],
     });
@@ -120,12 +120,12 @@ export const LeaderboardConfigEditor: React.FC<{
         <Label>Leaderboard Title</Label>
         <TextField
           icon="layout-grid"
-          value={leaderboardVal.name}
+          value={leaderboardVal.name ?? ''}
           onChange={handleNameChange}
         />
         <Label>Description</Label>
         <SimpleCodeLikeTextArea
-          value={leaderboardVal.description}
+          value={leaderboardVal.description ?? ''}
           onChange={handleDescriptionChange}
         />
         <Label>Columns</Label>
@@ -234,8 +234,8 @@ const ColumnEditor: React.FC<{
     [column.scorer_name]
   );
   const selectedMetricPath = useMemo(
-    () => ({val: column.summary_metric_path_parts.join('.')}),
-    [column.summary_metric_path_parts]
+    () => ({val: column.summary_metric_path}),
+    [column.summary_metric_path]
   );
   const shouldMinimize = column.should_minimize ?? false;
   return (
@@ -269,7 +269,7 @@ const ColumnEditor: React.FC<{
         onChange={newVal =>
           handleColumnChange(
             index,
-            'summary_metric_path_parts',
+            'summary_metric_path',
             newVal?.val.split('.')
           )
         }
