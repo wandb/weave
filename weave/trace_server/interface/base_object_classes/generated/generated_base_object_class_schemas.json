@@ -1,5 +1,80 @@
 {
   "$defs": {
+    "Leaderboard": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/LeaderboardColumn"
+          },
+          "title": "Columns",
+          "type": "array"
+        }
+      },
+      "required": [
+        "columns"
+      ],
+      "title": "Leaderboard",
+      "type": "object"
+    },
+    "LeaderboardColumn": {
+      "properties": {
+        "evaluation_object_ref": {
+          "title": "Evaluation Object Ref",
+          "type": "string"
+        },
+        "scorer_name": {
+          "title": "Scorer Name",
+          "type": "string"
+        },
+        "summary_metric_path": {
+          "title": "Summary Metric Path",
+          "type": "string"
+        },
+        "should_minimize": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Should Minimize"
+        }
+      },
+      "required": [
+        "evaluation_object_ref",
+        "scorer_name",
+        "summary_metric_path"
+      ],
+      "title": "LeaderboardColumn",
+      "type": "object"
+    },
     "TestOnlyExample": {
       "properties": {
         "name": {
@@ -103,11 +178,15 @@
     },
     "TestOnlyNestedBaseObject": {
       "$ref": "#/$defs/TestOnlyNestedBaseObject"
+    },
+    "Leaderboard": {
+      "$ref": "#/$defs/Leaderboard"
     }
   },
   "required": [
     "TestOnlyExample",
-    "TestOnlyNestedBaseObject"
+    "TestOnlyNestedBaseObject",
+    "Leaderboard"
   ],
   "title": "CompositeBaseObject",
   "type": "object"
