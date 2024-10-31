@@ -64,7 +64,8 @@ const getBaseObjectInstances = async <
   baseObjectClassName: C,
   req: TraceObjQueryReq
 ): Promise<Array<TraceObjSchema<T, C>>> => {
-  const knownObjectClass = baseObjectClassRegistry[baseObjectClassName];
+  const knownObjectClass: z.ZodType<T> =
+    baseObjectClassRegistry[baseObjectClassName];
   if (!knownObjectClass) {
     console.warn(`Unknown object class: ${baseObjectClassName}`);
     return [];
@@ -79,9 +80,13 @@ const getBaseObjectInstances = async <
 
   const objects = await objectPromise;
 
+  // We would expect that this  filtering does not filter anything
+  // out because the backend enforces the base object class, but this
+  // is here as a sanity check.
   return objects.objs
     .map(obj => ({obj, parsed: knownObjectClass.safeParse(obj.val)}))
     .filter(({parsed}) => parsed.success)
+    .filter(({obj}) => obj.base_object_class === baseObjectClassName)
     .map(
       ({obj, parsed}) => ({...obj, val: parsed.data} as TraceObjSchema<T, C>)
     );
