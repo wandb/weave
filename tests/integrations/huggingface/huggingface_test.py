@@ -383,3 +383,73 @@ def test_huggingface_question_answering_async(client):
     )
     output = call.output
     assert output.answer == "Clara"
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_huggingface_sentence_similarity(client):
+    from huggingface_hub import InferenceClient
+
+    InferenceClient(
+        api_key=os.getenv("HUGGINGFACE_API_KEY")
+        # api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+    ).sentence_similarity(
+        "Machine learning is so easy.",
+        other_sentences=[
+            "Deep learning is so straightforward.",
+            "This is so difficult, like rocket science.",
+            "I can't believe how much I struggled with this.",
+        ],
+    )
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert (
+        op_name_from_ref(call.op_name)
+        == "huggingface_hub.InferenceClient.sentence_similarity"
+    )
+    output = call.output
+    for item in output:
+        assert item > 0
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_huggingface_sentence_similarity_async(client):
+    from huggingface_hub import AsyncInferenceClient
+
+    asyncio.run(
+        AsyncInferenceClient(
+            api_key=os.getenv("HUGGINGFACE_API_KEY")
+            # api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+        ).sentence_similarity(
+            "Machine learning is so easy.",
+            other_sentences=[
+                "Deep learning is so straightforward.",
+                "This is so difficult, like rocket science.",
+                "I can't believe how much I struggled with this.",
+            ],
+        )
+    )
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert (
+        op_name_from_ref(call.op_name)
+        == "huggingface_hub.AsyncInferenceClient.sentence_similarity"
+    )
+    output = call.output
+    for item in output:
+        assert item > 0

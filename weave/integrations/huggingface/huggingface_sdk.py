@@ -168,5 +168,19 @@ huggingface_patcher = MultiPatcher(
                 name="huggingface_hub.AsyncInferenceClient.question_answering"
             ),
         ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "InferenceClient.sentence_similarity",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.InferenceClient.sentence_similarity"
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "AsyncInferenceClient.sentence_similarity",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.AsyncInferenceClient.sentence_similarity"
+            ),
+        ),
     ]
 )
