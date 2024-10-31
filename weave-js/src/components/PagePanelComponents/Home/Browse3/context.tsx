@@ -283,13 +283,21 @@ export const browse3ContextGen = (
       filePath?: string,
       refExtra?: string
     ) => {
-      const path = filePath ? `path=${encodeURIComponent(filePath)}` : '';
-      const extra = refExtra ? `extra=${encodeURIComponent(refExtra)}` : '';
-
-      return `${projectRoot(
+      let url = `${projectRoot(
         entityName,
         projectName
-      )}/objects/${objectName}/versions/${objectVersionHash}?${path}&${extra}`;
+      )}/objects/${objectName}/versions/${objectVersionHash}`;
+      const params = new URLSearchParams();
+      if (filePath !== undefined) {
+        params.set(PATH_PARAM, encodeURIComponent(filePath));
+      }
+      if (refExtra !== undefined) {
+        params.set(EXTRA_PARAM, encodeURIComponent(refExtra));
+      }
+      if (params.toString()) {
+        url += '?' + params.toString();
+      }
+      return url;
     },
     opVersionsUIUrl: (
       entityName: string,
@@ -529,6 +537,7 @@ const useSetSearchParam = () => {
 export const PEEK_PARAM = 'peekPath';
 export const TRACETREE_PARAM = 'tracetree';
 export const PATH_PARAM = 'path';
+export const EXTRA_PARAM = 'extra';
 
 export const baseContext = browse3ContextGen(
   (entityName: string, projectName: string) => {

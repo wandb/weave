@@ -51,7 +51,10 @@ import {
   isTableRef,
   makeRefExpandedPayload,
 } from './wfReactInterface/tsDataModelHooksCallRefExpansion';
-import {objectVersionKeyToRefUri} from './wfReactInterface/utilities';
+import {
+  objectVersionKeyToRefUri,
+  parseUrlPathToRefUri,
+} from './wfReactInterface/utilities';
 import {
   KnownBaseObjectClassType,
   ObjectVersionSchema,
@@ -332,7 +335,10 @@ const ObjectVersionsTable: React.FC<{
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();
   const {peekPath} = query;
-  const peekId = peekPath ? peekPath.split('/').pop() : null;
+
+  const {baseRouter} = useWeaveflowRouteContext();
+  const peekId = parseUrlPathToRefUri(peekPath, baseRouter);
+
   const rowIds = useMemo(() => {
     return rows.map(row => row.id);
   }, [rows]);
