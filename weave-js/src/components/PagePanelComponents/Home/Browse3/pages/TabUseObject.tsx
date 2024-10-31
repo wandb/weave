@@ -15,7 +15,7 @@ type TabUseObjectProps = {
 export const TabUseObject = ({name, uri}: TabUseObjectProps) => {
   const pythonName = isValidVarName(name) ? name : 'obj';
   return (
-    <Box m={2} className="text-sm">
+    <Box className="text-sm">
       <TabUseBanner>
         See{' '}
         <DocLink
