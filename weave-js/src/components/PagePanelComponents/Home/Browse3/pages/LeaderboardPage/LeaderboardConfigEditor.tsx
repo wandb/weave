@@ -262,11 +262,7 @@ const ColumnEditor: React.FC<{
       <Select<{val: string}>
         value={selectedMetricPath}
         onChange={newVal =>
-          handleColumnChange(
-            index,
-            'summary_metric_path',
-            newVal?.val ?? ''
-          )
+          handleColumnChange(index, 'summary_metric_path', newVal?.val ?? '')
         }
         options={metrics.map(metric => ({val: metric}))}
         isDisabled={!column.evaluation_object_ref || !column.scorer_name}
