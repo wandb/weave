@@ -22,6 +22,9 @@ from weave.trace import base_objects
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.interface.base_object_classes.test_only_example import (
+    TestOnlyNestedBaseModel,
+)
 
 
 def with_base_object_class_annotations(
@@ -50,7 +53,7 @@ def test_pythonic_creation(client: WeaveClient):
     nested_obj = base_objects.TestOnlyNestedBaseObject(b=3)
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
-        nested_base_model=base_objects.TestOnlyNestedBaseModel(a=2),
+        nested_base_model=TestOnlyNestedBaseModel(a=2),
         nested_base_object=weave.publish(nested_obj).uri(),
     )
     ref = weave.publish(top_obj)
@@ -151,7 +154,7 @@ def test_interface_creation(client):
     top_level_obj_id = "TestOnlyExample"
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
-        nested_base_model=base_objects.TestOnlyNestedBaseModel(a=2),
+        nested_base_model=TestOnlyNestedBaseModel(a=2),
         nested_base_object=nested_obj_ref.uri(),
     )
     top_obj_res = client.server.obj_create(
@@ -251,7 +254,7 @@ def test_digest_equality(client):
     nested_ref = weave.publish(nested_obj)
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
-        nested_base_model=base_objects.TestOnlyNestedBaseModel(a=2),
+        nested_base_model=TestOnlyNestedBaseModel(a=2),
         nested_base_object=nested_ref.uri(),
     )
     ref = weave.publish(top_obj)
@@ -287,7 +290,7 @@ def test_digest_equality(client):
     top_level_obj_id = "TestOnlyExample"
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
-        nested_base_model=base_objects.TestOnlyNestedBaseModel(a=2),
+        nested_base_model=TestOnlyNestedBaseModel(a=2),
         nested_base_object=nested_obj_ref.uri(),
     )
     top_obj_res = client.server.obj_create(
