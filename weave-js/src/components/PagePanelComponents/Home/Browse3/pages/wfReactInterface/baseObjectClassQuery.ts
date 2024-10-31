@@ -2,9 +2,7 @@ import {useDeepMemo} from '@wandb/weave/hookUtils';
 import {useEffect, useRef, useState} from 'react';
 import {z} from 'zod';
 
-import {
-  baseObjectClassRegistry,
-} from './generatedBaseObjectClasses.zod';
+import {baseObjectClassRegistry} from './generatedBaseObjectClasses.zod';
 import {TraceServerClient} from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {
@@ -57,8 +55,7 @@ const getBaseObjectInstances = async <
   baseObjectClassName: C,
   req: TraceObjQueryReq
 ): Promise<Array<TraceObjSchema<T, C>>> => {
-  const knownObjectClass: z.ZodType<T> =
-    baseObjectClassRegistry[baseObjectClassName];
+  const knownObjectClass = baseObjectClassRegistry[baseObjectClassName];
   if (!knownObjectClass) {
     console.warn(`Unknown object class: ${baseObjectClassName}`);
     return [];
