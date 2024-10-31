@@ -81,8 +81,7 @@ from weave.trace_server.feedback import (
 from weave.trace_server.ids import generate_id
 from weave.trace_server.llm_completion import lite_llm_completion
 from weave.trace_server.model_providers.model_providers import (
-    MODEL_PROVIDERS_FILE,
-    fetch_model_to_provider_info_map,
+    read_model_to_provider_info_map,
 )
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
@@ -191,9 +190,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._flush_immediately = True
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
-        self._model_to_provider_info_map = fetch_model_to_provider_info_map(
-            MODEL_PROVIDERS_FILE
-        )
+        self._model_to_provider_info_map = read_model_to_provider_info_map()
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
