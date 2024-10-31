@@ -121,19 +121,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         minWidth: 150,
         flex: 1,
         renderCell: (params: GridRenderCellParams) => {
-          let isOp = false;
-          try {
-            isOp =
-              Object.values(
-                Object.values(
-                  Object.values(
-                    (params.row as RowData).modelGroup.datasetGroups
-                  )[0].scorerGroups
-                )[0].metricPathGroups
-              )[0][0].modelType === 'op';
-          } catch (e) {
-            console.log(e);
-          }
+          const isOp = modelGroupIsOp((params.row as RowData).modelGroup);
           const modelRef = parseRefMaybe(
             `weave:///${entity}/${project}/${isOp ? 'op' : 'object'}/${
               params.value
@@ -478,6 +466,25 @@ const getColumnStats = (data: GroupedLeaderboardData): ColumnStats => {
   });
 
   return stats;
+};
+
+/**
+ * Check if a model group is an op. This is a little hacky - we just look
+ * at the first entry down the chain and see if it's an op.
+ */
+const modelGroupIsOp = (modelGroup: GroupedLeaderboardModelGroup) => {
+  let isOp = false;
+  try {
+    isOp =
+      Object.values(
+        Object.values(
+          Object.values(modelGroup.datasetGroups)[0].scorerGroups
+        )[0].metricPathGroups
+      )[0][0].modelType === 'op';
+  } catch (e) {
+    console.log(e);
+  }
+  return isOp;
 };
 
 const valueFromRowData = (
