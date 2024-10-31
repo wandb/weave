@@ -296,15 +296,12 @@ export function parseUrlPathToRefUri(
   // Remove leading and trailing slashes
   const cleanPath = urlPath.replace(/^\/|\/$/g, '');
 
-  // Split the path into segments
   const segments = cleanPath.split('/');
 
-  // Check if we have enough segments for a valid object version path
+  // we need at least 6 segments to be a valid object version path
   if (segments.length < 6) {
     return null;
   }
-
-  // Extract relevant parts
   const entity = segments[0];
   const project = segments[1];
   const objectId = segments[3];
