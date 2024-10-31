@@ -16,7 +16,7 @@ import {
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useContext, useEffect, useMemo, useState} from 'react';
 
 import {TEAL_600} from '../../../../../common/css/color.styles';
 import {ErrorPanel} from '../../../../ErrorPanel';
@@ -24,6 +24,7 @@ import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
+import {TableNavigationContext} from '../navigationContext';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
 import {Empty} from './common/Empty';
@@ -354,6 +355,12 @@ const ObjectVersionsTable: React.FC<{
       }
     }
   }, [rowIds, peekId]);
+
+  console.log('rowIDs in ObjectVersionsPage: ', rowIds);
+  const {setIDs} = useContext(TableNavigationContext);
+  useEffect(() => {
+    setIDs?.(rowIds);
+  }, [setIDs, rowIds]);
 
   return (
     <StyledDataGrid

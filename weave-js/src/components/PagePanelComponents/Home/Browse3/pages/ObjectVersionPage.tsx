@@ -105,6 +105,8 @@ const ObjectVersionPageInner: React.FC<{
 }> = ({objectVersion}) => {
   useObjectViewEvent(objectVersion);
 
+  const tableNavigation = useContext(TableNavigationContext);
+
   const {useRootObjectVersions, useCalls, useRefsData} = useWFHooks();
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
@@ -195,6 +197,11 @@ const ObjectVersionPageInner: React.FC<{
     () => (data.result?.[0] ? JSON.stringify(data.result?.[0]).length : 0),
     [data.result]
   );
+
+  // keyboard navigation logic (go up and down the table)
+
+  // attach
+  useEffect(() => {}, []);
 
   if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;

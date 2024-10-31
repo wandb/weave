@@ -67,6 +67,7 @@ import {
 } from './Browse3/grid/pagination';
 import {getValidPinModel, removeAlwaysLeft} from './Browse3/grid/pin';
 import {getValidSortModel} from './Browse3/grid/sort';
+import {TableNavigationProvider} from './Browse3/navigationContext';
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
@@ -267,7 +268,9 @@ const Browse3Mounted: FC<{
                 flexDirection: 'column',
               }}>
               <ErrorBoundary>
-                <MainPeekingLayout />
+                <TableNavigationProvider>
+                  <MainPeekingLayout />
+                </TableNavigationProvider>
               </ErrorBoundary>
             </Box>
           </Route>
