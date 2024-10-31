@@ -1,8 +1,7 @@
 import {Box} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button/Button';
-import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {Loading} from '@wandb/weave/components/Loading';
-import React, {FC, useCallback} from 'react';
+import React, {FC, useCallback, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
@@ -11,10 +10,13 @@ import {Empty} from '../common/Empty';
 import {EMPTY_PROPS_LEADERBOARDS} from '../common/EmptyContent';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {ObjectVersionsTable} from '../ObjectVersionsPage';
-import {useWFHooks} from '../wfReactInterface/context';
+import {useBaseObjectInstances} from '../wfReactInterface/baseObjectClassQuery';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {sanitizeObjectId} from '../wfReactInterface/traceServerDirectClient';
-import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
+import {
+  convertTraceServerObjectVersionToSchema,
+  projectIdFromParts,
+} from '../wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {useIsEditor} from './LeaderboardPage';
 
@@ -101,18 +103,22 @@ const LeaderboardTable: React.FC<{
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
-  const {useRootObjectVersions} = useWFHooks();
 
   // TODO: Once `useCollectionObjects` lands from the online
   // evals project, switch to that (much more type safe)
-  const leaderboardObjectVersions = useRootObjectVersions(
-    props.entity,
-    props.project,
-    {
-      baseObjectClasses: ['Leaderboard'],
-      latestOnly: true,
-    }
-  );
+  const leaderboardQuery = useBaseObjectInstances('Leaderboard', {
+    project_id: projectIdFromParts({
+      entity: props.entity,
+      project: props.project,
+    }),
+    filter: {latest_only: true},
+  });
+
+  const leaderboardObjectVersions = useMemo(() => {
+    return (leaderboardQuery.result ?? []).map(
+      convertTraceServerObjectVersionToSchema
+    );
+  }, [leaderboardQuery.result]);
   const onClick = useCallback(
     (obj: ObjectVersionSchema) => {
       const to = peekingRouter.leaderboardsUIUrl(
@@ -125,22 +131,18 @@ const LeaderboardTable: React.FC<{
     [history, peekingRouter, props.entity, props.project]
   );
 
-  if (leaderboardObjectVersions.loading) {
+  if (leaderboardQuery.loading) {
     return <Loading centered />;
   }
-  if (leaderboardObjectVersions.error) {
-    return <ErrorPanel />;
-  }
 
-  const objectVersions = leaderboardObjectVersions.result ?? [];
-  const isEmpty = objectVersions.length === 0;
+  const isEmpty = leaderboardObjectVersions.length === 0;
   if (isEmpty) {
     return <Empty {...EMPTY_PROPS_LEADERBOARDS} />;
   }
 
   return (
     <ObjectVersionsTable
-      objectVersions={leaderboardObjectVersions.result ?? []}
+      objectVersions={leaderboardObjectVersions}
       objectTitle="Name"
       hidePropsAsColumns
       hidePeerVersionsColumn
