@@ -210,5 +210,19 @@ huggingface_patcher = MultiPatcher(
                 name="huggingface_hub.AsyncInferenceClient.table_question_answering"
             ),
         ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "InferenceClient.text_classification",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.InferenceClient.text_classification"
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "AsyncInferenceClient.text_classification",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.AsyncInferenceClient.text_classification"
+            ),
+        ),
     ]
 )
