@@ -273,6 +273,17 @@ export type TraceFileContentReadRes = {
   content: ArrayBuffer;
 };
 
+export type CompletionsCreateReq = {
+  project_id: string;
+  // TODO make this type better
+  inputs: any;
+};
+
+export type CompletionsCreateRes = {
+  response: any;
+  weave_call_id: string;
+};
+
 export enum ContentType {
   csv = 'text/csv',
   tsv = 'text/tab-separated-values',

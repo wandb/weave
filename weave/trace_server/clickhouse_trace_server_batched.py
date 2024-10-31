@@ -73,7 +73,12 @@ from weave.trace_server.clickhouse_schema import (
 )
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
 from weave.trace_server.emoji_util import detone_emojis
-from weave.trace_server.errors import InsertTooLarge, InvalidRequest, RequestTooLarge
+from weave.trace_server.errors import (
+    InsertTooLarge,
+    InvalidRequest,
+    MissingLLMApiKeyError,
+    RequestTooLarge,
+)
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
@@ -1540,7 +1545,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise InvalidRequest(f"No secret name found for model {model_name}")
         api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
         if not api_key:
-            raise InvalidRequest(f"No API key found for model {model_name}")
+            raise MissingLLMApiKeyError(
+                f"No API key {secret_name} found for model {model_name}",
+                api_key_name=secret_name,
+            )
 
         start_time = datetime.datetime.now()
         res = lite_llm_completion(api_key, req.inputs)
@@ -1579,7 +1587,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             batch_data.append(values)
 
         self._insert_call_batch(batch_data)
-        return res
+
+        return tsi.CompletionsCreateRes(
+            response=res.response, weave_call_id=start_call.id
+        )
 
     # Private Methods
     @property

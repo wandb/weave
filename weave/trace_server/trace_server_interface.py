@@ -275,6 +275,7 @@ class CompletionsCreateReq(BaseModel):
 
 class CompletionsCreateRes(BaseModel):
     response: Dict[str, Any]
+    weave_call_id: Optional[str] = None
 
 
 class CallsFilter(BaseModel):
@@ -888,6 +889,7 @@ class TraceServerInterface(Protocol):
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
+
     # Action API
     def execute_batch_action(
         self, req: ExecuteBatchActionReq

@@ -16,6 +16,8 @@ import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 
 import {
+  CompletionsCreateReq,
+  CompletionsCreateRes,
   ContentType,
   FeedbackCreateReq,
   FeedbackCreateRes,
@@ -285,6 +287,26 @@ export class DirectTraceServerClient {
           reject(err);
         });
     });
+  }
+
+  public completionsCreate(
+    req: CompletionsCreateReq
+  ): Promise<CompletionsCreateRes> {
+    try {
+      return this.makeRequest<CompletionsCreateReq, CompletionsCreateRes>(
+        '/completions/create',
+        req
+      );
+    } catch (error: any) {
+      if (error?.api_key_name) {
+        console.log('Missing LLM API key:', error.api_key_name);
+      }
+    }
+
+    return this.makeRequest<CompletionsCreateReq, CompletionsCreateRes>(
+      '/completions/create',
+      req
+    );
   }
 
   private makeRequest = async <QT, ST>(
