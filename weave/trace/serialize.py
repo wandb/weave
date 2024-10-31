@@ -228,7 +228,11 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             return custom_objs.decode_custom_obj(
                 obj["weave_type"], files, obj.get("load_op")
             )
-        elif baseObject := BASE_OBJECT_REGISTRY.get(val_type):
+        elif (
+            isinstance(val_type, str)
+            and obj.get("_class_name") == val_type
+            and (baseObject := BASE_OBJECT_REGISTRY.get(val_type))
+        ):
             return baseObject.model_validate(obj)
         else:
             return ObjectRecord(
