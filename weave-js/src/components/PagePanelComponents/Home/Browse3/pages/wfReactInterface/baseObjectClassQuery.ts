@@ -13,14 +13,19 @@ import {
 } from './traceServerClientTypes';
 import {Loadable} from './wfDataModelHooksInterface';
 
-export const useBaseObjectInstances = <
-  C extends keyof typeof baseObjectClassRegistry,
-  T = z.infer<(typeof baseObjectClassRegistry)[C]>
->(
+type BaseObjectClassRegistry = typeof baseObjectClassRegistry;
+type BaseObjectClassRegistryKeys = keyof BaseObjectClassRegistry;
+type BaseObjectClassType<C extends BaseObjectClassRegistryKeys> = z.infer<
+  BaseObjectClassRegistry[C]
+>;
+
+export const useBaseObjectInstances = <C extends BaseObjectClassRegistryKeys>(
   baseObjectClassName: C,
   req: TraceObjQueryReq
-): Loadable<Array<TraceObjSchema<T, C>>> => {
-  const [objects, setObjects] = useState<Array<TraceObjSchema<T, C>>>([]);
+): Loadable<Array<TraceObjSchema<BaseObjectClassType<C>, C>>> => {
+  const [objects, setObjects] = useState<
+    Array<TraceObjSchema<BaseObjectClassType<C>, C>>
+  >([]);
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
   const deepReq = useDeepMemo(req);
@@ -34,7 +39,7 @@ export const useBaseObjectInstances = <
     getBaseObjectInstances(client, baseObjectClassName, deepReq).then(
       collectionObjects => {
         if (isMounted && currReq.current === deepReq) {
-          setObjects(collectionObjects as Array<TraceObjSchema<T, C>>);
+          setObjects(collectionObjects);
           setLoading(false);
         }
       }
@@ -47,14 +52,11 @@ export const useBaseObjectInstances = <
   return {result: objects, loading};
 };
 
-const getBaseObjectInstances = async <
-  C extends keyof typeof baseObjectClassRegistry,
-  T = z.infer<(typeof baseObjectClassRegistry)[C]>
->(
+const getBaseObjectInstances = async <C extends BaseObjectClassRegistryKeys>(
   client: TraceServerClient,
   baseObjectClassName: C,
   req: TraceObjQueryReq
-): Promise<Array<TraceObjSchema<T, C>>> => {
+): Promise<Array<TraceObjSchema<BaseObjectClassType<C>, C>>> => {
   const knownObjectClass = baseObjectClassRegistry[baseObjectClassName];
   if (!knownObjectClass) {
     console.warn(`Unknown object class: ${baseObjectClassName}`);
@@ -78,13 +80,17 @@ const getBaseObjectInstances = async <
     .filter(({parsed}) => parsed.success)
     .filter(({obj}) => obj.base_object_class === baseObjectClassName)
     .map(
-      ({obj, parsed}) => ({...obj, val: parsed.data} as TraceObjSchema<T, C>)
+      ({obj, parsed}) =>
+        ({...obj, val: parsed.data} as TraceObjSchema<
+          BaseObjectClassType<C>,
+          C
+        >)
     );
 };
 
 export const useCreateBaseObjectInstance = <
-  C extends keyof typeof baseObjectClassRegistry,
-  T = z.infer<(typeof baseObjectClassRegistry)[C]>
+  C extends BaseObjectClassRegistryKeys,
+  T = BaseObjectClassType<C>
 >(
   baseObjectClassName: C
 ): ((req: TraceObjCreateReq<T>) => Promise<TraceObjCreateRes>) => {
@@ -95,8 +101,8 @@ export const useCreateBaseObjectInstance = <
 };
 
 const createBaseObjectInstance = async <
-  C extends keyof typeof baseObjectClassRegistry,
-  T = z.infer<(typeof baseObjectClassRegistry)[C]>
+  C extends BaseObjectClassRegistryKeys,
+  T = BaseObjectClassType<C>
 >(
   client: TraceServerClient,
   baseObjectClassName: C,
