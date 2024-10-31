@@ -67,7 +67,8 @@ def get_leaderboard_results(
             if c.evaluation_object_ref != eval_obj_ref_uri:
                 continue
             val = call.output.get(c.scorer_name)
-            for part in c.summary_metric_path_parts:
+            summary_metric_path_parts = c.summary_metric_path.split(".")
+            for part in summary_metric_path_parts:
                 if isinstance(val, dict):
                     val = val.get(part)
                 elif isinstance(val, list):

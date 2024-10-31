@@ -1,4 +1,3 @@
-from dataclasses import field
 from typing import Optional
 
 from pydantic import BaseModel
@@ -9,7 +8,7 @@ from weave.trace_server.interface.base_object_classes import base_object_def
 class LeaderboardColumn(BaseModel):
     evaluation_object_ref: base_object_def.RefStr
     scorer_name: str
-    summary_metric_path_parts: list[str] = field(default_factory=list)
+    summary_metric_path: str
     should_minimize: Optional[bool] = None
 
 

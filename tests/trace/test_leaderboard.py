@@ -113,7 +113,7 @@ async def test_leaderboard_with_results(client):
             leaderboard.LeaderboardColumn(
                 evaluation_object_ref=get_ref(evaluation_obj_1).uri(),
                 scorer_name="my_scorer",
-                summary_metric_path_parts=["true_fraction"],
+                summary_metric_path="true_fraction",
             )
         ],
     )
@@ -152,18 +152,18 @@ This leaderboard has multiple columns
             leaderboard.LeaderboardColumn(
                 evaluation_object_ref=get_ref(evaluation_obj_2).uri(),
                 scorer_name="my_scorer",
-                summary_metric_path_parts=["true_count"],
+                summary_metric_path="true_count",
             ),
             leaderboard.LeaderboardColumn(
                 evaluation_object_ref=get_ref(evaluation_obj_2).uri(),
                 scorer_name="my_scorer",
                 should_minimize=True,
-                summary_metric_path_parts=["true_fraction"],
+                summary_metric_path="true_fraction",
             ),
             leaderboard.LeaderboardColumn(
                 evaluation_object_ref=get_ref(evaluation_obj_1).uri(),
                 scorer_name="my_scorer",
-                summary_metric_path_parts=["true_fraction"],
+                summary_metric_path="true_fraction",
             ),
         ],
     )

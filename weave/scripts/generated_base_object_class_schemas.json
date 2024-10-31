@@ -50,12 +50,9 @@
           "title": "Scorer Name",
           "type": "string"
         },
-        "summary_metric_path_parts": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Summary Metric Path Parts",
-          "type": "array"
+        "summary_metric_path": {
+          "title": "Summary Metric Path",
+          "type": "string"
         },
         "should_minimize": {
           "anyOf": [
@@ -72,7 +69,8 @@
       },
       "required": [
         "evaluation_object_ref",
-        "scorer_name"
+        "scorer_name",
+        "summary_metric_path"
       ],
       "title": "LeaderboardColumn",
       "type": "object"

@@ -4,7 +4,7 @@ export const LeaderboardColumnSchema = z.object({
   evaluation_object_ref: z.string(),
   scorer_name: z.string(),
   should_minimize: z.union([z.boolean(), z.null()]).optional(),
-  summary_metric_path_parts: z.array(z.string()).optional(),
+  summary_metric_path: z.string(),
 });
 export type LeaderboardColumn = z.infer<typeof LeaderboardColumnSchema>;
 
