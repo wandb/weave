@@ -2,9 +2,7 @@ import {useDeepMemo} from '@wandb/weave/hookUtils';
 import {useEffect, useRef, useState} from 'react';
 import {z} from 'zod';
 
-import {
-  GeneratedBaseObjectClassesZodSchema,
-} from './generatedBaseObjectClasses.zod';
+import {GeneratedBaseObjectClassesZodSchema} from './generatedBaseObjectClasses.zod';
 import {TraceServerClient} from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {
@@ -15,7 +13,7 @@ import {
 } from './traceServerClientTypes';
 import {Loadable} from './wfDataModelHooksInterface';
 
-const baseObjectClassRegistry: Record<string, z.ZodType> = 
+const baseObjectClassRegistry: Record<string, z.ZodType> =
   GeneratedBaseObjectClassesZodSchema.shape;
 
 export const useBaseObjectInstances = <
