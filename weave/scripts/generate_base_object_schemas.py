@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from weave.trace_server.interface.base_object_classes.base_object_registry import (
-    REGISTRY,
+    BASE_OBJECT_REGISTRY,
     CompositeBaseObject,
 )
 
@@ -21,7 +21,7 @@ def generate_schemas() -> None:
     with OUTPUT_PATH.open("w") as f:
         json.dump(top_level_schema, f, indent=2)
 
-    print(f"Generated union schema for {len(REGISTRY)} objects")
+    print(f"Generated union schema for {len(BASE_OBJECT_REGISTRY)} objects")
     print(f"Wrote schema to {OUTPUT_PATH.absolute()}")
 
 

@@ -5,6 +5,9 @@ from typing import Any, Optional, Sequence
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
+from weave.trace_server.interface.base_object_classes.base_object_registry import (
+    BASE_OBJECT_REGISTRY,
+)
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -225,6 +228,8 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             return custom_objs.decode_custom_obj(
                 obj["weave_type"], files, obj.get("load_op")
             )
+        elif baseObject := BASE_OBJECT_REGISTRY.get(val_type):
+            return baseObject.model_validate(obj)
         else:
             return ObjectRecord(
                 {k: from_json(v, project_id, server) for k, v in obj.items()}

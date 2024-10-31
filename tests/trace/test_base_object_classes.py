@@ -12,6 +12,8 @@ This test file ensures the base_object_classes behavior is as expected. Specific
 4. We ensure that invalid schemas are properly rejected from the server.
 """
 
+from typing import Literal, Optional
+
 import pytest
 
 import weave
@@ -21,13 +23,34 @@ from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
 
+def with_base_object_class_annotations(
+    val: dict,
+    class_name: str,
+    base_object_name: Optional[Literal["Object", "BaseObject"]] = None,
+):
+    """
+    When serializing pydantic objects, add additional fields to indicate the class information. This is
+    a utlity to perform that mapping for the purposes of testing. We want to ensure that both the client
+    and server agree on this structure, therefore I am adding this utility here.
+    """
+    bases = ["BaseModel"]
+    if base_object_name is not None:
+        bases.insert(0, base_object_name)
+    return {
+        **val,
+        "_type": class_name,
+        "_class_name": class_name,
+        "_bases": bases,
+    }
+
+
 def test_pythonic_creation(client: WeaveClient):
     # First, let's use the high-level pythonic creation API.
     nested_obj = base_objects.TestOnlyNestedBaseObject(b=3)
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
         nested_base_model=base_objects.TestOnlyNestedBaseModel(a=2),
-        nested_obj=weave.publish(nested_obj).uri(),
+        nested_base_object=weave.publish(nested_obj).uri(),
     )
     ref = weave.publish(top_obj)
 
@@ -36,7 +59,7 @@ def test_pythonic_creation(client: WeaveClient):
     assert isinstance(top_obj_gotten, base_objects.TestOnlyExample)
     assert top_obj_gotten.model_dump() == top_obj.model_dump()
 
-    objs = client.server.obj_query(
+    objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
                 "project_id": client._project_id(),
@@ -44,11 +67,37 @@ def test_pythonic_creation(client: WeaveClient):
             },
         )
     )
+    objs = objs_res.objs
 
     assert len(objs) == 1
-    assert objs[0].val == top_obj.model_dump()
+    assert (
+        objs[0].val
+        == {
+            **with_base_object_class_annotations(
+                top_obj.model_dump(), "TestOnlyExample", "BaseObject"
+            ),
+            "nested_base_model": with_base_object_class_annotations(
+                top_obj.nested_base_model.model_dump(), "TestOnlyNestedBaseModel"
+            ),
+        }
+        == {
+            "_type": "TestOnlyExample",
+            "name": None,
+            "description": None,
+            "primitive": 1,
+            "nested_base_model": {
+                "_type": "TestOnlyNestedBaseModel",
+                "a": 2,
+                "_class_name": "TestOnlyNestedBaseModel",
+                "_bases": ["BaseModel"],
+            },
+            "nested_base_object": "weave:///shawn/test-project/object/TestOnlyNestedBaseObject:JyFvHfyaJ79uCKpdZ3DD3if4NYam8QgTkzUlXQXAILI",
+            "_class_name": "TestOnlyExample",
+            "_bases": ["BaseObject", "BaseModel"],
+        }
+    )
 
-    objs = client.server.obj_query(
+    objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
                 "project_id": client._project_id(),
@@ -56,9 +105,23 @@ def test_pythonic_creation(client: WeaveClient):
             },
         )
     )
+    objs = objs_res.objs
 
     assert len(objs) == 1
-    assert objs[0].val == nested_obj.model_dump()
+    assert (
+        objs[0].val
+        == with_base_object_class_annotations(
+            nested_obj.model_dump(), "TestOnlyNestedBaseObject", "BaseObject"
+        )
+        == {
+            "_type": "TestOnlyNestedBaseObject",
+            "name": None,
+            "description": None,
+            "b": 3,
+            "_class_name": "TestOnlyNestedBaseObject",
+            "_bases": ["BaseObject", "BaseModel"],
+        }
+    )
 
 
 def test_interface_creation(client):
@@ -115,7 +178,7 @@ def test_interface_creation(client):
 
     assert nested_obj_gotten.model_dump() == nested_obj.model_dump()
 
-    objs = client.server.obj_query(
+    objs_res = client.server.obj_query(
         tsi.ObjQueryReq.model_validate(
             {
                 "project_id": client._project_id(),
@@ -124,10 +187,11 @@ def test_interface_creation(client):
         )
     )
 
+    objs = objs_res.objs
     assert len(objs) == 1
     assert objs[0].val == top_obj.model_dump()
 
-    objs = client.server.obj_query(
+    objs_res = client.server.obj_query(
         tsi.ObjQueryReq.model_validate(
             {
                 "project_id": client._project_id(),
@@ -135,7 +199,7 @@ def test_interface_creation(client):
             },
         )
     )
-
+    objs = objs_res.objs
     assert len(objs) == 1
     assert objs[0].val == nested_obj.model_dump()
 

@@ -16,6 +16,7 @@ import {
 } from './traceServerClientTypes';
 import {Loadable} from './wfDataModelHooksInterface';
 
+// TODO: This should be generated from the registry!
 const collectionRegistry = {
   TestOnlyExample: TestOnlyExampleSchema,
   TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,

@@ -53,6 +53,7 @@ from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.base_object_class_util import get_base_object_class
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -2057,20 +2058,6 @@ def get_kind(val: Any) -> str:
     if val_type == "Op":
         return "op"
     return "object"
-
-
-def get_base_object_class(val: Any) -> Optional[str]:
-    if isinstance(val, dict):
-        if "_bases" in val:
-            if isinstance(val["_bases"], list):
-                if len(val["_bases"]) >= 2:
-                    if val["_bases"][-1] == "BaseModel":
-                        if val["_bases"][-2] == "Object":
-                            if len(val["_bases"]) > 2:
-                                return val["_bases"][-3]
-                            elif "_class_name" in val:
-                                return val["_class_name"]
-    return None
 
 
 def find_call_descendants(
