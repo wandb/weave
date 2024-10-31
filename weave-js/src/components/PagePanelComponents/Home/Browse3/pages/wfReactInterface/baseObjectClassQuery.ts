@@ -1,39 +1,57 @@
 import {useDeepMemo} from '@wandb/weave/hookUtils';
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {z} from 'zod';
 
-import { TestOnlyExampleSchema, TestOnlyNestedBaseObjectSchema } from './generatedBaseObjectClasses.zod';
-import { TraceServerClient } from './traceServerClient';
-import { useGetTraceServerClientContext } from './traceServerClientContext';
+import {
+  TestOnlyExampleSchema,
+  TestOnlyNestedBaseObjectSchema,
+} from './generatedBaseObjectClasses.zod';
+import {TraceServerClient} from './traceServerClient';
+import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {
   TraceObjCreateReq,
+  TraceObjCreateRes,
   TraceObjQueryReq,
   TraceObjSchema,
 } from './traceServerClientTypes';
 
 const collectionRegistry = {
-    TestOnlyExample: TestOnlyExampleSchema,
-    TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,
-}
+  TestOnlyExample: TestOnlyExampleSchema,
+  TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,
+};
+
+type Loadable<T> =
+  | {
+      loading: true;
+    }
+  | {
+      loading: false;
+      data: T;
+    };
 
 export const useCollectionObjects = <
   C extends keyof typeof collectionRegistry,
-  T extends z.infer<(typeof collectionRegistry)[C]>
+  T = z.infer<(typeof collectionRegistry)[C]>
 >(
   collectionName: C,
   req: TraceObjQueryReq
-) => {
-  const [objects, setObjects] = useState<Array<TraceObjSchema<T>>>([]);
+): Loadable<Array<TraceObjSchema<T, C>>> => {
+  const [objects, setObjects] = useState<Array<TraceObjSchema<T, C>>>([]);
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
   const deepReq = useDeepMemo(req);
+  const currReq = useRef(deepReq);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
+    setLoading(true);
+    currReq.current = deepReq;
     getCollectionObjects(client, collectionName, deepReq).then(
       collectionObjects => {
-        if (isMounted) {
-          setObjects(collectionObjects as Array<TraceObjSchema<T>>);
+        if (isMounted && currReq.current === deepReq) {
+          setObjects(collectionObjects as Array<TraceObjSchema<T, C>>);
+          setLoading(false);
         }
       }
     );
@@ -42,17 +60,17 @@ export const useCollectionObjects = <
     };
   }, [client, collectionName, deepReq]);
 
-  return objects;
+  return {data: objects, loading};
 };
 
 const getCollectionObjects = async <
   C extends keyof typeof collectionRegistry,
-  T extends z.infer<(typeof collectionRegistry)[C]>
+  T = z.infer<(typeof collectionRegistry)[C]>
 >(
   client: TraceServerClient,
   collectionName: C,
   req: TraceObjQueryReq
-): Promise<Array<TraceObjSchema<T>>> => {
+): Promise<Array<TraceObjSchema<T, C>>> => {
   const knownCollection = collectionRegistry[collectionName];
   if (!knownCollection) {
     console.warn(`Unknown collection: ${collectionName}`);
@@ -72,16 +90,16 @@ const getCollectionObjects = async <
     .map(obj => ({obj, parsed: knownCollection.safeParse(obj.val)}))
     .filter(({parsed}) => parsed.success)
     .map(({obj, parsed}) => ({...obj, val: parsed.data!})) as Array<
-    TraceObjSchema<T>
+    TraceObjSchema<T, C>
   >;
 };
 
 export const useCreateCollectionObject = <
   C extends keyof typeof collectionRegistry,
-  T extends z.infer<(typeof collectionRegistry)[C]>
+  T = z.infer<(typeof collectionRegistry)[C]>
 >(
   collectionName: C
-) => {
+): ((req: TraceObjCreateReq<T>) => Promise<TraceObjCreateRes>) => {
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
   return (req: TraceObjCreateReq<T>) =>
@@ -90,12 +108,12 @@ export const useCreateCollectionObject = <
 
 const createCollectionObject = async <
   C extends keyof typeof collectionRegistry,
-  T extends z.infer<(typeof collectionRegistry)[C]>
+  T = z.infer<(typeof collectionRegistry)[C]>
 >(
   client: TraceServerClient,
   collectionName: C,
   req: TraceObjCreateReq<T>
-) => {
+): Promise<TraceObjCreateRes> => {
   const knownCollection = collectionRegistry[collectionName];
   if (!knownCollection) {
     throw new Error(`Unknown collection: ${collectionName}`);

@@ -205,7 +205,10 @@ export type TraceObjQueryReq = {
   metadata_only?: boolean;
 };
 
-export interface TraceObjSchema<T extends any = any> {
+export interface TraceObjSchema<
+  T extends any = any,
+  OBC extends string = string
+> {
   project_id: string;
   object_id: string;
   created_at: string;
@@ -213,7 +216,7 @@ export interface TraceObjSchema<T extends any = any> {
   version_index: number;
   is_latest: number;
   kind: 'op' | 'object';
-  base_object_class?: string;
+  base_object_class?: OBC;
   val: T;
 }
 

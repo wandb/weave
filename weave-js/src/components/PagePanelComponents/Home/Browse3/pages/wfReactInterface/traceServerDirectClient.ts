@@ -395,7 +395,6 @@ export class DirectTraceServerClient {
   };
 }
 
-
 /**
  * Sanitizes an object name by replacing non-alphanumeric characters with dashes and enforcing length limits.
  * This matches the Python implementation in weave_client.py.
