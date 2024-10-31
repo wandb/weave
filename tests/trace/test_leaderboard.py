@@ -1,8 +1,9 @@
 import pytest
 
 import weave
-from weave.flow import leaderboard
+from weave.flow.leaderboard_util import get_leaderboard_results
 from weave.trace.weave_client import get_ref
+from weave.trace_server.interface.base_object_classes import leaderboard
 
 
 def test_leaderboard_empty(client):
@@ -28,10 +29,10 @@ def test_leaderboard_empty(client):
 
     ref = weave.publish(spec)
 
-    # TODO: this is not working
-    # spec = ref.get()
+    # Overriding spec to show that this works
+    spec = ref.get()
 
-    results = leaderboard.get_leaderboard_results(spec, client)
+    results = get_leaderboard_results(spec, client)
     assert len(results) == 0
 
 
@@ -50,10 +51,10 @@ def test_leaderboard_mis_configured(client):
 
     ref = weave.publish(spec)
 
-    # TODO: this is not working
-    # spec = ref.get()
+    # Overriding spec to show that this works
+    spec = ref.get()
 
-    results = leaderboard.get_leaderboard_results(spec, client)
+    results = get_leaderboard_results(spec, client)
     assert len(results) == 0
 
 
@@ -119,10 +120,10 @@ async def test_leaderboard_with_results(client):
 
     ref = weave.publish(spec)
 
-    # TODO: this is not working
-    # spec = ref.get()
+    # Overriding spec to show that this works
+    spec = ref.get()
 
-    results = leaderboard.get_leaderboard_results(spec, client)
+    results = get_leaderboard_results(spec, client)
     assert len(results) == 1
     assert results[0].model_ref == get_ref(simple_model).uri()
     assert results[0].column_scores[0].scores[0].value == 1.0
@@ -169,10 +170,10 @@ This leaderboard has multiple columns
 
     ref = weave.publish(spec)
 
-    # TODO: this is not working
-    # spec = ref.get()
+    # Overriding spec to show that this works
+    spec = ref.get()
 
-    results = leaderboard.get_leaderboard_results(spec, client)
+    results = get_leaderboard_results(spec, client)
     assert len(results) == 3
     assert results[0].model_ref == get_ref(simple_model).uri()
     assert len(results[0].column_scores) == 3

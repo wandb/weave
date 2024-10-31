@@ -22,6 +22,7 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
+from weave.trace_server.interface.base_object_classes import leaderboard
 
 
 def init(
@@ -101,9 +102,6 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
 
     ref = client._save_object(obj, save_name, "latest")
 
-    # Avoid circular import
-    from weave.flow.leaderboard import Leaderboard
-
     if isinstance(ref, weave_client.ObjectRef):
         if isinstance(ref, weave_client.OpRef):
             url = urls.op_version_path(
@@ -112,7 +110,7 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
                 ref.name,
                 ref.digest,
             )
-        elif isinstance(obj, Leaderboard):
+        elif isinstance(obj, leaderboard.Leaderboard):
             url = urls.leaderboard_path(
                 ref.entity,
                 ref.project,

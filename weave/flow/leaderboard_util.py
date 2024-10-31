@@ -1,44 +1,12 @@
-from dataclasses import field
-from typing import Any, Optional
-
-from pydantic import BaseModel
-
-import weave
 from weave.trace.refs import OpRef
 from weave.trace.weave_client import WeaveClient, get_ref
+from weave.trace_server.interface.base_object_classes import leaderboard
 from weave.trace_server.trace_server_interface import CallsFilter
 
 
-class LeaderboardColumn(BaseModel):
-    evaluation_object_ref: str
-    scorer_name: str
-    summary_metric_path_parts: list[str] = field(default_factory=list)
-    should_minimize: Optional[bool] = None
-
-
-# TODO: Merge `Leaderboard` into weave/trace_server/interface/base_models/base_model_registry.py after
-# Online evals lands
-class Leaderboard(weave.Object):
-    columns: list[LeaderboardColumn]
-
-
-class LeaderboardModelEvaluationResult(BaseModel):
-    evaluate_call_ref: str
-    value: Any
-
-
-class ModelScoresForColumn(BaseModel):
-    scores: list[LeaderboardModelEvaluationResult]
-
-
-class LeaderboardModelResult(BaseModel):
-    model_ref: str
-    column_scores: list[ModelScoresForColumn]
-
-
 def get_leaderboard_results(
-    spec: Leaderboard, client: WeaveClient
-) -> list[LeaderboardModelResult]:
+    spec: leaderboard.Leaderboard, client: WeaveClient
+) -> list[leaderboard.LeaderboardModelResult]:
     entity, project = client._project_id().split("/")
     calls = client.get_calls(
         filter=CallsFilter(
@@ -54,7 +22,7 @@ def get_leaderboard_results(
         )
     )
 
-    res_map: dict[str, LeaderboardModelResult] = {}
+    res_map: dict[str, leaderboard.LeaderboardModelResult] = {}
     for call in calls:
         # Frustrating that we have to get the ref like this. Since the
         # `Call` object auto-derefs the inputs (making a network request),
@@ -69,9 +37,11 @@ def get_leaderboard_results(
             continue
         model_ref_uri = model_ref.uri()
         if model_ref_uri not in res_map:
-            res_map[model_ref_uri] = LeaderboardModelResult(
+            res_map[model_ref_uri] = leaderboard.LeaderboardModelResult(
                 model_ref=model_ref_uri,
-                column_scores=[ModelScoresForColumn(scores=[]) for _ in spec.columns],
+                column_scores=[
+                    leaderboard.ModelScoresForColumn(scores=[]) for _ in spec.columns
+                ],
             )
         for col_idx, c in enumerate(spec.columns):
             eval_obj_ref = get_ref(call.inputs["self"])
@@ -89,7 +59,7 @@ def get_leaderboard_results(
                 else:
                     break
             res_map[model_ref_uri].column_scores[col_idx].scores.append(
-                LeaderboardModelEvaluationResult(
+                leaderboard.LeaderboardModelEvaluationResult(
                     evaluate_call_ref=call_ref_uri, value=val
                 )
             )
