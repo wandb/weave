@@ -15,6 +15,8 @@ import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {useWeaveflowRouteContext} from '../../context';
 import {PaginationButtons} from '../../pages/CallsPage/CallsTableButtons';
+import { Empty } from '../../pages/common/Empty';
+import { EMPTY_PROPS_LEADERBOARD } from '../../pages/common/EmptyContent';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {
   GroupedLeaderboardData,
@@ -330,6 +332,20 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       setSortModel(defaultSortModel);
     }
   }, [columns, defaultSortModel, loading]);
+
+
+  if (rows.length === 0) {
+    return <Box
+    sx={{
+      height: '100%',
+      width: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+        overflow: 'hidden',
+      }}>
+        <Empty {...EMPTY_PROPS_LEADERBOARD} />
+      </Box>
+  }
 
   return (
     <Box

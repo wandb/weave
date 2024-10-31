@@ -43,6 +43,25 @@ export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
   ),
 };
 
+export const EMPTY_PROPS_LEADERBOARD: EmptyProps = {
+  icon: 'benchmark-square' as const,
+  heading: 'No leaderboard submissions found.',
+  description: 'Create leaderboard submissions by running evaluations.',
+  moreInformation: (
+    <>
+      Learn{' '}
+      <TargetBlank href="https://wandb.me/weave_evals">
+        evaluation basics
+      </TargetBlank>{' '}
+      or follow our tutorial to{' '}
+      <TargetBlank href="http://wandb.me/weave_eval_tut">
+        set up an evaluation pipeline
+      </TargetBlank>
+      .
+    </>
+  ),
+};
+
 export const EMPTY_PROPS_LEADERBOARDS: EmptyProps = {
   icon: 'benchmark-square' as const,
   heading: 'No leaderboards yet',
