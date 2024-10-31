@@ -21,30 +21,26 @@ export class Netrc {
   private load(): void {
     try {
       const content = readFileSync(this.path, 'utf8');
-      const lines = content.split('\n');
-      let currentMachine: string | null = null;
       let currentEntry: Partial<NetrcEntry> = {};
 
+      const lines = content.split('\n');
       for (const line of lines) {
         const [key, value] = line.trim().split(/\s+/);
-        switch (key) {
-          case 'machine':
-            if (currentMachine && Object.keys(currentEntry).length) {
-              this.entries.set(currentMachine, currentEntry as NetrcEntry);
-            }
-            currentMachine = value;
-            currentEntry = {machine: value};
-            break;
-          case 'login':
-          case 'password':
+        if (key === 'machine') {
+          if (currentEntry.machine && currentEntry.login) {
+            this.entries.set(currentEntry.machine, currentEntry as NetrcEntry);
+          }
+          currentEntry = {machine: value};
+        } else if (key === 'login' || key === 'password') {
+          currentEntry[key] = value;
         }
       }
 
-      if (currentMachine && Object.keys(currentEntry).length > 1) {
-        this.entries.set(currentMachine, currentEntry as NetrcEntry);
+      if (currentEntry.machine && currentEntry.login) {
+        this.entries.set(currentEntry.machine, currentEntry as NetrcEntry);
       }
     } catch (error) {
-      // File doesn't exist or can't be read, starting with empty entries
+      console.error('Error parsing netrc file', error);
     }
   }
 
