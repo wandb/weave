@@ -7,7 +7,13 @@ from weave.trace_server.interface.base_object_classes.base_object_registry impor
     BASE_OBJECT_REGISTRY,
 )
 
-OUTPUT_DIR = Path(__file__).parent.parent / "generated"
+OUTPUT_DIR = (
+    Path(__file__).parent.parent
+    / "trace_server"
+    / "interface"
+    / "base_object_classes"
+    / "generated"
+)
 OUTPUT_PATH = OUTPUT_DIR / "generated_base_object_class_schemas.json"
 
 
