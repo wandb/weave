@@ -6,7 +6,6 @@ interface NetrcEntry {
   machine: string;
   login: string;
   password: string;
-  account?: string;
 }
 
 export class Netrc {
@@ -38,11 +37,6 @@ export class Netrc {
             break;
           case 'login':
           case 'password':
-          case 'account':
-            if (currentMachine) {
-              currentEntry[key] = value;
-            }
-            break;
         }
       }
 
@@ -60,7 +54,6 @@ export class Netrc {
         let str = `machine ${machine}\n`;
         if (entry.login) str += `  login ${entry.login}\n`;
         if (entry.password) str += `  password ${entry.password}\n`;
-        if (entry.account) str += `  account ${entry.account}\n`;
         return str;
       })
       .join('\n');
@@ -72,7 +65,11 @@ export class Netrc {
     return this.entries.get(machine);
   }
 
-  setEntry(machine: string, entry: Partial<NetrcEntry>): void {
+  setEntry(entry: NetrcEntry): void {
+    const machine = entry.machine;
+    if (!machine) {
+      throw new Error('Machine is required');
+    }
     const existingEntry = this.entries.get(machine) || {machine};
     const updatedEntry = {...existingEntry, ...entry} as NetrcEntry;
     this.entries.delete(machine);
