@@ -24,8 +24,10 @@ import {
 import {useSavedLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {SimplePageLayout} from '../common/SimplePageLayout';
-import {useBaseObjectInstances} from '../wfReactInterface/baseObjectClassQuery';
-import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import {
+  useBaseObjectInstances,
+  useCreateBaseObjectInstance,
+} from '../wfReactInterface/baseObjectClassQuery';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
 
@@ -129,20 +131,14 @@ const useUpdateLeaderboard = (
   project: string,
   objectId: string
 ) => {
-  const getTsClient = useGetTraceServerClientContext();
-  const client = getTsClient();
+  const createLeaderboard = useCreateBaseObjectInstance('Leaderboard');
 
   const updateLeaderboard = async (leaderboardVal: LeaderboardObjectVal) => {
-    return await client.objCreate({
+    return await createLeaderboard({
       obj: {
         project_id: projectIdFromParts({entity, project}),
         object_id: objectId,
-        val: {
-          _type: 'Leaderboard',
-          _class_name: 'Leaderboard',
-          _bases: ['Object', 'BaseModel'],
-          ...leaderboardVal,
-        },
+        val: leaderboardVal,
       },
     });
   };
