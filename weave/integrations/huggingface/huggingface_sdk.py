@@ -182,5 +182,19 @@ huggingface_patcher = MultiPatcher(
                 name="huggingface_hub.AsyncInferenceClient.sentence_similarity"
             ),
         ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "InferenceClient.summarization",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.InferenceClient.summarization"
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "AsyncInferenceClient.summarization",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.AsyncInferenceClient.summarization"
+            ),
+        ),
     ]
 )

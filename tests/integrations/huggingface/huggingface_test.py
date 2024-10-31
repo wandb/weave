@@ -394,8 +394,7 @@ def test_huggingface_sentence_similarity(client):
     from huggingface_hub import InferenceClient
 
     InferenceClient(
-        api_key=os.getenv("HUGGINGFACE_API_KEY")
-        # api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
     ).sentence_similarity(
         "Machine learning is so easy.",
         other_sentences=[
@@ -429,8 +428,7 @@ def test_huggingface_sentence_similarity_async(client):
 
     asyncio.run(
         AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY")
-            # api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
         ).sentence_similarity(
             "Machine learning is so easy.",
             other_sentences=[
@@ -453,3 +451,30 @@ def test_huggingface_sentence_similarity_async(client):
     output = call.output
     for item in output:
         assert item > 0
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_huggingface_summarization(client):
+    from huggingface_hub import InferenceClient
+
+    InferenceClient(
+        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+    ).summarization(
+        "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum."
+    )
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert (
+        op_name_from_ref(call.op_name)
+        == "huggingface_hub.InferenceClient.summarization"
+    )
+    output = call.output
+    assert "Lorem Ipsum" in output.summary_text
