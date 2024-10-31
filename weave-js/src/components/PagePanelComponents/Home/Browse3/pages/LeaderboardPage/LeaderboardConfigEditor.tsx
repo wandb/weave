@@ -265,7 +265,7 @@ const ColumnEditor: React.FC<{
           handleColumnChange(
             index,
             'summary_metric_path',
-            newVal?.val.split('.')
+            newVal?.val ?? ''
           )
         }
         options={metrics.map(metric => ({val: metric}))}
