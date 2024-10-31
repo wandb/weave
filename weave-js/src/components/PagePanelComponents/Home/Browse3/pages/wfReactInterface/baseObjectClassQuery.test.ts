@@ -1,8 +1,8 @@
 import {expectType} from 'tsd';
 
 import {
-  useCollectionObjects,
-  useCreateCollectionObject,
+  useBaseObjectInstances,
+  useCreateBaseObjectInstance,
 } from './baseObjectClassQuery';
 import {
   TestOnlyExample,
@@ -24,7 +24,7 @@ type TypesAreEqual<T, U> = [T] extends [U]
 describe('Type Tests', () => {
   it('useCollectionObjects return type matches expected structure', () => {
     type CollectionObjectsReturn = ReturnType<
-      typeof useCollectionObjects<'TestOnlyExample'>
+      typeof useBaseObjectInstances<'TestOnlyExample'>
     >;
 
     // Define the expected type structure
@@ -74,7 +74,7 @@ describe('Type Tests', () => {
 
   it('useCreateCollectionObject return type matches expected structure', () => {
     type CreateCollectionObjectReturn = ReturnType<
-      typeof useCreateCollectionObject<'TestOnlyExample'>
+      typeof useCreateBaseObjectInstance<'TestOnlyExample'>
     >;
 
     // Define the expected type structure

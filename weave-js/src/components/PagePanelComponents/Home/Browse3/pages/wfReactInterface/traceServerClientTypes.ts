@@ -239,6 +239,7 @@ export type TraceObjCreateReq<T extends any = any> = {
     project_id: string;
     object_id: string;
     val: T;
+    set_base_object_class?: string;
   };
 };
 

@@ -17,16 +17,16 @@ import {
 import {Loadable} from './wfDataModelHooksInterface';
 
 // TODO: This should be generated from the registry!
-const collectionRegistry = {
+const baseObjectClassRegistry = {
   TestOnlyExample: TestOnlyExampleSchema,
   TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,
 };
 
-export const useCollectionObjects = <
-  C extends keyof typeof collectionRegistry,
-  T = z.infer<(typeof collectionRegistry)[C]>
+export const useBaseObjectInstances = <
+  C extends keyof typeof baseObjectClassRegistry,
+  T = z.infer<(typeof baseObjectClassRegistry)[C]>
 >(
-  collectionName: C,
+  baseObjectClassName: C,
   req: TraceObjQueryReq
 ): Loadable<Array<TraceObjSchema<T, C>>> => {
   const [objects, setObjects] = useState<Array<TraceObjSchema<T, C>>>([]);
@@ -40,7 +40,7 @@ export const useCollectionObjects = <
     let isMounted = true;
     setLoading(true);
     currReq.current = deepReq;
-    getCollectionObjects(client, collectionName, deepReq).then(
+    getBaseObjectInstances(client, baseObjectClassName, deepReq).then(
       collectionObjects => {
         if (isMounted && currReq.current === deepReq) {
           setObjects(collectionObjects as Array<TraceObjSchema<T, C>>);
@@ -51,68 +51,77 @@ export const useCollectionObjects = <
     return () => {
       isMounted = false;
     };
-  }, [client, collectionName, deepReq]);
+  }, [client, baseObjectClassName, deepReq]);
 
   return {result: objects, loading};
 };
 
-const getCollectionObjects = async <
-  C extends keyof typeof collectionRegistry,
-  T = z.infer<(typeof collectionRegistry)[C]>
+const getBaseObjectInstances = async <
+  C extends keyof typeof baseObjectClassRegistry,
+  T = z.infer<(typeof baseObjectClassRegistry)[C]>
 >(
   client: TraceServerClient,
-  collectionName: C,
+  baseObjectClassName: C,
   req: TraceObjQueryReq
 ): Promise<Array<TraceObjSchema<T, C>>> => {
-  const knownCollection = collectionRegistry[collectionName];
-  if (!knownCollection) {
-    console.warn(`Unknown collection: ${collectionName}`);
+  const knownObjectClass = baseObjectClassRegistry[baseObjectClassName];
+  if (!knownObjectClass) {
+    console.warn(`Unknown object class: ${baseObjectClassName}`);
     return [];
   }
 
-  const reqWithCollection: TraceObjQueryReq = {
+  const reqWithBaseObjectClass: TraceObjQueryReq = {
     ...req,
-    filter: {...req.filter, base_object_classes: [collectionName]},
+    filter: {...req.filter, base_object_classes: [baseObjectClassName]},
   };
 
-  const objectPromise = client.objsQuery(reqWithCollection);
+  const objectPromise = client.objsQuery(reqWithBaseObjectClass);
 
   const objects = await objectPromise;
 
   return objects.objs
-    .map(obj => ({obj, parsed: knownCollection.safeParse(obj.val)}))
+    .map(obj => ({obj, parsed: knownObjectClass.safeParse(obj.val)}))
     .filter(({parsed}) => parsed.success)
     .map(({obj, parsed}) => ({...obj, val: parsed.data!})) as Array<
     TraceObjSchema<T, C>
   >;
 };
 
-export const useCreateCollectionObject = <
-  C extends keyof typeof collectionRegistry,
-  T = z.infer<(typeof collectionRegistry)[C]>
+export const useCreateBaseObjectInstance = <
+  C extends keyof typeof baseObjectClassRegistry,
+  T = z.infer<(typeof baseObjectClassRegistry)[C]>
 >(
-  collectionName: C
+  baseObjectClassName: C
 ): ((req: TraceObjCreateReq<T>) => Promise<TraceObjCreateRes>) => {
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
   return (req: TraceObjCreateReq<T>) =>
-    createCollectionObject(client, collectionName, req);
+    createBaseObjectInstance(client, baseObjectClassName, req);
 };
 
-const createCollectionObject = async <
-  C extends keyof typeof collectionRegistry,
-  T = z.infer<(typeof collectionRegistry)[C]>
+const createBaseObjectInstance = async <
+  C extends keyof typeof baseObjectClassRegistry,
+  T = z.infer<(typeof baseObjectClassRegistry)[C]>
 >(
   client: TraceServerClient,
-  collectionName: C,
+  baseObjectClassName: C,
   req: TraceObjCreateReq<T>
 ): Promise<TraceObjCreateRes> => {
-  const knownCollection = collectionRegistry[collectionName];
-  if (!knownCollection) {
-    throw new Error(`Unknown collection: ${collectionName}`);
+  if (
+    req.obj.set_base_object_class != null &&
+    req.obj.set_base_object_class !== baseObjectClassName
+  ) {
+    throw new Error(
+      `set_base_object_class must match baseObjectClassName: ${baseObjectClassName}`
+    );
   }
 
-  const verifiedObject = knownCollection.safeParse(req.obj.val);
+  const knownBaseObjectClass = baseObjectClassRegistry[baseObjectClassName];
+  if (!knownBaseObjectClass) {
+    throw new Error(`Unknown object class: ${baseObjectClassName}`);
+  }
+
+  const verifiedObject = knownBaseObjectClass.safeParse(req.obj.val);
 
   if (!verifiedObject.success) {
     throw new Error(
@@ -120,15 +129,13 @@ const createCollectionObject = async <
     );
   }
 
-  const reqWithCollection: TraceObjCreateReq = {
+  const reqWithBaseObjectClass: TraceObjCreateReq = {
     ...req,
     obj: {
       ...req.obj,
-      val: {...req.obj.val, _bases: [collectionName, 'BaseModel']},
+      set_base_object_class: baseObjectClassName,
     },
   };
 
-  const createPromse = client.objCreate(reqWithCollection);
-
-  return createPromse;
+  return client.objCreate(reqWithBaseObjectClass);
 };
