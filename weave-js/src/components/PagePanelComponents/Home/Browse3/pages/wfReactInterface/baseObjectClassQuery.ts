@@ -3,8 +3,7 @@ import {useEffect, useRef, useState} from 'react';
 import {z} from 'zod';
 
 import {
-  TestOnlyExampleSchema,
-  TestOnlyNestedBaseObjectSchema,
+  GeneratedBaseObjectClassesZodSchema,
 } from './generatedBaseObjectClasses.zod';
 import {TraceServerClient} from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
@@ -16,11 +15,8 @@ import {
 } from './traceServerClientTypes';
 import {Loadable} from './wfDataModelHooksInterface';
 
-// TODO: This should be generated from the registry!
-const baseObjectClassRegistry: Record<string, z.ZodType> = {
-  TestOnlyExample: TestOnlyExampleSchema,
-  TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,
-};
+const baseObjectClassRegistry: Record<string, z.ZodType> = 
+  GeneratedBaseObjectClassesZodSchema.shape;
 
 export const useBaseObjectInstances = <
   C extends keyof typeof baseObjectClassRegistry,
