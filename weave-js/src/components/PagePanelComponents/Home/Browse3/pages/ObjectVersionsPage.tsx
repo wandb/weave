@@ -336,8 +336,7 @@ const ObjectVersionsTable: React.FC<{
   const query = useURLSearchParamsDict();
   const {peekPath} = query;
 
-  const {baseRouter} = useWeaveflowRouteContext();
-  const peekId = parseUrlPathToRefUri(peekPath, baseRouter);
+  const peekId = parseUrlPathToRefUri(peekPath);
 
   const rowIds = useMemo(() => {
     return rows.map(row => row.id);
