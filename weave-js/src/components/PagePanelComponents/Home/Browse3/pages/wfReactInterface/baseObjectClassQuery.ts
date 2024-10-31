@@ -17,7 +17,7 @@ import {
 import {Loadable} from './wfDataModelHooksInterface';
 
 // TODO: This should be generated from the registry!
-const baseObjectClassRegistry = {
+const baseObjectClassRegistry: Record<string, z.ZodType> = {
   TestOnlyExample: TestOnlyExampleSchema,
   TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,
 };
@@ -82,9 +82,9 @@ const getBaseObjectInstances = async <
   return objects.objs
     .map(obj => ({obj, parsed: knownObjectClass.safeParse(obj.val)}))
     .filter(({parsed}) => parsed.success)
-    .map(({obj, parsed}) => ({...obj, val: parsed.data!})) as Array<
-    TraceObjSchema<T, C>
-  >;
+    .map(
+      ({obj, parsed}) => ({...obj, val: parsed.data} as TraceObjSchema<T, C>)
+    );
 };
 
 export const useCreateBaseObjectInstance = <
