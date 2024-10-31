@@ -1,11 +1,52 @@
-import {useCollectionObjects} from './baseObjectClassQuery';
-import {TestOnlyExampleSchema} from './generatedBaseObjectClasses.zod';
-describe('useCollectionObjects', () => {
-  it('hasCorrectTypes', () => {
-    type CT = ReturnType<typeof useCollectionObjects<'TestOnlyExample'>>;
-    const exampleResult: CT = {
+import {expectType} from 'tsd';
+
+import {
+  useCollectionObjects,
+  useCreateCollectionObject,
+} from './baseObjectClassQuery';
+import {
+  TestOnlyExample,
+  TestOnlyExampleSchema,
+} from './generatedBaseObjectClasses.zod';
+import {
+  TraceObjCreateReq,
+  TraceObjCreateRes,
+  TraceObjSchema,
+} from './traceServerClientTypes';
+import {Loadable} from './wfDataModelHooksInterface';
+
+type TypesAreEqual<T, U> = [T] extends [U]
+  ? [U] extends [T]
+    ? true
+    : false
+  : false;
+
+describe('Type Tests', () => {
+  it('useCollectionObjects return type matches expected structure', () => {
+    type CollectionObjectsReturn = ReturnType<
+      typeof useCollectionObjects<'TestOnlyExample'>
+    >;
+
+    // Define the expected type structure
+    type ExpectedType = Loadable<
+      Array<TraceObjSchema<TestOnlyExample, 'TestOnlyExample'>>
+    >;
+
+    // Type assertion tests
+    type AssertTypesAreEqual = TypesAreEqual<
+      CollectionObjectsReturn,
+      ExpectedType
+    >;
+    type Assert = AssertTypesAreEqual extends true ? true : never;
+
+    // This will fail compilation if the types don't match exactly
+    const _assert: Assert = true;
+    expect(_assert).toBe(true);
+
+    // Additional runtime sample for documentation
+    const sampleResult: CollectionObjectsReturn = {
       loading: false,
-      data: [
+      result: [
         {
           project_id: '',
           object_id: '',
@@ -27,7 +68,38 @@ describe('useCollectionObjects', () => {
         },
       ],
     };
-    // This should fail, looking for the correct way to validate types
-    expect(exampleResult).toBeNull();
+
+    expectType<ExpectedType>(sampleResult);
+  });
+
+  it('useCreateCollectionObject return type matches expected structure', () => {
+    type CreateCollectionObjectReturn = ReturnType<
+      typeof useCreateCollectionObject<'TestOnlyExample'>
+    >;
+
+    // Define the expected type structure
+    type ExpectedType = (
+      req: TraceObjCreateReq<TestOnlyExample>
+    ) => Promise<TraceObjCreateRes>;
+
+    // Type assertion tests
+    type AssertTypesAreEqual = TypesAreEqual<
+      CreateCollectionObjectReturn,
+      ExpectedType
+    >;
+    type Assert = AssertTypesAreEqual extends true ? true : never;
+
+    // This will fail compilation if the types don't match exactly
+    const _assert: Assert = true;
+    expect(_assert).toBe(true);
+
+    // Additional runtime sample for documentation
+    const sampleResult: CreateCollectionObjectReturn = async req => {
+      return {
+        digest: '',
+      };
+    };
+
+    expectType<ExpectedType>(sampleResult);
   });
 });

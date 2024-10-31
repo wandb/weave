@@ -14,20 +14,12 @@ import {
   TraceObjQueryReq,
   TraceObjSchema,
 } from './traceServerClientTypes';
+import {Loadable} from './wfDataModelHooksInterface';
 
 const collectionRegistry = {
   TestOnlyExample: TestOnlyExampleSchema,
   TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,
 };
-
-type Loadable<T> =
-  | {
-      loading: true;
-    }
-  | {
-      loading: false;
-      data: T;
-    };
 
 export const useCollectionObjects = <
   C extends keyof typeof collectionRegistry,
@@ -60,7 +52,7 @@ export const useCollectionObjects = <
     };
   }, [client, collectionName, deepReq]);
 
-  return {data: objects, loading};
+  return {result: objects, loading};
 };
 
 const getCollectionObjects = async <
