@@ -478,3 +478,67 @@ def test_huggingface_summarization(client):
     )
     output = call.output
     assert "Lorem Ipsum" in output.summary_text
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_huggingface_table_question_answering(client):
+    from huggingface_hub import InferenceClient
+
+    query = "How many stars does the transformers repository have?"
+    table = {
+        "Repository": ["Transformers", "Datasets", "Tokenizers"],
+        "Stars": ["36542", "4512", "3934"],
+    }
+    InferenceClient(
+        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+    ).table_question_answering(table, query, model="google/tapas-base-finetuned-wtq")
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert (
+        op_name_from_ref(call.op_name)
+        == "huggingface_hub.InferenceClient.table_question_answering"
+    )
+    output = call.output
+    assert output.answer == "AVERAGE > 36542"
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_huggingface_table_question_answering_async(client):
+    from huggingface_hub import AsyncInferenceClient
+
+    query = "How many stars does the transformers repository have?"
+    table = {
+        "Repository": ["Transformers", "Datasets", "Tokenizers"],
+        "Stars": ["36542", "4512", "3934"],
+    }
+    asyncio.run(
+        AsyncInferenceClient(
+            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+        ).table_question_answering(
+            table, query, model="google/tapas-base-finetuned-wtq"
+        )
+    )
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert (
+        op_name_from_ref(call.op_name)
+        == "huggingface_hub.AsyncInferenceClient.table_question_answering"
+    )
+    output = call.output
+    assert output.answer == "AVERAGE > 36542"
