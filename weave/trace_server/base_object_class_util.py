@@ -6,6 +6,12 @@ from weave.trace_server.interface.base_object_classes.base_object_registry impor
     BASE_OBJECT_REGISTRY,
 )
 
+"""
+There are two standard base object classes: BaseObject and Object
+
+`Object` is the base class for the more advanced object-oriented `weave.Object` use cases.
+`BaseObject` is the more simple schema-based base object class.
+"""
 base_object_class_names = ["BaseObject", "Object"]
 
 
@@ -26,6 +32,27 @@ def get_base_object_class(val: Any) -> Optional[str]:
 def process_incoming_object(
     val: Any, req_base_object_class: Optional[str] = None
 ) -> Tuple[dict, Optional[str]]:
+    """
+    This method is responsible for accepting an incoming object from the user, validating it
+    against the base object class, and returning the object with the base object class
+    set. It does not mutate the original object, but returns a new object with values set if needed.
+
+    Specifically,:
+
+    1. If the object is not a dict, it is returned as is, and the base object class is set to None.
+    2. There are 2 ways to specify the base object class:
+        a. The `req_base_object_class` argument.
+            * used by non-pythonic writers of weave objects
+        b. The `_bases` & `_class_name` attributes of the object, which is a list of base class names.
+            * used by pythonic weave object writers (legacy)
+    3. If the object has a base object class that does not match the requested base object class,
+        an error is thrown.
+    4. if the object contains a base object class inside the payload, then we simply validate
+        the object against the base object class (if a match is found in BASE_OBJECT_REGISTRY)
+    5. If the object does not have a base object class and a requested base object class is
+        provided, we require a match in BASE_OBJECT_REGISTRY and validate the object against
+        the requested base object class. Finally, we set the correct feilds.
+    """
     if not isinstance(val, dict):
         if req_base_object_class is not None:
             raise ValueError(
@@ -86,5 +113,9 @@ def _general_dump(val: Any) -> Any:
         return {k: _general_dump(v) for k, v in val.items()}
     elif isinstance(val, list):
         return [_general_dump(v) for v in val]
+    elif isinstance(val, tuple):
+        return tuple(_general_dump(v) for v in val)
+    elif isinstance(val, set):
+        return {_general_dump(v) for v in val}
     else:
         return val
