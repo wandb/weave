@@ -159,7 +159,6 @@ Run `make synchronize-base-object-schemas` to ensure the frontend TypeScript typ
 3. Run `make synchronize-base-object-schemas` to generate the frontend types.
     * The first step (`make generate_base_object_schemas`) will run `weave/scripts/generate_base_object_schemas.py` to generate a JSON schema in `weave/scripts/generated_base_object_class_schemas.json`.
     * The second step (yarn `generate-schemas`) will read this file and use it to generate the frontend types located in `weave-js/src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBaseObjectClasses.zod.ts`.
-        * Note, you need to run prettier to fix the output. These files should be checked in.
 4. Now, each use case uses different parts:
     1. `Python Writing`. Users can directly import these classes and use them as normal Pydantic models, which get published with `weave.publish`. The python client correct builds the requisite payload.
     2. `Python Reading`. Users can `weave.ref().get()` and the weave python SDK will return the instance with the correct type. Note: we do some special handling such that the returned object is not a WeaveObject, but literally the exact pydantic class.
