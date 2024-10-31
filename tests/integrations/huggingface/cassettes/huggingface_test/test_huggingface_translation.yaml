@@ -1,0 +1,48 @@
+interactions:
+- request:
+    body: '{"inputs": "My name is Wolfgang and I live in Berlin"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '54'
+      Content-Type:
+      - application/json
+      X-Amzn-Trace-Id:
+      - 37a2939e-3fa4-4a84-8575-497219ce20fe
+      user-agent:
+      - unknown/None; hf_hub/0.26.2; python/3.9.12; torch/2.4.1
+    method: POST
+    uri: https://api-inference.huggingface.co/models/Helsinki-NLP/opus-mt-en-fr
+  response:
+    body:
+      string: "[{\"translation_text\":\"Je m'appelle Wolfgang et je vis \xE0 Berlin.\"}]"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '67'
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 31 Oct 2024 14:12:14 GMT
+      access-control-allow-credentials:
+      - 'true'
+      vary:
+      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+      x-compute-time:
+      - '0.237'
+      x-compute-type:
+      - cache
+      x-request-id:
+      - roM0t_ythCsh_GC2BTGjR
+      x-sha:
+      - dd7f6540a7a48a7f4db59e5c0b9c42c8eea67f18
+    status:
+      code: 200
+      message: OK
+version: 1

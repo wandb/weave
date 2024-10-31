@@ -654,3 +654,30 @@ def test_huggingface_token_classification_async(client):
     output = call.output
     assert output[0].word == "Sarah Jessica Parker"
     assert output[0].score > 0
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_huggingface_translation(client):
+    from huggingface_hub import InferenceClient
+
+    InferenceClient(
+        api_key=os.getenv("HUGGINGFACE_API_KEY")
+        # api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+    ).translation(
+        "My name is Wolfgang and I live in Berlin", model="Helsinki-NLP/opus-mt-en-fr"
+    )
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert (
+        op_name_from_ref(call.op_name) == "huggingface_hub.InferenceClient.translation"
+    )
+    output = call.output
+    assert "Wolfgang" in output.translation_text
