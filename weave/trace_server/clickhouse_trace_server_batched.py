@@ -53,7 +53,9 @@ from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.base_object_class_util import get_base_object_class
+from weave.trace_server.base_object_class_util import (
+    process_incoming_object,
+)
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -600,16 +602,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        json_val = json.dumps(req.obj.val)
+        dict_val, base_object_class = process_incoming_object(
+            req.obj.val, req.obj.set_base_object_class
+        )
+
+        json_val = json.dumps(dict_val)
         digest = str_digest(json_val)
 
-        req_obj = req.obj
         ch_obj = ObjCHInsertable(
-            project_id=req_obj.project_id,
-            object_id=req_obj.object_id,
-            kind=get_kind(req.obj.val),
-            base_object_class=get_base_object_class(req.obj.val),
-            refs=extract_refs_from_values(req.obj.val),
+            project_id=req.obj.project_id,
+            object_id=req.obj.object_id,
+            kind=get_kind(dict_val),
+            base_object_class=base_object_class,
+            refs=extract_refs_from_values(dict_val),
             val_dump=json_val,
             digest=digest,
         )

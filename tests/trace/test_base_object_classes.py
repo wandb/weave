@@ -15,6 +15,7 @@ This test file ensures the base_object_classes behavior is as expected. Specific
 from typing import Literal, Optional
 
 import pytest
+from pydantic import ValidationError
 
 import weave
 from weave.trace import base_objects
@@ -126,7 +127,7 @@ def test_pythonic_creation(client: WeaveClient):
 
 def test_interface_creation(client):
     # Now we will do the equivant operation using low-level interface.
-    nested_obj_id = "nested_obj"
+    nested_obj_id = "TestOnlyNestedBaseObject"
     nested_obj = base_objects.TestOnlyNestedBaseObject(b=3)
     nested_obj_res = client.server.obj_create(
         tsi.ObjCreateReq.model_validate(
@@ -135,6 +136,7 @@ def test_interface_creation(client):
                     "project_id": client._project_id(),
                     "object_id": nested_obj_id,
                     "val": nested_obj.model_dump(),
+                    "set_base_object_class": "TestOnlyNestedBaseObject",
                 }
             }
         )
@@ -143,14 +145,14 @@ def test_interface_creation(client):
         entity=client.entity,
         project=client.project,
         name=nested_obj_id,
-        digest=nested_obj_res.digest,
+        _digest=nested_obj_res.digest,
     )
 
-    top_level_obj_id = "top_obj"
+    top_level_obj_id = "TestOnlyExample"
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
         nested_base_model=base_objects.TestOnlyNestedBaseModel(a=2),
-        nested_obj=nested_obj_ref.uri(),
+        nested_base_object=nested_obj_ref.uri(),
     )
     top_obj_res = client.server.obj_create(
         tsi.ObjCreateReq.model_validate(
@@ -159,6 +161,7 @@ def test_interface_creation(client):
                     "project_id": client._project_id(),
                     "object_id": top_level_obj_id,
                     "val": top_obj.model_dump(),
+                    "set_base_object_class": "TestOnlyExample",
                 }
             }
         )
@@ -167,7 +170,7 @@ def test_interface_creation(client):
         entity=client.entity,
         project=client.project,
         name=top_level_obj_id,
-        digest=top_obj_res.digest,
+        _digest=top_obj_res.digest,
     )
 
     top_obj_gotten = weave.ref(top_obj_ref.uri()).get()
@@ -178,7 +181,7 @@ def test_interface_creation(client):
 
     assert nested_obj_gotten.model_dump() == nested_obj.model_dump()
 
-    objs_res = client.server.obj_query(
+    objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
                 "project_id": client._project_id(),
@@ -189,9 +192,34 @@ def test_interface_creation(client):
 
     objs = objs_res.objs
     assert len(objs) == 1
-    assert objs[0].val == top_obj.model_dump()
+    assert (
+        objs[0].val
+        == {
+            **with_base_object_class_annotations(
+                top_obj.model_dump(), "TestOnlyExample", "BaseObject"
+            ),
+            "nested_base_model": with_base_object_class_annotations(
+                top_obj.nested_base_model.model_dump(), "TestOnlyNestedBaseModel"
+            ),
+        }
+        == {
+            "_type": "TestOnlyExample",
+            "name": None,
+            "description": None,
+            "primitive": 1,
+            "nested_base_model": {
+                "_type": "TestOnlyNestedBaseModel",
+                "a": 2,
+                "_class_name": "TestOnlyNestedBaseModel",
+                "_bases": ["BaseModel"],
+            },
+            "nested_base_object": "weave:///shawn/test-project/object/TestOnlyNestedBaseObject:JyFvHfyaJ79uCKpdZ3DD3if4NYam8QgTkzUlXQXAILI",
+            "_class_name": "TestOnlyExample",
+            "_bases": ["BaseObject", "BaseModel"],
+        }
+    )
 
-    objs_res = client.server.obj_query(
+    objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
                 "project_id": client._project_id(),
@@ -201,23 +229,37 @@ def test_interface_creation(client):
     )
     objs = objs_res.objs
     assert len(objs) == 1
-    assert objs[0].val == nested_obj.model_dump()
+    assert (
+        objs[0].val
+        == with_base_object_class_annotations(
+            nested_obj.model_dump(), "TestOnlyNestedBaseObject", "BaseObject"
+        )
+        == {
+            "_type": "TestOnlyNestedBaseObject",
+            "name": None,
+            "description": None,
+            "b": 3,
+            "_class_name": "TestOnlyNestedBaseObject",
+            "_bases": ["BaseObject", "BaseModel"],
+        }
+    )
 
 
 def test_digest_equality(client):
     # Next, let's make sure that the digests are all equivalent
-
     nested_obj = base_objects.TestOnlyNestedBaseObject(b=3)
+    nested_ref = weave.publish(nested_obj)
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
         nested_base_model=base_objects.TestOnlyNestedBaseModel(a=2),
-        nested_obj=weave.publish(nested_obj).uri(),
+        nested_base_object=nested_ref.uri(),
     )
     ref = weave.publish(top_obj)
-    pythonic_digest = ref.digest
+    nested_pythonic_digest = nested_ref.digest
+    top_level_pythonic_digest = ref.digest
 
     # Now we will do the equivant operation using low-level interface.
-    nested_obj_id = "nested_obj"
+    nested_obj_id = "TestOnlyNestedBaseObject"
     nested_obj = base_objects.TestOnlyNestedBaseObject(b=3)
     nested_obj_res = client.server.obj_create(
         tsi.ObjCreateReq.model_validate(
@@ -226,6 +268,7 @@ def test_digest_equality(client):
                     "project_id": client._project_id(),
                     "object_id": nested_obj_id,
                     "val": nested_obj.model_dump(),
+                    "set_base_object_class": "TestOnlyNestedBaseObject",
                 }
             }
         )
@@ -234,14 +277,18 @@ def test_digest_equality(client):
         entity=client.entity,
         project=client.project,
         name=nested_obj_id,
-        digest=nested_obj_res.digest,
+        _digest=nested_obj_res.digest,
     )
 
-    top_level_obj_id = "top_obj"
+    nested_interface_style_digest = nested_obj_ref.digest
+
+    assert nested_pythonic_digest == nested_interface_style_digest
+
+    top_level_obj_id = "TestOnlyExample"
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
         nested_base_model=base_objects.TestOnlyNestedBaseModel(a=2),
-        nested_obj=nested_obj_ref.uri(),
+        nested_base_object=nested_obj_ref.uri(),
     )
     top_obj_res = client.server.obj_create(
         tsi.ObjCreateReq.model_validate(
@@ -250,26 +297,66 @@ def test_digest_equality(client):
                     "project_id": client._project_id(),
                     "object_id": top_level_obj_id,
                     "val": top_obj.model_dump(),
+                    "set_base_object_class": "TestOnlyExample",
                 }
             }
         )
     )
 
-    interface_style_digest = top_obj_res.digest
+    top_level_interface_style_digest = top_obj_res.digest
 
-    assert pythonic_digest == interface_style_digest
+    assert top_level_pythonic_digest == top_level_interface_style_digest
 
 
 def test_schema_validation(client):
     # Test that we can't create an object with the wrong schema
-    with pytest.raises():
+    with pytest.raises(ValidationError):
         client.server.obj_create(
             tsi.ObjCreateReq.model_validate(
                 {
                     "obj": {
                         "project_id": client._project_id(),
                         "object_id": "nested_obj",
+                        # Incorrect schema, should raise!
                         "val": {"a": 2},
+                        "set_base_object_class": "TestOnlyNestedBaseObject",
+                    }
+                }
+            )
+        )
+
+    # Correct schema, should work
+    client.server.obj_create(
+        tsi.ObjCreateReq.model_validate(
+            {
+                "obj": {
+                    "project_id": client._project_id(),
+                    "object_id": "nested_obj",
+                    "val": {
+                        "b": 2,
+                        "_class_name": "TestOnlyNestedBaseObject",
+                        "_bases": ["BaseObject", "BaseModel"],
+                    },
+                    "set_base_object_class": "TestOnlyNestedBaseObject",
+                }
+            }
+        )
+    )
+
+    with pytest.raises(ValueError):
+        # Mismatching base object class, should raise
+        client.server.obj_create(
+            tsi.ObjCreateReq.model_validate(
+                {
+                    "obj": {
+                        "project_id": client._project_id(),
+                        "object_id": "nested_obj",
+                        "val": {
+                            "b": 2,
+                            "_class_name": "TestOnlyNestedBaseObject",
+                            "_bases": ["BaseObject", "BaseModel"],
+                        },
+                        "set_base_object_class": "TestOnlyExample",
                     }
                 }
             )
