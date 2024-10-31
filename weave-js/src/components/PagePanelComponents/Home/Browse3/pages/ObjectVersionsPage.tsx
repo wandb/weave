@@ -53,7 +53,7 @@ import {
 } from './wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {
   objectVersionKeyToRefUri,
-  parseUrlPathToRefUri,
+  parseObjectVersionUrlPathToRefUri,
 } from './wfReactInterface/utilities';
 import {
   KnownBaseObjectClassType,
@@ -336,7 +336,7 @@ const ObjectVersionsTable: React.FC<{
   const query = useURLSearchParamsDict();
   const {peekPath} = query;
 
-  const peekId = parseUrlPathToRefUri(peekPath);
+  const peekId = parseObjectVersionUrlPathToRefUri(peekPath);
 
   const rowIds = useMemo(() => {
     return rows.map(row => row.id);

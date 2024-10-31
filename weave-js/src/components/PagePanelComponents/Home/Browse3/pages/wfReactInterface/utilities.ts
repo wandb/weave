@@ -286,7 +286,7 @@ export const objectVersionNiceString = (ov: ObjectVersionSchema) => {
   return result;
 };
 
-export function parseUrlPathToRefUri(
+export function parseObjectVersionUrlPathToRefUri(
   urlPath: string | undefined
 ): string | null {
   if (!urlPath) {
