@@ -48,33 +48,6 @@ import {
   TraceTableQueryStatsRes,
 } from './traceServerClientTypes';
 
-/**
- * Sanitizes an object name by replacing non-alphanumeric characters with dashes and enforcing length limits.
- * This matches the Python implementation in weave_client.py.
- *
- * @param name The name to sanitize
- * @returns The sanitized name
- * @throws Error if the resulting name would be empty
- */
-export function sanitizeObjectId(name: string): string {
-  // Replace any non-word chars (except dots and underscores) with dashes
-  let res = name.replace(/[^\w._]+/g, '-');
-  // Replace multiple consecutive dashes/dots/underscores with a single dash
-  res = res.replace(/([._-]{2,})+/g, '-');
-  // Remove leading/trailing dashes and underscores
-  res = res.replace(/^[-_]+|[-_]+$/g, '');
-
-  if (!res) {
-    throw new Error(`Invalid object name: ${name}`);
-  }
-
-  if (res.length > 128) {
-    res = res.slice(0, 128);
-  }
-
-  return res;
-}
-
 export class DirectTraceServerClient {
   private baseUrl: string;
   private inFlightFetchesRequests: Record<
@@ -251,22 +224,6 @@ export class DirectTraceServerClient {
 
   public objRead(req: TraceObjReadReq): Promise<TraceObjReadRes> {
     return this.makeRequest<TraceObjReadReq, TraceObjReadRes>('/obj/read', req);
-  }
-
-  public objCreate(req: TraceObjCreateReq): Promise<TraceObjCreateRes> {
-    const initialObjectId = req.obj.object_id;
-    const sanitizedObjectId = sanitizeObjectId(initialObjectId);
-    if (sanitizedObjectId !== initialObjectId) {
-      // Caller is expected to sanitize the object id. We should be doing this
-      // on the server, but it is currently disabled.
-      throw new Error(
-        `Invalid object name: ${initialObjectId}, sanitized to ${sanitizedObjectId}`
-      );
-    }
-    return this.makeRequest<TraceObjCreateReq, TraceObjCreateRes>(
-      '/obj/create',
-      req
-    );
   }
 
   public readBatch(req: TraceRefsReadBatchReq): Promise<TraceRefsReadBatchRes> {
