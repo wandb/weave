@@ -665,8 +665,7 @@ def test_huggingface_translation(client):
     from huggingface_hub import InferenceClient
 
     InferenceClient(
-        api_key=os.getenv("HUGGINGFACE_API_KEY")
-        # api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
     ).translation(
         "My name is Wolfgang and I live in Berlin", model="Helsinki-NLP/opus-mt-en-fr"
     )
