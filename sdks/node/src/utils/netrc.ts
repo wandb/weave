@@ -65,15 +65,13 @@ export class Netrc {
     return this.entries.get(machine);
   }
 
-  setEntry(entry: NetrcEntry): void {
-    const machine = entry.machine;
+  setEntry({machine, ...entryProps}: NetrcEntry): void {
     if (!machine) {
       throw new Error('Machine is required');
     }
-    const existingEntry = this.entries.get(machine) || {machine};
-    const updatedEntry = {...existingEntry, ...entry} as NetrcEntry;
-    this.entries.delete(machine);
-    this.entries.set(machine, updatedEntry);
+    const existing = this.entries.get(machine) ?? {machine};
+    const updated = {...existing, ...entryProps, machine};
+    this.entries.set(machine, updated);
   }
 
   getLastEntry(): NetrcEntry | undefined {
