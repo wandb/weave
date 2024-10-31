@@ -176,16 +176,28 @@ export const SimplePageLayoutWithHeader: FC<{
   // We try to preserve the selected tab even if the set of tabs changes,
   // falling back to the first tab.
   const [tabId, setTabId] = useState(tabs[0].label);
+  // If the user has manually selected a tab, always keep that tab selected
+  // otherwise, always default to the leftmost tab. Some calls have chat
+  // tabs, others do not, so unless the user has explicitly selected a different
+  // tab, always show the chat tab when possible.
+  const [userSelectedTab, setUserSelectedTab] = useState(false);
   const idxSelected = tabs.findIndex(t => t.label === tabId);
   const tabValue = idxSelected !== -1 ? idxSelected : 0;
   const handleTabChange = (newValue: string) => {
     setTabId(newValue);
+    setUserSelectedTab(true);
   };
   useEffect(() => {
     if (idxSelected === -1) {
       setTabId(tabs[0].label);
+      setUserSelectedTab(false);
+    } else if (!userSelectedTab && idxSelected === 1) {
+      // User has not selected a tab, but the current tab is not the leftmost tab.
+      // Default to the leftmost.
+      // Example: view call w/o chat [tab='call'] -> view call w/ chat [tab='call']
+      setTabId(tabs[0].label);
     }
-  }, [tabs, idxSelected]);
+  }, [tabs, idxSelected, userSelectedTab]);
   const tabContent = useMemo(() => tabs[tabValue].content, [tabs, tabValue]);
 
   return (
