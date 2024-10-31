@@ -2,7 +2,6 @@ import {Box} from '@mui/material';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
-import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {Loading} from '@wandb/weave/components/Loading';
 import _ from 'lodash';
 import React, {
@@ -25,7 +24,7 @@ import {
 import {useSavedLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {SimplePageLayout} from '../common/SimplePageLayout';
-import {useWFHooks} from '../wfReactInterface/context';
+import {useBaseObjectInstances} from '../wfReactInterface/baseObjectClassQuery';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
@@ -85,25 +84,19 @@ export const LeaderboardPageContent: React.FC<
     setIsEditing: (isEditing: boolean) => void;
   }
 > = props => {
-  const {useRootObjectVersions} = useWFHooks();
   const {entity, project} = props;
-  const leaderboardObjectVersion = useRootObjectVersions(entity, project, {
-    objectIds: [props.leaderboardName],
-    baseObjectClasses: ['Leaderboard'],
-    latestOnly: true,
+  const leaderboardInstances = useBaseObjectInstances('Leaderboard', {
+    project_id: projectIdFromParts({entity, project}),
+    filter: {object_ids: [props.leaderboardName], latest_only: true},
   });
 
-  if (leaderboardObjectVersion.loading) {
+  if (leaderboardInstances.loading) {
     return <Loading centered />;
   }
 
-  if (leaderboardObjectVersion.error) {
-    return <ErrorPanel />;
-  }
-
   if (
-    leaderboardObjectVersion.result == null ||
-    leaderboardObjectVersion.result.length !== 1
+    leaderboardInstances.result == null ||
+    leaderboardInstances.result.length !== 1
   ) {
     return (
       <NotFoundPanel
@@ -112,9 +105,7 @@ export const LeaderboardPageContent: React.FC<
     );
   }
 
-  const leaderboardVal = parseLeaderboardVal(
-    leaderboardObjectVersion.result[0].val
-  );
+  const leaderboardVal = leaderboardInstances.result[0].val;
 
   if (leaderboardVal == null) {
     return (
@@ -321,68 +312,6 @@ export const ToggleLeaderboardConfig: React.FC<{
       />
     </Box>
   );
-};
-
-const parseLeaderboardVal = (
-  leaderboardVal: any
-): LeaderboardObjectVal | null => {
-  if (typeof leaderboardVal !== 'object' || leaderboardVal == null) {
-    return null;
-  }
-
-  const name = leaderboardVal.name;
-  if (typeof name !== 'string') {
-    return null;
-  }
-
-  const description = leaderboardVal.description;
-  if (typeof description !== 'string') {
-    return null;
-  }
-
-  const columns = leaderboardVal.columns;
-  if (!Array.isArray(columns)) {
-    return null;
-  }
-
-  const finalColumns = columns
-    // .map(column => {
-    //   const evaluationObjectRef = column.evaluation_object_ref;
-    //   if (typeof evaluationObjectRef !== 'string') {
-    //     return null;
-    //   }
-
-    //   const scorerName = column.scorer_name;
-    //   if (typeof scorerName !== 'string') {
-    //     return null;
-    //   }
-
-    //   const shouldMinimize = column.should_minimize;
-    //   if (shouldMinimize != null && typeof shouldMinimize !== 'boolean') {
-    //     return null;
-    //   }
-
-    //   const summaryMetricParts = column.summary_metric_path_parts;
-    //   if (!Array.isArray(summaryMetricParts)) {
-    //     return null;
-    //   } else if (summaryMetricParts.some(part => typeof part !== 'string')) {
-    //     return null;
-    //   }
-
-    //   return {
-    //     evaluation_object_ref: evaluationObjectRef,
-    //     scorer_name: scorerName,
-    //     should_minimize: shouldMinimize,
-    //     summary_metric_path_parts: summaryMetricParts,
-    //   };
-    // })
-    .filter(column => column != null) as LeaderboardObjectVal['columns'];
-
-  return {
-    name,
-    description,
-    columns: finalColumns,
-  };
 };
 
 const EditLeaderboardButton: FC<{

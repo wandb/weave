@@ -10,8 +10,10 @@ import {Empty} from '../common/Empty';
 import {EMPTY_PROPS_LEADERBOARDS} from '../common/EmptyContent';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {ObjectVersionsTable} from '../ObjectVersionsPage';
-import {useBaseObjectInstances} from '../wfReactInterface/baseObjectClassQuery';
-import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import {
+  useBaseObjectInstances,
+  useCreateBaseObjectInstance,
+} from '../wfReactInterface/baseObjectClassQuery';
 import {sanitizeObjectId} from '../wfReactInterface/traceServerDirectClient';
 import {
   convertTraceServerObjectVersionToSchema,
@@ -160,21 +162,15 @@ const generateLeaderboardId = () => {
 };
 
 const useCreateLeaderboard = (entity: string, project: string) => {
-  const getTsClient = useGetTraceServerClientContext();
-  const client = getTsClient();
+  const createLeaderboardInstance = useCreateBaseObjectInstance('Leaderboard');
 
-  // TODO: Once `useCreateCollectionObject` lands from the online
-  // evals project, switch to that (much more type safe)
   const createLeaderboard = async () => {
     const objectId = sanitizeObjectId(generateLeaderboardId());
-    await client.objCreate({
+    await createLeaderboardInstance({
       obj: {
         project_id: projectIdFromParts({entity, project}),
         object_id: objectId,
         val: {
-          _type: 'Leaderboard',
-          _class_name: 'Leaderboard',
-          _bases: ['Object', 'BaseModel'],
           name: objectId,
           description: '',
           columns: [],
