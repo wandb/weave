@@ -295,10 +295,9 @@ export function parseUrlPathToRefUri(
 
   // Remove leading and trailing slashes
   const cleanPath = urlPath.replace(/^\/|\/$/g, '');
-
   const segments = cleanPath.split('/');
 
-  // we need at least 6 segments to be a valid object version path
+  // We need at least 6 segments to be a valid object version path
   if (segments.length < 6) {
     return null;
   }
