@@ -266,5 +266,19 @@ huggingface_patcher = MultiPatcher(
                 name="huggingface_hub.AsyncInferenceClient.zero_shot_classification"
             ),
         ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "InferenceClient.text_to_image",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.InferenceClient.text_to_image"
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "AsyncInferenceClient.text_to_image",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.AsyncInferenceClient.text_to_image"
+            ),
+        ),
     ]
 )

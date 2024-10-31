@@ -697,8 +697,7 @@ def test_huggingface_zero_shot_classification(client):
     )
     labels = ["scientific discovery"]
     InferenceClient(
-        api_key=os.getenv("HUGGINGFACE_API_KEY")
-        # api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
     ).zero_shot_classification(text, labels)
 
     calls = list(client.calls())
@@ -731,8 +730,7 @@ def test_huggingface_zero_shot_classification_async(client):
     labels = ["scientific discovery"]
     asyncio.run(
         AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY")
-            # api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
         ).zero_shot_classification(text, labels)
     )
 
