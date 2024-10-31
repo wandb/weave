@@ -271,10 +271,14 @@ class CompletionsCreateReq(BaseModel):
     project_id: str
     inputs: CompletionsCreateRequestInputs
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    track_llm_call: Optional[bool] = Field(
+        True, description="Whether to track this LLM call in the trace server"
+    )
 
 
 class CompletionsCreateRes(BaseModel):
     response: Dict[str, Any]
+    weave_call_id: Optional[str] = None
 
 
 class CallsFilter(BaseModel):
@@ -888,6 +892,7 @@ class TraceServerInterface(Protocol):
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
+
     # Action API
     def execute_batch_action(
         self, req: ExecuteBatchActionReq
