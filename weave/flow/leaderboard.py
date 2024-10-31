@@ -80,3 +80,7 @@ def get_leaderboard_results(
                 )
             )
     return list(res_map.values())
+
+# Re-export:
+Leaderboard = leaderboard.Leaderboard
+LeaderboardColumn = leaderboard.LeaderboardColumn
