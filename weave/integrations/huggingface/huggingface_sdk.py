@@ -224,5 +224,19 @@ huggingface_patcher = MultiPatcher(
                 name="huggingface_hub.AsyncInferenceClient.text_classification"
             ),
         ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "InferenceClient.token_classification",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.InferenceClient.token_classification"
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "AsyncInferenceClient.token_classification",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.AsyncInferenceClient.token_classification"
+            ),
+        ),
     ]
 )
