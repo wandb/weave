@@ -323,18 +323,18 @@ This leaderboard compares the performance of models in terms of world knowledge 
         leaderboard.LeaderboardColumn(
             evaluation_object_ref=get_ref(evaluations[0]).uri(),
             scorer_name="check_concrete_fields",
-            summary_metric_path_parts=["state_match", "true_fraction"],
+            summary_metric_path="state_match.true_fraction",
         ),
         leaderboard.LeaderboardColumn(
             evaluation_object_ref=get_ref(evaluations[1]).uri(),
             scorer_name="check_value_fields",
             should_minimize=True,
-            summary_metric_path_parts=["avg_temp_f_err", "mean"],
+            summary_metric_path="avg_temp_f_err.mean",
         ),
         leaderboard.LeaderboardColumn(
             evaluation_object_ref=get_ref(evaluations[2]).uri(),
             scorer_name="check_subjective_fields",
-            summary_metric_path_parts=["correct_known_for", "true_fraction"],
+            summary_metric_path="correct_known_for.true_fraction",
         ),
     ],
 )
