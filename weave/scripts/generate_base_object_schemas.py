@@ -7,7 +7,14 @@ from weave.trace_server.interface.base_object_classes.base_object_registry impor
     BASE_OBJECT_REGISTRY,
 )
 
-OUTPUT_PATH = Path(__file__).parent / "generated_base_object_class_schemas.json"
+OUTPUT_DIR = (
+    Path(__file__).parent.parent
+    / "trace_server"
+    / "interface"
+    / "base_object_classes"
+    / "generated"
+)
+OUTPUT_PATH = OUTPUT_DIR / "generated_base_object_class_schemas.json"
 
 
 def generate_schemas() -> None:
@@ -24,6 +31,9 @@ def generate_schemas() -> None:
 
     # Generate the schema using the composite model
     top_level_schema = CompositeModel.model_json_schema(mode="validation")
+
+    # make sure the output directory exists
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # Write schema to file
     with OUTPUT_PATH.open("w") as f:
