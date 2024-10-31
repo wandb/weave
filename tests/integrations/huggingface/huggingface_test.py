@@ -326,3 +326,60 @@ def test_huggingface_fill_mask_async(client):
     output = call.output
     assert output[0].token_str in output[0].sequence
     assert output[0].score > 0
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_huggingface_question_answering(client):
+    from huggingface_hub import InferenceClient
+
+    InferenceClient(
+        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+    ).question_answering(
+        question="What's my name?", context="My name is Clara and I live in Berkeley."
+    )
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert (
+        op_name_from_ref(call.op_name)
+        == "huggingface_hub.InferenceClient.question_answering"
+    )
+    output = call.output
+    assert output.answer == "Clara"
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_huggingface_question_answering_async(client):
+    from huggingface_hub import AsyncInferenceClient
+
+    asyncio.run(
+        AsyncInferenceClient(
+            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+        ).question_answering(
+            question="What's my name?",
+            context="My name is Clara and I live in Berkeley.",
+        )
+    )
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert (
+        op_name_from_ref(call.op_name)
+        == "huggingface_hub.AsyncInferenceClient.question_answering"
+    )
+    output = call.output
+    assert output.answer == "Clara"

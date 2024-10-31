@@ -145,15 +145,27 @@ huggingface_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("huggingface_hub"),
             "InferenceClient.fill_mask",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.InferenceClient.fill_mask"
-            ),
+            huggingface_wrapper_sync(name="huggingface_hub.InferenceClient.fill_mask"),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("huggingface_hub"),
             "AsyncInferenceClient.fill_mask",
             huggingface_wrapper_sync(
                 name="huggingface_hub.AsyncInferenceClient.fill_mask"
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "InferenceClient.question_answering",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.InferenceClient.question_answering"
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "AsyncInferenceClient.question_answering",
+            huggingface_wrapper_sync(
+                name="huggingface_hub.AsyncInferenceClient.question_answering"
             ),
         ),
     ]
