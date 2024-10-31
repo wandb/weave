@@ -13,6 +13,9 @@ import emoji
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.base_object_class_util import (
+    process_incoming_object,
+)
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.feedback import (
@@ -608,25 +611,28 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
-        json_val = json.dumps(req.obj.val)
+
+        val, base_object_class = process_incoming_object(
+            req.obj.val, req.obj.set_base_object_class
+        )
+        json_val = json.dumps(val)
         digest = str_digest(json_val)
 
         # Validate
         object_id_validator(req.obj.object_id)
 
-        req_obj = req.obj
         # TODO: version index isn't right here, what if we delete stuff?
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
             # Mark all existing objects with such id as not latest
             cursor.execute(
                 """UPDATE objects SET is_latest = 0 WHERE project_id = ? AND object_id = ?""",
-                (req_obj.project_id, req_obj.object_id),
+                (req.obj.project_id, req.obj.object_id),
             )
             # first get version count
             cursor.execute(
                 """SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?""",
-                (req_obj.project_id, req_obj.object_id),
+                (req.obj.project_id, req.obj.object_id),
             )
             version_index = cursor.fetchone()[0]
 
@@ -644,11 +650,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     is_latest
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    req_obj.project_id,
-                    req_obj.object_id,
+                    req.obj.project_id,
+                    req.obj.object_id,
                     datetime.datetime.now().isoformat(),
-                    get_kind(req_obj.val),
-                    get_base_object_class(req_obj.val),
+                    get_kind(val),
+                    base_object_class,
                     json.dumps([]),
                     json_val,
                     digest,
@@ -1203,20 +1209,6 @@ def get_kind(val: Any) -> str:
     if val_type == "Op":
         return "op"
     return "object"
-
-
-def get_base_object_class(val: Any) -> Optional[str]:
-    if isinstance(val, dict):
-        if "_bases" in val:
-            if isinstance(val["_bases"], list):
-                if len(val["_bases"]) >= 2:
-                    if val["_bases"][-1] == "BaseModel":
-                        if val["_bases"][-2] == "Object":
-                            if len(val["_bases"]) > 2:
-                                return val["_bases"][-3]
-                            elif "_class_name" in val:
-                                return val["_class_name"]
-    return None
 
 
 def _transform_external_calls_field_to_internal_calls_field(

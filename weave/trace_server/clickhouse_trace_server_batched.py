@@ -53,6 +53,9 @@ from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.base_object_class_util import (
+    process_incoming_object,
+)
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -596,16 +599,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        json_val = json.dumps(req.obj.val)
+        val, base_object_class = process_incoming_object(
+            req.obj.val, req.obj.set_base_object_class
+        )
+
+        json_val = json.dumps(val)
         digest = str_digest(json_val)
 
-        req_obj = req.obj
         ch_obj = ObjCHInsertable(
-            project_id=req_obj.project_id,
-            object_id=req_obj.object_id,
-            kind=get_kind(req.obj.val),
-            base_object_class=get_base_object_class(req.obj.val),
-            refs=extract_refs_from_values(req.obj.val),
+            project_id=req.obj.project_id,
+            object_id=req.obj.object_id,
+            kind=get_kind(val),
+            base_object_class=base_object_class,
+            refs=extract_refs_from_values(val),
             val_dump=json_val,
             digest=digest,
         )
@@ -2054,20 +2060,6 @@ def get_kind(val: Any) -> str:
     if val_type == "Op":
         return "op"
     return "object"
-
-
-def get_base_object_class(val: Any) -> Optional[str]:
-    if isinstance(val, dict):
-        if "_bases" in val:
-            if isinstance(val["_bases"], list):
-                if len(val["_bases"]) >= 2:
-                    if val["_bases"][-1] == "BaseModel":
-                        if val["_bases"][-2] == "Object":
-                            if len(val["_bases"]) > 2:
-                                return val["_bases"][-3]
-                            elif "_class_name" in val:
-                                return val["_class_name"]
-    return None
 
 
 def find_call_descendants(
