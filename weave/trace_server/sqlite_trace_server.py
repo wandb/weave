@@ -612,10 +612,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
 
-        dict_val, base_object_class = process_incoming_object(
+        val, base_object_class = process_incoming_object(
             req.obj.val, req.obj.set_base_object_class
         )
-        json_val = json.dumps(dict_val)
+        json_val = json.dumps(val)
         digest = str_digest(json_val)
 
         # Validate
@@ -653,7 +653,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.obj.project_id,
                     req.obj.object_id,
                     datetime.datetime.now().isoformat(),
-                    get_kind(dict_val),
+                    get_kind(val),
                     base_object_class,
                     json.dumps([]),
                     json_val,

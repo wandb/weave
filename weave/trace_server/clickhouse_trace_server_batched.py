@@ -599,19 +599,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        dict_val, base_object_class = process_incoming_object(
+        val, base_object_class = process_incoming_object(
             req.obj.val, req.obj.set_base_object_class
         )
 
-        json_val = json.dumps(dict_val)
+        json_val = json.dumps(val)
         digest = str_digest(json_val)
 
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
             object_id=req.obj.object_id,
-            kind=get_kind(dict_val),
+            kind=get_kind(val),
             base_object_class=base_object_class,
-            refs=extract_refs_from_values(dict_val),
+            refs=extract_refs_from_values(val),
             val_dump=json_val,
             digest=digest,
         )

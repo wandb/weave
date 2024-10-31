@@ -24,9 +24,16 @@ def get_base_object_class(val: Any) -> Optional[str]:
 
 
 def process_incoming_object(
-    dict_val: dict, req_base_object_class: Optional[str] = None
+    val: Any, req_base_object_class: Optional[str] = None
 ) -> Tuple[dict, Optional[str]]:
-    dict_val = dict_val.copy()
+    if not isinstance(val, dict):
+        if req_base_object_class is not None:
+            raise ValueError(
+                "set_base_object_class cannot be provided for non-dict objects"
+            )
+        return val, None
+
+    dict_val = val.copy()
     val_base_object_class = get_base_object_class(dict_val)
 
     if (
