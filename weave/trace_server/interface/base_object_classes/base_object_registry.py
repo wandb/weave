@@ -10,6 +10,7 @@ REGISTRY: Dict[str, Type[BaseObject]] = {
     "TestOnlyNestedBaseObject": TestOnlyNestedBaseObject,
 }
 
+
 # This is a union type of all registered base objects.
 class CompositeBaseObject(BaseModel):
     TestOnlyExample: TestOnlyExample
