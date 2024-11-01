@@ -1,22 +1,16 @@
-import {Checkbox} from '@mui/material';
-import {Autocomplete, TextField as MuiTextField} from '@mui/material';
-import {toast} from '@wandb/weave/common/components/elements/Toast';
-import {MOON_300} from '@wandb/weave/common/css/color.styles';
-import {TextField} from '@wandb/weave/components/Form/TextField';
-import {LoadingDots} from '@wandb/weave/components/LoadingDots';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {parseRef} from '@wandb/weave/react';
-import debounce from 'lodash/debounce';
-import React, {
-  SyntheticEvent,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { Autocomplete, Checkbox, TextField as MuiTextField } from '@mui/material';
+import { toast } from '@wandb/weave/common/components/elements/Toast';
+import { MOON_300 } from '@wandb/weave/common/css/color.styles';
+import { TextField } from '@wandb/weave/components/Form/TextField';
+import { LoadingDots } from '@wandb/weave/components/LoadingDots';
+import { Tailwind } from '@wandb/weave/components/Tailwind';
+import { parseRef } from '@wandb/weave/react';
+import _ from 'lodash';
+import React, { SyntheticEvent, useEffect, useMemo, useState } from 'react';
 
-import {CellValueString} from '../../../Browse2/CellValueString';
-import {useWFHooks} from '../../pages/wfReactInterface/context';
-import {useGetTraceServerClientContext} from '../../pages/wfReactInterface/traceServerClientContext';
+import { CellValueString } from '../../../Browse2/CellValueString';
+import { useWFHooks } from '../../pages/wfReactInterface/context';
+import { useGetTraceServerClientContext } from '../../pages/wfReactInterface/traceServerClientContext';
 import {
   FeedbackCreateError,
   FeedbackCreateSuccess,
@@ -29,12 +23,7 @@ import {
 
 // Constants
 const HUMAN_FEEDBACK_TYPE = 'wandb.human_annotation.1';
-const MAGIC_FEEDBACK_TYPES = {
-  NUMERICAL: 'number',
-  TEXT: 'text',
-  BOOLEAN: 'boolean',
-  CATEGORICAL: 'categorical',
-};
+const FEEDBACK_TYPE_OPTIONS = ['text', 'number', 'boolean', 'categorical'];
 const DEBOUNCE_VAL = 200;
 
 // Interfaces
@@ -73,14 +62,30 @@ const createFeedbackRequest = (props: HumanFeedbackProps, value: any) => {
   return baseRequest;
 };
 
+const inferTypeFromJsonSchema = (jsonSchema: Record<string, any>) => {
+  if (jsonSchema.type in FEEDBACK_TYPE_OPTIONS) {
+    return jsonSchema.type;
+  }
+  if (jsonSchema.min !== undefined || jsonSchema.max !== undefined) {
+    return 'number';
+  }
+  if (jsonSchema.max_length !== undefined) {
+    return 'text';
+  }
+  if (jsonSchema.options !== undefined) {
+    return 'categorical';
+  }
+  return 'boolean';
+};
+
 const renderFeedbackComponent = (
   props: HumanFeedbackProps,
   onAddFeedback: (value: any) => Promise<boolean>,
   foundValue: string | number | null
 ) => {
-  // TODO validation on json_schema
-  switch (props.hfColumn.json_schema.type) {
-    case MAGIC_FEEDBACK_TYPES.NUMERICAL:
+  const type = inferTypeFromJsonSchema(props.hfColumn.json_schema);
+  switch (type) {
+    case 'number':
       const numericalFeedback = props.hfColumn.json_schema;
       return (
         <NumericalFeedbackColumn
@@ -91,7 +96,7 @@ const renderFeedbackComponent = (
           focused={props.focused}
         />
       );
-    case MAGIC_FEEDBACK_TYPES.TEXT:
+    case 'text':
       return (
         <TextFeedbackColumn
           onAddFeedback={onAddFeedback}
@@ -99,7 +104,7 @@ const renderFeedbackComponent = (
           focused={props.focused}
         />
       );
-    case MAGIC_FEEDBACK_TYPES.CATEGORICAL:
+    case 'categorical':
       const categoricalFeedback = props.hfColumn.json_schema;
       return (
         <CategoricalFeedbackColumn
@@ -109,7 +114,7 @@ const renderFeedbackComponent = (
           focused={props.focused}
         />
       );
-    case MAGIC_FEEDBACK_TYPES.BOOLEAN:
+    case 'boolean':
       return (
         <BinaryFeedbackColumn
           onAddFeedback={onAddFeedback}
@@ -262,7 +267,7 @@ export const NumericalFeedbackColumn = ({
     setValue(defaultValue ?? null);
   }, [defaultValue]);
 
-  const debouncedOnAddFeedback = debounce((val: number | null) => {
+  const debouncedOnAddFeedback = _.debounce((val: number | null) => {
     onAddFeedback?.(val);
   }, DEBOUNCE_VAL);
 
@@ -314,7 +319,7 @@ export const TextFeedbackColumn = ({
     setValue(defaultValue ?? '');
   }, [defaultValue]);
 
-  const debouncedOnAddFeedback = debounce((val: string) => {
+  const debouncedOnAddFeedback = _.debounce((val: string) => {
     onAddFeedback?.(val);
   }, DEBOUNCE_VAL);
 
@@ -368,7 +373,7 @@ export const CategoricalFeedbackColumn = ({
     );
   }, [defaultValue, dropdownOptions]);
 
-  const debouncedOnAddFeedback = debounce((val: string) => {
+  const debouncedOnAddFeedback = _.debounce((val: string) => {
     onAddFeedback?.(val);
   }, DEBOUNCE_VAL);
 
@@ -446,7 +451,7 @@ export const BinaryFeedbackColumn = ({
     setValue(defaultValue === 'true');
   }, [defaultValue]);
 
-  const debouncedOnAddFeedback = debounce((val: string) => {
+  const debouncedOnAddFeedback = _.debounce((val: string) => {
     onAddFeedback?.(val);
   }, DEBOUNCE_VAL);
 

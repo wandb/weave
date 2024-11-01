@@ -8,6 +8,23 @@ export const LeaderboardColumnSchema = z.object({
 });
 export type LeaderboardColumn = z.infer<typeof LeaderboardColumnSchema>;
 
+export const LeaderboardSchema = z.object({
+  columns: z.array(LeaderboardColumnSchema),
+  description: z.union([z.null(), z.string()]).optional(),
+  name: z.union([z.null(), z.string()]).optional(),
+});
+export type Leaderboard = z.infer<typeof LeaderboardSchema>;
+
+export const HumanAnnotationColumnSchema = z.object({
+  name: z.string().optional(),
+  description: z.union([z.null(), z.string()]).optional(),
+  json_schema: z.record(z.any()),
+  unique_among_creators: z.boolean().optional(),
+  op_scope: z.union([z.null(), z.array(z.string())]),
+});
+export type HumanAnnotationColumn = z.infer<typeof HumanAnnotationColumnSchema>;
+
+// ----- TEST OBJECTS -----
 export const TestOnlyNestedBaseModelSchema = z.object({
   a: z.number(),
 });
@@ -24,13 +41,6 @@ export type TestOnlyNestedBaseObject = z.infer<
   typeof TestOnlyNestedBaseObjectSchema
 >;
 
-export const LeaderboardSchema = z.object({
-  columns: z.array(LeaderboardColumnSchema),
-  description: z.union([z.null(), z.string()]).optional(),
-  name: z.union([z.null(), z.string()]).optional(),
-});
-export type Leaderboard = z.infer<typeof LeaderboardSchema>;
-
 export const TestOnlyExampleSchema = z.object({
   description: z.union([z.null(), z.string()]).optional(),
   name: z.union([z.null(), z.string()]).optional(),
@@ -40,8 +50,10 @@ export const TestOnlyExampleSchema = z.object({
 });
 export type TestOnlyExample = z.infer<typeof TestOnlyExampleSchema>;
 
+// ----- REGISTRY -----
 export const baseObjectClassRegistry = {
   Leaderboard: LeaderboardSchema,
+  HumanAnnotationColumn: HumanAnnotationColumnSchema,
   TestOnlyExample: TestOnlyExampleSchema,
   TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,
 };

@@ -1,8 +1,12 @@
 import {useEffect, useMemo, useState} from 'react';
 
-import {useWFHooks} from '../../pages/wfReactInterface/context';
+import {useBaseObjectInstances} from '../../pages/wfReactInterface/baseObjectClassQuery';
+import {
+  TraceObjQueryReq,
+  TraceObjSchema,
+} from '../../pages/wfReactInterface/traceServerClientTypes';
+import {projectIdFromParts} from '../../pages/wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '../../pages/wfReactInterface/utilities';
-import {ObjectVersionSchema} from '../../pages/wfReactInterface/wfDataModelHooksInterface';
 import {
   HumanAnnotationPayload,
   tsHumanFeedbackColumn,
@@ -12,29 +16,21 @@ export const useHumanFeedbackOptions = (
   entity: string,
   project: string
 ): tsHumanFeedbackColumn[] => {
-  const {useRootObjectVersions} = useWFHooks();
-
-  const [cols, setCols] = useState<ObjectVersionSchema[] | null>(null);
-  const humanAnnotationColumns = useRootObjectVersions(
-    entity,
-    project,
-    {
-      baseObjectClasses: ['HumanAnnotationColumn'],
-      latestOnly: true,
+  const req: TraceObjQueryReq = {
+    project_id: projectIdFromParts({entity, project}),
+    filter: {
+      latest_only: true,
     },
-    undefined, // limit
-    false // metadataOnly
-  );
+  };
+  const res = useBaseObjectInstances('HumanAnnotationColumn', req);
+  const [cols, setCols] = useState<TraceObjSchema[] | null>(null);
 
   useEffect(() => {
-    if (
-      humanAnnotationColumns.loading ||
-      humanAnnotationColumns.result == null
-    ) {
+    if (res.loading || res.result == null) {
       return;
     }
-    setCols(humanAnnotationColumns.result);
-  }, [humanAnnotationColumns.loading, humanAnnotationColumns.result]);
+    setCols(res.result);
+  }, [res.loading, res.result]);
 
   return useMemo(() => {
     if (cols == null) {
@@ -43,9 +39,17 @@ export const useHumanFeedbackOptions = (
     return cols.map(col => ({
       ...col.val,
       // attach object refs to the columns
-      ref: objectVersionKeyToRefUri(col),
+      ref: objectVersionKeyToRefUri({
+        scheme: 'weave',
+        weaveKind: 'object',
+        entity,
+        project,
+        objectId: col.object_id,
+        versionHash: col.digest,
+        path: '',
+      }),
     }));
-  }, [cols]);
+  }, [cols, entity, project]);
 };
 
 export const extractValFromHumanAnnotationPayload = (
