@@ -29,7 +29,7 @@ export async function login(options?: LoginOptions) {
   if (!options?.apiKey) {
     throw Error('API Key must be specified');
   }
-  const {traceBaseUrl, domain} = getUrls(options?.host);
+  const {traceBaseUrl, host} = getUrls(options?.host);
 
   // Test the connection to the traceServerApi
   const testTraceServerApi = new TraceServerApi({
@@ -50,9 +50,9 @@ export async function login(options?: LoginOptions) {
   }
 
   const netrc = new Netrc();
-  netrc.setEntry({machine: domain, login: 'user', password: options.apiKey});
+  netrc.setEntry({machine: host, login: 'user', password: options.apiKey});
   netrc.save();
-  console.log(`Successfully logged in.  Credentials saved for ${domain}`);
+  console.log(`Successfully logged in.  Credentials saved for ${host}`);
 }
 
 /**
