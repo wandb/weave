@@ -22,6 +22,7 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
+from weave.trace_server.interface.base_object_classes import leaderboard
 
 
 def init(
@@ -108,6 +109,12 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
                 ref.project,
                 ref.name,
                 ref.digest,
+            )
+        elif isinstance(obj, leaderboard.Leaderboard):
+            url = urls.leaderboard_path(
+                ref.entity,
+                ref.project,
+                ref.name,
             )
         # TODO(gst): once frontend has direct dataset/model links
         # elif isinstance(obj, weave_client.Dataset):
