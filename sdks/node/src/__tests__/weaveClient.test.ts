@@ -7,6 +7,30 @@ import {WeaveClient} from '../weaveClient';
 jest.mock('../generated/traceServerApi');
 jest.mock('../wandb/wandbServerApi');
 
+function createStreamFromCalls(calls: any[] = []) {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      calls.forEach(call => {
+        controller.enqueue(encoder.encode(JSON.stringify(call) + '\n'));
+      });
+      controller.close();
+    },
+  });
+  return stream;
+}
+function mockStreamResponse(
+  api: jest.Mocked<TraceServerApi<any>>,
+  calls: any[]
+) {
+  const stream = createStreamFromCalls(calls);
+  (
+    api.calls.callsQueryStreamCallsStreamQueryPost as jest.Mock
+  ).mockResolvedValue({
+    body: stream,
+  } as any);
+}
+
 describe('WeaveClient', () => {
   let client: WeaveClient;
   let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
@@ -32,21 +56,7 @@ describe('WeaveClient', () => {
         {id: '1', name: 'call1'},
         {id: '2', name: 'call2'},
       ];
-      const encoder = new TextEncoder();
-      const stream = new ReadableStream({
-        start(controller) {
-          mockCalls.forEach(call => {
-            controller.enqueue(encoder.encode(JSON.stringify(call) + '\n'));
-          });
-          controller.close();
-        },
-      });
-      (
-        mockTraceServerApi.calls
-          .callsQueryStreamCallsStreamQueryPost as jest.Mock
-      ).mockResolvedValue({
-        body: stream,
-      } as any);
+      mockStreamResponse(mockTraceServerApi, mockCalls);
 
       // Call the method
       const filter = {};
@@ -231,42 +241,15 @@ describe('WeaveClient', () => {
   describe('getCall', () => {
     it('should fetch a single call by ID', async () => {
       const mockCall = {id: 'test-id', name: 'test-call'};
-      const encoder = new TextEncoder();
-      const stream = new ReadableStream({
-        start(controller) {
-          controller.enqueue(encoder.encode(JSON.stringify(mockCall) + '\n'));
-          controller.close();
-        },
-      });
-
-      (
-        mockTraceServerApi.calls
-          .callsQueryStreamCallsStreamQueryPost as jest.Mock
-      ).mockResolvedValue({
-        body: stream,
-      } as any);
+      mockStreamResponse(mockTraceServerApi, [mockCall]);
 
       const result = await client.getCall('test-id');
-
       expect(result).toEqual(mockCall);
     });
 
     it('should throw error when call is not found', async () => {
-      const stream = new ReadableStream({
-        start(controller) {
-          // Return empty stream
-          controller.close();
-        },
-      });
-
-      (
-        mockTraceServerApi.calls
-          .callsQueryStreamCallsStreamQueryPost as jest.Mock
-      ).mockResolvedValue({
-        body: stream,
-      } as any);
-
-      await expect(client.getCall('non-existent-id')).rejects.toThrow(
+      mockStreamResponse(mockTraceServerApi, []);
+      expect(client.getCall('non-existent-id')).rejects.toThrow(
         'Call not found: non-existent-id'
       );
     });
