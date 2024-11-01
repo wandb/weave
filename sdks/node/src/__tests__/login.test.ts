@@ -18,6 +18,7 @@ describe('login', () => {
     (getUrls as jest.Mock).mockReturnValue({
       traceBaseUrl: 'https://api.wandb.ai',
       domain: 'wandb.ai',
+      host: 'api.wandb.ai',
     });
 
     const mockSetEntry = jest.fn();
@@ -36,13 +37,13 @@ describe('login', () => {
     await login('test-api-key');
 
     expect(mockSetEntry).toHaveBeenCalledWith({
-      machine: 'wandb.ai',
+      machine: 'api.wandb.ai',
       login: 'user',
       password: 'test-api-key',
     });
     expect(mockSave).toHaveBeenCalled();
     expect(console.log).toHaveBeenCalledWith(
-      'Successfully logged in.  Credentials saved for wandb.ai'
+      'Successfully logged in.  Credentials saved for api.wandb.ai'
     );
   });
 
