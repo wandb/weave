@@ -73,6 +73,7 @@
     "uuidv7": "^1.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.48.2",
     "@types/cli-progress": "^3.11.6",
     "@types/jest": "^29.5.13",
     "@types/node": "^22.5.1",
