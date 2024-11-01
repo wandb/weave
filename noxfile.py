@@ -25,6 +25,12 @@ def lint(session):
 @nox.parametrize(
     "shard",
     [
+        # The `custom` shard is included if you want to run your own tests.  By default,
+        # no tests are specified, which means ALL tests will run.  To run just your own
+        # subset, you can pass `-- test_your_thing.py` to nox.
+        # For example,
+        #   nox -e "tests-3.12(shard='custom')" -- test_your_thing.py
+        "custom",
         "trace",
         "trace_server",
         "anthropic",
@@ -76,6 +82,7 @@ def tests(session, shard):
 
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
+        "custom": [],
         "trace": ["trace/"],
         "trace_server": ["trace_server/"],
         "mistral0": ["integrations/mistral/v0/"],
