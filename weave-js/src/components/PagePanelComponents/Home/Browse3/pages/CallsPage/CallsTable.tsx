@@ -8,12 +8,13 @@
 
 import {
   Autocomplete,
+  Box,
   Chip,
   FormControl,
   ListItem,
   Tooltip,
+  Typography,
 } from '@mui/material';
-import {Box, Typography} from '@mui/material';
 import {
   GridColDef,
   GridColumnVisibilityModel,
@@ -25,10 +26,10 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
-import {Switch} from '@wandb/weave/components';
-import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
-import {Icon} from '@wandb/weave/components/Icon';
+import { MOON_200, TEAL_300 } from '@wandb/weave/common/css/color.styles';
+import { Switch } from '@wandb/weave/components';
+import { Checkbox } from '@wandb/weave/components/Checkbox/Checkbox';
+import { Icon } from '@wandb/weave/components/Icon';
 import React, {
   FC,
   useCallback,
@@ -38,42 +39,42 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {useHistory} from 'react-router-dom';
+import { useHistory } from 'react-router-dom';
 
-import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
-import {A, TargetBlank} from '../../../../../../common/util/links';
-import {TailwindContents} from '../../../../../Tailwind';
-import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
-import {TableRowSelectionContext} from '../../../Browse3';
-import {useWeaveflowCurrentRouteContext} from '../../context';
-import {OnAddFilter} from '../../filters/CellFilterWrapper';
-import {getDefaultOperatorForValue} from '../../filters/common';
-import {FilterPanel} from '../../filters/FilterPanel';
-import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
-import {StyledPaper} from '../../StyledAutocomplete';
-import {StyledDataGrid} from '../../StyledDataGrid';
-import {StyledTextField} from '../../StyledTextField';
-import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
-import {Empty} from '../common/Empty';
+import { useViewerInfo } from '../../../../../../common/hooks/useViewerInfo';
+import { A, TargetBlank } from '../../../../../../common/util/links';
+import { TailwindContents } from '../../../../../Tailwind';
+import { flattenObjectPreservingWeaveTypes } from '../../../Browse2/browse2Util';
+import { TableRowSelectionContext } from '../../../Browse3';
+import { useWeaveflowCurrentRouteContext, WeaveflowPeekContext } from '../../context';
+import { OnAddFilter } from '../../filters/CellFilterWrapper';
+import { getDefaultOperatorForValue } from '../../filters/common';
+import { FilterPanel } from '../../filters/FilterPanel';
+import { DEFAULT_PAGE_SIZE } from '../../grid/pagination';
+import { StyledPaper } from '../../StyledAutocomplete';
+import { StyledDataGrid } from '../../StyledDataGrid';
+import { StyledTextField } from '../../StyledTextField';
+import { ConfirmDeleteModal } from '../CallPage/OverflowMenu';
+import { Empty } from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
   EMPTY_PROPS_TRACES,
 } from '../common/EmptyContent';
-import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
-import {prepareFlattenedDataForTable} from '../common/tabularListViews/columnBuilder';
+import { FilterLayoutTemplate } from '../common/SimpleFilterableDataTable';
+import { prepareFlattenedDataForTable } from '../common/tabularListViews/columnBuilder';
 import {
   truncateID,
   useControllableState,
   useURLSearchParamsDict,
 } from '../util';
-import {useWFHooks} from '../wfReactInterface/context';
-import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
-import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
-import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
-import {objectVersionNiceString} from '../wfReactInterface/utilities';
-import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {CallsCharts} from './CallsCharts';
-import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
+import { useWFHooks } from '../wfReactInterface/context';
+import { TraceCallSchema } from '../wfReactInterface/traceServerClientTypes';
+import { traceCallToUICallSchema } from '../wfReactInterface/tsDataModelHooks';
+import { EXPANDED_REF_REF_KEY } from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
+import { objectVersionNiceString } from '../wfReactInterface/utilities';
+import { CallSchema } from '../wfReactInterface/wfDataModelHooksInterface';
+import { CallsCharts } from './CallsCharts';
+import { CallsCustomColumnMenu } from './CallsCustomColumnMenu';
 import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
@@ -81,16 +82,11 @@ import {
   PaginationButtons,
   RefreshButton,
 } from './CallsTableButtons';
-import {useCallsTableColumns} from './callsTableColumns';
-import {WFHighLevelCallFilter} from './callsTableFilter';
-import {getEffectiveFilter} from './callsTableFilter';
-import {useOpVersionOptions} from './callsTableFilter';
-import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
-import {useInputObjectVersionOptions} from './callsTableFilter';
-import {useOutputObjectVersionOptions} from './callsTableFilter';
-import {useCallsForQuery} from './callsTableQuery';
-import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
-import {ManageColumnsButton} from './ManageColumnsButton';
+import { useCallsTableColumns } from './callsTableColumns';
+import { ALL_TRACES_OR_CALLS_REF_KEY, getEffectiveFilter, useInputObjectVersionOptions, useOpVersionOptions, useOutputObjectVersionOptions, WFHighLevelCallFilter } from './callsTableFilter';
+import { useCallsForQuery } from './callsTableQuery';
+import { useCurrentFilterIsEvaluationsFilter } from './evaluationsFilter';
+import { ManageColumnsButton } from './ManageColumnsButton';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -485,14 +481,12 @@ export const CallsTable: FC<{
     }
   }, [rowIds, peekId]);
   const {setRowIds} = useContext(TableRowSelectionContext);
+  const {isPeeking} = useContext(WeaveflowPeekContext);
   useEffect(() => {
-    // HACK, hideControls is a proxy for when the table is embedded
-    // in the peek drawer, we only want to track call IDs in the main
-    // table. Ignore call Ids if hiding controls.
-    if (!hideControls && setRowIds) {
+    if (!isPeeking && setRowIds) {
       setRowIds(rowIds);
     }
-  }, [rowIds, hideControls, setRowIds]);
+  }, [rowIds, isPeeking, setRowIds]);
 
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {
