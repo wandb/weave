@@ -77,6 +77,7 @@ def test_feedback_replace(client) -> None:
         weave_ref="weave:///test/project/obj/123:abc",
         feedback_type="reaction",
         payload={"emoji": "👍"},
+        wb_user_id="test_user",
     )
     initial_feedback = client.server.feedback_create(create_req)
 
@@ -87,6 +88,7 @@ def test_feedback_replace(client) -> None:
             weave_ref="weave:///test/project/obj/456:def",
             feedback_type="note",
             payload={"note": "This is a test note"},
+            wb_user_id="test_user",
         )
     )
 
@@ -97,6 +99,7 @@ def test_feedback_replace(client) -> None:
         feedback_type="note",
         payload={"note": "Updated feedback"},
         feedback_id=initial_feedback.id,
+        wb_user_id="test_user",
     )
     replaced_feedback = client.server.feedback_replace(replace_req)
 
@@ -126,6 +129,7 @@ def test_feedback_replace(client) -> None:
         feedback_type="reaction",
         payload={"emoji": "👍"},
         feedback_id=replaced_feedback.id,
+        wb_user_id="test_user",
     )
     replaced_feedback = client.server.feedback_replace(replace_req)
 
