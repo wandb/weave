@@ -35,7 +35,8 @@ describe('login', () => {
 
     await login('test-api-key');
 
-    expect(mockSetEntry).toHaveBeenCalledWith('wandb.ai', {
+    expect(mockSetEntry).toHaveBeenCalledWith({
+      machine: 'wandb.ai',
       login: 'user',
       password: 'test-api-key',
     });

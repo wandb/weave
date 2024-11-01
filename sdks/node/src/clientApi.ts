@@ -41,7 +41,7 @@ export async function login(apiKey: string, host: string = defaultHost) {
   }
 
   const netrc = new Netrc();
-  netrc.setEntry(domain, {login: 'user', password: apiKey});
+  netrc.setEntry({machine: domain, login: 'user', password: apiKey});
   netrc.save();
   console.log(`Successfully logged in.  Credentials saved for ${domain}`);
 }
