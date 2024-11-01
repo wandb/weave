@@ -26,8 +26,8 @@
       "^.+\\.tsx?$": "ts-jest"
     },
     "testMatch": [
-      "**/__tests__/**/*.test.ts?(x)",
-      "**/?(*.)+(spec|test).ts?(x)"
+      "**/*.test.ts?(x)",
+      "!**/__tests__/playwright/**"
     ],
     "moduleFileExtensions": [
       "js",
