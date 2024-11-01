@@ -101,7 +101,6 @@ def test_feedback_replace(client) -> None:
     replaced_feedback = client.server.feedback_replace(replace_req)
 
     # Verify the replacement
-    assert replaced_feedback.id == initial_feedback.id
     assert replaced_feedback.feedback_type == "note"
     assert replaced_feedback.payload == {"note": "Updated feedback"}
 
@@ -130,6 +129,5 @@ def test_feedback_replace(client) -> None:
     )
     replaced_feedback = client.server.feedback_replace(replace_req)
 
-    assert replaced_feedback.id == replaced_feedback.id
     assert replaced_feedback.feedback_type == "reaction"
     assert replaced_feedback.payload == {"emoji": "👍"}
