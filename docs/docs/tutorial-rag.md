@@ -147,7 +147,7 @@ When there aren't simple ways to evaluate your application, one approach is to u
 
 ### Defining a scoring function
 
-As we did in the [Build an Evaluation pipeline tutorial](/tutorial-eval), we'll define a set of example rows to test our app against and a scoring function. Our scoring function will take one row and evaluate it. The input arguments should match with the corresponding keys in our row, so `question` here will be taken from the row dictionary. `model_output` is the output of the model. The input to the model will be taken from the example based on its input argument, so `question` here too. We're using `async` functions so they run fast in parallel. If you need a quick introduction to async, you can find one [here](https://docs.python.org/3/library/asyncio.html).
+As we did in the [Build an Evaluation pipeline tutorial](/tutorial-eval), we'll define a set of example rows to test our app against and a scoring function. Our scoring function will take one row and evaluate it. The input arguments should match with the corresponding keys in our row, so `question` here will be taken from the row dictionary. `output` is the output of the model. The input to the model will be taken from the example based on its input argument, so `question` here too. We're using `async` functions so they run fast in parallel. If you need a quick introduction to async, you can find one [here](https://docs.python.org/3/library/asyncio.html).
 
 <Tabs groupId="programming-language">
   <TabItem value="python" label="Python" default>
@@ -158,7 +158,7 @@ As we did in the [Build an Evaluation pipeline tutorial](/tutorial-eval), we'll 
 
     # highlight-next-line
     @weave.op()
-    async def context_precision_score(question, model_output):
+    async def context_precision_score(question, output):
         context_precision_prompt = """Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output.
         Output in only valid JSON format.
 
@@ -170,8 +170,8 @@ As we did in the [Build an Evaluation pipeline tutorial](/tutorial-eval), we'll 
 
         prompt = context_precision_prompt.format(
             question=question,
-            context=model_output['context'],
-            answer=model_output['answer'],
+            context=output['context'],
+            answer=output['answer'],
         )
 
         response = client.chat.completions.create(
@@ -216,7 +216,7 @@ On a high-level the steps to create custom Scorer are quite simple:
 
 1. Define a custom class that inherits from `weave.flow.scorer.Scorer`
 2. Overwrite the `score` function and add a `@weave.op()` if you want to track each call of the function
-   - this function has to define a `model_output` argument where the prediction of the model will be passed to. We define it as type `Optional[dict]` in case the mode might return "None".
+   - this function has to define an `output` argument where the prediction of the model will be passed to. We define it as type `Optional[dict]` in case the mode might return "None".
    - the rest of the arguments can either be a general `Any` or `dict` or can select specific columns from the dataset that is used to evaluate the model using the `weave.Evaluate` class - they have to have the exact same names as the column names or keys of a single row after being passed to `preprocess_model_input` if that is used.
 3. _Optional:_ Overwrite the `summarize` function to customize the calculation of the aggregate score. By default Weave uses the `weave.flow.scorer.auto_summarize` function if you don't define a custom function.
    - this function has to have a `@weave.op()` decorator.
@@ -233,10 +233,10 @@ On a high-level the steps to create custom Scorer are quite simple:
         device: str
 
         @weave.op()
-        async def score(self, model_output: Optional[dict], query: str, answer: str) -> Any:
+        async def score(self, output: Optional[dict], query: str, answer: str) -> Any:
             """Score the correctness of the predictions by comparing the pred, query, target.
             Args:
-                - model_output: the dict that will be provided by the model that is evaluated
+                - output: the dict that will be provided by the model that is evaluated
                 - query: the question asked - as defined in the dataset
                 - answer: the target answer - as defined in the dataset
             Returns:
@@ -253,7 +253,7 @@ On a high-level the steps to create custom Scorer are quite simple:
                 {
                     "query": query,
                     "answer": answer,
-                    "result": model_output.get("result"),
+                    "result": output.get("result"),
                 }
             )
             # output parsing - could be done more reobustly with pydantic
@@ -420,11 +420,11 @@ Here, we show the code in it's entirety.
         system_message="You are an expert in finance and answer questions related to finance, financial services, and financial markets. When responding based on provided information, be sure to cite the source."
     )
 
-    # Here is our scoring function uses our question and model_output to product a score
+    # Here is our scoring function uses our question and output to product a score
     # highlight-next-line
     @weave.op()
     # highlight-next-line
-    async def context_precision_score(question, model_output):
+    async def context_precision_score(question, output):
         context_precision_prompt = """Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output.
         Output in only valid JSON format.
 
@@ -436,8 +436,8 @@ Here, we show the code in it's entirety.
 
         prompt = context_precision_prompt.format(
             question=question,
-            context=model_output['context'],
-            answer=model_output['answer'],
+            context=output['context'],
+            answer=output['answer'],
         )
 
         response = client.chat.completions.create(
