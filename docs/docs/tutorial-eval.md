@@ -165,8 +165,8 @@ Here `sentence` is passed to the model's predict function, and `target` is used 
     weave.init('intro-example')
 
     @weave.op()
-    def fruit_name_score(target: dict, model_output: dict) -> dict:
-        return {'correct': target['fruit'] == model_output['fruit']}
+    def fruit_name_score(target: dict, output: dict) -> dict:
+        return {'correct': target['fruit'] == output['fruit']}
 
     # highlight-next-line
     evaluation = weave.Evaluation(
@@ -288,8 +288,8 @@ In some applications we want to create custom `Scorer` classes - where for examp
 
     # We define a scoring function to compare our model predictions with a ground truth label.
     @weave.op()
-    def fruit_name_score(target: dict, model_output: dict) -> dict:
-        return {'correct': target['fruit'] == model_output['fruit']}
+    def fruit_name_score(target: dict, output: dict) -> dict:
+        return {'correct': target['fruit'] == output['fruit']}
 
     # Finally, we run an evaluation of this model.
     # This will generate a prediction for each input example, and then score it with each scoring function.
