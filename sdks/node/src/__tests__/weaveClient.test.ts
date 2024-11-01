@@ -227,4 +227,56 @@ describe('WeaveClient', () => {
       expect((client as any).callQueue.length).toBe(0);
     });
   });
+
+  describe('getCall', () => {
+    it('should fetch a single call by ID', async () => {
+      const mockCall = {id: 'test-id', name: 'test-call'};
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(JSON.stringify(mockCall) + '\n'));
+          controller.close();
+        },
+      });
+
+      (
+        mockTraceServerApi.calls
+          .callsQueryStreamCallsStreamQueryPost as jest.Mock
+      ).mockResolvedValue({
+        body: stream,
+      } as any);
+
+      const result = await client.getCall('test-id');
+
+      expect(result).toEqual(mockCall);
+      expect(
+        mockTraceServerApi.calls.callsQueryStreamCallsStreamQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        filter: {call_ids: ['test-id']},
+        include_costs: false,
+        limit: 1000,
+      });
+    });
+
+    it('should throw error when call is not found', async () => {
+      const stream = new ReadableStream({
+        start(controller) {
+          // Return empty stream
+          controller.close();
+        },
+      });
+
+      (
+        mockTraceServerApi.calls
+          .callsQueryStreamCallsStreamQueryPost as jest.Mock
+      ).mockResolvedValue({
+        body: stream,
+      } as any);
+
+      await expect(client.getCall('non-existent-id')).rejects.toThrow(
+        'Call not found: non-existent-id'
+      );
+    });
+  });
 });
