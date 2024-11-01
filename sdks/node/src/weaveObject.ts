@@ -22,7 +22,7 @@ export class ObjectRef {
     return `weave:///${this.projectId}/object/${this.objectId}:${this.digest}`;
   }
 
-  public ui_url() {
+  public uiUrl() {
     const domain = getGlobalDomain();
     return `https://${domain}/${this.projectId}/weave/objects/${this.objectId}/versions/${this.digest}`;
   }
