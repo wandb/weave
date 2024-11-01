@@ -77,7 +77,12 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
-from weave.type_serializers.Image.image import PathImage
+from weave.type_serializers.Image.image import (
+    PathImage,
+    is_base64_image,
+    is_local_image,
+    is_remote_image,
+)
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -1250,7 +1255,7 @@ class WeaveClient:
         # Case 1: Object:
         # Here we recurse into each of the properties of the object
         # and save them, and then save the object itself.
-        if isinstance(obj, Object):
+        if isinstance(obj, Object) or isinstance(obj, PathImage):
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
@@ -1572,22 +1577,16 @@ def sanitize_object_name(name: str) -> str:
     return res
 
 
-# match local image file paths
-image_suffix = r".*\.(png|jpg|jpeg|gif|tiff)"
-local_image_pattern = re.compile(rf"^{image_suffix}$", re.IGNORECASE)
-remote_image_pattern = re.compile(rf"https://.*\.{image_suffix}", re.IGNORECASE)
-
-
 def convert_paths_to_images(obj: str) -> typing.Union[str, PathImage]:
     """Load or download paths to images as PathImage objects.
 
     If the path is a local image, open it and return a PathImage object.
     If the path is a remote image, download it and return a PathImage object.
     """
-    if remote_image_pattern.match(obj):
-        return PathImage(path=obj, is_local=False)
-    elif local_image_pattern.match(obj):
-        return PathImage(path=obj, is_local=True)
+    if is_remote_image(obj) or is_local_image(obj):
+        return PathImage(path=obj, data=None)
+    elif is_base64_image(obj):
+        return PathImage(data=obj, path=None)
 
     return obj
 

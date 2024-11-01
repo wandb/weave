@@ -1,9 +1,9 @@
 import os
 import tempfile
 from pathlib import Path
-import requests
 
 import pytest
+import requests
 from PIL import Image
 
 import weave
@@ -173,7 +173,22 @@ def test_image_from_remote_path(client: WeaveClient) -> None:
     input_image_path_obj = call.inputs["path"]
     output_image_path_obj = call.output["imgs"][0]
 
+    print(output_image_path_obj)
+
     assert input_image_path_obj.path == remote_path
     assert input_image_path_obj.img.tobytes() == img.tobytes()
     assert output_image_path_obj.path == remote_path
     assert output_image_path_obj.img.tobytes() == img.tobytes()
+
+
+def test_image_from_base64(client: WeaveClient) -> None:
+    data = """data:image/png;base64, R0lGODlhDwAPAKECAAAAzMzM/////wAAACwAAAAADwAPAAACIISPeQHsrZ5ModrLlN48CXF8m2iQ3YmmKqVlRtW4MLwWACH+H09wdGltaXplZCBieSBVbGVhZCBTbWFydFNhdmVyIQAAOw=="""
+
+    @weave.op
+    def log_image(data: str) -> dict:
+        return {"imgs": [data], "img": data}
+
+    log_image(data)
+    call = log_image.calls()[0]
+    assert isinstance(call.output["imgs"][0], Image.Image)
+    assert isinstance(call.output["img"], Image.Image)
