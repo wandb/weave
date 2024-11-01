@@ -7,6 +7,7 @@ import {
   GridSortDirection,
   GridSortItem,
 } from '@mui/x-data-grid-pro';
+import {Loading} from '@wandb/weave/components/Loading';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -332,6 +333,10 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       setSortModel(defaultSortModel);
     }
   }, [columns, defaultSortModel, loading]);
+
+  if (loading) {
+    return <Loading centered />;
+  }
 
   if (rows.length === 0) {
     return (
