@@ -11,4 +11,5 @@ test('defaults to JS page', async ({page}) => {
   // Nav to the "use" tab and confirm it's on the TypeScript page by default (not Python)
   await page.getByRole('tab', {name: 'use'}).click();
   await expect(page.getByText(`import * as weave from 'weave';`)).toBeVisible();
+  await expect(page.getByText(`import weave`)).not.toBeVisible();
 });
