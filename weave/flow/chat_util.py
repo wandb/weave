@@ -100,6 +100,8 @@ class OpenAIStream:
                             )
 
     def final_response(self) -> "ChatCompletion":
+        from openai.types.chat import ChatCompletion
+
         if self.first_chunk is None:
             raise ValueError("No chunks received")
         return ChatCompletion(

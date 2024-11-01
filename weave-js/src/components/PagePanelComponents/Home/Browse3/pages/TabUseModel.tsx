@@ -21,7 +21,7 @@ export const TabUseModel = ({name, uri, projectName}: TabUseModelProps) => {
   const label = isParentObject ? 'model version' : 'object';
 
   return (
-    <Box m={2} className="text-sm">
+    <Box className="text-sm">
       <TabUseBanner>
         See{' '}
         <DocLink path="guides/tracking/models" text="Weave docs on models" />{' '}
