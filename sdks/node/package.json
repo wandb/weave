@@ -6,7 +6,7 @@
   "main": "dist/src/index.js",
   "type": "commonjs",
   "scripts": {
-    "test": "jest",
+    "test": "jest --silent",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch",
     "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\"",
@@ -22,6 +22,9 @@
   "license": "Apache-2.0",
   "jest": {
     "testEnvironment": "node",
+    "setupFilesAfterEnv": [
+      "<rootDir>/jest.setup.js"
+    ],
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
     },
