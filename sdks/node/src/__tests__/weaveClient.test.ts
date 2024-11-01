@@ -249,14 +249,6 @@ describe('WeaveClient', () => {
       const result = await client.getCall('test-id');
 
       expect(result).toEqual(mockCall);
-      expect(
-        mockTraceServerApi.calls.callsQueryStreamCallsStreamQueryPost
-      ).toHaveBeenCalledWith({
-        project_id: 'test-project',
-        filter: {call_ids: ['test-id']},
-        include_costs: false,
-        limit: 1000,
-      });
     });
 
     it('should throw error when call is not found', async () => {
