@@ -30,6 +30,8 @@ jobs:
         working-directory: sdks/node
         env:
           WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+      - name: Setup playwright
+        run: pnpm exec playwright install
       - name: Run playwright tests
         run: pnpm exec playwright test
         working-directory: sdks/node
