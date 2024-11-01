@@ -45,6 +45,7 @@ Next, load the required API keys for OpenAI and Weave. Here, we use set_env whic
 
 ```python
 # Set environment variables.
+from set_env import set_env
 
 _ = set_env("OPENAI_API_KEY")
 _ = set_env("WANDB_API_KEY")
