@@ -21,7 +21,7 @@ client = OpenAI(api_key="...")
 
 # highlight-next-line
 @weave.op()
-def extract_dinos(sentence: str) -> dict:
+def extract_dinos(sentence: str) -> str:
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[

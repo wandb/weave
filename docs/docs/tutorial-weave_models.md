@@ -29,7 +29,7 @@ from openai import OpenAI
 import weave
 
 @weave.op()
-def extract_dinos(wmodel: weave.Model, sentence: str) -> dict:
+def extract_dinos(wmodel: weave.Model, sentence: str) -> str:
     response = wmodel.client.chat.completions.create(
         model=wmodel.model_name,
         temperature=wmodel.temperature,
