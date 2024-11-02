@@ -330,7 +330,7 @@ class CallsIter:
         )
         return response.calls
 
-    def _get_one(self, index: int) -> WeaveObject:
+    def _get_one(self, index: int) -> Call:
         if index < 0:
             raise IndexError("Negative indexing not supported")
 
@@ -342,10 +342,9 @@ class CallsIter:
             raise IndexError(f"Index {index} out of range")
 
         call = calls[page_offset]
-        entity, project = self.project_id.split("/")
-        return make_client_call(entity, project, call, self.server)
+        return make_client_call(call, self.server)
 
-    def _get_slice(self, key: slice) -> Iterator[WeaveObject]:
+    def _get_slice(self, key: slice) -> Iterator[Call]:
         if (start := key.start or 0) < 0:
             raise ValueError("Negative start not supported")
         if (stop := key.stop) is not None and stop < 0:
@@ -361,21 +360,16 @@ class CallsIter:
                 break
             i += step
 
-    def __getitem__(
-        self, key: Union[slice, int]
-    ) -> Union[WeaveObject, list[WeaveObject]]:
+    def __getitem__(self, key: Union[slice, int]) -> Union[Call, list[Call]]:
         if isinstance(key, slice):
             return list(self._get_slice(key))
         return self._get_one(key)
 
-    def __iter__(self) -> typing.Iterator[WeaveObject]:
+    def __iter__(self) -> typing.Iterator[Call]:
         return self._get_slice(slice(0, None, 1))
 
 
-def make_client_call(
-    entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
-) -> WeaveObject:
-    output = server_call.output
+def make_client_call(server_call: CallSchema, server: TraceServerInterface) -> Call:
     call = Call(
         _op_name=server_call.op_name,
         project_id=server_call.project_id,
@@ -383,7 +377,7 @@ def make_client_call(
         parent_id=server_call.parent_id,
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
-        output=from_json(output, server_call.project_id, server),
+        output=from_json(server_call.output, server_call.project_id, server),
         summary=dict(server_call.summary) if server_call.summary is not None else None,
         display_name=server_call.display_name,
         attributes=server_call.attributes,
@@ -393,7 +387,7 @@ def make_client_call(
     )
     if call.id is None:
         raise ValueError("Call ID is None")
-    return WeaveObject(call, CallRef(entity, project, call.id), server, None)
+    return call
 
 
 def sum_dict_leaves(dicts: list[dict]) -> dict:
@@ -590,9 +584,7 @@ class WeaveClient:
         return self.get_calls(filter=filter, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
-    def get_call(
-        self, call_id: str, include_costs: Optional[bool] = False
-    ) -> WeaveObject:
+    def get_call(self, call_id: str, include_costs: Optional[bool] = False) -> Call:
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
@@ -603,7 +595,7 @@ class WeaveClient:
         if not response.calls:
             raise ValueError(f"Call not found: {call_id}")
         response_call = response.calls[0]
-        return make_client_call(self.entity, self.project, response_call, self.server)
+        return make_client_call(response_call, self.server)
 
     @deprecated(new_name="get_call")
     def call(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
