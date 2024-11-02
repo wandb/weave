@@ -658,6 +658,8 @@ export const CallsTable: FC<{
     [callsLoading, setPaginationModel]
   );
 
+  console.log('CallsTable', {tableData, selectedCalls, rowSelectionModel});
+
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
