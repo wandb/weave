@@ -25,7 +25,10 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
+import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
+import {Switch} from '@wandb/weave/components';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
+import {Icon} from '@wandb/weave/components/Icon';
 import React, {
   FC,
   useCallback,
@@ -38,7 +41,7 @@ import {useHistory} from 'react-router-dom';
 
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
-import {Tailwind} from '../../../../../Tailwind';
+import {TailwindContents} from '../../../../../Tailwind';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
@@ -67,6 +70,7 @@ import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallsCharts} from './CallsCharts';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
   BulkDeleteButton,
@@ -85,8 +89,6 @@ import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
-
-const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -168,6 +170,7 @@ export const CallsTable: FC<{
   allowedColumnPatterns,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+  const [isMetricsChecked, setMetricsChecked] = useState(false);
 
   const isReadonly =
     loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
@@ -245,8 +248,8 @@ export const CallsTable: FC<{
     project,
     effectiveFilter,
     filterModelResolved,
-    sortModelResolved,
     paginationModelResolved,
+    sortModelResolved,
     expandedRefCols
   );
 
@@ -373,7 +376,8 @@ export const CallsTable: FC<{
     onExpand,
     columnIsRefExpanded,
     allowedColumnPatterns,
-    onAddFilter
+    onAddFilter,
+    calls.costsLoading
   );
 
   // This contains columns which are suitable for selection and raw data
@@ -663,15 +667,33 @@ export const CallsTable: FC<{
         alignItems: 'center',
       }}
       filterListItems={
-        <Tailwind style={{display: 'contents'}}>
+        <TailwindContents>
+          <RefreshButton onClick={() => calls.refetch()} />
           {!hideOpSelector && (
             <div className="flex-none">
-              <ListItem sx={{minWidth: 190, width: 320}}>
-                <FormControl fullWidth>
+              <ListItem
+                sx={{minWidth: 190, width: 320, height: 32, padding: 0}}>
+                <FormControl fullWidth sx={{borderColor: MOON_200}}>
                   <Autocomplete
                     PaperComponent={paperProps => (
                       <StyledPaper {...paperProps} />
                     )}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        height: '32px',
+                        '& fieldset': {
+                          borderColor: MOON_200,
+                        },
+                        '&:hover fieldset': {
+                          borderColor: `rgba(${TEAL_300}, 0.48)`,
+                        },
+                      },
+                      '& .MuiOutlinedInput-input': {
+                        height: '32px',
+                        padding: '0 14px',
+                        boxSizing: 'border-box',
+                      },
+                    }}
                     size="small"
                     // Temp disable multiple for simplicity - may want to re-enable
                     // multiple
@@ -696,7 +718,6 @@ export const CallsTable: FC<{
                     renderInput={renderParams => (
                       <StyledTextField
                         {...renderParams}
-                        label={OP_FILTER_GROUP_HEADER}
                         sx={{maxWidth: '350px'}}
                       />
                     )}
@@ -708,6 +729,8 @@ export const CallsTable: FC<{
                     }
                     groupBy={option => opVersionOptions[option]?.group}
                     options={Object.keys(opVersionOptions)}
+                    popupIcon={<Icon name="chevron-down" />}
+                    clearIcon={<Icon name="close" />}
                   />
                 </FormControl>
               </ListItem>
@@ -722,6 +745,15 @@ export const CallsTable: FC<{
               clearSelectedCalls={clearSelectedCalls}
             />
           )}
+          <div className="flex items-center gap-6">
+            <Switch.Root
+              size="small"
+              checked={isMetricsChecked}
+              onCheckedChange={setMetricsChecked}>
+              <Switch.Thumb size="small" checked={isMetricsChecked} />
+            </Switch.Root>
+            Metrics
+          </div>
           {selectedInputObjectVersion && (
             <Chip
               label={`Input: ${objectVersionNiceString(
@@ -763,31 +795,38 @@ export const CallsTable: FC<{
             <CompareEvaluationsTableButton
               onClick={() => {
                 history.push(
-                  router.compareEvaluationsUri(entity, project, selectedCalls)
+                  router.compareEvaluationsUri(
+                    entity,
+                    project,
+                    selectedCalls,
+                    null
+                  )
                 );
               }}
               disabled={selectedCalls.length === 0}
             />
           )}
-          {!isReadonly && (
-            <div className="flex-none">
-              <BulkDeleteButton
-                onClick={() => setDeleteConfirmModalOpen(true)}
-                disabled={selectedCalls.length === 0}
-              />
-              <ConfirmDeleteModal
-                calls={tableData
-                  .filter(row => selectedCalls.includes(row.id))
-                  .map(traceCallToUICallSchema)}
-                confirmDelete={deleteConfirmModalOpen}
-                setConfirmDelete={setDeleteConfirmModalOpen}
-                onDeleteCallback={() => {
-                  setSelectedCalls([]);
-                }}
-              />
-            </div>
+          {!isReadonly && selectedCalls.length !== 0 && (
+            <>
+              <div className="flex-none">
+                <BulkDeleteButton
+                  onClick={() => setDeleteConfirmModalOpen(true)}
+                  disabled={selectedCalls.length === 0}
+                />
+                <ConfirmDeleteModal
+                  calls={tableData
+                    .filter(row => selectedCalls.includes(row.id))
+                    .map(traceCallToUICallSchema)}
+                  confirmDelete={deleteConfirmModalOpen}
+                  setConfirmDelete={setDeleteConfirmModalOpen}
+                  onDeleteCallback={() => {
+                    setSelectedCalls([]);
+                  }}
+                />
+              </div>
+              <ButtonDivider />
+            </>
           )}
-          <ButtonDivider />
 
           <div className="flex-none">
             <ExportSelector
@@ -820,10 +859,16 @@ export const CallsTable: FC<{
               </div>
             </>
           )}
-          <ButtonDivider />
-          <RefreshButton onClick={() => calls.refetch()} />
-        </Tailwind>
+        </TailwindContents>
       }>
+      {isMetricsChecked && (
+        <CallsCharts
+          entity={entity}
+          project={project}
+          filter={filter}
+          filterModelProp={filterModelResolved}
+        />
+      )}
       <StyledDataGrid
         // Start Column Menu
         // ColumnMenu is needed to support pinning and column visibility
@@ -887,6 +932,9 @@ export const CallsTable: FC<{
           // This moves the pagination controls to the left
           '& .MuiDataGrid-footerContainer': {
             justifyContent: 'flex-start',
+          },
+          '& .MuiDataGrid-main:focus-visible': {
+            outline: 'none',
           },
         }}
         slots={{

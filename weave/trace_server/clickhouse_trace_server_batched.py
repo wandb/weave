@@ -53,6 +53,9 @@ from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.base_object_class_util import (
+    process_incoming_object,
+)
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -70,6 +73,7 @@ from weave.trace_server.clickhouse_schema import (
     SelectableCHCallSchema,
     SelectableCHObjSchema,
 )
+from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InsertTooLarge, InvalidRequest, RequestTooLarge
 from weave.trace_server.feedback import (
@@ -78,7 +82,12 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.ids import generate_id
+from weave.trace_server.llm_completion import lite_llm_completion
+from weave.trace_server.model_providers.model_providers import (
+    read_model_to_provider_info_map,
+)
 from weave.trace_server.orm import ParamBuilder, Row
+from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
     TABLE_ROWS_ALIAS,
@@ -184,10 +193,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._flush_immediately = True
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
+        self._model_to_provider_info_map = read_model_to_provider_info_map()
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
-        return cls(
+        # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
+        # that type checking is applied to the constructor.
+        return ClickHouseTraceServer(
             host=wf_env.wf_clickhouse_host(),
             port=wf_env.wf_clickhouse_port(),
             user=wf_env.wf_clickhouse_user(),
@@ -258,6 +270,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         stream = self.calls_query_stream(req)
         return tsi.CallsQueryRes(calls=list(stream))
 
+    def _construct_query_str_maybe_do_pre_query(
+        self, calls_query: CallsQuery, pb: ParamBuilder
+    ) -> str:
+        """Helper to query the calls table if heavy. Immediately returns a formatted sql string
+        if not heavy, otherwise does a pre-query to get the filtered call ids, injects them
+        into the main query, and returns the main query str.
+        """
+        if not calls_query.should_do_two_step_query():
+            query = calls_query.as_sql(pb)[0]
+            return query
+
+        # We have to do a two-step query. Set the param for the output
+        # of the first query
+        output_param_name = "call_ids"
+        calls_query.set_filtered_output_param(output_param_name)
+        ids_query, filtered_query = calls_query.as_sql(pb)
+
+        # Hit the db to get the ids
+        ids_res = self._query(ids_query, pb.get_params())
+
+        ids = [x[0] for x in ids_res.result_rows]
+        # add the ids param to the param builder
+        pb.add(ids, param_name=output_param_name, param_type="Array(String)")
+
+        return filtered_query
+
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
@@ -271,11 +309,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.add_condition(req.query.expr_)
 
         pb = ParamBuilder()
-        inner_query = cq.as_sql(pb)
-        raw_res = self._query(
-            f"SELECT count() FROM ({inner_query})",
-            pb.get_params(),
-        )
+        query = self._construct_query_str_maybe_do_pre_query(cq, pb)
+        count_query_str = f"SELECT count() FROM ({query})"
+        raw_res = self._query(count_query_str, pb.get_params())
+
         rows = raw_res.result_rows
         count = 0
         if rows and len(rows) == 1 and len(rows[0]) == 1:
@@ -323,10 +360,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        raw_res = self._query_stream(
-            cq.as_sql(pb),
-            pb.get_params(),
-        )
+        query = self._construct_query_str_maybe_do_pre_query(cq, pb)
+        raw_res = self._query_stream(query, pb.get_params())
 
         select_columns = [c.field for c in cq.select_fields]
 
@@ -564,16 +599,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        json_val = json.dumps(req.obj.val)
+        val, base_object_class = process_incoming_object(
+            req.obj.val, req.obj.set_base_object_class
+        )
+
+        json_val = json.dumps(val)
         digest = str_digest(json_val)
 
-        req_obj = req.obj
         ch_obj = ObjCHInsertable(
-            project_id=req_obj.project_id,
-            object_id=req_obj.object_id,
-            kind=get_kind(req.obj.val),
-            base_object_class=get_base_object_class(req.obj.val),
-            refs=extract_refs_from_values(req.obj.val),
+            project_id=req.obj.project_id,
+            object_id=req.obj.object_id,
+            kind=get_kind(val),
+            base_object_class=base_object_class,
+            refs=extract_refs_from_values(val),
             val_dump=json_val,
             digest=digest,
         )
@@ -770,6 +808,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+        rows = list(self.table_query_stream(req))
+        return tsi.TableQueryRes(rows=rows)
+
+    def table_query_stream(
+        self, req: tsi.TableQueryReq
+    ) -> Iterator[tsi.TableRowSchema]:
         conds = []
         pb = ParamBuilder()
         if req.filter:
@@ -790,7 +834,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     direction="ASC" if sort.direction.lower() == "asc" else "DESC",
                 )
                 sort_fields.append(field)
-        rows = self._table_query(
+
+        rows = self._table_query_stream(
             req.project_id,
             req.digest,
             pb,
@@ -799,9 +844,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             limit=req.limit,
             offset=req.offset,
         )
-        return tsi.TableQueryRes(rows=rows)
+        for row in rows:
+            yield row
 
-    def _table_query(
+    def _table_query_stream(
         self,
         project_id: str,
         digest: str,
@@ -813,7 +859,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         sort_fields: Optional[list[OrderField]] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
-    ) -> list[tsi.TableRowSchema]:
+    ) -> Iterator[tsi.TableRowSchema]:
         if not sort_fields:
             sort_fields = [
                 OrderField(
@@ -850,12 +896,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 offset=offset,
             )
 
-        query_result = self.ch_client.query(query, parameters=pb.get_params())
+        res = self._query_stream(query, parameters=pb.get_params())
 
-        return [
-            tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
-            for r in query_result.result_rows
-        ]
+        for row in res:
+            yield tsi.TableRowSchema(digest=row[0], val=json.loads(row[1]))
 
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
         parameters: Dict[str, Any] = {
@@ -1124,7 +1168,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     raise ValueError("Will not resolve cross-project refs.")
                 pb = ParamBuilder()
                 row_digests_name = pb.add_param(row_digests)
-                rows = self._table_query(
+                rows_stream = self._table_query_stream(
                     project_id=project_id_scope,
                     digest=digest,
                     pb=pb,
@@ -1132,6 +1176,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         f"digest IN {{{row_digests_name}: Array(String)}}"
                     ],
                 )
+                rows = list(rows_stream)
                 # Unpack the results into the target rows
                 row_digest_vals = {r.digest: r.val for r in rows}
                 for index, row_digest in index_digests:
@@ -1375,6 +1420,64 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
+
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        model_name = req.inputs.model
+        model_info = self._model_to_provider_info_map.get(model_name)
+        if not model_info:
+            raise InvalidRequest(f"No model info found for model {model_name}")
+        secret_fetcher = _secret_fetcher_context.get()
+        if not secret_fetcher:
+            raise InvalidRequest(
+                f"No secret fetcher found, cannot fetch API key for model {model_name}"
+            )
+        secret_name = model_info.get("api_key_name")
+        if not secret_name:
+            raise InvalidRequest(f"No secret name found for model {model_name}")
+        api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
+        if not api_key:
+            raise InvalidRequest(f"No API key found for model {model_name}")
+
+        start_time = datetime.datetime.now()
+        res = lite_llm_completion(api_key, req.inputs)
+        end_time = datetime.datetime.now()
+
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=req.project_id,
+            wb_user_id=req.wb_user_id,
+            op_name=COMPLETIONS_CREATE_OP_NAME,
+            started_at=start_time,
+            inputs={**req.inputs.model_dump(exclude_none=True)},
+            attributes={},
+        )
+        start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=req.project_id,
+            id=start_call.id,
+            ended_at=end_time,
+            output=res.response,
+            summary={},
+        )
+        if "usage" in res.response:
+            end.summary["usage"] = {req.inputs.model: res.response["usage"]}
+
+        if "error" in res.response:
+            end.exception = res.response["error"]
+        end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+        calls: list[Union[CallStartCHInsertable, CallEndCHInsertable]] = [
+            start_call,
+            end_call,
+        ]
+        batch_data = []
+        for call in calls:
+            call_dict = call.model_dump()
+            values = [call_dict.get(col) for col in all_call_insert_columns]
+            batch_data.append(values)
+
+        self._insert_call_batch(batch_data)
+        return res
 
     # Private Methods
     @property
@@ -1957,20 +2060,6 @@ def get_kind(val: Any) -> str:
     if val_type == "Op":
         return "op"
     return "object"
-
-
-def get_base_object_class(val: Any) -> Optional[str]:
-    if isinstance(val, dict):
-        if "_bases" in val:
-            if isinstance(val["_bases"], list):
-                if len(val["_bases"]) >= 2:
-                    if val["_bases"][-1] == "BaseModel":
-                        if val["_bases"][-2] == "Object":
-                            if len(val["_bases"]) > 2:
-                                return val["_bases"][-3]
-                            elif "_class_name" in val:
-                                return val["_class_name"]
-    return None
 
 
 def find_call_descendants(

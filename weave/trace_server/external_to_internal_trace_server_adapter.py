@@ -268,6 +268,14 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.table_query, req)
 
+    def table_query_stream(
+        self, req: tsi.TableQueryReq
+    ) -> Iterator[tsi.TableRowSchema]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(
+            self._internal_trace_server.table_query_stream, req
+        )
+
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.table_query_stats, req)
@@ -336,4 +344,11 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                 if cost["pricing_level_id"] != req.project_id:
                     raise ValueError("Internal Error - Project Mismatch")
                 cost["pricing_level_id"] = original_project_id
+        return res
+
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        res = self._ref_apply(self._internal_trace_server.completions_create, req)
         return res

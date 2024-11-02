@@ -103,7 +103,7 @@ import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/t
 import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
-  '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
+  'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
 );
 
 type Browse3Params = Partial<Browse3ProjectParams> &
@@ -463,7 +463,7 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route
           path={[
-            `${projectRoot}/:tab(datasets|models|objects)`,
+            `${projectRoot}/:tab(prompts|datasets|models|objects)`,
             `${projectRoot}/object-versions`,
           ]}>
           <ObjectVersionsPageBinding />
@@ -818,12 +818,12 @@ const ObjectVersionsPageBinding = () => {
       }
     }
 
-    // If the tab is models or datasets, set the baseObjectClass filter
-    // directly from the tab
-    if (tab === 'models') {
+    // Set the baseObjectClass filter based on the tab
+    if (tab === 'prompts') {
+      queryFilter.baseObjectClass = 'Prompt';
+    } else if (tab === 'models') {
       queryFilter.baseObjectClass = 'Model';
-    }
-    if (tab === 'datasets') {
+    } else if (tab === 'datasets') {
       queryFilter.baseObjectClass = 'Dataset';
     }
     return queryFilter;
@@ -921,16 +921,54 @@ const OpPageBinding = () => {
 };
 
 const CompareEvaluationsBinding = () => {
+  const history = useHistory();
+  const routerContext = useWeaveflowCurrentRouteContext();
   const {entity, project} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
   const evaluationCallIds = useMemo(() => {
     return JSON.parse(query.evaluationCallIds);
   }, [query.evaluationCallIds]);
+  const selectedMetrics: Record<string, boolean> | null = useMemo(() => {
+    try {
+      return JSON.parse(query.metrics);
+    } catch (e) {
+      return null;
+    }
+  }, [query.metrics]);
+  const onEvaluationCallIdsUpdate = useCallback(
+    (newEvaluationCallIds: string[]) => {
+      history.push(
+        routerContext.compareEvaluationsUri(
+          entity,
+          project,
+          newEvaluationCallIds,
+          selectedMetrics
+        )
+      );
+    },
+    [history, entity, project, routerContext, selectedMetrics]
+  );
+  const setSelectedMetrics = useCallback(
+    (newModel: Record<string, boolean>) => {
+      history.push(
+        routerContext.compareEvaluationsUri(
+          entity,
+          project,
+          evaluationCallIds,
+          newModel
+        )
+      );
+    },
+    [history, entity, project, routerContext, evaluationCallIds]
+  );
   return (
     <CompareEvaluationsPage
       entity={entity}
       project={project}
       evaluationCallIds={evaluationCallIds}
+      onEvaluationCallIdsUpdate={onEvaluationCallIdsUpdate}
+      selectedMetrics={selectedMetrics}
+      setSelectedMetrics={setSelectedMetrics}
     />
   );
 };

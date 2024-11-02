@@ -13,7 +13,6 @@ title: Custom Model Cost
 
 
 
-<img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 <!--- @wandbcode{prompt-optim-notebook} -->
 
 # Setting up a custom cost model
@@ -93,6 +92,7 @@ class YourModel(Model):
             "usage": {
                 "input_tokens": prompt_tokens,
                 "output_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
             },
             "model": "your_model_name",
             "output": prediction,

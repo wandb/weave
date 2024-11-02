@@ -9,10 +9,11 @@ from typing import Any, Iterator, Optional, Union
 # TODO: type_serializers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_serializers  # noqa: F401
-from weave.trace import context, urls, util, weave_client, weave_init
-from weave.trace.call_context import get_current_call, require_current_call
-from weave.trace.client_context import weave_client as weave_client_context
+from weave.trace import urls, util, weave_client, weave_init
 from weave.trace.constants import TRACE_OBJECT_EMOJI
+from weave.trace.context import call_context
+from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.context.call_context import get_current_call, require_current_call
 from weave.trace.op import as_op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.settings import (
@@ -21,6 +22,7 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
+from weave.trace_server.interface.base_object_classes import leaderboard
 
 
 def init(
@@ -108,6 +110,12 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
                 ref.name,
                 ref.digest,
             )
+        elif isinstance(obj, leaderboard.Leaderboard):
+            url = urls.leaderboard_path(
+                ref.entity,
+                ref.project,
+                ref.name,
+            )
         # TODO(gst): once frontend has direct dataset/model links
         # elif isinstance(obj, weave_client.Dataset):
         else:
@@ -178,14 +186,14 @@ def attributes(attributes: dict[str, Any]) -> Iterator:
         print(my_function.call("World"))
     ```
     """
-    cur_attributes = {**context.call_attributes.get()}
+    cur_attributes = {**call_context.call_attributes.get()}
     cur_attributes.update(attributes)
 
-    token = context.call_attributes.set(cur_attributes)
+    token = call_context.call_attributes.set(cur_attributes)
     try:
         yield
     finally:
-        context.call_attributes.reset(token)
+        call_context.call_attributes.reset(token)
 
 
 def serve(
@@ -214,7 +222,7 @@ def serve(
 
     wandb_api_ctx = wandb_api.get_wandb_api_context()
     app = object_method_app(model_ref, method_name=method_name, auth_entity=auth_entity)
-    trace_attrs = context.call_attributes.get()
+    trace_attrs = call_context.call_attributes.get()
 
     def run() -> None:
         # This function doesn't return, because uvicorn.run does not return.
