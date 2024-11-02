@@ -12,7 +12,10 @@ import {isWeaveObjectRef} from '@wandb/weave/react';
 import _ from 'lodash';
 
 import {parseRefMaybe} from '../../Browse2/SmallRef';
-import {WEAVE_REF_PREFIX} from '../pages/wfReactInterface/constants';
+import {
+  WANDB_ARTIFACT_REF_PREFIX,
+  WEAVE_REF_PREFIX,
+} from '../pages/wfReactInterface/constants';
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
 export type FilterId = number | string | undefined;
@@ -256,6 +259,16 @@ export const isWeaveRef = (value: any): value is WeaveRefString => {
   const parsed = parseRefMaybe(value);
   return parsed ? isWeaveObjectRef(parsed) : false;
 };
+
+export function isArtifactRef(uri: string): boolean {
+  if (typeof uri !== 'string') {
+    return false;
+  }
+  if (uri.startsWith(WANDB_ARTIFACT_REF_PREFIX)) {
+    return true;
+  }
+  return false;
+}
 
 export const getStringList = (value: any): string[] => {
   if (_.isString(value)) {
