@@ -461,7 +461,6 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
           }
         }}
         onChange={(e, {value: val}) => {
-          console.log('Val', val);
           setSearchQuery('');
           const valCount = _.isArray(val) ? val.length : 0;
           if (valCount < itemCount() || !atItemLimit()) {

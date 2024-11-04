@@ -64,7 +64,7 @@ const getStyles = (props: AdditionalProps) => {
               },
             },
             '& .MuiAutocomplete-popupIndicator': {
-              borderRadius: '4px', // Set the desired border radius
+              borderRadius: '4px',
               padding: '4px',
             },
             '&.MuiAutocomplete-hasPopupIcon .MuiOutlinedInput-root, &.MuiAutocomplete-hasClearIcon .MuiOutlinedInput-root':
