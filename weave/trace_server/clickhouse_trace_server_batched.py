@@ -171,6 +171,10 @@ ObjRefListType = list[ri.InternalObjectRef]
 CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
+CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
+    "max_memory_usage": 10 * 1024 * 1024 * 1024,  # 10 GiB
+}
+
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
     def __init__(
@@ -270,32 +274,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         stream = self.calls_query_stream(req)
         return tsi.CallsQueryRes(calls=list(stream))
 
-    def _construct_query_str_maybe_do_pre_query(
-        self, calls_query: CallsQuery, pb: ParamBuilder
-    ) -> str:
-        """Helper to query the calls table if heavy. Immediately returns a formatted sql string
-        if not heavy, otherwise does a pre-query to get the filtered call ids, injects them
-        into the main query, and returns the main query str.
-        """
-        if not calls_query.should_do_two_step_query():
-            query = calls_query.as_sql(pb)[0]
-            return query
-
-        # We have to do a two-step query. Set the param for the output
-        # of the first query
-        output_param_name = "call_ids"
-        calls_query.set_filtered_output_param(output_param_name)
-        ids_query, filtered_query = calls_query.as_sql(pb)
-
-        # Hit the db to get the ids
-        ids_res = self._query(ids_query, pb.get_params())
-
-        ids = [x[0] for x in ids_res.result_rows]
-        # add the ids param to the param builder
-        pb.add(ids, param_name=output_param_name, param_type="Array(String)")
-
-        return filtered_query
-
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
@@ -309,10 +287,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.add_condition(req.query.expr_)
 
         pb = ParamBuilder()
-        query = self._construct_query_str_maybe_do_pre_query(cq, pb)
-        count_query_str = f"SELECT count() FROM ({query})"
-        raw_res = self._query(count_query_str, pb.get_params())
-
+        inner_query = cq.as_sql(pb)
+        raw_res = self._query(
+            f"SELECT count() FROM ({inner_query})",
+            pb.get_params(),
+        )
         rows = raw_res.result_rows
         count = 0
         if rows and len(rows) == 1 and len(rows[0]) == 1:
@@ -360,8 +339,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        query = self._construct_query_str_maybe_do_pre_query(cq, pb)
-        raw_res = self._query_stream(query, pb.get_params())
+        raw_res = self._query_stream(
+            cq.as_sql(pb),
+            pb.get_params(),
+        )
 
         select_columns = [c.field for c in cq.select_fields]
 
@@ -1703,12 +1684,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query: str,
         parameters: Dict[str, Any],
         column_formats: Optional[Dict[str, Any]] = None,
+        settings: Optional[Dict[str, Any]] = None,
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
+        if not settings:
+            settings = {}
+        settings.update(CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+
         summary = None
         parameters = _process_parameters(parameters)
         with self.ch_client.query_rows_stream(
-            query, parameters=parameters, column_formats=column_formats, use_none=True
+            query,
+            parameters=parameters,
+            column_formats=column_formats,
+            use_none=True,
+            settings=settings,
         ) as stream:
             if isinstance(stream.source, QueryResult):
                 summary = stream.source.summary
