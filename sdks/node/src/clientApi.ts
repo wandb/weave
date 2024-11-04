@@ -19,8 +19,12 @@ export let globalClient: WeaveClient | null = null;
  * @param {string} [host] - (Optional) The host name (usually only needed if you're using a custom W&B server).
  * @throws {Error} If the API key is not specified or if the connection to the weave trace server cannot be verified.
  */
-export async function login(apiKey: string, host: string = defaultHost) {
-  const {traceBaseUrl, domain} = getUrls(host);
+export async function login(apiKey: string, host?: string) {
+  if (!host) {
+    console.warn('No host provided, using default host:', defaultHost);
+    host = defaultHost;
+  }
+  const {traceBaseUrl} = getUrls(host);
 
   // Test the connection to the traceServerApi
   const testTraceServerApi = new TraceServerApi({
@@ -41,9 +45,9 @@ export async function login(apiKey: string, host: string = defaultHost) {
   }
 
   const netrc = new Netrc();
-  netrc.setEntry({machine: domain, login: 'user', password: apiKey});
+  netrc.setEntry({machine: host, login: 'user', password: apiKey});
   netrc.save();
-  console.log(`Successfully logged in.  Credentials saved for ${domain}`);
+  console.log(`Successfully logged in.  Credentials saved for ${host}`);
 }
 
 /**
