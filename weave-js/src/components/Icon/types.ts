@@ -59,6 +59,7 @@ export const IconNames = {
   Documentation: 'documentation',
   Download: 'download',
   Draft: 'draft',
+  DragGrip: 'drag-grip',
   DragGripHorizontal: 'drag-grip-horizontal',
   EducationAcademic: 'education-academic',
   EmailAt: 'email-at',
