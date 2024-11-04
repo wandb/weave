@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Type, TypeVar, Union, overload
+from typing import Any, Optional, Tuple, Type, TypeVar, Union, overload
 
 from pydantic import BaseModel, ValidationError
 
@@ -34,6 +34,19 @@ FEEDBACK_PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
 ANNOTATION_FEEDBACK_TYPE_PREFIX = "wandb.annotation"
 RUNNABLE_FEEDBACK_TYPE_PREFIX = "wandb.runnable"
 
+
+# Making the decision to use `value` & `payload` as nested keys so that
+# we can:
+# 1. Add more fields in the future without breaking changes
+# 2. Support primitive values for annotation feedback that still schema
+class AnnotationPayloadSchema(BaseModel):
+    value: Any
+
+
+class RunnablePayloadSchema(BaseModel):
+    output: Any
+
+
 T = TypeVar(
     "T", ri.InternalObjectRef, ri.InternalTableRef, ri.InternalCallRef, ri.InternalOpRef
 )
@@ -67,7 +80,10 @@ def _ensure_ref_is_valid(
     Raises:
         InvalidRequest: If the reference is invalid or doesn't match expected_type
     """
-    parsed_ref = ri.parse_internal_uri(ref)
+    try:
+        parsed_ref = ri.parse_internal_uri(ref)
+    except ValueError as e:
+        raise InvalidRequest(f"Invalid ref: {ref}, {e}")
     if expected_type and not isinstance(parsed_ref, expected_type):
         raise InvalidRequest(
             f"Invalid ref: {ref}, expected {(t.__name__ for t in expected_type)}"
@@ -86,7 +102,9 @@ def validate_feedback_create_req(req: tsi.FeedbackCreateReq) -> None:
             )
 
     # Validate the required fields for the feedback type.
-    if req.feedback_type.startswith(ANNOTATION_FEEDBACK_TYPE_PREFIX):
+    is_annotation = req.feedback_type.startswith(ANNOTATION_FEEDBACK_TYPE_PREFIX)
+    is_runnable = req.feedback_type.startswith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
+    if is_annotation:
         if not req.feedback_type.startswith(ANNOTATION_FEEDBACK_TYPE_PREFIX + "."):
             raise InvalidRequest(
                 f"Invalid annotation feedback type: {req.feedback_type}"
@@ -101,7 +119,17 @@ def validate_feedback_create_req(req: tsi.FeedbackCreateReq) -> None:
             raise InvalidRequest(
                 f"annotation_ref must point to an object with name {type_subname}"
             )
-    elif req.feedback_type.startswith(RUNNABLE_FEEDBACK_TYPE_PREFIX):
+        try:
+            AnnotationPayloadSchema.model_validate(req.payload)
+        except ValidationError as e:
+            raise InvalidRequest(
+                f"Invalid payload for feedback_type {req.feedback_type}: {e}"
+            )
+    elif req.annotation_ref:
+        raise InvalidRequest(
+            "annotation_ref is not allowed for non-annotation feedback"
+        )
+    elif is_runnable:
         if not req.feedback_type.startswith(RUNNABLE_FEEDBACK_TYPE_PREFIX + "."):
             raise InvalidRequest(f"Invalid runnable feedback type: {req.feedback_type}")
         type_subname = req.feedback_type[len(RUNNABLE_FEEDBACK_TYPE_PREFIX) + 1 :]
@@ -116,6 +144,18 @@ def validate_feedback_create_req(req: tsi.FeedbackCreateReq) -> None:
             )
         if isinstance(runnable_ref, ri.InternalOpRef) and not req.call_ref:
             raise InvalidRequest("call_ref is required for runnable feedback on ops")
+        try:
+            RunnablePayloadSchema.model_validate(req.payload)
+        except ValidationError as e:
+            raise InvalidRequest(
+                f"Invalid payload for feedback_type {req.feedback_type}: {e}"
+            )
+    elif req.runnable_ref:
+        raise InvalidRequest("runnable_ref is not allowed for non-runnable feedback")
+    elif req.call_ref:
+        raise InvalidRequest("call_ref is not allowed for non-runnable feedback")
+    elif req.trigger_ref:
+        raise InvalidRequest("trigger_ref is not allowed for non-runnable feedback")
 
     # Validate the ref formats (we could even query the DB to ensure they exist and are valid)
     if req.annotation_ref:
