@@ -5,7 +5,7 @@ import logging
 import re
 from io import BytesIO
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import BaseModel
 
@@ -79,11 +79,11 @@ class PathImage(BaseModel):
     # allow PIL.Image.Image in the pydantic model
     model_config = {"arbitrary_types_allowed": True}
 
-    path: Optional[str | Path]
+    path: Optional[Union[str, Path]]
     img: Optional[Image.Image]
 
     @staticmethod
-    def from_path(path: str | Path) -> Optional["PathImage"]:
+    def from_path(path: Union[str, Path]) -> Optional["PathImage"]:
         if isinstance(path, str):
             assert is_local_image(path), "Path is not a local image"
         try:
