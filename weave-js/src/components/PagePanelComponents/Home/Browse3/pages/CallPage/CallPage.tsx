@@ -1,34 +1,38 @@
 import Box from '@mui/material/Box';
-import { Loading } from '@wandb/weave/components/Loading';
-import { useViewTraceEvent } from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, { FC, useCallback, useContext, useEffect, useState } from 'react';
-import { useHistory } from 'react-router-dom';
+import {Loading} from '@wandb/weave/components/Loading';
+import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
+import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
-import { makeRefCall } from '../../../../../../util/refs';
-import { Button } from '../../../../../Button';
-import { Tailwind } from '../../../../../Tailwind';
-import { Browse2OpDefCode } from '../../../Browse2/Browse2OpDefCode';
-import { TableRowSelectionContext } from '../../../Browse3';
-import { TRACETREE_PARAM, useWeaveflowCurrentRouteContext, WeaveflowPeekContext } from '../../context';
-import { FeedbackGrid } from '../../feedback/FeedbackGrid';
-import { NotFoundPanel } from '../../NotFoundPanel';
-import { isCallChat } from '../ChatView/hooks';
-import { isEvaluateOp } from '../common/heuristics';
-import { CenteredAnimatedLoader } from '../common/Loader';
+import {makeRefCall} from '../../../../../../util/refs';
+import {Button} from '../../../../../Button';
+import {Tailwind} from '../../../../../Tailwind';
+import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
+import {TableRowSelectionContext} from '../../../Browse3';
+import {
+  TRACETREE_PARAM,
+  useWeaveflowCurrentRouteContext,
+  WeaveflowPeekContext,
+} from '../../context';
+import {FeedbackGrid} from '../../feedback/FeedbackGrid';
+import {NotFoundPanel} from '../../NotFoundPanel';
+import {isCallChat} from '../ChatView/hooks';
+import {isEvaluateOp} from '../common/heuristics';
+import {CenteredAnimatedLoader} from '../common/Loader';
 import {
   ScrollableTabContent,
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
-import { CompareEvaluationsPageContent } from '../CompareEvaluationsPage/CompareEvaluationsPage';
-import { TabUseCall } from '../TabUseCall';
-import { useURLSearchParamsDict } from '../util';
-import { useWFHooks } from '../wfReactInterface/context';
-import { CallSchema } from '../wfReactInterface/wfDataModelHooksInterface';
-import { CallChat } from './CallChat';
-import { CallDetails } from './CallDetails';
-import { CallOverview } from './CallOverview';
-import { CallSummary } from './CallSummary';
-import { CallTraceView, useCallFlattenedTraceTree } from './CallTraceView';
+import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
+import {TabUseCall} from '../TabUseCall';
+import {useURLSearchParamsDict} from '../util';
+import {useWFHooks} from '../wfReactInterface/context';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallChat} from './CallChat';
+import {CallDetails} from './CallDetails';
+import {CallOverview} from './CallOverview';
+import {CallSummary} from './CallSummary';
+import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
 export const CallPage: FC<{
   entity: string;
   project: string;
@@ -198,7 +202,9 @@ const CallPageInnerVertical: FC<{
   }, [callComplete]);
 
   // Call navigation by arrow keys and buttons
-  const {getNextRowId, getPreviousRowId, rowIdsConfigured} = useContext(TableRowSelectionContext);
+  const {getNextRowId, getPreviousRowId, rowIdsConfigured} = useContext(
+    TableRowSelectionContext
+  );
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const showPaginationContols = isPeeking && rowIdsConfigured;
   const onNextCall = useCallback(() => {
@@ -272,23 +278,23 @@ const CallPageInnerVertical: FC<{
             alignItems: 'center',
           }}>
           {showPaginationContols && (
-          <Box>
-            <Button
-              icon="sort-ascending"
-              tooltip="Previous call. (Shift + Arrow Up)"
-              variant="ghost"
-              onClick={onPreviousCall}
-              className="mr-2"
-            />
-            <Button
-              icon="sort-descending"
-              tooltip="Next call. (Shift + Arrow Down)"
-              variant="ghost"
-              onClick={onNextCall}
+            <Box>
+              <Button
+                icon="sort-ascending"
+                tooltip="Previous call. (Shift + Arrow Up)"
+                variant="ghost"
+                onClick={onPreviousCall}
+                className="mr-2"
               />
-          </Box>
+              <Button
+                icon="sort-descending"
+                tooltip="Next call. (Shift + Arrow Down)"
+                variant="ghost"
+                onClick={onNextCall}
+              />
+            </Box>
           )}
-          <Box>
+          <Box sx={{marginLeft: showPaginationContols ? 0 : 'auto'}}>
             <Button
               icon="layout-tabs"
               tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
