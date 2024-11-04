@@ -294,6 +294,46 @@ class Call:
     def remove_display_name(self) -> None:
         self.set_display_name(None)
 
+    def _apply_scorer(self, scorer_op: Op) -> None:
+        """
+        This is a private method that applies a scorer to a call and records the feedback.
+        In the near future, this will be made public, but for now it is only used internally
+        for testing.
+
+        Before making this public, we should refactor such that the `predict_and_score` method
+        inside `eval.py` uses this method inside the scorer block.
+
+        Current limitations:
+        - only works for ops (not Scorer class)
+        - no async support
+        - no context yet (ie. ground truth)
+        """
+        client = weave_client_context.require_weave_client()
+        scorer_signature = scorer_op.signature
+        scorer_arg_names = list(scorer_signature.parameters.keys())
+        score_args = {k: v for k, v in self.inputs.items() if k in scorer_arg_names}
+        if "output" in scorer_arg_names:
+            score_args["output"] = self.output
+        _, score_call = scorer_op.call(**score_args)
+        scorer_op_ref = get_ref(scorer_op)
+        if scorer_op_ref is None:
+            raise ValueError("Scorer op has no ref")
+        self_ref = get_ref(self)
+        if self_ref is None:
+            raise ValueError("Call has no ref")
+        score_name = scorer_op_ref.name
+        score_results = score_call.output
+        score_call_ref = get_ref(score_call)
+        if score_call_ref is None:
+            raise ValueError("Score call has no ref")
+        return client._add_score(
+            call_ref_uri=self_ref.uri(),
+            score_name=score_name,
+            score_results=score_results,
+            scorer_call_ref_uri=score_call_ref.uri(),
+            scorer_op_ref_uri=scorer_op_ref.uri(),
+        )
+
 
 class CallsIter:
     server: TraceServerInterface

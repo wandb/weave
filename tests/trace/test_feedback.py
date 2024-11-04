@@ -1,6 +1,7 @@
 import pytest
 
-from weave.trace.weave_client import WeaveClient
+import weave
+from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 
@@ -321,3 +322,91 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "call_ref": call_ref,
         "trigger_ref": trigger_ref,
     }
+
+
+def populate_feedback(client: WeaveClient) -> None:
+    @weave.op
+    def my_scorer(x: int, output: int) -> int:
+        expected = ["a", "b", "c", "d"][x]
+        return {
+            "model_output": output,
+            "expected": expected,
+            "match": output == expected,
+        }
+
+    @weave.op
+    def my_model(x: int) -> str:
+        return [
+            "a",
+            "x",  # intentional "mistake"
+            "b",
+            "y",  # intentional "mistake"
+        ][x]
+
+    ids = []
+    for x in range(4):
+        _, c = my_model.call(x)
+        ids.append(c.id)
+        c._apply_scorer(my_scorer)
+
+    assert len(list(my_scorer.calls())) == 4
+    assert len(list(my_model.calls())) == 4
+
+    return ids, my_scorer, my_model
+
+
+def test_sort_by_feedback(client: WeaveClient) -> None:
+    """Test sorting by feedback."""
+    ids, my_scorer, my_model = populate_feedback(client)
+
+    for field, direction, id_exp in [
+        (
+            "feedback[wandb.runnable.my_scorer].payload.model_output",
+            "asc",
+            [ids[0], ids[2], ids[1], ids[3]],
+        ),
+        (
+            "feedback[wandb.runnable.my_scorer].payload.model_output",
+            "desc",
+            [ids[3], ids[1], ids[2], ids[0]],
+        ),
+        (
+            "feedback[wandb.runnable.my_scorer].payload.expected",
+            "asc",
+            [ids[3], ids[1], ids[2], ids[0]],
+        ),
+        (
+            "feedback[wandb.runnable.my_scorer].payload.expected",
+            "desc",
+            [ids[0], ids[2], ids[1], ids[3]],
+        ),
+        (
+            "feedback[wandb.runnable.my_scorer].payload.match",
+            "asc",
+            [ids[0], ids[2], ids[1], ids[3]],
+        ),
+        (
+            "feedback[wandb.runnable.my_scorer].payload.match",
+            "desc",
+            [ids[3], ids[1], ids[2], ids[0]],
+        ),
+    ]:
+        calls = client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                filter=tsi.CallsFilter(op_name=[get_ref(my_model).uri()]),
+                sort_by=tsi.SortBy(
+                    field=field,
+                    direction=direction,
+                ),
+                include_feedback=True,
+            )
+        )
+
+        assert [c.id for c in calls] == id_exp
+
+
+def test_filter_by_feedback(client: WeaveClient) -> None:
+    """Test filtering by feedback."""
+    ids, my_scorer, my_model = populate_feedback(client)
+    raise NotImplementedError
