@@ -115,3 +115,15 @@ class PathImage(BaseModel):
                 logger.error(f"Failed to load remote image file: {self.path}. {e}")
                 return None
         return None
+
+    @staticmethod
+    def from_data(data: str) -> "PathImage":
+        return PathImage(data=data, path=None)
+
+    @staticmethod
+    def from_path(path: str) -> "PathImage":
+        return PathImage(data=None, path=path)
+
+    @staticmethod
+    def from_url(url: str) -> "PathImage":
+        return PathImage(data=None, path=url)
