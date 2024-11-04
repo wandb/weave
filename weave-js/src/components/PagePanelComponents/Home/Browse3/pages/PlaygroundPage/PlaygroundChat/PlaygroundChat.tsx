@@ -5,7 +5,7 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {Dispatch, SetStateAction, useState} from 'react';
 import {Link} from 'react-router-dom';
 
-import {CallChat} from '../../ChatView/CallChat';
+import {CallChat} from '../../CallPage/CallChat';
 import {Message} from '../../ChatView/types';
 import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
 import {

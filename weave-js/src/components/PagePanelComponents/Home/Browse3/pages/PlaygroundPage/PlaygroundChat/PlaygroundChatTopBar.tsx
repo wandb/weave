@@ -112,8 +112,8 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
             handleModelChange(idx, model, maxTokens)
           }
         />
-        {calls[idx].traceCall?.id && (
-          <CopyableId id={calls[idx].traceCall.id} type="Call" />
+        {calls[idx]?.traceCall?.id && (
+          <CopyableId id={calls[idx]!.traceCall!.id} type="Call" />
         )}
       </Box>
       <Box
