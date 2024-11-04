@@ -67,10 +67,10 @@ def gemini_accumulator(
 def gemini_on_finish(
     call: Call, output: Any, exception: Optional[BaseException]
 ) -> None:
-    if hasattr(call.inputs["self"], "model_name"):
-        original_model_name = call.inputs["self"].model_name
-    elif hasattr(call.inputs["self"], "model"):
-        original_model_name = call.inputs["self"].model.model_name
+    if "model_name" in call.inputs["self"]:
+        original_model_name = call.inputs["self"]["model_name"]
+    elif "model" in call.inputs["self"]:
+        original_model_name = call.inputs["self"]["model"]["model_name"]
     else:
         raise ValueError("Unknown model type")
     model_name = original_model_name.split("/")[-1]
