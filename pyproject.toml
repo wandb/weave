@@ -186,6 +186,9 @@ exclude = ["weave_query"]
 [tool.pyright]
 include = ["weave"]
 exclude = ["weave_query", "tests", "examples", "docs", "noxfile.py"]
+# In cases where we support multiple versions of an integration, some imports can be missing
+reportMissingImports = false
+
 
 [tool.mypy]
 warn_unused_configs = true
