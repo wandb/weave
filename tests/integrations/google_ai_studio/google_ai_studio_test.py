@@ -64,10 +64,9 @@ def test_content_generation(client):
 
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.generativeai.GenerativeModel.generate_content"
-    assert "paris" in str(call.output).lower()
-    # TODO: Re-enable after dictify is fixed
-    # assert_correct_output_shape(call.output)
-    # assert_correct_summary(call.summary, trace_name)
+    assert call.output is not None
+    assert_correct_output_shape(call.output)
+    assert_correct_summary(call.summary, trace_name)
 
 
 @pytest.mark.retry(max_attempts=5)
@@ -89,10 +88,9 @@ def test_content_generation_stream(client):
 
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.generativeai.GenerativeModel.generate_content"
-    assert "paris" in str(call.output).lower()
-    # TODO: Re-enable after dictify is fixed
-    # assert_correct_output_shape(call.output)
-    # assert_correct_summary(call.summary, trace_name)
+    assert call.output is not None
+    assert_correct_output_shape(call.output)
+    assert_correct_summary(call.summary, trace_name)
 
 
 @pytest.mark.retry(max_attempts=5)
@@ -113,10 +111,9 @@ async def test_content_generation_async(client):
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.generativeai.GenerativeModel.generate_content_async"
-    assert "paris" in str(call.output).lower()
-    # TODO: Re-enable after dictify is fixed
-    # assert_correct_output_shape(call.output)
-    # assert_correct_summary(call.summary, trace_name)
+    assert call.output is not None
+    assert_correct_output_shape(call.output)
+    assert_correct_summary(call.summary, trace_name)
 
 
 @pytest.mark.retry(max_attempts=5)
