@@ -686,6 +686,18 @@ class FeedbackCreateReq(BaseModel):
             }
         ]
     )
+    annotation_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/object/name:digest"]
+    )
+    runnable_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/op/name:digest"]
+    )
+    call_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/call/call_id"]
+    )
+    trigger_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/object/name:digest"]
+    )
 
     # wb_user_id is automatically populated by the server
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
