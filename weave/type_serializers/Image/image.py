@@ -80,7 +80,7 @@ class PathImage(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
     path: Optional[Union[str, Path]]
-    img: Optional[Image.Image]
+    img: Optional["Image.Image"]
 
     @staticmethod
     def from_path(path: Union[str, Path]) -> Optional["PathImage"]:
@@ -112,7 +112,7 @@ class EncodedImage(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
     raw_data: str
-    img: Image.Image
+    img: "Image.Image"
 
     @staticmethod
     def from_data(data: str) -> Optional["EncodedImage"]:
