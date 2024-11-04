@@ -893,9 +893,11 @@ const useObjectVersion = (
   }, [cachedObjectVersion, key, objectVersionRes]);
 };
 
-const convertTraceServerObjectVersionToSchema = (
-  obj: traceServerTypes.TraceObjSchema
-): ObjectVersionSchema => {
+export const convertTraceServerObjectVersionToSchema = <
+  T extends traceServerTypes.TraceObjSchema
+>(
+  obj: T
+): ObjectVersionSchema<T['val']> => {
   const [entity, project] = obj.project_id.split('/');
   return {
     scheme: 'weave' as const,
