@@ -359,36 +359,18 @@ def test_sort_by_feedback(client: WeaveClient) -> None:
     """Test sorting by feedback."""
     ids, my_scorer, my_model = populate_feedback(client)
 
-    for field, direction, id_exp in [
+    for field, asc_ids, desc_ids in [
         (
             "feedback[wandb.runnable.my_scorer].payload.model_output",
-            "asc",
             [ids[0], ids[2], ids[1], ids[3]],
-        ),
-        (
-            "feedback[wandb.runnable.my_scorer].payload.model_output",
-            "desc",
-            [ids[3], ids[1], ids[2], ids[0]],
         ),
         (
             "feedback[wandb.runnable.my_scorer].payload.expected",
-            "asc",
             [ids[3], ids[1], ids[2], ids[0]],
         ),
         (
-            "feedback[wandb.runnable.my_scorer].payload.expected",
-            "desc",
-            [ids[0], ids[2], ids[1], ids[3]],
-        ),
-        (
             "feedback[wandb.runnable.my_scorer].payload.match",
-            "asc",
             [ids[0], ids[2], ids[1], ids[3]],
-        ),
-        (
-            "feedback[wandb.runnable.my_scorer].payload.match",
-            "desc",
-            [ids[3], ids[1], ids[2], ids[0]],
         ),
     ]:
         calls = client.server.calls_query_stream(
@@ -397,16 +379,84 @@ def test_sort_by_feedback(client: WeaveClient) -> None:
                 filter=tsi.CallsFilter(op_name=[get_ref(my_model).uri()]),
                 sort_by=tsi.SortBy(
                     field=field,
-                    direction=direction,
+                    direction="asc",
                 ),
                 include_feedback=True,
             )
         )
 
-        assert [c.id for c in calls] == id_exp
+        assert [c.id for c in calls] == asc_ids
+
+        calls = client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                filter=tsi.CallsFilter(op_name=[get_ref(my_model).uri()]),
+                sort_by=tsi.SortBy(
+                    field=field,
+                    direction="desc",
+                ),
+                include_feedback=True,
+            )
+        )
+
+        assert [c.id for c in calls] == desc_ids
 
 
 def test_filter_by_feedback(client: WeaveClient) -> None:
     """Test filtering by feedback."""
     ids, my_scorer, my_model = populate_feedback(client)
-    raise NotImplementedError
+    for field, value, eq_ids, gt_ids in [
+        (
+            "feedback[wandb.runnable.my_scorer].payload.model_output",
+            "a",
+            [ids[0], ids[2]],
+            [ids[1], ids[3]],
+        ),
+        (
+            "feedback[wandb.runnable.my_scorer].payload.expected",
+            "a",
+            [ids[3], ids[1]],
+            [ids[0], ids[2]],
+        ),
+        (
+            "feedback[wandb.runnable.my_scorer].payload.match",
+            True,
+            [ids[0], ids[2]],
+            [ids[1], ids[3]],
+        ),
+    ]:
+        calls = client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                filter=tsi.CallsFilter(op_name=[get_ref(my_model).uri()]),
+                query={
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": field},
+                            {"$literal": value},
+                        ]
+                    }
+                },
+                include_feedback=True,
+            )
+        )
+
+        assert [c.id for c in calls] == eq_ids
+
+        calls = client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                filter=tsi.CallsFilter(op_name=[get_ref(my_model).uri()]),
+                query={
+                    "$expr": {
+                        "$gt": [
+                            {"$getField": field},
+                            {"$literal": value},
+                        ]
+                    }
+                },
+                include_feedback=True,
+            )
+        )
+
+        assert [c.id for c in calls] == gt_ids
