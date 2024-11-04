@@ -13,10 +13,7 @@ export const MessageList = ({
   scrollLastMessage = false,
 }: MessageListProps) => {
   const lastMessageRef = useRef<HTMLDivElement>(null);
-  const processedMessages = useMemo(
-    () => processToolCallMessages(messages),
-    [messages]
-  );
+  const processedMessages = processToolCallMessages(messages);
 
   useEffect(() => {
     if (lastMessageRef.current && scrollLastMessage) {
