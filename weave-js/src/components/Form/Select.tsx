@@ -18,7 +18,6 @@ import {
   TEAL_300,
   TEAL_350,
   TEAL_400,
-  TEAL_500,
   TEAL_600,
 } from '@wandb/weave/common/css/globals.styles';
 import {Icon} from '@wandb/weave/components/Icon';
@@ -226,9 +225,10 @@ const getStyles = <
           ? `0 0 0 2px ${colorBorderOpen}`
           : `inset 0 0 0 1px ${colorBorderDefault}`,
         '&:hover': {
-          boxShadow: state.menuIsOpen
-            ? `0 0 0 2px ${colorBorderOpen}`
-            : `0 0 0 2px ${colorBorderHover}`,
+          boxShadow:
+            state.menuIsOpen || state.isFocused
+              ? `0 0 0 2px ${colorBorderOpen}`
+              : `0 0 0 2px ${colorBorderHover}`,
         },
       };
     },

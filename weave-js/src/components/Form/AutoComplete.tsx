@@ -1,6 +1,6 @@
 import Autocomplete, {AutocompleteProps} from '@mui/material/Autocomplete';
 import {createTheme, ThemeProvider} from '@mui/material/styles';
-import React, {useEffect, useCallback, useState} from 'react';
+import React from 'react';
 
 import {
   MOON_100,
@@ -66,6 +66,9 @@ const getStyles = (props: AdditionalProps) => {
             '& .MuiAutocomplete-popupIndicator': {
               borderRadius: '4px',
               padding: '4px',
+              '& .MuiIconButton-root': {
+                disableRipple: true, // Disable ripple effect
+              },
             },
             '&.MuiAutocomplete-hasPopupIcon .MuiOutlinedInput-root, &.MuiAutocomplete-hasClearIcon .MuiOutlinedInput-root':
               {
