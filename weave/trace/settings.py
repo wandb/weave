@@ -77,7 +77,7 @@ class UserSettings(BaseModel):
     convert_paths_to_images: bool = False
     """Toggles conversion of image file paths to PathImage objects.
 
-    If True, image file paths and base64 encoded images will be converted to 
+    If True, image file paths and base64 encoded images will be converted to
     PathImage and EncodedImage objects.
 
     Example:
