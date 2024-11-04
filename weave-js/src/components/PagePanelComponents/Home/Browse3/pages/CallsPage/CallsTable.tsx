@@ -8,12 +8,13 @@
 
 import {
   Autocomplete,
+  Box,
   Chip,
   FormControl,
   ListItem,
   Tooltip,
+  Typography,
 } from '@mui/material';
-import {Box, Typography} from '@mui/material';
 import {
   GridColDef,
   GridColumnVisibilityModel,
@@ -80,12 +81,14 @@ import {
   RefreshButton,
 } from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
-import {WFHighLevelCallFilter} from './callsTableFilter';
-import {getEffectiveFilter} from './callsTableFilter';
-import {useOpVersionOptions} from './callsTableFilter';
-import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
-import {useInputObjectVersionOptions} from './callsTableFilter';
-import {useOutputObjectVersionOptions} from './callsTableFilter';
+import {
+  ALL_TRACES_OR_CALLS_REF_KEY,
+  getEffectiveFilter,
+  useInputObjectVersionOptions,
+  useOpVersionOptions,
+  useOutputObjectVersionOptions,
+  WFHighLevelCallFilter,
+} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
@@ -747,12 +750,15 @@ export const CallsTable: FC<{
           )}
           <div className="flex items-center gap-6">
             <Switch.Root
+              id="tracesMetricsSwitch"
               size="small"
               checked={isMetricsChecked}
               onCheckedChange={setMetricsChecked}>
               <Switch.Thumb size="small" checked={isMetricsChecked} />
             </Switch.Root>
-            Metrics
+            <label className="cursor-pointer" htmlFor="tracesMetricsSwitch">
+              Metrics
+            </label>
           </div>
           {selectedInputObjectVersion && (
             <Chip

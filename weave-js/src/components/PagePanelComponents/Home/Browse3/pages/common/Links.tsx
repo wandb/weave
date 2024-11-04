@@ -43,6 +43,15 @@ export const Link = styled(LinkComp)<LinkProps>`
 `;
 Link.displayName = 'S.Link';
 
+const FakeLink = styled.div<LinkProps>`
+  font-weight: 600;
+  color: ${p => (p.$variant === 'secondary' ? MOON_700 : TEAL_600)};
+  &:hover {
+    color: ${TEAL_500};
+  }
+`;
+Link.displayName = 'S.Link';
+
 const LinkWrapper = styled.div<{fullWidth?: boolean; color?: string}>`
   ${p =>
     p.fullWidth &&
@@ -146,13 +155,16 @@ export const ObjectVersionLink: React.FC<{
   fullWidth?: boolean;
   icon?: React.ReactNode;
   color?: string;
+  hideVersionSuffix?: boolean;
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
   // const text = props.hideName
   //   ? props.version
   //   : props.objectName + ': ' + truncateID(props.version);
-  const text = objectVersionText(props.objectName, props.versionIndex);
+  const text = props.hideVersionSuffix
+    ? props.objectName
+    : objectVersionText(props.objectName, props.versionIndex);
   const to = peekingRouter.objectVersionUIUrl(
     props.entityName,
     props.projectName,
@@ -271,6 +283,7 @@ export const CallLink: React.FC<{
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
+
   const opName = opNiceName(props.opName);
 
   // Custom logic to calculate path and tracetree here is not good. Shows
@@ -325,6 +338,47 @@ export const CallLink: React.FC<{
             <Id id={props.callId} type="Call" />
           </span>
         </Link>
+      </LinkTruncater>
+    </LinkWrapper>
+  );
+};
+
+export const CustomLink: React.FC<{
+  text: string;
+  onClick: () => void;
+  fullWidth?: boolean;
+  color?: string;
+  variant?: LinkVariant;
+  icon?: React.ReactNode;
+}> = props => {
+  // Used to look like our other links, but delegate to a custom onClick
+  return (
+    <LinkWrapper
+      onClick={props.onClick}
+      fullWidth={props.fullWidth}
+      color={props.color}>
+      <LinkTruncater fullWidth={props.fullWidth}>
+        <FakeLink
+          $variant={props.variant}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            // allow flex items to shrink below their minimum content size
+            minWidth: 0,
+          }}>
+          {props.icon}
+          <span
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              flexGrow: 1,
+              flexShrink: 1,
+            }}>
+            {props.text}
+          </span>
+        </FakeLink>
       </LinkTruncater>
     </LinkWrapper>
   );

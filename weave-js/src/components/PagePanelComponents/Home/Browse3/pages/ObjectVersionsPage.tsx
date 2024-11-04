@@ -29,11 +29,17 @@ import {basicField} from './common/DataTable';
 import {Empty} from './common/Empty';
 import {
   EMPTY_PROPS_DATASETS,
+  EMPTY_PROPS_LEADERBOARDS,
   EMPTY_PROPS_MODEL,
   EMPTY_PROPS_OBJECTS,
   EMPTY_PROPS_PROMPTS,
 } from './common/EmptyContent';
-import {ObjectVersionLink, ObjectVersionsLink} from './common/Links';
+import {
+  CustomLink,
+  ObjectVersionLink,
+  ObjectVersionsLink,
+  objectVersionText,
+} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {
@@ -159,6 +165,8 @@ export const FilterableObjectVersionsTable: React.FC<{
       propsEmpty = EMPTY_PROPS_MODEL;
     } else if (DATASET_BASE_OBJECT_CLASS === base) {
       propsEmpty = EMPTY_PROPS_DATASETS;
+    } else if (base === 'Leaderboard') {
+      propsEmpty = EMPTY_PROPS_LEADERBOARDS;
     }
     return <Empty {...propsEmpty} />;
   }
@@ -174,18 +182,25 @@ export const FilterableObjectVersionsTable: React.FC<{
       )}>
       <ObjectVersionsTable
         objectVersions={objectVersions}
-        usingLatestFilter={effectivelyLatestOnly}
+        hidePropsAsColumns={!!effectivelyLatestOnly}
+        hidePeerVersionsColumn={!effectivelyLatestOnly}
       />
     </FilterLayoutTemplate>
   );
 };
 
-const ObjectVersionsTable: React.FC<{
+export const ObjectVersionsTable: React.FC<{
   objectVersions: ObjectVersionSchema[];
-  usingLatestFilter?: boolean;
+  objectTitle?: string;
+  hidePropsAsColumns?: boolean;
+  hidePeerVersionsColumn?: boolean;
+  hideCategoryColumn?: boolean;
+  hideCreatedAtColumn?: boolean;
+  hideVersionSuffix?: boolean;
+  onRowClick?: (objectVersion: ObjectVersionSchema) => void;
 }> = props => {
   // `showPropsAsColumns` probably needs to be a bit more robust
-  const showPropsAsColumns = !props.usingLatestFilter;
+  const showPropsAsColumns = !props.hidePropsAsColumns;
   const rows: GridRowsProp = useMemo(() => {
     const vals = props.objectVersions.map(ov => ov.val);
     const flat = prepareFlattenedDataForTable(vals);
@@ -219,11 +234,27 @@ const ObjectVersionsTable: React.FC<{
     const cols: GridColDef[] = [
       // This field name chosen to reduce possibility of conflict
       // with the dynamic fields added below.
-      basicField('weave__object_version_link', 'Object', {
+      basicField('weave__object_version_link', props.objectTitle ?? 'Object', {
         hideable: false,
         renderCell: cellParams => {
           // Icon to indicate navigation to the object version
           const obj: ObjectVersionSchema = cellParams.row.obj;
+          if (props.onRowClick) {
+            let text = props.hideVersionSuffix
+              ? obj.objectId
+              : objectVersionText(obj.objectId, obj.versionIndex);
+
+            // This allows us to use the object name as the link text
+            // if it is available. Probably should make this workfor
+            // the object version link as well.
+            if (obj.val.name) {
+              text = obj.val.name;
+            }
+
+            return (
+              <CustomLink text={text} onClick={() => props.onRowClick?.(obj)} />
+            );
+          }
           return (
             <ObjectVersionLink
               entityName={obj.entity}
@@ -233,6 +264,7 @@ const ObjectVersionsTable: React.FC<{
               versionIndex={obj.versionIndex}
               fullWidth={true}
               color={TEAL_600}
+              hideVersionSuffix={props.hideVersionSuffix}
             />
           );
         },
@@ -283,36 +315,41 @@ const ObjectVersionsTable: React.FC<{
       groups = groupingModel;
     }
 
-    cols.push(
-      basicField('baseObjectClass', 'Category', {
-        width: 100,
-        display: 'flex',
-        valueGetter: (unused: any, row: any) => {
-          return row.obj.baseObjectClass;
-        },
-        renderCell: cellParams => {
-          const category = cellParams.value;
-          if (KNOWN_BASE_OBJECT_CLASSES.includes(category)) {
-            return <TypeVersionCategoryChip baseObjectClass={category} />;
-          }
-          return null;
-        },
-      })
-    );
+    if (!props.hideCategoryColumn) {
+      cols.push(
+        basicField('baseObjectClass', 'Category', {
+          width: 100,
+          display: 'flex',
+          valueGetter: (unused: any, row: any) => {
+            return row.obj.baseObjectClass;
+          },
+          renderCell: cellParams => {
+            const category = cellParams.value;
+            if (KNOWN_BASE_OBJECT_CLASSES.includes(category)) {
+              return <TypeVersionCategoryChip baseObjectClass={category} />;
+            }
+            return null;
+          },
+        })
+      );
+    }
 
-    cols.push(
-      basicField('createdAtMs', 'Created', {
-        width: 100,
-        valueGetter: (unused: any, row: any) => {
-          return row.obj.createdAtMs;
-        },
-        renderCell: cellParams => {
-          const createdAtMs = cellParams.value;
-          return <Timestamp value={createdAtMs / 1000} format="relative" />;
-        },
-      })
-    );
-    if (props.usingLatestFilter) {
+    if (!props.hideCreatedAtColumn) {
+      cols.push(
+        basicField('createdAtMs', 'Created', {
+          width: 100,
+          valueGetter: (unused: any, row: any) => {
+            return row.obj.createdAtMs;
+          },
+          renderCell: cellParams => {
+            const createdAtMs = cellParams.value;
+            return <Timestamp value={createdAtMs / 1000} format="relative" />;
+          },
+        })
+      );
+    }
+
+    if (!props.hidePeerVersionsColumn) {
       cols.push(
         basicField('peerVersions', 'Versions', {
           width: 100,
@@ -327,7 +364,7 @@ const ObjectVersionsTable: React.FC<{
     }
 
     return {cols, groups};
-  }, [showPropsAsColumns, props.usingLatestFilter, rows]);
+  }, [props, showPropsAsColumns, rows]);
 
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();
