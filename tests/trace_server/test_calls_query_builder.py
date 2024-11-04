@@ -123,7 +123,8 @@ def test_query_heavy_column_simple_filter() -> None:
         WHERE
             project_id = {pb_2:String}
         AND
-            (id IN filtered_calls)
+            (id IN (SELECT id
+                    FROM filtered_calls))
         GROUP BY (project_id,id)
         """,
         {"pb_0": ["a", "b"], "pb_1": "project", "pb_2": "project"},
@@ -164,7 +165,8 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
         WHERE
             project_id = {pb_2:String}
         AND
-            (id IN filtered_calls)
+            (id IN (SELECT id
+                    FROM filtered_calls))
         GROUP BY (project_id,id)
         ORDER BY any(calls_merged.started_at) DESC
         """,
@@ -211,7 +213,8 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
         WHERE
             project_id = {pb_2:String}
         AND
-            (id IN filtered_calls)
+            (id IN (SELECT id
+                    FROM filtered_calls))
         GROUP BY (project_id,id)
         ORDER BY any(calls_merged.started_at) DESC
         """,
@@ -277,7 +280,8 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
         WHERE
             project_id = {pb_5:String}
         AND
-            (id IN filtered_calls)
+            (id IN (SELECT id
+                    FROM filtered_calls))
         GROUP BY (project_id,id)
         HAVING (
             JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) = {pb_4:String}
@@ -340,7 +344,7 @@ def test_query_light_column_with_costs() -> None:
                     any(calls_merged.started_at) AS started_at
                 FROM calls_merged
                 WHERE project_id = {pb_2:String}
-                    AND (id IN filtered_calls)
+                    AND (id IN (SELECT id FROM filtered_calls))
                 GROUP BY (project_id, id)),
             -- From the all_calls we get the usage data for LLMs
             llm_usage AS (
