@@ -15,19 +15,19 @@ CREATE MATERIALIZED VIEW files_stats_view
 TO files_stats
 AS
 SELECT
-    project_id,
-    digest,
-    chunk_index,
-    anySimpleState(n_chunks) as n_chunks,
-    anySimpleState(name) as name,
-    anySimpleState(length(val_bytes)) AS size_bytes,
-    minSimpleState(created_at) AS created_at,
-    maxSimpleState(created_at) AS updated_at
+    files.project_id,
+    files.digest,
+    files.chunk_index,
+    anySimpleState(files.n_chunks) as n_chunks,
+    anySimpleState(files.name) as name,
+    anySimpleState(length(files.val_bytes)) AS size_bytes,
+    minSimpleState(files.created_at) AS created_at,
+    maxSimpleState(files.created_at) AS updated_at
 FROM files
 GROUP BY
-    project_id,
-    digest,
-    chunk_index;
+    files.project_id,
+    files.digest,
+    files.chunk_index;
 
 CREATE TABLE table_rows_stats
 (
@@ -44,15 +44,16 @@ CREATE MATERIALIZED VIEW table_rows_stats_view
 TO table_rows_stats
 AS
 SELECT
-    project_id,
-    digest,
-    anySimpleState(refs) as refs,
-    anySimpleState(length(val_dump)) AS size_bytes,
-    minSimpleState(created_at) AS created_at,
-    maxSimpleState(created_at) AS updated_at
+    table_rows.project_id,
+    table_rows.digest,
+    anySimpleState(table_rows.refs) as refs,
+    anySimpleState(length(table_rows.val_dump)) AS size_bytes,
+    minSimpleState(table_rows.created_at) AS created_at,
+    maxSimpleState(table_rows.created_at) AS updated_at
 FROM table_rows
 GROUP BY
-    project_id, digest;
+    table_rows.project_id,
+    table_rows.digest;
 
 
 CREATE TABLE object_versions_stats
@@ -73,18 +74,21 @@ CREATE MATERIALIZED VIEW object_versions_stats_view
 TO object_versions_stats
 AS
 SELECT
-    project_id,
-    kind,
-    object_id,
-    digest,
-    anySimpleState(base_object_class) AS base_object_class,
-    anySimpleState(refs) AS refs,
-    anySimpleState(length(val_dump)) AS size_bytes,
-    minSimpleState(created_at) AS created_at,
-    maxSimpleState(created_at) AS updated_at
+    object_versions.project_id,
+    object_versions.kind,
+    object_versions.object_id,
+    object_versions.digest,
+    anySimpleState(object_versions.base_object_class) AS base_object_class,
+    anySimpleState(object_versions.refs) AS refs,
+    anySimpleState(length(object_versions.val_dump)) AS size_bytes,
+    minSimpleState(object_versions.created_at) AS created_at,
+    maxSimpleState(object_versions.created_at) AS updated_at
 FROM object_versions
 GROUP BY
-    project_id, kind, object_id, digest;
+    object_versions.project_id,
+    object_versions.kind,
+    object_versions.object_id,
+    object_versions.digest;
 
 CREATE TABLE feedback_stats
 (
@@ -104,18 +108,21 @@ CREATE MATERIALIZED VIEW feedback_stats_view
 TO feedback_stats
 AS
 SELECT
-    project_id,
-    weave_ref,
-    wb_user_id,
-    id,
-    anySimpleState(creator) as creator,
-    minSimpleState(created_at) as created_at,
-    maxSimpleState(created_at) as updated_at,
-    argMaxState(feedback_type, created_at) as feedback_type,
-    anySimpleState(length(payload_dump)) as payload_size_bytes,
+    feedback.project_id,
+    feedback.weave_ref,
+    feedback.wb_user_id,
+    feedback.id,
+    anySimpleState(feedback.creator) as creator,
+    minSimpleState(feedback.created_at) as created_at,
+    maxSimpleState(feedback.created_at) as updated_at,
+    argMaxState(feedback.feedback_type, feedback.created_at) as feedback_type,
+    anySimpleState(length(feedback.payload_dump)) as payload_size_bytes
 FROM feedback
 GROUP BY
-    project_id, weave_ref, wb_user_id, id;
+    feedback.project_id,
+    feedback.weave_ref,
+    feedback.wb_user_id,
+    feedback.id;
 
 CREATE TABLE calls_merged_stats
 (
@@ -146,24 +153,26 @@ CREATE MATERIALIZED VIEW calls_merged_stats_view
 TO calls_merged_stats
 AS
 SELECT
-    project_id,
-    id,
-    anySimpleState(trace_id) as trace_id,
-    anySimpleState(parent_id) as parent_id,
-    anySimpleState(op_name) as op_name,
-    anySimpleState(started_at) as started_at,
-    anySimpleState(length(attributes_dump)) as attributes_size_bytes,
-    anySimpleState(length(inputs_dump)) as inputs_size_bytes,
-    anySimpleState(input_refs) as input_refs,
-    anySimpleState(ended_at) as ended_at,
-    anySimpleState(length(output_dump)) as output_size_bytes,
-    anySimpleState(length(summary_dump)) as summary_size_bytes,
-    anySimpleState(exception) as exception,
-    anySimpleState(output_refs) as output_refs,
-    anySimpleState(wb_user_id) as wb_user_id,
-    anySimpleState(wb_run_id) as wb_run_id,
-    anySimpleState(deleted_at) as deleted_at,
-    maxSimpleState(created_at) as updated_at,
-    argMaxState(display_name, created_at) as display_name
+    call_parts.project_id,
+    call_parts.id,
+    anySimpleState(call_parts.trace_id) as trace_id,
+    anySimpleState(call_parts.parent_id) as parent_id,
+    anySimpleState(call_parts.op_name) as op_name,
+    anySimpleState(call_parts.started_at) as started_at,
+    anySimpleState(length(call_parts.attributes_dump)) as attributes_size_bytes,
+    anySimpleState(length(call_parts.inputs_dump)) as inputs_size_bytes,
+    anySimpleState(call_parts.input_refs) as input_refs,
+    anySimpleState(call_parts.ended_at) as ended_at,
+    anySimpleState(length(call_parts.output_dump)) as output_size_bytes,
+    anySimpleState(length(call_parts.summary_dump)) as summary_size_bytes,
+    anySimpleState(call_parts.exception) as exception,
+    anySimpleState(call_parts.output_refs) as output_refs,
+    anySimpleState(call_parts.wb_user_id) as wb_user_id,
+    anySimpleState(call_parts.wb_run_id) as wb_run_id,
+    anySimpleState(call_parts.deleted_at) as deleted_at,
+    maxSimpleState(call_parts.created_at) as updated_at,
+    argMaxState(call_parts.display_name, call_parts.created_at) as display_name
 FROM call_parts
-GROUP BY project_id, id;
+GROUP BY
+    call_parts.project_id,
+    call_parts.id;
