@@ -762,12 +762,15 @@ export const CallsTable: FC<{
           )}
           <div className="flex items-center gap-6">
             <Switch.Root
+              id="tracesMetricsSwitch"
               size="small"
               checked={isMetricsChecked}
               onCheckedChange={setMetricsChecked}>
               <Switch.Thumb size="small" checked={isMetricsChecked} />
             </Switch.Root>
-            Metrics
+            <label className="cursor-pointer" htmlFor="tracesMetricsSwitch">
+              Metrics
+            </label>
           </div>
           {selectedInputObjectVersion && (
             <Chip

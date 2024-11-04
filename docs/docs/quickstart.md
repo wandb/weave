@@ -28,7 +28,7 @@ First install the weave library:
 
 **Get your API key**
 
-Then, create a Weights & Biases (W&B) account here https://wandb.ai/site and copy your API key from https://wandb.ai/authorize
+Then, create a Weights & Biases (W&B) account at https://wandb.ai and copy your API key from https://wandb.ai/authorize
 
 ## 2. Log a trace to a new project
 
