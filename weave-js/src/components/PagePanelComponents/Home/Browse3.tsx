@@ -92,6 +92,7 @@ import {OpPage} from './Browse3/pages/OpPage';
 import {OpsPage} from './Browse3/pages/OpsPage';
 import {OpVersionPage} from './Browse3/pages/OpVersionPage';
 import {OpVersionsPage} from './Browse3/pages/OpVersionsPage';
+import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
@@ -486,6 +487,13 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/calls/:itemName`}>
           <CallPageBinding />
         </Route>
+        <Route
+          path={[
+            `${projectRoot}/playground/:itemName`,
+            `${projectRoot}/playground`,
+          ]}>
+          <PlaygroundPageBinding />
+        </Route>
         <Route path={`${projectRoot}/:tab(evaluations|traces|calls)`}>
           <CallsPageBinding />
         </Route>
@@ -652,7 +660,17 @@ const useParamsDecoded = <T extends object>() => {
   }, [params]);
 };
 
-// TODO(tim/weaveflow_improved_nav): Generalize this
+const PlaygroundPageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+  return (
+    <PlaygroundPage
+      entity={params.entity}
+      project={params.project}
+      callId={params.itemName}
+    />
+  );
+};
+
 const CallPageBinding = () => {
   useCallPeekRedirect();
   const params = useParamsDecoded<Browse3TabItemParams>();

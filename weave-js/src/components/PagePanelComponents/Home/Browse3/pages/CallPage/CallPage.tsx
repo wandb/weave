@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box';
 import {Loading} from '@wandb/weave/components/Loading';
+import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {FC, useCallback, useEffect, useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -11,6 +12,7 @@ import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {NotFoundPanel} from '../../NotFoundPanel';
+import {CallChat} from '../ChatView/CallChat';
 import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
@@ -23,7 +25,6 @@ import {TabUseCall} from '../TabUseCall';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
@@ -54,6 +55,14 @@ const useCallTabs = (call: CallSchema) => {
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
+
+  const handleOpenInPlayground = () => {
+    window.open(
+      urlPrefixed(`/${entity}/${project}/weave/playground/${callId}`),
+      '_blank'
+    );
+  };
+
   return [
     // Disabling Evaluation tab until it's better for single evaluation
     ...(false && isEvaluateOp(call.spanName)
@@ -80,11 +89,20 @@ const useCallTabs = (call: CallSchema) => {
           {
             label: 'Chat',
             content: (
-              <ScrollableTabContent>
-                <Tailwind>
-                  <CallChat call={call.traceCall!} />
-                </Tailwind>
-              </ScrollableTabContent>
+              <>
+                <Button
+                  variant="secondary"
+                  startIcon="sandbox-playground"
+                  className="m-16 mb-8"
+                  onClick={handleOpenInPlayground}>
+                  Open chat in playground
+                </Button>
+                <ScrollableTabContent>
+                  <Tailwind>
+                    <CallChat call={call.traceCall!} isPlayground={false} />
+                  </Tailwind>
+                </ScrollableTabContent>
+              </>
             ),
           },
         ]
