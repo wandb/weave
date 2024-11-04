@@ -187,13 +187,20 @@ export const useProjectSidebar = (
             iconName: IconNames.CubeContainer,
           },
           {
+            type: 'button' as const,
+            name: 'Playground',
+            slug: 'weave/playground',
+            isShown: isWeaveOnly,
+            iconName: IconNames.CubeContainer,
+          },
+          {
             type: 'menuPlaceholder' as const,
             // name: 'More',
             // slug: 'moreWeave',
             key: 'moreWeave',
             isShown: isShowAll,
             // iconName: IconNames.OverflowHorizontal,
-            menu: ['weave/operations', 'weave/objects'],
+            menu: ['weave/operations', 'weave/objects', 'weave/playground'],
           },
         ];
 
