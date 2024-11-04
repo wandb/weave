@@ -1,6 +1,6 @@
 import Autocomplete, {AutocompleteProps} from '@mui/material/Autocomplete';
 import {createTheme, ThemeProvider} from '@mui/material/styles';
-import React from 'react';
+import React, {useEffect, useCallback, useState} from 'react';
 
 import {
   MOON_100,
@@ -62,6 +62,10 @@ const getStyles = (props: AdditionalProps) => {
                 padding: '0px',
                 minHeight: `${HEIGHTS[size]} !important`,
               },
+            },
+            '& .MuiAutocomplete-popupIndicator': {
+              borderRadius: '4px', // Set the desired border radius
+              padding: '4px',
             },
             '&.MuiAutocomplete-hasPopupIcon .MuiOutlinedInput-root, &.MuiAutocomplete-hasClearIcon .MuiOutlinedInput-root':
               {

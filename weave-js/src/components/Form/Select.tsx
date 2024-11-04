@@ -16,6 +16,8 @@ import {
   MOON_800,
   RED_550,
   TEAL_300,
+  TEAL_350,
+  TEAL_400,
   TEAL_500,
   TEAL_600,
 } from '@wandb/weave/common/css/globals.styles';
@@ -204,10 +206,8 @@ const getStyles = <
     },
     control: (baseStyles, state) => {
       const colorBorderDefault = MOON_250;
-      const colorBorderHover = hexToRGB(TEAL_500, 0.4);
-      const colorBorderOpen = errorState
-        ? hexToRGB(RED_550, 0.64)
-        : hexToRGB(TEAL_500, 0.64);
+      const colorBorderHover = TEAL_350;
+      const colorBorderOpen = errorState ? hexToRGB(RED_550, 0.64) : TEAL_400;
       const height = HEIGHTS[size];
       const minHeight = MIN_HEIGHTS[size] ?? height;
       const lineHeight = LINE_HEIGHTS[size];
