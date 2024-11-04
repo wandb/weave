@@ -66,9 +66,6 @@ const getStyles = (props: AdditionalProps) => {
             '& .MuiAutocomplete-popupIndicator': {
               borderRadius: '4px',
               padding: '4px',
-              '& .MuiIconButton-root': {
-                disableRipple: true, // Disable ripple effect
-              },
             },
             '&.MuiAutocomplete-hasPopupIcon .MuiOutlinedInput-root, &.MuiAutocomplete-hasClearIcon .MuiOutlinedInput-root':
               {
