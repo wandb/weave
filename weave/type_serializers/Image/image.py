@@ -3,8 +3,8 @@
 import base64
 import logging
 import re
-from functools import cached_property
 from io import BytesIO
+from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel
@@ -23,6 +23,13 @@ except ImportError:
 
 
 logger = logging.getLogger(__name__)
+
+# match local image file paths
+IMAGE_SUFFIX = r".*\.(png|jpg|jpeg|gif|tiff)"
+LOCAL_IMAGE_PATTERN = re.compile(rf"^{IMAGE_SUFFIX}$", re.IGNORECASE)
+REMOTE_IMAGE_PATTERN = re.compile(rf"https://.*\.{IMAGE_SUFFIX}", re.IGNORECASE)
+# match base64 encoded images
+BASE64_IMAGE_PATTERN = re.compile(r"^data:image/.*;base64,", re.IGNORECASE)
 
 
 def save(obj: "Image.Image", artifact: MemTraceFilesArtifact, name: str) -> None:
@@ -56,74 +63,64 @@ def register() -> None:
         serializer.register_serializer(Image.Image, save, load)
 
 
-# match local image file paths
-image_suffix = r".*\.(png|jpg|jpeg|gif|tiff)"
-local_image_pattern = re.compile(rf"^{image_suffix}$", re.IGNORECASE)
-remote_image_pattern = re.compile(rf"https://.*\.{image_suffix}", re.IGNORECASE)
-# match base64 encoded images
-base64_image_pattern = re.compile(r"^data:image/.*;base64,", re.IGNORECASE)
-
-
 def is_local_image(path: str) -> bool:
-    return local_image_pattern.match(path) is not None
+    return LOCAL_IMAGE_PATTERN.match(path) is not None
 
 
 def is_remote_image(path: str) -> bool:
-    return remote_image_pattern.match(path) is not None
+    return REMOTE_IMAGE_PATTERN.match(path) is not None
 
 
 def is_base64_image(path: str) -> bool:
-    return base64_image_pattern.match(path) is not None
+    return BASE64_IMAGE_PATTERN.match(path) is not None
 
 
 class PathImage(BaseModel):
-    data: Optional[str]
-    path: Optional[str]
+    # allow PIL.Image.Image in the pydantic model
+    model_config = {"arbitrary_types_allowed": True}
 
-    @cached_property
-    def img(self) -> Optional[Image.Image]:
-        if not dependencies_met:
-            logger.error("Failed to load image: PIL is not installed")
+    path: Optional[str | Path]
+    img: Optional[Image.Image]
+
+    @staticmethod
+    def from_path(path: str | Path) -> Optional["PathImage"]:
+        if isinstance(path, str):
+            assert is_local_image(path), "Path is not a local image"
+        try:
+            img = Image.open(path)
+            return PathImage(img=img, path=path)
+        except Exception as e:
+            logger.warning(f"Failed to open local image file: {path}. {e}")
             return None
 
-        # If we have the raw bytes, use that
-        if self.data:
-            # strip headers, then decode
-            try:
-                image_data = re.sub("^data:image/.+;base64,", "", self.data)
-                return Image.open(BytesIO(base64.b64decode(image_data)))
-            except Exception as e:
-                logger.error(f"Failed to decode base64 image data: {e}")
-                return None
+    @staticmethod
+    def from_url(url: str) -> Optional["PathImage"]:
+        assert is_remote_image(url), "URL is not a remote image"
+        try:
+            import requests
 
-        if not self.path:
+            img_stream = requests.get(url, stream=True).raw
+            img = Image.open(img_stream)
+            return PathImage(img=img, path=url)
+        except Exception as e:
+            logger.warning(f"Failed to load remote image file: {url}. {e}")
             return None
 
-        if is_local_image(self.path):
-            try:
-                return Image.open(self.path)
-            except Exception as e:
-                logger.error(f"Failed to open local image file: {self.path}. {e}")
-                return None
 
-        if is_remote_image(self.path):
-            try:
-                import requests
+class EncodedImage(BaseModel):
+    # allow PIL.Image.Image in the pydantic model
+    model_config = {"arbitrary_types_allowed": True}
 
-                return Image.open(requests.get(self.path).raw)
-            except Exception as e:
-                logger.error(f"Failed to load remote image file: {self.path}. {e}")
-                return None
-        return None
+    raw_data: str
+    img: Image.Image
 
     @staticmethod
-    def from_data(data: str) -> "PathImage":
-        return PathImage(data=data, path=None)
-
-    @staticmethod
-    def from_path(path: str) -> "PathImage":
-        return PathImage(data=None, path=path)
-
-    @staticmethod
-    def from_url(url: str) -> "PathImage":
-        return PathImage(data=None, path=url)
+    def from_data(data: str) -> Optional["EncodedImage"]:
+        assert is_base64_image(data), "Data is not a base64 encoded image"
+        try:
+            image_data = re.sub("^data:image/.+;base64,", "", data)
+            img = Image.open(BytesIO(base64.b64decode(image_data)))
+            return EncodedImage(raw_data=data, img=img)
+        except Exception as e:
+            logger.warning(f"Failed to decode base64 image data: {e}")
+            return None

@@ -7,6 +7,7 @@ import sys
 import typing
 from concurrent.futures import Future
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Union
 
 import pydantic
@@ -78,6 +79,7 @@ from weave.trace_server.trace_server_interface import (
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.type_serializers.Image.image import (
+    EncodedImage,
     PathImage,
     is_base64_image,
     is_local_image,
@@ -654,6 +656,7 @@ class WeaveClient:
         parse_obj_functions: list[Callable] = [redact_sensitive_keys]
         if should_convert_paths_to_images():
             parse_obj_functions.append(convert_paths_to_images)
+            parse_obj_functions.append(convert_str_paths_to_images)
 
         inputs = parse_obj(inputs, parse_obj_functions)
 
@@ -754,6 +757,7 @@ class WeaveClient:
         parse_obj_functions: list[Callable] = []
         if should_convert_paths_to_images():
             parse_obj_functions.append(convert_paths_to_images)
+            parse_obj_functions.append(convert_str_paths_to_images)
 
         output = parse_obj(output, parse_obj_functions)
         original_output = output
@@ -1255,7 +1259,7 @@ class WeaveClient:
         # Case 1: Object:
         # Here we recurse into each of the properties of the object
         # and save them, and then save the object itself.
-        if isinstance(obj, Object) or isinstance(obj, PathImage):
+        if isinstance(obj, Object) or isinstance(obj, (PathImage, EncodedImage)):
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
@@ -1577,18 +1581,24 @@ def sanitize_object_name(name: str) -> str:
     return res
 
 
-def convert_paths_to_images(obj: str) -> typing.Union[str, PathImage]:
+def convert_paths_to_images(obj: Path) -> typing.Union[Path, PathImage]:
+    return PathImage.from_path(obj) or obj
+
+
+def convert_str_paths_to_images(obj: str) -> typing.Union[str, PathImage, EncodedImage]:
     """Load or download paths to images as PathImage objects.
 
     If the path is a local image, open it and return a PathImage object.
     If the path is a remote image, download it and return a PathImage object.
     """
-    if is_remote_image(obj) or is_local_image(obj):
-        return PathImage(path=obj, data=None)
+    converted: Optional[typing.Union[PathImage, EncodedImage]] = None
+    if is_remote_image(obj):
+        converted = PathImage.from_url(obj)
+    elif is_local_image(obj):
+        converted = PathImage.from_path(obj)
     elif is_base64_image(obj):
-        return PathImage(data=obj, path=None)
-
-    return obj
+        converted = EncodedImage.from_data(obj)
+    return converted or obj
 
 
 def parse_obj(obj: Any, parsers: list[Callable[..., Any]]) -> Any:
@@ -1630,6 +1640,14 @@ def parse_obj(obj: Any, parsers: list[Callable[..., Any]]) -> Any:
             param_types = typing.get_type_hints(parser)
             if "obj" in param_types and param_types["obj"] == str:
                 obj = parser(obj)
+
+    # apply parsers to Path types
+    if isinstance(obj, Path):
+        for parser in parsers:
+            param_types = typing.get_type_hints(parser)
+            if "obj" in param_types and param_types["obj"] == Path:
+                obj = parser(obj)
+
     return obj
 
 

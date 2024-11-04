@@ -1,8 +1,8 @@
 import React from 'react';
 
-import {LoadingDots} from '../../../../../LoadingDots';
-import {useWFHooks} from '../../pages/wfReactInterface/context';
-import {CustomWeaveTypePayload} from '../customWeaveType.types';
+import { LoadingDots } from '../../../../../LoadingDots';
+import { useWFHooks } from '../../pages/wfReactInterface/context';
+import { CustomWeaveTypePayload } from '../customWeaveType.types';
 
 type PILImageImageTypePayload = CustomWeaveTypePayload<
   'PIL.Image.Image',
@@ -32,6 +32,8 @@ export const PILImageImage: React.FC<{
   } else if (imageBinary.result == null) {
     return <span></span>;
   }
+
+  console.log("RENDERING PILLL", props.data);
 
   const arrayBuffer = imageBinary.result as any as ArrayBuffer;
   const blob = new Blob([arrayBuffer], {type: 'image/png'});
