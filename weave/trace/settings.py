@@ -73,11 +73,12 @@ class UserSettings(BaseModel):
     This cannot be changed after the client has been initialized.
     """
 
-    convert_paths_to_images: bool = True
+    # TODO(gst): Make this the default behavior.
+    convert_paths_to_images: bool = False
     """Toggles conversion of image file paths to PathImage objects.
 
-    If True, image file paths will be converted to PathImage objects.
-    Can be overrided with the environment variable `WEAVE_CONVERT_PATHS_TO_IMAGES`
+    If True, image file paths and base64 encoded images will be converted to 
+    PathImage and EncodedImage objects.
 
     Example:
         @weave.op
