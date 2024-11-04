@@ -12,6 +12,7 @@
       "weave": ["./src/index.ts"]
     }
   },
+  "include": ["src/**/*"],
   "exclude": ["src", "examples", "dist", "node_modules"],
   "references": [
     {

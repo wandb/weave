@@ -19,8 +19,10 @@
     "generate:watch": "graphql-codegen -w",
     "prettier": "prettier --config .prettierrc --check \"src/**/*.ts\" \"src/**/*.tsx\"",
     "prettier-fix": "prettier --loglevel warn --config .prettierrc --write \"src/**/*.ts\" \"src/**/*.tsx\"",
+    "direct-prettier": "prettier",
     "lint": "yarn eslint & yarn tslint & yarn prettier & wait",
-    "lint-fix": "yarn eslint-fix & yarn tslint-fix & yarn prettier-fix & wait"
+    "lint-fix": "yarn eslint-fix & yarn tslint-fix & yarn prettier-fix & wait",
+    "generate-schemas": "bash scripts/generate-schemas.sh"
   },
   "dependencies": {
     "@apollo/client": "^3.8.4",
@@ -145,7 +147,8 @@
     "wavesurfer.js": "^2.0.0",
     "web-tree-sitter": "^0.20.5",
     "yet-another-react-lightbox": "^3.17.5",
-    "zen-observable": "^0.10.0"
+    "zen-observable": "^0.10.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@babel/core": "^7.23.2",
@@ -217,11 +220,13 @@
     "identity-obj-proxy": "^3.0.0",
     "jsdom": "^22.1.0",
     "json-schema-to-typescript": "^11.0.2",
+    "json-schema-to-zod": "^2.4.1",
     "less": "^2.7.3",
     "lodash.defaults": "^4.2.0",
     "nodemon": "^2.0.22",
     "prettier": "^2.8.7",
     "prettier-plugin-tailwindcss": "^0.2.1",
+    "quicktype": "^23.0.170",
     "rimraf": "^3.0.2",
     "rollup-plugin-visualizer": "^5.5.2",
     "tailwindcss": "^3.3.2",
@@ -233,7 +238,8 @@
     "typescript": "4.7.4",
     "uuid": "^9.0.0",
     "vite": "5.2.9",
-    "vitest": "^1.6.0"
+    "vitest": "^1.6.0",
+    "tsd": "^0.30.4"
   },
   "resolutions": {
     "@types/react": "^17.0.26",
