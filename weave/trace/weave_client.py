@@ -18,7 +18,6 @@ from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
-from weave.trace.feedback_types.score import SCORE_TYPE_NAME, ScoreTypePayload
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
@@ -1106,8 +1105,6 @@ class WeaveClient:
 
         Outstanding questions:
         - Should we somehow include supervision (ie. the ground truth) in the payload?
-        - What should the shape of `ScoreTypePayload` be? Maybe we want the results to be top-level?
-        - What should we use for name? A standard "score" or the score name?
         """
         # Parse the refs (acts as validation)
         call_ref = parse_uri(call_ref_uri)
@@ -1132,18 +1129,17 @@ class WeaveClient:
 
         # # Prepare the supervision payload
 
-        payload: ScoreTypePayload = {
-            "name": score_name,
-            "op_ref": scorer_op_ref_uri,
-            "call_ref": scorer_call_ref_uri,
-            "results": results_json,
+        payload = {
+            "output": results_json,
         }
 
         freq = FeedbackCreateReq(
             project_id=self._project_id(),
             weave_ref=call_ref_uri,
-            feedback_type=SCORE_TYPE_NAME,  # should this be score_name?
+            feedback_type="wandb.runnable." + score_name,
             payload=payload,
+            runnable_ref=scorer_op_ref_uri,
+            call_ref=scorer_call_ref_uri,
         )
         response = self.server.feedback_create(freq)
 
