@@ -22,6 +22,10 @@ TABLE_FEEDBACK = Table(
         Column("created_at", "datetime"),
         Column("feedback_type", "string"),
         Column("payload", "json", db_name="payload_dump"),
+        Column("annotation_ref", "string", nullable=True),
+        Column("runnable_ref", "string", nullable=True),
+        Column("call_ref", "string", nullable=True),
+        Column("trigger_ref", "string", nullable=True),
     ],
 )
 

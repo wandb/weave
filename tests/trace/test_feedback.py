@@ -171,6 +171,10 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         "created_at": create_res.created_at.isoformat().replace("T", " "),
         "feedback_type": feedback_type,
         "payload": payload,
+        "annotation_ref": annotation_ref,
+        "runnable_ref": None,
+        "call_ref": None,
+        "trigger_ref": None,
     }
 
 
@@ -312,4 +316,8 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "created_at": create_res.created_at.isoformat().replace("T", " "),
         "feedback_type": feedback_type,
         "payload": payload,
+        "annotation_ref": None,
+        "runnable_ref": runnable_ref,
+        "call_ref": call_ref,
+        "trigger_ref": trigger_ref,
     }

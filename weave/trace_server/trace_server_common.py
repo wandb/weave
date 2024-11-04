@@ -37,6 +37,10 @@ def make_feedback_query_req(
             "creator",
             "created_at",
             "wb_user_id",
+            "runnable_ref",
+            "call_ref",
+            "trigger_ref",
+            "annotation_ref",
         ],
         query=query,
     )

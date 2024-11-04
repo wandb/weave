@@ -970,6 +970,6 @@ async def test_feedback_is_correctly_linked(client):
         == CallRef(
             entity=client.entity,
             project=client.project,
-            call_id=list(score.get_calls())[0].id,
+            id=list(score.calls())[0].id,
         ).uri()
     )
