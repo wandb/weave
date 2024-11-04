@@ -388,7 +388,7 @@ class CallsQuery(BaseModel):
         SELECT {SELECT_FIELDS}
         FROM calls_merged
         WHERE project_id = {PROJECT_ID}
-        AND id IN (filtered_calls)
+        AND id IN (SELECT id FROM filtered_calls)
         GROUP BY (project_id, id)
         --- IF ORDER BY CANNOT BE PUSHED DOWN ---
         HAVING {HEAVY_FILTER_CONDITIONS}        -- optional <-- yes, this is inside the conditional
@@ -556,7 +556,7 @@ class CallsQuery(BaseModel):
 
         id_subquery_sql = ""
         if id_subquery_name is not None:
-            id_subquery_sql = f"AND (id IN {id_subquery_name})"
+            id_subquery_sql = f"AND (id IN (SELECT id FROM {id_subquery_name}))"
 
         project_param = pb.add_param(self.project_id)
 
