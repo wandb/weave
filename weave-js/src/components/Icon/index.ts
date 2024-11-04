@@ -60,6 +60,7 @@ export {
   IconDocumentation,
   IconDownload,
   IconDraft,
+  IconDragGrip,
   IconDragGripHorizontal,
   IconEducationAcademic,
   IconEmailAt,
