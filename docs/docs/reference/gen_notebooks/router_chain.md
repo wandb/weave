@@ -313,7 +313,7 @@ model = ChainModel(model_name='gpt-4', prompt_router=prompt_router)
 results = await evaluation.evaluate(model)
 ```
 
-## Evaluating Category Alignment in Routing
+# Evaluating Category Alignment in Routing
 
  Similar to evaluating the final output, we assess routing accuracy by categorizing each query against an expected category (e.g., "Math" or "Physics") to verify that `prompt_router` selects the correct prompt template.
 
