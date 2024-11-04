@@ -132,6 +132,8 @@ def test_send_message(client):
     )
 
     calls = list(client.calls())
+    # `send_message` is using `GenerativeModel.generate_content under the hood
+    # which we're already patching. Hence, we have 2 calls here.
     assert len(calls) == 2
 
     call = calls[0]
@@ -165,6 +167,8 @@ def test_send_message_stream(client):
     _ = [r for r in response]
 
     calls = list(client.calls())
+    # `send_message` is using `GenerativeModel.generate_content under the hood
+    # which we're already patching. Hence, we have 2 calls here.
     assert len(calls) == 2
 
     call = calls[0]
@@ -197,6 +201,8 @@ async def test_send_message_async(client):
     )
 
     calls = list(client.calls())
+    # `send_message` is using `GenerativeModel.generate_content under the hood
+    # which we're already patching. Hence, we have 2 calls here.
     assert len(calls) == 2
 
     call = calls[0]
