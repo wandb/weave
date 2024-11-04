@@ -387,7 +387,7 @@ class Evaluation(Object):
                     for param in score_signature.parameters.values()
                     if param.default == inspect.Parameter.empty
                 ]
-                required_arg_names.remove(self._output_key)
+                required_arg_names.remove(score_output_name)
 
                 message = textwrap.dedent(
                     f"""
