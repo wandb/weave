@@ -2,9 +2,7 @@ import 'prismjs/components/prism-markup-templating';
 
 import React from 'react';
 
-import Markdown from '../../../../../../common/components/Markdown';
 import {TargetBlank} from '../../../../../../common/util/links';
-import {isLikelyMarkdown} from '../../../../../../util/markdown';
 import {CodeEditor} from '../../../../../CodeEditor';
 import {MessagePart} from './types';
 
@@ -19,10 +17,11 @@ export const MessagePanelPart = ({
       const reformat = JSON.stringify(JSON.parse(value), null, 2);
       return <CodeEditor language="json" value={reformat} />;
     }
-    if (isLikelyMarkdown(value)) {
-      return <Markdown content={value} />;
-    }
-    return <span className="whitespace-break-spaces">{value}</span>;
+    // Markdown is slowing down chat view, maybe bring this back if users complain
+    // if (isLikelyMarkdown(value)) {
+    //   return <Markdown content={value} />;
+    // }
+    return <div className="whitespace-break-spaces">{value}</div>;
   }
   if (value.type === 'text' && 'text' in value) {
     return <div className="whitespace-break-spaces">{value.text}</div>;
