@@ -3,7 +3,7 @@ import {Table} from '../../table';
 
 describe('table', () => {
   beforeEach(async () => {
-    await login({apiKey: process.env.WANDB_API_KEY ?? ''});
+    await login(process.env.WANDB_API_KEY ?? '');
   });
 
   test('example', async () => {

@@ -10,7 +10,8 @@ export function getUrls(host?: string) {
     traceBaseUrl: isDefault
       ? `https://trace.wandb.ai`
       : `https://${resolvedHost}`,
-    domain: isDefault ? defaultHost : resolvedHost,
+    domain: isDefault ? defaultDomain : resolvedHost,
+    host: isDefault ? defaultHost : resolvedHost,
   };
 }
 

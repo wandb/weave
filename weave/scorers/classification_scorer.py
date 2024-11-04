@@ -37,12 +37,15 @@ class MultiTaskBinaryClassificationF1(Scorer):
 
         return result
 
+    # NOTE: This is an old-style scorer that uses `model_output` instead of `output` for
+    # backwards compatibility.  In future, this behaviour may change to use the newer `output` key.
+    # You can still pass a `column_map` to map to the new `output` key if you prefer.
     @weave.op()
-    def score(self, target: dict, output: Optional[dict]) -> dict:
+    def score(self, target: dict, model_output: Optional[dict]) -> dict:
         result = {}
         for class_name in self.class_names:
             class_label = target.get(class_name)
-            class_output = output.get(class_name) if output else None
+            class_output = model_output.get(class_name) if model_output else None
             result[class_name] = {
                 "correct": class_label == class_output,
                 "negative": not class_output,

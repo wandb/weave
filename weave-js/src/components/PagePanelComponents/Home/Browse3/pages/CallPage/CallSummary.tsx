@@ -1,7 +1,7 @@
 import _ from 'lodash';
-import numeral from 'numeral';
 import React, {useMemo} from 'react';
 
+import {BytesStoredInfoIcon} from '../../../../../BytesStoredInfoIcon';
 import {Timestamp} from '../../../../../Timestamp';
 import {UserLink} from '../../../../../UserLink';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
@@ -92,7 +92,12 @@ export const CallSummary: React.FC<{
                 Latency: span.summary.latency_s.toFixed(3) + 's',
               }
             : {}),
-          'Bytes stored': numeral(totalBytesStored).format('0.0b'),
+          'Bytes stored': (
+            <BytesStoredInfoIcon
+              bytesStored={totalBytesStored}
+              weaveKind="trace"
+            />
+          ),
           ...(Object.keys(attributes).length > 0
             ? {Attributes: attributes}
             : {}),

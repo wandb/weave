@@ -18,6 +18,9 @@ export interface WandbLoaderProps extends StrictLoaderProps {
   size?: StrictLoaderProps['size'];
 }
 
+/**
+ * @deprecated use the new wave loader instead
+ */
 const WandbLoader: React.FC<WandbLoaderProps> = React.memo(
   ({className, inline, size = 'huge'}) => {
     return <Loader active inline={inline} size={size} className={className} />;
