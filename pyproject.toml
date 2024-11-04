@@ -176,6 +176,10 @@ line-length = 88
 show-fixes = true
 exclude = ["weave_query"]
 
+[tool.pyright]
+include = ["weave"]
+exclude = ["weave_query", "tests", "examples", "docs", "noxfile.py"]
+
 [tool.mypy]
 warn_unused_configs = true
 # Note: You have to update .pre-commit-config.yaml too!
