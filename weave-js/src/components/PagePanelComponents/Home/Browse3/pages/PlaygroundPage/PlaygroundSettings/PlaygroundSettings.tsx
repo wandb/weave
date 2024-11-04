@@ -4,7 +4,8 @@ import * as Tabs from '@wandb/weave/components/Tabs';
 import {Tag} from '@wandb/weave/components/Tag';
 import React from 'react';
 
-import {PlaygroundState, PlaygroundResponseFormats} from '../types';
+
+import {PlaygroundResponseFormats,PlaygroundState} from '../types';
 import {FunctionEditor} from './FunctionEditor';
 import {PlaygroundSlider} from './PlaygroundSlider';
 import {ResponseFormatEditor} from './ResponseFormatEditor';
