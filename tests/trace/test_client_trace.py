@@ -1506,24 +1506,10 @@ def test_unknown_input_and_output_types(client):
 
     assert len(inner_res.calls) == 1
     assert inner_res.calls[0].inputs == {
-        "a": {
-            "__class__": {
-                "module": "test_client_trace",
-                "qualname": "test_unknown_input_and_output_types.<locals>.MyUnknownClassA",
-                "name": "MyUnknownClassA",
-            },
-            "a_val": 3,
-        },
+        "a": repr(a),
         "b": 0.14,
     }
-    assert inner_res.calls[0].output == {
-        "__class__": {
-            "module": "test_client_trace",
-            "qualname": "test_unknown_input_and_output_types.<locals>.MyUnknownClassB",
-            "name": "MyUnknownClassB",
-        },
-        "b_val": 3.14,
-    }
+    assert inner_res.calls[0].output == repr(res)
 
 
 def test_unknown_attribute(client):

@@ -699,7 +699,7 @@ class WeaveClient:
         project_id = self._project_id()
 
         def send_start_call() -> None:
-            inputs_json = to_json(inputs_with_refs, project_id, self, use_dictify=True)
+            inputs_json = to_json(inputs_with_refs, project_id, self, use_dictify=False)
             self.server.call_start(
                 CallStartReq(
                     start=StartedCallSchemaForInsert(
@@ -798,7 +798,7 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
-            output_json = to_json(call.output, project_id, self, use_dictify=True)
+            output_json = to_json(call.output, project_id, self, use_dictify=False)
             self.server.call_end(
                 CallEndReq(
                     end=EndedCallSchemaForInsert(
