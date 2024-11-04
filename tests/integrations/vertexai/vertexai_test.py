@@ -7,10 +7,6 @@ from weave.integrations.integration_utilities import op_name_from_ref
 
 @pytest.mark.retry(max_attempts=5)
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-)
 def test_content_generation(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel
@@ -32,10 +28,6 @@ def test_content_generation(client):
 
 @pytest.mark.retry(max_attempts=5)
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-)
 def test_content_generation_stream(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel
@@ -58,18 +50,15 @@ def test_content_generation_stream(client):
 
 
 @pytest.mark.retry(max_attempts=5)
+@pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-)
-def test_content_generation_async(client):
+async def test_content_generation_async(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel
 
     vertexai.init(project="wandb-growth", location="us-central1")
     model = GenerativeModel("gemini-1.5-flash")
-    asyncio.run(model.generate_content_async("What is the capital of France?"))
+    await model.generate_content_async("What is the capital of France?")
 
     calls = list(client.calls())
     assert len(calls) == 1
@@ -83,12 +72,9 @@ def test_content_generation_async(client):
 
 
 @pytest.mark.retry(max_attempts=5)
+@pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-)
-def test_content_generation_async_stream(client):
+async def test_content_generation_async_stream(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel
 
@@ -104,7 +90,7 @@ def test_content_generation_async_stream(client):
                 chunks.append(chunk.text)
         return chunks
 
-    asyncio.run(get_response())
+    await get_response()
 
     calls = list(client.calls())
     assert len(calls) == 1
