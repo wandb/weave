@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useRef} from 'react';
+import React, {useEffect, useRef} from 'react';
 
 import {MessagePanel} from './MessagePanel';
 import {Message, Messages, ToolCallWithResponse} from './types';
