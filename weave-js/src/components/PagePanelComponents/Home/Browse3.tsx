@@ -33,9 +33,9 @@ import React, {
 } from 'react';
 import useMousetrap from 'react-hook-mousetrap';
 import {
+  Link as RouterLink,
   Redirect,
   Route,
-  Link as RouterLink,
   Switch,
   useHistory,
   useLocation,
