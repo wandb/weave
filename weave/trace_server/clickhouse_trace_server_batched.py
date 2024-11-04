@@ -1453,7 +1453,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         end_time = datetime.datetime.now()
 
         if not req.track_llm_call:
-            return tsi.CompletionsCreateRes(response=res.response, weave_call_id=None)
+            return tsi.CompletionsCreateRes(response=res.response)
 
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
@@ -1489,7 +1489,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         self._insert_call_batch(batch_data)
 
-        return tsi.CompletionsCreateRes(response=res.response)
+        return tsi.CompletionsCreateRes(
+            response=res.response, weave_call_id=start_call.id
+        )
 
     # Private Methods
     @property

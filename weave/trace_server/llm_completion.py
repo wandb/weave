@@ -12,7 +12,6 @@ def lite_llm_completion(
         res = litellm.completion(
             **inputs.model_dump(exclude_none=True), api_key=api_key
         )
-        print("res", res.model_dump(), flush=True)
         return tsi.CompletionsCreateRes(response=res.model_dump())
     except Exception as e:
         print("error", str(e), flush=True)
