@@ -31,6 +31,7 @@ class Message(BaseModel):
 
 class Result(BaseModel):
     id: str
+    intent: str
     conversation: List[Message]
     categories: List[str]
     score: float
@@ -128,7 +129,9 @@ class HaizeEvaluation(weave.Evaluation):
 
     # identity function to log attacks/responses to weave
     @weave.op(postprocess_inputs=postprocess_inputs)
-    def log_attack(self, attack: str, score: int, status: str, output: str):
+    def log_attack(
+        self, intent: str, attack: str, score: int, status: str, output: str
+    ):
         return {"function_output": output, "score": score, "status": status}
 
     async def _get_results(self, headers):
@@ -170,6 +173,7 @@ class HaizeEvaluation(weave.Evaluation):
                     live.update(print_table(new_results=new_results))
                     for result in results_to_show:
                         self.log_attack(
+                            intent=result.intent,
                             attack=result.conversation[0].content,
                             score=result.score,
                             status=statuses[result.status],
