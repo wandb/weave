@@ -225,7 +225,6 @@ async def test_litellm_quickstart_stream_async(
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
-@pytest.mark.asyncio
 def test_model_predict(
     client: weave.trace.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
