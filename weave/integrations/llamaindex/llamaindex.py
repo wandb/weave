@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 if not import_failed:
 
-    class WeaveCallbackHandler(BaseCallbackHandler):
+    class WeaveCallbackHandler(BaseCallbackHandler):  # pyright: ignore[reportRedeclaration]
         """Base callback handler that can be used to track event starts and ends."""
 
         def __init__(

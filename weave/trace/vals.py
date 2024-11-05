@@ -3,6 +3,7 @@ import inspect
 import logging
 import operator
 import typing
+from copy import deepcopy
 from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
 
 from pydantic import BaseModel
@@ -194,6 +195,17 @@ class WeaveObject(Traceable):
         self.server = server
         self.root = root or self
         self.parent = parent
+
+    def __deepcopy__(self, memo: dict) -> "WeaveObject":
+        val_copy = deepcopy(self._val, memo)
+        res = WeaveObject(
+            val_copy,
+            ref=self.ref,  # maybe this should be zero'd?
+            server=self.server,
+            root=self.root,
+        )
+        memo[id(self)] = res
+        return res
 
     def __getattribute__(self, __name: str) -> Any:
         try:
@@ -456,6 +468,18 @@ class WeaveList(Traceable, list):
         self.parent = parent
         super().__init__(*args)
 
+    def __deepcopy__(self, memo: dict) -> "WeaveList":
+        items_copy = [deepcopy(item, memo) for item in self]
+        res = WeaveList(
+            items_copy,
+            server=self.server,
+            ref=self.ref,  # maybe this should be zero'd?
+            root=self.root,
+            parent=self.parent,
+        )
+        memo[id(self)] = res
+        return res
+
     def __getitem__(self, i: Union[SupportsIndex, slice]) -> Any:
         if isinstance(i, slice):
             raise ValueError("Slices not yet supported")
@@ -520,6 +544,18 @@ class WeaveDict(Traceable, dict):
         self.root = root if root is not None else self
         self.parent = parent
         super().__init__(*args, **kwargs)
+
+    def __deepcopy__(self, memo: dict) -> "WeaveDict":
+        items_copy = {k: deepcopy(v, memo) for k, v in self.items()}
+        res = WeaveDict(
+            items_copy,
+            server=self.server,
+            ref=self.ref,  # maybe this should be zero'd?
+            root=self.root,
+            parent=self.parent,
+        )
+        memo[id(self)] = res
+        return res
 
     def __getitem__(self, key: str) -> Any:
         new_ref = self.ref.with_key(key) if self.ref else None

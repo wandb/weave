@@ -611,7 +611,7 @@ def op(
             if is_async:
 
                 @wraps(func)
-                async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                async def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportRedeclaration]
                     res, _ = await _do_call_async(
                         cast(Op, wrapper), *args, __should_raise=True, **kwargs
                     )
