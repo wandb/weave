@@ -1,92 +1,52 @@
 import pytest
 
 import weave
-from weave.trace.refs import ObjectRef
+from tests.trace.util import client_is_sqlite
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.interface.base_object_classes.actions import (
     ActionDefinition,
-    ContainsWordsActionSpec,
 )
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from weave.trace_server.trace_server_interface import (
     ActionsExecuteBatchReq,
     FeedbackCreateReq,
-    ObjCreateReq,
-    ObjQueryReq,
 )
 
 
-def test_action_execute_workflow(client: WeaveClient):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)  # type: ignore
-    if is_sqlite:
-        # dont run this test for sqlite
-        return
+def test_action_lifecycle_simple(client: WeaveClient):
+    if client_is_sqlite(client):
+        return pytest.skip("skipping for sqlite")
 
-    action_name = "test_action"
-    # part 1: create the action
-    digest = client.server.obj_create(
-        ObjCreateReq.model_validate(
-            {
-                "obj": {
-                    "project_id": client._project_id(),
-                    "object_id": action_name,
-                    "base_object_class": "ActionDefinition",
-                    "val": ActionDefinition(
-                        name="test_action",
-                        spec=ContainsWordsActionSpec(
-                            target_words=["mindful", "demure"]
-                        ),
-                    ).model_dump(),
-                }
-            }
-        )
-    ).digest
+    action_name = "my_contains_words_action"
 
-    configured_actions = client.server.objs_query(
-        ObjQueryReq.model_validate(
-            {
-                "project_id": client._project_id(),
-                "filter": {"base_object_classes": ["Action"]},
-            }
+    published_ref = weave.publish(
+        ActionDefinition(
+            name=action_name,
+            spec={
+                "action_type": "contains_words",
+                "target_words": ["mindful", "demure"],
+            },
         )
     )
 
-    assert len(configured_actions.objs) == 1
-    assert configured_actions.objs[0].digest == digest
-    action_ref_uri = ObjectRef(
-        entity=client.entity,
-        project=client.project,
-        name=action_name,
-        _digest=digest,
-    ).uri()
+    # Construct the URI
+    action_ref_uri = published_ref.uri()
 
-    # part 2: manually create feedback
+    # Part 2: Demonstrate manual feedback (this is not user-facing)
     @weave.op
     def example_op(input: str) -> str:
         return input[::-1]
 
-    _, call1 = example_op.call("i've been very mindful today")
-    with pytest.raises(Exception):
-        client.server.feedback_create(
-            FeedbackCreateReq.model_validate(
-                {
-                    "project_id": client._project_id(),
-                    "weave_ref": call1.ref.uri(),
-                    "feedback_type": "MachineScore",
-                    "payload": True,
-                }
-            )
-        )
+    _, call1 = example_op.call("i've been very distracted today")
 
     res = client.server.feedback_create(
         FeedbackCreateReq.model_validate(
             {
                 "project_id": client._project_id(),
                 "weave_ref": call1.ref.uri(),
-                "feedback_type": "MachineScore",
+                "feedback_type": "wandb.runnable." + action_name,
+                "runnable_ref": action_ref_uri,
                 "payload": {
-                    "runnable_ref": action_ref_uri,
-                    "value": {action_name: {digest: True}},
+                    "output": False,
                 },
             }
         )
@@ -94,12 +54,10 @@ def test_action_execute_workflow(client: WeaveClient):
 
     feedbacks = list(call1.feedback)
     assert len(feedbacks) == 1
-    assert feedbacks[0].payload == {
-        "runnable_ref": action_ref_uri,
-        "value": {action_name: {digest: True}},
-        "call_ref": None,
-        "trigger_ref": None,
-    }
+    feedback = feedbacks[0]
+    assert feedback.feedback_type == "wandb.runnable." + action_name
+    assert feedback.runnable_ref == action_ref_uri
+    assert feedback.payload == {"output": False}
 
     # Step 3: test that we can in-place execute one action at a time.
 
@@ -109,17 +67,15 @@ def test_action_execute_workflow(client: WeaveClient):
         ActionsExecuteBatchReq.model_validate(
             {
                 "project_id": client._project_id(),
-                "call_ids": [call2.id],
                 "action_ref": action_ref_uri,
+                "call_ids": [call2.id],
             }
         )
     )
 
     feedbacks = list(call2.feedback)
     assert len(feedbacks) == 1
-    assert feedbacks[0].payload == {
-        "runnable_ref": action_ref_uri,
-        "value": {action_name: {digest: False}},
-        "call_ref": None,
-        "trigger_ref": None,
-    }
+    feedback = feedbacks[0]
+    assert feedback.feedback_type == "wandb.runnable." + action_name
+    assert feedback.runnable_ref == action_ref_uri
+    assert feedback.payload == {"output": True}
