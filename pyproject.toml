@@ -189,6 +189,24 @@ exclude = ["weave_query", "tests", "examples", "docs", "noxfile.py"]
 # In cases where we support multiple versions of an integration, some imports can be missing
 reportMissingImports = false
 
+# TODO: Gradually remove as we improve our code!
+reportAttributeAccessIssue = false
+reportPossiblyUnboundVariable = false
+reportOptionalMemberAccess = false
+reportPrivateImportUsage = false
+reportArgumentType = false
+reportReturnType = false
+reportGeneralTypeIssues = false
+reportCallIssue = false
+reportIncompatibleMethodOverride = false
+reportRedeclaration = false
+reportIndexIssue = false
+reportOperatorIssue = false
+reportAssignmentType = false
+reportInconsistentOverload = false
+reportTypedDictNotRequiredAccess = false
+reportOptionalSubscript = false
+reportFunctionMemberAccess = false
 
 [tool.mypy]
 warn_unused_configs = true

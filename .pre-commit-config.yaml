@@ -20,6 +20,11 @@ repos:
         # Note: You have to update pyproject.toml[tool.mypy] too!
         args: ["--config-file=pyproject.toml"]
         exclude: (.*pyi$)|(weave_query)|(tests)|(examples)
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.387
+    hooks:
+      - id: pyright
+
   # This is legacy Weave when we were building a notebook product - should be removed
   - repo: local
     hooks:
