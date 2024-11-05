@@ -89,7 +89,7 @@ if not import_failed:
         run_dict = {k: v for k, v in run_dict.items() if v}
         return run_dict
 
-    class WeaveTracer(BaseTracer):
+    class WeaveTracer(BaseTracer):  # pyright: ignore[reportRedeclaration]
         run_inline: bool = True
 
         def __init__(self, **kwargs: Any) -> None:
