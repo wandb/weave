@@ -1,38 +1,10 @@
 #!/usr/bin/env python3
 import sys
 from pathlib import Path
-from typing import Set
 
 from PIL import Image
 
-# Comprehensive list of image extensions we want to process
-IMAGE_EXTENSIONS: Set[str] = {
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".gif",
-    ".tiff",
-    ".tif",
-    ".bmp",
-    ".webp",
-    ".heic",
-    ".heif",
-}
-
-
-def has_exif(image: Image.Image) -> bool:
-    """Check if image has EXIF data.
-
-    Args:
-        image: PIL Image object
-
-    Returns:
-        bool: True if image has EXIF data, False otherwise
-    """
-    try:
-        return bool(image.getexif())
-    except Exception:
-        return False
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tiff", ".tif", ".webp"}
 
 
 def strip_exif(image_path: Path) -> bool:
@@ -45,24 +17,21 @@ def strip_exif(image_path: Path) -> bool:
         bool: True if successful, False if failed
     """
     try:
-        image = Image.open(image_path)
+        with Image.open(image_path) as img:
+            if not img.getexif():
+                return True
 
-        if not has_exif(image):
+            # Convert RGBA to RGB if needed (some formats don't support RGBA)
+            if img.mode == "RGBA":
+                img = img.convert("RGB")
+
+            # Create a new image without EXIF
+            data = list(img.getdata())
+            img_without_exif = Image.new(img.mode, img.size)
+            img_without_exif.putdata(data)
+            img_without_exif.save(image_path, format=img.format)
+            print(f"Stripped EXIF from: {image_path}")
             return True
-
-        # Convert RGBA to RGB if needed (some formats don't support RGBA)
-        if image.mode == "RGBA":
-            image = image.convert("RGB")
-
-        # Create a new image without EXIF
-        data = list(image.getdata())
-        image_without_exif = Image.new(image.mode, image.size)
-        image_without_exif.putdata(data)
-
-        # Save back to the same path, preserving original format
-        image_without_exif.save(image_path, format=image.format)
-        print(f"Stripped EXIF from: {image_path}")
-        return True
 
     except Exception as e:
         print(f"Error processing {image_path}: {e}", file=sys.stderr)
