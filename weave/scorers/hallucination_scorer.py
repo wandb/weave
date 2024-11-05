@@ -1,5 +1,3 @@
-from typing import List
-
 from pydantic import BaseModel, Field
 
 import weave
@@ -94,7 +92,7 @@ class HallucinationResponse(BaseModel):
         description="Think step by step about whether the <output> contains hallucinations \
 based on the <input_data>."
     )
-    reasonings: List[HallucinationReasoning] = Field(
+    reasonings: list[HallucinationReasoning] = Field(
         description="A list of reasoning steps that lead to the conclusion about whether or not\
 the <output> contains hallucinations."
     )

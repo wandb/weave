@@ -3,10 +3,9 @@ import datetime
 import platform
 import re
 import sys
-import typing
 from concurrent.futures import Future
 from functools import lru_cache
-from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Union
+from typing import Any, Callable, Iterator, Optional, Sequence, Union, cast
 
 import pydantic
 from requests import HTTPError
@@ -84,7 +83,7 @@ from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTrace
 ALLOW_MIXED_PROJECT_REFS = False
 
 
-def dataclasses_asdict_one_level(obj: Any) -> typing.Dict[str, Any]:
+def dataclasses_asdict_one_level(obj: Any) -> dict[str, Any]:
     # dataclasses.asdict is recursive. We don't want that when json encoding
     return {f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}
 
@@ -370,7 +369,7 @@ class CallsIter:
             return list(self._get_slice(key))
         return self._get_one(key)
 
-    def __iter__(self) -> typing.Iterator[WeaveObject]:
+    def __iter__(self) -> Iterator[WeaveObject]:
         return self._get_slice(slice(0, None, 1))
 
 
@@ -924,12 +923,12 @@ class WeaveClient:
         llm_id: str,
         prompt_token_cost: float,
         completion_token_cost: float,
-        effective_date: typing.Optional[datetime.datetime] = datetime.datetime.now(
+        effective_date: Optional[datetime.datetime] = datetime.datetime.now(
             datetime.timezone.utc
         ),
-        prompt_token_cost_unit: typing.Optional[str] = "USD",
-        completion_token_cost_unit: typing.Optional[str] = "USD",
-        provider_id: typing.Optional[str] = "default",
+        prompt_token_cost_unit: Optional[str] = "USD",
+        completion_token_cost_unit: Optional[str] = "USD",
+        provider_id: Optional[str] = "default",
     ) -> CostCreateRes:
         """Add a cost to the current project.
 
@@ -1424,7 +1423,7 @@ class WeaveClient:
             filter = ObjectVersionFilter()
         else:
             filter = filter.model_copy()
-        filter = typing.cast(ObjectVersionFilter, filter)
+        filter = cast(ObjectVersionFilter, filter)
         filter.is_op = False
 
         response = self.server.objs_query(
@@ -1453,7 +1452,7 @@ class WeaveClient:
     def _remove_call_display_name(self, call: Call) -> None:
         self._set_call_display_name(call, None)
 
-    def _ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
+    def _ref_output_of(self, ref: ObjectRef) -> Optional[Call]:
         raise NotImplementedError()
 
     def _op_runs(self, op_def: Op) -> Sequence[Call]:
@@ -1502,7 +1501,7 @@ def check_wandb_run_matches(
             )
 
 
-def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
+def _build_anonymous_op(name: str, config: Optional[dict] = None) -> Op:
     if config is None:
 
         def op_fn(*args, **kwargs):  # type: ignore
@@ -1522,7 +1521,7 @@ def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
     return op
 
 
-def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
+def redact_sensitive_keys(obj: Any) -> Any:
     # We should NEVER mutate reffed objects.
     #
     # 1. This code builds new objects that no longer have refs

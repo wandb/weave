@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 from playwright.async_api import async_playwright
 
@@ -15,10 +15,10 @@ async def generate_screenshot_from_browser(
     url: str,
     output_path: str,
     selector: Optional[str] = None,
-    viewport_size: Optional[Tuple[int, int]] = None,
-    clicks: Optional[List[str]] = None,
+    viewport_size: Optional[tuple[int, int]] = None,
+    clicks: Optional[list[str]] = None,
     delay: Optional[float] = None,
-    local_storage: Optional[Dict[str, str]] = None,
+    local_storage: Optional[dict[str, str]] = None,
     zoom: Optional[float] = None,
 ) -> None:
     """
@@ -39,7 +39,7 @@ async def generate_screenshot_from_browser(
             before taking the screenshot.
         delay (Optional[float]): The number of seconds to wait before taking the
             screenshot after all other actions are completed.
-        local_storage (Optional[Dict[str, str]]): A dictionary of key-value pairs to set
+        local_storage (Optional[dict[str, str]]): A dictionary of key-value pairs to set
             in local storage before loading the page.
         zoom (Optional[float]): The zoom level to set for the page. If None, uses the default zoom.
 

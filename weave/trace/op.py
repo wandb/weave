@@ -13,7 +13,6 @@ from typing import (
     Any,
     Callable,
     Coroutine,
-    Dict,
     Mapping,
     Optional,
     Protocol,
@@ -101,7 +100,7 @@ class ProcessedInputs:
 
 OnInputHandlerType = Callable[["Op", tuple, dict], Optional[ProcessedInputs]]
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
-OnOutputHandlerType = Callable[[Any, FinishCallbackType, Dict], Any]
+OnOutputHandlerType = Callable[[Any, FinishCallbackType, dict], Any]
 # Call, original function output, exception if occurred
 OnFinishHandlerType = Callable[["Call", Any, Optional[BaseException]], None]
 

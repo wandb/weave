@@ -8,7 +8,7 @@ import math
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, Tuple, TypedDict
+from typing import Optional, TypedDict
 
 from clickhouse_connect.driver.client import Client
 
@@ -20,7 +20,7 @@ logger.setLevel(logging.INFO)
 
 def get_current_costs(
     client: Client,
-) -> list[Tuple[str, float, float, datetime]]:
+) -> list[tuple[str, float, float, datetime]]:
     current_costs = client.query(
         """
         SELECT
