@@ -10,6 +10,7 @@ import requests
 from PIL import Image
 
 import weave
+from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace.weave_client import WeaveClient, get_ref
 
 """When testing types, it is important to test:
@@ -140,6 +141,7 @@ def test_image_as_file(client: WeaveClient) -> None:
 
 def test_image_from_path(client: WeaveClient) -> None:
     client.project = "test_image_from_path"
+    parse_and_apply_settings(UserSettings(convert_paths_to_images=True))
     with tempfile.TemporaryDirectory() as temp_dir:
         path_str = os.path.join(temp_dir, "img.png")
         img = Image.new("RGB", (512, 512), "purple")
@@ -166,6 +168,7 @@ def test_image_from_path(client: WeaveClient) -> None:
 
 def test_image_from_remote_path(client: WeaveClient) -> None:
     client.project = "test_image_from_remote_path"
+    parse_and_apply_settings(UserSettings(convert_paths_to_images=True))
     remote_path = "https://www.gstatic.com/webp/gallery/1.jpg"
     img = Image.open(requests.get(remote_path, stream=True).raw)
 
@@ -187,6 +190,7 @@ def test_image_from_remote_path(client: WeaveClient) -> None:
 
 def test_image_from_base64(client: WeaveClient) -> None:
     client.project = "test_image_from_base64"
+    parse_and_apply_settings(UserSettings(convert_paths_to_images=True))
     data = """data:image/png;base64, R0lGODlhDwAPAKECAAAAzMzM/////wAAACwAAAAADwAPAAACIISPeQHsrZ5ModrLlN48CXF8m2iQ3YmmKqVlRtW4MLwWACH+H09wdGltaXplZCBieSBVbGVhZCBTbWFydFNhdmVyIQAAOw=="""
 
     @weave.op
