@@ -15,12 +15,7 @@ import functools
 import os
 import site
 import sys
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union
-
-if sys.version_info >= (3, 8):
-    from typing import Literal
-else:
-    from typing_extensions import Literal
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Union
 
 if TYPE_CHECKING:
     from sentry_sdk._types import ExcInfo
