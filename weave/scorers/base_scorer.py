@@ -18,6 +18,7 @@ class Scorer(Object):
         description="A mapping from column names in the dataset to the names expected by the scorer",
     )
 
+    @weave.op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
 
