@@ -1,6 +1,6 @@
 import inspect
 from numbers import Number
-from typing import Any, Callable, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Optional, Sequence, Union
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -87,7 +87,7 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
 
 def get_scorer_attributes(
     scorer: Union[Callable, Op, Scorer],
-) -> Tuple[str, Callable, Callable]:
+) -> tuple[str, Callable, Callable]:
     score_fn: Union[Op, Callable[..., Any]]
     if weave_isinstance(scorer, Scorer):
         scorer_name = scorer.name

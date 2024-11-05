@@ -28,7 +28,7 @@ Outstanding Optimizations/Work:
 """
 
 import logging
-import typing
+from typing import Literal, Optional, cast
 
 import sqlparse
 from pydantic import BaseModel, Field
@@ -58,7 +58,7 @@ class QueryBuilderField(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: typing.Optional[tsi_query.CastTo] = None,
+        cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
         return clickhouse_cast(f"{table_alias}.{self.field}", cast)
 
@@ -78,20 +78,20 @@ class CallsMergedAggField(CallsMergedField):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: typing.Optional[tsi_query.CastTo] = None,
+        cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
         inner = super().as_sql(pb, table_alias)
         return clickhouse_cast(f"{self.agg_fn}({inner})")
 
 
 class CallsMergedDynamicField(CallsMergedAggField):
-    extra_path: typing.Optional[list[str]] = None
+    extra_path: Optional[list[str]] = None
 
     def as_sql(
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: typing.Optional[tsi_query.CastTo] = None,
+        cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
         res = super().as_sql(pb, table_alias)
         return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
@@ -129,13 +129,13 @@ class QueryBuilderDynamicField(QueryBuilderField):
     # the needed functionality with minimal refactoring. In the future, we should
     # consider a more elegant solution that reduces code duplication.
 
-    extra_path: typing.Optional[list[str]] = None
+    extra_path: Optional[list[str]] = None
 
     def as_sql(
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: typing.Optional[tsi_query.CastTo] = None,
+        cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
         res = super().as_sql(pb, table_alias)
         return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
@@ -152,8 +152,8 @@ def json_dump_field_as_sql(
     pb: ParamBuilder,
     table_alias: str,
     root_field_sanitized: str,
-    extra_path: typing.Optional[list[str]] = None,
-    cast: typing.Optional[tsi_query.CastTo] = None,
+    extra_path: Optional[list[str]] = None,
+    cast: Optional[tsi_query.CastTo] = None,
 ) -> str:
     if cast != "exists":
         path_str = "'$'"
@@ -175,10 +175,10 @@ def json_dump_field_as_sql(
 
 class OrderField(BaseModel):
     field: QueryBuilderField
-    direction: typing.Literal["ASC", "DESC"]
+    direction: Literal["ASC", "DESC"]
 
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
-        options: list[typing.Tuple[typing.Optional[tsi_query.CastTo], str]]
+        options: list[tuple[Optional[tsi_query.CastTo], str]]
         if isinstance(self.field, (QueryBuilderDynamicField, CallsMergedDynamicField)):
             # Prioritize existence, then cast to double, then str
             options = [
@@ -198,7 +198,7 @@ class OrderField(BaseModel):
 
 class Condition(BaseModel):
     operand: "tsi_query.Operand"
-    _consumed_fields: typing.Optional[list[CallsMergedField]] = None
+    _consumed_fields: Optional[list[CallsMergedField]] = None
 
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         conditions = process_query_to_conditions(
@@ -260,10 +260,10 @@ class CallsQuery(BaseModel):
     project_id: str
     select_fields: list[CallsMergedField] = Field(default_factory=list)
     query_conditions: list[Condition] = Field(default_factory=list)
-    hardcoded_filter: typing.Optional[HardCodedFilter] = None
+    hardcoded_filter: Optional[HardCodedFilter] = None
     order_fields: list[OrderField] = Field(default_factory=list)
-    limit: typing.Optional[int] = None
-    offset: typing.Optional[int] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
     include_costs: bool = False
 
     def add_field(self, field: str) -> "CallsQuery":
@@ -289,7 +289,7 @@ class CallsQuery(BaseModel):
         direction = direction.upper()
         if direction not in ("ASC", "DESC"):
             raise ValueError(f"Direction {direction} is not allowed")
-        direction = typing.cast(typing.Literal["ASC", "DESC"], direction)
+        direction = cast(Literal["ASC", "DESC"], direction)
         self.order_fields.append(
             OrderField(field=get_field_by_name(field), direction=direction)
         )
@@ -517,7 +517,7 @@ class CallsQuery(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        id_subquery_name: typing.Optional[str] = None,
+        id_subquery_name: Optional[str] = None,
     ) -> str:
         select_fields_sql = ", ".join(
             field.as_select_sql(pb, table_alias) for field in self.select_fields
@@ -739,10 +739,10 @@ def process_calls_filter_to_conditions(
         # If there are any non-wildcarded names, then we at least have an IN condition
         # If there are any wildcarded names, then we have a LIKE condition for each
 
-        or_conditions: typing.List[str] = []
+        or_conditions: list[str] = []
 
-        non_wildcarded_names: typing.List[str] = []
-        wildcarded_names: typing.List[str] = []
+        non_wildcarded_names: list[str] = []
+        wildcarded_names: list[str] = []
         for name in filter.op_names:
             if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
                 wildcarded_names.append(name)
