@@ -142,6 +142,7 @@ export {
   IconOrchestrationLaunch,
   IconOrganizationCorporate,
   IconOverflowHorizontal,
+  IconOverflowVertical,
   IconPanel,
   IconPanelAutoGen,
   IconPanelManual,

@@ -63,6 +63,10 @@ const getStyles = (props: AdditionalProps) => {
                 minHeight: `${HEIGHTS[size]} !important`,
               },
             },
+            '& .MuiAutocomplete-popupIndicator': {
+              borderRadius: '4px',
+              padding: '4px',
+            },
             '&.MuiAutocomplete-hasPopupIcon .MuiOutlinedInput-root, &.MuiAutocomplete-hasClearIcon .MuiOutlinedInput-root':
               {
                 paddingRight: props.hasInputValue ? '28px' : '0px', // Apply padding only if input exists
