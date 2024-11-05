@@ -3,6 +3,7 @@ import inspect
 import logging
 import operator
 import typing
+from copy import deepcopy
 from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
 
 from pydantic import BaseModel
@@ -455,6 +456,18 @@ class WeaveList(Traceable, list):
         self.root = root if root is not None else self
         self.parent = parent
         super().__init__(*args)
+
+    def __deepcopy__(self, memo: dict) -> "WeaveList":
+        items_copy = [deepcopy(item, memo) for item in self]
+        res = WeaveList(
+            items_copy,
+            server=self.server,
+            ref=self.ref,  # maybe this should be zero'd?
+            root=self.root,
+            parent=self.parent,
+        )
+        memo[id(self)] = res
+        return res
 
     def __getitem__(self, i: Union[SupportsIndex, slice]) -> Any:
         if isinstance(i, slice):
