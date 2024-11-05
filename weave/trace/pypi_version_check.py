@@ -54,18 +54,11 @@ def check_available(
     )
     delete_message = None
     if deleted:
-        delete_message = "{} version {} has been retired!  Please upgrade.".format(
-            module_name,
-            current_version,
-        )
+        delete_message = f"{module_name} version {current_version} has been retired!  Please upgrade."
     yank_message = None
     if yanked:
-        reason_message = "({})  ".format(yanked_reason) if yanked_reason else ""
-        yank_message = "{} version {} has been recalled!  {}Please upgrade.".format(
-            module_name,
-            current_version,
-            reason_message,
-        )
+        reason_message = f"({yanked_reason})  " if yanked_reason else ""
+        yank_message = f"{module_name} version {current_version} has been recalled!  {reason_message}Please upgrade."
 
     # A new version is available!
     return {
