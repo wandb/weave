@@ -1,9 +1,9 @@
 import Box from '@mui/material/Box';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import numeral from 'numeral';
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
+import {BytesStoredInfoIcon} from '../../../../BytesStoredInfoIcon';
 import {Icon, IconName} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
@@ -51,7 +51,8 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Prompt: 'forum-chat-bubble',
   Model: 'model',
   Dataset: 'table',
-  Evaluation: 'benchmark-square',
+  Evaluation: 'baseline-alt',
+  Leaderboard: 'benchmark-square',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
@@ -249,7 +250,10 @@ const ObjectVersionPageInner: React.FC<{
                 {data.loading ? (
                   <LoadingDots />
                 ) : (
-                  numeral(bytesStored).format('0.0b')
+                  <BytesStoredInfoIcon
+                    bytesStored={bytesStored}
+                    weaveKind="object"
+                  />
                 )}
               </>
             ),

@@ -60,6 +60,7 @@ import {ReactComponent as ImportDocument} from '../../assets/icons/icon-document
 import {ReactComponent as ImportDocumentation} from '../../assets/icons/icon-documentation.svg';
 import {ReactComponent as ImportDownload} from '../../assets/icons/icon-download.svg';
 import {ReactComponent as ImportDraft} from '../../assets/icons/icon-draft.svg';
+import {ReactComponent as ImportDragGrip} from '../../assets/icons/icon-drag-grip.svg';
 import {ReactComponent as ImportDragGripHorizontal} from '../../assets/icons/icon-drag-grip-horizontal.svg';
 import {ReactComponent as ImportEducationAcademic} from '../../assets/icons/icon-education-academic.svg';
 import {ReactComponent as ImportEmailAt} from '../../assets/icons/icon-email-at.svg';
@@ -447,6 +448,9 @@ export const IconDownload = (props: SVGIconProps) => (
 );
 export const IconDraft = (props: SVGIconProps) => (
   <ImportDraft {...updateIconProps(props)} />
+);
+export const IconDragGrip = (props: SVGIconProps) => (
+  <ImportDragGrip {...updateIconProps(props)} />
 );
 export const IconDragGripHorizontal = (props: SVGIconProps) => (
   <ImportDragGripHorizontal {...updateIconProps(props)} />
@@ -1092,6 +1096,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   documentation: IconDocumentation,
   download: IconDownload,
   draft: IconDraft,
+  'drag-grip': IconDragGrip,
   'drag-grip-horizontal': IconDragGripHorizontal,
   'education-academic': IconEducationAcademic,
   'email-at': IconEmailAt,

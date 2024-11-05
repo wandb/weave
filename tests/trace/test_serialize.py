@@ -150,3 +150,52 @@ def test_fallback_encode_dictify_fails() -> None:
 
     pt = Point(1, 2)
     assert fallback_encode(pt) == repr(pt)
+
+
+def test_dictify_sanitizes() -> None:
+    class MyClass:
+        api_key: str
+
+        def __init__(self, secret: str) -> None:
+            self.api_key = secret
+
+    instance = MyClass("sk-1234567890qwertyuiop")
+    assert dictify(instance) == {
+        "__class__": {
+            "module": "test_serialize",
+            "qualname": "test_dictify_sanitizes.<locals>.MyClass",
+            "name": "MyClass",
+        },
+        "api_key": "REDACTED",
+    }
+
+
+def test_dictify_sanitizes_nested() -> None:
+    class MyClassA:
+        api_key: str
+
+        def __init__(self, secret: str) -> None:
+            self.api_key = secret
+
+    class MyClassB:
+        a: MyClassA
+
+        def __init__(self, a: MyClassA) -> None:
+            self.a = a
+
+    instance = MyClassB(MyClassA("sk-1234567890qwertyuiop"))
+    assert dictify(instance) == {
+        "__class__": {
+            "module": "test_serialize",
+            "qualname": "test_dictify_sanitizes_nested.<locals>.MyClassB",
+            "name": "MyClassB",
+        },
+        "a": {
+            "__class__": {
+                "module": "test_serialize",
+                "qualname": "test_dictify_sanitizes_nested.<locals>.MyClassA",
+                "name": "MyClassA",
+            },
+            "api_key": "REDACTED",
+        },
+    }
