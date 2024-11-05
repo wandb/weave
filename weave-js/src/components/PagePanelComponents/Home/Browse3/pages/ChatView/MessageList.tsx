@@ -9,7 +9,7 @@ type MessageListProps = {
 
 export const MessageList = ({messages}: MessageListProps) => {
   return (
-    <div className="flex flex-col gap-36">
+    <div className="flex flex-col">
       {messages.map((m, i) => (
         <MessagePanel key={i} message={m} />
       ))}
