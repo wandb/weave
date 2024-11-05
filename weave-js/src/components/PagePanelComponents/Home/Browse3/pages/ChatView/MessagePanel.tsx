@@ -1,7 +1,7 @@
 import {Callout} from '@wandb/weave/components/Callout';
 import classNames from 'classnames';
 import _ from 'lodash';
-import React, {useEffect, useRef,useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 
 import {MessagePanelPart} from './MessagePanelPart';
 import {ShowMoreButton} from './ShowMoreButton';
@@ -54,6 +54,7 @@ export const MessagePanel = ({
           'ml-auto bg-cactus-300/[0.24]': isUser,
           // Justify the message to the left if it's not a user message
           'mr-auto': !isUser,
+          'pb-40': isOverflowing && isShowingMore,
         })}>
         {isSystemPrompt && (
           // We only show the role for system prompts
@@ -65,7 +66,7 @@ export const MessagePanel = ({
         )}
         <div
           ref={contentRef}
-          className={classNames('w-full overflow-y-hidden', {
+          className={classNames('w-full overflow-y-hidden px-16', {
             'max-h-[400px]': !isShowingMore,
             'max-h-full': isShowingMore,
           })}>
