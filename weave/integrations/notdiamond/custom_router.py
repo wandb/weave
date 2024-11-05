@@ -83,6 +83,7 @@ def evaluate_router(
     class _DummyEvalModel(weave.Model):
         model_results: pd.DataFrame
 
+        @weave.op()
         def predict(self, prompt: str) -> Dict[str, Any]:
             response, score = self.model_results[
                 self.model_results[prompt_column] == prompt

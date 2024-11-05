@@ -196,7 +196,6 @@ reportOptionalMemberAccess = false
 reportArgumentType = false
 reportReturnType = false
 reportCallIssue = false
-reportIncompatibleMethodOverride = false
 reportRedeclaration = false
 
 [tool.mypy]
