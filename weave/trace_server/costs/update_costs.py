@@ -35,7 +35,7 @@ def get_current_costs(file_name: str = COST_FILE) -> dict[str, list[CostDetails]
         return {}
 
     try:
-        with open(file_path, "r") as f:
+        with open(file_path) as f:
             return json.load(f)
     except json.JSONDecodeError as e:
         print("Failed to parse existing costs file:", e)

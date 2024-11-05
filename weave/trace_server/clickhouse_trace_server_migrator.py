@@ -180,7 +180,7 @@ class ClickHouseTraceServerMigrator:
         logger.info(f"Applying migration {migration_file} to `{target_db}`")
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_file_path = os.path.join(migration_dir, migration_file)
-        with open(migration_file_path, "r") as f:
+        with open(migration_file_path) as f:
             migration_sql = f.read()
         self.ch_client.command(
             f"""

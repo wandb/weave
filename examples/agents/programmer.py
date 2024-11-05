@@ -80,7 +80,7 @@ def read_from_file(path: str) -> str:
         The content of the file.
     """
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             result = f.read()
             if len(result) > LENGTH_LIMIT:
                 result = result[:LENGTH_LIMIT]
