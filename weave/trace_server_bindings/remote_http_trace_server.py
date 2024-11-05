@@ -446,8 +446,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> Iterator[tsi.TableRowSchema]:
         # Need to manually iterate over this until the stram endpoint is built and shipped.
         res = self.table_query(req)
-        for row in res.rows:
-            yield row
+        yield from res.rows
 
     def table_query_stats(
         self, req: Union[tsi.TableQueryStatsReq, dict[str, Any]]
