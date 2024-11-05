@@ -203,7 +203,7 @@ class String:
             return float(self)  # type: ignore
         return None
     
-    @op(name="string-toNumber-with-locale", output_type=types.optional(types.Number()))
+    @op(name="string-toNumberWithLocale", output_type=types.optional(types.Number()))
     def to_number_with_locale(self):
         import locale
         
