@@ -8,7 +8,7 @@ import math
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple, TypedDict
+from typing import Optional, TypedDict
 
 from clickhouse_connect.driver.client import Client
 
@@ -20,7 +20,7 @@ logger.setLevel(logging.INFO)
 
 def get_current_costs(
     client: Client,
-) -> List[Tuple[str, float, float, datetime]]:
+) -> list[tuple[str, float, float, datetime]]:
     current_costs = client.query(
         """
         SELECT
@@ -45,7 +45,7 @@ class CostDetails(TypedDict):
     created_at: str
 
 
-def load_costs_from_json(file_name: str = COST_FILE) -> Dict[str, List[CostDetails]]:
+def load_costs_from_json(file_name: str = COST_FILE) -> dict[str, list[CostDetails]]:
     if not os.path.isabs(file_name):
         file_path = os.path.join(os.path.dirname(__file__), file_name)
     else:
@@ -61,7 +61,7 @@ def load_costs_from_json(file_name: str = COST_FILE) -> Dict[str, List[CostDetai
     return data
 
 
-def insert_costs_into_db(client: Client, data: Dict[str, List[CostDetails]]) -> None:
+def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> None:
     rows = []
     for llm_id, costs in data.items():
         for cost in costs:
@@ -112,8 +112,8 @@ def insert_costs_into_db(client: Client, data: Dict[str, List[CostDetails]]) -> 
 
 
 def filter_out_current_costs(
-    client: Client, new_costs: Dict[str, List[CostDetails]]
-) -> Dict[str, List[CostDetails]]:
+    client: Client, new_costs: dict[str, list[CostDetails]]
+) -> dict[str, list[CostDetails]]:
     current_costs = get_current_costs(client)
     for (
         llm_id,
@@ -141,7 +141,7 @@ def filter_out_current_costs(
     return new_costs
 
 
-def sum_costs(data: Dict[str, List[CostDetails]]) -> float:
+def sum_costs(data: dict[str, list[CostDetails]]) -> float:
     total_costs = 0
     for costs in data.values():
         total_costs += len(costs)

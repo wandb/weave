@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from weave.trace.autopatch import autopatch
 
@@ -83,8 +83,8 @@ def create(
 
 
 def embed(
-    client: _LLM_CLIENTS, model_id: str, texts: Union[str, List[str]], **kwargs: Any
-) -> List[List[float]]:
+    client: _LLM_CLIENTS, model_id: str, texts: Union[str, list[str]], **kwargs: Any
+) -> list[list[float]]:
     client_type = type(client).__name__.lower()
     if "openai" in client_type:
         response = client.embeddings.create(model=model_id, input=texts, **kwargs)

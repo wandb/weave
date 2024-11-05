@@ -6,7 +6,7 @@ import hashlib
 import json
 import sqlite3
 import threading
-from typing import Any, Dict, Iterator, Optional, cast
+from typing import Any, Iterator, Optional, cast
 from zoneinfo import ZoneInfo
 
 import emoji
@@ -506,8 +506,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.CallsQueryRes(calls=[tsi.CallSchema(**call) for call in calls])
 
     def _expand_refs(
-        self, data: Dict[str, Any], expand_columns: list[str]
-    ) -> Dict[str, Any]:
+        self, data: dict[str, Any], expand_columns: list[str]
+    ) -> dict[str, Any]:
         """
         Recursively expand refs in the data. Only expand refs if requested in the
         expand_columns list. expand_columns must be sorted by depth, shallowest first.
@@ -686,7 +686,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conds: list[str] = []
-        parameters: Dict[str, Any] = {}
+        parameters: dict[str, Any] = {}
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
@@ -1114,7 +1114,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         conditions: Optional[list[str]] = None,
-        parameters: Optional[Dict[str, Any]] = None,
+        parameters: Optional[dict[str, Any]] = None,
         metadata_only: Optional[bool] = False,
         limit: Optional[int] = None,
         offset: Optional[int] = None,

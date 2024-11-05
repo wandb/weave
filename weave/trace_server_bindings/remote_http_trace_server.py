@@ -1,7 +1,7 @@
 import io
 import json
 import logging
-from typing import Any, Iterator, List, Optional, Tuple, Type, Union, cast
+from typing import Any, Iterator, Optional, Union, cast
 
 import tenacity
 from pydantic import BaseModel, ValidationError
@@ -104,7 +104,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self.should_batch = should_batch
         if self.should_batch:
             self.call_processor = AsyncBatchProcessor(self._flush_calls)
-        self._auth: Optional[Tuple[str, str]] = None
+        self._auth: Optional[tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
     def ensure_project_exists(
@@ -122,7 +122,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         # that type checking is applied to the constructor.
         return RemoteHTTPTraceServer(weave_trace_server_url(), should_batch)
 
-    def set_auth(self, auth: Tuple[str, str]) -> None:
+    def set_auth(self, auth: tuple[str, str]) -> None:
         self._auth = auth
 
     @tenacity.retry(
@@ -137,7 +137,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     )
     def _flush_calls(
         self,
-        batch: List,
+        batch: list,
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
@@ -218,8 +218,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self,
         url: str,
         req: BaseModel,
-        req_model: Type[BaseModel],
-        res_model: Type[BaseModel],
+        req_model: type[BaseModel],
+        res_model: type[BaseModel],
     ) -> BaseModel:
         if isinstance(req, dict):
             req = req_model.model_validate(req)
@@ -230,8 +230,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self,
         url: str,
         req: BaseModel,
-        req_model: Type[BaseModel],
-        res_model: Type[BaseModel],
+        req_model: type[BaseModel],
+        res_model: type[BaseModel],
     ) -> Iterator[BaseModel]:
         if isinstance(req, dict):
             req = req_model.model_validate(req)

@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import multiprocessing
-from typing import Any, AsyncIterator, Awaitable, Callable, Iterable, Tuple, TypeVar
+from typing import Any, AsyncIterator, Awaitable, Callable, Iterable, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -13,10 +13,10 @@ async def async_foreach(
     sequence: Iterable[T],
     func: Callable[[T], Awaitable[U]],
     max_concurrent_tasks: int,
-) -> AsyncIterator[Tuple[T, U]]:
+) -> AsyncIterator[tuple[T, U]]:
     semaphore = asyncio.Semaphore(max_concurrent_tasks)
 
-    async def process_item(item: T) -> Tuple[T, U]:
+    async def process_item(item: T) -> tuple[T, U]:
         async with semaphore:
             result = await func(item)
             return item, result
@@ -36,8 +36,8 @@ def _subproc(
 
 
 def _run_in_process(
-    func: Callable, args: Tuple = (), kwargs: dict = {}
-) -> Tuple[multiprocessing.Process, multiprocessing.Queue]:
+    func: Callable, args: tuple = (), kwargs: dict = {}
+) -> tuple[multiprocessing.Process, multiprocessing.Queue]:
     """Run a function in a separate process and return the process object and a multiprocessing.Queue for the result."""
     queue: multiprocessing.Queue = multiprocessing.Queue()
     process: multiprocessing.Process = multiprocessing.Process(

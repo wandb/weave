@@ -1,4 +1,4 @@
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -31,7 +31,7 @@ def get_base_object_class(val: Any) -> Optional[str]:
 
 def process_incoming_object(
     val: Any, req_base_object_class: Optional[str] = None
-) -> Tuple[dict, Optional[str]]:
+) -> tuple[dict, Optional[str]]:
     """
     This method is responsible for accepting an incoming object from the user, validating it
     against the base object class, and returning the object with the base object class
