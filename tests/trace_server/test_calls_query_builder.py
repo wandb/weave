@@ -14,8 +14,8 @@ def test_query_baseline() -> None:
         """
         SELECT calls_merged.id AS id
         FROM calls_merged
-        WHERE project_id = {pb_0:String}
-        GROUP BY (project_id,id)
+        WHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((
                 any(calls_merged.deleted_at) IS NULL
@@ -43,8 +43,8 @@ def test_query_light_column() -> None:
             calls_merged.id AS id,
             any(calls_merged.started_at) AS started_at
         FROM calls_merged
-        WHERE project_id = {pb_0:String}
-        GROUP BY (project_id,id)
+        WHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((
                 any(calls_merged.deleted_at) IS NULL
@@ -72,8 +72,8 @@ def test_query_heavy_column() -> None:
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        WHERE project_id = {pb_0:String}
-        GROUP BY (project_id,id)
+        WHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((
                 any(calls_merged.deleted_at) IS NULL
@@ -108,8 +108,8 @@ def test_query_heavy_column_simple_filter() -> None:
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            WHERE project_id = {pb_1:String}
-            GROUP BY (project_id,id)
+            WHERE calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
@@ -121,12 +121,12 @@ def test_query_heavy_column_simple_filter() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
         WHERE
-            project_id = {pb_2:String}
+            calls_merged.project_id = {pb_1:String}
         AND
-            (id IN filtered_calls)
-        GROUP BY (project_id,id)
+            (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
         """,
-        {"pb_0": ["a", "b"], "pb_1": "project", "pb_2": "project"},
+        {"pb_0": ["a", "b"], "pb_1": "project"},
     )
 
 
@@ -149,8 +149,8 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            WHERE project_id = {pb_1:String}
-            GROUP BY (project_id,id)
+            WHERE calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
@@ -162,13 +162,13 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
         WHERE
-            project_id = {pb_2:String}
+            calls_merged.project_id = {pb_1:String}
         AND
-            (id IN filtered_calls)
-        GROUP BY (project_id,id)
+            (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC
         """,
-        {"pb_0": ["a", "b"], "pb_1": "project", "pb_2": "project"},
+        {"pb_0": ["a", "b"], "pb_1": "project"},
     )
 
 
@@ -192,8 +192,8 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            WHERE project_id = {pb_1:String}
-            GROUP BY (project_id,id)
+            WHERE calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
             AND
@@ -209,13 +209,13 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
         WHERE
-            project_id = {pb_2:String}
+            calls_merged.project_id = {pb_1:String}
         AND
-            (id IN filtered_calls)
-        GROUP BY (project_id,id)
+            (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC
         """,
-        {"pb_0": ["a", "b"], "pb_1": "project", "pb_2": "project"},
+        {"pb_0": ["a", "b"], "pb_1": "project"},
     )
 
 
@@ -258,8 +258,8 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            WHERE project_id = {pb_2:String}
-            GROUP BY (project_id,id)
+            WHERE calls_merged.project_id = {pb_2:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.wb_user_id) = {pb_0:String}))
             AND
@@ -275,10 +275,10 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
         WHERE
-            project_id = {pb_5:String}
+            calls_merged.project_id = {pb_2:String}
         AND
-            (id IN filtered_calls)
-        GROUP BY (project_id,id)
+            (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) = {pb_4:String}
         )
@@ -291,7 +291,6 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             "pb_2": "project",
             "pb_3": '$."param"."val"',
             "pb_4": "hello",
-            "pb_5": "project",
         },
     )
 
@@ -329,8 +328,8 @@ def test_query_light_column_with_costs() -> None:
             filtered_calls AS (
                 SELECT calls_merged.id AS id
                 FROM calls_merged
-                WHERE project_id = {pb_1:String}
-                GROUP BY (project_id, id)
+                WHERE calls_merged.project_id = {pb_1:String}
+                GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING (((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
                 AND (any(calls_merged.op_name) IN {pb_0:Array(String)}))),
@@ -339,9 +338,9 @@ def test_query_light_column_with_costs() -> None:
                     calls_merged.id AS id,
                     any(calls_merged.started_at) AS started_at
                 FROM calls_merged
-                WHERE project_id = {pb_2:String}
-                    AND (id IN filtered_calls)
-                GROUP BY (project_id, id)),
+                WHERE calls_merged.project_id = {pb_1:String}
+                    AND (calls_merged.id IN filtered_calls)
+                GROUP BY (calls_merged.project_id, calls_merged.id)),
             -- From the all_calls we get the usage data for LLMs
             llm_usage AS (
                 SELECT
@@ -434,14 +433,13 @@ def test_query_light_column_with_costs() -> None:
                     '}' )
                 ) AS summary_dump
             FROM ranked_prices
-            WHERE (rank = {pb_3:UInt64})
+            WHERE (rank = {pb_2:UInt64})
             GROUP BY id, started_at
         """,
         {
             "pb_0": ["a", "b"],
             "pb_1": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
-            "pb_2": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
-            "pb_3": 1,
+            "pb_2": 1,
         },
     )
 
