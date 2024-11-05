@@ -148,6 +148,12 @@ class ClickHouseTraceServerMigrator:
     ) -> typing.List[typing.Tuple[int, str]]:
         if target_version is None:
             target_version = len(migration_map)
+            # Do not run down migrations if not explicitly requesting target_version
+            if current_version > target_version:
+                logger.warning(
+                    f"NOT running down migration from {current_version} to {target_version}"
+                )
+                return []
         if target_version < 0 or target_version > len(migration_map):
             raise Exception(f"Invalid target version: {target_version}")
 

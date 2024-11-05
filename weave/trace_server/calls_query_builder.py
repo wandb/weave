@@ -388,7 +388,7 @@ class CallsQuery(BaseModel):
         SELECT {SELECT_FIELDS}
         FROM calls_merged
         WHERE project_id = {PROJECT_ID}
-        AND id IN (filtered_calls)
+        AND id IN filtered_calls
         GROUP BY (project_id, id)
         --- IF ORDER BY CANNOT BE PUSHED DOWN ---
         HAVING {HEAVY_FILTER_CONDITIONS}        -- optional <-- yes, this is inside the conditional

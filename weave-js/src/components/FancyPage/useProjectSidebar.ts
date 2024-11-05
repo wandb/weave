@@ -31,6 +31,7 @@ export const useProjectSidebar = (
   const isNoSidebarItems = !showModelsSidebarItems && !showWeaveSidebarItems;
   const isBothSidebarItems = showModelsSidebarItems && showWeaveSidebarItems;
   const isShowAll = isNoSidebarItems || isBothSidebarItems;
+
   return useMemo(() => {
     const allItems = isLoading
       ? []
@@ -138,6 +139,11 @@ export const useProjectSidebar = (
             iconName: IconNames.LayoutTabs,
           },
           {
+            type: 'divider' as const,
+            key: 'dividerWithinWeave-1',
+            isShown: isWeaveOnly,
+          },
+          {
             type: 'button' as const,
             name: 'Evals',
             slug: 'weave/evaluations',
@@ -146,11 +152,23 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
-            name: 'Prompts',
-            slug: 'weave/prompts',
-            isShown: showWeaveSidebarItems || isShowAll,
-            iconName: IconNames.ForumChatBubble,
+            name: 'Leaders',
+            slug: 'weave/leaderboards',
+            isShown: isWeaveOnly,
+            iconName: IconNames.BenchmarkSquare,
           },
+          {
+            type: 'divider' as const,
+            key: 'dividerWithinWeave-2',
+            isShown: isWeaveOnly,
+          },
+          // {
+          //   type: 'button' as const,
+          //   name: 'Prompts',
+          //   slug: 'weave/prompts',
+          //   isShown: showWeaveSidebarItems || isShowAll,
+          //   iconName: IconNames.ForumChatBubble,
+          // },
           {
             type: 'button' as const,
             name: 'Models',
@@ -167,7 +185,7 @@ export const useProjectSidebar = (
           },
           {
             type: 'divider' as const,
-            key: 'dividerWithinWeave',
+            key: 'dividerWithinWeave-3',
             isShown: isWeaveOnly,
           },
           {
@@ -193,7 +211,7 @@ export const useProjectSidebar = (
             key: 'moreWeave',
             isShown: isShowAll,
             // iconName: IconNames.OverflowHorizontal,
-            menu: ['weave/operations', 'weave/objects'],
+            menu: ['weave/leaderboards', 'weave/operations', 'weave/objects'],
           },
         ];
 
@@ -220,10 +238,10 @@ export const useProjectSidebar = (
     return onlyShownItems;
   }, [
     isLoading,
-    isModelsOnly,
-    isWeaveOnly,
-    showWeaveSidebarItems,
     isShowAll,
+    isWeaveOnly,
     viewingRestricted,
+    isModelsOnly,
+    showWeaveSidebarItems,
   ]);
 };
