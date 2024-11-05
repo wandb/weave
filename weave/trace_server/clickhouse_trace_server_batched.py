@@ -827,8 +827,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             limit=req.limit,
             offset=req.offset,
         )
-        for row in rows:
-            yield row
+        yield from rows
 
     def _table_query_stream(
         self,
@@ -1721,8 +1720,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "summary": summary,
                 },
             )
-            for row in stream:
-                yield row
+            yield from stream
 
     def _query(
         self,

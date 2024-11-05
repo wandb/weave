@@ -1186,8 +1186,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         self, req: tsi.TableQueryReq
     ) -> Iterator[tsi.TableRowSchema]:
         results = self.table_query(req)
-        for row in results.rows:
-            yield row
+        yield from results.rows
 
 
 def get_type(val: Any) -> str:
