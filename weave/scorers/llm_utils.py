@@ -83,7 +83,7 @@ def create(
 
 
 def embed(
-    client: _LLM_CLIENTS, model_id: str, texts: Union[str, list[str]], **kwargs: Any
+    client: _LLM_CLIENTS, model_id: str, texts: str | list[str], **kwargs: Any
 ) -> list[list[float]]:
     client_type = type(client).__name__.lower()
     if "openai" in client_type:
