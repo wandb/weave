@@ -5,7 +5,7 @@ from typing import Any, Tuple
 from openai import OpenAI
 
 from weave.trace_server.feedback import RunnablePayloadSchema
-from weave.trace_server.interface.base_models.action_base_models import (
+from weave.trace_server.interface.base_object_classes.actions import (
     Action,
     LlmJudgeActionSpec,
 )

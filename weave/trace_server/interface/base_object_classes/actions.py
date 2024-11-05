@@ -1,5 +1,5 @@
 from typing import Any, Literal, Optional, Union
-
+from weave.trace_server.interface.base_object_classes import base_object_def
 from pydantic import BaseModel
 
 
@@ -31,16 +31,14 @@ ActionSpecType = Union[
 ]
 
 
-# TODO: Make this a baseObject
-class Action(BaseModel):
+class Action(base_object_def.BaseObject):
     name: str
     spec: ActionSpecType
 
 
 # CRITICAL! When saving this object, always set the object_id == "op_id-action_id"
-# TODO: Make this a baseObject
-class ActionDispatchFilter(BaseModel):
+class ActionDispatchFilter(base_object_def.BaseObject):
     op_name: str
     sample_rate: float
-    action_ref: str
+    action_ref: base_object_def.RefStr
     disabled: Optional[bool] = False
