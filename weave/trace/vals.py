@@ -199,10 +199,10 @@ class WeaveObject(Traceable):
     def __deepcopy__(self, memo: dict) -> "WeaveObject":
         val_copy = deepcopy(self._val, memo)
         res = WeaveObject(
-            val_copy,
-            self.ref,
-            self.server,
-            self.root,
+            val=val_copy,
+            ref=self.ref,  # maybe this should be zero'd?
+            server=self.server,
+            root=self.root,
         )
         memo[id(self)] = res
         return res
