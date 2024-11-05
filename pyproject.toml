@@ -167,6 +167,7 @@ select = [
   "F401",   # https://docs.astral.sh/ruff/rules/unused-import/
   "TID252", # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
   "UP006",  # https://docs.astral.sh/ruff/rules/non-pep585-annotation/
+  "UP007",  # https://docs.astral.sh/ruff/rules/non-pep604-annotation/
 ]
 ignore = [
   # we use Google style
