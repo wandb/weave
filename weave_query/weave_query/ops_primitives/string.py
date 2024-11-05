@@ -202,7 +202,21 @@ class String:
         if self.isnumeric():
             return float(self)  # type: ignore
         return None
+    
+    @op(name="string-toNumber-with-locale", output_type=types.optional(types.Number()))
+    def to_number_with_locale(self):
+        import locale
+        
+        current_locale = locale.getlocale('LC_NUMERIC')  # save the current locale
+        locale.setlocale(locale.LC_NUMERIC, '') # sets the locale for LC_NUMERIC to native locale
+        
+        try:
+            number = locale.atof(self)
+        except Exception:
+            number = None
 
+        locale.setlocale(current_locale) # reset locale
+        return number
 
 types.String.instance_class = String
 
