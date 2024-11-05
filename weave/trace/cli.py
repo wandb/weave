@@ -18,7 +18,7 @@ def cli() -> None:
     pass
 
 
-@cli.command(help="Serve weave models.")
+@cli.command(help="Serve weave models.")  # type: ignore
 @click.argument("model_ref")
 @click.option("--method", help="Method name to serve.")
 @click.option("--project", help="W&B project name.")
@@ -54,7 +54,7 @@ def serve(
         )
 
 
-@cli.group(help="Deploy weave models.")
+@cli.group(help="Deploy weave models.")  # type: ignore
 def deploy() -> None:
     pass
 
