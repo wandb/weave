@@ -267,7 +267,8 @@ class Call:
     def delete(self) -> bool:
         """Delete the call."""
         client = weave_client_context.require_weave_client()
-        return client.delete_call(call=self)
+        client.delete_call(call=self)
+        return True
 
     def set_display_name(self, name: Optional[str]) -> None:
         """

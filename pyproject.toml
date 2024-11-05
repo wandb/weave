@@ -194,7 +194,6 @@ reportAttributeAccessIssue = false
 reportPossiblyUnboundVariable = false
 reportOptionalMemberAccess = false
 reportArgumentType = false
-reportReturnType = false
 reportCallIssue = false
 reportRedeclaration = false
 
