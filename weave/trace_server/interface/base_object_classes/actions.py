@@ -1,6 +1,8 @@
 from typing import Any, Literal, Optional, Union
-from weave.trace_server.interface.base_object_classes import base_object_def
+
 from pydantic import BaseModel
+
+from weave.trace_server.interface.base_object_classes import base_object_def
 
 
 class LlmJudgeActionSpec(BaseModel):
@@ -31,14 +33,7 @@ ActionSpecType = Union[
 ]
 
 
-class Action(base_object_def.BaseObject):
+# TODO: Make sure we really like this name - it is permanent
+class ActionDefinition(base_object_def.BaseObject):
     name: str
     spec: ActionSpecType
-
-
-# CRITICAL! When saving this object, always set the object_id == "op_id-action_id"
-class ActionDispatchFilter(base_object_def.BaseObject):
-    op_name: str
-    sample_rate: float
-    action_ref: base_object_def.RefStr
-    disabled: Optional[bool] = False
