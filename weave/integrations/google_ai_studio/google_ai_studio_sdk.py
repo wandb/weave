@@ -5,10 +5,17 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.serialize import dictify
 from weave.trace.weave_client import Call
 
 if TYPE_CHECKING:
     from google.generativeai.types.generation_types import GenerateContentResponse
+
+
+def gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+    if "self" in inputs:
+        inputs["self"] = dictify(inputs["self"])
+    return inputs
 
 
 def gemini_accumulator(
@@ -32,11 +39,12 @@ def gemini_accumulator(
 def gemini_on_finish(
     call: Call, output: Any, exception: Optional[BaseException]
 ) -> None:
-    original_model_name = call.inputs["self"].model_name
+    original_model_name = call.inputs["self"]["model_name"]
     model_name = original_model_name.split("/")[-1]
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
     if output:
+        call.output = dictify(output)
         usage[model_name].update(
             {
                 "prompt_tokens": output.usage_metadata.prompt_token_count,
@@ -50,7 +58,7 @@ def gemini_on_finish(
 
 def gemini_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op()(fn)
+        op = weave.op(postprocess_inputs=gemini_postprocess_inputs)(fn)
         op.name = name  # type: ignore
         op._set_on_finish_handler(gemini_on_finish)
         return add_accumulator(
@@ -73,7 +81,7 @@ def gemini_wrapper_async(name: str) -> Callable[[Callable], Callable]:
             return _async_wrapper
 
         "We need to do this so we can check if `stream` is used"
-        op = weave.op()(_fn_wrapper(fn))
+        op = weave.op(postprocess_inputs=gemini_postprocess_inputs)(_fn_wrapper(fn))
         op.name = name  # type: ignore
         op._set_on_finish_handler(gemini_on_finish)
         return add_accumulator(
