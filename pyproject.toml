@@ -175,6 +175,7 @@ select = [
   "UP034",  # https://docs.astral.sh/ruff/rules/extraneous-parentheses/
   "UP035",  # https://docs.astral.sh/ruff/rules/deprecated-import/
   "UP036",  # https://docs.astral.sh/ruff/rules/outdated-version-block/
+  "UP037",  # https://docs.astral.sh/ruff/rules/quoted-annotation/
 ]
 ignore = [
   # we use Google style
