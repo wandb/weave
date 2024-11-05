@@ -24,6 +24,7 @@ repos:
     rev: v1.1.387
     hooks:
       - id: pyright
+        additional_dependencies: [".[tests]"]
 
   # This is legacy Weave when we were building a notebook product - should be removed
   - repo: local

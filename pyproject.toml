@@ -193,18 +193,13 @@ reportMissingImports = false
 reportAttributeAccessIssue = false
 reportPossiblyUnboundVariable = false
 reportOptionalMemberAccess = false
-reportPrivateImportUsage = false
 reportArgumentType = false
 reportReturnType = false
-reportGeneralTypeIssues = false
 reportCallIssue = false
 reportIncompatibleMethodOverride = false
 reportRedeclaration = false
-reportIndexIssue = false
-reportOperatorIssue = false
 reportAssignmentType = false
 reportInconsistentOverload = false
-reportTypedDictNotRequiredAccess = false
 
 [tool.mypy]
 warn_unused_configs = true
