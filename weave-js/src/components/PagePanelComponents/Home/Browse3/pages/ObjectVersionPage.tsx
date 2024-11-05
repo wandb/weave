@@ -51,7 +51,8 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Prompt: 'forum-chat-bubble',
   Model: 'model',
   Dataset: 'table',
-  Evaluation: 'benchmark-square',
+  Evaluation: 'baseline-alt',
+  Leaderboard: 'benchmark-square',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
