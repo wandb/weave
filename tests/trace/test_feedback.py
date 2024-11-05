@@ -339,7 +339,7 @@ def populate_feedback(client: WeaveClient) -> None:
         return [
             "a",
             "x",  # intentional "mistake"
-            "b",
+            "c",
             "y",  # intentional "mistake"
         ][x]
 
@@ -359,47 +359,60 @@ def test_sort_by_feedback(client: WeaveClient) -> None:
     """Test sorting by feedback."""
     ids, my_scorer, my_model = populate_feedback(client)
 
-    for field, asc_ids, desc_ids in [
+    for fields, asc_ids in [
         (
-            "feedback[wandb.runnable.my_scorer].payload.model_output",
+            ["feedback.[wandb.runnable.my_scorer].payload.output.model_output"],
             [ids[0], ids[2], ids[1], ids[3]],
         ),
         (
-            "feedback[wandb.runnable.my_scorer].payload.expected",
-            [ids[3], ids[1], ids[2], ids[0]],
+            ["feedback.[wandb.runnable.my_scorer].payload.output.expected"],
+            [ids[0], ids[1], ids[2], ids[3]],
         ),
         (
-            "feedback[wandb.runnable.my_scorer].payload.match",
-            [ids[0], ids[2], ids[1], ids[3]],
+            [
+                "feedback.[wandb.runnable.my_scorer].payload.output.match",
+                "feedback.[wandb.runnable.my_scorer].payload.output.model_output",
+            ],
+            [ids[1], ids[3], ids[0], ids[2]],
         ),
     ]:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_name=[get_ref(my_model).uri()]),
-                sort_by=tsi.SortBy(
-                    field=field,
-                    direction="asc",
-                ),
-                include_feedback=True,
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+                sort_by=[
+                    tsi.SortBy(
+                        field=field,
+                        direction="asc",
+                    )
+                    for field in fields
+                ],
             )
         )
 
-        assert [c.id for c in calls] == asc_ids
+        found_ids = [c.id for c in calls]
+        assert (
+            found_ids == asc_ids
+        ), f"Sorting by {fields} ascending failed, expected {asc_ids}, got {found_ids}"
 
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_name=[get_ref(my_model).uri()]),
-                sort_by=tsi.SortBy(
-                    field=field,
-                    direction="desc",
-                ),
-                include_feedback=True,
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+                sort_by=[
+                    tsi.SortBy(
+                        field=field,
+                        direction="desc",
+                    )
+                    for field in fields
+                ],
             )
         )
 
-        assert [c.id for c in calls] == desc_ids
+        found_ids = [c.id for c in calls]
+        assert (
+            found_ids == asc_ids[::-1]
+        ), f"Sorting by {fields} descending failed, expected {asc_ids[::-1]}, got {found_ids}"
 
 
 def test_filter_by_feedback(client: WeaveClient) -> None:
@@ -407,19 +420,19 @@ def test_filter_by_feedback(client: WeaveClient) -> None:
     ids, my_scorer, my_model = populate_feedback(client)
     for field, value, eq_ids, gt_ids in [
         (
-            "feedback[wandb.runnable.my_scorer].payload.model_output",
+            "feedback.[wandb.runnable.my_scorer].payload.model_output",
             "a",
             [ids[0], ids[2]],
             [ids[1], ids[3]],
         ),
         (
-            "feedback[wandb.runnable.my_scorer].payload.expected",
+            "feedback.[wandb.runnable.my_scorer].payload.expected",
             "a",
             [ids[3], ids[1]],
             [ids[0], ids[2]],
         ),
         (
-            "feedback[wandb.runnable.my_scorer].payload.match",
+            "feedback.[wandb.runnable.my_scorer].payload.match",
             True,
             [ids[0], ids[2]],
             [ids[1], ids[3]],
@@ -428,7 +441,7 @@ def test_filter_by_feedback(client: WeaveClient) -> None:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_name=[get_ref(my_model).uri()]),
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
                 query={
                     "$expr": {
                         "$eq": [
@@ -441,12 +454,13 @@ def test_filter_by_feedback(client: WeaveClient) -> None:
             )
         )
 
-        assert [c.id for c in calls] == eq_ids
+        found_ids = [c.id for c in calls]
+        assert found_ids == eq_ids
 
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_name=[get_ref(my_model).uri()]),
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
                 query={
                     "$expr": {
                         "$gt": [
@@ -459,4 +473,5 @@ def test_filter_by_feedback(client: WeaveClient) -> None:
             )
         )
 
-        assert [c.id for c in calls] == gt_ids
+        found_ids = [c.id for c in calls]
+        assert found_ids == gt_ids

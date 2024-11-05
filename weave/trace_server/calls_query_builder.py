@@ -23,11 +23,11 @@ Outstanding Optimizations/Work:
 
 * [ ] Implement column selection at interface level so that it can be used here
 * [ ] Consider how we will do latency order/filter
-* [ ] Consider how we will do feedback fields
 
 """
 
 import logging
+import re
 import typing
 
 import sqlparse
@@ -114,6 +114,48 @@ class CallsMergedDynamicField(CallsMergedAggField):
         return True
 
 
+class CallsMergedFeedbackPayloadField(CallsMergedField):
+    feedback_type: str
+    extra_path: list[str]
+
+    @classmethod
+    def from_path(cls, path: str) -> "CallsMergedFeedbackPayloadField":
+        """Expected format: `[feedback.type].dot.path`"""
+        regex = re.compile(r"^(\[.+\])\.(.+\..+)$")
+        match = regex.match(path)
+        if not match:
+            raise InvalidFieldError(f"Invalid feedback path: {path}")
+        feedback_type, path = match.groups()
+        if feedback_type[0] != "[" or feedback_type[-1] != "]":
+            raise InvalidFieldError(f"Invalid feedback type: {feedback_type}")
+        extra_path = path.split(".")
+        if extra_path[0] != "payload":
+            raise InvalidFieldError(f"Invalid feedback path: {path}")
+        feedback_type = feedback_type[1:-1]
+        return CallsMergedFeedbackPayloadField(
+            field="payload_dump", feedback_type=feedback_type, extra_path=extra_path[1:]
+        )
+
+    def is_heavy(self) -> bool:
+        return True
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: typing.Optional[tsi_query.CastTo] = None,
+    ) -> str:
+        inner = super().as_sql(pb, "feedback")
+        param_name = pb.add_param(self.feedback_type)
+        res = f"anyIf({inner}, feedback.feedback_type = {_param_slot(param_name, 'String')})"
+        return json_dump_field_as_sql(pb, "feedback", res, self.extra_path, cast)
+
+    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+        raise NotImplementedError(
+            "Feedback fields cannot be selected directly, yet - implement me!"
+        )
+
+
 class QueryBuilderDynamicField(QueryBuilderField):
     # This is a temporary solution to address a specific use case.
     # We need to reuse the `CallsMergedDynamicField` mechanics in the table_query,
@@ -179,7 +221,14 @@ class OrderField(BaseModel):
 
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         options: list[typing.Tuple[typing.Optional[tsi_query.CastTo], str]]
-        if isinstance(self.field, (QueryBuilderDynamicField, CallsMergedDynamicField)):
+        if isinstance(
+            self.field,
+            (
+                QueryBuilderDynamicField,
+                CallsMergedDynamicField,
+                CallsMergedFeedbackPayloadField,
+            ),
+        ):
             # Prioritize existence, then cast to double, then str
             options = [
                 ("exists", "desc"),
@@ -519,6 +568,7 @@ class CallsQuery(BaseModel):
         table_alias: str,
         id_subquery_name: typing.Optional[str] = None,
     ) -> str:
+        needs_feedback = False
         select_fields_sql = ", ".join(
             field.as_select_sql(pb, table_alias) for field in self.select_fields
         )
@@ -545,6 +595,9 @@ class CallsQuery(BaseModel):
                     for order_field in self.order_fields
                 ]
             )
+            for order_field in self.order_fields:
+                if isinstance(order_field.field, CallsMergedFeedbackPayloadField):
+                    needs_feedback = True
 
         limit_sql = ""
         if self.limit is not None:
@@ -556,23 +609,36 @@ class CallsQuery(BaseModel):
 
         id_subquery_sql = ""
         if id_subquery_name is not None:
-            id_subquery_sql = f"AND (id IN {id_subquery_name})"
+            id_subquery_sql = f"AND (calls_merged.id IN {id_subquery_name})"
 
         project_param = pb.add_param(self.project_id)
 
         # Special Optimization
         id_mask_sql = ""
         if self.hardcoded_filter and self.hardcoded_filter.filter.call_ids:
-            id_mask_sql = f"AND (id IN {_param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
+            id_mask_sql = f"AND (calls_merged.id IN {_param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
         # TODO: We should also pull out id-masks from the dynamic query
+
+        feedback_join_sql = ""
+        feedback_where_sql = ""
+        if needs_feedback:
+            feedback_where_sql = (
+                f" AND calls_merged.project_id = {_param_slot(project_param, 'String')}"
+            )
+            feedback_join_sql = f"""
+            LEFT JOIN feedback
+            ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, 'String')}, '/call/', calls_merged.id))
+            """
 
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM calls_merged
-        WHERE project_id = {_param_slot(project_param, 'String')}
+        {feedback_join_sql}
+        WHERE calls_merged.project_id = {_param_slot(project_param, 'String')}
+        {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
-        GROUP BY (project_id, id)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
         {limit_sql}
@@ -606,16 +672,19 @@ ALLOWED_CALL_FIELDS = {
 
 def get_field_by_name(name: str) -> CallsMergedField:
     if name not in ALLOWED_CALL_FIELDS:
-        field_parts = name.split(".")
-        start_part = field_parts[0]
-        dumped_start_part = start_part + "_dump"
-        if dumped_start_part in ALLOWED_CALL_FIELDS:
-            field = ALLOWED_CALL_FIELDS[dumped_start_part]
-            if isinstance(field, CallsMergedDynamicField):
-                if len(field_parts) > 1:
-                    return field.with_path(field_parts[1:])
-            return field
-        raise InvalidFieldError(f"Field {name} is not allowed")
+        if name.startswith("feedback."):
+            return CallsMergedFeedbackPayloadField.from_path(name[len("feedback.") :])
+        else:
+            field_parts = name.split(".")
+            start_part = field_parts[0]
+            dumped_start_part = start_part + "_dump"
+            if dumped_start_part in ALLOWED_CALL_FIELDS:
+                field = ALLOWED_CALL_FIELDS[dumped_start_part]
+                if isinstance(field, CallsMergedDynamicField):
+                    if len(field_parts) > 1:
+                        return field.with_path(field_parts[1:])
+                return field
+            raise InvalidFieldError(f"Field {name} is not allowed")
     return ALLOWED_CALL_FIELDS[name]
 
 
