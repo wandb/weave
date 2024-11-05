@@ -1,23 +1,13 @@
 import json
-from functools import partial, wraps
-from typing import Any, Callable, Optional, TypeVar
+from functools import partial
+from typing import Any, Tuple
 
-from weave.actions_worker.celery_app import app
-from weave.trace_server.action_executor import TaskCtx
-from weave.trace_server.clickhouse_trace_server_batched import (
-    ActionsAckBatchReq,
-    ClickHouseTraceServer,
-)
+from openai import OpenAI
+
+from weave.trace_server.feedback import RunnablePayloadSchema
 from weave.trace_server.interface.base_models.action_base_models import (
-    ConfiguredAction,
-    ConfiguredContainsWordsAction,
+    ActionConfigType,
     ConfiguredLlmJudgeAction,
-    ConfiguredNoopAction,
-    ConfiguredWordCountAction,
-)
-from weave.trace_server.interface.base_models.base_model_registry import base_model_name
-from weave.trace_server.interface.base_models.feedback_base_model_registry import (
-    MachineScore,
 )
 from weave.trace_server.refs_internal import (
     InternalCallRef,
@@ -27,172 +17,33 @@ from weave.trace_server.refs_internal import (
 )
 from weave.trace_server.trace_server_interface import (
     CallSchema,
-    CallsFilter,
-    CallsQueryReq,
     FeedbackCreateReq,
-    RefsReadBatchReq,
 )
-
-WEAVE_ACTION_EXECUTOR_PACEHOLDER_ID = "WEAVE_ACTION_EXECUTOR"
-
-
-def ack_on_clickhouse(ctx: TaskCtx, succeeded: bool) -> None:
-    project_id = ctx["project_id"]
-    call_id = ctx["call_id"]
-    id = ctx["id"]
-    ClickHouseTraceServer.from_env().actions_ack_batch(
-        ActionsAckBatchReq(
-            project_id=project_id, call_ids=[call_id], id=id, succeeded=succeeded
-        )
-    )
 
 
 def publish_results_as_feedback(
-    ctx: TaskCtx,
+    target_call: CallSchema,
+    runnable_ref: str,
     result: Any,
-    configured_action_ref: str,
-    trigger_ref: Optional[str] = None,
-) -> None:
-    project_id = ctx["project_id"]
-    call_id = ctx["call_id"]
-    id = ctx["id"]
-    call_ref = InternalCallRef(project_id, call_id).uri()
-    parsed_action_ref = parse_internal_uri(configured_action_ref)
+) -> FeedbackCreateReq:
+    project_id = target_call.project_id
+    call_id = target_call.id
+    weave_ref = InternalCallRef(project_id, call_id).uri()
+    parsed_action_ref = parse_internal_uri(runnable_ref)
     if not isinstance(parsed_action_ref, (InternalObjectRef, InternalOpRef)):
-        raise ValueError(f"Invalid action ref: {configured_action_ref}")
+        raise ValueError(f"Invalid action ref: {runnable_ref}")
     action_name = parsed_action_ref.name
-    digest = parsed_action_ref.version
-    ClickHouseTraceServer.from_env().feedback_create(
-        FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=call_ref,
-            feedback_type=base_model_name(MachineScore),
-            payload=MachineScore(
-                runnable_ref=configured_action_ref,
-                value={action_name: {digest: result}},
-                trigger_ref=trigger_ref,
-            ).model_dump(),
-            wb_user_id=WEAVE_ACTION_EXECUTOR_PACEHOLDER_ID,
-        )
+
+    return FeedbackCreateReq(
+        project_id=project_id,
+        weave_ref=weave_ref,
+        feedback_type="wandb.runnable." + action_name,
+        runnable_ref=runnable_ref,
+        payload=RunnablePayloadSchema(output=result).model_dump(),
     )
 
 
-def resolve_action_ref(configured_action_ref: str) -> ConfiguredAction:
-    server = ClickHouseTraceServer.from_env()
-    action_dict_res = server.refs_read_batch(
-        RefsReadBatchReq(refs=[configured_action_ref])
-    )
-    action_dict = action_dict_res.vals[0]
-    assert isinstance(action_dict, dict)
-    action = ConfiguredAction.model_validate(action_dict)
-    return action
-
-
-def resolve_call(ctx: TaskCtx) -> CallSchema:
-    project_id, call_id = ctx["project_id"], ctx["call_id"]
-    server = ClickHouseTraceServer.from_env()
-    calls_query_res = server.calls_query(
-        CallsQueryReq(
-            project_id=project_id, filter=CallsFilter(call_ids=[call_id]), limit=1
-        )
-    )
-    return calls_query_res.calls[0]
-
-
-ActionConfigT = TypeVar("ActionConfigT")
-ActionResultT = TypeVar("ActionResultT")
-
-
-def action_task(
-    func: Callable[[str, str, ActionConfigT], ActionResultT],
-) -> Callable[[TaskCtx, str, str, str, ActionConfigT, Optional[str]], ActionResultT]:
-    @wraps(func)
-    def wrapper(
-        ctx: TaskCtx,
-        call_input: str,
-        call_output: str,
-        configured_action_ref: str,
-        configured_action: ActionConfigT,
-        trigger_ref: Optional[str] = None,
-    ) -> ActionResultT:
-        success = True
-        try:
-            result = func(call_input, call_output, configured_action)
-            publish_results_as_feedback(ctx, result, configured_action_ref, trigger_ref)
-            # logging.info(f"Successfully ran {func.__name__}")
-            # logging.info(f"Result: {result}")
-        except Exception as e:
-            success = False
-            raise e
-        finally:
-            ack_on_clickhouse(ctx, success)
-        return result
-
-    return wrapper
-
-
-@app.task()
-def do_task(
-    ctx: TaskCtx, configured_action_ref: str, trigger_ref: Optional[str] = None
-) -> None:
-    action = resolve_action_ref(configured_action_ref)
-    call = resolve_call(ctx)
-    call_input = json.dumps(call.inputs)
-    call_output = call.output
-    if not isinstance(call_output, str):
-        call_output = json.dumps(call_output)
-
-    if action.config.action_type == "wordcount":
-        wordcount(
-            ctx,
-            call_input,
-            call_output,
-            configured_action_ref,
-            action.config,
-            trigger_ref,
-        )
-    elif action.config.action_type == "llm_judge":
-        llm_judge(
-            ctx,
-            call_input,
-            call_output,
-            configured_action_ref,
-            action.config,
-            trigger_ref,
-        )
-    elif action.config.action_type == "noop":
-        noop(
-            ctx,
-            call_input,
-            call_output,
-            configured_action_ref,
-            action.config,
-            trigger_ref,
-        )
-    elif action.config.action_type == "contains_words":
-        contains_words(
-            ctx,
-            call_input,
-            call_output,
-            configured_action_ref,
-            action.config,
-            trigger_ref,
-        )
-    else:
-        raise ValueError(f"Unknown action type: {action.config.action_type}")
-
-
-@action_task
-def wordcount(
-    call_input: str, call_output: str, config: ConfiguredWordCountAction
-) -> int:
-    return len(call_output.split(" "))
-
-
-@action_task
-def llm_judge(
-    call_input: str, call_output: str, config: ConfiguredLlmJudgeAction
-) -> str:
+def do_llm_judge_action(config: ConfiguredLlmJudgeAction, call: CallSchema) -> Any:
     model = config.model
     system_prompt = config.prompt
     if config.response_format is None:
@@ -215,10 +66,9 @@ def llm_judge(
     }
 
     args = {
-        "inputs": call_input,
-        "output": call_output,
+        "inputs": call.inputs,
+        "output": call.output,
     }
-    from openai import OpenAI
 
     client = OpenAI()
     # Silly hack to get around issue in tests:
@@ -239,14 +89,14 @@ def llm_judge(
     return res
 
 
-@action_task
-def contains_words(
-    call_input: str, call_output: str, config: ConfiguredContainsWordsAction
-) -> bool:
-    word_set = set(call_output.split(" "))
-    return len(set(config.target_words) & word_set) > 0
-
-
-@action_task
-def noop(call_input: str, call_output: str, config: ConfiguredNoopAction) -> None:
-    pass
+def do_action(
+    configured_action_ref: str, action_config: ActionConfigType, call: CallSchema
+) -> Tuple[Any, FeedbackCreateReq]:
+    runnable_ref = None
+    if isinstance(action_config, ConfiguredLlmJudgeAction):
+        result = do_llm_judge_action(action_config, call)
+        runnable_ref = configured_action_ref
+    else:
+        raise ValueError(f"Unsupported action config: {action_config}")
+    req = publish_results_as_feedback(call, runnable_ref, result)
+    return result, req

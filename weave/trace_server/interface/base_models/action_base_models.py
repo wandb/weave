@@ -2,6 +2,9 @@ from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel
 
+# class BaseActionModel(BaseModel):
+#     action_type: str
+
 
 class ConfiguredLlmJudgeAction(BaseModel):
     action_type: Literal["llm_judge"] = "llm_judge"
