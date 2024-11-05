@@ -420,22 +420,22 @@ def test_filter_by_feedback(client: WeaveClient) -> None:
     ids, my_scorer, my_model = populate_feedback(client)
     for field, value, eq_ids, gt_ids in [
         (
-            "feedback.[wandb.runnable.my_scorer].payload.model_output",
+            "feedback.[wandb.runnable.my_scorer].payload.output.model_output",
             "a",
-            [ids[0], ids[2]],
-            [ids[1], ids[3]],
+            [ids[0]],
+            [ids[1], ids[2], ids[3]],
         ),
         (
-            "feedback.[wandb.runnable.my_scorer].payload.expected",
-            "a",
-            [ids[3], ids[1]],
-            [ids[0], ids[2]],
+            "feedback.[wandb.runnable.my_scorer].payload.output.expected",
+            "c",
+            [ids[2]],
+            [ids[3]],
         ),
         (
-            "feedback.[wandb.runnable.my_scorer].payload.match",
-            True,
-            [ids[0], ids[2]],
+            "feedback.[wandb.runnable.my_scorer].payload.output.match",
+            "false",
             [ids[1], ids[3]],
+            [ids[0], ids[2]],
         ),
     ]:
         calls = client.server.calls_query_stream(
@@ -450,12 +450,13 @@ def test_filter_by_feedback(client: WeaveClient) -> None:
                         ]
                     }
                 },
-                include_feedback=True,
             )
         )
 
         found_ids = [c.id for c in calls]
-        assert found_ids == eq_ids
+        assert (
+            found_ids == eq_ids
+        ), f"Filtering by {field} == {value} failed, expected {eq_ids}, got {found_ids}"
 
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
@@ -469,9 +470,10 @@ def test_filter_by_feedback(client: WeaveClient) -> None:
                         ]
                     }
                 },
-                include_feedback=True,
             )
         )
 
         found_ids = [c.id for c in calls]
-        assert found_ids == gt_ids
+        assert (
+            found_ids == gt_ids
+        ), f"Filtering by {field} > {value} failed, expected {gt_ids}, got {found_ids}"

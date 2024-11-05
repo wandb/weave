@@ -258,7 +258,8 @@ class Condition(BaseModel):
         if self._consumed_fields is None:
             self._consumed_fields = []
             for field in conditions.fields_used:
-                self._consumed_fields.append(get_field_by_name(field))
+                # TODO: Verify that this is "ok" since before we were just looking at field name
+                self._consumed_fields.append(field)
         return combine_conditions(conditions.conditions, "AND")
 
     def _get_consumed_fields(self) -> list[CallsMergedField]:
@@ -579,6 +580,10 @@ class CallsQuery(BaseModel):
             having_conditions_sql.extend(
                 c.as_sql(pb, table_alias) for c in self.query_conditions
             )
+            for query_condition in self.query_conditions:
+                for field in query_condition._get_consumed_fields():
+                    if isinstance(field, CallsMergedFeedbackPayloadField):
+                        needs_feedback = True
         if self.hardcoded_filter is not None:
             having_conditions_sql.append(self.hardcoded_filter.as_sql(pb, table_alias))
 
@@ -690,7 +695,7 @@ def get_field_by_name(name: str) -> CallsMergedField:
 
 class FilterToConditions(BaseModel):
     conditions: list[str]
-    fields_used: set[str]
+    fields_used: list[CallsMergedField]
 
 
 def process_query_to_conditions(
@@ -700,7 +705,7 @@ def process_query_to_conditions(
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
-    raw_fields_used = set()
+    raw_fields_used: dict[str, CallsMergedField] = {}
 
     # This is the mongo-style query
     def process_operation(operation: tsi_query.Operation) -> str:
@@ -766,7 +771,7 @@ def process_query_to_conditions(
         elif isinstance(operand, tsi_query.GetFieldOperator):
             structured_field = get_field_by_name(operand.get_field_)
             field = structured_field.as_sql(param_builder, table_alias)
-            raw_fields_used.add(structured_field.field)
+            raw_fields_used[structured_field.field] = structured_field
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
             field = process_operand(operand.convert_.input)
@@ -792,7 +797,9 @@ def process_query_to_conditions(
 
     conditions.append(filter_cond)
 
-    return FilterToConditions(conditions=conditions, fields_used=raw_fields_used)
+    return FilterToConditions(
+        conditions=conditions, fields_used=list(raw_fields_used.values())
+    )
 
 
 def process_calls_filter_to_conditions(

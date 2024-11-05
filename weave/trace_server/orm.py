@@ -484,12 +484,12 @@ def python_value_to_ch_type(value: typing.Any) -> str:
     """Helper function to convert python types to clickhouse types."""
     if isinstance(value, str):
         return "String"
+    elif isinstance(value, bool):
+        return "Bool"
     elif isinstance(value, int):
         return "UInt64"
     elif isinstance(value, float):
         return "Float64"
-    elif isinstance(value, bool):
-        return "UInt8"
     elif value is None:
         return "Nullable(String)"
     else:
