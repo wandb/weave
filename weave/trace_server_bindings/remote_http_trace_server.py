@@ -1,7 +1,7 @@
 import io
 import json
 import logging
-from typing import Any, Iterator, List, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import Any, Iterator, List, Optional, Tuple, Type, Union, cast
 
 import tenacity
 from pydantic import BaseModel, ValidationError
@@ -214,16 +214,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
         return r
 
-    ReqType = TypeVar("ReqType", bound=BaseModel)
-    ResType = TypeVar("ResType", bound=BaseModel)
-
     def _generic_request(
         self,
         url: str,
-        req: Union[ReqType, dict[str, Any]],
-        req_model: Type[ReqType],
-        res_model: Type[ResType],
-    ) -> ResType:
+        req: BaseModel,
+        req_model: Type[BaseModel],
+        res_model: Type[BaseModel],
+    ) -> BaseModel:
         if isinstance(req, dict):
             req = req_model.model_validate(req)
         r = self._generic_request_executor(url, req)
@@ -232,10 +229,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def _generic_stream_request(
         self,
         url: str,
-        req: ReqType,
-        req_model: Type[ReqType],
-        res_model: Type[ResType],
-    ) -> Iterator[ResType]:
+        req: BaseModel,
+        req_model: Type[BaseModel],
+        res_model: Type[BaseModel],
+    ) -> Iterator[BaseModel]:
         if isinstance(req, dict):
             req = req_model.model_validate(req)
         r = self._generic_request_executor(url, req, stream=True)
