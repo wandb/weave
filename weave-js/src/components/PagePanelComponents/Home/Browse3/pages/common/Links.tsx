@@ -50,7 +50,7 @@ const FakeLink = styled.div<LinkProps>`
     color: ${TEAL_500};
   }
 `;
-Link.displayName = 'S.Link';
+FakeLink.displayName = 'S.FakeLink';
 
 const LinkWrapper = styled.div<{fullWidth?: boolean; color?: string}>`
   ${p =>
