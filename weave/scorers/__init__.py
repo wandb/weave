@@ -1,5 +1,6 @@
 from weave.scorers.base_scorer import (
     Scorer,
+    _has_oldstyle_scorers,
     auto_summarize,
     get_scorer_attributes,
 )
@@ -39,6 +40,7 @@ __all__ = [
     "ContextRelevancyScorer",
     "EmbeddingSimilarityScorer",
     "get_scorer_attributes",
+    "_has_oldstyle_scorers",
     "HallucinationFreeScorer",
     "InstructorLLMScorer",
     "ValidJSONScorer",

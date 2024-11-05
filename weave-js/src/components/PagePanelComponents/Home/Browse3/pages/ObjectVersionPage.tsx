@@ -1,9 +1,9 @@
 import Box from '@mui/material/Box';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import numeral from 'numeral';
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
+import {BytesStoredInfoIcon} from '../../../../BytesStoredInfoIcon';
 import {Icon, IconName} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
@@ -27,9 +27,11 @@ import {
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
 import {EvaluationLeaderboardTab} from './LeaderboardTab';
+import {TabPrompt} from './TabPrompt';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
+import {TabUsePrompt} from './TabUsePrompt';
 import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
 import {useWFHooks} from './wfReactInterface/context';
 import {
@@ -49,7 +51,8 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Prompt: 'forum-chat-bubble',
   Model: 'model',
   Dataset: 'table',
-  Evaluation: 'benchmark-square',
+Evaluation: 'baseline-alt',
+Leaderboard: 'benchmark-square',
   Scorer: 'type-number-alt',
   ConfiguredAction: 'rocket-launch',
 };
@@ -128,6 +131,8 @@ const ObjectVersionPageInner: React.FC<{
       : null;
   }, [objectVersion.baseObjectClass]);
   const refUri = objectVersionKeyToRefUri(objectVersion);
+
+  const showPromptTab = objectVersion.val._class_name === 'EasyPrompt';
 
   const minimalColumns = useMemo(() => {
     return ['id', 'op_name', 'project_id'];
@@ -247,7 +252,10 @@ const ObjectVersionPageInner: React.FC<{
                 {data.loading ? (
                   <LoadingDots />
                 ) : (
-                  numeral(bytesStored).format('0.0b')
+                  <BytesStoredInfoIcon
+                    bytesStored={bytesStored}
+                    weaveKind="object"
+                  />
                 )}
               </>
             ),
@@ -289,6 +297,26 @@ const ObjectVersionPageInner: React.FC<{
       //   },
       // ]}
       tabs={[
+        ...(showPromptTab
+          ? [
+              {
+                label: 'Prompt',
+                content: (
+                  <ScrollableTabContent>
+                    {data.loading ? (
+                      <CenteredAnimatedLoader />
+                    ) : (
+                      <TabPrompt
+                        entity={entityName}
+                        project={projectName}
+                        data={viewerDataAsObject}
+                      />
+                    )}
+                  </ScrollableTabContent>
+                ),
+              },
+            ]
+          : []),
         ...(isEvaluation && evalHasCalls
           ? [
               {
@@ -335,23 +363,33 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'Use',
           content: (
-            <Tailwind>
-              {baseObjectClass === 'Dataset' ? (
-                <TabUseDataset
-                  name={objectName}
-                  uri={refUri}
-                  versionIndex={objectVersionIndex}
-                />
-              ) : baseObjectClass === 'Model' ? (
-                <TabUseModel
-                  name={objectName}
-                  uri={refUri}
-                  projectName={projectName}
-                />
-              ) : (
-                <TabUseObject name={objectName} uri={refUri} />
-              )}
-            </Tailwind>
+            <ScrollableTabContent>
+              <Tailwind>
+                {baseObjectClass === 'Prompt' ? (
+                  <TabUsePrompt
+                    name={objectName}
+                    uri={refUri}
+                    entityName={entityName}
+                    projectName={projectName}
+                    data={viewerDataAsObject}
+                  />
+                ) : baseObjectClass === 'Dataset' ? (
+                  <TabUseDataset
+                    name={objectName}
+                    uri={refUri}
+                    versionIndex={objectVersionIndex}
+                  />
+                ) : baseObjectClass === 'Model' ? (
+                  <TabUseModel
+                    name={objectName}
+                    uri={refUri}
+                    projectName={projectName}
+                  />
+                ) : (
+                  <TabUseObject name={objectName} uri={refUri} />
+                )}
+              </Tailwind>
+            </ScrollableTabContent>
           ),
         },
 

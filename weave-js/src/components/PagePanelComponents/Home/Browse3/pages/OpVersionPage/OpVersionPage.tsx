@@ -13,6 +13,7 @@ import {
 } from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {
+  ScrollableTabContent,
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
@@ -147,9 +148,11 @@ const OpVersionPageInner: React.FC<{
               {
                 label: 'Use',
                 content: (
-                  <Tailwind>
-                    <TabUseOp name={opNiceName(opId)} uri={uri} />
-                  </Tailwind>
+                  <ScrollableTabContent>
+                    <Tailwind>
+                      <TabUseOp name={opNiceName(opId)} uri={uri} />
+                    </Tailwind>
+                  </ScrollableTabContent>
                 ),
               },
             ]

@@ -82,6 +82,8 @@ import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
+import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
+import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
 import {
@@ -153,6 +155,7 @@ const tabOptions = [
   'op-versions',
   'calls',
   'evaluations',
+  'leaderboards',
   'boards',
   'tables',
   'scorers',
@@ -341,90 +344,92 @@ const MainPeekingLayout: FC = () => {
     <WFDataModelAutoProvider
       entityName={params.entity!}
       projectName={params.project!}>
-      <Box
-        sx={{
-          flex: '1 1 auto',
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          overflow: 'hidden',
-          flexDirection: 'row',
-          alignContent: 'stretch',
-        }}>
+      <TableRowSelectionProvider>
         <Box
           sx={{
-            flex: '1 1 40%',
-            overflow: 'hidden',
+            flex: '1 1 auto',
+            width: '100%',
+            height: '100%',
             display: 'flex',
-            marginRight: !isDrawerOpen ? 0 : `${drawerWidthPx}px`,
+            overflow: 'hidden',
+            flexDirection: 'row',
+            alignContent: 'stretch',
           }}>
-          <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
-        </Box>
-
-        <Drawer
-          variant="persistent"
-          anchor="right"
-          open={isDrawerOpen}
-          onClose={closePeek}
-          PaperProps={{
-            ref: drawerRef,
-            style: {
+          <Box
+            sx={{
+              flex: '1 1 40%',
               overflow: 'hidden',
-              display: isDrawerOpen ? 'flex' : 'none',
-              zIndex: 1,
-              width: isDrawerOpen ? `${drawerWidthPx}px` : 0,
-              height: '100%',
-              borderLeft: '1px solid #e0e0e0',
-              position: 'absolute',
-              pointerEvents: isDragging ? 'none' : 'auto',
-            },
-          }}
-          ModalProps={{
-            keepMounted: true,
-          }}>
-          <div
-            id="dragger"
-            onMouseDown={handleDragStart}
-            style={{
-              position: 'absolute',
-              top: 0,
-              bottom: 0,
-              left: 0,
-              width: '5px',
-              cursor: 'col-resize',
-              zIndex: 2,
+              display: 'flex',
+              marginRight: !isDrawerOpen ? 0 : `${drawerWidthPx}px`,
+            }}>
+            <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
+          </Box>
+
+          <Drawer
+            variant="persistent"
+            anchor="right"
+            open={isDrawerOpen}
+            onClose={closePeek}
+            PaperProps={{
+              ref: drawerRef,
+              style: {
+                overflow: 'hidden',
+                display: isDrawerOpen ? 'flex' : 'none',
+                zIndex: 1,
+                width: isDrawerOpen ? `${drawerWidthPx}px` : 0,
+                height: '100%',
+                borderLeft: '1px solid #e0e0e0',
+                position: 'absolute',
+                pointerEvents: isDragging ? 'none' : 'auto',
+              },
             }}
-          />
-          {peekLocation && (
-            <WeaveflowPeekContext.Provider value={{isPeeking: true}}>
-              <SimplePageLayoutContext.Provider
-                value={{
-                  headerSuffix: (
-                    <Box sx={{flex: '0 0 auto'}}>
-                      <FullPageButton
-                        query={query}
-                        generalBase={generalBase}
-                        targetBase={targetBase}
-                      />
-                      <Button
-                        tooltip="Close drawer"
-                        icon="close"
-                        variant="ghost"
-                        className="ml-4"
-                        onClick={closePeek}
-                      />
-                    </Box>
-                  ),
-                }}>
-                <Browse3ProjectRoot
-                  customLocation={peekLocation}
-                  projectRoot={generalProjectRoot}
-                />
-              </SimplePageLayoutContext.Provider>
-            </WeaveflowPeekContext.Provider>
-          )}
-        </Drawer>
-      </Box>
+            ModalProps={{
+              keepMounted: true,
+            }}>
+            <div
+              id="dragger"
+              onMouseDown={handleDragStart}
+              style={{
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                left: 0,
+                width: '5px',
+                cursor: 'col-resize',
+                zIndex: 2,
+              }}
+            />
+            {peekLocation && (
+              <WeaveflowPeekContext.Provider value={{isPeeking: true}}>
+                <SimplePageLayoutContext.Provider
+                  value={{
+                    headerSuffix: (
+                      <Box sx={{flex: '0 0 auto'}}>
+                        <FullPageButton
+                          query={query}
+                          generalBase={generalBase}
+                          targetBase={targetBase}
+                        />
+                        <Button
+                          tooltip="Close drawer"
+                          icon="close"
+                          variant="ghost"
+                          className="ml-4"
+                          onClick={closePeek}
+                        />
+                      </Box>
+                    ),
+                  }}>
+                  <Browse3ProjectRoot
+                    customLocation={peekLocation}
+                    projectRoot={generalProjectRoot}
+                  />
+                </SimplePageLayoutContext.Provider>
+              </WeaveflowPeekContext.Provider>
+            )}
+          </Drawer>
+        </Box>
+      </TableRowSelectionProvider>
     </WFDataModelAutoProvider>
   );
 };
@@ -497,6 +502,13 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/:tab(scorers)`}>
           <ScorersPageBinding />
+          </Route>
+        <Route
+          path={[
+            `${projectRoot}/leaderboards/:itemName`,
+            `${projectRoot}/leaderboards`,
+          ]}>
+          <LeaderboardPageBinding />
         </Route>
         {/* BOARDS */}
         <Route
@@ -979,6 +991,7 @@ const CompareEvaluationsBinding = () => {
   );
 };
 
+
 const ScorersPageBinding = () => {
   const {entity, project} = useParamsDecoded<Browse3TabParams>();
   const enableOnlineEvalUI = getFeatureFlag(ENABLE_ONLINE_EVAL_UI);
@@ -986,6 +999,24 @@ const ScorersPageBinding = () => {
     return null;
   }
   return <ScorersPage entity={entity} project={project} />;
+};
+
+const LeaderboardPageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+  const {entity, project, itemName: leaderboardName} = params;
+  const query = useURLSearchParamsDict();
+  const edit = query.edit === 'true';
+  if (!leaderboardName) {
+    return <LeaderboardListingPage entity={entity} project={project} />;
+  }
+  return (
+    <LeaderboardPage
+      entity={entity}
+      project={project}
+      leaderboardName={leaderboardName}
+      openEditorOnMount={edit}
+    />
+  );
 };
 
 const OpsPageBinding = () => {
@@ -1093,5 +1124,53 @@ const Browse3Breadcrumbs: FC = props => {
         </React.Fragment>
       ))}
     </Breadcrumbs>
+  );
+};
+
+export const TableRowSelectionContext = React.createContext<{
+  rowIdsConfigured: boolean;
+  setRowIds?: (rowIds: string[]) => void;
+  getNextRowId?: (currentId: string) => string | null;
+  getPreviousRowId?: (currentId: string) => string | null;
+}>({
+  rowIdsConfigured: false,
+  setRowIds: () => {},
+  getNextRowId: () => null,
+  getPreviousRowId: () => null,
+});
+
+const TableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
+  children,
+}) => {
+  const [rowIds, setRowIds] = useState<string[]>([]);
+  const rowIdsConfigured = useMemo(() => rowIds.length > 0, [rowIds]);
+
+  const getNextRowId = useCallback(
+    (currentId: string) => {
+      const currentIndex = rowIds.indexOf(currentId);
+      if (currentIndex !== -1) {
+        return rowIds[currentIndex + 1];
+      }
+      return null;
+    },
+    [rowIds]
+  );
+
+  const getPreviousRowId = useCallback(
+    (currentId: string) => {
+      const currentIndex = rowIds.indexOf(currentId);
+      if (currentIndex !== -1) {
+        return rowIds[currentIndex - 1];
+      }
+      return null;
+    },
+    [rowIds]
+  );
+
+  return (
+    <TableRowSelectionContext.Provider
+      value={{rowIdsConfigured, setRowIds, getNextRowId, getPreviousRowId}}>
+      {children}
+    </TableRowSelectionContext.Provider>
   );
 };

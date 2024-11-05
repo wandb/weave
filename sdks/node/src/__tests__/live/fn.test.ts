@@ -29,7 +29,7 @@ class ParametrizedFunction extends CallableObject<
 
 describe('Fn', () => {
   beforeEach(async () => {
-    await login({apiKey: process.env.WANDB_API_KEY ?? ''});
+    await login(process.env.WANDB_API_KEY ?? '');
   });
 
   test('use fn', async () => {

@@ -60,6 +60,9 @@ from weave.trace_server.action_executor import (
     queue_from_addr,
 )
 from weave.trace_server.actions import TABLE_ACTIONS, get_stale_actions
+from weave.trace_server.base_object_class_util import (
+    process_incoming_object,
+)
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -77,6 +80,7 @@ from weave.trace_server.clickhouse_schema import (
     SelectableCHCallSchema,
     SelectableCHObjSchema,
 )
+from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InsertTooLarge, InvalidRequest, RequestTooLarge
 from weave.trace_server.feedback import (
@@ -85,6 +89,7 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.ids import generate_id
+
 from weave.trace_server.interface.base_models.action_base_models import (
     ActionDispatchFilter,
 )
@@ -96,7 +101,12 @@ from weave.trace_server.interface.base_models.base_model_registry import (
 from weave.trace_server.interface.base_models.feedback_base_model_registry import (
     feedback_base_models,
 )
+from weave.trace_server.llm_completion import lite_llm_completion
+from weave.trace_server.model_providers.model_providers import (
+    read_model_to_provider_info_map,
+)
 from weave.trace_server.orm import ParamBuilder, Row
+from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
     TABLE_ROWS_ALIAS,
@@ -135,8 +145,6 @@ FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 100
 MAX_CALLS_STREAM_BATCH_SIZE = 500
-
-WEAVE_ACTION_EXECUTOR_PACEHOLDER_ID = "WEAVE_ACTION_EXECUTOR"
 
 
 class NotFoundError(Exception):
@@ -181,6 +189,10 @@ ObjRefListType = list[ri.InternalObjectRef]
 
 CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
+
+CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
+    "max_memory_usage": 10 * 1024 * 1024 * 1024,  # 10 GiB
+}
 
 
 @dataclasses.dataclass
@@ -255,6 +267,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch = CallBatch()
         self._use_async_insert = use_async_insert
         self._action_executor_addr = action_executor_addr
+        self._model_to_provider_info_map = read_model_to_provider_info_map()
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -638,28 +651,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        req_obj = req.obj
-        dict_val = req_obj.val
+        val, base_object_class = process_incoming_object(
+            req.obj.val, req.obj.set_base_object_class
+        )
 
-        if req.obj.base_object_class:
-            for base_model in base_models:
-                if base_model_name(base_model) == req.obj.base_object_class:
-                    # 1. Validate the object against the base model & re-dump to a dict
-                    dict_val = base_model_dump(base_model.model_validate(dict_val))
-                    break
-            else:
-                raise ValueError(
-                    f"Unknown base object class: {req.obj.base_object_class}"
-                )
-
-        json_val = json.dumps(dict_val)
+        json_val = json.dumps(val)
         digest = str_digest(json_val)
+
         ch_obj = ObjCHInsertable(
-            project_id=req_obj.project_id,
-            object_id=req_obj.object_id,
-            kind=get_kind(dict_val),
-            base_object_class=get_base_object_class(dict_val),
-            refs=extract_refs_from_values(dict_val),
+            project_id=req.obj.project_id,
+            object_id=req.obj.object_id,
+            kind=get_kind(val),
+            base_object_class=base_object_class,
+            refs=extract_refs_from_values(val),
             val_dump=json_val,
             digest=digest,
         )
@@ -1413,6 +1417,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 break
 
         # Augment emoji with alias.
+        res_payload = {}
         if req.feedback_type == "wandb.reaction.1":
             em = req.payload["emoji"]
             if emoji.emoji_count(em) != 1:
@@ -1477,6 +1482,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
+
 
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
@@ -1560,6 +1566,64 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         except Exception as e:
             logger.error(f"Error in _actions_requeue_stale: {str(e)}")
             raise
+
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        model_name = req.inputs.model
+        model_info = self._model_to_provider_info_map.get(model_name)
+        if not model_info:
+            raise InvalidRequest(f"No model info found for model {model_name}")
+        secret_fetcher = _secret_fetcher_context.get()
+        if not secret_fetcher:
+            raise InvalidRequest(
+                f"No secret fetcher found, cannot fetch API key for model {model_name}"
+            )
+        secret_name = model_info.get("api_key_name")
+        if not secret_name:
+            raise InvalidRequest(f"No secret name found for model {model_name}")
+        api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
+        if not api_key:
+            raise InvalidRequest(f"No API key found for model {model_name}")
+
+        start_time = datetime.datetime.now()
+        res = lite_llm_completion(api_key, req.inputs)
+        end_time = datetime.datetime.now()
+
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=req.project_id,
+            wb_user_id=req.wb_user_id,
+            op_name=COMPLETIONS_CREATE_OP_NAME,
+            started_at=start_time,
+            inputs={**req.inputs.model_dump(exclude_none=True)},
+            attributes={},
+        )
+        start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=req.project_id,
+            id=start_call.id,
+            ended_at=end_time,
+            output=res.response,
+            summary={},
+        )
+        if "usage" in res.response:
+            end.summary["usage"] = {req.inputs.model: res.response["usage"]}
+
+        if "error" in res.response:
+            end.exception = res.response["error"]
+        end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+        calls: list[Union[CallStartCHInsertable, CallEndCHInsertable]] = [
+            start_call,
+            end_call,
+        ]
+        batch_data = []
+        for call in calls:
+            call_dict = call.model_dump()
+            values = [call_dict.get(col) for col in all_call_insert_columns]
+            batch_data.append(values)
+
+        self._insert_call_batch(batch_data)
+        return res
 
     # Private Methods
     @property
@@ -1790,12 +1854,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query: str,
         parameters: Dict[str, Any],
         column_formats: Optional[Dict[str, Any]] = None,
+        settings: Optional[Dict[str, Any]] = None,
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
+        if not settings:
+            settings = {}
+        settings.update(CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+
         summary = None
         parameters = _process_parameters(parameters)
         with self.ch_client.query_rows_stream(
-            query, parameters=parameters, column_formats=column_formats, use_none=True
+            query,
+            parameters=parameters,
+            column_formats=column_formats,
+            use_none=True,
+            settings=settings,
         ) as stream:
             if isinstance(stream.source, QueryResult):
                 summary = stream.source.summary
@@ -2238,7 +2311,7 @@ def _process_parameters(
 
 
 def get_type(val: Any) -> str:
-    if val is None:
+    if val == None:
         return "none"
     elif isinstance(val, dict):
         if "_type" in val:
@@ -2256,28 +2329,6 @@ def get_kind(val: Any) -> str:
     if val_type == "Op":
         return "op"
     return "object"
-
-
-def get_base_object_class(val: Any) -> Optional[str]:
-    """
-    Get the base object class of a value using:
-    1. The last base class that is a subclass of BaseModel and not Object
-    2. The _class_name attribute if it exists
-    3. None if no base class is found
-    """
-    if isinstance(val, dict):
-        if "_bases" in val:
-            if isinstance(val["_bases"], list):
-                bases = val["_bases"]
-                if len(bases) > 0 and bases[-1] == "BaseModel":
-                    bases = bases[:-1]
-                    if len(bases) > 0 and bases[-1] == "Object":
-                        bases = bases[:-1]
-                    if len(bases) > 0:
-                        return bases[-1]
-                    elif "_class_name" in val:
-                        return val["_class_name"]
-    return None
 
 
 def find_call_descendants(

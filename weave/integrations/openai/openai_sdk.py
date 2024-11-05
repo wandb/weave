@@ -3,6 +3,7 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
+from weave.trace.op import Op, ProcessedInputs
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
@@ -277,6 +278,28 @@ def should_use_accumulator(inputs: dict) -> bool:
     )
 
 
+def openai_on_input_handler(
+    func: Op, args: tuple, kwargs: dict
+) -> Optional[ProcessedInputs]:
+    if len(args) == 2 and isinstance(args[1], weave.EasyPrompt):
+        original_args = args
+        original_kwargs = kwargs
+        prompt = args[1]
+        args = args[:-1]
+        kwargs.update(prompt.as_dict())
+        inputs = {
+            "prompt": prompt,
+        }
+        return ProcessedInputs(
+            original_args=original_args,
+            original_kwargs=original_kwargs,
+            args=args,
+            kwargs=kwargs,
+            inputs=inputs,
+        )
+    return None
+
+
 def create_wrapper_sync(
     name: str,
 ) -> Callable[[Callable], Callable]:
@@ -301,6 +324,7 @@ def create_wrapper_sync(
 
         op = weave.op()(_add_stream_options(fn))
         op.name = name  # type: ignore
+        op._set_on_input_handler(openai_on_input_handler)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
@@ -338,6 +362,7 @@ def create_wrapper_async(
 
         op = weave.op()(_add_stream_options(fn))
         op.name = name  # type: ignore
+        op._set_on_input_handler(openai_on_input_handler)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(

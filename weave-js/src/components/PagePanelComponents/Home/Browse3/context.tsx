@@ -193,7 +193,16 @@ export const browse2Context = {
   ) => {
     throw new Error('Not implemented');
   },
+
   metricsUIUrl: (entityName: string, projectName: string) => {
+    throw new Error('Not implemented');
+  },
+  leaderboardsUIUrl: (
+    entityName: string,
+    projectName: string,
+    leaderboardName?: string,
+    edit?: boolean
+  ) => {
     throw new Error('Not implemented');
   },
 };
@@ -425,8 +434,21 @@ export const browse3ContextGen = (
         JSON.stringify(evaluationCallIds)
       )}${metricsPart}`;
     },
+
     metricsUIUrl: (entityName: string, projectName: string) => {
       return `${projectRoot(entityName, projectName)}/metrics`;
+    },
+
+    leaderboardsUIUrl: (
+      entityName: string,
+      projectName: string,
+      leaderboardName?: string,
+      edit?: boolean
+    ) => {
+      return `${projectRoot(entityName, projectName)}/leaderboards${
+        leaderboardName ? `/${leaderboardName}` : ''
+      }${edit ? '?edit=true' : ''}`;
+
     },
   };
   return browse3Context;
@@ -512,7 +534,16 @@ type RouteType = {
     evaluationCallIds: string[],
     metrics: Record<string, boolean> | null
   ) => string;
+
   metricsUIUrl: (entityName: string, projectName: string) => string;
+
+  leaderboardsUIUrl: (
+    entityName: string,
+    projectName: string,
+    leaderboardName?: string,
+    edit?: boolean
+  ) => string;
+
 };
 
 const useSetSearchParam = () => {
@@ -628,6 +659,11 @@ const useMakePeekingRouter = (): RouteType => {
     },
     metricsUIUrl: (...args: Parameters<typeof baseContext.metricsUIUrl>) => {
       return setSearchParam(PEEK_PARAM, baseContext.metricsUIUrl(...args));
+    },
+    leaderboardsUIUrl: (
+      ...args: Parameters<typeof baseContext.leaderboardsUIUrl>
+    ) => {
+      return setSearchParam(PEEK_PARAM, baseContext.leaderboardsUIUrl(...args));
     },
   };
 };

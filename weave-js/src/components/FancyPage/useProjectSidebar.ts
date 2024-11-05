@@ -36,6 +36,7 @@ export const useProjectSidebar = (
   const isBothSidebarItems = showModelsSidebarItems && showWeaveSidebarItems;
   const isShowAll = isNoSidebarItems || isBothSidebarItems;
   const enableOnlineEvalUI = getFeatureFlag(ENABLE_ONLINE_EVAL_UI);
+
   return useMemo(() => {
     const allItems = isLoading
       ? []
@@ -143,12 +144,36 @@ export const useProjectSidebar = (
             iconName: IconNames.LayoutTabs,
           },
           {
+            type: 'divider' as const,
+            key: 'dividerWithinWeave-1',
+            isShown: isWeaveOnly,
+          },
+          {
             type: 'button' as const,
             name: 'Evals',
             slug: 'weave/evaluations',
             isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.BaselineAlt,
           },
+          {
+            type: 'button' as const,
+            name: 'Leaders',
+            slug: 'weave/leaderboards',
+            isShown: isWeaveOnly,
+            iconName: IconNames.BenchmarkSquare,
+          },
+          {
+            type: 'divider' as const,
+            key: 'dividerWithinWeave-2',
+            isShown: isWeaveOnly,
+          },
+          // {
+          //   type: 'button' as const,
+          //   name: 'Prompts',
+          //   slug: 'weave/prompts',
+          //   isShown: showWeaveSidebarItems || isShowAll,
+          //   iconName: IconNames.ForumChatBubble,
+          // },
           {
             type: 'button' as const,
             name: 'Models',
@@ -172,7 +197,7 @@ export const useProjectSidebar = (
           },
           {
             type: 'divider' as const,
-            key: 'dividerWithinWeave',
+            key: 'dividerWithinWeave-3',
             isShown: isWeaveOnly,
           },
           {
@@ -198,7 +223,7 @@ export const useProjectSidebar = (
             key: 'moreWeave',
             isShown: isShowAll,
             // iconName: IconNames.OverflowHorizontal,
-            menu: ['weave/operations', 'weave/objects'],
+            menu: ['weave/leaderboards', 'weave/operations', 'weave/objects'],
           },
         ];
 
