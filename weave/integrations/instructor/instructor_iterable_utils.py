@@ -8,10 +8,10 @@ from weave.trace.op_extensions.accumulator import add_accumulator
 
 
 def instructor_iterable_accumulator(
-    acc: Optional[BaseModel], value: BaseModel
+    acc: Optional[list[BaseModel]], value: BaseModel
 ) -> list[BaseModel]:
     if acc is None:
-        acc = [value]
+        return [value]
     if acc[-1] != value:
         acc.append(value)
     return acc

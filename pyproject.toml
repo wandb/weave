@@ -205,7 +205,6 @@ reportOperatorIssue = false
 reportAssignmentType = false
 reportInconsistentOverload = false
 reportTypedDictNotRequiredAccess = false
-reportOptionalSubscript = false
 
 [tool.mypy]
 warn_unused_configs = true
