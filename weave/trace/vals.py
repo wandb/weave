@@ -196,6 +196,17 @@ class WeaveObject(Traceable):
         self.root = root or self
         self.parent = parent
 
+    def __deepcopy__(self, memo: dict) -> "WeaveObject":
+        val_copy = deepcopy(self._val, memo)
+        res = WeaveObject(
+            val_copy,
+            self.ref,
+            self.server,
+            self.root,
+        )
+        memo[id(self)] = res
+        return res
+
     def __getattribute__(self, __name: str) -> Any:
         try:
             return object.__getattribute__(self, __name)
