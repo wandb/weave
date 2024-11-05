@@ -8,7 +8,7 @@ const colorMap: Record<KnownBaseObjectClassType, TagColorName> = {
   Model: 'blue',
   Dataset: 'green',
   Evaluation: 'cactus',
-Leaderboard: 'gold',
+  Leaderboard: 'gold',
   Scorer: 'purple',
   ConfiguredAction: 'sienna',
 };

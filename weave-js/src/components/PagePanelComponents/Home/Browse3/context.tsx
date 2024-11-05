@@ -448,7 +448,6 @@ export const browse3ContextGen = (
       return `${projectRoot(entityName, projectName)}/leaderboards${
         leaderboardName ? `/${leaderboardName}` : ''
       }${edit ? '?edit=true' : ''}`;
-
     },
   };
   return browse3Context;
@@ -543,7 +542,6 @@ type RouteType = {
     leaderboardName?: string,
     edit?: boolean
   ) => string;
-
 };
 
 const useSetSearchParam = () => {

@@ -51,8 +51,8 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Prompt: 'forum-chat-bubble',
   Model: 'model',
   Dataset: 'table',
-Evaluation: 'baseline-alt',
-Leaderboard: 'benchmark-square',
+  Evaluation: 'baseline-alt',
+  Leaderboard: 'benchmark-square',
   Scorer: 'type-number-alt',
   ConfiguredAction: 'rocket-launch',
 };

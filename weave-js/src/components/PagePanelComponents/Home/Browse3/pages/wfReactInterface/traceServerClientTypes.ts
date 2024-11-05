@@ -220,7 +220,6 @@ export interface TraceObjSchema<
   val: T;
 }
 
-
 export type TraceObjQueryRes<T extends any = any> = {
   objs: Array<TraceObjSchema<T>>;
 };

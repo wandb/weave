@@ -502,7 +502,7 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/:tab(scorers)`}>
           <ScorersPageBinding />
-          </Route>
+        </Route>
         <Route
           path={[
             `${projectRoot}/leaderboards/:itemName`,
@@ -990,7 +990,6 @@ const CompareEvaluationsBinding = () => {
     />
   );
 };
-
 
 const ScorersPageBinding = () => {
   const {entity, project} = useParamsDecoded<Browse3TabParams>();
