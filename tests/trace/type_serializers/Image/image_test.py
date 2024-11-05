@@ -1,9 +1,16 @@
+import base64
+import os
+import re
+import tempfile
+from io import BytesIO
 from pathlib import Path
 
 import pytest
+import requests
 from PIL import Image
 
 import weave
+from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace.weave_client import WeaveClient, get_ref
 
 """When testing types, it is important to test:
@@ -130,3 +137,111 @@ def test_image_as_file(client: WeaveClient) -> None:
         assert res == "Image size: 100x100"
     finally:
         file_path.unlink()
+
+
+def test_image_from_path_disabled(client: WeaveClient) -> None:
+    client.project = "test_image_from_path_disabled"
+
+    remote_path = "https://www.gstatic.com/webp/gallery/1.jpg"
+
+    @weave.op
+    def log_image(path: str) -> dict:
+        return {"imgs": [path]}
+
+    log_image(remote_path)
+    call = log_image.calls()[0]
+    assert call.inputs["path"] == remote_path
+    assert call.output["imgs"][0] == remote_path
+
+
+def test_image_from_path(client: WeaveClient) -> None:
+    client.project = "test_image_from_path"
+    parse_and_apply_settings(UserSettings(convert_paths_to_images=True))
+    with tempfile.TemporaryDirectory() as temp_dir:
+        path_str = os.path.join(temp_dir, "img.png")
+        img = Image.new("RGB", (512, 512), "purple")
+        img.save(path_str)
+        exp_bytes = img.tobytes()
+
+        @weave.op
+        def save_image(path: Path) -> dict:
+            return {"out-img-path": path}
+
+        save_image(Path(path_str))
+
+        call = save_image.calls()[0]
+        assert call.output["out-img-path"].img.tobytes() == exp_bytes
+
+        @weave.op
+        def save_stuff_with_image_embedded(path: Path) -> dict:
+            return {"out": f"Some random text + a path: {path}"}
+
+        save_stuff_with_image_embedded(Path(path_str))
+        call = save_stuff_with_image_embedded.calls()[0]
+        assert call.output["out"] == f"Some random text + a path: {path_str}"
+
+
+def test_image_from_remote_path(client: WeaveClient) -> None:
+    client.project = "test_image_from_remote_path"
+    parse_and_apply_settings(UserSettings(convert_paths_to_images=True))
+    remote_path = "https://www.gstatic.com/webp/gallery/1.jpg"
+    img = Image.open(requests.get(remote_path, stream=True).raw)
+
+    @weave.op
+    def log_image(path: str) -> dict:
+        return {"imgs": [path]}
+
+    log_image(remote_path)
+    call = log_image.calls()[0]
+
+    input_image_path_obj = call.inputs["path"]
+    output_image_path_obj = call.output["imgs"][0]
+
+    assert input_image_path_obj.path == remote_path
+    assert input_image_path_obj.img.tobytes() == img.tobytes()
+    assert output_image_path_obj.path == remote_path
+    assert output_image_path_obj.img.tobytes() == img.tobytes()
+
+
+def test_image_from_remote_path_nonexistent(client: WeaveClient) -> None:
+    client.project = "test_image_from_remote_path_nonexistent"
+    parse_and_apply_settings(UserSettings(convert_paths_to_images=True))
+    remote_path = "https://www.gstatic.com/webp/gallersssssssssssssssssssy/1.jpg"
+
+    @weave.op
+    def log_image(path: str) -> dict:
+        return {"imgs": [path]}
+
+    log_image(remote_path)
+    call = log_image.calls()[0]
+
+    input_image_path_obj = call.inputs["path"]
+    output_image_path_obj = call.output["imgs"][0]
+
+    assert input_image_path_obj == remote_path
+    assert output_image_path_obj == remote_path
+
+
+def test_image_from_base64(client: WeaveClient) -> None:
+    client.project = "test_image_from_base64"
+    parse_and_apply_settings(UserSettings(convert_paths_to_images=True))
+    data = """data:image/png;base64, R0lGODlhDwAPAKECAAAAzMzM/////wAAACwAAAAADwAPAAACIISPeQHsrZ5ModrLlN48CXF8m2iQ3YmmKqVlRtW4MLwWACH+H09wdGltaXplZCBieSBVbGVhZCBTbWFydFNhdmVyIQAAOw=="""
+
+    @weave.op
+    def log_image(data: str) -> dict:
+        return {"imgs": [data, data], "img": data}
+
+    log_image(data)
+    call = log_image.calls()[0]
+
+    img = Image.open(
+        BytesIO(base64.b64decode(re.sub("^data:image/.+;base64,", "", data)))
+    )
+
+    assert isinstance(call.output["imgs"][0].img, Image.Image)
+    assert isinstance(call.output["imgs"][1].img, Image.Image)
+    assert isinstance(call.output["img"].img, Image.Image)
+
+    assert call.output["imgs"][0].img.tobytes() == img.tobytes()
+    assert call.output["imgs"][1].img.tobytes() == img.tobytes()
+    assert call.output["img"].img.tobytes() == img.tobytes()
