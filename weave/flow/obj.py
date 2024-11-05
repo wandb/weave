@@ -73,7 +73,7 @@ class Object(BaseModel):
 
             # pydantic validation will construct a new pydantic object
             def is_ignored_type(v: type) -> bool:
-                return isinstance(v, cls.model_config["ignored_types"])  # pyright: ignore[reportTypedDictNotRequiredAccess]
+                return isinstance(v, cls.model_config["ignored_types"])
 
             allowed_fields = {k: v for k, v in fields.items() if not is_ignored_type(v)}
             new_obj = handler(allowed_fields)
