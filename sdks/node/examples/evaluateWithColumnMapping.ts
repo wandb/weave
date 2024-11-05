@@ -16,7 +16,7 @@ async function main() {
   const evaluation = new weave.Evaluation({
     dataset: ds,
     scorers: [
-      weave.op(({modelOutput, datasetItem}) => modelOutput == datasetItem.age, {
+      weave.op(({modelOutput, datasetRow}) => modelOutput == datasetRow.age, {
         name: 'isEqual',
       }),
     ],

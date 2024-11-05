@@ -3,7 +3,7 @@ import {Dataset, op, weaveAudio, weaveImage} from '../../index';
 
 describe('Publishing Various Data Types', () => {
   beforeEach(async () => {
-    await login({apiKey: process.env.WANDB_API_KEY ?? ''});
+    await login(process.env.WANDB_API_KEY ?? '');
   });
 
   const primitiveOp = op(async function primitive(input: string) {

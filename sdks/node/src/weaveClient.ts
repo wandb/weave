@@ -169,6 +169,16 @@ export class WeaveClient {
     }
   }
 
+  public async getCall(
+    callId: string,
+    includeCosts: boolean = false
+  ): Promise<CallSchema> {
+    const calls = await this.getCalls({call_ids: [callId]}, includeCosts);
+    if (calls.length === 0) {
+      throw new Error(`Call not found: ${callId}`);
+    }
+    return calls[0];
+  }
   public async getCalls(
     filter: CallsFilter = {},
     includeCosts: boolean = false,
