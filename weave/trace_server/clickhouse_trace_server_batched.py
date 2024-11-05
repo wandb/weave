@@ -89,14 +89,11 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.ids import generate_id
-
 from weave.trace_server.interface.base_models.action_base_models import (
     ActionDispatchFilter,
 )
 from weave.trace_server.interface.base_models.base_model_registry import (
-    base_model_dump,
     base_model_name,
-    base_models,
 )
 from weave.trace_server.interface.base_models.feedback_base_model_registry import (
     feedback_base_models,
@@ -1417,7 +1414,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 break
 
         # Augment emoji with alias.
-        res_payload = {}
         if req.feedback_type == "wandb.reaction.1":
             em = req.payload["emoji"]
             if emoji.emoji_count(em) != 1:
@@ -1482,7 +1478,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
-
 
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq

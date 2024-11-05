@@ -573,7 +573,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
 
-
 __docspec__ = [
     RemoteHTTPTraceServer,
     ServerInfoRes,

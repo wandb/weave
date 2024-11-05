@@ -1100,7 +1100,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         print("COMPLETIONS CREATE is not implemented for local sqlite", req)
         return tsi.CompletionsCreateRes()
 
-
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
         # Now get the rows
