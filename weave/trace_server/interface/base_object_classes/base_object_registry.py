@@ -1,5 +1,6 @@
 from typing import Dict, Type
 
+from weave.trace_server.interface.base_object_classes.actions import ActionDefinition
 from weave.trace_server.interface.base_object_classes.base_object_def import BaseObject
 from weave.trace_server.interface.base_object_classes.leaderboard import Leaderboard
 from weave.trace_server.interface.base_object_classes.test_only_example import (
@@ -23,3 +24,4 @@ def register_base_object(cls: Type[BaseObject]) -> None:
 register_base_object(TestOnlyExample)
 register_base_object(TestOnlyNestedBaseObject)
 register_base_object(Leaderboard)
+register_base_object(ActionDefinition)

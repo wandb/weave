@@ -3,8 +3,8 @@ import pytest
 import weave
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.interface.base_models.action_base_models import (
-    Action,
+from weave.trace_server.interface.base_object_classes.actions import (
+    ActionDefinition,
     ContainsWordsActionSpec,
 )
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
@@ -30,10 +30,10 @@ def test_action_execute_workflow(client: WeaveClient):
                 "obj": {
                     "project_id": client._project_id(),
                     "object_id": action_name,
-                    "base_object_class": "Action",
-                    "val": Action(
+                    "base_object_class": "ActionDefinition",
+                    "val": ActionDefinition(
                         name="test_action",
-                        config=ContainsWordsActionSpec(
+                        spec=ContainsWordsActionSpec(
                             target_words=["mindful", "demure"]
                         ),
                     ).model_dump(),
