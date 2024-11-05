@@ -534,6 +534,18 @@ class WeaveDict(Traceable, dict):
         self.parent = parent
         super().__init__(*args, **kwargs)
 
+    def __deepcopy__(self, memo: dict) -> "WeaveDict":
+        items_copy = {k: deepcopy(v, memo) for k, v in self.items()}
+        res = WeaveDict(
+            items_copy,
+            server=self.server,
+            ref=self.ref,  # maybe this should be zero'd?
+            root=self.root,
+            parent=self.parent,
+        )
+        memo[id(self)] = res
+        return res
+
     def __getitem__(self, key: str) -> Any:
         new_ref = self.ref.with_key(key) if self.ref else None
         v = super().__getitem__(key)
