@@ -139,6 +139,21 @@ def test_image_as_file(client: WeaveClient) -> None:
         file_path.unlink()
 
 
+def test_image_from_path_disabled(client: WeaveClient) -> None:
+    client.project = "test_image_from_path_disabled"
+
+    remote_path = "https://www.gstatic.com/webp/gallery/1.jpg"
+
+    @weave.op
+    def log_image(path: str) -> dict:
+        return {"imgs": [path]}
+
+    log_image(remote_path)
+    call = log_image.calls()[0]
+    assert call.inputs["path"] == remote_path
+    assert call.output["imgs"][0] == remote_path
+
+
 def test_image_from_path(client: WeaveClient) -> None:
     client.project = "test_image_from_path"
     parse_and_apply_settings(UserSettings(convert_paths_to_images=True))
@@ -186,6 +201,25 @@ def test_image_from_remote_path(client: WeaveClient) -> None:
     assert input_image_path_obj.img.tobytes() == img.tobytes()
     assert output_image_path_obj.path == remote_path
     assert output_image_path_obj.img.tobytes() == img.tobytes()
+
+
+def test_image_from_remote_path_nonexistent(client: WeaveClient) -> None:
+    client.project = "test_image_from_remote_path_nonexistent"
+    parse_and_apply_settings(UserSettings(convert_paths_to_images=True))
+    remote_path = "https://www.gstatic.com/webp/gallersssssssssssssssssssy/1.jpg"
+
+    @weave.op
+    def log_image(path: str) -> dict:
+        return {"imgs": [path]}
+
+    log_image(remote_path)
+    call = log_image.calls()[0]
+
+    input_image_path_obj = call.inputs["path"]
+    output_image_path_obj = call.output["imgs"][0]
+
+    assert input_image_path_obj == remote_path
+    assert output_image_path_obj == remote_path
 
 
 def test_image_from_base64(client: WeaveClient) -> None:
