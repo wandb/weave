@@ -166,10 +166,6 @@ select = [
   "W391",   # https://docs.astral.sh/ruff/rules/too-many-newlines-at-end-of-file/
   "F401",   # https://docs.astral.sh/ruff/rules/unused-import/
   "TID252", # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
-  # "UP001",
-  # "UP003",
-  # "UP004",
-  # "UP005",
   "UP006",
 ]
 ignore = [
