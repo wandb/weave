@@ -14,5 +14,4 @@ def lite_llm_completion(
         )
         return tsi.CompletionsCreateRes(response=res.model_dump())
     except Exception as e:
-        print("error", str(e), flush=True)
         return tsi.CompletionsCreateRes(response={"error": str(e)})
