@@ -7,6 +7,7 @@ from weave.trace_server.interface.base_object_classes import base_object_def
 
 class LlmJudgeActionSpec(BaseModel):
     action_type: Literal["llm_judge"] = "llm_judge"
+    # TODO: Remove this restriction
     model: Literal["gpt-4o", "gpt-4o-mini"]
     prompt: str
     response_format: Optional[dict[str, Any]]

@@ -79,3 +79,49 @@ def test_action_lifecycle_simple(client: WeaveClient):
     assert feedback.feedback_type == "wandb.runnable." + action_name
     assert feedback.runnable_ref == action_ref_uri
     assert feedback.payload == {"output": True}
+
+
+def test_action_lifecycle_llm_judge(client: WeaveClient):
+    if client_is_sqlite(client):
+        return pytest.skip("skipping for sqlite")
+
+    action_name = "response_is_mindful"
+
+    published_ref = weave.publish(
+        ActionDefinition(
+            name=action_name,
+            spec={
+                "action_type": "llm_judge",
+                "model": "gpt-4o-mini",
+                "prompt": "Is the response mindful?",
+                "response_format": {"type": "boolean"},
+            },
+        )
+    )
+
+    # Construct the URI
+    action_ref_uri = published_ref.uri()
+
+    @weave.op
+    def example_op(input: str) -> str:
+        return input[::-1]
+
+    # Step 2: test that we can in-place execute one action at a time.
+    _, call = example_op.call("i've been very meditative today")
+
+    res = client.server.actions_execute_batch(
+        ActionsExecuteBatchReq.model_validate(
+            {
+                "project_id": client._project_id(),
+                "action_ref": action_ref_uri,
+                "call_ids": [call.id],
+            }
+        )
+    )
+
+    feedbacks = list(call.feedback)
+    assert len(feedbacks) == 1
+    feedback = feedbacks[0]
+    assert feedback.feedback_type == "wandb.runnable." + action_name
+    assert feedback.runnable_ref == action_ref_uri
+    assert feedback.payload == {"output": True}
