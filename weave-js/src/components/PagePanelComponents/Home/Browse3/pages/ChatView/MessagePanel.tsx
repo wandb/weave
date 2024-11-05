@@ -19,6 +19,8 @@ export const MessagePanel = ({
   const isUser = message.role === 'user';
   const isTool = message.role === 'tool';
   const isSystemPrompt = message.role === 'system';
+  const hasToolCalls = !!message.tool_calls && message.tool_calls.length > 0;
+  const hasContent = !!message.content && message.content.length > 0;
 
   return (
     <div className={classNames('flex gap-8', {'mt-32': !isTool})}>
@@ -39,7 +41,7 @@ export const MessagePanel = ({
           'w-full rounded-lg border border-moon-250': isSystemPrompt,
           // Max width for non-system prompts
           'max-w-3xl': !isSystemPrompt,
-          'w-3/4': isTool || isStructuredOutput,
+          'w-3/4': isTool || isStructuredOutput || hasToolCalls,
           // Justify the message to the right if it's a user message, add cactus background
           'ml-auto bg-cactus-300/[0.24]': isUser,
           // Justify the message to the left if it's not a user message
@@ -54,7 +56,7 @@ export const MessagePanel = ({
           </div>
         )}
         <div className="w-full px-16">
-          {message.content && (
+          {hasContent && (
             <div>
               {_.isString(message.content) ? (
                 <MessagePanelPart
@@ -62,13 +64,13 @@ export const MessagePanel = ({
                   isStructuredOutput={isStructuredOutput}
                 />
               ) : (
-                message.content.map((p, i) => (
+                message.content!.map((p, i) => (
                   <MessagePanelPart key={i} value={p} />
                 ))
               )}
             </div>
           )}
-          {message.tool_calls && <ToolCalls toolCalls={message.tool_calls} />}
+          {hasToolCalls && <ToolCalls toolCalls={message.tool_calls!} />}
         </div>
       </div>
     </div>
