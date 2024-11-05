@@ -565,3 +565,124 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
             "pb_5": '$."output"."expected"',
         },
     )
+
+
+def test_query_with_simple_feedback_filter() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {
+                        "$getField": "feedback.[wandb.runnable.my_op].payload.output.expected"
+                    },
+                    {
+                        "$getField": "feedback.[wandb.runnable.my_op].payload.output.found"
+                    },
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+        LEFT JOIN feedback ON
+            (feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_3:String},
+            '/call/',
+            calls_merged.id))
+        WHERE
+            calls_merged.project_id = {pb_3:String}
+            AND calls_merged.project_id = {pb_3:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            (((JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_1:String}) > JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_2:String})))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": "wandb.runnable.my_op",
+            "pb_1": '$."output"."expected"',
+            "pb_2": '$."output"."found"',
+            "pb_3": "project",
+        },
+    )
+
+
+def test_query_with_simple_feedback_sort_and_filter() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {
+                        "$getField": "feedback.[wandb.runnable.my_op].payload.output.expected"
+                    },
+                    {"$literal": "a"},
+                ]
+            }
+        )
+    )
+    cq.add_order("feedback.[wandb.runnable.my_op].payload.output.score", "desc")
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+        LEFT JOIN feedback ON
+            (feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_6:String},
+            '/call/',
+            calls_merged.id))
+        WHERE
+            calls_merged.project_id = {pb_6:String}
+            AND calls_merged.project_id = {pb_6:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            (((JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_1:String}) = {pb_2:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        ORDER BY
+            (NOT (JSONType(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_3:String},
+            {pb_4:String}) = 'Null'
+                OR JSONType(anyIf(feedback.payload_dump,
+                feedback.feedback_type = {pb_0:String}),
+                {pb_3:String},
+                {pb_4:String}) IS NULL)) desc,
+            toFloat64OrNull(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_5:String})) DESC,
+            toString(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_5:String})) DESC
+        """,
+        {
+            "pb_0": "wandb.runnable.my_op",
+            "pb_1": '$."output"."expected"',
+            "pb_2": "a",
+            "pb_3": "output",
+            "pb_4": "score",
+            "pb_5": '$."output"."score"',
+            "pb_6": "project",
+        },
+    )
