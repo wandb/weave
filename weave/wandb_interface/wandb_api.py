@@ -7,7 +7,8 @@
 import contextlib
 import contextvars
 import dataclasses
-from typing import Any, Generator, Optional
+from collections.abc import Generator
+from typing import Any, Optional
 
 import aiohttp
 import gql

@@ -1,4 +1,5 @@
-from typing import Any, Mapping, Optional, Union
+from collections.abc import Mapping
+from typing import Any, Optional, Union
 
 from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
 from weave.trace.context.weave_client_context import require_weave_client

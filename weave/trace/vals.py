@@ -3,8 +3,9 @@ import inspect
 import logging
 import operator
 import typing
+from collections.abc import Generator, Iterator
 from copy import deepcopy
-from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
+from typing import Any, Literal, Optional, SupportsIndex, Union
 
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1

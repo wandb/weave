@@ -2,7 +2,8 @@ import contextlib
 import contextvars
 import copy
 import logging
-from typing import TYPE_CHECKING, Any, Iterator, Optional
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import Call

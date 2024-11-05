@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Iterator, Optional
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from openai.types.chat import (
