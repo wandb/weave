@@ -1,4 +1,5 @@
 import {Box, SxProps, Theme} from '@mui/material';
+import {MOON_200} from '@wandb/weave/common/css/color.styles';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import _ from 'lodash';
 import React, {
@@ -69,7 +70,7 @@ export const SimplePageLayout: FC<{
           pb: 0,
           height: 44,
           width: '100%',
-          borderBottom: '1px solid #e0e0e0',
+          borderBottom: `1px solid ${MOON_200}`,
           display: 'flex',
           flexDirection: 'row',
           alignItems: 'center',
@@ -139,7 +140,7 @@ export const SimplePageLayout: FC<{
               overflow: 'hidden',
               height: '100%',
               maxHeight: '100%',
-              borderRight: '1px solid #e0e0e0',
+              borderRight: `1px solid ${MOON_200}`,
             }}>
             {props.leftSidebar}
           </Box>
@@ -224,7 +225,7 @@ export const SimplePageLayoutWithHeader: FC<{
           zIndex: 1,
           backgroundColor: 'white',
           pb: 0,
-          borderBottom: '1px solid #e0e0e0',
+          borderBottom: `1px solid ${MOON_200}`,
           justifyContent: 'flex-start',
         }}>
         {simplePageLayoutContextValue.headerPrefix}
