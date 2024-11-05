@@ -194,7 +194,6 @@ reportAttributeAccessIssue = false
 reportPossiblyUnboundVariable = false
 reportOptionalMemberAccess = false
 reportArgumentType = false
-reportCallIssue = false
 
 [tool.mypy]
 warn_unused_configs = true
