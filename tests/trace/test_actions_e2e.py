@@ -4,8 +4,8 @@ import weave
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.interface.base_models.action_base_models import (
-    ConfiguredAction,
-    ConfiguredContainsWordsAction,
+    Action,
+    ContainsWordsActionSpec,
 )
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from weave.trace_server.trace_server_interface import (
@@ -30,10 +30,10 @@ def test_action_execute_workflow(client: WeaveClient):
                 "obj": {
                     "project_id": client._project_id(),
                     "object_id": action_name,
-                    "base_object_class": "ConfiguredAction",
-                    "val": ConfiguredAction(
+                    "base_object_class": "Action",
+                    "val": Action(
                         name="test_action",
-                        config=ConfiguredContainsWordsAction(
+                        config=ContainsWordsActionSpec(
                             target_words=["mindful", "demure"]
                         ),
                     ).model_dump(),
@@ -46,7 +46,7 @@ def test_action_execute_workflow(client: WeaveClient):
         ObjQueryReq.model_validate(
             {
                 "project_id": client._project_id(),
-                "filter": {"base_object_classes": ["ConfiguredAction"]},
+                "filter": {"base_object_classes": ["Action"]},
             }
         )
     )
@@ -110,7 +110,7 @@ def test_action_execute_workflow(client: WeaveClient):
             {
                 "project_id": client._project_id(),
                 "call_ids": [call2.id],
-                "configured_action_ref": action_ref_uri,
+                "action_ref": action_ref_uri,
             }
         )
     )

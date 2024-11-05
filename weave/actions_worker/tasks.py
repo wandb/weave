@@ -6,8 +6,8 @@ from openai import OpenAI
 
 from weave.trace_server.feedback import RunnablePayloadSchema
 from weave.trace_server.interface.base_models.action_base_models import (
-    ActionConfigType,
-    ConfiguredLlmJudgeAction,
+    Action,
+    LlmJudgeActionSpec,
 )
 from weave.trace_server.refs_internal import (
     InternalCallRef,
@@ -43,7 +43,7 @@ def publish_results_as_feedback(
     )
 
 
-def do_llm_judge_action(config: ConfiguredLlmJudgeAction, call: CallSchema) -> Any:
+def do_llm_judge_action(config: LlmJudgeActionSpec, call: CallSchema) -> Any:
     model = config.model
     system_prompt = config.prompt
     if config.response_format is None:
@@ -90,12 +90,12 @@ def do_llm_judge_action(config: ConfiguredLlmJudgeAction, call: CallSchema) -> A
 
 
 def do_action(
-    configured_action_ref: str, action_config: ActionConfigType, call: CallSchema
+    action_ref: str, action_config: Action, call: CallSchema
 ) -> Tuple[Any, FeedbackCreateReq]:
     runnable_ref = None
-    if isinstance(action_config, ConfiguredLlmJudgeAction):
+    if isinstance(action_config, LlmJudgeActionSpec):
         result = do_llm_judge_action(action_config, call)
-        runnable_ref = configured_action_ref
+        runnable_ref = action_ref
     else:
         raise ValueError(f"Unsupported action config: {action_config}")
     req = publish_results_as_feedback(call, runnable_ref, result)

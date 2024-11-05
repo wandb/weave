@@ -698,6 +698,7 @@ class FeedbackCreateReq(BaseModel):
     trigger_ref: Optional[str] = Field(
         default=None, examples=["weave:///entity/project/object/name:digest"]
     )
+
     # wb_user_id is automatically populated by the server
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
@@ -850,8 +851,8 @@ class CostPurgeRes(BaseModel):
 
 class ActionsExecuteBatchReq(BaseModel):
     project_id: str
+    action_ref: str
     call_ids: list[str]
-    configured_action_ref: str
 
 
 class ActionsExecuteBatchRes(BaseModel):
