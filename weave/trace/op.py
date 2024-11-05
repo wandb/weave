@@ -4,7 +4,6 @@ import inspect
 import logging
 import sys
 import traceback
-import typing
 from dataclasses import dataclass
 from functools import partial, wraps
 from types import MethodType
@@ -118,8 +117,8 @@ def value_is_sentinel(param: Any) -> bool:
 
 
 def _apply_fn_defaults_to_inputs(
-    fn: typing.Callable, inputs: Mapping[str, typing.Any]
-) -> dict[str, typing.Any]:
+    fn: Callable, inputs: Mapping[str, Any]
+) -> dict[str, Any]:
     inputs = {**inputs}
     sig = inspect.signature(fn)
     for param_name, param in sig.parameters.items():
