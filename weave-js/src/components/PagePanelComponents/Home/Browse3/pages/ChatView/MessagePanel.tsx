@@ -1,9 +1,10 @@
 import {Callout} from '@wandb/weave/components/Callout';
 import classNames from 'classnames';
 import _ from 'lodash';
-import React from 'react';
+import React, {useEffect, useRef,useState} from 'react';
 
 import {MessagePanelPart} from './MessagePanelPart';
+import {ShowMoreButton} from './ShowMoreButton';
 import {ToolCalls} from './ToolCalls';
 import {Message} from './types';
 
@@ -19,6 +20,15 @@ export const MessagePanel = ({
   const isUser = message.role === 'user';
   const isTool = message.role === 'tool';
   const isSystemPrompt = message.role === 'system';
+
+  const [isShowingMore, setIsShowingMore] = useState(false);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (contentRef.current) {
+      setIsOverflowing(contentRef.current.scrollHeight > 400);
+    }
+  }, [message.content]);
 
   return (
     <div className={classNames('flex gap-8', {'mt-32': !isTool})}>
@@ -53,7 +63,12 @@ export const MessagePanel = ({
             </div>
           </div>
         )}
-        <div className="w-full px-16">
+        <div
+          ref={contentRef}
+          className={classNames('w-full overflow-y-hidden', {
+            'max-h-[400px]': !isShowingMore,
+            'max-h-full': isShowingMore,
+          })}>
           {message.content && (
             <div>
               {_.isString(message.content) ? (
@@ -70,6 +85,14 @@ export const MessagePanel = ({
           )}
           {message.tool_calls && <ToolCalls toolCalls={message.tool_calls} />}
         </div>
+
+        {isOverflowing && (
+          <ShowMoreButton
+            isUser={isUser}
+            isShowingMore={isShowingMore}
+            setIsShowingMore={setIsShowingMore}
+          />
+        )}
       </div>
     </div>
   );
