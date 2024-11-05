@@ -200,7 +200,6 @@ reportGeneralTypeIssues = false
 reportCallIssue = false
 reportIncompatibleMethodOverride = false
 reportRedeclaration = false
-reportIndexIssue = false
 reportOperatorIssue = false
 reportAssignmentType = false
 reportInconsistentOverload = false
