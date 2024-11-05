@@ -198,7 +198,6 @@ reportReturnType = false
 reportCallIssue = false
 reportIncompatibleMethodOverride = false
 reportRedeclaration = false
-reportAssignmentType = false
 reportInconsistentOverload = false
 
 [tool.mypy]
