@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Dict, TypedDict
+from typing import TypedDict
 
 import requests
 
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 def read_model_to_provider_info_map(
     file_name: str = MODEL_PROVIDER_INFO_FILE,
-) -> Dict[str, LLMModelProviderInfo]:
+) -> dict[str, LLMModelProviderInfo]:
     full_path = os.path.join(os.path.dirname(__file__), file_name)
     try:
         with open(full_path, "r") as f:
@@ -42,7 +42,7 @@ def read_model_to_provider_info_map(
 
 def main(
     file_name: str = MODEL_PROVIDER_INFO_FILE,
-) -> Dict[str, LLMModelProviderInfo]:
+) -> dict[str, LLMModelProviderInfo]:
     full_path = os.path.join(os.path.dirname(__file__), file_name)
     try:
         req = requests.get(model_providers_url)
@@ -51,7 +51,7 @@ def main(
         print("Failed to fetch models:", e)
         return {}
 
-    providers: Dict[str, LLMModelProviderInfo] = {}
+    providers: dict[str, LLMModelProviderInfo] = {}
     for k, val in req.json().items():
         provider = val.get("litellm_provider")
         api_key_name = PROVIDER_TO_API_KEY_NAME_MAP.get(provider)

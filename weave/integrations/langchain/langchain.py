@@ -55,7 +55,7 @@ try:
 except ImportError:
     import_failed = True
 
-from typing import Any, Dict, Generator, List, Optional, cast
+from typing import Any, Generator, Optional, cast
 
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
 
@@ -93,7 +93,7 @@ if not import_failed:
         run_inline: bool = True
 
         def __init__(self, **kwargs: Any) -> None:
-            self._call_map: Dict[str, Call] = {}
+            self._call_map: dict[str, Call] = {}
             self.latest_run: Optional[Run] = None
             self.gc = weave_client_context.require_weave_client()
             super().__init__()
@@ -225,13 +225,13 @@ if not import_failed:
 
         def on_chat_model_start(
             self,
-            serialized: Dict[str, Any],
-            messages: List[List[BaseMessage]],
+            serialized: dict[str, Any],
+            messages: list[list[BaseMessage]],
             *,
             run_id: UUID,
-            tags: Optional[List[str]] = None,
+            tags: Optional[list[str]] = None,
             parent_run_id: Optional[UUID] = None,
-            metadata: Optional[Dict[str, Any]] = None,
+            metadata: Optional[dict[str, Any]] = None,
             name: Optional[str] = None,
             **kwargs: Any,
         ) -> Run:
