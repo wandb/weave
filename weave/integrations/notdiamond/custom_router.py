@@ -83,7 +83,7 @@ def evaluate_router(
     class _DummyEvalModel(weave.Model):
         model_results: pd.DataFrame
 
-        @weave.op()
+        @weave.op
         def predict(self, prompt: str) -> dict[str, Any]:
             response, score = self.model_results[
                 self.model_results[prompt_column] == prompt
@@ -93,12 +93,12 @@ def evaluate_router(
     class BestRoutedModel(_DummyEvalModel):
         model_name: str
 
-        @weave.op()
+        @weave.op
         def predict(self, prompt: str) -> dict[str, Any]:
             return super().predict(prompt)
 
     class NotDiamondRoutedModel(_DummyEvalModel):
-        @weave.op()
+        @weave.op
         def predict(self, prompt: str) -> dict[str, Any]:
             return super().predict(prompt)
 
