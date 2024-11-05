@@ -48,10 +48,20 @@ class ParamBuilder:
         self._params: typing.Dict[str, typing.Any] = {}
         self._prefix = (prefix or f"pb_{param_builder_count}") + "_"
         self._database_type = database_type
+        self._param_to_name: dict[typing.Any, str] = {}
 
     def add_param(self, param_value: typing.Any) -> str:
+        try:
+            if param_value in self._param_to_name:
+                return self._param_to_name[param_value]
+        except TypeError:
+            pass
         param_name = self._prefix + str(len(self._params))
         self._params[param_name] = param_value
+        try:
+            self._param_to_name[param_value] = param_name
+        except TypeError:
+            pass
         return param_name
 
     def add(

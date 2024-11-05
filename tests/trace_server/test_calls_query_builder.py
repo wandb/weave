@@ -444,3 +444,124 @@ def test_query_light_column_with_costs() -> None:
             "pb_3": 1,
         },
     )
+
+
+def test_query_with_simple_feedback_sort() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_order("feedback.[wandb.runnable.my_op].payload.output.expected", "desc")
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+        LEFT JOIN feedback ON
+            (feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_4:String},
+            '/call/',
+            calls_merged.id))
+        WHERE
+            calls_merged.project_id = {pb_4:String}
+            AND calls_merged.project_id = {pb_4:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            (((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        ORDER BY
+            (NOT (JSONType(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_1:String},
+            {pb_2:String}) = 'Null'
+                OR JSONType(anyIf(feedback.payload_dump,
+                feedback.feedback_type = {pb_0:String}),
+                {pb_1:String},
+                {pb_2:String}) IS NULL)) desc,
+            toFloat64OrNull(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_3:String})) DESC,
+            toString(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_3:String})) DESC
+        """,
+        {
+            "pb_0": "wandb.runnable.my_op",
+            "pb_1": "output",
+            "pb_2": "expected",
+            "pb_3": '$."output"."expected"',
+            "pb_4": "project",
+        },
+    )
+
+
+def test_query_with_simple_feedback_sort_with_op_name() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.set_hardcoded_filter(
+        HardCodedFilter(
+            filter={"op_names": ["weave-trace-internal:///project/op/my_op:1234567890"]}
+        )
+    )
+    cq.add_order("feedback.[wandb.runnable.my_op].payload.output.expected", "desc")
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS
+        (
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+        WHERE
+            calls_merged.project_id = {pb_1:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            (((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                    AND (any(calls_merged.op_name) IN {pb_0:Array(String)})))
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+        LEFT JOIN feedback ON
+            (feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_1:String},
+            '/call/',
+            calls_merged.id))
+        WHERE
+            calls_merged.project_id = {pb_1:String}
+            AND calls_merged.project_id = {pb_1:String}
+            AND (calls_merged.id IN filtered_calls)
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        ORDER BY
+            (NOT (JSONType(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_2:String}),
+            {pb_3:String},
+            {pb_4:String}) = 'Null'
+                OR JSONType(anyIf(feedback.payload_dump,
+                feedback.feedback_type = {pb_2:String}),
+                {pb_3:String},
+                {pb_4:String}) IS NULL)) desc,
+            toFloat64OrNull(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_2:String}),
+            {pb_5:String})) DESC,
+            toString(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_2:String}),
+            {pb_5:String})) DESC
+        """,
+        {
+            "pb_0": ["weave-trace-internal:///project/op/my_op:1234567890"],
+            "pb_1": "project",
+            "pb_2": "wandb.runnable.my_op",
+            "pb_3": "output",
+            "pb_4": "expected",
+            "pb_5": '$."output"."expected"',
+        },
+    )
