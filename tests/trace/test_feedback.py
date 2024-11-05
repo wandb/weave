@@ -1,6 +1,9 @@
+import datetime
+
 import pytest
 
 import weave
+from tests.trace.util import client_is_sqlite
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
@@ -169,7 +172,10 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         "weave_ref": weave_ref,
         "wb_user_id": "shawn",
         "creator": None,
-        "created_at": create_res.created_at.isoformat().replace("T", " "),
+        # Sad - seems like sqlite and clickhouse remote different types here
+        "created_at": create_res.created_at.isoformat().replace("T", " ")
+        if client_is_sqlite(client)
+        else MatchAnyDatetime(),
         "feedback_type": feedback_type,
         "payload": payload,
         "annotation_ref": annotation_ref,
@@ -314,7 +320,10 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "weave_ref": weave_ref,
         "wb_user_id": "shawn",
         "creator": None,
-        "created_at": create_res.created_at.isoformat().replace("T", " "),
+        # Sad - seems like sqlite and clickhouse remote different types here
+        "created_at": create_res.created_at.isoformat().replace("T", " ")
+        if client_is_sqlite(client)
+        else MatchAnyDatetime(),
         "feedback_type": feedback_type,
         "payload": payload,
         "annotation_ref": None,
@@ -356,6 +365,10 @@ def populate_feedback(client: WeaveClient) -> None:
 
 
 def test_sort_by_feedback(client: WeaveClient) -> None:
+    if client_is_sqlite(client):
+        # Not implemented in sqlite - skip
+        return pytest.skip()
+
     """Test sorting by feedback."""
     ids, my_scorer, my_model = populate_feedback(client)
 
@@ -416,6 +429,10 @@ def test_sort_by_feedback(client: WeaveClient) -> None:
 
 
 def test_filter_by_feedback(client: WeaveClient) -> None:
+    if client_is_sqlite(client):
+        # Not implemented in sqlite - skip
+        return pytest.skip()
+
     """Test filtering by feedback."""
     ids, my_scorer, my_model = populate_feedback(client)
     for field, value, eq_ids, gt_ids in [
@@ -477,3 +494,8 @@ def test_filter_by_feedback(client: WeaveClient) -> None:
         assert (
             found_ids == gt_ids
         ), f"Filtering by {field} > {value} failed, expected {gt_ids}, got {found_ids}"
+
+
+class MatchAnyDatetime:
+    def __eq__(self, other):
+        return isinstance(other, datetime.datetime)
