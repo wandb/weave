@@ -206,7 +206,6 @@ reportAssignmentType = false
 reportInconsistentOverload = false
 reportTypedDictNotRequiredAccess = false
 reportOptionalSubscript = false
-reportFunctionMemberAccess = false
 
 [tool.mypy]
 warn_unused_configs = true
