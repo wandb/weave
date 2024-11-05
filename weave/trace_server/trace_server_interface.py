@@ -837,6 +837,20 @@ class CostPurgeRes(BaseModel):
     pass
 
 
+class ActionsExecuteBatchReq(BaseModel):
+    project_id: str
+    call_ids: list[str]
+    configured_action_ref: str
+    trigger_ref: Optional[str] = None
+    # `id` is here so that clients can potentially guarantee idempotence.
+    # Repeated calls with the same id will not result in duplicate actions.
+    id: Optional[str] = None
+
+
+class ActionsExecuteBatchRes(BaseModel):
+    id: str
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -878,5 +892,11 @@ class TraceServerInterface(Protocol):
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
+
+    # Action API
+    def actions_execute_batch(
+        self, req: ActionsExecuteBatchReq
+    ) -> ActionsExecuteBatchRes: ...
+
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...

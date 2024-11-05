@@ -53,6 +53,8 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Dataset: 'table',
   Evaluation: 'baseline-alt',
   Leaderboard: 'benchmark-square',
+  Scorer: 'type-number-alt',
+  ConfiguredAction: 'rocket-launch',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {

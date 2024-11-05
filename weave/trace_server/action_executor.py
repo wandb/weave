@@ -1,0 +1,95 @@
+from abc import ABC, abstractmethod
+from typing import Optional
+
+from typing_extensions import TypedDict
+
+from weave.trace_server import environment as wf_env
+
+
+def queue_from_addr(addr: str) -> "ActionExecutor":
+    if addr == "noop://":
+        return NoOpActionQueue()
+    elif addr.startswith("redis://"):
+        # Seems odd that we are not passing in the address to the queue.
+        return CeleryActionQueue()
+    else:
+        raise ValueError(f"Invalid action queue address: {addr}")
+
+
+TaskCtx = TypedDict("TaskCtx", {"project_id": str, "call_id": str, "id": str})
+
+
+class ActionExecutor(ABC):
+    @abstractmethod
+    def enqueue(
+        self,
+        ctx: TaskCtx,
+        configured_action_ref: str,
+        trigger_ref: Optional[str] = None,
+    ) -> None:
+        pass
+
+    @abstractmethod
+    def do_now(
+        self,
+        ctx: TaskCtx,
+        configured_action_ref: str,
+        trigger_ref: Optional[str] = None,
+    ) -> None:
+        pass
+
+    @abstractmethod
+    def _TESTONLY_clear_queue(self) -> None:
+        pass
+
+
+class CeleryActionQueue(ActionExecutor):
+    def enqueue(
+        self,
+        ctx: TaskCtx,
+        configured_action_ref: str,
+        trigger_ref: Optional[str] = None,
+    ) -> None:
+        # TODO We put this in here to break a circular import. Fix this later.
+        import weave.actions_worker.tasks as tasks
+
+        tasks.do_task.delay(ctx, configured_action_ref, trigger_ref)
+
+    def do_now(
+        self,
+        ctx: TaskCtx,
+        configured_action_ref: str,
+        trigger_ref: Optional[str] = None,
+    ) -> None:
+        import weave.actions_worker.tasks as tasks
+
+        tasks.do_task(ctx, configured_action_ref, trigger_ref)
+
+    def _TESTONLY_clear_queue(self) -> None:
+        # Again, this can be hoisted to the top once core
+        # has the dep.
+        from redis import Redis
+
+        redis = Redis.from_url(wf_env.wf_action_executor())
+        redis.delete("celery")
+
+
+class NoOpActionQueue(ActionExecutor):
+    def enqueue(
+        self,
+        ctx: TaskCtx,
+        configured_action_ref: str,
+        trigger_ref: Optional[str] = None,
+    ) -> None:
+        pass
+
+    def do_now(
+        self,
+        ctx: TaskCtx,
+        configured_action_ref: str,
+        trigger_ref: Optional[str] = None,
+    ) -> None:
+        pass
+
+    def _TESTONLY_clear_queue(self) -> None:
+        pass

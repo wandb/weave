@@ -92,8 +92,9 @@ import {
 } from './Browse3/pages/ObjectVersionsPage';
 import {OpPage} from './Browse3/pages/OpPage';
 import {OpsPage} from './Browse3/pages/OpsPage';
-import {OpVersionPage} from './Browse3/pages/OpVersionPage';
+import {OpVersionPage} from './Browse3/pages/OpVersionPage/OpVersionPage';
 import {OpVersionsPage} from './Browse3/pages/OpVersionsPage';
+import {ScorersPage} from './Browse3/pages/ScorersPage/ScorersPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
@@ -102,6 +103,7 @@ import {
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import {ENABLE_ONLINE_EVAL_UI, getFeatureFlag} from './Browse3/windowFlags';
 import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
@@ -156,6 +158,7 @@ const tabOptions = [
   'leaderboards',
   'boards',
   'tables',
+  'scorers',
 ];
 const tabs = tabOptions.join('|');
 const browse3Paths = (projectRoot: string) => [
@@ -496,6 +499,9 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
+        </Route>
+        <Route path={`${projectRoot}/:tab(scorers)`}>
+          <ScorersPageBinding />
         </Route>
         <Route
           path={[
@@ -983,6 +989,15 @@ const CompareEvaluationsBinding = () => {
       setSelectedMetrics={setSelectedMetrics}
     />
   );
+};
+
+const ScorersPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  const enableOnlineEvalUI = getFeatureFlag(ENABLE_ONLINE_EVAL_UI);
+  if (!enableOnlineEvalUI) {
+    return null;
+  }
+  return <ScorersPage entity={entity} project={project} />;
 };
 
 const LeaderboardPageBinding = () => {

@@ -1,25 +1,27 @@
 import React, {useMemo} from 'react';
 
-import {LoadingDots} from '../../../../LoadingDots';
-import {Tailwind} from '../../../../Tailwind';
-import {NotFoundPanel} from '../NotFoundPanel';
-import {OpCodeViewer} from '../OpCodeViewer';
+import {LoadingDots} from '../../../../../LoadingDots';
+import {Tailwind} from '../../../../../Tailwind';
+import {NotFoundPanel} from '../../NotFoundPanel';
+import {OpCodeViewer} from '../../OpCodeViewer';
+import {ENABLE_ONLINE_EVAL_UI, getFeatureFlag} from '../../windowFlags';
 import {
   CallsLink,
   opNiceName,
   OpVersionsLink,
   opVersionText,
-} from './common/Links';
-import {CenteredAnimatedLoader} from './common/Loader';
+} from '../common/Links';
+import {CenteredAnimatedLoader} from '../common/Loader';
 import {
   ScrollableTabContent,
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
-} from './common/SimplePageLayout';
-import {TabUseOp} from './TabUseOp';
-import {useWFHooks} from './wfReactInterface/context';
-import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
-import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
+} from '../common/SimplePageLayout';
+import {TabUseOp} from '../TabUseOp';
+import {useWFHooks} from '../wfReactInterface/context';
+import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
+import {OpVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {OpOnlineScorersTab} from './OpOnlineScorersTab';
 
 export const OpVersionPage: React.FC<{
   entity: string;
@@ -70,6 +72,7 @@ const OpVersionPageInner: React.FC<{
     // that data available yet.
     return true;
   }, []);
+  const enableOnlineEvalUI = getFeatureFlag(ENABLE_ONLINE_EVAL_UI);
 
   return (
     <SimplePageLayoutWithHeader
@@ -132,6 +135,14 @@ const OpVersionPageInner: React.FC<{
             />
           ),
         },
+        ...(enableOnlineEvalUI
+          ? [
+              {
+                label: 'Online Scorers',
+                content: <OpOnlineScorersTab opVersion={opVersion} />,
+              },
+            ]
+          : []),
         ...(useOpSupported
           ? [
               {

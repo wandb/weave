@@ -16,6 +16,8 @@ import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 
 import {
+  ActionsExecuteBatchReq,
+  ActionsExecuteBatchRes,
   ContentType,
   FeedbackCreateReq,
   FeedbackCreateRes,
@@ -226,13 +228,6 @@ export class DirectTraceServerClient {
     return this.makeRequest<TraceObjReadReq, TraceObjReadRes>('/obj/read', req);
   }
 
-  public readBatch(req: TraceRefsReadBatchReq): Promise<TraceRefsReadBatchRes> {
-    return this.makeRequest<TraceRefsReadBatchReq, TraceRefsReadBatchRes>(
-      '/refs/read_batch',
-      req
-    );
-  }
-
   public objCreate(req: TraceObjCreateReq): Promise<TraceObjCreateRes> {
     const initialObjectId = req.obj.object_id;
     const sanitizedObjectId = sanitizeObjectId(initialObjectId);
@@ -245,6 +240,13 @@ export class DirectTraceServerClient {
     }
     return this.makeRequest<TraceObjCreateReq, TraceObjCreateRes>(
       '/obj/create',
+      req
+    );
+  }
+
+  public readBatch(req: TraceRefsReadBatchReq): Promise<TraceRefsReadBatchRes> {
+    return this.makeRequest<TraceRefsReadBatchReq, TraceRefsReadBatchRes>(
+      '/refs/read_batch',
       req
     );
   }
@@ -282,6 +284,15 @@ export class DirectTraceServerClient {
   public feedbackPurge(req: FeedbackPurgeReq): Promise<FeedbackPurgeRes> {
     return this.makeRequest<FeedbackPurgeReq, FeedbackPurgeRes>(
       '/feedback/purge',
+      req
+    );
+  }
+
+  public actionsExecuteBatch(
+    req: ActionsExecuteBatchReq
+  ): Promise<ActionsExecuteBatchRes> {
+    return this.makeRequest<ActionsExecuteBatchReq, ActionsExecuteBatchRes>(
+      '/actions/execute_batch',
       req
     );
   }

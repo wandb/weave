@@ -2,6 +2,10 @@ import {IconNames} from '@wandb/weave/components/Icon';
 import _ from 'lodash';
 import {useMemo} from 'react';
 
+import {
+  ENABLE_ONLINE_EVAL_UI,
+  getFeatureFlag,
+} from '../PagePanelComponents/Home/Browse3/windowFlags';
 import {FancyPageSidebarItem} from './FancyPageSidebar';
 
 export const useProjectSidebar = (
@@ -31,6 +35,7 @@ export const useProjectSidebar = (
   const isNoSidebarItems = !showModelsSidebarItems && !showWeaveSidebarItems;
   const isBothSidebarItems = showModelsSidebarItems && showWeaveSidebarItems;
   const isShowAll = isNoSidebarItems || isBothSidebarItems;
+  const enableOnlineEvalUI = getFeatureFlag(ENABLE_ONLINE_EVAL_UI);
 
   return useMemo(() => {
     const allItems = isLoading
@@ -184,6 +189,13 @@ export const useProjectSidebar = (
             iconName: IconNames.Table,
           },
           {
+            type: 'button' as const,
+            name: 'Scorers',
+            slug: 'weave/scorers',
+            isShown: enableOnlineEvalUI && (showWeaveSidebarItems || isShowAll),
+            iconName: IconNames.TypeNumberAlt,
+          },
+          {
             type: 'divider' as const,
             key: 'dividerWithinWeave-3',
             isShown: isWeaveOnly,
@@ -243,5 +255,6 @@ export const useProjectSidebar = (
     viewingRestricted,
     isModelsOnly,
     showWeaveSidebarItems,
+    enableOnlineEvalUI,
   ]);
 };
