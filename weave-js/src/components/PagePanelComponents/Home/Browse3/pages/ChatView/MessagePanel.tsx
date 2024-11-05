@@ -1,3 +1,4 @@
+import {Callout} from '@wandb/weave/components/Callout';
 import classNames from 'classnames';
 import _ from 'lodash';
 import React from 'react';
@@ -16,25 +17,60 @@ export const MessagePanel = ({
   isStructuredOutput,
 }: MessagePanelProps) => {
   const isUser = message.role === 'user';
-  const bg = isUser ? 'bg-cactus-300/[0.48]' : 'bg-moon-100';
+  const isTool = message.role === 'tool';
+  const isSystemPrompt = message.role === 'system';
+
   return (
-    <div className={classNames('rounded-[8px] px-16 py-8', bg)}>
-      <div style={{fontVariantCaps: 'all-small-caps'}}>{message.role}</div>
-      {message.content && (
-        <div>
-          {_.isString(message.content) ? (
-            <MessagePanelPart
-              value={message.content}
-              isStructuredOutput={isStructuredOutput}
-            />
-          ) : (
-            message.content.map((p, i) => (
-              <MessagePanelPart key={i} value={p} />
-            ))
+    <div className={classNames('flex gap-8', {'mt-32': !isTool})}>
+      <div className="w-40">
+        {!isUser && !isTool && (
+          <Callout
+            size="small"
+            icon="robot-service-member"
+            color="moon"
+            className="h-32 w-32"
+          />
+        )}
+      </div>
+      <div
+        className={classNames('relative overflow-visible py-8', {
+          'border-t border-moon-250': isTool,
+          // System prompt styles, full width with border
+          'w-full rounded-lg border border-moon-250': isSystemPrompt,
+          // Max width for non-system prompts
+          'max-w-3xl': !isSystemPrompt,
+          'w-3/4': isTool || isStructuredOutput,
+          // Justify the message to the right if it's a user message, add cactus background
+          'ml-auto bg-cactus-300/[0.24]': isUser,
+          // Justify the message to the left if it's not a user message
+          'mr-auto': !isUser,
+        })}>
+        {isSystemPrompt && (
+          // We only show the role for system prompts
+          <div className="flex justify-between px-16">
+            <div className="text-base font-semibold">
+              {message.role.charAt(0).toUpperCase() + message.role.slice(1)}
+            </div>
+          </div>
+        )}
+        <div className="w-full px-16">
+          {message.content && (
+            <div>
+              {_.isString(message.content) ? (
+                <MessagePanelPart
+                  value={message.content}
+                  isStructuredOutput={isStructuredOutput}
+                />
+              ) : (
+                message.content.map((p, i) => (
+                  <MessagePanelPart key={i} value={p} />
+                ))
+              )}
+            </div>
           )}
+          {message.tool_calls && <ToolCalls toolCalls={message.tool_calls} />}
         </div>
-      )}
-      {message.tool_calls && <ToolCalls toolCalls={message.tool_calls} />}
+      </div>
     </div>
   );
 };
