@@ -499,3 +499,39 @@ def test_filter_by_feedback(client: WeaveClient) -> None:
 class MatchAnyDatetime:
     def __eq__(self, other):
         return isinstance(other, datetime.datetime)
+
+
+def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
+    if client_is_sqlite(client):
+        # Not implemented in sqlite - skip
+        return pytest.skip()
+
+    """Test filtering by feedback."""
+    ids, my_scorer, my_model = populate_feedback(client)
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+            # Filter down to just correct matches
+            query={
+                "$expr": {
+                    "$eq": [
+                        {
+                            "$getField": "feedback.[wandb.runnable.my_scorer].payload.output.match"
+                        },
+                        {"$literal": "true"},
+                    ]
+                }
+            },
+            # Sort by the model output desc
+            sort_by=[
+                {
+                    "field": "feedback.[wandb.runnable.my_scorer].payload.output.model_output",
+                    "direction": "desc",
+                }
+            ],
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 2
+    assert [c.id for c in calls] == [ids[2], ids[0]]
