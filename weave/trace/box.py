@@ -87,7 +87,8 @@ class BoxedNDArray(np.ndarray):
         if obj is None:
             return
 
-    def __deepcopy__(self, memo: dict) -> "BoxedNDArray":
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> "BoxedNDArray":
+        memo = memo or {}
         res = np.asarray(self).view(BoxedNDArray)
         memo[id(self)] = res
         return res
