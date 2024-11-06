@@ -1,5 +1,5 @@
 import importlib
-from typing import TYPE_CHECKING, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
     from groq.types.chat import ChatCompletion, ChatCompletionChunk
@@ -79,7 +79,7 @@ def groq_accumulator(
     return acc
 
 
-def should_use_accumulator(inputs: Dict) -> bool:
+def should_use_accumulator(inputs: dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 

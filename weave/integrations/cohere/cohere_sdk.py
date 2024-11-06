@@ -88,7 +88,7 @@ def cohere_accumulator_v2(
 
 def cohere_wrapper(name: str) -> Callable:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op()(fn)
+        op = weave.op(fn)
         op.name = name  # type: ignore
         return op
 
@@ -122,7 +122,7 @@ def cohere_wrapper_v2(name: str) -> Callable:
 
             return _wrapper
 
-        op = weave.op()(_post_process_response(fn))
+        op = weave.op(_post_process_response(fn))
         op.name = name  # type: ignore
         return op
 
@@ -156,7 +156,7 @@ def cohere_wrapper_async_v2(name: str) -> Callable:
 
             return _wrapper
 
-        op = weave.op()(_post_process_response(fn))
+        op = weave.op(_post_process_response(fn))
         op.name = name  # type: ignore
         return op
 
@@ -165,7 +165,7 @@ def cohere_wrapper_async_v2(name: str) -> Callable:
 
 def cohere_stream_wrapper(name: str) -> Callable:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op()(fn)
+        op = weave.op(fn)
         op.name = name  # type: ignore
         return add_accumulator(op, lambda inputs: cohere_accumulator)  # type: ignore
 
@@ -174,7 +174,7 @@ def cohere_stream_wrapper(name: str) -> Callable:
 
 def cohere_stream_wrapper_v2(name: str) -> Callable:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op()(fn)
+        op = weave.op(fn)
         op.name = name  # type: ignore
         return add_accumulator(
             op, make_accumulator=lambda inputs: cohere_accumulator_v2

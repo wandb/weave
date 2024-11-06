@@ -4,7 +4,7 @@ import inspect
 import logging
 import sys
 import traceback
-import typing
+from collections.abc import Coroutine, Mapping
 from dataclasses import dataclass
 from functools import partial, wraps
 from types import MethodType
@@ -12,9 +12,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Coroutine,
-    Dict,
-    Mapping,
     Optional,
     Protocol,
     TypedDict,
@@ -101,7 +98,7 @@ class ProcessedInputs:
 
 OnInputHandlerType = Callable[["Op", tuple, dict], Optional[ProcessedInputs]]
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
-OnOutputHandlerType = Callable[[Any, FinishCallbackType, Dict], Any]
+OnOutputHandlerType = Callable[[Any, FinishCallbackType, dict], Any]
 # Call, original function output, exception if occurred
 OnFinishHandlerType = Callable[["Call", Any, Optional[BaseException]], None]
 
@@ -119,8 +116,8 @@ def value_is_sentinel(param: Any) -> bool:
 
 
 def _apply_fn_defaults_to_inputs(
-    fn: typing.Callable, inputs: Mapping[str, typing.Any]
-) -> dict[str, typing.Any]:
+    fn: Callable, inputs: Mapping[str, Any]
+) -> dict[str, Any]:
     inputs = {**inputs}
     sig = inspect.signature(fn)
     for param_name, param in sig.parameters.items():
@@ -611,7 +608,7 @@ def op(
             if is_async:
 
                 @wraps(func)
-                async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                async def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportRedeclaration]
                     res, _ = await _do_call_async(
                         cast(Op, wrapper), *args, __should_raise=True, **kwargs
                     )

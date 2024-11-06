@@ -83,8 +83,9 @@ def object_method_app(
     if method_name is None:
         if len(op_attrs) > 1:
             raise ValueError(
-                "Multiple ops found on object (%s), must specify method_name argument"
-                % ", ".join(op_attrs)
+                "Multiple ops found on object ({}), must specify method_name argument".format(
+                    ", ".join(op_attrs)
+                )
             )
         method_name = next(iter(op_attrs))
 

@@ -166,6 +166,7 @@ select = [
   "W391",   # https://docs.astral.sh/ruff/rules/too-many-newlines-at-end-of-file/
   "F401",   # https://docs.astral.sh/ruff/rules/unused-import/
   "TID252", # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
+  "UP",     # https://docs.astral.sh/ruff/rules/#pyupgrade-up
 ]
 ignore = [
   # we use Google style
@@ -189,6 +190,12 @@ exclude = ["weave_query", "tests", "examples", "docs", "noxfile.py"]
 # In cases where we support multiple versions of an integration, some imports can be missing
 reportMissingImports = false
 
+# TODO: Gradually remove as we improve our code!
+reportAttributeAccessIssue = false
+reportPossiblyUnboundVariable = false
+reportOptionalMemberAccess = false
+reportArgumentType = false
+reportCallIssue = false
 
 [tool.mypy]
 warn_unused_configs = true

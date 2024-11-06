@@ -4,7 +4,8 @@ import logging
 import textwrap
 import time
 import traceback
-from typing import Any, Callable, Coroutine, Literal, Optional, Union, cast
+from collections.abc import Coroutine
+from typing import Any, Callable, Literal, Optional, Union, cast
 
 from pydantic import PrivateAttr
 from rich import print

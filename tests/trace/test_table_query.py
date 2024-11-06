@@ -1,5 +1,5 @@
 import random
-from typing import Iterator
+from collections.abc import Iterator
 
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
