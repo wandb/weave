@@ -193,6 +193,14 @@ export const browse2Context = {
   ) => {
     throw new Error('Not implemented');
   },
+  leaderboardsUIUrl: (
+    entityName: string,
+    projectName: string,
+    leaderboardName?: string,
+    edit?: boolean
+  ) => {
+    throw new Error('Not implemented');
+  },
 };
 
 export const browse3ContextGen = (
@@ -430,6 +438,16 @@ export const browse3ContextGen = (
         JSON.stringify(evaluationCallIds)
       )}${metricsPart}`;
     },
+    leaderboardsUIUrl: (
+      entityName: string,
+      projectName: string,
+      leaderboardName?: string,
+      edit?: boolean
+    ) => {
+      return `${projectRoot(entityName, projectName)}/leaderboards${
+        leaderboardName ? `/${leaderboardName}` : ''
+      }${edit ? '?edit=true' : ''}`;
+    },
   };
   return browse3Context;
 };
@@ -513,6 +531,12 @@ type RouteType = {
     projectName: string,
     evaluationCallIds: string[],
     metrics: Record<string, boolean> | null
+  ) => string;
+  leaderboardsUIUrl: (
+    entityName: string,
+    projectName: string,
+    leaderboardName?: string,
+    edit?: boolean
   ) => string;
 };
 
@@ -627,6 +651,11 @@ const useMakePeekingRouter = (): RouteType => {
         PEEK_PARAM,
         baseContext.compareEvaluationsUri(...args)
       );
+    },
+    leaderboardsUIUrl: (
+      ...args: Parameters<typeof baseContext.leaderboardsUIUrl>
+    ) => {
+      return setSearchParam(PEEK_PARAM, baseContext.leaderboardsUIUrl(...args));
     },
   };
 };

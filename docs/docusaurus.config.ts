@@ -1,7 +1,7 @@
-import { themes as prismThemes } from "prism-react-renderer";
-import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
+import type {Config} from "@docusaurus/types";
 import type * as OpenApiPlugin from "docusaurus-plugin-openapi-docs";
+import {themes as prismThemes} from "prism-react-renderer";
 
 const config: Config = {
   title: "W&B Weave",
@@ -108,7 +108,7 @@ const config: Config = {
         anonymizeIP: true,
       },
     ],
-    'plugin-image-zoom',
+    "plugin-image-zoom",
   ],
 
   themes: [
@@ -152,6 +152,11 @@ const config: Config = {
               type: "docSidebar",
               sidebarId: "pythonSdkSidebar",
               label: "Python SDK",
+            },
+            {
+              type: "docSidebar",
+              sidebarId: "typescriptSdkSidebar",
+              label: "TypeScript SDK",
             },
             {
               type: "docSidebar",
@@ -233,13 +238,13 @@ const config: Config = {
         {
           className: "theme-code-block-highlighted-line",
           line: "highlight-next-line",
-          block: { start: "highlight-start", end: "highlight-end" },
+          block: {start: "highlight-start", end: "highlight-end"},
         },
       ],
     },
     imageZoom: {
       // CSS selector to apply the plugin to
-      selector: 'img.zoomable',
+      selector: "img.zoomable",
       // Optional medium-zoom options
       // see: https://www.npmjs.com/package/medium-zoom#options
       options: {},

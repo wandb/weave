@@ -1,6 +1,7 @@
 import contextvars
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator, Optional, Protocol
+from typing import Optional, Protocol
 
 
 class SecretFetcher(Protocol):

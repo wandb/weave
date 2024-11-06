@@ -1,7 +1,8 @@
 import asyncio
 import json
 import os
-from typing import Any, Iterable, List
+from collections.abc import Iterable
+from typing import Any
 
 import pytest
 from pydantic import BaseModel
@@ -22,7 +23,7 @@ class User(BaseModel):
 
 
 class MeetingInfo(BaseModel):
-    users: List[User]
+    users: list[User]
     date: str
     location: str
     budget: int
@@ -207,7 +208,7 @@ def test_instructor_iterable_sync_stream(
             },
         ],
     )
-    _ = [user for user in users]
+    _ = list(users)
 
     calls = list(client.calls())
     assert len(calls) == 2
@@ -242,7 +243,7 @@ def test_instructor_iterable_async_stream(
         AsyncOpenAI(api_key=api_key), mode=instructor.Mode.TOOLS
     )
 
-    async def print_iterable_results() -> List[Person]:
+    async def print_iterable_results() -> list[Person]:
         model = await lm_client.chat.completions.create(
             model="gpt-4",
             response_model=Iterable[Person],
@@ -324,7 +325,7 @@ list of speakers.
         ],
         stream=True,
     )
-    _ = [extraction for extraction in extraction_stream]
+    _ = list(extraction_stream)
 
     calls = list(client.calls())
     assert len(calls) == 2
@@ -382,7 +383,7 @@ A follow-up meeting is scheduled for January 25th at 3 PM GMT to finalize the ag
 list of speakers.
     """
 
-    async def fetch_results(text_block: str) -> List[Any]:
+    async def fetch_results(text_block: str) -> list[Any]:
         extraction_stream = lm_client.chat.completions.create_partial(
             model="gpt-4",
             response_model=MeetingInfo,
