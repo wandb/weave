@@ -18,19 +18,9 @@ class ContainsWordsActionSpec(BaseModel):
     target_words: list[str]
 
 
-class WordCountActionSpec(BaseModel):
-    action_type: Literal["wordcount"] = "wordcount"
-
-
-class NoopActionSpec(BaseModel):
-    action_type: Literal["noop"] = "noop"
-
-
 ActionSpecType = Union[
     LlmJudgeActionSpec,
     ContainsWordsActionSpec,
-    WordCountActionSpec,
-    NoopActionSpec,
 ]
 
 

@@ -46,6 +46,7 @@ from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 
+from weave.actions_worker.dispatcher import execute_batch
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
@@ -1410,7 +1411,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:
-        raise NotImplementedError()
+        if len(req.call_ids) == 0:
+            return tsi.ActionsExecuteBatchRes()
+        if len(req.call_ids) > 1:
+            raise NotImplementedError("Batching actions is not yet supported")
+
+        execute_batch(
+            batch_req=req,
+            trace_server=self,
+        )
+
+        raise tsi.ActionsExecuteBatchRes()
 
     def completions_create(
         self, req: tsi.CompletionsCreateReq
