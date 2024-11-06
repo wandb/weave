@@ -119,7 +119,7 @@ def generate_screenshot(screenshot_spec):
 
 def generate_screenshots_from_spec(spec_filepath):
     try:
-        with open(spec_filepath, "r") as f:
+        with open(spec_filepath) as f:
             spec = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
         logging.error(f"Error reading or parsing spec file: {str(e)}")
