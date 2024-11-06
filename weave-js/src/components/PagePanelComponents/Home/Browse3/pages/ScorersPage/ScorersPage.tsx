@@ -13,7 +13,7 @@ import {
 } from '../wfReactInterface/generatedBaseObjectClasses.zod';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {actionDefinitionConfigurationSpecs} from './actionDefinitionConfigurationSpecs';
-import {NewBuiltInActionScorerModal} from './NewBuiltInActionScorerModal';
+import {NewActionDefinitionModal} from './NewActionDefinitionModal';
 
 export const ScorersPage: React.FC<{
   entity: string;
@@ -184,7 +184,7 @@ const OnlineScorersTab: React.FC<{
           baseObjectClass: 'ActionDefinition',
         }}
       />
-      <NewBuiltInActionScorerModal
+      <NewActionDefinitionModal
         open={isModalOpen}
         onClose={handleCloseModal}
         onSave={handleSaveModal}

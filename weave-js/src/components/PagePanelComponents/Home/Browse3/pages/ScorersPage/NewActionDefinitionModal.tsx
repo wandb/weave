@@ -16,7 +16,7 @@ import {
 } from '../wfReactInterface/generatedBaseObjectClasses.zod';
 import {actionDefinitionConfigurationSpecs} from './actionDefinitionConfigurationSpecs';
 
-interface NewBuiltInActionScorerModalProps {
+interface NewActionDefinitionModalProps {
   open: boolean;
   onClose: () => void;
   onSave: (newAction: ActionDefinition) => void;
@@ -26,9 +26,12 @@ interface NewBuiltInActionScorerModalProps {
   } | null;
 }
 
-export const NewBuiltInActionScorerModal: FC<
-  NewBuiltInActionScorerModalProps
-> = ({open, onClose, onSave, initialTemplate}) => {
+export const NewActionDefinitionModal: FC<NewActionDefinitionModalProps> = ({
+  open,
+  onClose,
+  onSave,
+  initialTemplate,
+}) => {
   const [name, setName] = useState('');
   const [selectedActionType, setSelectedActionType] =
     useState<ActionType>('llm_judge');
