@@ -203,16 +203,20 @@ class String:
             return float(self)  # type: ignore
         return None
     
-    @op(
-        name="string-parseNumberWithSeparator",
-        input_type={
-            "self": types.String(), 
-            "separator": types.String()
-        },
-        output_type=types.optional(types.Number())
-    )
-    def parse_number_with_separator(self, separator: str):
-        mNumber = self.replace(separator, '')
+    @op(name="string-parseNumberWithSeparator", output_type=types.optional(types.Number()))
+    def parse_number_with_separator(
+        self, 
+        thousands_separator: typing.Optional[str], 
+        decimal_separator: typing.Optional[str],
+    ):
+        mNumber = self
+        
+        if thousands_separator:
+            mNumber = mNumber.replace(thousands_separator, '')
+            
+        if decimal_separator:
+            mNumber = mNumber.replace(decimal_separator, '.')
+
         try:
             number = float(mNumber)
         except:
