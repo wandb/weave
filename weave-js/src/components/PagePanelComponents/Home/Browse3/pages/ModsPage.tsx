@@ -3,9 +3,16 @@ import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
+import Drawer from '@mui/material/Drawer';
 import Grid from '@mui/material/Grid2';
 import TextField from '@mui/material/TextField';
-import React, {useState} from 'react';
+import {
+  useInsertSecret,
+  useSecrets,
+} from '@wandb/weave/common/hooks/useSecrets';
+import {TargetBlank} from '@wandb/weave/common/util/links';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {useHistory} from 'react-router';
 import {Link} from 'react-router-dom';
 
 import {SimplePageLayout} from './common/SimplePageLayout';
@@ -14,6 +21,7 @@ type Mod = {
   id: string;
   name: string;
   description: string;
+  secrets: string[];
 };
 
 type ModCategoryType = 'Labeling' | 'Analysis' | 'Demos';
@@ -25,28 +33,25 @@ type ModCategories = {
 const mods: ModCategories = {
   Labeling: [
     {
-      id: 'labeling/eval-forge',
-      name: 'Eval Forge',
-      description:
-        'Create LLM judges using your existing traces and intelligence',
-    },
-    {
       id: 'labeling/html',
       name: 'HTML Labeler',
       description: 'Label generated HTML against your own criteria',
+      secrets: ['WANDB_API_KEY', 'OPENAI_API_KEY'],
     },
   ],
   Analysis: [
-    {
-      id: 'agi',
-      name: 'AGI Agent',
-      description: 'Run an agent that can interact with a computer',
-    },
     {
       id: 'embedding-classifier',
       name: 'Embedding Classifier',
       description:
         'Classify your traces by embedding them and have an LLM label the clusters',
+      secrets: ['WANDB_API_KEY', 'OPENAI_API_KEY'],
+    },
+    {
+      id: 'cost-dashboard',
+      name: 'Cost Dashboard',
+      description: 'A dashboard showing your project LLM costs over time',
+      secrets: ['WANDB_API_KEY'],
     },
   ],
   Demos: [
@@ -54,16 +59,19 @@ const mods: ModCategories = {
       id: 'welcome',
       name: 'Welcome',
       description: 'A simple welcome mod',
+      secrets: ['WANDB_API_KEY'],
     },
     {
       id: 'openui',
       name: 'OpenUI',
       description: 'Generate UIs from images or text descriptions',
+      secrets: ['WANDB_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY'],
     },
     {
       id: 'gist',
       name: 'Gist',
       description: 'Load a gist that contains a streamlit app.py file',
+      secrets: ['WANDB_API_KEY'],
     },
   ],
 };
@@ -126,7 +134,7 @@ const ModCards: React.FC<{mods: Mod[]; entity: string; project: string}> = ({
                 component={Link}
                 to={`/${entity}/${project}/weave/mods/${encodeURIComponent(
                   mod.id
-                )}?purl=${purl}`}
+                )}?purl=${purl}&checkSecrets=true`}
                 size="small">
                 Run
               </Button>
@@ -147,7 +155,14 @@ const ModFrame: React.FC<{entity: string; project: string; modId: string}> = ({
   const purl = searchParams.get('purl');
   return (
     <iframe
-      style={{width: '100%', height: '100vh', border: 'none'}}
+      style={{
+        width: '100%',
+        height: '100vh',
+        border: 0,
+        borderImage:
+          'linear-gradient(to right, rgb(19, 169, 186), rgb(102, 51, 153)) 1',
+        borderTop: '3px solid',
+      }}
       title="Weave Mod"
       allow="accelerometer; ambient-light-sensor; autoplay; battery; camera; clipboard-read; clipboard-write; display-capture; document-domain; encrypted-media; fullscreen; geolocation; gyroscope; layout-animations; legacy-image-formats; magnetometer; microphone; midi; oversized-images; payment; picture-in-picture; publickey-credentials-get; sync-xhr; usb; vr ; wake-lock; xr-spatial-tracking"
       sandbox="allow-downloads allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-storage-access-by-user-activation"
@@ -158,12 +173,129 @@ const ModFrame: React.FC<{entity: string; project: string; modId: string}> = ({
   );
 };
 
+export const SecretSettings: React.FC<{
+  entity: string;
+  project: string;
+  modId: string | undefined;
+  purl: string | null;
+  secretNames: string[];
+}> = ({entity, project, modId, purl, secretNames}) => {
+  const helpText: Record<string, string> = {
+    OPENAI_API_KEY: 'https://platform.openai.com/api-keys',
+    ANTHROPIC_API_KEY: 'https://console.anthropic.com/keys',
+  };
+  const history = useHistory();
+  const [open, setOpen] = useState(true);
+  const carryOn = useCallback(() => {
+    history.push(
+      `/${entity}/${project}/weave/mods/${encodeURIComponent(
+        modId || ''
+      )}?purl=${purl || ''}`
+    );
+  }, [history, entity, project, modId, purl]);
+  const closeDrawer = useCallback(() => {
+    setOpen(false);
+    // TODO: maybe don't allow this?
+    carryOn();
+  }, [setOpen, carryOn]);
+  const {secrets: existingSecrets, loading} = useSecrets({
+    entityName: entity,
+  });
+  const insertSecret = useInsertSecret();
+  const [secrets, setSecrets] = useState<Record<string, string>>({});
+  const missingSecrets: string[] = useMemo(() => {
+    return secretNames.filter(
+      name => !existingSecrets.includes(name) && name !== 'WANDB_API_KEY'
+    );
+  }, [secretNames, existingSecrets]);
+  useEffect(() => {
+    if (!loading && missingSecrets.length === 0) {
+      carryOn();
+    }
+  }, [loading, missingSecrets.length, carryOn]);
+
+  const handleChange = (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    name: string
+  ) => {
+    setSecrets(prevSecrets => ({...prevSecrets, [name]: event.target.value}));
+  };
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await Promise.all(
+      Object.entries(secrets).map(([name, value]) =>
+        insertSecret({
+          variables: {entityName: entity, secretName: name, secretValue: value},
+        })
+      )
+    );
+    carryOn();
+  };
+  if (loading) {
+    return <></>;
+  }
+  if (missingSecrets.length === 0) {
+    return <></>;
+  }
+  return (
+    <Drawer anchor="right" open={open} onClose={closeDrawer}>
+      <Box sx={{width: 400, padding: '4em 1em'}}>
+        <h3>Required Secrets</h3>
+        <p>
+          The mod you've chosen requires the following secrets which currently
+          don't exist. You can set them here or in your team settings page.
+        </p>
+        <form onSubmit={handleSubmit} autoComplete="off">
+          {missingSecrets.map((name, idx) => (
+            <Box key={name} mb={2}>
+              <TextField
+                label={name}
+                type="password"
+                variant="standard"
+                fullWidth
+                autoComplete="new-password"
+                id={`secret-${idx}`}
+                name={`secret-${idx}`}
+                helperText={
+                  helpText[name] ? (
+                    <TargetBlank
+                      href={helpText[name]}
+                      target="_blank"
+                      rel="noreferrer">
+                      {helpText[name]}
+                    </TargetBlank>
+                  ) : undefined
+                }
+                value={secrets[name] || ''}
+                onChange={event => handleChange(event, name)}
+              />
+            </Box>
+          ))}
+          <Button variant="contained" color="primary" type="submit">
+            Run Mod
+          </Button>
+        </form>
+      </Box>
+    </Drawer>
+  );
+};
+
 export const ModsPage: React.FC<{
   entity: string;
   project: string;
   itemName?: string;
 }> = ({entity, project, itemName}) => {
-  return itemName ? (
+  const searchParams = new URLSearchParams(window.location.search);
+  const checkSecrets = searchParams.get('checkSecrets');
+  const purl = searchParams.get('purl');
+  const mod = itemName
+    ? Object.values(mods)
+        .flat()
+        .find(m => m.id === itemName)
+    : undefined;
+  const secrets = mod?.secrets ?? [];
+
+  return itemName && !checkSecrets ? (
     <ModFrame entity={entity} project={project} modId={itemName} />
   ) : (
     <SimplePageLayout
@@ -192,6 +324,15 @@ export const ModsPage: React.FC<{
                 category="Demos"
                 mods={mods.Demos}
               />
+              {checkSecrets && (
+                <SecretSettings
+                  entity={entity}
+                  project={project}
+                  modId={itemName}
+                  purl={purl}
+                  secretNames={secrets}
+                />
+              )}
             </div>
           ),
         },
