@@ -1,7 +1,8 @@
 import asyncio
 import json
 import os
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import pytest
 from pydantic import BaseModel

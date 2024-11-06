@@ -29,12 +29,11 @@ import json
 import logging
 import threading
 from collections import defaultdict
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from typing import (
     Any,
-    Iterator,
     Optional,
-    Sequence,
     Union,
     cast,
 )

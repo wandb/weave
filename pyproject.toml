@@ -172,6 +172,7 @@ select = [
   "UP031",  # https://docs.astral.sh/ruff/rules/printf-string-formatting/
   "UP032",  # https://docs.astral.sh/ruff/rules/f-string/
   "UP034",  # https://docs.astral.sh/ruff/rules/extraneous-parentheses/
+  "UP035",  # https://docs.astral.sh/ruff/rules/deprecated-import/
   "UP036",  # https://docs.astral.sh/ruff/rules/outdated-version-block/
 ]
 ignore = [

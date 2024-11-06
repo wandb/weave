@@ -2,8 +2,8 @@
 # This file should be in the trace SDK dir
 
 import logging
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 import wandb
 from wandb import errors as wandb_errors

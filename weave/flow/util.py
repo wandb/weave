@@ -1,7 +1,8 @@
 import asyncio
 import logging
 import multiprocessing
-from typing import Any, AsyncIterator, Awaitable, Callable, Iterable, TypeVar
+from collections.abc import AsyncIterator, Awaitable, Iterable
+from typing import Any, Callable, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")

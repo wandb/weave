@@ -2,7 +2,8 @@ import contextlib
 import io
 import os
 import tempfile
-from typing import Generator, Iterator, Mapping, Optional, Union
+from collections.abc import Generator, Iterator, Mapping
+from typing import Optional, Union
 
 from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
 

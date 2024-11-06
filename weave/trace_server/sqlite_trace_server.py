@@ -6,7 +6,8 @@ import hashlib
 import json
 import sqlite3
 import threading
-from typing import Any, Iterator, Optional, cast
+from collections.abc import Iterator
+from typing import Any, Optional, cast
 from zoneinfo import ZoneInfo
 
 import emoji

@@ -4,6 +4,7 @@ import inspect
 import logging
 import sys
 import traceback
+from collections.abc import Coroutine, Mapping
 from dataclasses import dataclass
 from functools import partial, wraps
 from types import MethodType
@@ -11,8 +12,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Coroutine,
-    Mapping,
     Optional,
     Protocol,
     TypedDict,
