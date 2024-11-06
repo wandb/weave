@@ -5,7 +5,7 @@ import MenuItem from '@mui/material/MenuItem';
 import {Button} from '@wandb/weave/components/Button/Button';
 import React, {FC, useState} from 'react';
 
-import {AxctionDefinitionType} from '../../collections/actionCollection';
+import {ActionDefinitionType} from '../../collections/actionCollection';
 import {useCreateCollectionObject} from '../../collections/getCollectionObjects';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
@@ -81,7 +81,7 @@ const OnlineScorersTab: React.FC<{
 }> = ({entity, project}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('');
-  const createCollectionObject = useCreateCollectionObject('AxctionDefinition');
+  const createCollectionObject = useCreateCollectionObject('ActionDefinition');
   const [lastUpdatedTimestamp, setLastUpdatedTimestamp] = useState(0);
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
@@ -111,7 +111,7 @@ const OnlineScorersTab: React.FC<{
     setSelectedTemplate('');
   };
 
-  const handleSaveModal = (newAction: AxctionDefinitionType) => {
+  const handleSaveModal = (newAction: ActionDefinitionType) => {
     let objectId = newAction.name;
     // Remove non alphanumeric characters
     objectId = objectId.replace(/[^a-zA-Z0-9]/g, '-');
@@ -181,7 +181,7 @@ const OnlineScorersTab: React.FC<{
         entity={entity}
         project={project}
         initialFilter={{
-          baseObjectClass: 'AxctionDefinition',
+          baseObjectClass: 'ActionDefinition',
         }}
       />
       <NewBuiltInActionScorerModal

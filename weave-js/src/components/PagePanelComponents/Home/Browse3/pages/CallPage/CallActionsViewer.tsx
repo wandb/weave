@@ -7,7 +7,7 @@ import {z} from 'zod';
 
 import {CellValue} from '../../../Browse2/CellValue';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
-import {AxctionDefinitionType} from '../../collections/actionCollection';
+import {ActionDefinitionType} from '../../collections/actionCollection';
 import {useCollectionObjects} from '../../collections/getCollectionObjects';
 import {StyledDataGrid} from '../../StyledDataGrid'; // Import the StyledDataGrid component
 import {WEAVE_REF_SCHEME} from '../wfReactInterface/constants';
@@ -23,7 +23,7 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 type CallActionRow = {
   actionRef: string;
-  actionDef: AxctionDefinitionType;
+  actionDef: ActionDefinitionType;
   runCount: number;
   lastResult?: unknown;
   lastRanAt?: Date;
@@ -89,7 +89,7 @@ export const CallActionsViewer: React.FC<{
     weaveRef,
   });
 
-  const AxctionDefinitions = useCollectionObjects('AxctionDefinition', {
+  const ActionDefinitions = useCollectionObjects('ActionDefinition', {
     project_id: projectIdFromParts({
       entity: props.call.entity,
       project: props.call.project,
@@ -130,22 +130,22 @@ export const CallActionsViewer: React.FC<{
 
   const allCallActions: CallActionRow[] = useMemo(() => {
     return (
-      AxctionDefinitions?.map(AxctionDefinition => {
-        const AxctionDefinitionRefUri = objectVersionKeyToRefUri({
+      ActionDefinitions?.map(ActionDefinition => {
+        const ActionDefinitionRefUri = objectVersionKeyToRefUri({
           scheme: WEAVE_REF_SCHEME,
           weaveKind: 'object',
           entity: props.call.entity,
           project: props.call.project,
-          objectId: AxctionDefinition.object_id,
-          versionHash: AxctionDefinition.digest,
+          objectId: ActionDefinition.object_id,
+          versionHash: ActionDefinition.digest,
           path: '',
         });
-        const feedbacks = getFeedbackForAction(AxctionDefinitionRefUri);
+        const feedbacks = getFeedbackForAction(ActionDefinitionRefUri);
         const selectedFeedback =
           feedbacks.length > 0 ? feedbacks[0] : undefined;
         return {
-          actionRef: AxctionDefinitionRefUri,
-          actionDef: AxctionDefinition.val,
+          actionRef: ActionDefinitionRefUri,
+          actionDef: ActionDefinition.val,
           runCount: feedbacks.length,
           lastRanAt: selectedFeedback
             ? convertISOToDate(selectedFeedback.feedbackRaw.created_at + 'Z')
@@ -157,7 +157,7 @@ export const CallActionsViewer: React.FC<{
       }) ?? []
     );
   }, [
-    AxctionDefinitions,
+    ActionDefinitions,
     getFeedbackForAction,
     props.call.entity,
     props.call.project,
