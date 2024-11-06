@@ -8,6 +8,7 @@ from weave.actions_worker.actions.contains_words import (
 from weave.actions_worker.actions.llm_judge import do_llm_judge_action
 from weave.trace_server.interface.base_object_classes.actions import (
     ActionDefinition,
+    ActionSpecType,
     ContainsWordsActionSpec,
     LlmJudgeActionSpec,
 )
@@ -32,9 +33,9 @@ from weave.trace_server.trace_server_interface import (
 ActionFnType = Callable[[ActionDefinition, CallSchema, TraceServerInterface], Any]
 
 # TODO: Nail down this typing
-dispatch_map: dict[str, ActionFnType] = {
-    LlmJudgeActionSpec.action_type: do_llm_judge_action,
-    ContainsWordsActionSpec.action_type: do_contains_words_action,
+dispatch_map: dict[type[ActionSpecType], ActionFnType] = {
+    LlmJudgeActionSpec: do_llm_judge_action,
+    ContainsWordsActionSpec: do_contains_words_action,
 }
 
 
@@ -89,7 +90,7 @@ def dispatch_action(
     target_call: CallSchema,
     trace_server: TraceServerInterface,
 ) -> ActionResult:
-    action_type = action_def.spec.action_type
+    action_type = type(action_def.spec)
     action_fn = dispatch_map[action_type]
     result = action_fn(action_def.spec, target_call, trace_server)
     feedback_res = publish_results_as_feedback(
@@ -118,5 +119,7 @@ def publish_results_as_feedback(
             feedback_type="wandb.runnable." + action_name,
             runnable_ref=action_ref,
             payload=RunnablePayloadSchema(output=result).model_dump(),
+            # TODO: Make `wb_user_id` optional.
+            wb_user_id="",
         )
     )

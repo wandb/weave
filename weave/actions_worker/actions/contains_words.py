@@ -16,7 +16,7 @@ def do_contains_words_action(
     trace_server: TraceServerInterface,
 ) -> Any:
     target_words = config.target_words
-    text = json.dumps(call.outputs)
+    text = json.dumps(call.output)
     for word in target_words:
         if word in text:
             return True

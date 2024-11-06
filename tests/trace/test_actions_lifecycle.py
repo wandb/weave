@@ -34,7 +34,7 @@ def test_action_lifecycle_simple(client: WeaveClient):
     # Part 2: Demonstrate manual feedback (this is not user-facing)
     @weave.op
     def example_op(input: str) -> str:
-        return input[::-1]
+        return input + "!!!"
 
     _, call1 = example_op.call("i've been very distracted today")
 
@@ -61,7 +61,7 @@ def test_action_lifecycle_simple(client: WeaveClient):
 
     # Step 3: test that we can in-place execute one action at a time.
 
-    _, call2 = example_op.call("i've been very meditative today")
+    _, call2 = example_op.call("i've been very mindful today")
 
     res = client.server.actions_execute_batch(
         ActionsExecuteBatchReq.model_validate(

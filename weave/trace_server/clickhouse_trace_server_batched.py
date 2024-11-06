@@ -1421,7 +1421,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             trace_server=self,
         )
 
-        raise tsi.ActionsExecuteBatchRes()
+        return tsi.ActionsExecuteBatchRes()
 
     def completions_create(
         self, req: tsi.CompletionsCreateReq
