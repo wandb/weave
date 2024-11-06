@@ -143,7 +143,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: typing.Optional[tsi_query.CastTo] = None,
+        cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
         inner = super().as_sql(pb, "feedback")
         param_name = pb.add_param(self.feedback_type)

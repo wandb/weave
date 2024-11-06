@@ -327,7 +327,7 @@ class Call:
         score_call_ref = get_ref(score_call)
         if score_call_ref is None:
             raise ValueError("Score call has no ref")
-        return client._add_score(
+        client._add_score(
             call_ref_uri=self_ref.uri(),
             score_name=score_name,
             score_results=score_results,

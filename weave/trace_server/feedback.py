@@ -1,4 +1,4 @@
-from typing import Any, Optional, Tuple, Type, TypeVar, Union, overload
+from typing import Any, Optional, TypeVar, Union, overload
 
 from pydantic import BaseModel, ValidationError
 
@@ -65,12 +65,12 @@ def _ensure_ref_is_valid(
 @overload
 def _ensure_ref_is_valid(
     ref: str,
-    expected_type: Tuple[Type[T], ...],
+    expected_type: tuple[type[T], ...],
 ) -> T: ...
 
 
 def _ensure_ref_is_valid(
-    ref: str, expected_type: Optional[Tuple[Type, ...]] = None
+    ref: str, expected_type: Optional[tuple[type, ...]] = None
 ) -> Union[ri.InternalObjectRef, ri.InternalTableRef, ri.InternalCallRef]:
     """Validates and parses an internal URI reference.
 
