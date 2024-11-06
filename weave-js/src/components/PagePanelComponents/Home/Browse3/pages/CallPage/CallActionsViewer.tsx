@@ -36,8 +36,9 @@ const RunButton: React.FC<{
   entity: string;
   project: string;
   refetchFeedback: () => void;
-  getClient: () => any;
-}> = ({actionRef, callId, entity, project, refetchFeedback, getClient}) => {
+}> = ({actionRef, callId, entity, project, refetchFeedback}) => {
+  const getClient = useGetTraceServerClientContext();
+
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +49,7 @@ const RunButton: React.FC<{
       await getClient().actionsExecuteBatch({
         project_id: projectIdFromParts({entity, project}),
         call_ids: [callId],
-        configured_action_ref: actionRef,
+        action_ref: actionRef,
       });
       refetchFeedback();
     } catch (err) {
@@ -129,7 +130,6 @@ export const CallActionsViewer: React.FC<{
     [verifiedActionFeedbacks]
   );
 
-  const getClient = useGetTraceServerClientContext();
 
   const allCallActions: CallActionRow[] = useMemo(() => {
     return (
@@ -206,7 +206,6 @@ export const CallActionsViewer: React.FC<{
           entity={props.call.entity}
           project={props.call.project}
           refetchFeedback={feedbackQuery.refetch}
-          getClient={getClient}
         />
       ),
     },
