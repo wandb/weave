@@ -173,6 +173,7 @@ select = [
   "C408",   # https://docs.astral.sh/ruff/rules/unnecessary-collection-call/
   "C403",   # https://docs.astral.sh/ruff/rules/unnecessary-list-comprehension-set/
   "C416",   # https://docs.astral.sh/ruff/rules/unnecessary-comprehension/
+  "C417",   # https://docs.astral.sh/ruff/rules/unnecessary-map/
 ]
 ignore = [
   # we use Google style
