@@ -5,10 +5,10 @@ import MenuItem from '@mui/material/MenuItem';
 import {Button} from '@wandb/weave/components/Button/Button';
 import React, {FC, useState} from 'react';
 
-import {ActionDefinitionType} from '../../collections/actionCollection';
-import {useCreateCollectionObject} from '../../collections/getCollectionObjects';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
+import {useCreateBaseObjectInstance} from '../wfReactInterface/baseObjectClassQuery';
+import {ActionDefinition} from '../wfReactInterface/generatedBaseObjectClasses.zod';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {actionTemplates} from './actionTemplates';
 import {NewBuiltInActionScorerModal} from './NewBuiltInActionScorerModal';
@@ -81,7 +81,8 @@ const OnlineScorersTab: React.FC<{
 }> = ({entity, project}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('');
-  const createCollectionObject = useCreateCollectionObject('ActionDefinition');
+  const createCollectionObject =
+    useCreateBaseObjectInstance('ActionDefinition');
   const [lastUpdatedTimestamp, setLastUpdatedTimestamp] = useState(0);
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
@@ -111,10 +112,11 @@ const OnlineScorersTab: React.FC<{
     setSelectedTemplate('');
   };
 
-  const handleSaveModal = (newAction: ActionDefinitionType) => {
+  const handleSaveModal = (newAction: ActionDefinition) => {
     let objectId = newAction.name;
     // Remove non alphanumeric characters
-    objectId = objectId.replace(/[^a-zA-Z0-9]/g, '-');
+    // TODO: reconcile this null-name issue
+    objectId = objectId?.replace(/[^a-zA-Z0-9]/g, '-') ?? '';
     createCollectionObject({
       obj: {
         project_id: projectIdFromParts({entity, project}),

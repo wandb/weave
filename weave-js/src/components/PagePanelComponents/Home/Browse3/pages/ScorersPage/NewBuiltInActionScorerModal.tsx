@@ -9,14 +9,13 @@ import _ from 'lodash';
 import React, {FC, useEffect, useState} from 'react';
 import {z} from 'zod';
 
-import {
-  ActionDefinitionSchema,
-  ActionDefinitionType,
-  ConfiguredLlmJudgeActionSchema,
-  ConfiguredWordCountActionSchema,
-} from '../../collections/actionCollection';
+import {ConfiguredLlmJudgeActionSchema} from '../../collections/actionCollection';
 import {DynamicConfigForm} from '../../DynamicConfigForm';
 import {ReusableDrawer} from '../../ReusableDrawer';
+import {
+  ActionDefinition,
+  ActionDefinitionSchema,
+} from '../wfReactInterface/generatedBaseObjectClasses.zod';
 import {
   actionTemplates,
   ConfiguredLlmJudgeActionFriendlySchema,
@@ -54,26 +53,26 @@ const knownBuiltinActions = [
       },
     },
   },
-  {
-    name: 'Word Count',
-    actionSchema: ConfiguredWordCountActionSchema,
-    friendly: {
-      schema: z.object({}),
-      convert: (
-        data: z.infer<typeof ConfiguredWordCountActionSchema>
-      ): z.infer<typeof ConfiguredWordCountActionSchema> => {
-        return {
-          action_type: 'wordcount',
-        };
-      },
-    },
-  },
+  // {
+  //   name: 'Word Count',
+  //   actionSchema: ConfiguredWordCountActionSchema,
+  //   friendly: {
+  //     schema: z.object({}),
+  //     convert: (
+  //       data: z.infer<typeof ConfiguredWordCountActionSchema>
+  //     ): z.infer<typeof ConfiguredWordCountActionSchema> => {
+  //       return {
+  //         action_type: 'wordcount',
+  //       };
+  //     },
+  //   },
+  // },
 ];
 
 interface NewBuiltInActionScorerModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (newAction: ActionDefinitionType) => void;
+  onSave: (newAction: ActionDefinition) => void;
   initialTemplate: string;
 }
 

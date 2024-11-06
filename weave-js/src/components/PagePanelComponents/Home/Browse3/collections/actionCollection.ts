@@ -21,31 +21,31 @@ export type ConfiguredLlmJudgeActionType = z.infer<
   typeof ConfiguredLlmJudgeActionSchema
 >;
 
-export const ConfiguredWordCountActionSchema = z.object({
-  action_type: z.literal('wordcount'),
-});
-export type ConfiguredWordCountActionType = z.infer<
-  typeof ConfiguredWordCountActionSchema
->;
+// export const ConfiguredWordCountActionSchema = z.object({
+//   action_type: z.literal('wordcount'),
+// });
+// export type ConfiguredWordCountActionType = z.infer<
+//   typeof ConfiguredWordCountActionSchema
+// >;
 
-export const ActionConfigSchema = z.discriminatedUnion('action_type', [
-  ConfiguredLlmJudgeActionSchema,
-  ConfiguredWordCountActionSchema,
-]);
-export type ActionConfigType = z.infer<typeof ActionConfigSchema>;
+// export const ActionConfigSchema = z.discriminatedUnion('action_type', [
+//   ConfiguredLlmJudgeActionSchema,
+//   ConfiguredWordCountActionSchema,
+// ]);
+// export type ActionConfigType = z.infer<typeof ActionConfigSchema>;
 
-export const ActionDefinitionSchema = z.object({
-  name: z.string(),
-  config: ActionConfigSchema,
-});
-export type ActionDefinitionType = z.infer<typeof ActionDefinitionSchema>;
+// export const ActionDefinitionSchema = z.object({
+//   name: z.string(),
+//   config: ActionConfigSchema,
+// });
+// export type ActionDefinitionType = z.infer<typeof ActionDefinitionSchema>;
 
-export const ActionDispatchFilterSchema = z.object({
-  op_name: z.string(),
-  sample_rate: z.number().min(0).max(1).default(1),
-  configured_action_ref: z.string(),
-  disabled: z.boolean().optional(),
-});
-export type ActionDispatchFilterType = z.infer<
-  typeof ActionDispatchFilterSchema
->;
+// export const ActionDispatchFilterSchema = z.object({
+//   op_name: z.string(),
+//   sample_rate: z.number().min(0).max(1).default(1),
+//   configured_action_ref: z.string(),
+//   disabled: z.boolean().optional(),
+// });
+// export type ActionDispatchFilterType = z.infer<
+//   typeof ActionDispatchFilterSchema
+// >;

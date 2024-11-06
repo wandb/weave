@@ -7,11 +7,12 @@ import {z} from 'zod';
 
 import {CellValue} from '../../../Browse2/CellValue';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
-import {ActionDefinitionType} from '../../collections/actionCollection';
-import {useCollectionObjects} from '../../collections/getCollectionObjects';
+// import {ActionDefinitionType} from '../../collections/actionCollection';
 import {StyledDataGrid} from '../../StyledDataGrid'; // Import the StyledDataGrid component
+import {useBaseObjectInstances} from '../wfReactInterface/baseObjectClassQuery';
 import {WEAVE_REF_SCHEME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
+import {ActionDefinition} from '../wfReactInterface/generatedBaseObjectClasses.zod';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {Feedback} from '../wfReactInterface/traceServerClientTypes';
 import {
@@ -23,7 +24,7 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 type CallActionRow = {
   actionRef: string;
-  actionDef: ActionDefinitionType;
+  actionDef: ActionDefinition;
   runCount: number;
   lastResult?: unknown;
   lastRanAt?: Date;
@@ -89,13 +90,15 @@ export const CallActionsViewer: React.FC<{
     weaveRef,
   });
 
-  const ActionDefinitions = useCollectionObjects('ActionDefinition', {
-    project_id: projectIdFromParts({
-      entity: props.call.entity,
-      project: props.call.project,
-    }),
-    filter: {latest_only: true},
-  }).sort((a, b) => a.val.name.localeCompare(b.val.name));
+  const actionDefinitions = (
+    useBaseObjectInstances('ActionDefinition', {
+      project_id: projectIdFromParts({
+        entity: props.call.entity,
+        project: props.call.project,
+      }),
+      filter: {latest_only: true},
+    }).result ?? []
+  ).sort((a, b) => (a.val.name ?? '').localeCompare(b.val.name ?? ''));
   const verifiedActionFeedbacks: Array<{
     data: MachineScoreFeedbackPayloadType;
     feedbackRaw: Feedback;
@@ -130,22 +133,22 @@ export const CallActionsViewer: React.FC<{
 
   const allCallActions: CallActionRow[] = useMemo(() => {
     return (
-      ActionDefinitions?.map(ActionDefinition => {
-        const ActionDefinitionRefUri = objectVersionKeyToRefUri({
+      actionDefinitions.map(actionDefinition => {
+        const actionDefinitionRefUri = objectVersionKeyToRefUri({
           scheme: WEAVE_REF_SCHEME,
           weaveKind: 'object',
           entity: props.call.entity,
           project: props.call.project,
-          objectId: ActionDefinition.object_id,
-          versionHash: ActionDefinition.digest,
+          objectId: actionDefinition.object_id,
+          versionHash: actionDefinition.digest,
           path: '',
         });
-        const feedbacks = getFeedbackForAction(ActionDefinitionRefUri);
+        const feedbacks = getFeedbackForAction(actionDefinitionRefUri);
         const selectedFeedback =
           feedbacks.length > 0 ? feedbacks[0] : undefined;
         return {
-          actionRef: ActionDefinitionRefUri,
-          actionDef: ActionDefinition.val,
+          actionRef: actionDefinitionRefUri,
+          actionDef: actionDefinition.val,
           runCount: feedbacks.length,
           lastRanAt: selectedFeedback
             ? convertISOToDate(selectedFeedback.feedbackRaw.created_at + 'Z')
@@ -157,7 +160,7 @@ export const CallActionsViewer: React.FC<{
       }) ?? []
     );
   }, [
-    ActionDefinitions,
+    actionDefinitions,
     getFeedbackForAction,
     props.call.entity,
     props.call.project,
