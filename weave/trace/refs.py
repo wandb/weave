@@ -279,5 +279,5 @@ def parse_uri(uri: str) -> AnyRef:
 
 def parse_op_uri(uri: str) -> OpRef:
     if not isinstance(parsed := parse_uri(uri), OpRef):
-        raise ValueError(f"URI is not for an Op: {uri}")
+        raise TypeError(f"URI is not for an Op: {uri}")
     return parsed

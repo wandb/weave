@@ -103,7 +103,7 @@ def get_obj_name(val: Any) -> str:
         else:
             name = f"{val.__class__.__name__}"
     if not isinstance(name, str):
-        raise ValueError(f"Object's name attribute is not a string: {name}")
+        raise TypeError(f"Object's name attribute is not a string: {name}")
     return name
 
 
@@ -561,7 +561,7 @@ class WeaveClient:
 
         ref = self._save_object(val, name, branch)
         if not isinstance(ref, ObjectRef):
-            raise ValueError(f"Expected ObjectRef, got {ref}")
+            raise TypeError(f"Expected ObjectRef, got {ref}")
         return self.get(ref)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1122,7 +1122,7 @@ class WeaveClient:
             scorer_op_ref_uri = score_call.op_name
             scorer_op_ref = parse_uri(scorer_op_ref_uri)
             if not isinstance(scorer_op_ref, OpRef):
-                raise ValueError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
+                raise TypeError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
             score_name = scorer_op_ref.name
             score_results = score_call.output
 
@@ -1155,13 +1155,13 @@ class WeaveClient:
         # Parse the refs (acts as validation)
         call_ref = parse_uri(call_ref_uri)
         if not isinstance(call_ref, CallRef):
-            raise ValueError(f"Invalid call ref: {call_ref_uri}")
+            raise TypeError(f"Invalid call ref: {call_ref_uri}")
         scorer_call_ref = parse_uri(scorer_call_ref_uri)
         if not isinstance(scorer_call_ref, CallRef):
-            raise ValueError(f"Invalid scorer call ref: {scorer_call_ref_uri}")
+            raise TypeError(f"Invalid scorer call ref: {scorer_call_ref_uri}")
         scorer_op_ref = parse_uri(scorer_op_ref_uri)
         if not isinstance(scorer_op_ref, OpRef):
-            raise ValueError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
+            raise TypeError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
 
         # Validate score_name (we might want to relax this in the future)
         if score_name != scorer_op_ref.name:
