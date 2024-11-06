@@ -85,7 +85,7 @@ async def generate_screenshot_from_browser(
                 if element:
                     await element.screenshot(path=output_path)
                 else:
-                    raise Exception(f"Element with selector '{selector}' not found")
+                    raise ValueError(f"Element with selector '{selector}' not found")
             else:
                 await page.screenshot(path=output_path, full_page=True)
 
