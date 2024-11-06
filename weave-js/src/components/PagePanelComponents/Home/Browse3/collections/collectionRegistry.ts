@@ -1,6 +1,6 @@
 import {
-  ActionDispatchFilterSchema,
   ActionDefinitionSchema,
+  ActionDispatchFilterSchema,
 } from './actionCollection';
 
 export const collectionRegistry = {
