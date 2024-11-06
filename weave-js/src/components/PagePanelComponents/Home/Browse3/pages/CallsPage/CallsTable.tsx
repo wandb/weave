@@ -279,6 +279,11 @@ export const CallsTable: FC<{
       setCallsResult([]);
       setCallsTotal(0);
       callsEffectiveFilter.current = effectiveFilter;
+      // Refetch the calls IFF the filter has changed, this is a
+      // noop if the calls query is already loading, but if the filter
+      // has no effective impact (frozen vs. not frozen) we need to
+      // manually refetch
+      calls.refetch();
     } else if (!calls.loading) {
       setCallsResult(calls.result);
       setCallsTotal(calls.total);
