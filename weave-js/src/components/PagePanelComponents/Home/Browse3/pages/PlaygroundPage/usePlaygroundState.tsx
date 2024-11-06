@@ -1,41 +1,48 @@
 import {SetStateAction, useCallback, useState} from 'react';
 
-import {Message} from '../ChatView/types';
 import {
+  OptionalTraceCallSchema,
   PlaygroundResponseFormats,
   PlaygroundState,
   PlaygroundStateKey,
 } from './types';
 
+const DEFAULT_PLAYGROUND_STATE = {
+  traceCall: {
+    inputs: {
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a helpful assistant.',
+        },
+      ],
+    },
+  },
+  trackLLMCall: true,
+  loading: false,
+  functions: [],
+  responseFormat: PlaygroundResponseFormats.Text,
+  temperature: 1,
+  maxTokens: 4096,
+  stopSequences: [],
+  topP: 1,
+  frequencyPenalty: 0,
+  presencePenalty: 0,
+  nTimes: 1,
+  maxTokensLimit: 16384,
+  model: 'gpt-4o-mini',
+};
+
 export const usePlaygroundState = () => {
   const [playgroundStates, setPlaygroundStates] = useState<PlaygroundState[]>([
-    {
-      trackLLMCall: true,
-      loading: false,
-      functions: [],
-      responseFormat: PlaygroundResponseFormats.Text,
-      temperature: 1,
-      maxTokens: 4000,
-      stopSequences: [],
-      topP: 1,
-      frequencyPenalty: 0,
-      presencePenalty: 0,
-      nTimes: 1,
-      maxTokensLimit: 16000,
-      model: 'gpt-4o-mini',
-    },
+    DEFAULT_PLAYGROUND_STATE,
   ]);
 
   const setPlaygroundStateField = useCallback(
     (
       index: number,
       field: PlaygroundStateKey,
-      value:
-        | PlaygroundState[PlaygroundStateKey]
-        | SetStateAction<Array<{[key: string]: any; name: string}>>
-        | SetStateAction<PlaygroundResponseFormats>
-        | SetStateAction<number>
-        | SetStateAction<string[]>
+      value: SetStateAction<PlaygroundState[PlaygroundStateKey]>
     ) => {
       setPlaygroundStates(prevStates =>
         prevStates.map((state, i) =>
@@ -55,12 +62,20 @@ export const usePlaygroundState = () => {
   );
 
   // Takes in a function input and sets the state accordingly
-  const setPlaygroundStateFromInputs = useCallback(
-    (inputs: Record<string, any>) => {
+  const setPlaygroundStateFromTraceCall = useCallback(
+    (traceCall: OptionalTraceCallSchema) => {
+      const inputs = traceCall.inputs;
       // https://docs.litellm.ai/docs/completion/input
       // pulled from litellm
       setPlaygroundStates(prevState => {
         const newState = {...prevState[0]};
+
+        newState.traceCall = traceCall;
+
+        if (!inputs) {
+          return [newState];
+        }
+
         if (inputs.tools) {
           newState.functions = [];
           for (const tool of inputs.tools) {
@@ -97,20 +112,20 @@ export const usePlaygroundState = () => {
     playgroundStates,
     setPlaygroundStates,
     setPlaygroundStateField,
-    setPlaygroundStateFromInputs,
+    setPlaygroundStateFromTraceCall,
   };
 };
 
-export const getInputFromPlaygroundState = (
-  state: PlaygroundState,
-  messagesToSend: Message[]
-) => {
+export const getInputFromPlaygroundState = (state: PlaygroundState) => {
   const tools = state.functions.map(func => ({
     type: 'function',
     function: func,
   }));
   return {
-    messages: messagesToSend,
+    // Adding this to prevent the exact same call from not getting run when i want it too
+    request_key: `${Date.now()}-${Math.random()}`,
+
+    messages: state.traceCall?.inputs?.messages,
     model: state.model,
     temperature: state.temperature,
     max_tokens: state.maxTokens,

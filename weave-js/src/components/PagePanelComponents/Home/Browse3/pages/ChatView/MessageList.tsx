@@ -65,7 +65,7 @@ const processToolCallMessages = (messages: Messages) => {
     // If the number of tool messages doesn't match the number of tool calls,
     // log a warning.
     if (toolMessages.length !== message.tool_calls.length) {
-      console.warn('Tool call count mismatch');
+      // console.warn('Tool call count mismatch');
     }
 
     const toolCallsWithResponses: ToolCallWithResponse[] =

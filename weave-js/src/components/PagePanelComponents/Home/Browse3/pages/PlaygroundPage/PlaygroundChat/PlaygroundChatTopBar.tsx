@@ -1,15 +1,11 @@
-import {Box, Switch} from '@mui/material';
+import {Box} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import {Tag} from '@wandb/weave/components/Tag';
 import React from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {CopyableId} from '../../common/Id';
-import {
-  OptionalCallSchema,
-  OptionalTraceCallSchema,
-  PlaygroundState,
-} from '../types';
+import {OptionalTraceCallSchema, PlaygroundState} from '../types';
 import {LLMDropdown} from './LLMDropdown';
 
 type PlaygroundChatTopBarProps = {
@@ -21,8 +17,6 @@ type PlaygroundChatTopBarProps = {
     field: keyof PlaygroundState,
     value: any
   ) => void;
-  setCalls: (calls: OptionalCallSchema[]) => void;
-  calls: OptionalCallSchema[];
   entity: string;
   project: string;
   playgroundStates: PlaygroundState[];
@@ -34,8 +28,6 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   settingsTab,
   setSettingsTab,
   setPlaygroundStateField,
-  setCalls,
-  calls,
   entity,
   project,
   playgroundStates,
@@ -54,35 +46,23 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
 
   const clearCall = (index: number) => {
     history.push(`/${entity}/${project}/weave/playground`);
-    setCalls(
-      calls.map((call, i) =>
-        i === index
-          ? ({
-              entity,
-              project,
-              traceCall: {
-                project_id: project,
-                id: '', // Generate a new ID or use a placeholder
-                op_name: '',
-                trace_id: '',
-                inputs: {
-                  messages: [
-                    {
-                      role: 'system',
-                      content: 'You are a helpful assistant.',
-                    },
-                  ],
-                },
-              } as OptionalTraceCallSchema,
-            } as OptionalCallSchema)
-          : call
-      )
-    );
+    setPlaygroundStateField(index, 'traceCall', {
+      project_id: `${entity}/${project}`,
+      id: '',
+      inputs: {
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful assistant.',
+          },
+        ],
+      },
+    } as OptionalTraceCallSchema);
   };
 
   const handleCompare = () => {
-    if (calls.length < 2) {
-      setCalls([calls[0], JSON.parse(JSON.stringify(calls[0]))]);
+    if (playgroundStates.length < 2) {
+      //   setCalls([calls[0], JSON.parse(JSON.stringify(calls[0]))]);
       setPlaygroundStates([
         ...playgroundStates,
         JSON.parse(JSON.stringify(playgroundStates[0])),
@@ -105,15 +85,15 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           alignItems: 'center',
           backgroundColor: 'white',
         }}>
-        {calls.length > 1 && <Tag label={`${idx + 1}`} />}
+        {playgroundStates.length > 1 && <Tag label={`${idx + 1}`} />}
         <LLMDropdown
           value={playgroundStates[idx].model}
           onChange={(model, maxTokens) =>
             handleModelChange(idx, model, maxTokens)
           }
         />
-        {calls[idx].traceCall?.id && (
-          <CopyableId id={calls[idx].traceCall.id} type="Call" />
+        {playgroundStates[idx].traceCall?.id && (
+          <CopyableId id={playgroundStates[idx]!.traceCall!.id} type="Call" />
         )}
       </Box>
       <Box
@@ -130,17 +110,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           variant="ghost"
           onClick={() => clearCall(idx)}
         />
-        <Switch
-          checked={playgroundStates[idx].trackLLMCall}
-          onChange={() =>
-            setPlaygroundStateField(
-              idx,
-              'trackLLMCall',
-              !playgroundStates[idx].trackLLMCall
-            )
-          }
-        />
-        {calls.length < 2 ? (
+        {playgroundStates.length < 2 ? (
           <Button
             tooltip={'Add chat'}
             endIcon="swap"
@@ -159,7 +129,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
               if (settingsTab === idx) {
                 setSettingsTab(0);
               }
-              setCalls(calls.filter((_, index) => index !== idx));
+              //   setCalls(calls.filter((_, index) => index !== idx));
               setPlaygroundStates(
                 playgroundStates.filter((_, index) => index !== idx)
               );
@@ -167,7 +137,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
             Remove
           </Button>
         )}
-        {idx === calls.length - 1 && (
+        {idx === playgroundStates.length - 1 && (
           <Button
             tooltip={'Chat settings'}
             icon="settings-parameters"

@@ -6,7 +6,6 @@ import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
-import {OptionalCallSchema, OptionalTraceCallSchema} from './types';
 import {usePlaygroundState} from './usePlaygroundState';
 
 export type PlaygroundPageProps = {
@@ -35,12 +34,12 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
     playgroundStates,
     setPlaygroundStates,
     setPlaygroundStateField,
-    setPlaygroundStateFromInputs,
+    setPlaygroundStateFromTraceCall,
   } = usePlaygroundState();
 
   const [settingsTab, setSettingsTab] = useState<number | null>(null);
 
-  const {useCall} = useWFHooks();
+  const {useCall, useCalls} = useWFHooks();
   const call = useCall(
     useMemo(() => {
       return props.callId
@@ -53,40 +52,49 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
     }, [props.entity, props.project, props.callId])
   );
 
-  const [calls, setCalls] = useState<OptionalCallSchema[]>([]);
+  const {result: calls} = useCalls(props.entity, props.project, {
+    callIds: playgroundStates.map(state => state.traceCall.id || ''),
+  });
 
   useEffect(() => {
     if (!call.loading && call.result) {
-      setCalls([call.result]);
       if (call.result.traceCall?.inputs) {
-        setPlaygroundStateFromInputs(call.result.traceCall.inputs);
+        setPlaygroundStateFromTraceCall(call.result.traceCall);
       }
-    } else if (calls.length === 0) {
-      setCalls([
-        {
-          entity: props.entity,
-          project: props.project,
-          traceCall: {
-            inputs: {
-              messages: [
-                {
-                  role: 'system',
-                  content: 'You are a helpful assistant.',
-                },
-              ],
+    } else if (
+      playgroundStates.length === 1 &&
+      !playgroundStates[0].traceCall.project_id
+    ) {
+      setPlaygroundStateField(0, 'traceCall', {
+        inputs: {
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful assistant.',
             },
-          } as OptionalTraceCallSchema,
-        } as OptionalCallSchema,
-      ]);
+          ],
+        },
+        project_id: `${props.entity}/${props.project}`,
+      });
     }
+    // Only set the call the first time the page loads, and we get the call
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    call,
-    props.entity,
-    props.project,
-    setPlaygroundStateFromInputs,
-    // calls.length,
-  ]);
+  }, [props.callId]);
+
+  useEffect(() => {
+    setPlaygroundStates(prev => {
+      const newStates = [...prev];
+      for (const [idx, state] of newStates.entries()) {
+        for (const c of calls || []) {
+          if (state.traceCall.id === c.callId) {
+            newStates[idx] = {...state, traceCall: c.traceCall || {}};
+            break;
+          }
+        }
+      }
+      return newStates;
+    });
+  }, [calls, setPlaygroundStates]);
 
   return (
     <Box
@@ -106,8 +114,6 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
         </Box>
       ) : (
         <PlaygroundChat
-          setCalls={setCalls}
-          calls={calls}
           playgroundStates={playgroundStates}
           setPlaygroundStates={setPlaygroundStates}
           setPlaygroundStateField={setPlaygroundStateField}

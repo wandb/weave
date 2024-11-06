@@ -71,7 +71,8 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
       />
       <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
         <Box sx={{display: 'flex', gap: '8px'}}>
-          <Button variant="secondary" size="small" startIcon="photo" />
+          {/* TODO: Add image upload */}
+          {/* <Button variant="secondary" size="small" startIcon="photo" /> */}
         </Box>
         <Box sx={{display: 'flex', gap: '8px'}}>
           <Box

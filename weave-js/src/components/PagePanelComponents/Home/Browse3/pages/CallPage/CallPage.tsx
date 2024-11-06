@@ -17,7 +17,6 @@ import {
 } from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {NotFoundPanel} from '../../NotFoundPanel';
-import {CallChat} from '../ChatView/CallChat';
 import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
@@ -30,6 +29,7 @@ import {TabUseCall} from '../TabUseCall';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';

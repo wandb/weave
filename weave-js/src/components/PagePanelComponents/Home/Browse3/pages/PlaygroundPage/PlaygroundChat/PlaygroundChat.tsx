@@ -2,47 +2,35 @@ import {Box, CircularProgress, Divider} from '@mui/material';
 import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {MOON_200} from '@wandb/weave/common/css/color.styles';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {Dispatch, SetStateAction, useState} from 'react';
+import React, {SetStateAction, useState} from 'react';
 import {Link} from 'react-router-dom';
 
-import {CallChat} from '../../ChatView/CallChat';
+import {CallChat} from '../../CallPage/CallChat';
 import {Message} from '../../ChatView/types';
 import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
-import {
-  OptionalCallSchema,
-  PlaygroundResponseFormats,
-  PlaygroundState,
-} from '../types';
+import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
+import {PlaygroundState} from '../types';
 import {getInputFromPlaygroundState} from '../usePlaygroundState';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
-import {useChatFunctions} from './useChatFunctions';
+import {clearTraceCall, useChatFunctions} from './useChatFunctions';
 
 export type PlaygroundChatProps = {
-  setCalls: Dispatch<SetStateAction<OptionalCallSchema[]>>;
-  calls: OptionalCallSchema[];
   entity: string;
   project: string;
   setPlaygroundStates: (states: PlaygroundState[]) => void;
   playgroundStates: PlaygroundState[];
-  setPlaygroundStateField: (
+  setPlaygroundStateField: <K extends keyof PlaygroundState>(
     index: number,
-    field: keyof PlaygroundState,
-    value:
-      | PlaygroundState[keyof PlaygroundState]
-      | React.SetStateAction<Array<{name: string; [key: string]: any}>>
-      | React.SetStateAction<PlaygroundResponseFormats>
-      | React.SetStateAction<number>
-      | React.SetStateAction<string[]>
+    field: K,
+    value: SetStateAction<PlaygroundState[K]>
   ) => void;
   setSettingsTab: (callIndex: number | null) => void;
   settingsTab: number | null;
 };
 
 export const PlaygroundChat = ({
-  setCalls,
-  calls,
   entity,
   project,
   setPlaygroundStates,
@@ -56,52 +44,49 @@ export const PlaygroundChat = ({
   const getTsClient = useGetTraceServerClientContext();
 
   const {deleteMessage, editMessage, deleteChoice, editChoice, addMessage} =
-    useChatFunctions(setCalls);
+    useChatFunctions(setPlaygroundStateField);
 
   const handleAddMessage = (role: 'assistant' | 'user', text: string) => {
-    for (let i = 0; i < calls.length; i++) {
+    for (let i = 0; i < playgroundStates.length; i++) {
       addMessage(i, {role, content: text});
     }
     setChatText('');
   };
 
   // Helper functions
-  const appendChoicesToMessages = (call: OptionalCallSchema) => {
-    const updatedCall = JSON.parse(JSON.stringify(call));
+  const appendChoicesToMessages = (state: PlaygroundState) => {
+    const updatedState = JSON.parse(JSON.stringify(state));
     if (
-      updatedCall.traceCall?.inputs?.messages &&
-      updatedCall.traceCall.output?.choices
+      updatedState.traceCall?.inputs?.messages &&
+      updatedState.traceCall.output?.choices
     ) {
-      updatedCall.traceCall.output.choices.forEach((choice: any) => {
+      updatedState.traceCall.output.choices.forEach((choice: any) => {
         if (choice.message) {
-          updatedCall.traceCall.inputs.messages.push(choice.message);
+          updatedState.traceCall.inputs.messages.push(choice.message);
         }
       });
-      updatedCall.traceCall.output.choices = undefined;
+      updatedState.traceCall.output.choices = undefined;
     }
-    return updatedCall;
+    return updatedState;
   };
 
   const makeCompletionRequest = async (
     callIndex: number,
-    updatedCalls: OptionalCallSchema[],
-    trackLLMCall?: boolean
+    updatedStates: PlaygroundState[]
   ) => {
-    const inputs = getInputFromPlaygroundState(
-      playgroundStates[callIndex],
-      updatedCalls[callIndex].traceCall?.inputs?.messages || []
-    );
+    console.log(updatedStates[callIndex], callIndex);
+    const inputs = getInputFromPlaygroundState(updatedStates[callIndex]);
 
     return getTsClient().completionsCreate({
       project_id: `${entity}/${project}`,
       inputs,
-      track_llm_call: trackLLMCall,
+      track_llm_call: updatedStates[callIndex].trackLLMCall,
     });
   };
 
   const handleErrorsAndUpdate = async (
     response: any,
-    updatedCalls: OptionalCallSchema[],
+    updatedStates: PlaygroundState[],
     callIndex?: number
   ) => {
     const hasMissingLLMApiKey = handleMissingLLMApiKey(response, entity);
@@ -115,29 +100,30 @@ export const PlaygroundChat = ({
       return false;
     }
 
-    const finalCalls = updatedCalls.map((call, index) => {
+    const finalStates = updatedStates.map((state, index) => {
       if (callIndex === undefined || index === callIndex) {
         return handleUpdateCallWithResponse(
-          call,
+          state,
           Array.isArray(response) ? response[index] : response
         );
       }
-      return call;
+      return state;
     });
 
-    setCalls(finalCalls);
+    setPlaygroundStates(finalStates);
     return true;
   };
 
-  const updateCallWithMessage = (
-    call: OptionalCallSchema,
+  const updatePlaygroundStateWithMessage = (
+    state: PlaygroundState,
     message: Message | undefined
   ) => {
-    const updatedCall = appendChoicesToMessages(call);
-    if (updatedCall.traceCall?.inputs?.messages) {
-      updatedCall.traceCall.inputs.messages.push(message);
+    const updatedState = appendChoicesToMessages(state);
+    if (updatedState.traceCall?.inputs?.messages) {
+      updatedState.traceCall.inputs.messages.push(message);
     }
-    return updatedCall;
+
+    return updatedState;
   };
 
   const withCompletionsLoading = async (operation: () => Promise<void>) => {
@@ -157,23 +143,19 @@ export const PlaygroundChat = ({
   ) => {
     await withCompletionsLoading(async () => {
       const newMessage = createMessage(role, messageText || chatText);
-      const updatedCalls = calls.map(call => {
-        return updateCallWithMessage(call, newMessage);
+      const updatedStates = playgroundStates.map(state => {
+        return updatePlaygroundStateWithMessage(state, newMessage);
       });
 
-      setCalls(updatedCalls);
+      setPlaygroundStates(updatedStates);
       setChatText('');
 
       const responses = await Promise.all(
-        updatedCalls.map((_, index) =>
-          makeCompletionRequest(
-            index,
-            updatedCalls,
-            playgroundStates[index].trackLLMCall
-          )
+        updatedStates.map((_, index) =>
+          makeCompletionRequest(index, updatedStates)
         )
       );
-      await handleErrorsAndUpdate(responses, updatedCalls);
+      await handleErrorsAndUpdate(responses, updatedStates);
     });
   };
 
@@ -185,18 +167,18 @@ export const PlaygroundChat = ({
   ) => {
     await withCompletionsLoading(async () => {
       const newMessage = createMessage(role, content, toolCallId);
-      const updatedCalls = calls.map((call, index) => {
+      const updatedStates = playgroundStates.map((state, index) => {
         if (callIndex !== index) {
-          return call;
+          return state;
         }
-        return updateCallWithMessage(call, newMessage);
+        return updatePlaygroundStateWithMessage(state, newMessage);
       });
 
-      setCalls(updatedCalls);
+      setPlaygroundStates(updatedStates);
       setChatText('');
 
-      const response = await makeCompletionRequest(callIndex, updatedCalls);
-      await handleErrorsAndUpdate(response, updatedCalls, callIndex);
+      const response = await makeCompletionRequest(callIndex, updatedStates);
+      await handleErrorsAndUpdate(response, updatedStates, callIndex);
     });
   };
 
@@ -206,27 +188,23 @@ export const PlaygroundChat = ({
     isChoice?: boolean
   ) => {
     await withCompletionsLoading(async () => {
-      const updatedCalls = calls.map((call, index) => {
+      const updatedStates = playgroundStates.map((state, index) => {
         if (index === callIndex) {
           if (isChoice) {
-            return appendChoicesToMessages(call);
+            return appendChoicesToMessages(state);
           }
-          const updatedCall = JSON.parse(JSON.stringify(call));
-          if (updatedCall.traceCall?.inputs?.messages) {
-            updatedCall.traceCall.inputs.messages =
-              updatedCall.traceCall.inputs.messages.slice(0, messageIndex + 1);
+          const updatedState = JSON.parse(JSON.stringify(state));
+          if (updatedState.traceCall?.inputs?.messages) {
+            updatedState.traceCall.inputs.messages =
+              updatedState.traceCall.inputs.messages.slice(0, messageIndex + 1);
           }
-          return updatedCall;
+          return updatedState;
         }
-        return call;
+        return state;
       });
 
-      const response = await makeCompletionRequest(
-        callIndex,
-        updatedCalls,
-        playgroundStates[callIndex].trackLLMCall
-      );
-      await handleErrorsAndUpdate(response, updatedCalls, callIndex);
+      const response = await makeCompletionRequest(callIndex, updatedStates);
+      await handleErrorsAndUpdate(response, updatedStates, callIndex);
     });
   };
 
@@ -264,7 +242,7 @@ export const PlaygroundChat = ({
             <CircularProgress />
           </Box>
         )}
-        {calls.map((call, idx) => (
+        {playgroundStates.map((state, idx) => (
           <React.Fragment key={idx}>
             {idx > 0 && (
               <Divider
@@ -290,23 +268,22 @@ export const PlaygroundChat = ({
                   left:
                     idx === 0
                       ? '8px'
-                      : `calc(${(idx * 100) / calls.length}% + 8px)`,
-                  right: idx === calls.length - 1 ? '8px' : undefined,
+                      : `calc(${(idx * 100) / playgroundStates.length}% + 8px)`,
+                  right:
+                    idx === playgroundStates.length - 1 ? '8px' : undefined,
                   width:
-                    idx === calls.length - 1
+                    idx === playgroundStates.length - 1
                       ? undefined
-                      : `calc(${100 / calls.length}% - 16px)`,
+                      : `calc(${100 / playgroundStates.length}% - 16px)`,
                   zIndex: 10,
                 }}>
                 <PlaygroundChatTopBar
-                  calls={calls}
                   idx={idx}
                   settingsTab={settingsTab}
                   setSettingsTab={setSettingsTab}
                   setPlaygroundStateField={setPlaygroundStateField}
                   setPlaygroundStates={setPlaygroundStates}
                   playgroundStates={playgroundStates}
-                  setCalls={setCalls}
                   entity={entity}
                   project={project}
                 />
@@ -321,9 +298,9 @@ export const PlaygroundChat = ({
                 }}>
                 <Tailwind>
                   <div className="h-full pb-32">
-                    {call?.traceCall && (
+                    {state.traceCall && (
                       <CallChat
-                        call={call.traceCall}
+                        call={state.traceCall as TraceCallSchema}
                         isPlayground
                         deleteMessage={messageIndex =>
                           deleteMessage(idx, messageIndex)
@@ -360,9 +337,12 @@ export const PlaygroundChat = ({
                   padding: '8px',
                   paddingLeft: '12px',
                   marginX: 'auto',
+                  marginBottom: '16px',
                 }}>
-                {call?.traceCall && (
-                  <PlaygroundCallStats call={call.traceCall} />
+                {state.traceCall.summary && (
+                  <PlaygroundCallStats
+                    call={state.traceCall as TraceCallSchema}
+                  />
                 )}
               </Box>
             </Box>
@@ -431,8 +411,8 @@ const handleUpdateCallWithResponse = (updatedCall: any, response: any) => {
   return {
     ...updatedCall,
     traceCall: {
-      ...updatedCall.traceCall,
-      id: response.weave_call_id ?? updatedCall.traceCall?.id ?? '',
+      ...clearTraceCall(updatedCall.traceCall),
+      id: response.weave_call_id ?? '',
       output: response.response,
     },
   };

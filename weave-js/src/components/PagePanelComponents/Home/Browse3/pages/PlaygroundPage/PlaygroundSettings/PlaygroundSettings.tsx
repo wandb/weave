@@ -1,10 +1,11 @@
+import {Switch} from '@mui/material';
 import Box from '@mui/material/Box';
-import {MOON_250} from '@wandb/weave/common/css/color.styles';
+import {MOON_250, TEAL_500} from '@wandb/weave/common/css/color.styles';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import {Tag} from '@wandb/weave/components/Tag';
-import React from 'react';
+import React, {SetStateAction} from 'react';
 
-import {PlaygroundResponseFormats, PlaygroundState} from '../types';
+import {PlaygroundState} from '../types';
 import {FunctionEditor} from './FunctionEditor';
 import {PlaygroundSlider} from './PlaygroundSlider';
 import {ResponseFormatEditor} from './ResponseFormatEditor';
@@ -12,15 +13,10 @@ import {StopSequenceEditor} from './StopSequenceEditor';
 
 export type PlaygroundSettingsProps = {
   playgroundStates: PlaygroundState[];
-  setPlaygroundStateField: (
-    idx: number,
-    key: keyof PlaygroundState,
-    value:
-      | PlaygroundState[keyof PlaygroundState]
-      | React.SetStateAction<Array<{name: string; [key: string]: any}>>
-      | React.SetStateAction<PlaygroundResponseFormats>
-      | React.SetStateAction<number>
-      | React.SetStateAction<string[]>
+  setPlaygroundStateField: <K extends keyof PlaygroundState>(
+    index: number,
+    field: K,
+    value: SetStateAction<PlaygroundState[K]>
   ) => void;
   settingsTab: number;
   setSettingsTab: (tab: number) => void;
@@ -143,6 +139,40 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 label="n times to run"
                 value={playgroundState.nTimes}
               />
+
+              <Box
+                sx={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}>
+                <span>Track this LLM call with Weave</span>
+                <Switch
+                  checked={playgroundStates[idx].trackLLMCall}
+                  onChange={() =>
+                    setPlaygroundStateField(
+                      idx,
+                      'trackLLMCall',
+                      !playgroundStates[idx].trackLLMCall
+                    )
+                  }
+                  sx={{
+                    '& .MuiSwitch-switchBase.Mui-checked': {
+                      color: TEAL_500,
+                      '&:hover': {
+                        backgroundColor: `${TEAL_500}/[.5]`,
+                      },
+                    },
+                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                      backgroundColor: TEAL_500,
+                    },
+                    '& .MuiSwitch-switchBase.Mui-checked:hover': {
+                      backgroundColor: `${TEAL_500}/[.5]`,
+                    },
+                  }}
+                />
+              </Box>
             </Box>
           </Tabs.Content>
         ))}
