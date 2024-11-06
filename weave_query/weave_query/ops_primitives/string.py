@@ -241,7 +241,7 @@ class String:
         current_locale = locale.getlocale(locale.LC_NUMERIC)  # save the current locale
                 
         # Parse commas and underscores
-        locale.setlocale(locale.LC_NUMERIC, 'en_US.UTF-8')
+        locale.setlocale(locale.LC_NUMERIC, 'en_US')
         try:
             number = locale.atof(self)
         except:
