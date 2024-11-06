@@ -55,7 +55,7 @@ try:
 except ImportError:
     import_failed = True
 
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Generator, Optional, cast
 
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
 
@@ -89,11 +89,11 @@ if not import_failed:
         run_dict = {k: v for k, v in run_dict.items() if v}
         return run_dict
 
-    class WeaveTracer(BaseTracer):
+    class WeaveTracer(BaseTracer):  # pyright: ignore[reportRedeclaration]
         run_inline: bool = True
 
         def __init__(self, **kwargs: Any) -> None:
-            self._call_map: Dict[str, Call] = {}
+            self._call_map: dict[str, Call] = {}
             self.latest_run: Optional[Run] = None
             self.gc = weave_client_context.require_weave_client()
             super().__init__()
@@ -182,7 +182,9 @@ if not import_failed:
                             # Note: this is implemented as a network call - it would be much nice
                             # to refactor `create_call` such that it could accept a parent_id instead
                             # of an entire Parent object.
-                            parent_run = self.gc.get_call(wv_current_run.parent_id)
+                            parent_run = cast(
+                                Call, self.gc.get_call(wv_current_run.parent_id)
+                            )
 
             fn_name = make_pythonic_function_name(run.name)
             complete_op_name = f"langchain.{run.run_type.capitalize()}.{fn_name}"
@@ -223,13 +225,13 @@ if not import_failed:
 
         def on_chat_model_start(
             self,
-            serialized: Dict[str, Any],
-            messages: List[List[BaseMessage]],
+            serialized: dict[str, Any],
+            messages: list[list[BaseMessage]],
             *,
             run_id: UUID,
-            tags: Optional[List[str]] = None,
+            tags: Optional[list[str]] = None,
             parent_run_id: Optional[UUID] = None,
-            metadata: Optional[Dict[str, Any]] = None,
+            metadata: Optional[dict[str, Any]] = None,
             name: Optional[str] = None,
             **kwargs: Any,
         ) -> Run:

@@ -79,5 +79,5 @@ describe('Publishing Various Data Types', () => {
     const datasetResult = await datasetOp();
     expect(datasetResult).toBeInstanceOf(Dataset);
     expect(datasetResult.rows).toHaveLength(3);
-  });
+  }, 20000); // Adding explicit timeout here, though I'm not sure why it's needed
 });

@@ -1,5 +1,5 @@
 import os
-from typing import Generator, List, Tuple
+from typing import Generator
 
 import pytest
 import tiktoken
@@ -357,8 +357,6 @@ def fix_chroma_ci() -> Generator[None, None, None]:
     before_record_request=filter_body,
 )
 def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
-    from typing import List
-
     from langchain.text_splitter import RecursiveCharacterTextSplitter
     from langchain_community.document_loaders import TextLoader
     from langchain_community.vectorstores import Chroma
@@ -393,7 +391,7 @@ def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
         model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
     )
 
-    def format_docs(documents: List[Document]) -> str:
+    def format_docs(documents: list[Document]) -> str:
         return "\n\n".join(doc.page_content for doc in documents)
 
     # Chain
@@ -491,7 +489,7 @@ def test_agent_run_with_tools(
 
     llm_with_tools = llm.bind(tools=functions)
 
-    def _format_chat_history(chat_history: List[Tuple[str, str]]) -> List:
+    def _format_chat_history(chat_history: list[tuple[str, str]]) -> list:
         buffer = []
         for human, ai in chat_history:
             buffer.append(HumanMessage(content=human))
@@ -513,7 +511,7 @@ def test_agent_run_with_tools(
 
     class AgentInput(BaseModel):
         input: str
-        chat_history: List[Tuple[str, str]] = Field(
+        chat_history: list[tuple[str, str]] = Field(
             ...,
             extra={"widget": {"type": "chat", "input": "input", "output": "output"}},
         )
@@ -609,7 +607,7 @@ def test_agent_run_with_function_call(
 
     llm_with_tools = llm.bind(functions=functions)
 
-    def _format_chat_history(chat_history: List[Tuple[str, str]]) -> List:
+    def _format_chat_history(chat_history: list[tuple[str, str]]) -> list:
         buffer = []
         for human, ai in chat_history:
             buffer.append(HumanMessage(content=human))
@@ -631,7 +629,7 @@ def test_agent_run_with_function_call(
 
     class AgentInput(BaseModel):
         input: str
-        chat_history: List[Tuple[str, str]] = Field(
+        chat_history: list[tuple[str, str]] = Field(
             ...,
             extra={"widget": {"type": "chat", "input": "input", "output": "output"}},
         )

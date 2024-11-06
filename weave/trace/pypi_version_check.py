@@ -15,9 +15,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Dict,
     Optional,
-    Tuple,
     Union,
 )
 
@@ -29,7 +27,7 @@ if TYPE_CHECKING:
 
 def check_available(
     current_version: str, module_name: str
-) -> Optional[Dict[str, Optional[str]]]:
+) -> Optional[dict[str, Optional[str]]]:
     """
     Check if there is a new version of the module available on PyPI.
 
@@ -38,7 +36,7 @@ def check_available(
         module_name (str): The name of the module to check for updates.
 
     Returns:
-        Optional[Dict[str, Optional[str]]]: A dictionary containing the upgrade message, yank message, or delete message, or None if no update is available.
+        Optional[dict[str, Optional[str]]]: A dictionary containing the upgrade message, yank message, or delete message, or None if no update is available.
     """
     package_info = _find_available(current_version, module_name)
     if not package_info:
@@ -56,18 +54,11 @@ def check_available(
     )
     delete_message = None
     if deleted:
-        delete_message = "{} version {} has been retired!  Please upgrade.".format(
-            module_name,
-            current_version,
-        )
+        delete_message = f"{module_name} version {current_version} has been retired!  Please upgrade."
     yank_message = None
     if yanked:
-        reason_message = "({})  ".format(yanked_reason) if yanked_reason else ""
-        yank_message = "{} version {} has been recalled!  {}Please upgrade.".format(
-            module_name,
-            current_version,
-            reason_message,
-        )
+        reason_message = f"({yanked_reason})  " if yanked_reason else ""
+        yank_message = f"{module_name} version {current_version} has been recalled!  {reason_message}Please upgrade."
 
     # A new version is available!
     return {
@@ -113,7 +104,7 @@ def _async_call(
 
     def wrapper(
         *args: Any, **kwargs: Any
-    ) -> Union[Tuple[Exception, "threading.Thread"], Tuple[None, "threading.Thread"]]:
+    ) -> Union[tuple[Exception, "threading.Thread"], tuple[None, "threading.Thread"]]:
         thread = threading.Thread(
             target=wrapped_target, args=(q,) + args, kwargs=kwargs
         )
@@ -132,7 +123,7 @@ def _async_call(
 
 def _find_available(
     current_version: str, module_name: str
-) -> Optional[Tuple[str, bool, bool, bool, Optional[str]]]:
+) -> Optional[tuple[str, bool, bool, bool, Optional[str]]]:
     pypi_url = f"https://pypi.org/pypi/{module_name}/json"
     yanked_dict = {}
     try:

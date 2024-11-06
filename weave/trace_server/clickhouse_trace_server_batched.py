@@ -32,12 +32,9 @@ from collections import defaultdict
 from contextlib import contextmanager
 from typing import (
     Any,
-    Dict,
     Iterator,
     Optional,
     Sequence,
-    Set,
-    Tuple,
     Union,
     cast,
 )
@@ -75,7 +72,12 @@ from weave.trace_server.clickhouse_schema import (
 )
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
 from weave.trace_server.emoji_util import detone_emojis
-from weave.trace_server.errors import InsertTooLarge, InvalidRequest, RequestTooLarge
+from weave.trace_server.errors import (
+    InsertTooLarge,
+    InvalidRequest,
+    MissingLLMApiKeyError,
+    RequestTooLarge,
+)
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
@@ -410,8 +412,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _get_refs_to_resolve(
         self, calls: list[dict[str, Any]], expand_columns: list[str]
-    ) -> Dict[tuple[int, str], ri.InternalObjectRef]:
-        refs_to_resolve: Dict[tuple[int, str], ri.InternalObjectRef] = {}
+    ) -> dict[tuple[int, str], ri.InternalObjectRef]:
+        refs_to_resolve: dict[tuple[int, str], ri.InternalObjectRef] = {}
         for i, call in enumerate(calls):
             for col in expand_columns:
                 if col in call:
@@ -607,7 +609,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds: list[str] = []
         object_id_conditions = ["object_id = {object_id: String}"]
-        parameters: Dict[str, Union[str, int]] = {"object_id": req.object_id}
+        parameters: dict[str, Union[str, int]] = {"object_id": req.object_id}
         if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
@@ -825,8 +827,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             limit=req.limit,
             offset=req.offset,
         )
-        for row in rows:
-            yield row
+        yield from rows
 
     def _table_query_stream(
         self,
@@ -883,7 +884,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             yield tsi.TableRowSchema(digest=row[0], val=json.loads(row[1]))
 
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
-        parameters: Dict[str, Any] = {
+        parameters: dict[str, Any] = {
             "project_id": req.project_id,
             "digest": req.digest,
         }
@@ -922,7 +923,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _parsed_refs_read_batch(
         self,
         parsed_refs: ObjRefListType,
-        root_val_cache: Optional[Dict[str, Any]] = None,
+        root_val_cache: Optional[dict[str, Any]] = None,
     ) -> list[Any]:
         # Next, group the refs by project_id
         refs_by_project_id: dict[str, ObjRefListType] = defaultdict(list)
@@ -930,7 +931,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             refs_by_project_id[ref.project_id].append(ref)
 
         # Lookup data for each project, scoped to each project
-        final_result_cache: Dict[str, Any] = {}
+        final_result_cache: dict[str, Any] = {}
 
         def make_ref_cache_key(ref: ri.InternalObjectRef) -> str:
             return ref.uri()
@@ -952,7 +953,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id_scope: str,
         parsed_refs: ObjRefListType,
-        root_val_cache: Optional[Dict[str, Any]],
+        root_val_cache: Optional[dict[str, Any]],
     ) -> list[Any]:
         if root_val_cache is None:
             root_val_cache = {}
@@ -1098,7 +1099,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             or any(r.remaining_extra for r in extra_results)
         ):
             # Resolve any unresolved object refs
-            needed_extra_results: list[Tuple[int, PartialRefResult]] = []
+            needed_extra_results: list[tuple[int, PartialRefResult]] = []
             for i, extra_result in enumerate(extra_results):
                 if extra_result.unresolved_obj_ref is not None:
                     needed_extra_results.append((i, extra_result))
@@ -1122,7 +1123,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             # Resolve any unresolved table refs
             # First batch the table queries by project_id and table digest
-            table_queries: dict[Tuple[str, str], list[Tuple[int, str]]] = {}
+            table_queries: dict[tuple[str, str], list[tuple[int, str]]] = {}
             for i, extra_result in enumerate(extra_results):
                 if extra_result.unresolved_table_ref is not None:
                     table_ref = extra_result.unresolved_table_ref
@@ -1423,11 +1424,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise InvalidRequest(f"No secret name found for model {model_name}")
         api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
         if not api_key:
-            raise InvalidRequest(f"No API key found for model {model_name}")
+            raise MissingLLMApiKeyError(
+                f"No API key {secret_name} found for model {model_name}",
+                api_key_name=secret_name,
+            )
 
         start_time = datetime.datetime.now()
         res = lite_llm_completion(api_key, req.inputs)
         end_time = datetime.datetime.now()
+
+        if not req.track_llm_call:
+            return tsi.CompletionsCreateRes(response=res.response)
 
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
@@ -1462,7 +1469,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             batch_data.append(values)
 
         self._insert_call_batch(batch_data)
-        return res
+
+        return tsi.CompletionsCreateRes(
+            response=res.response, weave_call_id=start_call.id
+        )
 
     # Private Methods
     @property
@@ -1505,7 +1515,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         project_id: str,
         conditions: Optional[list[str]] = None,
         object_id_conditions: Optional[list[str]] = None,
-        parameters: Optional[Dict[str, Any]] = None,
+        parameters: Optional[dict[str, Any]] = None,
         metadata_only: Optional[bool] = False,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
@@ -1668,7 +1678,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         }
         query_result = self._query_stream(query, parameters)
         # Map (object_id, digest) to val_dump
-        object_values: Dict[tuple[str, str], Any] = {}
+        object_values: dict[tuple[str, str], Any] = {}
         for row in query_result:
             (object_id, digest, val_dump) = row
             object_values[(object_id, digest)] = val_dump
@@ -1686,9 +1696,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _query_stream(
         self,
         query: str,
-        parameters: Dict[str, Any],
-        column_formats: Optional[Dict[str, Any]] = None,
-        settings: Optional[Dict[str, Any]] = None,
+        parameters: dict[str, Any],
+        column_formats: Optional[dict[str, Any]] = None,
+        settings: Optional[dict[str, Any]] = None,
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
         if not settings:
@@ -1714,14 +1724,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "summary": summary,
                 },
             )
-            for row in stream:
-                yield row
+            yield from stream
 
     def _query(
         self,
         query: str,
-        parameters: Dict[str, Any],
-        column_formats: Optional[Dict[str, Any]] = None,
+        parameters: dict[str, Any],
+        column_formats: Optional[dict[str, Any]] = None,
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
         parameters = _process_parameters(parameters)
@@ -1743,7 +1752,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         table: str,
         data: Sequence[Sequence[Any]],
         column_names: list[str],
-        settings: Optional[Dict[str, Any]] = None,
+        settings: Optional[dict[str, Any]] = None,
     ) -> QuerySummary:
         try:
             return self.ch_client.insert(
@@ -1842,7 +1851,7 @@ def _any_value_to_dump(
     return json.dumps(value)
 
 
-def _dict_dump_to_dict(val: str) -> Dict[str, Any]:
+def _dict_dump_to_dict(val: str) -> dict[str, Any]:
     res = json.loads(val)
     if not isinstance(res, dict):
         raise ValueError(f"Value is not a dict: {val}")
@@ -1874,7 +1883,7 @@ def _ensure_datetimes_have_tz(
 
 def _nullable_dict_dump_to_dict(
     val: Optional[str],
-) -> Optional[Dict[str, Any]]:
+) -> Optional[dict[str, Any]]:
     return _dict_dump_to_dict(val) if val else None
 
 
@@ -1885,7 +1894,7 @@ def _nullable_any_dump_to_any(
 
 
 def _raw_call_dict_to_ch_call(
-    call: Dict[str, Any],
+    call: dict[str, Any],
 ) -> SelectableCHCallSchema:
     return SelectableCHCallSchema.model_validate(call)
 
@@ -1922,7 +1931,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
 
 
 # Keep in sync with `_ch_call_to_call_schema`. This copy is for performance
-def _ch_call_dict_to_call_schema_dict(ch_call_dict: Dict) -> Dict:
+def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     summary = _nullable_any_dump_to_any(ch_call_dict.get("summary_dump"))
     started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
     ended_at = _ensure_datetimes_have_tz(ch_call_dict.get("ended_at"))
@@ -2007,8 +2016,8 @@ def _end_call_for_insert_to_ch_insertable_end_call(
 
 
 def _process_parameters(
-    parameters: Dict[str, Any],
-) -> Dict[str, Any]:
+    parameters: dict[str, Any],
+) -> dict[str, Any]:
     # Special processing for datetimes! For some reason, the clickhouse connect
     # client truncates the datetime to the nearest second, so we need to convert
     # the datetime to a float which is then converted back to a datetime in the
@@ -2067,7 +2076,7 @@ def find_call_descendants(
             children_map[call.parent_id].append(call.id)
 
     # do DFS to get all descendants
-    def find_all_descendants(root_ids: list[str]) -> Set[str]:
+    def find_all_descendants(root_ids: list[str]) -> set[str]:
         descendants = set()
         stack = root_ids
 
