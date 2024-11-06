@@ -1,9 +1,10 @@
 import warnings
+from collections.abc import Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 from contextvars import Context, copy_context
 from functools import partial, wraps
 from threading import Thread as _Thread
-from typing import Any, Callable, Iterable, Iterator, Optional
+from typing import Any, Callable, Optional
 
 
 class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
