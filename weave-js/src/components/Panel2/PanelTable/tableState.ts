@@ -1,5 +1,6 @@
 import {
   allObjPaths,
+  canSortType,
   constFunction,
   ConstNode,
   constNodeUnsafe,
@@ -687,6 +688,16 @@ export async function disableGroupByCol(
 ) {
   const colIds = _.isArray(colId) ? colId : [colId];
   const groupBy = ts.groupBy;
+
+  // (WB-16067)
+  // We may try to sort on aggregated columns after ungrouping
+  // To prevent this, disable sorting on all the columns and re-enable
+  // after the ungroup
+  const initiallySortedCols = _.clone(ts.sort);
+  ts.sort.forEach(sortObj => {
+    ts = disableSortByCol(ts, sortObj.columnId);
+  });
+
   ts = produce(ts, draft => {
     draft.autoColumns = false;
     for (const cid of colIds) {
@@ -701,9 +712,15 @@ export async function disableGroupByCol(
     }
   });
   ts = await refreshSelectFunctions(ts, inputArrayNode, weave, stack);
-  if (ts.sort.find(s => s.columnId === colId) !== undefined) {
-    ts = disableSortByCol(ts, colId);
-  }
+
+  initiallySortedCols.forEach(sortObj => {
+    if (
+      sortObj.columnId !== colId &&
+      canSortType(ts.columnSelectFunctions[sortObj.columnId].type)
+    ) {
+      ts = enableSortByCol(ts, sortObj.columnId, sortObj.dir === 'asc');
+    }
+  });
   return ts;
 }
 
