@@ -75,10 +75,10 @@ def create(
         max_output_tokens = kwargs.pop("max_tokens")
         temperature = kwargs.pop("temperature", None)
         _ = kwargs.pop("model")  # model is baked in the client
-        kwargs["generation_config"] = dict(
-            max_output_tokens=max_output_tokens,
-            temperature=temperature,
-        )
+        kwargs["generation_config"] = {
+            "max_output_tokens": max_output_tokens,
+            "temperature": temperature,
+        }
     return client.chat.completions.create(*args, **kwargs)
 
 
