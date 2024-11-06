@@ -56,19 +56,6 @@ def do_llm_judge_action(
         )
     )
 
-    # client = OpenAI()
-    # # Silly hack to get around issue in tests:
-    # create = client.chat.completions.create
-    # if hasattr(create, "resolve_fn"):
-    #     create = partial(create.resolve_fn, self=client.chat.completions)
-    # completion = create(
-    #     model=model,
-    #     messages=[
-    #         {"role": "system", "content": system_prompt},
-    #         {"role": "user", "content": json.dumps(args)},
-    #     ],
-    #     response_format=response_format,
-    # )
     content = (
         completion.response.get("choices", [{}])[0].get("message", {}).get("content")
     )
