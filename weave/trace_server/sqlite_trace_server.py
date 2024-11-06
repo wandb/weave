@@ -263,7 +263,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         non_wildcarded_names.append(name)
 
                 if non_wildcarded_names:
-                    in_expr = ", ".join((f"'{x}'" for x in non_wildcarded_names))
+                    in_expr = ", ".join(f"'{x}'" for x in non_wildcarded_names)
                     or_conditions += [f"op_name IN ({', '.join({in_expr})})"]
 
                 for name_ndx, name in enumerate(wildcarded_names):
@@ -284,18 +284,18 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     or_conditions.append(f"output_refs LIKE '%{ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.parent_ids:
-                in_expr = ", ".join((f"'{x}'" for x in filter.parent_ids))
+                in_expr = ", ".join(f"'{x}'" for x in filter.parent_ids)
                 conds += [f"parent_id IN ({in_expr})"]
             if filter.trace_ids:
-                in_expr = ", ".join((f"'{x}'" for x in filter.trace_ids))
+                in_expr = ", ".join(f"'{x}'" for x in filter.trace_ids)
                 conds += [f"trace_id IN ({in_expr})"]
             if filter.call_ids:
-                in_expr = ", ".join((f"'{x}'" for x in filter.call_ids))
+                in_expr = ", ".join(f"'{x}'" for x in filter.call_ids)
                 conds += [f"id IN ({in_expr})"]
             if filter.trace_roots_only:
                 conds.append("parent_id IS NULL")
             if filter.wb_run_ids:
-                in_expr = ", ".join((f"'{x}'" for x in filter.wb_run_ids))
+                in_expr = ", ".join(f"'{x}'" for x in filter.wb_run_ids)
                 conds += [f"wb_run_id IN ({in_expr})"]
 
         if req.query:
