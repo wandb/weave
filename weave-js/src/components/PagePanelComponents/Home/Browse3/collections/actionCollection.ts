@@ -34,11 +34,11 @@ export const ActionConfigSchema = z.discriminatedUnion('action_type', [
 ]);
 export type ActionConfigType = z.infer<typeof ActionConfigSchema>;
 
-export const ConfiguredActionSchema = z.object({
+export const AxctionDefinitionSchema = z.object({
   name: z.string(),
   config: ActionConfigSchema,
 });
-export type ConfiguredActionType = z.infer<typeof ConfiguredActionSchema>;
+export type AxctionDefinitionType = z.infer<typeof AxctionDefinitionSchema>;
 
 export const ActionDispatchFilterSchema = z.object({
   op_name: z.string(),

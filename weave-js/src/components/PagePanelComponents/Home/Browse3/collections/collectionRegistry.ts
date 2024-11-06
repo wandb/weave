@@ -1,9 +1,9 @@
 import {
   ActionDispatchFilterSchema,
-  ConfiguredActionSchema,
+  AxctionDefinitionSchema,
 } from './actionCollection';
 
 export const collectionRegistry = {
-  ConfiguredAction: ConfiguredActionSchema,
+  AxctionDefinition: AxctionDefinitionSchema,
   ActionDispatchFilter: ActionDispatchFilterSchema,
 };

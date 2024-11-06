@@ -10,8 +10,8 @@ import React, {FC, useEffect, useState} from 'react';
 import {z} from 'zod';
 
 import {
-  ConfiguredActionSchema,
-  ConfiguredActionType,
+  AxctionDefinitionSchema,
+  AxctionDefinitionType,
   ConfiguredLlmJudgeActionSchema,
   ConfiguredWordCountActionSchema,
 } from '../../collections/actionCollection';
@@ -73,7 +73,7 @@ const knownBuiltinActions = [
 interface NewBuiltInActionScorerModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (newAction: ConfiguredActionType) => void;
+  onSave: (newAction: AxctionDefinitionType) => void;
   initialTemplate: string;
 }
 
@@ -98,7 +98,7 @@ export const NewBuiltInActionScorerModal: FC<
   }, [initialTemplate]);
 
   const handleSave = () => {
-    const newAction = ConfiguredActionSchema.parse({
+    const newAction = AxctionDefinitionSchema.parse({
       name,
       config: knownBuiltinActions[selectedActionIndex].friendly.convert(
         config as any
