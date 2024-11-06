@@ -439,7 +439,7 @@ def _do_call(
                 op, call, *pargs.args, __should_raise=__should_raise, **pargs.kwargs
             )
             if inspect.iscoroutine(execute_result):
-                raise Exception(
+                raise TypeError(
                     "Internal error: Expected `_execute_call` to return a sync result"
                 )
             execute_result = cast(tuple[Any, "Call"], execute_result)
@@ -482,7 +482,7 @@ async def _do_call_async(
                 op, call, *args, __should_raise=__should_raise, **kwargs
             )
             if not inspect.iscoroutine(execute_result):
-                raise Exception(
+                raise TypeError(
                     "Internal error: Expected `_execute_call` to return a coroutine"
                 )
             execute_result = cast(

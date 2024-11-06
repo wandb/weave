@@ -83,6 +83,10 @@ from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTrace
 ALLOW_MIXED_PROJECT_REFS = False
 
 
+class OpNameError(ValueError):
+    """Raised when an op name is invalid."""
+
+
 def dataclasses_asdict_one_level(obj: Any) -> dict[str, Any]:
     # dataclasses.asdict is recursive. We don't want that when json encoding
     return {f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}
@@ -205,7 +209,7 @@ class Call:
             self.__dict__["_op_name"] = self._op_name.result()
 
         if not isinstance(self._op_name, str):
-            raise Exception(f"Call op_name is not a string: {self._op_name}")
+            raise OpNameError(f"Call op_name is not a string: {self._op_name}")
 
         return self._op_name
 
