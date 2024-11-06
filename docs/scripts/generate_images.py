@@ -92,7 +92,7 @@ async def generate_screenshot_from_browser(
             logging.info(f"Screenshot captured successfully: {output_path}")
 
         except Exception as e:
-            logging.error(f"Error capturing screenshot for {url}: {str(e)}")
+            logging.exception(f"Error capturing screenshot for {url}: {str(e)}")
             raise
 
         finally:
@@ -114,7 +114,7 @@ def generate_screenshot(screenshot_spec):
             )
         )
     except Exception as e:
-        logging.error(f"Failed to generate screenshot: {str(e)}")
+        logging.exception(f"Failed to generate screenshot: {str(e)}")
 
 
 def generate_screenshots_from_spec(spec_filepath):
@@ -122,7 +122,7 @@ def generate_screenshots_from_spec(spec_filepath):
         with open(spec_filepath) as f:
             spec = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        logging.error(f"Error reading or parsing spec file: {str(e)}")
+        logging.exception(f"Error reading or parsing spec file: {str(e)}")
         return
 
     with ThreadPoolExecutor() as executor:
