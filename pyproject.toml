@@ -167,20 +167,16 @@ select = [
   "F401",   # https://docs.astral.sh/ruff/rules/unused-import/
   "TID252", # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
   "UP",     # https://docs.astral.sh/ruff/rules/#pyupgrade-up
-  "C409",   # https://docs.astral.sh/ruff/rules/unnecessary-literal-within-tuple-call/
-  "C400",   # https://docs.astral.sh/ruff/rules/unnecessary-generator-list/
-  "C419",   # https://docs.astral.sh/ruff/rules/unnecessary-comprehension-in-call/
-  "C408",   # https://docs.astral.sh/ruff/rules/unnecessary-collection-call/
-  "C403",   # https://docs.astral.sh/ruff/rules/unnecessary-list-comprehension-set/
-  "C416",   # https://docs.astral.sh/ruff/rules/unnecessary-comprehension/
-  "C417",   # https://docs.astral.sh/ruff/rules/unnecessary-map/
-  "C405",   # https://docs.astral.sh/ruff/rules/unnecessary-literal-set/
+  "C",      # https://docs.astral.sh/ruff/rules/#convention-c
 ]
 ignore = [
   # we use Google style
   "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/
   "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/
   "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/
+
+  # This is a more involved change, so disabling for now.
+  "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
 ]
 exclude = ["weave_query"]
 
