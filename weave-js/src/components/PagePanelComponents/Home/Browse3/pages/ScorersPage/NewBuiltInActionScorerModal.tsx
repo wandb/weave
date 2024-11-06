@@ -9,9 +9,9 @@ import _ from 'lodash';
 import React, {FC, useEffect, useState} from 'react';
 import {z} from 'zod';
 
-import {ConfiguredLlmJudgeActionSchema} from '../../collections/actionCollection';
 import {DynamicConfigForm} from '../../DynamicConfigForm';
 import {ReusableDrawer} from '../../ReusableDrawer';
+import {LlmJudgeActionSpecSchema} from '../wfReactInterface/baseObjectClasses.zod';
 import {
   ActionDefinition,
   ActionDefinitionSchema,
@@ -24,14 +24,14 @@ import {
 const knownBuiltinActions = [
   {
     name: 'LLM Judge',
-    actionSchema: ConfiguredLlmJudgeActionSchema,
+    actionSchema: LlmJudgeActionSpecSchema,
     friendly: {
       schema: ConfiguredLlmJudgeActionFriendlySchema,
       convert: (
         data: z.infer<typeof ConfiguredLlmJudgeActionFriendlySchema>
-      ): z.infer<typeof ConfiguredLlmJudgeActionSchema> => {
+      ): z.infer<typeof LlmJudgeActionSpecSchema> => {
         let responseFormat: z.infer<
-          typeof ConfiguredLlmJudgeActionSchema
+          typeof LlmJudgeActionSpecSchema
         >['response_schema'];
         if (data.response_schema.type === 'simple') {
           responseFormat = {type: data.response_schema.schema};
@@ -53,20 +53,6 @@ const knownBuiltinActions = [
       },
     },
   },
-  // {
-  //   name: 'Word Count',
-  //   actionSchema: ConfiguredWordCountActionSchema,
-  //   friendly: {
-  //     schema: z.object({}),
-  //     convert: (
-  //       data: z.infer<typeof ConfiguredWordCountActionSchema>
-  //     ): z.infer<typeof ConfiguredWordCountActionSchema> => {
-  //       return {
-  //         action_type: 'wordcount',
-  //       };
-  //     },
-  //   },
-  // },
 ];
 
 interface NewBuiltInActionScorerModalProps {

@@ -1,31 +1,19 @@
 import * as z from 'zod';
 
-// BEGINNING OF CUSTOM CODE /////
-// Sadly, the json-schema to zod converter doesn't support discriminator
-// so we have to define the schemas manually. If you run the generator
-// make sure to review the changes to this section.
-export const LlmJudgeActionSpecSchema = z.object({
-  action_type: z.enum(['llm_judge']),
-  model: z.enum(['gpt-4o', 'gpt-4o-mini']),
-  prompt: z.string(),
-  response_schema: z.record(z.string(), z.any()),
-});
-export type LlmJudgeActionSpec = z.infer<typeof LlmJudgeActionSpecSchema>;
+export const ActionTypeSchema = z.enum(['contains_words', 'llm_judge']);
+export type ActionType = z.infer<typeof ActionTypeSchema>;
 
-export const ContainsWordsActionSpecSchema = z.object({
-  action_type: z.enum(['contains_words']),
-  target_words: z.array(z.string()),
-});
-export type ContainsWordsActionSpec = z.infer<
-  typeof ContainsWordsActionSpecSchema
->;
+export const ModelSchema = z.enum(['gpt-4o', 'gpt-4o-mini']);
+export type Model = z.infer<typeof ModelSchema>;
 
-export const SpecSchema = z.discriminatedUnion('action_type', [
-  LlmJudgeActionSpecSchema,
-  ContainsWordsActionSpecSchema,
-]);
+export const SpecSchema = z.object({
+  action_type: ActionTypeSchema.optional(),
+  model: ModelSchema.optional(),
+  prompt: z.string().optional(),
+  response_schema: z.record(z.string(), z.any()).optional(),
+  target_words: z.array(z.string()).optional(),
+});
 export type Spec = z.infer<typeof SpecSchema>;
-// END OF CUSTOM CODE /////
 
 export const LeaderboardColumnSchema = z.object({
   evaluation_object_ref: z.string(),
