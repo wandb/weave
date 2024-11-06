@@ -458,7 +458,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         query_result = cursor.fetchall()
         calls = []
         for row in query_result:
-            call_dict = {k: v for k, v in zip(select_columns, row)}
+            call_dict = dict(zip(select_columns, row))
             # convert json dump fields into json
             for json_field in ["attributes", "summary", "inputs", "output"]:
                 if call_dict.get(json_field):
