@@ -16,12 +16,14 @@ class PydanticScorer(Scorer):
         if isinstance(output, str):
             try:
                 self.model.model_validate_json(output)
-                return {"valid_pydantic": True}
             except ValidationError:
                 return {"valid_pydantic": False}
+            else:
+                return {"valid_pydantic": True}
         else:
             try:
                 self.model.model_validate(output)
-                return {"valid_pydantic": True}
             except ValidationError:
                 return {"valid_pydantic": False}
+            else:
+                return {"valid_pydantic": True}

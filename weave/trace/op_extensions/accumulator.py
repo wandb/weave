@@ -120,13 +120,14 @@ class _IteratorWrapper(Generic[V]):
                 if get_raise_on_captured_errors():
                     raise
                 log_once(logger.error, ON_YIELD_MSG.format(traceback.format_exc()))
-            return value
         except (StopIteration, StopAsyncIteration) as e:
             self._call_on_close_once()
             raise
         except Exception as e:
             self._call_on_error_once(e)
             raise
+        else:
+            return value
 
     def __aiter__(self) -> "_IteratorWrapper":
         return self
@@ -158,13 +159,14 @@ class _IteratorWrapper(Generic[V]):
                 if get_raise_on_captured_errors():
                     raise
                 log_once(logger.error, ON_AYIELD_MSG.format(traceback.format_exc()))
-            return value
         except (StopAsyncIteration, StopIteration) as e:
             self._call_on_close_once()
             raise StopAsyncIteration
         except Exception as e:
             self._call_on_error_once(e)
             raise
+        else:
+            return value
 
     def __del__(self) -> None:
         self._call_on_close_once()
