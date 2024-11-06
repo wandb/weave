@@ -12,7 +12,7 @@ export const ConfiguredLlmJudgeActionSchema = z.object({
   action_type: z.literal('llm_judge'),
   model: z.enum(['gpt-4o-mini', 'gpt-4o']).default('gpt-4o-mini'),
   prompt: z.string(),
-  response_format: z.discriminatedUnion('type', [
+  response_schema: z.discriminatedUnion('type', [
     SimpleJsonResponseFormat,
     ObjectJsonResponseFormat,
   ]),

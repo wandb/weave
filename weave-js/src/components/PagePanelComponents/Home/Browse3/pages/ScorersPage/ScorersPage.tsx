@@ -1,5 +1,4 @@
 import {Box} from '@material-ui/core';
-import {Alert} from '@mui/material';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import {Button} from '@wandb/weave/components/Button/Button';
@@ -20,16 +19,18 @@ export const ScorersPage: React.FC<{
   return (
     <SimplePageLayoutWithHeader
       title="Scorers"
-      // hideTabsIfSingle
       tabs={[
         {
-          label: 'Built-In Actions',
+          // It is true that this panel can show more than LLM Judges, but the
+          // branding is better
+          label: 'Configurable LLM Judges',
           content: <OnlineScorersTab entity={entity} project={project} />,
         },
-        {
-          label: 'Human Review',
-          content: <HumanScorersTab entity={entity} project={project} />,
-        },
+        // This is a placeholder for Griffin's annotation column manager section
+        // {
+        //   label: 'Human Review',
+        //   content: <HumanScorersTab entity={entity} project={project} />,
+        // },
         {
           label: 'Code Scorers',
           content: <CodeScorersTab entity={entity} project={project} />,
@@ -53,26 +54,6 @@ const CodeScorersTab: React.FC<{
       }}
     />
   );
-};
-
-const HumanScorersTab: React.FC<{
-  entity: string;
-  project: string;
-}> = ({entity, project}) => {
-  return (
-    <Box sx={{p: 3}}>
-      <Alert severity="info">Human Review coming soon</Alert>
-    </Box>
-  );
-  // return (
-  //   <FilterableObjectVersionsTable
-  //     entity={entity}
-  //     project={project}
-  //     initialFilter={{
-  //       baseObjectClass: 'PLACEHOLDER_FOR_COLUMN_CONFIG',
-  //     }}
-  //   />
-  // );
 };
 
 const OnlineScorersTab: React.FC<{

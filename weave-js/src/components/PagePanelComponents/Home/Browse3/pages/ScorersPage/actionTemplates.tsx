@@ -19,7 +19,7 @@ const ResponseFormatSchema = z.discriminatedUnion('type', [
 export const ConfiguredLlmJudgeActionFriendlySchema = z.object({
   model: z.enum(['gpt-4o-mini', 'gpt-4o']).default('gpt-4o-mini'),
   prompt: z.string(),
-  response_format: ResponseFormatSchema,
+  response_schema: ResponseFormatSchema,
 });
 type ConfiguredLlmJudgeActionFriendlyType = z.infer<
   typeof ConfiguredLlmJudgeActionFriendlySchema
@@ -34,7 +34,7 @@ export const actionTemplates: Array<{
     type: {
       model: 'gpt-4o-mini',
       prompt: 'Is the output relevant to the input?',
-      response_format: {
+      response_schema: {
         type: 'simple',
         schema: 'boolean',
       },
@@ -46,7 +46,7 @@ export const actionTemplates: Array<{
       model: 'gpt-4o-mini',
       prompt:
         'Given the input and output, and your knowledge of the world, is the output correct?',
-      response_format: {
+      response_schema: {
         type: 'structured',
         schema: {
           is_correct: 'boolean',

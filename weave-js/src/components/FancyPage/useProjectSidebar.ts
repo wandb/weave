@@ -158,6 +158,13 @@ export const useProjectSidebar = (
             iconName: IconNames.BenchmarkSquare,
           },
           {
+            type: 'button' as const,
+            name: 'Scorers',
+            slug: 'weave/scorers',
+            isShown: isWeaveOnly,
+            iconName: IconNames.TypeNumberAlt,
+          },
+          {
             type: 'divider' as const,
             key: 'dividerWithinWeave-2',
             isShown: isWeaveOnly,
@@ -182,13 +189,6 @@ export const useProjectSidebar = (
             slug: 'weave/datasets',
             isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.Table,
-          },
-          {
-            type: 'button' as const,
-            name: 'Scorers',
-            slug: 'weave/scorers',
-            isShown: showWeaveSidebarItems || isShowAll,
-            iconName: IconNames.TypeNumberAlt,
           },
           {
             type: 'divider' as const,
@@ -218,7 +218,12 @@ export const useProjectSidebar = (
             key: 'moreWeave',
             isShown: isShowAll,
             // iconName: IconNames.OverflowHorizontal,
-            menu: ['weave/leaderboards', 'weave/operations', 'weave/objects'],
+            menu: [
+              'weave/leaderboards',
+              'weave/scorers',
+              'weave/operations',
+              'weave/objects',
+            ],
           },
         ];
 

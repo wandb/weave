@@ -32,13 +32,13 @@ const knownBuiltinActions = [
       ): z.infer<typeof ConfiguredLlmJudgeActionSchema> => {
         let responseFormat: z.infer<
           typeof ConfiguredLlmJudgeActionSchema
-        >['response_format'];
-        if (data.response_format.type === 'simple') {
-          responseFormat = {type: data.response_format.schema};
+        >['response_schema'];
+        if (data.response_schema.type === 'simple') {
+          responseFormat = {type: data.response_schema.schema};
         } else {
           responseFormat = {
             type: 'object',
-            properties: _.mapValues(data.response_format.schema, value => ({
+            properties: _.mapValues(data.response_schema.schema, value => ({
               type: value as 'boolean' | 'number' | 'string',
             })),
             additionalProperties: false,
@@ -48,7 +48,7 @@ const knownBuiltinActions = [
           action_type: 'llm_judge',
           model: data.model,
           prompt: data.prompt,
-          response_format: responseFormat,
+          response_schema: responseFormat,
         };
       },
     },
@@ -99,7 +99,7 @@ export const NewBuiltInActionScorerModal: FC<
   const handleSave = () => {
     const newAction = ActionDefinitionSchema.parse({
       name,
-      config: knownBuiltinActions[selectedActionIndex].friendly.convert(
+      spec: knownBuiltinActions[selectedActionIndex].friendly.convert(
         config as any
       ),
     });
