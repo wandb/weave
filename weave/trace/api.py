@@ -4,7 +4,8 @@ import contextlib
 import os
 import threading
 import time
-from typing import Any, Iterator, Optional, Union
+from collections.abc import Iterator
+from typing import Any, Optional, Union
 
 # TODO: type_serializers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.

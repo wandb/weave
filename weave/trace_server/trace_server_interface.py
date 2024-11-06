@@ -1,6 +1,7 @@
 import datetime
+from collections.abc import Iterator
 from enum import Enum
-from typing import Any, Iterator, Literal, Optional, Protocol, Union
+from typing import Any, Literal, Optional, Protocol, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict

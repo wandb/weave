@@ -1,7 +1,8 @@
 import io
 import json
 import logging
-from typing import Any, Iterator, Optional, Union, cast
+from collections.abc import Iterator
+from typing import Any, Optional, Union, cast
 
 import tenacity
 from pydantic import BaseModel, ValidationError

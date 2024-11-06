@@ -236,7 +236,7 @@ class EasyPrompt(UserList, Prompt):
     # TODO: Any should be Dataset but there is a circular dependency issue
     def bind_rows(self, dataset: Union[list[dict], Any]) -> list["Prompt"]:
         rows = dataset if isinstance(dataset, list) else dataset.rows
-        bound: list["Prompt"] = []
+        bound: list[Prompt] = []
         for row in rows:
             bound.append(self.copy().bind(row))
         return bound
@@ -411,7 +411,7 @@ class EasyPrompt(UserList, Prompt):
     @staticmethod
     def load_file(filepath: Union[str, Path]) -> "Prompt":
         expanded_path = os.path.expanduser(str(filepath))
-        with open(expanded_path, "r") as f:
+        with open(expanded_path) as f:
             return EasyPrompt.load(f)
 
     def dump(self, fp: IO) -> None:

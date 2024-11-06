@@ -3,13 +3,11 @@ import logging
 import sys
 import traceback
 import weakref
+from collections.abc import AsyncIterator, Generator, Iterator
 from typing import (
     Any,
-    AsyncIterator,
     Callable,
-    Generator,
     Generic,
-    Iterator,
     Optional,
     TypeVar,
     Union,

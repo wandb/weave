@@ -1,6 +1,7 @@
 import abc
 import typing
-from typing import Callable, Iterator, TypeVar
+from collections.abc import Iterator
+from typing import Callable, TypeVar
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_converter import (

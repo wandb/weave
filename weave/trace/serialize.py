@@ -1,7 +1,8 @@
 import logging
 import typing
+from collections.abc import Sequence
 from types import CoroutineType
-from typing import Any, Optional, Sequence
+from typing import Any, Optional
 
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord

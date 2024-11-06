@@ -3,9 +3,10 @@ import datetime
 import platform
 import re
 import sys
+from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
-from typing import Any, Callable, Iterator, Optional, Sequence, Union, cast
+from typing import Any, Callable, Optional, Union, cast
 
 import pydantic
 from requests import HTTPError

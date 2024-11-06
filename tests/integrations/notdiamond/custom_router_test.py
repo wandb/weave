@@ -42,7 +42,6 @@ def preference_id():
     try:
         with open(
             "integrations/notdiamond/cassettes/custom_router_test/test_custom_router_train_router.yaml",
-            "r",
         ) as file:
             cassette = yaml.safe_load(file)
 

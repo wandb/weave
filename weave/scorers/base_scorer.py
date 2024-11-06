@@ -1,6 +1,7 @@
 import inspect
+from collections.abc import Sequence
 from numbers import Number
-from typing import Any, Callable, Optional, Sequence, Union
+from typing import Any, Callable, Optional, Union
 
 import numpy as np
 from pydantic import BaseModel, Field

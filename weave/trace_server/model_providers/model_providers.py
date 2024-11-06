@@ -31,7 +31,7 @@ def read_model_to_provider_info_map(
 ) -> dict[str, LLMModelProviderInfo]:
     full_path = os.path.join(os.path.dirname(__file__), file_name)
     try:
-        with open(full_path, "r") as f:
+        with open(full_path) as f:
             return json.load(f)
     except Exception as e:
         logger.error(
