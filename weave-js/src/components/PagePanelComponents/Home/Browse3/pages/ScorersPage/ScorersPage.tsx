@@ -35,7 +35,7 @@ export const ScorersPage: React.FC<{
         //   content: <HumanScorersTab entity={entity} project={project} />,
         // },
         {
-          label: 'Code Scorers',
+          label: 'Programmatic Scorers',
           content: <CodeScorersTab entity={entity} project={project} />,
         },
       ]}
