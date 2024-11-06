@@ -30,7 +30,7 @@ def test_objs_query_filter_object_ids(client: WeaveClient):
         )
     )
     assert len(res.objs) == 20
-    assert all([obj.object_id in ["obj_0", "obj_1"] for obj in res.objs])
+    assert all(obj.object_id in ["obj_0", "obj_1"] for obj in res.objs)
 
 
 def test_objs_query_filter_is_op(client: WeaveClient):
@@ -60,8 +60,8 @@ def test_objs_query_filter_latest_only(client: WeaveClient):
         )
     )
     assert len(res.objs) == 10
-    assert all([obj.is_latest for obj in res.objs])
-    assert all([obj.val["j"] == 9 for obj in res.objs])
+    assert all(obj.is_latest for obj in res.objs)
+    assert all(obj.val["j"] == 9 for obj in res.objs)
 
 
 def test_objs_query_filter_limit_offset_sort_by_created_at(client: WeaveClient):
@@ -77,7 +77,7 @@ def test_objs_query_filter_limit_offset_sort_by_created_at(client: WeaveClient):
         )
     )
     assert len(res.objs) == 3
-    assert all([obj.is_latest for obj in res.objs])
+    assert all(obj.is_latest for obj in res.objs)
     assert res.objs[0].val["j"] == 9
     assert res.objs[0].val["i"] == 4
     assert res.objs[1].val["j"] == 9
@@ -95,7 +95,7 @@ def test_objs_query_filter_limit_offset_sort_by_created_at(client: WeaveClient):
         )
     )
     assert len(res.objs) == 3
-    assert all([obj.is_latest for obj in res.objs])
+    assert all(obj.is_latest for obj in res.objs)
     assert res.objs[0].val["j"] == 9
     assert res.objs[0].val["i"] == 5
     assert res.objs[1].val["j"] == 9
@@ -117,7 +117,7 @@ def test_objs_query_filter_limit_offset_sort_by_object_id(client: WeaveClient):
         )
     )
     assert len(res.objs) == 3
-    assert all([obj.is_latest for obj in res.objs])
+    assert all(obj.is_latest for obj in res.objs)
     assert res.objs[0].val["j"] == 9
     assert res.objs[0].val["i"] == 4
     assert res.objs[1].val["j"] == 9
@@ -135,7 +135,7 @@ def test_objs_query_filter_limit_offset_sort_by_object_id(client: WeaveClient):
         )
     )
     assert len(res.objs) == 3
-    assert all([obj.is_latest for obj in res.objs])
+    assert all(obj.is_latest for obj in res.objs)
     assert res.objs[0].val["j"] == 9
     assert res.objs[0].val["i"] == 5
     assert res.objs[1].val["j"] == 9
