@@ -194,7 +194,7 @@ export const browse2Context = {
     throw new Error('Not implemented');
   },
 
-  metricsUIUrl: (entityName: string, projectName: string) => {
+  scorersUIUrl: (entityName: string, projectName: string) => {
     throw new Error('Not implemented');
   },
   leaderboardsUIUrl: (
@@ -435,8 +435,8 @@ export const browse3ContextGen = (
       )}${metricsPart}`;
     },
 
-    metricsUIUrl: (entityName: string, projectName: string) => {
-      return `${projectRoot(entityName, projectName)}/metrics`;
+    scorersUIUrl: (entityName: string, projectName: string) => {
+      return `${projectRoot(entityName, projectName)}/scorers`;
     },
 
     leaderboardsUIUrl: (
@@ -534,7 +534,7 @@ type RouteType = {
     metrics: Record<string, boolean> | null
   ) => string;
 
-  metricsUIUrl: (entityName: string, projectName: string) => string;
+  scorersUIUrl: (entityName: string, projectName: string) => string;
 
   leaderboardsUIUrl: (
     entityName: string,
@@ -655,8 +655,8 @@ const useMakePeekingRouter = (): RouteType => {
         baseContext.compareEvaluationsUri(...args)
       );
     },
-    metricsUIUrl: (...args: Parameters<typeof baseContext.metricsUIUrl>) => {
-      return setSearchParam(PEEK_PARAM, baseContext.metricsUIUrl(...args));
+    scorersUIUrl: (...args: Parameters<typeof baseContext.scorersUIUrl>) => {
+      return setSearchParam(PEEK_PARAM, baseContext.scorersUIUrl(...args));
     },
     leaderboardsUIUrl: (
       ...args: Parameters<typeof baseContext.leaderboardsUIUrl>
