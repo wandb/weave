@@ -1,6 +1,6 @@
 from typing import Any, Literal, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from weave.trace_server.interface.base_object_classes import base_object_def
 
@@ -30,4 +30,4 @@ ActionSpecType = Union[
 class ActionDefinition(base_object_def.BaseObject):
     # Pyright doesn't like this override
     # name: str
-    spec: ActionSpecType
+    spec: ActionSpecType = Field(..., discriminator="action_type")
