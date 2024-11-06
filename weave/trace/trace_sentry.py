@@ -15,12 +15,7 @@ import functools
 import os
 import site
 import sys
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, Union
-
-if sys.version_info >= (3, 8):
-    from typing import Literal
-else:
-    from typing_extensions import Literal
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Union
 
 if TYPE_CHECKING:
     from sentry_sdk._types import ExcInfo
@@ -38,7 +33,7 @@ def _safe_noop(func: Callable) -> Callable:
     """Decorator to ensure that Sentry methods do nothing if disabled and don't raise."""
 
     @functools.wraps(func)
-    def wrapper(self: Type["Sentry"], *args: Any, **kwargs: Any) -> Any:
+    def wrapper(self: type["Sentry"], *args: Any, **kwargs: Any) -> Any:
         if self._disabled:
             return None
         try:
@@ -178,7 +173,7 @@ class Sentry:
     @_safe_noop
     def configure_scope(
         self,
-        tags: Optional[Dict[str, Any]] = None,
+        tags: Optional[dict[str, Any]] = None,
     ) -> None:
         """Configure the Sentry scope for the current thread.
 

@@ -1,7 +1,7 @@
 # Clickhouse Trace Server Manager
 import logging
 import os
-import typing
+from typing import Optional
 
 from clickhouse_connect.driver.client import Client as CHClient
 
@@ -22,7 +22,7 @@ class ClickHouseTraceServerMigrator:
         self._initialize_migration_db()
 
     def apply_migrations(
-        self, target_db: str, target_version: typing.Optional[int] = None
+        self, target_db: str, target_version: Optional[int] = None
     ) -> None:
         status = self._get_migration_status(target_db)
         logger.info(f"""`{target_db}` migration status: {status}""")
@@ -67,7 +67,7 @@ class ClickHouseTraceServerMigrator:
         """
         )
 
-    def _get_migration_status(self, db_name: str) -> typing.Dict:
+    def _get_migration_status(self, db_name: str) -> dict:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
         select_columns = ", ".join(column_names)
         query = f"""
@@ -90,10 +90,10 @@ class ClickHouseTraceServerMigrator:
 
     def _get_migrations(
         self,
-    ) -> typing.Dict[int, typing.Dict[str, typing.Optional[str]]]:
+    ) -> dict[int, dict[str, Optional[str]]]:
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_files = os.listdir(migration_dir)
-        migration_map: typing.Dict[int, typing.Dict[str, typing.Optional[str]]] = {}
+        migration_map: dict[int, dict[str, Optional[str]]] = {}
         max_version = 0
         for file in migration_files:
             if not file.endswith(".up.sql") and not file.endswith(".down.sql"):
@@ -143,9 +143,9 @@ class ClickHouseTraceServerMigrator:
     def _determine_migrations_to_apply(
         self,
         current_version: int,
-        migration_map: typing.Dict,
-        target_version: typing.Optional[int] = None,
-    ) -> typing.List[typing.Tuple[int, str]]:
+        migration_map: dict,
+        target_version: Optional[int] = None,
+    ) -> list[tuple[int, str]]:
         if target_version is None:
             target_version = len(migration_map)
             # Do not run down migrations if not explicitly requesting target_version
