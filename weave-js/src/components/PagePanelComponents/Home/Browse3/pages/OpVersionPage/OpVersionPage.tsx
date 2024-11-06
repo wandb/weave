@@ -20,7 +20,6 @@ import {TabUseOp} from '../TabUseOp';
 import {useWFHooks} from '../wfReactInterface/context';
 import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {OpVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {OpOnlineScorersTab} from './OpOnlineScorersTab';
 
 export const OpVersionPage: React.FC<{
   entity: string;
@@ -132,10 +131,6 @@ const OpVersionPageInner: React.FC<{
               currentVersionURI={uri}
             />
           ),
-        },
-        {
-          label: 'Online Scorers',
-          content: <OpOnlineScorersTab opVersion={opVersion} />,
         },
         ...(useOpSupported
           ? [
