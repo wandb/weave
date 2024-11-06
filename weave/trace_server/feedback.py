@@ -1,10 +1,17 @@
-from typing import Any
-
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.interface.feedback_types import (
+    ANNOTATION_FEEDBACK_TYPE_PREFIX,
+    FEEDBACK_PAYLOAD_SCHEMAS,
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+    AnnotationPayloadSchema,
+    RunnablePayloadSchema,
+    feedback_type_is_annotation,
+    feedback_type_is_runnable,
+)
 from weave.trace_server.orm import Column, Table
 from weave.trace_server.refs_internal_server_util import ensure_ref_is_valid
 from weave.trace_server.validation import (
@@ -29,35 +36,6 @@ TABLE_FEEDBACK = Table(
         Column("trigger_ref", "string", nullable=True),
     ],
 )
-
-
-FEEDBACK_PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
-    "wandb.reaction.1": tsi.FeedbackPayloadReactionReq,
-    "wandb.note.1": tsi.FeedbackPayloadNoteReq,
-}
-
-ANNOTATION_FEEDBACK_TYPE_PREFIX = "wandb.annotation"
-RUNNABLE_FEEDBACK_TYPE_PREFIX = "wandb.runnable"
-
-
-# Making the decision to use `value` & `payload` as nested keys so that
-# we can:
-# 1. Add more fields in the future without breaking changes
-# 2. Support primitive values for annotation feedback that still schema
-class AnnotationPayloadSchema(BaseModel):
-    value: Any
-
-
-class RunnablePayloadSchema(BaseModel):
-    output: Any
-
-
-def feedback_type_is_annotation(feedback_type: str) -> bool:
-    return feedback_type.startswith(ANNOTATION_FEEDBACK_TYPE_PREFIX)
-
-
-def feedback_type_is_runnable(feedback_type: str) -> bool:
-    return feedback_type.startswith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
 
 
 def validate_feedback_create_req(req: tsi.FeedbackCreateReq) -> None:

@@ -670,14 +670,6 @@ class RefsReadBatchRes(BaseModel):
     vals: list[Any]
 
 
-class FeedbackPayloadReactionReq(BaseModel):
-    emoji: str
-
-
-class FeedbackPayloadNoteReq(BaseModel):
-    note: str = Field(min_length=1, max_length=1024)
-
-
 class FeedbackCreateReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
     weave_ref: str = Field(examples=["weave:///entity/project/object/name:digest"])
