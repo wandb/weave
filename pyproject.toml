@@ -166,17 +166,7 @@ select = [
   "W391",   # https://docs.astral.sh/ruff/rules/too-many-newlines-at-end-of-file/
   "F401",   # https://docs.astral.sh/ruff/rules/unused-import/
   "TID252", # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
-  "UP006",  # https://docs.astral.sh/ruff/rules/non-pep585-annotation/
-  "UP007",  # https://docs.astral.sh/ruff/rules/non-pep604-annotation/
-  "UP015",  # https://docs.astral.sh/ruff/rules/redundant-open-modes/
-  "UP024",  # https://docs.astral.sh/ruff/rules/os-error-alias/
-  "UP028",  # https://docs.astral.sh/ruff/rules/yield-in-for-loop/
-  "UP031",  # https://docs.astral.sh/ruff/rules/printf-string-formatting/
-  "UP032",  # https://docs.astral.sh/ruff/rules/f-string/
-  "UP034",  # https://docs.astral.sh/ruff/rules/extraneous-parentheses/
-  "UP035",  # https://docs.astral.sh/ruff/rules/deprecated-import/
-  "UP036",  # https://docs.astral.sh/ruff/rules/outdated-version-block/
-  "UP037",  # https://docs.astral.sh/ruff/rules/quoted-annotation/
+  "UP",     # https://docs.astral.sh/ruff/rules/#pyupgrade-up
 ]
 ignore = [
   # we use Google style
