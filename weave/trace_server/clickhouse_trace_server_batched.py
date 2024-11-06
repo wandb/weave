@@ -45,11 +45,11 @@ from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 
-from weave.actions_worker.dispatcher import execute_batch
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.base_object_class_util import (
     process_incoming_object,
 )

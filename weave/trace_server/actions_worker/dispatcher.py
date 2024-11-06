@@ -2,10 +2,10 @@ from typing import Any, Callable
 
 from pydantic import BaseModel
 
-from weave.actions_worker.actions.contains_words import (
+from weave.trace_server.actions_worker.actions.contains_words import (
     do_contains_words_action,
 )
-from weave.actions_worker.actions.llm_judge import do_llm_judge_action
+from weave.trace_server.actions_worker.actions.llm_judge import do_llm_judge_action
 from weave.trace_server.interface.base_object_classes.actions import (
     ActionDefinition,
     ActionSpecType,
