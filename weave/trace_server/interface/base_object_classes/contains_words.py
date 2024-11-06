@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 from weave.trace_server.interface.base_object_classes.actions import (
@@ -14,4 +15,9 @@ def do_contains_words_action(
     call: CallSchema,
     trace_server: TraceServerInterface,
 ) -> Any:
-    pass
+    target_words = config.target_words
+    text = json.dumps(call.outputs)
+    for word in target_words:
+        if word in text:
+            return True
+    return False
