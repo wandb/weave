@@ -3,10 +3,10 @@ import datetime
 import platform
 import re
 import sys
-import typing
+from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
-from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Union
+from typing import Any, Callable, Optional, Union, cast
 
 import pydantic
 from requests import HTTPError
@@ -18,7 +18,6 @@ from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
-from weave.trace.feedback_types.score import SCORE_TYPE_NAME, ScoreTypePayload
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
@@ -35,6 +34,7 @@ from weave.trace.refs import (
     parse_op_uri,
     parse_uri,
 )
+from weave.trace.sanitize import REDACT_KEYS, REDACTED_VALUE
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.settings import client_parallelism
@@ -83,7 +83,11 @@ from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTrace
 ALLOW_MIXED_PROJECT_REFS = False
 
 
-def dataclasses_asdict_one_level(obj: Any) -> typing.Dict[str, Any]:
+class OpNameError(ValueError):
+    """Raised when an op name is invalid."""
+
+
+def dataclasses_asdict_one_level(obj: Any) -> dict[str, Any]:
     # dataclasses.asdict is recursive. We don't want that when json encoding
     return {f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}
 
@@ -99,7 +103,7 @@ def get_obj_name(val: Any) -> str:
         else:
             name = f"{val.__class__.__name__}"
     if not isinstance(name, str):
-        raise ValueError(f"Object's name attribute is not a string: {name}")
+        raise TypeError(f"Object's name attribute is not a string: {name}")
     return name
 
 
@@ -205,7 +209,7 @@ class Call:
             self.__dict__["_op_name"] = self._op_name.result()
 
         if not isinstance(self._op_name, str):
-            raise Exception(f"Call op_name is not a string: {self._op_name}")
+            raise OpNameError(f"Call op_name is not a string: {self._op_name}")
 
         return self._op_name
 
@@ -266,7 +270,8 @@ class Call:
     def delete(self) -> bool:
         """Delete the call."""
         client = weave_client_context.require_weave_client()
-        return client.delete_call(call=self)
+        client.delete_call(call=self)
+        return True
 
     def set_display_name(self, name: Optional[str]) -> None:
         """
@@ -294,6 +299,46 @@ class Call:
 
     def remove_display_name(self) -> None:
         self.set_display_name(None)
+
+    def _apply_scorer(self, scorer_op: Op) -> None:
+        """
+        This is a private method that applies a scorer to a call and records the feedback.
+        In the near future, this will be made public, but for now it is only used internally
+        for testing.
+
+        Before making this public, we should refactor such that the `predict_and_score` method
+        inside `eval.py` uses this method inside the scorer block.
+
+        Current limitations:
+        - only works for ops (not Scorer class)
+        - no async support
+        - no context yet (ie. ground truth)
+        """
+        client = weave_client_context.require_weave_client()
+        scorer_signature = scorer_op.signature
+        scorer_arg_names = list(scorer_signature.parameters.keys())
+        score_args = {k: v for k, v in self.inputs.items() if k in scorer_arg_names}
+        if "output" in scorer_arg_names:
+            score_args["output"] = self.output
+        _, score_call = scorer_op.call(**score_args)
+        scorer_op_ref = get_ref(scorer_op)
+        if scorer_op_ref is None:
+            raise ValueError("Scorer op has no ref")
+        self_ref = get_ref(self)
+        if self_ref is None:
+            raise ValueError("Call has no ref")
+        score_name = scorer_op_ref.name
+        score_results = score_call.output
+        score_call_ref = get_ref(score_call)
+        if score_call_ref is None:
+            raise ValueError("Score call has no ref")
+        client._add_score(
+            call_ref_uri=self_ref.uri(),
+            score_name=score_name,
+            score_results=score_results,
+            scorer_call_ref_uri=score_call_ref.uri(),
+            scorer_op_ref_uri=scorer_op_ref.uri(),
+        )
 
 
 class CallsIter:
@@ -368,7 +413,7 @@ class CallsIter:
             return list(self._get_slice(key))
         return self._get_one(key)
 
-    def __iter__(self) -> typing.Iterator[WeaveObject]:
+    def __iter__(self) -> Iterator[WeaveObject]:
         return self._get_slice(slice(0, None, 1))
 
 
@@ -516,7 +561,7 @@ class WeaveClient:
 
         ref = self._save_object(val, name, branch)
         if not isinstance(ref, ObjectRef):
-            raise ValueError(f"Expected ObjectRef, got {ref}")
+            raise TypeError(f"Expected ObjectRef, got {ref}")
         return self.get(ref)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -698,7 +743,7 @@ class WeaveClient:
         project_id = self._project_id()
 
         def send_start_call() -> None:
-            inputs_json = to_json(inputs_with_refs, project_id, self)
+            inputs_json = to_json(inputs_with_refs, project_id, self, use_dictify=False)
             self.server.call_start(
                 CallStartReq(
                     start=StartedCallSchemaForInsert(
@@ -797,7 +842,7 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
-            output_json = to_json(call.output, project_id, self)
+            output_json = to_json(call.output, project_id, self, use_dictify=False)
             self.server.call_end(
                 CallEndReq(
                     end=EndedCallSchemaForInsert(
@@ -922,12 +967,12 @@ class WeaveClient:
         llm_id: str,
         prompt_token_cost: float,
         completion_token_cost: float,
-        effective_date: typing.Optional[datetime.datetime] = datetime.datetime.now(
+        effective_date: Optional[datetime.datetime] = datetime.datetime.now(
             datetime.timezone.utc
         ),
-        prompt_token_cost_unit: typing.Optional[str] = "USD",
-        completion_token_cost_unit: typing.Optional[str] = "USD",
-        provider_id: typing.Optional[str] = "default",
+        prompt_token_cost_unit: Optional[str] = "USD",
+        completion_token_cost_unit: Optional[str] = "USD",
+        provider_id: Optional[str] = "default",
     ) -> CostCreateRes:
         """Add a cost to the current project.
 
@@ -1077,7 +1122,7 @@ class WeaveClient:
             scorer_op_ref_uri = score_call.op_name
             scorer_op_ref = parse_uri(scorer_op_ref_uri)
             if not isinstance(scorer_op_ref, OpRef):
-                raise ValueError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
+                raise TypeError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
             score_name = scorer_op_ref.name
             score_results = score_call.output
 
@@ -1106,19 +1151,17 @@ class WeaveClient:
 
         Outstanding questions:
         - Should we somehow include supervision (ie. the ground truth) in the payload?
-        - What should the shape of `ScoreTypePayload` be? Maybe we want the results to be top-level?
-        - What should we use for name? A standard "score" or the score name?
         """
         # Parse the refs (acts as validation)
         call_ref = parse_uri(call_ref_uri)
         if not isinstance(call_ref, CallRef):
-            raise ValueError(f"Invalid call ref: {call_ref_uri}")
+            raise TypeError(f"Invalid call ref: {call_ref_uri}")
         scorer_call_ref = parse_uri(scorer_call_ref_uri)
         if not isinstance(scorer_call_ref, CallRef):
-            raise ValueError(f"Invalid scorer call ref: {scorer_call_ref_uri}")
+            raise TypeError(f"Invalid scorer call ref: {scorer_call_ref_uri}")
         scorer_op_ref = parse_uri(scorer_op_ref_uri)
         if not isinstance(scorer_op_ref, OpRef):
-            raise ValueError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
+            raise TypeError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
 
         # Validate score_name (we might want to relax this in the future)
         if score_name != scorer_op_ref.name:
@@ -1132,18 +1175,17 @@ class WeaveClient:
 
         # # Prepare the supervision payload
 
-        payload: ScoreTypePayload = {
-            "name": score_name,
-            "op_ref": scorer_op_ref_uri,
-            "call_ref": scorer_call_ref_uri,
-            "results": results_json,
+        payload = {
+            "output": results_json,
         }
 
         freq = FeedbackCreateReq(
             project_id=self._project_id(),
             weave_ref=call_ref_uri,
-            feedback_type=SCORE_TYPE_NAME,  # should this be score_name?
+            feedback_type="wandb.runnable." + score_name,
             payload=payload,
+            runnable_ref=scorer_op_ref_uri,
+            call_ref=scorer_call_ref_uri,
         )
         response = self.server.feedback_create(freq)
 
@@ -1422,7 +1464,7 @@ class WeaveClient:
             filter = ObjectVersionFilter()
         else:
             filter = filter.model_copy()
-        filter = typing.cast(ObjectVersionFilter, filter)
+        filter = cast(ObjectVersionFilter, filter)
         filter.is_op = False
 
         response = self.server.objs_query(
@@ -1451,7 +1493,7 @@ class WeaveClient:
     def _remove_call_display_name(self, call: Call) -> None:
         self._set_call_display_name(call, None)
 
-    def _ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
+    def _ref_output_of(self, ref: ObjectRef) -> Optional[Call]:
         raise NotImplementedError()
 
     def _op_runs(self, op_def: Op) -> Sequence[Call]:
@@ -1483,9 +1525,10 @@ def safe_current_wb_run_id() -> Optional[str]:
         wandb_run = wandb.run
         if wandb_run is None:
             return None
-        return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
     except ImportError:
         return None
+    else:
+        return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
 
 
 def check_wandb_run_matches(
@@ -1500,7 +1543,7 @@ def check_wandb_run_matches(
             )
 
 
-def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
+def _build_anonymous_op(name: str, config: Optional[dict] = None) -> Op:
     if config is None:
 
         def op_fn(*args, **kwargs):  # type: ignore
@@ -1520,14 +1563,7 @@ def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
     return op
 
 
-REDACT_KEYS = (
-    "api_key",
-    "Authorization",
-)
-REDACTED_VALUE = "REDACTED"
-
-
-def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
+def redact_sensitive_keys(obj: Any) -> Any:
     # We should NEVER mutate reffed objects.
     #
     # 1. This code builds new objects that no longer have refs
