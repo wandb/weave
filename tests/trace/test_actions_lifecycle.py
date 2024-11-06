@@ -1,6 +1,8 @@
 import os
+from unittest.mock import patch
 
 import pytest
+from litellm.assistants.main import ModelResponse
 
 import weave
 from tests.integrations.litellm.client_completions_create_test import (
@@ -93,6 +95,40 @@ def test_action_lifecycle_word_count(client: WeaveClient):
     assert feedback.payload == {"output": True}
 
 
+mock_response = {
+    "id": "chatcmpl-AQPvs3DE4NQqLxorvaTPixpqq9nTD",
+    "choices": [
+        {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+                "content": '{"response":true}',
+                "role": "assistant",
+                "tool_calls": None,
+                "function_call": None,
+            },
+        }
+    ],
+    "created": 1730859576,
+    "model": "gpt-4o-mini-2024-07-18",
+    "object": "chat.completion",
+    "system_fingerprint": "fp_0ba0d124f1",
+    "usage": {
+        "completion_tokens": 5,
+        "prompt_tokens": 74,
+        "total_tokens": 79,
+        "completion_tokens_details": {
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "accepted_prediction_tokens": 0,
+            "rejected_prediction_tokens": 0,
+        },
+        "prompt_tokens_details": {"audio_tokens": 0, "cached_tokens": 0},
+    },
+    "service_tier": None,
+}
+
+
 def test_action_lifecycle_llm_judge(client: WeaveClient):
     if client_is_sqlite(client):
         return pytest.skip("skipping for sqlite")
@@ -122,15 +158,17 @@ def test_action_lifecycle_llm_judge(client: WeaveClient):
     _, call = example_op.call("i've been very meditative and mindful today")
 
     with secret_fetcher_context(DummySecretFetcher()):
-        res = client.server.actions_execute_batch(
-            ActionsExecuteBatchReq.model_validate(
-                {
-                    "project_id": client._project_id(),
-                    "action_ref": action_ref_uri,
-                    "call_ids": [call.id],
-                }
+        with patch("litellm.completion") as mock_completion:
+            mock_completion.return_value = ModelResponse.model_validate(mock_response)
+            client.server.actions_execute_batch(
+                ActionsExecuteBatchReq.model_validate(
+                    {
+                        "project_id": client._project_id(),
+                        "action_ref": action_ref_uri,
+                        "call_ids": [call.id],
+                    }
+                )
             )
-        )
 
     feedbacks = list(call.feedback)
     assert len(feedbacks) == 1
