@@ -164,7 +164,7 @@ all_obj_select_columns = list(SelectableCHObjSchema.model_fields.keys())
 all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 
 # Let's just make everything required for now ... can optimize when we implement column selection
-required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
+required_obj_select_columns = list(set(all_obj_select_columns) - set())
 
 ObjRefListType = list[ri.InternalObjectRef]
 
@@ -1660,8 +1660,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return result
 
         # now get the val_dump for each object
-        object_ids = list(set([row.object_id for row in result]))
-        digests = list(set([row.digest for row in result]))
+        object_ids = list({row.object_id for row in result})
+        digests = list({row.digest for row in result})
         query = """
             SELECT object_id, digest, any(val_dump)
             FROM object_versions
@@ -1935,18 +1935,18 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
     ended_at = _ensure_datetimes_have_tz(ch_call_dict.get("ended_at"))
     display_name = empty_str_to_none(ch_call_dict.get("display_name"))
-    return dict(
-        project_id=ch_call_dict.get("project_id"),
-        id=ch_call_dict.get("id"),
-        trace_id=ch_call_dict.get("trace_id"),
-        parent_id=ch_call_dict.get("parent_id"),
-        op_name=ch_call_dict.get("op_name"),
-        started_at=started_at,
-        ended_at=ended_at,
-        attributes=_dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}")),
-        inputs=_dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
-        output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
-        summary=make_derived_summary_fields(
+    return {
+        "project_id": ch_call_dict.get("project_id"),
+        "id": ch_call_dict.get("id"),
+        "trace_id": ch_call_dict.get("trace_id"),
+        "parent_id": ch_call_dict.get("parent_id"),
+        "op_name": ch_call_dict.get("op_name"),
+        "started_at": started_at,
+        "ended_at": ended_at,
+        "attributes": _dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}")),
+        "inputs": _dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
+        "output": _nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
+        "summary": make_derived_summary_fields(
             summary=summary or {},
             op_name=ch_call_dict.get("op_name", ""),
             started_at=started_at,
@@ -1954,11 +1954,11 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
             exception=ch_call_dict.get("exception"),
             display_name=display_name,
         ),
-        exception=ch_call_dict.get("exception"),
-        wb_run_id=ch_call_dict.get("wb_run_id"),
-        wb_user_id=ch_call_dict.get("wb_user_id"),
-        display_name=display_name,
-    )
+        "exception": ch_call_dict.get("exception"),
+        "wb_run_id": ch_call_dict.get("wb_run_id"),
+        "wb_user_id": ch_call_dict.get("wb_user_id"),
+        "display_name": display_name,
+    }
 
 
 def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
