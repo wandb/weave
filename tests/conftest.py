@@ -6,7 +6,7 @@ import subprocess
 import time
 import typing
 import urllib
-from typing import Iterator
+from collections.abc import Iterator
 
 import pytest
 import requests

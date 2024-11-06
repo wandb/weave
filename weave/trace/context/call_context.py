@@ -2,9 +2,10 @@ import contextlib
 import contextvars
 import copy
 import logging
-import typing
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any, Optional
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from weave.trace.weave_client import Call
 
 
@@ -24,7 +25,7 @@ def push_call(call: "Call") -> None:
     _call_stack.set(new_stack)
 
 
-def pop_call(call_id: typing.Optional[str]) -> None:
+def pop_call(call_id: Optional[str]) -> None:
     new_stack = copy.copy(_call_stack.get())
     if len(new_stack) == 0:
         logger.debug(
@@ -106,7 +107,7 @@ def require_current_call() -> "Call":
     return call
 
 
-def get_current_call() -> typing.Optional["Call"]:
+def get_current_call() -> Optional["Call"]:
     """Get the Call object for the currently executing Op, within that Op.
 
     Returns:
@@ -124,7 +125,7 @@ def get_call_stack() -> list["Call"]:
 @contextlib.contextmanager
 def set_call_stack(
     stack: list["Call"],
-) -> typing.Iterator[list["Call"]]:
+) -> Iterator[list["Call"]]:
     token = _call_stack.set(stack)
     try:
         yield stack
@@ -132,6 +133,6 @@ def set_call_stack(
         _call_stack.reset(token)
 
 
-call_attributes: contextvars.ContextVar[typing.Dict[str, typing.Any]] = (
-    contextvars.ContextVar("call_attributes", default={})
+call_attributes: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
+    "call_attributes", default={}
 )

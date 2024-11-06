@@ -1,5 +1,6 @@
 import logging
-from typing import Any, Callable, Optional, Sequence
+from collections.abc import Sequence
+from typing import Any, Callable, Optional
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 
