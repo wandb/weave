@@ -313,8 +313,8 @@ export function parseObjectVersionUrlPathToRefUri(
     project,
     objectId,
     versionHash,
-    path: '',
-    refExtra: '',
+    path: '', // empty because path is legacy
+    refExtra: '', // empty because refExtra is legacy
     weaveKind: 'object',
   });
 }

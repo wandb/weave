@@ -291,6 +291,11 @@ export const browse3ContextGen = (
       filePath?: string,
       refExtra?: string
     ) => {
+      console.log('objectVersionUIUrl: ', {
+        root: projectRoot(entityName, projectName),
+        entityName,
+        projectName,
+      });
       let url = `${projectRoot(
         entityName,
         projectName
@@ -305,6 +310,7 @@ export const browse3ContextGen = (
       if (params.toString()) {
         url += '?' + params.toString();
       }
+      console.log('final url: ', url);
       return url;
     },
     opVersionsUIUrl: (
