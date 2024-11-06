@@ -128,7 +128,7 @@ export const TextField = ({
             readOnly={!onChange} // It would be readonly regardless but this prevents a console warning
             aria-label={ariaLabel}
             maxLength={maxLength}
-            type={type}
+            type={type === 'number' ? 'text' : type}
             autoComplete={autoComplete}
             data-test={dataTest}
             step={step}

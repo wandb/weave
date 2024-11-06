@@ -1,16 +1,17 @@
-import { Autocomplete, Checkbox, TextField as MuiTextField } from '@mui/material';
-import { toast } from '@wandb/weave/common/components/elements/Toast';
-import { MOON_300 } from '@wandb/weave/common/css/color.styles';
-import { TextField } from '@wandb/weave/components/Form/TextField';
-import { LoadingDots } from '@wandb/weave/components/LoadingDots';
-import { Tailwind } from '@wandb/weave/components/Tailwind';
-import { parseRef } from '@wandb/weave/react';
+import {Autocomplete, TextField as MuiTextField} from '@mui/material';
+import {toast} from '@wandb/weave/common/components/elements/Toast';
+import {MOON_300} from '@wandb/weave/common/css/color.styles';
+import {Button} from '@wandb/weave/components/Button';
+import {TextField} from '@wandb/weave/components/Form/TextField';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
-import React, { SyntheticEvent, useEffect, useMemo, useState } from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
-import { CellValueString } from '../../../Browse2/CellValueString';
-import { useWFHooks } from '../../pages/wfReactInterface/context';
-import { useGetTraceServerClientContext } from '../../pages/wfReactInterface/traceServerClientContext';
+import {CellValueString} from '../../../Browse2/CellValueString';
+import {useWFHooks} from '../../pages/wfReactInterface/context';
+import {useGetTraceServerClientContext} from '../../pages/wfReactInterface/traceServerClientContext';
 import {
   FeedbackCreateError,
   FeedbackCreateSuccess,
@@ -27,7 +28,7 @@ const FEEDBACK_TYPE_OPTIONS = ['text', 'number', 'boolean', 'categorical'];
 const DEBOUNCE_VAL = 200;
 
 // Interfaces
-interface HumanFeedbackProps {
+type HumanFeedbackProps = {
   entity: string;
   project: string;
   viewer: string | null;
@@ -35,108 +36,20 @@ interface HumanFeedbackProps {
   callRef: string;
   readOnly?: boolean;
   focused?: boolean;
-}
-
-// Utility function for creating feedback request
-const createFeedbackRequest = (props: HumanFeedbackProps, value: any) => {
-  const ref = props.hfColumn.ref;
-  const parsedRef = parseRef(ref);
-  const humanAnnotationPayload: HumanAnnotationPayload = {
-    annotation_column_ref: ref,
-    value: {
-      [parsedRef.artifactName]: {
-        [parsedRef?.artifactVersion]: value,
-      },
-    },
-  };
-
-  const baseRequest = {
-    project_id: `${props.entity}/${props.project}`,
-    weave_ref: props.callRef,
-    creator: props.viewer,
-    feedback_type: HUMAN_FEEDBACK_TYPE,
-    payload: humanAnnotationPayload,
-    sort_by: [{created_at: 'desc'}],
-  };
-
-  return baseRequest;
-};
-
-const inferTypeFromJsonSchema = (jsonSchema: Record<string, any>) => {
-  if (jsonSchema.type in FEEDBACK_TYPE_OPTIONS) {
-    return jsonSchema.type;
-  }
-  if (jsonSchema.min !== undefined || jsonSchema.max !== undefined) {
-    return 'number';
-  }
-  if (jsonSchema.max_length !== undefined) {
-    return 'text';
-  }
-  if (jsonSchema.options !== undefined) {
-    return 'categorical';
-  }
-  return 'boolean';
-};
-
-const renderFeedbackComponent = (
-  props: HumanFeedbackProps,
-  onAddFeedback: (value: any) => Promise<boolean>,
-  foundValue: string | number | null
-) => {
-  const type = inferTypeFromJsonSchema(props.hfColumn.json_schema);
-  switch (type) {
-    case 'number':
-      const numericalFeedback = props.hfColumn.json_schema;
-      return (
-        <NumericalFeedbackColumn
-          min={numericalFeedback.min}
-          max={numericalFeedback.max}
-          onAddFeedback={onAddFeedback}
-          defaultValue={foundValue as number | null}
-          focused={props.focused}
-        />
-      );
-    case 'text':
-      return (
-        <TextFeedbackColumn
-          onAddFeedback={onAddFeedback}
-          defaultValue={foundValue as string | null}
-          focused={props.focused}
-        />
-      );
-    case 'categorical':
-      const categoricalFeedback = props.hfColumn.json_schema;
-      return (
-        <CategoricalFeedbackColumn
-          options={categoricalFeedback.options}
-          onAddFeedback={onAddFeedback}
-          defaultValue={foundValue as string | null}
-          focused={props.focused}
-        />
-      );
-    case 'boolean':
-      return (
-        <BinaryFeedbackColumn
-          onAddFeedback={onAddFeedback}
-          defaultValue={foundValue as string | null}
-          focused={props.focused}
-        />
-      );
-    default:
-      return <div>Unknown feedback type</div>;
-  }
 };
 
 export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
+  const getTsClient = useGetTraceServerClientContext();
+  const tsClient = getTsClient();
   const {useFeedback} = useWFHooks();
+  const [foundFeedback, setFoundFeedback] = useState<HumanFeedback[]>([]);
   const query = useFeedback({
     entity: props.entity,
     project: props.project,
     weaveRef: props.callRef,
   });
-  const [foundFeedback, setFoundFeedback] = useState<HumanFeedback[]>([]);
-  const getTsClient = useGetTraceServerClientContext();
-  const tsClient = getTsClient();
+  const foundFeedbackCallRef = query?.result?.[0]?.weave_ref;
+  const feedbackColumnRef = props.hfColumn.ref;
 
   useEffect(() => {
     if (!props.readOnly) {
@@ -152,15 +65,24 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
   }, []);
 
   useEffect(() => {
-    if (props.callRef !== query?.result?.[0]?.weave_ref) {
+    if (foundFeedbackCallRef && props.callRef !== foundFeedbackCallRef) {
       // The call was changed, we need to reset
       setFoundFeedback([]);
     }
-  }, [props.callRef, query?.result]);
+  }, [props.callRef, foundFeedbackCallRef]);
 
   const onAddFeedback = async (value: number | string): Promise<boolean> => {
     try {
-      const createRequest = createFeedbackRequest(props, value);
+      const requestProps: FeedbackRequestProps = {
+        entity: props.entity,
+        project: props.project,
+        viewer: props.viewer,
+        callRef: props.callRef,
+        feedbackColumnRef,
+        value,
+      };
+      // TODO(gst): use replace when feedback is updated within 10 seconds of the previous feedback
+      const createRequest = createFeedbackRequest(requestProps);
       const res = await tsClient.feedbackCreate(createRequest);
       if ('detail' in res) {
         const errorRes = res as FeedbackCreateError;
@@ -188,7 +110,7 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
     }
 
     const feedbackRefMatches = (feedback: HumanFeedback) =>
-      feedback.payload.annotation_column_ref === props.hfColumn.ref;
+      feedback.payload.annotation_column_ref === feedbackColumnRef;
 
     const currFeedback = query.result?.filter((feedback: HumanFeedback) =>
       feedbackRefMatches(feedback)
@@ -198,39 +120,23 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
     }
 
     setFoundFeedback(currFeedback);
-  }, [query?.result, query?.loading, props.hfColumn]);
+  }, [query?.result, query?.loading, feedbackColumnRef]);
 
-  // userId -> objectId -> objectHash : value
-  const combinedFeedback = foundFeedback.reduce((acc, feedback) => {
-    return {
-      [feedback.creator ?? '']: feedback.payload.value,
-      ...acc,
-    };
-  }, {}) as Record<string, Record<string, Record<string, string>>>;
+  const extractedValues = useMemo(
+    () => extractFeedbackValues(foundFeedback, props.viewer, feedbackColumnRef),
+    [foundFeedback, props.viewer, feedbackColumnRef]
+  );
+  const {rawValues, mostRecentVal} = extractedValues;
 
-  const parsedRef = parseRef(props.hfColumn.ref);
-  const rawValues = useMemo(() => {
-    const values = [];
-    for (const payload of Object.values(combinedFeedback)) {
-      const pRecord = payload as Record<
-        string,
-        Record<string, string | number>
-      >;
-      values.push(pRecord[parsedRef.artifactName]?.[parsedRef.artifactVersion]);
-    }
-    return values;
-  }, [combinedFeedback, parsedRef]);
+  const type = useMemo(
+    () => inferTypeFromJsonSchema(props.hfColumn.json_schema),
+    [props.hfColumn.json_schema]
+  );
 
-  const viewerFeedbackVal =
-    combinedFeedback[props.viewer ?? '']?.[parsedRef.artifactName]?.[
-      parsedRef.artifactVersion
-    ];
   if (query?.loading) {
     return <LoadingDots />;
   }
-
   if (props.readOnly) {
-    // TODO: make this prettier, for now just join with commas
     return (
       <div className="flex w-full justify-center">
         <CellValueString value={rawValues?.join(', ')} />
@@ -240,9 +146,185 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
 
   return (
     <div className="w-full py-4">
-      {renderFeedbackComponent(props, onAddFeedback, viewerFeedbackVal)}
+      <FeedbackComponentSelector
+        type={type}
+        jsonSchema={props.hfColumn.json_schema}
+        focused={props.focused ?? false}
+        onAddFeedback={onAddFeedback}
+        foundValue={mostRecentVal}
+      />
     </div>
   );
+};
+
+const FeedbackComponentSelector: React.FC<{
+  type: string | null;
+  jsonSchema: Record<string, any>;
+  focused: boolean;
+  onAddFeedback: (value: any) => Promise<boolean>;
+  foundValue: string | number | null;
+}> = React.memo(({type, jsonSchema, focused, onAddFeedback, foundValue}) => {
+  switch (type) {
+    case 'number':
+      return (
+        <NumericalFeedbackColumn
+          min={jsonSchema.min}
+          max={jsonSchema.max}
+          isInteger={jsonSchema.is_integer}
+          onAddFeedback={onAddFeedback}
+          defaultValue={foundValue as number | null}
+          focused={focused}
+        />
+      );
+    case 'text':
+      return (
+        <TextFeedbackColumn
+          onAddFeedback={onAddFeedback}
+          defaultValue={foundValue as string | null}
+          focused={focused}
+        />
+      );
+    case 'categorical':
+      return (
+        <CategoricalFeedbackColumn
+          options={jsonSchema.options}
+          onAddFeedback={onAddFeedback}
+          defaultValue={foundValue as string | null}
+          focused={focused}
+        />
+      );
+    case 'boolean':
+      return (
+        <BinaryFeedbackColumn
+          onAddFeedback={onAddFeedback}
+          defaultValue={foundValue as string | null}
+          focused={focused}
+        />
+      );
+    default:
+      // Return a text column by default
+      return (
+        <TextFeedbackColumn
+          onAddFeedback={onAddFeedback}
+          defaultValue={foundValue as string | null}
+          focused={focused}
+        />
+      );
+  }
+});
+
+type ExtractedFeedbackValues = {
+  // The leaves of the feedback tree, just the raw values
+  rawValues: Array<string | number>;
+  // The most recent feedback value from the CURRENT viewer
+  viewerFeedbackVal: string | number | null;
+  // The most recent feedback value from ANY viewer
+  mostRecentVal: string | number | null;
+  // The combined feedback from all viewers
+  // userId -> objectId -> objectHash : value
+  combinedFeedback: Record<string, Record<string, Record<string, string>>>;
+};
+
+const extractFeedbackValues = (
+  foundFeedback: HumanFeedback[],
+  viewer: string | null,
+  columnRef: string
+): ExtractedFeedbackValues => {
+  const combinedFeedback = foundFeedback.reduce((acc, feedback) => {
+    return {
+      [feedback.creator ?? '']: feedback.payload.value,
+      ...acc,
+    };
+  }, {}) as Record<string, Record<string, Record<string, string>>>;
+
+  const parsedRef = parseRef(columnRef);
+  const rawValues = Object.values(combinedFeedback)
+    .map(payload => {
+      const pRecord = payload as Record<
+        string,
+        Record<string, string | number>
+      >;
+      return pRecord[parsedRef.artifactName]?.[parsedRef.artifactVersion];
+    })
+    .filter(Boolean);
+
+  const viewerFeedbackVal =
+    combinedFeedback[viewer ?? '']?.[parsedRef.artifactName]?.[
+      parsedRef.artifactVersion
+    ];
+
+  // Get most recent value from the first feedback (since they're sorted by created_at desc)
+  const mostRecentVal =
+    foundFeedback[0]?.payload.value?.[parsedRef.artifactName]?.[
+      parsedRef.artifactVersion
+    ] ?? null;
+
+  return {
+    rawValues,
+    // Currently unused, but likely useful in the future
+    viewerFeedbackVal,
+    mostRecentVal,
+    combinedFeedback,
+  };
+};
+
+type FeedbackRequestProps = {
+  entity: string;
+  project: string;
+  viewer: string | null;
+  callRef: string;
+  feedbackColumnRef: string;
+  value: any;
+};
+
+// Utility function for creating feedback request
+const createFeedbackRequest = ({
+  entity,
+  project,
+  viewer,
+  callRef,
+  feedbackColumnRef,
+  value,
+}: FeedbackRequestProps) => {
+  const parsedRef = parseRef(feedbackColumnRef);
+  const humanAnnotationPayload: HumanAnnotationPayload = {
+    annotation_column_ref: feedbackColumnRef,
+    value: {
+      [parsedRef.artifactName]: {
+        [parsedRef?.artifactVersion]: value,
+      },
+    },
+  };
+
+  const baseRequest = {
+    project_id: `${entity}/${project}`,
+    weave_ref: callRef,
+    creator: viewer,
+    feedback_type: HUMAN_FEEDBACK_TYPE,
+    payload: humanAnnotationPayload,
+    sort_by: [{created_at: 'desc'}],
+  };
+
+  return baseRequest;
+};
+
+const inferTypeFromJsonSchema = (jsonSchema: Record<string, any>) => {
+  if (jsonSchema.type in FEEDBACK_TYPE_OPTIONS) {
+    return jsonSchema.type;
+  }
+  if (jsonSchema.min !== undefined || jsonSchema.max !== undefined) {
+    return 'number';
+  }
+  if (jsonSchema.max_length !== undefined) {
+    return 'text';
+  }
+  if (jsonSchema.options !== undefined) {
+    return 'categorical';
+  }
+  toast(`Unknown feedback type from spec: ${JSON.stringify(jsonSchema)}`, {
+    type: 'warning',
+  });
+  return null;
 };
 
 export const NumericalFeedbackColumn = ({
@@ -260,46 +342,75 @@ export const NumericalFeedbackColumn = ({
   focused?: boolean;
   isInteger?: boolean;
 }) => {
-  const [value, setValue] = useState<number | null>(defaultValue ?? null);
+  const [value, setValue] = useState<string>(defaultValue?.toString() ?? '');
   const [error, setError] = useState<boolean>(false);
 
+  const debouncedFn = useMemo(
+    () =>
+      _.debounce((val: number | null) => onAddFeedback?.(val), DEBOUNCE_VAL),
+    [onAddFeedback]
+  );
   useEffect(() => {
-    setValue(defaultValue ?? null);
+    return () => {
+      debouncedFn.cancel();
+    };
+  }, [debouncedFn]);
+
+  useEffect(() => {
+    setValue(defaultValue?.toString() ?? '');
   }, [defaultValue]);
 
-  const debouncedOnAddFeedback = _.debounce((val: number | null) => {
-    onAddFeedback?.(val);
-  }, DEBOUNCE_VAL);
-
-  const onValueChange = (v: string) => {
-    const val = v !== '' ? parseInt(v) : null;
-    if (val === value) {
-      return;
+  const getVal = (v: string) => {
+    if (v === '') {
+      return null;
     }
-    setValue(val);
-    if (val && (val < min || val > max)) {
-      setError(true);
-      return;
-    } else {
-      setError(false);
+    if (isInteger) {
+      return v;
     }
-    debouncedOnAddFeedback(val);
+    const floatRegExp = new RegExp('^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$');
+    if (!floatRegExp.test(v)) {
+      return null;
+    }
+    return v;
   };
+
+  const onValueChange = useCallback(
+    (v: string) => {
+      const val = getVal(v);
+      if (val === value) {
+        return;
+      }
+      setValue(v);
+      const parsedVal = val
+        ? isInteger
+          ? parseInt(val, 10)
+          : parseFloat(val)
+        : null;
+      if (parsedVal && (parsedVal < min || parsedVal > max)) {
+        setError(true);
+        return;
+      } else {
+        setError(false);
+      }
+      debouncedFn(parsedVal);
+    },
+    [value, min, max, debouncedFn]
+  );
 
   return (
     <div className="w-full">
-      <div className="mb-1 text-xs text-moon-500">
-        min: {min}, max: {max}
-      </div>
       <TextField
         autoFocus={focused}
-        type="number"
+        type={isInteger ? 'number' : 'text'}
         value={value?.toString() ?? ''}
         onChange={onValueChange}
-        placeholder="..."
+        placeholder=""
         step={isInteger ? 1 : 0.001}
         errorState={error}
       />
+      <div className="mb-1 text-xs text-moon-500">
+        min: {min}, max: {max}
+      </div>
     </div>
   );
 };
@@ -315,21 +426,31 @@ export const TextFeedbackColumn = ({
 }) => {
   const [value, setValue] = useState<string>(defaultValue ?? '');
 
+  const debouncedFn = useMemo(
+    () => _.debounce((val: string) => onAddFeedback?.(val), DEBOUNCE_VAL),
+    [onAddFeedback]
+  );
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      debouncedFn.cancel();
+    };
+  }, [debouncedFn]);
+
   useEffect(() => {
     setValue(defaultValue ?? '');
   }, [defaultValue]);
 
-  const debouncedOnAddFeedback = _.debounce((val: string) => {
-    onAddFeedback?.(val);
-  }, DEBOUNCE_VAL);
-
-  const onValueChange = (newValue: string) => {
-    setValue(newValue);
-    debouncedOnAddFeedback(newValue);
-  };
+  const onValueChange = useCallback(
+    (newValue: string) => {
+      setValue(newValue);
+      debouncedFn(newValue);
+    },
+    [debouncedFn]
+  );
 
   return (
-    <div className="w-full pb-4">
+    <div className="w-full">
       <TextField
         autoFocus={focused}
         value={value}
@@ -364,6 +485,7 @@ export const CategoricalFeedbackColumn = ({
     opts.splice(0, 0, {label: '', value: ''});
     return opts;
   }, [options]);
+
   const [value, setValue] = useState<Option>(dropdownOptions[0]);
 
   useEffect(() => {
@@ -373,17 +495,16 @@ export const CategoricalFeedbackColumn = ({
     );
   }, [defaultValue, dropdownOptions]);
 
-  const debouncedOnAddFeedback = _.debounce((val: string) => {
-    onAddFeedback?.(val);
-  }, DEBOUNCE_VAL);
-
-  const onValueChange = (e: any, newValue: Option) => {
-    if (newValue?.value === value?.value) {
-      return;
-    }
-    setValue(newValue);
-    debouncedOnAddFeedback(newValue?.value ?? '');
-  };
+  const onValueChange = useCallback(
+    (e: any, newValue: Option) => {
+      if (newValue?.value === value?.value) {
+        return;
+      }
+      setValue(newValue);
+      onAddFeedback?.(newValue?.value ?? '');
+    },
+    [value?.value, onAddFeedback]
+  );
 
   return (
     <div className="flex w-full">
@@ -445,33 +566,33 @@ export const BinaryFeedbackColumn = ({
   defaultValue: string | null;
   focused?: boolean;
 }) => {
-  const [value, setValue] = useState<boolean | null>(null);
+  const [value, setValue] = useState<string | null>(defaultValue);
 
   useEffect(() => {
-    setValue(defaultValue === 'true');
+    setValue(defaultValue);
   }, [defaultValue]);
 
-  const debouncedOnAddFeedback = _.debounce((val: string) => {
-    onAddFeedback?.(val);
-  }, DEBOUNCE_VAL);
-
-  const onValueChange = (e: SyntheticEvent<HTMLInputElement>) => {
-    const val = (e.target as HTMLInputElement).checked ? 'true' : 'false';
-    if ((val === 'true') === value) {
-      return;
-    }
-    setValue(val === 'true');
-    debouncedOnAddFeedback(val);
+  const handleClick = (newValue: string) => {
+    // If clicking the same value, deselect it
+    const valueToSet = value === newValue ? null : newValue;
+    setValue(valueToSet);
+    onAddFeedback?.(valueToSet ?? '');
   };
 
   return (
     <Tailwind>
-      <div className="flex w-full justify-center">
-        <Checkbox
-          autoFocus={focused}
-          checked={value ?? false}
-          onChange={onValueChange}
-        />
+      <div className="flex w-full justify-center gap-10">
+        <Button
+          variant={value === 'true' ? 'primary' : 'outline'}
+          onClick={() => handleClick('true')}
+          autoFocus={focused}>
+          True
+        </Button>
+        <Button
+          variant={value === 'false' ? 'primary' : 'outline'}
+          onClick={() => handleClick('false')}>
+          False
+        </Button>
       </div>
     </Tailwind>
   );

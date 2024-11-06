@@ -1,4 +1,5 @@
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
+import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useState} from 'react';
@@ -35,19 +36,24 @@ export const HumanFeedbackSidebar = ({
   return (
     <Tailwind>
       <div className="flex h-full flex-col bg-white">
-        <div className="flex w-full justify-center border-b border-moon-300 p-12">
-          <h2 className="text-gray-900 text-lg font-semibold">Add feedback</h2>
+        <div className="justify-left flex w-full border-b border-moon-300 p-12">
+          <div className="text-lg font-semibold">Feedback</div>
+          <div className="flex-grow" />
+          {false && (
+            // Enable when we have a proper settings page
+            <Button icon="settings" size="small" variant="ghost" />
+          )}
         </div>
         <div className="mx-6 h-full flex-grow">
           <div>
             <button
-              className="text-md text-gray-700 hover:bg-gray-100 flex w-full items-center justify-between px-6 py-8 font-semibold"
+              className="text-md hover:bg-gray-100 flex w-full items-center justify-between px-6 py-8 font-semibold"
               onClick={() => setIsExpanded(!isExpanded)}>
-              <div className="flex items-center">
-                <span className="">Human scores</span>
-                <span className="text-gray-600 bg-gray-200 ml-4 mt-2 rounded-full px-2 text-xs font-medium">
+              <div className="mb-8 flex items-center">
+                <div className="text-lg">Human scores</div>
+                <div className="bg-gray-200 ml-4 mt-2 rounded-full px-2 text-xs font-medium">
                   {feedbackCellCount}
-                </span>
+                </div>
               </div>
               <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} />
             </button>
@@ -55,15 +61,15 @@ export const HumanFeedbackSidebar = ({
               <div>
                 {feedbackColumns?.map((field, index) => (
                   <div key={field.ref}>
-                    <h3 className="bg-gray-50 px-6 py-4 text-sm font-semibold text-moon-700">
+                    <div className="bg-gray-50 text-md px-6 py-0 font-semibold">
                       {field.name}
-                    </h3>
+                    </div>
                     {field.description && (
-                      <p className="bg-gray-50 font-italic px-6 py-4 text-sm text-moon-700 ">
+                      <div className="bg-gray-50 font-italic px-6 py-4 text-sm text-moon-700 ">
                         {field.description}
-                      </p>
+                      </div>
                     )}
-                    <div className="pb-8 pl-6 pr-8 pt-2">
+                    <div className="pb-8 pl-6 pr-8 pt-4">
                       <HumanFeedbackCell
                         focused={index === 0}
                         hfColumn={field}
