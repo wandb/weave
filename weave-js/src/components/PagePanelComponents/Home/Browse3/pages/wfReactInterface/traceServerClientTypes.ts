@@ -171,6 +171,7 @@ export type Feedback = {
   created_at: string;
   feedback_type: string;
   payload: Record<string, any>;
+  runnable_ref?: string;
 };
 
 export type FeedbackQuerySuccess = {

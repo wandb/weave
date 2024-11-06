@@ -1,9 +1,7 @@
 import {Button} from '@wandb/weave/components/Button/Button';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
-import {parseRef} from '@wandb/weave/react';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useCallback, useMemo, useState} from 'react';
-import {z} from 'zod';
 
 import {CellValue} from '../../../Browse2/CellValue';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
@@ -101,35 +99,25 @@ export const CallActionsViewer: React.FC<{
     }).result ?? []
   ).sort((a, b) => (a.val.name ?? '').localeCompare(b.val.name ?? ''));
   const verifiedActionFeedbacks: Array<{
-    data: MachineScoreFeedbackPayloadType;
+    data: any;
     feedbackRaw: Feedback;
   }> = useMemo(() => {
     return (feedbackQuery.result ?? [])
+      .filter(f => f.feedback_type?.startsWith('wandb.runnable'))
       .map(feedback => {
-        const res = MachineScoreFeedbackPayloadSchema.safeParse(
-          feedback.payload
-        );
-        return {res, feedbackRaw: feedback};
-      })
-      .filter(result => result.res.success)
-      .map(result => ({
-        data: result.res.data,
-        feedbackRaw: result.feedbackRaw,
-      })) as Array<{
-      data: MachineScoreFeedbackPayloadType;
-      feedbackRaw: Feedback;
-    }>;
+        return {data: feedback.payload.output, feedbackRaw: feedback};
+      });
   }, [feedbackQuery.result]);
 
   const getFeedbackForAction = useCallback(
     (actionRef: string) => {
       return verifiedActionFeedbacks.filter(
-        feedback => feedback.data.runnable_ref === actionRef
+        feedback => feedback.feedbackRaw.runnable_ref === actionRef
       );
     },
     [verifiedActionFeedbacks]
   );
-
+  console.log(verifiedActionFeedbacks);
 
   const allCallActions: CallActionRow[] = useMemo(() => {
     return (
@@ -153,9 +141,7 @@ export const CallActionsViewer: React.FC<{
           lastRanAt: selectedFeedback
             ? convertISOToDate(selectedFeedback.feedbackRaw.created_at + 'Z')
             : undefined,
-          lastResult: selectedFeedback
-            ? getValueFromMachineScoreFeedbackPayload(selectedFeedback.data)
-            : undefined,
+          lastResult: selectedFeedback ? selectedFeedback.data : undefined,
         };
       }) ?? []
     );
@@ -255,25 +241,4 @@ export const CallActionsViewer: React.FC<{
       />
     </>
   );
-};
-
-const MachineScoreFeedbackPayloadSchema = z.object({
-  // _type: z.literal("ActionFeedback"),
-  runnable_ref: z.string(),
-  call_ref: z.string().optional(),
-  trigger_ref: z.string().optional(),
-  value: z.record(z.string(), z.record(z.string(), z.boolean())),
-});
-
-type MachineScoreFeedbackPayloadType = z.infer<
-  typeof MachineScoreFeedbackPayloadSchema
->;
-
-const getValueFromMachineScoreFeedbackPayload = (
-  payload: MachineScoreFeedbackPayloadType
-) => {
-  const ref = parseRef(payload.runnable_ref);
-  const name = ref.artifactName;
-  const digest = ref.artifactVersion;
-  return payload.value[name][digest];
 };
