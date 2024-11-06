@@ -142,7 +142,7 @@ def test_action_lifecycle_llm_judge_primitive(client: WeaveClient):
                 "action_type": "llm_judge",
                 "model": "gpt-4o-mini",
                 "prompt": "Is the response mindful?",
-                "response_format": {"type": "boolean"},
+                "response_schema": {"type": "boolean"},
             },
         )
     )
@@ -227,7 +227,7 @@ def test_action_lifecycle_llm_judge_structured(client: WeaveClient):
                 "action_type": "llm_judge",
                 "model": "gpt-4o-mini",
                 "prompt": "Is the response mindful?",
-                "response_format": {
+                "response_schema": {
                     "type": "object",
                     "properties": {
                         "is_mindful": {"type": "boolean"},

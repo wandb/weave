@@ -20,16 +20,16 @@ def do_llm_judge_action(
     model = config.model
     system_prompt = config.prompt
 
-    response_is_not_object = config.response_format["type"] != "object"
+    response_is_not_object = config.response_schema["type"] != "object"
     dummy_key = "response"
     if response_is_not_object:
         schema = {
             "type": "object",
-            "properties": {dummy_key: config.response_format},
+            "properties": {dummy_key: config.response_schema},
             "additionalProperties": False,
         }
     else:
-        schema = config.response_format
+        schema = config.response_schema
 
     response_format = {
         "type": "json_schema",
