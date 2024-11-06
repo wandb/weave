@@ -28,11 +28,12 @@ import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
 import {Empty} from './common/Empty';
 import {
-  EMPTY_PROPS_PROGRAMATIC_SCORERS,
+  EMPTY_PROPS_ACTION_DEFINITIONS,
   EMPTY_PROPS_DATASETS,
   EMPTY_PROPS_LEADERBOARDS,
   EMPTY_PROPS_MODEL,
   EMPTY_PROPS_OBJECTS,
+  EMPTY_PROPS_PROGRAMATIC_SCORERS,
   EMPTY_PROPS_PROMPTS,
 } from './common/EmptyContent';
 import {
@@ -170,6 +171,8 @@ export const FilterableObjectVersionsTable: React.FC<{
       propsEmpty = EMPTY_PROPS_LEADERBOARDS;
     } else if (base === 'Scorer') {
       propsEmpty = EMPTY_PROPS_PROGRAMATIC_SCORERS;
+    } else if (base === 'ActionDefinition') {
+      propsEmpty = EMPTY_PROPS_ACTION_DEFINITIONS;
     }
     return <Empty {...propsEmpty} />;
   }

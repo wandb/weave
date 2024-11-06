@@ -26,8 +26,8 @@ export const ScorersPage: React.FC<{
         {
           // It is true that this panel can show more than LLM Judges, but the
           // branding is better
-          label: 'Configurable LLM Judges',
-          content: <OnlineScorersTab entity={entity} project={project} />,
+          label: 'Configurable Judges',
+          content: <ActionDefinitionsTab entity={entity} project={project} />,
         },
         // This is a placeholder for Griffin's annotation column manager section
         // {
@@ -59,7 +59,7 @@ const CodeScorersTab: React.FC<{
   );
 };
 
-const OnlineScorersTab: React.FC<{
+const ActionDefinitionsTab: React.FC<{
   entity: string;
   project: string;
 }> = ({entity, project}) => {
