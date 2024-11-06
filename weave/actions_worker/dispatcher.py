@@ -2,14 +2,14 @@ from typing import Any, Callable
 
 from pydantic import BaseModel
 
+from weave.actions_worker.actions.contains_words import (
+    do_contains_words_action,
+)
 from weave.actions_worker.actions.llm_judge import do_llm_judge_action
 from weave.trace_server.interface.base_object_classes.actions import (
     ActionDefinition,
     ContainsWordsActionSpec,
     LlmJudgeActionSpec,
-)
-from weave.trace_server.interface.base_object_classes.contains_words import (
-    do_contains_words_action,
 )
 from weave.trace_server.interface.feedback_types import RunnablePayloadSchema
 from weave.trace_server.refs_internal import (
