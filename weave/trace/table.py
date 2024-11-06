@@ -48,7 +48,7 @@ class Table:
     def append(self, row: dict) -> None:
         """Add a row to the table."""
         if not isinstance(row, dict):
-            raise ValueError("Can only append dicts to tables")
+            raise TypeError("Can only append dicts to tables")
         self.rows.append(row)
 
     def pop(self, index: int) -> None:

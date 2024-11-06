@@ -113,7 +113,7 @@ class Traceable:
 
     def save(self) -> ObjectRef:
         if not isinstance(self.ref, ObjectRef):
-            raise ValueError("Can only save from object refs")
+            raise TypeError("Can only save from object refs")
         if self.root is not self:
             raise ValueError("Can only save from root object")
         if self.mutations is None:
@@ -444,7 +444,7 @@ class WeaveTable(Traceable):
 
     def append(self, val: dict) -> None:
         if not isinstance(val, dict):
-            raise ValueError("Can only append dicts to tables")
+            raise TypeError("Can only append dicts to tables")
         self._mark_dirty()
         self.rows.append(val)
 
@@ -483,7 +483,7 @@ class WeaveList(Traceable, list):
 
     def __getitem__(self, i: Union[SupportsIndex, slice]) -> Any:
         if isinstance(i, slice):
-            raise ValueError("Slices not yet supported")
+            raise TypeError("Slices not yet supported")
         index = operator.index(i)
         new_ref = self.ref.with_index(index) if self.ref else None
         index_val = super().__getitem__(index)
@@ -491,7 +491,7 @@ class WeaveList(Traceable, list):
 
     def __setitem__(self, i: Union[SupportsIndex, slice], value: Any) -> None:
         if isinstance(i, slice):
-            raise ValueError("Slices not yet supported")
+            raise TypeError("Slices not yet supported")
         if (index := operator.index(i)) >= len(self):
             raise IndexError("list assignment index out of range")
 

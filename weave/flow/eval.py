@@ -124,7 +124,7 @@ class Evaluation(Object):
             if isinstance(scorer, Scorer):
                 pass
             elif isinstance(scorer, type):
-                raise ValueError(
+                raise TypeError(
                     f"Scorer {scorer.__name__} must be an instance, not a class. Did you forget to instantiate?"
                 )
             elif callable(scorer) and not is_op(scorer):
