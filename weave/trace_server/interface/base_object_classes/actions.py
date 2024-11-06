@@ -36,5 +36,6 @@ ActionSpecType = Union[
 
 # TODO: Make sure we really like this name - it is permanent
 class ActionDefinition(base_object_def.BaseObject):
-    name: str
+    # Pyright doesn't like this override
+    # name: str
     spec: ActionSpecType

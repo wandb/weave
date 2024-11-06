@@ -1,14 +1,14 @@
 import json
 from functools import partial
-from typing import Any, Tuple
+from typing import Any
 
 from openai import OpenAI
 
-from weave.trace_server.feedback import RunnablePayloadSchema
 from weave.trace_server.interface.base_object_classes.actions import (
     ActionDefinition,
     LlmJudgeActionSpec,
 )
+from weave.trace_server.interface.feedback_types import RunnablePayloadSchema
 from weave.trace_server.refs_internal import (
     InternalCallRef,
     InternalObjectRef,
@@ -91,7 +91,7 @@ def do_llm_judge_action(config: LlmJudgeActionSpec, call: CallSchema) -> Any:
 
 def do_action(
     action_ref: str, action_config: ActionDefinition, call: CallSchema
-) -> Tuple[Any, FeedbackCreateReq]:
+) -> tuple[Any, FeedbackCreateReq]:
     runnable_ref = None
     if isinstance(action_config, LlmJudgeActionSpec):
         result = do_llm_judge_action(action_config, call)
