@@ -1660,8 +1660,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return result
 
         # now get the val_dump for each object
-        object_ids = list(set([row.object_id for row in result]))
-        digests = list(set([row.digest for row in result]))
+        object_ids = list({row.object_id for row in result})
+        digests = list({row.digest for row in result})
         query = """
             SELECT object_id, digest, any(val_dump)
             FROM object_versions
