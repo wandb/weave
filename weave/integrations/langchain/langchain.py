@@ -355,9 +355,10 @@ class LangchainPatcher(Patcher):
             register_configure_hook(
                 weave_tracing_callback_var, True, WeaveTracer, "WEAVE_TRACE_LANGCHAIN"
             )
-            return True
         except Exception:
             return False
+        else:
+            return True
 
     def undo_patch(self) -> bool:
         if not hasattr(self, "original_trace_state"):
@@ -370,10 +371,10 @@ class LangchainPatcher(Patcher):
             else:
                 os.environ["WEAVE_TRACE_LANGCHAIN"] = self.original_trace_state
             weave_tracing_callback_var.set(None)
-
-            return True
         except Exception:
             return False
+        else:
+            return True
 
 
 langchain_patcher = LangchainPatcher()

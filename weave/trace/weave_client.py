@@ -1525,9 +1525,10 @@ def safe_current_wb_run_id() -> Optional[str]:
         wandb_run = wandb.run
         if wandb_run is None:
             return None
-        return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
     except ImportError:
         return None
+    else:
+        return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
 
 
 def check_wandb_run_matches(

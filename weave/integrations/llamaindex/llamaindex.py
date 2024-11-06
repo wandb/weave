@@ -174,9 +174,10 @@ class LLamaIndexPatcher(Patcher):
             self._original_handler = llama_index.core.global_handler
 
             llama_index.core.global_handler = WeaveCallbackHandler()
-            return True
         except Exception:
             return False
+        else:
+            return True
 
     def undo_patch(self) -> bool:
         if not hasattr(self, "_original_handler"):
@@ -185,9 +186,10 @@ class LLamaIndexPatcher(Patcher):
             import llama_index.core
 
             llama_index.core.global_handler = self._original_handler
-            return True
         except Exception:
             return False
+        else:
+            return True
 
 
 llamaindex_patcher = LLamaIndexPatcher()
