@@ -58,9 +58,9 @@ async def generate_screenshot_from_browser(
 
         if local_storage:
             await context.add_init_script(
-                """
-                Object.assign(window.localStorage, {});
-            """.format(json.dumps(local_storage))
+                f"""
+                Object.assign(window.localStorage, {json.dumps(local_storage)});
+            """
             )
 
         try:
