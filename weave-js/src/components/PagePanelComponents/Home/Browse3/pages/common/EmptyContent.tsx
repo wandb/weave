@@ -191,13 +191,12 @@ export const EMPTY_NO_TRACE_SERVER: EmptyProps = {
 export const EMPTY_PROPS_PROGRAMATIC_SCORERS: EmptyProps = {
   icon: 'type-number-alt' as const,
   heading: 'No programmatic scorers yet',
-  description:
-    'Create programmatic scorers in Python.',
+  description: 'Create programmatic scorers in Python.',
   moreInformation: (
     <>
       Learn more about{' '}
       <TargetBlank href="https://weave-docs.wandb.ai/guides/evaluation/scorers#class-based-scorers">
-      creating and using scorers
+        creating and using scorers
       </TargetBlank>{' '}
       in evaluations.
     </>
@@ -209,9 +208,5 @@ export const EMPTY_PROPS_ACTION_DEFINITIONS: EmptyProps = {
   heading: 'No configurations yet',
   description:
     'Create new configuration by clicking "Create new" in the top right.',
-  moreInformation: (
-    <>
-      
-    </>
-  ),
+  moreInformation: <></>,
 };
