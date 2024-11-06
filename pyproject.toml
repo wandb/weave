@@ -169,6 +169,7 @@ select = [
   "UP",     # https://docs.astral.sh/ruff/rules/#pyupgrade-up
   "C409",   # https://docs.astral.sh/ruff/rules/unnecessary-literal-within-tuple-call/
   "C400",   # https://docs.astral.sh/ruff/rules/unnecessary-generator-list/
+  "C419",   # https://docs.astral.sh/ruff/rules/unnecessary-comprehension-in-call/
 ]
 ignore = [
   # we use Google style

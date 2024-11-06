@@ -334,7 +334,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     run_calls += num_calls * 3
     root_calls += num_calls
 
-    total_calls = sum([op_call.num_calls for op_call in result.values()])
+    total_calls = sum(op_call.num_calls for op_call in result.values())
 
     return OpCallSpec(
         call_summaries=result,
@@ -409,7 +409,7 @@ def test_trace_call_query_filter_op_version_refs(client):
 
 
 def has_any(list_a: list[str], list_b: list[str]) -> bool:
-    return any([a in list_b for a in list_a])
+    return any(a in list_b for a in list_a)
 
 
 def unique_vals(list_a: list[str]) -> list[str]:
@@ -425,7 +425,7 @@ def get_all_calls_asserting_finished(
         )
     )
     assert len(res.calls) == call_spec.total_calls
-    assert all([call.ended_at for call in res.calls])
+    assert all(call.ended_at for call in res.calls)
     return res
 
 
