@@ -306,3 +306,11 @@ export const fileExtensions = {
   [ContentType.any]: 'jsonl',
   [ContentType.json]: 'json',
 };
+
+export type ActionsExecuteBatchReq = {
+  project_id: string;
+  call_ids: string[];
+  configured_action_ref: string;
+};
+
+export type ActionsExecuteBatchRes = {};
