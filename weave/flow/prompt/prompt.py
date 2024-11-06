@@ -236,7 +236,7 @@ class EasyPrompt(UserList, Prompt):
     # TODO: Any should be Dataset but there is a circular dependency issue
     def bind_rows(self, dataset: Union[list[dict], Any]) -> list["Prompt"]:
         rows = dataset if isinstance(dataset, list) else dataset.rows
-        bound: list["Prompt"] = []
+        bound: list[Prompt] = []
         for row in rows:
             bound.append(self.copy().bind(row))
         return bound
