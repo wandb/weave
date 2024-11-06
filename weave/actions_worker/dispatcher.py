@@ -32,7 +32,7 @@ from weave.trace_server.trace_server_interface import (
 
 ActionFnType = Callable[[str, ActionDefinition, CallSchema, TraceServerInterface], Any]
 
-# TODO: Nail down this typing
+
 dispatch_map: dict[type[ActionSpecType], ActionFnType] = {
     LlmJudgeActionSpec: do_llm_judge_action,
     ContainsWordsActionSpec: do_contains_words_action,
@@ -49,6 +49,11 @@ def execute_batch(
     trace_server: TraceServerInterface,
 ) -> list[ActionResult]:
     project_id = batch_req.project_id
+    wb_user_id = batch_req.wb_user_id
+    if wb_user_id is None:
+        # We should probably relax this for online evals
+        raise ValueError("wb_user_id cannot be None")
+
     # 1. Lookup the action definition
     parsed_ref = parse_internal_uri(batch_req.action_ref)
     if parsed_ref.project_id != project_id:
@@ -77,11 +82,11 @@ def execute_batch(
     calls = calls_query.calls
 
     # 2. Dispatch the action to each call
-    # TODO: Some actions may be able to be batched together
+    # FUTURE: Some actions may be able to be batched together
     results = []
     for call in calls:
         result = dispatch_action(
-            project_id, batch_req.action_ref, action_def, call, trace_server
+            project_id, batch_req.action_ref, action_def, call, wb_user_id, trace_server
         )
         results.append(result)
     return results
@@ -92,13 +97,14 @@ def dispatch_action(
     action_ref: str,
     action_def: ActionDefinition,
     target_call: CallSchema,
+    wb_user_id: str,
     trace_server: TraceServerInterface,
 ) -> ActionResult:
     action_type = type(action_def.spec)
     action_fn = dispatch_map[action_type]
     result = action_fn(project_id, action_def.spec, target_call, trace_server)
     feedback_res = publish_results_as_feedback(
-        target_call, action_ref, result, trace_server
+        target_call, action_ref, result, wb_user_id, trace_server
     )
     return ActionResult(result=result, feedback_res=feedback_res)
 
@@ -107,6 +113,7 @@ def publish_results_as_feedback(
     target_call: CallSchema,
     action_ref: str,
     result: Any,
+    wb_user_id: str,
     trace_server: TraceServerInterface,
 ) -> FeedbackCreateRes:
     project_id = target_call.project_id
@@ -123,7 +130,6 @@ def publish_results_as_feedback(
             feedback_type="wandb.runnable." + action_name,
             runnable_ref=action_ref,
             payload=RunnablePayloadSchema(output=result).model_dump(),
-            # TODO: Make `wb_user_id` optional.
-            wb_user_id="",
+            wb_user_id=wb_user_id,
         )
     )

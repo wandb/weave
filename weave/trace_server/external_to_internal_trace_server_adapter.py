@@ -351,6 +351,10 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        original_user_id = req.wb_user_id
+        if original_user_id is None:
+            raise ValueError("wb_user_id cannot be None")
+        req.wb_user_id = self._idc.ext_to_int_user_id(original_user_id)
         res = self._ref_apply(self._internal_trace_server.actions_execute_batch, req)
         return res
 
