@@ -127,9 +127,9 @@ def _apply_fn_defaults_to_inputs(
             ):
                 inputs[param_name] = param.default
             if param.kind == inspect.Parameter.VAR_POSITIONAL:
-                inputs[param_name] = tuple()
+                inputs[param_name] = ()
             elif param.kind == inspect.Parameter.VAR_KEYWORD:
-                inputs[param_name] = dict()
+                inputs[param_name] = {}
     return inputs
 
 
