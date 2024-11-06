@@ -7,53 +7,15 @@ import {
 } from '@material-ui/core';
 import _ from 'lodash';
 import React, {FC, useEffect, useState} from 'react';
-import {z} from 'zod';
 
 import {DynamicConfigForm} from '../../DynamicConfigForm';
 import {ReusableDrawer} from '../../ReusableDrawer';
-import {LlmJudgeActionSpecSchema} from '../wfReactInterface/baseObjectClasses.zod';
 import {
   ActionDefinition,
   ActionDefinitionSchema,
 } from '../wfReactInterface/generatedBaseObjectClasses.zod';
-import {
-  actionTemplates,
-  ConfiguredLlmJudgeActionFriendlySchema,
-} from './actionTemplates';
-
-const knownBuiltinActions = [
-  {
-    name: 'LLM Judge',
-    actionSchema: LlmJudgeActionSpecSchema,
-    friendly: {
-      schema: ConfiguredLlmJudgeActionFriendlySchema,
-      convert: (
-        data: z.infer<typeof ConfiguredLlmJudgeActionFriendlySchema>
-      ): z.infer<typeof LlmJudgeActionSpecSchema> => {
-        let responseFormat: z.infer<
-          typeof LlmJudgeActionSpecSchema
-        >['response_schema'];
-        if (data.response_schema.type === 'simple') {
-          responseFormat = {type: data.response_schema.schema};
-        } else {
-          responseFormat = {
-            type: 'object',
-            properties: _.mapValues(data.response_schema.schema, value => ({
-              type: value as 'boolean' | 'number' | 'string',
-            })),
-            additionalProperties: false,
-          };
-        }
-        return {
-          action_type: 'llm_judge',
-          model: data.model,
-          prompt: data.prompt,
-          response_schema: responseFormat,
-        };
-      },
-    },
-  },
-];
+import {actionTemplates} from './actionTemplates';
+import {knownBuiltinActions} from './builtinActions';
 
 interface NewBuiltInActionScorerModalProps {
   open: boolean;
@@ -85,9 +47,7 @@ export const NewBuiltInActionScorerModal: FC<
   const handleSave = () => {
     const newAction = ActionDefinitionSchema.parse({
       name,
-      spec: knownBuiltinActions[selectedActionIndex].friendly.convert(
-        config as any
-      ),
+      spec: knownBuiltinActions[selectedActionIndex].convert(config as any),
     });
     onSave(newAction);
     setConfig({});
@@ -128,7 +88,7 @@ export const NewBuiltInActionScorerModal: FC<
       {selectedActionIndex !== -1 && (
         <DynamicConfigForm
           configSchema={
-            knownBuiltinActions[selectedActionIndex].friendly.schema
+            knownBuiltinActions[selectedActionIndex].inputFriendlySchema
           }
           config={config}
           setConfig={setConfig}
