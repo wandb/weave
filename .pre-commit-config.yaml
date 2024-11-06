@@ -34,3 +34,9 @@ repos:
         files: ^examples/.*\.ipynb$
         language: system
         entry: jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace
+      - id: strip-exif
+        name: Strip EXIF data
+        entry: python scripts/strip_exif.py
+        language: python
+        types: [image]
+        additional_dependencies: ["pillow"]
