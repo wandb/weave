@@ -690,6 +690,8 @@ class FeedbackCreateReq(BaseModel):
             }
         ]
     )
+    # TODO: From Griffin: `it would be nice if we could type this to a kind of ref,
+    # like objectRef, with a pydantic validator and then check its construction in the client.`
     annotation_ref: Optional[str] = Field(
         default=None, examples=["weave:///entity/project/object/name:digest"]
     )

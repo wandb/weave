@@ -51,17 +51,16 @@ class ParamBuilder:
         self._param_to_name: dict[typing.Any, str] = {}
 
     def add_param(self, param_value: typing.Any) -> str:
-        try:
+        param_name = self._prefix + str(len(self._params))
+
+        # Only attempt caching for hashable values
+        if isinstance(param_value, typing.Hashable):
             if param_value in self._param_to_name:
                 return self._param_to_name[param_value]
-        except TypeError:
-            pass
-        param_name = self._prefix + str(len(self._params))
-        self._params[param_name] = param_value
-        try:
             self._param_to_name[param_value] = param_name
-        except TypeError:
-            pass
+
+        # For non-hashable values, just generate a new param without caching
+        self._params[param_name] = param_value
         return param_name
 
     def add(

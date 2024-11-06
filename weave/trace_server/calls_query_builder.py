@@ -258,7 +258,6 @@ class Condition(BaseModel):
         if self._consumed_fields is None:
             self._consumed_fields = []
             for field in conditions.fields_used:
-                # TODO: Verify that this is "ok" since before we were just looking at field name
                 self._consumed_fields.append(field)
         return combine_conditions(conditions.conditions, "AND")
 
