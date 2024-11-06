@@ -7,9 +7,12 @@ import React, {FC, useState} from 'react';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
 import {useCreateBaseObjectInstance} from '../wfReactInterface/baseObjectClassQuery';
-import {ActionDefinition} from '../wfReactInterface/generatedBaseObjectClasses.zod';
+import {
+  ActionDefinition,
+  ActionType,
+} from '../wfReactInterface/generatedBaseObjectClasses.zod';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
-import {actionTemplates} from './actionTemplates';
+import {actionDefinitionConfigurationSpecs} from './actionDefinitionConfigurationSpecs';
 import {NewBuiltInActionScorerModal} from './NewBuiltInActionScorerModal';
 
 export const ScorersPage: React.FC<{
@@ -61,7 +64,10 @@ const OnlineScorersTab: React.FC<{
   project: string;
 }> = ({entity, project}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState<{
+    actionType: ActionType;
+    template: {name: string; config: Record<string, any>};
+  } | null>(null);
   const createCollectionObject =
     useCreateBaseObjectInstance('ActionDefinition');
   const [lastUpdatedTimestamp, setLastUpdatedTimestamp] = useState(0);
@@ -70,7 +76,7 @@ const OnlineScorersTab: React.FC<{
   const open = Boolean(anchorEl);
 
   const handleCreateBlank = () => {
-    setSelectedTemplate('');
+    setSelectedTemplate(null);
     setIsModalOpen(true);
   };
 
@@ -82,15 +88,18 @@ const OnlineScorersTab: React.FC<{
     setAnchorEl(null);
   };
 
-  const handleTemplateSelect = (templateName: string) => {
-    setSelectedTemplate(templateName);
+  const handleTemplateSelect = (template: {
+    actionType: ActionType;
+    template: {name: string; config: Record<string, any>};
+  }) => {
+    setSelectedTemplate(template);
     setIsModalOpen(true);
     handleClose();
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setSelectedTemplate('');
+    setSelectedTemplate(null);
   };
 
   const handleSaveModal = (newAction: ActionDefinition) => {
@@ -150,13 +159,21 @@ const OnlineScorersTab: React.FC<{
           />
         </Box>
         <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
-          {actionTemplates.map(template => (
-            <MenuItem
-              key={template.name}
-              onClick={() => handleTemplateSelect(template.name)}>
-              {template.name}
-            </MenuItem>
-          ))}
+          {Object.entries(actionDefinitionConfigurationSpecs).flatMap(
+            ([actionType, spec]) =>
+              spec.templates.map(template => (
+                <MenuItem
+                  key={template.name}
+                  onClick={() =>
+                    handleTemplateSelect({
+                      actionType: actionType as ActionType,
+                      template,
+                    })
+                  }>
+                  {template.name}
+                </MenuItem>
+              ))
+          )}
         </Menu>
       </Box>
       <FilterableObjectVersionsTable

@@ -5,7 +5,6 @@ import {
   Select,
   TextField,
 } from '@material-ui/core';
-import _ from 'lodash';
 import React, {FC, useEffect, useState} from 'react';
 
 import {DynamicConfigForm} from '../../DynamicConfigForm';
@@ -13,31 +12,35 @@ import {ReusableDrawer} from '../../ReusableDrawer';
 import {
   ActionDefinition,
   ActionDefinitionSchema,
+  ActionType,
 } from '../wfReactInterface/generatedBaseObjectClasses.zod';
-import {actionTemplates} from './actionTemplates';
-import {knownBuiltinActions} from './builtinActions';
+import {actionDefinitionConfigurationSpecs} from './actionDefinitionConfigurationSpecs';
 
 interface NewBuiltInActionScorerModalProps {
   open: boolean;
   onClose: () => void;
   onSave: (newAction: ActionDefinition) => void;
-  initialTemplate: string;
+  initialTemplate?: {
+    actionType: ActionType;
+    template: {name: string; config: Record<string, any>};
+  } | null;
 }
 
 export const NewBuiltInActionScorerModal: FC<
   NewBuiltInActionScorerModalProps
 > = ({open, onClose, onSave, initialTemplate}) => {
   const [name, setName] = useState('');
-  const [selectedActionIndex, setSelectedActionIndex] = useState<number>(0);
+  const [selectedActionType, setSelectedActionType] =
+    useState<ActionType>('llm_judge');
   const [config, setConfig] = useState<Record<string, any>>({});
+  const selectedActionDefinitionConfigurationSpec =
+    actionDefinitionConfigurationSpecs[selectedActionType];
 
   useEffect(() => {
     if (initialTemplate) {
-      const template = actionTemplates.find(t => t.name === initialTemplate);
-      if (template) {
-        setConfig(template.type);
-        setName(template.name);
-      }
+      setConfig(initialTemplate.template.config);
+      setSelectedActionType(initialTemplate.actionType);
+      setName(initialTemplate.template.name);
     } else {
       setConfig({});
       setName('');
@@ -45,13 +48,16 @@ export const NewBuiltInActionScorerModal: FC<
   }, [initialTemplate]);
 
   const handleSave = () => {
+    if (!selectedActionDefinitionConfigurationSpec) {
+      return;
+    }
     const newAction = ActionDefinitionSchema.parse({
       name,
-      spec: knownBuiltinActions[selectedActionIndex].convert(config as any),
+      spec: selectedActionDefinitionConfigurationSpec.convert(config as any),
     });
     onSave(newAction);
     setConfig({});
-    setSelectedActionIndex(0);
+    setSelectedActionType('llm_judge');
     setName('');
   };
 
@@ -74,21 +80,21 @@ export const NewBuiltInActionScorerModal: FC<
       <FormControl fullWidth margin="normal">
         <InputLabel>Action Type</InputLabel>
         <Select
-          value={selectedActionIndex}
-          onChange={e =>
-            setSelectedActionIndex(parseInt(e.target.value as string, 10))
-          }>
-          {knownBuiltinActions.map(({name: actionName}, ndx) => (
-            <MenuItem key={actionName} value={ndx}>
-              {actionName}
-            </MenuItem>
-          ))}
+          value={selectedActionType}
+          onChange={e => setSelectedActionType(e.target.value as ActionType)}>
+          {Object.entries(actionDefinitionConfigurationSpecs).map(
+            ([actionType, spec], ndx) => (
+              <MenuItem key={actionType} value={actionType}>
+                {spec.name}
+              </MenuItem>
+            )
+          )}
         </Select>
       </FormControl>
-      {selectedActionIndex !== -1 && (
+      {selectedActionDefinitionConfigurationSpec && (
         <DynamicConfigForm
           configSchema={
-            knownBuiltinActions[selectedActionIndex].inputFriendlySchema
+            selectedActionDefinitionConfigurationSpec.inputFriendlySchema
           }
           config={config}
           setConfig={setConfig}
