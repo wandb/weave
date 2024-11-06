@@ -34,7 +34,7 @@ def read_model_to_provider_info_map(
         with open(full_path) as f:
             return json.load(f)
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Failed to read model to provider info file at: {full_path}", exc_info=e
         )
         return {}
