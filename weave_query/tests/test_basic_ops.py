@@ -94,12 +94,12 @@ def test_string_ops():
     # assert weave.use(foo in foobar) == True # Broken
     # assert weave.use(foobar in foo) == False # Broken
 
-    assert weave.use(make_const_node(weave.types.String(), "123,456,008").toNumberWithLocale()) == 123456008.0
-    assert weave.use(make_const_node(weave.types.String(), "123,456.008").toNumberWithLocale()) == 123456.008
-    assert weave.use(make_const_node(weave.types.String(), "123_456_008").toNumberWithLocale()) == 123456008.0
-    assert weave.use(make_const_node(weave.types.String(), "123 456 008").toNumberWithLocale()) == 123456008.0
-    assert weave.use(make_const_node(weave.types.String(), "123.456").toNumberWithLocale()) == 123.456
-    assert weave.use(make_const_node(weave.types.String(), "123.456.008").toNumberWithLocale()) == None
+    assert weave.use(make_const_node(weave.types.String(), "123,456,008").parseNumberWithSeparator(",")) == 123456008.0
+    assert weave.use(make_const_node(weave.types.String(), "123,456,008").parseNumberWithSeparator(".")) == None
+    assert weave.use(make_const_node(weave.types.String(), "123,456.008").parseNumberWithSeparator(",")) == 123456.008
+    assert weave.use(make_const_node(weave.types.String(), "123_456_008").parseNumberWithSeparator("_")) == 123456008.0
+    assert weave.use(make_const_node(weave.types.String(), "123 456 008").parseNumberWithSeparator(" ")) == 123456008.0
+    assert weave.use(make_const_node(weave.types.String(), "123.456.008").parseNumberWithSeparator(".")) == 123456008.0
 
 def test_null_consuming_numbers_ops():
     data = [box.box(1), box.box(None), box.box(2)]

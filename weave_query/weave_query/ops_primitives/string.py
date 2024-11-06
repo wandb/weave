@@ -203,59 +203,21 @@ class String:
             return float(self)  # type: ignore
         return None
     
-    @op(name="string-toNumberWithLocale", output_type=types.optional(types.Number()))
-    def to_number_with_locale(self):
-        """
-        Quick solution to WB-16442, but slightly more robust.
-        
-        This function will handle commas (","), underscores ("_") and spaces (" ") as the
-        thousands separator: 
-    
-        >>> String.to_number_with_locale('123,456,008')
-        123456008.0
-
-        >>> String.to_number_with_locale('123_456_008')
-        12345608.0
-
-        >>> String.to_number_with_locale('123 456 008')
-        12345608.0
-        
-        Note that the use of spaces is handled as a special case via setting the locale to "pl_PL"
-        
-        A known limitation is the use of periods (".") as the thousands separator, in which case
-        the period will be treated as a decimal point:
-        
-        >>> String.to_number_with_locale('123.456')
-        123.456
-        
-        >>> String.to_number_with_locale('123.456.008')
-        ValueError: could not convert string to float: '123.456.008'
-        
-        ---
-        A better long-term solution would be to allow the user to set the locale they desire.
-        However, we should be wary that the `setlocale` method is NOT thread-safe (https://docs.python.org/3/library/locale.html#locale.setlocale)
-        and possibly expensive if we do it often.
-        """
-        import locale
-        
-        current_locale = locale.getlocale(locale.LC_NUMERIC)  # save the current locale
-                
-        # Parse commas and underscores
-        locale.setlocale(locale.LC_NUMERIC, 'en_US')
+    @op(
+        name="string-parseNumberWithSeparator",
+        input_type={
+            "self": types.String(), 
+            "separator": types.String()
+        },
+        output_type=types.optional(types.Number())
+    )
+    def parse_number_with_separator(self, separator: str):
+        mNumber = self.replace(separator, '')
         try:
-            number = locale.atof(self)
+            number = float(mNumber)
         except:
             number = None
-            
-        if not number:            
-            # Parse spaces
-            locale.setlocale(locale.LC_NUMERIC, 'pl_PL')
-            try:
-                number = locale.atof(self)
-            except:
-                number = None
-            
-        locale.setlocale(locale.LC_NUMERIC, current_locale) # reset locale
+        
         return number
 
 types.String.instance_class = String
