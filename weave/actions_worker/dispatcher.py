@@ -30,7 +30,7 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 
-ActionFnType = Callable[[ActionDefinition, CallSchema, TraceServerInterface], Any]
+ActionFnType = Callable[[str, ActionDefinition, CallSchema, TraceServerInterface], Any]
 
 # TODO: Nail down this typing
 dispatch_map: dict[type[ActionSpecType], ActionFnType] = {
@@ -48,18 +48,19 @@ def execute_batch(
     batch_req: ActionsExecuteBatchReq,
     trace_server: TraceServerInterface,
 ) -> list[ActionResult]:
+    project_id = batch_req.project_id
     # 1. Lookup the action definition
     parsed_ref = parse_internal_uri(batch_req.action_ref)
-    if parsed_ref.project_id != batch_req.project_id:
+    if parsed_ref.project_id != project_id:
         raise ValueError(
-            f"Action ref {batch_req.action_ref} does not match project_id {batch_req.project_id}"
+            f"Action ref {batch_req.action_ref} does not match project_id {project_id}"
         )
     if not isinstance(parsed_ref, InternalObjectRef):
         raise ValueError(f"Action ref {batch_req.action_ref} is not an object ref")
 
     action_def_read = trace_server.obj_read(
         ObjReadReq(
-            project_id=batch_req.project_id,
+            project_id=project_id,
             object_id=parsed_ref.name,
             digest=parsed_ref.version,
         )
@@ -69,7 +70,7 @@ def execute_batch(
     # Lookup the calls
     calls_query = trace_server.calls_query(
         CallsQueryReq(
-            project_id=batch_req.project_id,
+            project_id=project_id,
             filter=CallsFilter(call_ids=batch_req.call_ids),
         )
     )
@@ -79,12 +80,15 @@ def execute_batch(
     # TODO: Some actions may be able to be batched together
     results = []
     for call in calls:
-        result = dispatch_action(batch_req.action_ref, action_def, call, trace_server)
+        result = dispatch_action(
+            project_id, batch_req.action_ref, action_def, call, trace_server
+        )
         results.append(result)
     return results
 
 
 def dispatch_action(
+    project_id: str,
     action_ref: str,
     action_def: ActionDefinition,
     target_call: CallSchema,
@@ -92,7 +96,7 @@ def dispatch_action(
 ) -> ActionResult:
     action_type = type(action_def.spec)
     action_fn = dispatch_map[action_type]
-    result = action_fn(action_def.spec, target_call, trace_server)
+    result = action_fn(project_id, action_def.spec, target_call, trace_server)
     feedback_res = publish_results_as_feedback(
         target_call, action_ref, result, trace_server
     )

@@ -1,4 +1,4 @@
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Union
 
 from pydantic import BaseModel
 
@@ -10,7 +10,8 @@ class LlmJudgeActionSpec(BaseModel):
     # TODO: Remove this restriction
     model: Literal["gpt-4o", "gpt-4o-mini"]
     prompt: str
-    response_format: Optional[dict[str, Any]]
+    # Expected to be valid JSON Schema
+    response_format: dict[str, Any]
 
 
 class ContainsWordsActionSpec(BaseModel):

@@ -11,6 +11,7 @@ from weave.trace_server.trace_server_interface import (
 
 
 def do_contains_words_action(
+    project_id: str,
     config: ContainsWordsActionSpec,
     call: CallSchema,
     trace_server: TraceServerInterface,

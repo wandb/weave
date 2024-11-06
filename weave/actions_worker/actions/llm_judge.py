@@ -1,25 +1,24 @@
 import json
-from functools import partial
 from typing import Any
-
-from openai import OpenAI
 
 from weave.trace_server.interface.base_object_classes.actions import (
     LlmJudgeActionSpec,
 )
 from weave.trace_server.trace_server_interface import (
     CallSchema,
+    CompletionsCreateReq,
     TraceServerInterface,
 )
 
 
 def do_llm_judge_action(
-    config: LlmJudgeActionSpec, call: CallSchema, trace_server: TraceServerInterface
+    project_id: str,
+    config: LlmJudgeActionSpec,
+    call: CallSchema,
+    trace_server: TraceServerInterface,
 ) -> Any:
     model = config.model
     system_prompt = config.prompt
-    if config.response_format is None:
-        raise ValueError("response_format is required for llm_judge")
 
     response_is_not_object = config.response_format["type"] != "object"
     dummy_key = "response"
@@ -42,20 +41,41 @@ def do_llm_judge_action(
         "output": call.output,
     }
 
-    client = OpenAI()
-    # Silly hack to get around issue in tests:
-    create = client.chat.completions.create
-    if hasattr(create, "resolve_fn"):
-        create = partial(create.resolve_fn, self=client.chat.completions)
-    completion = create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": json.dumps(args)},
-        ],
-        response_format=response_format,
+    completion = trace_server.completions_create(
+        CompletionsCreateReq(
+            project_id=project_id,
+            inputs=dict(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": json.dumps(args)},
+                ],
+                response_format=response_format,
+            ),
+            track_llm_call=False,
+        )
     )
-    res = json.loads(completion.choices[0].message.content)
-    if response_is_not_object:
-        res = res[dummy_key]
+
+    # client = OpenAI()
+    # # Silly hack to get around issue in tests:
+    # create = client.chat.completions.create
+    # if hasattr(create, "resolve_fn"):
+    #     create = partial(create.resolve_fn, self=client.chat.completions)
+    # completion = create(
+    #     model=model,
+    #     messages=[
+    #         {"role": "system", "content": system_prompt},
+    #         {"role": "user", "content": json.dumps(args)},
+    #     ],
+    #     response_format=response_format,
+    # )
+    content = (
+        completion.response.get("choices", [{}])[0].get("message", {}).get("content")
+    )
+    if content is None:
+        res = None
+    else:
+        res = json.loads(content)
+        if response_is_not_object:
+            res = res[dummy_key]
     return res
