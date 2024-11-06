@@ -32,7 +32,7 @@ export const NewActionDefinitionModal: FC<NewActionDefinitionModalProps> = ({
   onSave,
   initialTemplate,
 }) => {
-  const [name, setName] = useState('');
+  const [name, setName] = useState<string>('');
   const [selectedActionType, setSelectedActionType] =
     useState<ActionType>('llm_judge');
   const [config, setConfig] = useState<Record<string, any>>({});
@@ -72,7 +72,7 @@ export const NewActionDefinitionModal: FC<NewActionDefinitionModalProps> = ({
       title="Configure Scorer"
       onClose={onClose}
       onSave={handleSave}
-      saveDisabled={!isValid}>
+      saveDisabled={!isValid || name === ''}>
       <TextField
         fullWidth
         label="Name"

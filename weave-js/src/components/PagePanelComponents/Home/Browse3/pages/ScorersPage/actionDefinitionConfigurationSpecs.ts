@@ -35,7 +35,7 @@ const ResponseFormatSchema = z.discriminatedUnion('type', [
 
 const ConfiguredLlmJudgeActionFriendlySchema = z.object({
   model: z.enum(['gpt-4o-mini', 'gpt-4o']).default('gpt-4o-mini'),
-  prompt: z.string(),
+  prompt: z.string().min(3),
   response_schema: ResponseFormatSchema,
 });
 
