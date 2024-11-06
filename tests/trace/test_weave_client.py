@@ -128,7 +128,7 @@ def test_table_update(client):
 def test_table_append(server):
     table_ref = server.new_table([1, 2, 3])
     new_table_ref, item_id = server.table_append(table_ref, 4)
-    assert list(r.val for r in server.table_query(new_table_ref)) == [1, 2, 3, 4]
+    assert [r.val for r in server.table_query(new_table_ref)] == [1, 2, 3, 4]
 
 
 @pytest.mark.skip()
@@ -137,7 +137,7 @@ def test_table_remove(server):
     table_ref1, item_id2 = server.table_append(table_ref0, 2)
     table_ref2, item_id3 = server.table_append(table_ref1, 3)
     table_ref3 = server.table_remove(table_ref2, item_id2)
-    assert list(r.val for r in server.table_query(table_ref3)) == [1, 3]
+    assert [r.val for r in server.table_query(table_ref3)] == [1, 3]
 
 
 @pytest.mark.skip()
@@ -153,7 +153,7 @@ def test_new_val_with_list(server):
     table_ref = server_val["a"]
     assert isinstance(table_ref, chobj.TableRef)
     table_val = server.table_query(table_ref)
-    assert list(r.val for r in table_val) == [1, 2, 3]
+    assert [r.val for r in table_val] == [1, 2, 3]
 
 
 @pytest.mark.skip()
