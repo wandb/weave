@@ -48,9 +48,18 @@ class ParamBuilder:
         self._params: dict[str, typing.Any] = {}
         self._prefix = (prefix or f"pb_{param_builder_count}") + "_"
         self._database_type = database_type
+        self._param_to_name: dict[typing.Any, str] = {}
 
     def add_param(self, param_value: typing.Any) -> str:
         param_name = self._prefix + str(len(self._params))
+
+        # Only attempt caching for hashable values
+        if isinstance(param_value, typing.Hashable):
+            if param_value in self._param_to_name:
+                return self._param_to_name[param_value]
+            self._param_to_name[param_value] = param_name
+
+        # For non-hashable values, just generate a new param without caching
         self._params[param_name] = param_value
         return param_name
 
@@ -474,12 +483,12 @@ def python_value_to_ch_type(value: typing.Any) -> str:
     """Helper function to convert python types to clickhouse types."""
     if isinstance(value, str):
         return "String"
+    elif isinstance(value, bool):
+        return "Bool"
     elif isinstance(value, int):
         return "UInt64"
     elif isinstance(value, float):
         return "Float64"
-    elif isinstance(value, bool):
-        return "UInt8"
     elif value is None:
         return "Nullable(String)"
     else:

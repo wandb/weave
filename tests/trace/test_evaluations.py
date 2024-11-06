@@ -10,7 +10,7 @@ import weave
 from tests.trace.util import AnyIntMatcher
 from weave import Evaluation, Model
 from weave.scorers import Scorer
-from weave.trace.feedback_types.score import SCORE_TYPE_NAME
+from weave.trace.refs import CallRef
 from weave.trace.weave_client import get_ref
 from weave.trace_server import trace_server_interface as tsi
 
@@ -935,6 +935,7 @@ async def test_evaluation_with_multiple_column_maps():
     ), "No matches should be found for AnotherDummyScorer"
 
 
+@pytest.mark.asyncio
 async def test_feedback_is_correctly_linked(client):
     @weave.op
     def predict(text: str) -> str:
@@ -961,7 +962,14 @@ async def test_feedback_is_correctly_linked(client):
     feedbacks = calls.calls[0].summary["weave"]["feedback"]
     assert len(feedbacks) == 1
     feedback = feedbacks[0]
-    assert feedback["feedback_type"] == SCORE_TYPE_NAME
-    assert feedback["payload"]["name"] == "score"
-    assert feedback["payload"]["op_ref"] == get_ref(score).uri()
-    assert feedback["payload"]["results"] == True
+    assert feedback["feedback_type"] == "wandb.runnable.score"
+    assert feedback["payload"] == {"output": True}
+    assert feedback["runnable_ref"] == get_ref(score).uri()
+    assert (
+        feedback["call_ref"]
+        == CallRef(
+            entity=client.entity,
+            project=client.project,
+            id=list(score.calls())[0].id,
+        ).uri()
+    )

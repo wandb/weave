@@ -18,7 +18,6 @@ from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
-from weave.trace.feedback_types.score import SCORE_TYPE_NAME, ScoreTypePayload
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
@@ -296,6 +295,46 @@ class Call:
 
     def remove_display_name(self) -> None:
         self.set_display_name(None)
+
+    def _apply_scorer(self, scorer_op: Op) -> None:
+        """
+        This is a private method that applies a scorer to a call and records the feedback.
+        In the near future, this will be made public, but for now it is only used internally
+        for testing.
+
+        Before making this public, we should refactor such that the `predict_and_score` method
+        inside `eval.py` uses this method inside the scorer block.
+
+        Current limitations:
+        - only works for ops (not Scorer class)
+        - no async support
+        - no context yet (ie. ground truth)
+        """
+        client = weave_client_context.require_weave_client()
+        scorer_signature = scorer_op.signature
+        scorer_arg_names = list(scorer_signature.parameters.keys())
+        score_args = {k: v for k, v in self.inputs.items() if k in scorer_arg_names}
+        if "output" in scorer_arg_names:
+            score_args["output"] = self.output
+        _, score_call = scorer_op.call(**score_args)
+        scorer_op_ref = get_ref(scorer_op)
+        if scorer_op_ref is None:
+            raise ValueError("Scorer op has no ref")
+        self_ref = get_ref(self)
+        if self_ref is None:
+            raise ValueError("Call has no ref")
+        score_name = scorer_op_ref.name
+        score_results = score_call.output
+        score_call_ref = get_ref(score_call)
+        if score_call_ref is None:
+            raise ValueError("Score call has no ref")
+        client._add_score(
+            call_ref_uri=self_ref.uri(),
+            score_name=score_name,
+            score_results=score_results,
+            scorer_call_ref_uri=score_call_ref.uri(),
+            scorer_op_ref_uri=scorer_op_ref.uri(),
+        )
 
 
 class CallsIter:
@@ -1108,8 +1147,6 @@ class WeaveClient:
 
         Outstanding questions:
         - Should we somehow include supervision (ie. the ground truth) in the payload?
-        - What should the shape of `ScoreTypePayload` be? Maybe we want the results to be top-level?
-        - What should we use for name? A standard "score" or the score name?
         """
         # Parse the refs (acts as validation)
         call_ref = parse_uri(call_ref_uri)
@@ -1134,18 +1171,17 @@ class WeaveClient:
 
         # # Prepare the supervision payload
 
-        payload: ScoreTypePayload = {
-            "name": score_name,
-            "op_ref": scorer_op_ref_uri,
-            "call_ref": scorer_call_ref_uri,
-            "results": results_json,
+        payload = {
+            "output": results_json,
         }
 
         freq = FeedbackCreateReq(
             project_id=self._project_id(),
             weave_ref=call_ref_uri,
-            feedback_type=SCORE_TYPE_NAME,  # should this be score_name?
+            feedback_type="wandb.runnable." + score_name,
             payload=payload,
+            runnable_ref=scorer_op_ref_uri,
+            call_ref=scorer_call_ref_uri,
         )
         response = self.server.feedback_create(freq)
 

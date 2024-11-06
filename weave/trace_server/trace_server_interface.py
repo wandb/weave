@@ -671,14 +671,6 @@ class RefsReadBatchRes(BaseModel):
     vals: list[Any]
 
 
-class FeedbackPayloadReactionReq(BaseModel):
-    emoji: str
-
-
-class FeedbackPayloadNoteReq(BaseModel):
-    note: str = Field(min_length=1, max_length=1024)
-
-
 class FeedbackCreateReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
     weave_ref: str = Field(examples=["weave:///entity/project/object/name:digest"])
@@ -690,6 +682,20 @@ class FeedbackCreateReq(BaseModel):
                 "key": "value",
             }
         ]
+    )
+    # TODO: From Griffin: `it would be nice if we could type this to a kind of ref,
+    # like objectRef, with a pydantic validator and then check its construction in the client.`
+    annotation_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/object/name:digest"]
+    )
+    runnable_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/op/name:digest"]
+    )
+    call_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/call/call_id"]
+    )
+    trigger_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/object/name:digest"]
     )
 
     # wb_user_id is automatically populated by the server
