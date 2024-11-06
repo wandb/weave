@@ -1,7 +1,8 @@
 """Classes for working with feedback on a project or ref level."""
 
 import json
-from typing import Any, Iterable, Iterator, Optional
+from collections.abc import Iterable, Iterator
+from typing import Any, Optional
 
 from rich.table import Table
 

@@ -4,10 +4,10 @@ import json
 import platform
 import sys
 import time
-import typing
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from contextvars import copy_context
+from typing import Any, Callable
 
 import pytest
 import wandb
@@ -244,12 +244,12 @@ def test_graph_call_ordering(client):
 
 
 class OpCallSummary(BaseModel):
-    op: typing.Callable
+    op: Callable
     num_calls: int = 0
 
 
 class OpCallSpec(BaseModel):
-    call_summaries: typing.Dict[str, OpCallSummary]
+    call_summaries: dict[str, OpCallSummary]
     total_calls: int
     root_calls: int
     run_calls: int
@@ -287,7 +287,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     def liner(m: Number, b, x) -> Number:
         return adder(Number(value=multiplier(m, x)), b)
 
-    result: typing.Dict[str, OpCallSummary] = {}
+    result: dict[str, OpCallSummary] = {}
     result["adder_v0"] = OpCallSummary(op=adder_v0)
     result["adder"] = OpCallSummary(op=adder)
     result["subtractor"] = OpCallSummary(op=subtractor)
@@ -334,7 +334,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     run_calls += num_calls * 3
     root_calls += num_calls
 
-    total_calls = sum([op_call.num_calls for op_call in result.values()])
+    total_calls = sum(op_call.num_calls for op_call in result.values())
 
     return OpCallSpec(
         call_summaries=result,
@@ -408,11 +408,11 @@ def test_trace_call_query_filter_op_version_refs(client):
         assert len(res.calls) == exp_count
 
 
-def has_any(list_a: typing.List[str], list_b: typing.List[str]) -> bool:
-    return any([a in list_b for a in list_a])
+def has_any(list_a: list[str], list_b: list[str]) -> bool:
+    return any(a in list_b for a in list_a)
 
 
-def unique_vals(list_a: typing.List[str]) -> typing.List[str]:
+def unique_vals(list_a: list[str]) -> list[str]:
     return list(set(list_a))
 
 
@@ -425,7 +425,7 @@ def get_all_calls_asserting_finished(
         )
     )
     assert len(res.calls) == call_spec.total_calls
-    assert all([call.ended_at for call in res.calls])
+    assert all(call.ended_at for call in res.calls)
     return res
 
 
@@ -1128,10 +1128,10 @@ def test_trace_call_filter(client):
         print(f"TEST CASE [{count}]", query)
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq.model_validate(
-                dict(
-                    project_id=get_client_project_id(client),
-                    query={"$expr": query},
-                )
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {"$expr": query},
+                }
             )
         )
 
@@ -1141,10 +1141,10 @@ def test_trace_call_filter(client):
             )
         inner_res = get_client_trace_server(client).calls_query_stats(
             tsi.CallsQueryStatsReq.model_validate(
-                dict(
-                    project_id=get_client_project_id(client),
-                    query={"$expr": query},
-                )
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {"$expr": query},
+                }
             )
         )
 
@@ -2243,7 +2243,7 @@ def test_sort_and_filter_through_refs(client):
         return val
 
     class TestObj(weave.Object):
-        val: typing.Any
+        val: Any
 
     def test_obj(val):
         return weave.publish(TestObj(val=val))
@@ -2331,21 +2331,23 @@ def test_sort_and_filter_through_refs(client):
     ]:
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq.model_validate(
-                dict(
-                    project_id=get_client_project_id(client),
-                    sort_by=[tsi.SortBy(field="inputs.val.a.b.c.d", direction="asc")],
-                    query={"$expr": query},
-                )
+                {
+                    "project_id": get_client_project_id(client),
+                    "sort_by": [
+                        tsi.SortBy(field="inputs.val.a.b.c.d", direction="asc")
+                    ],
+                    "query": {"$expr": query},
+                }
             )
         )
 
         assert len(inner_res.calls) == count
         inner_res = get_client_trace_server(client).calls_query_stats(
             tsi.CallsQueryStatsReq.model_validate(
-                dict(
-                    project_id=get_client_project_id(client),
-                    query={"$expr": query},
-                )
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {"$expr": query},
+                }
             )
         )
 
@@ -2374,10 +2376,10 @@ def test_in_operation(client):
 
     res = get_client_trace_server(client).calls_query_stats(
         tsi.CallsQueryStatsReq.model_validate(
-            dict(
-                project_id=get_client_project_id(client),
-                query={"$expr": query},
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "query": {"$expr": query},
+            }
         )
     )
     assert res.count == 2
@@ -2390,10 +2392,10 @@ def test_in_operation(client):
     }
     res = get_client_trace_server(client).calls_query_stream(
         tsi.CallsQueryReq.model_validate(
-            dict(
-                project_id=get_client_project_id(client),
-                query={"$expr": query},
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "query": {"$expr": query},
+            }
         )
     )
     res = list(res)
@@ -2661,13 +2663,13 @@ def test_object_with_disallowed_keys(client):
     assert obj.ref.name == "thing-with-disallowed-keys"
 
     create_req = tsi.ObjCreateReq.model_validate(
-        dict(
-            obj=dict(
-                project_id=client._project_id(),
-                object_id=name,
-                val={"1": 1},
-            )
-        )
+        {
+            "obj": {
+                "project_id": client._project_id(),
+                "object_id": name,
+                "val": {"1": 1},
+            }
+        }
     )
 
     if SHOULD_ENFORCE_OBJ_ID_CHARSET:
@@ -2688,13 +2690,13 @@ def test_object_with_char_limit(client):
     assert obj.ref.name == name
 
     create_req = tsi.ObjCreateReq.model_validate(
-        dict(
-            obj=dict(
-                project_id=client._project_id(),
-                object_id=name,
-                val={"1": 1},
-            )
-        )
+        {
+            "obj": {
+                "project_id": client._project_id(),
+                "object_id": name,
+                "val": {"1": 1},
+            }
+        }
     )
     client.server.obj_create(create_req)
 
@@ -2709,13 +2711,13 @@ def test_object_with_char_over_limit(client):
     assert obj.ref.name == name[:-1]
 
     create_req = tsi.ObjCreateReq.model_validate(
-        dict(
-            obj=dict(
-                project_id=client._project_id(),
-                object_id=name,
-                val={"1": 1},
-            )
-        )
+        {
+            "obj": {
+                "project_id": client._project_id(),
+                "object_id": name,
+                "val": {"1": 1},
+            }
+        }
     )
     with pytest.raises(Exception):
         client.server.obj_create(create_req)

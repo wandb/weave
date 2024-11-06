@@ -11,6 +11,10 @@ OBJECT_ATTR_EDGE_NAME = refs_internal.OBJECT_ATTR_EDGE_NAME
 TABLE_ROW_ID_EDGE_NAME = refs_internal.TABLE_ROW_ID_EDGE_NAME
 
 
+class WeaveDigestError(ValueError):
+    """Raised when a digest is invalid."""
+
+
 @dataclasses.dataclass(frozen=True)
 class Ref:
     def uri(self) -> str:
@@ -42,7 +46,7 @@ class TableRef(Ref):
             self.__dict__["_digest"] = self._digest.result()
 
         if not isinstance(self._digest, str):
-            raise Exception(f"TableRef digest is not a string: {self._digest}")
+            raise WeaveDigestError(f"TableRef digest is not a string: {self._digest}")
 
         refs_internal.validate_no_slashes(self._digest, "digest")
         refs_internal.validate_no_colons(self._digest, "digest")
@@ -56,7 +60,9 @@ class TableRef(Ref):
             self.__dict__["_row_digests"] = self._row_digests.result()
 
         if not isinstance(self._row_digests, list):
-            raise Exception(f"TableRef row_digests is not a list: {self._row_digests}")
+            raise WeaveDigestError(
+                f"TableRef row_digests is not a list: {self._row_digests}"
+            )
 
         return self._row_digests
 
@@ -123,7 +129,7 @@ class ObjectRef(RefWithExtra):
             self.__dict__["_digest"] = self._digest.result()
 
         if not isinstance(self._digest, str):
-            raise Exception(f"ObjectRef digest is not a string: {self._digest}")
+            raise WeaveDigestError(f"ObjectRef digest is not a string: {self._digest}")
 
         refs_internal.validate_no_slashes(self._digest, "digest")
         refs_internal.validate_no_colons(self._digest, "digest")

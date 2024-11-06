@@ -4,7 +4,8 @@ import logging
 import textwrap
 import time
 import traceback
-from typing import Any, Callable, Coroutine, Literal, Optional, Union, cast
+from collections.abc import Coroutine
+from typing import Any, Callable, Literal, Optional, Union, cast
 
 from pydantic import PrivateAttr
 from rich import print
@@ -318,7 +319,7 @@ class Evaluation(Object):
 
                                         You are mapping `{arg}` to `{dataset_column_name}`, but `{dataset_column_name}`
                                         was not found in the dataset columns.
-                                        
+
                                         Available dataset columns: {list(example.keys())}
 
                                         Hint:
@@ -332,7 +333,7 @@ class Evaluation(Object):
                                     You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
 
                                     `score` method argument `{arg}` is not found in the dataset columns and is not mapped in `column_map`.
-                                    
+
                                     Available dataset columns: {list(example.keys())}
                                     `column_map`: {scorer.column_map}
 
@@ -395,11 +396,11 @@ class Evaluation(Object):
 
                                         If using the `Scorer` weave class, you can set the `scorer.column_map`
                     attribute to map scorer argument names to dataset columns.
-                    
+
                     For example, if the `score` expects "output", "input" and "ground_truth" and we have a dataset
                     with columns "question" and "answer", `column_map` can be used to map the non-output parameter like so:
                     {{"input": "question", "ground_truth": "answer"}}
-                    
+
                     scorer argument names: {score_arg_names}
                     dataset keys: {example.keys()}
                     scorer.column_map: {getattr(scorer, 'column_map', '{}')}

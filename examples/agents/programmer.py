@@ -80,7 +80,7 @@ def read_from_file(path: str) -> str:
         The content of the file.
     """
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             result = f.read()
             if len(result) > LENGTH_LIMIT:
                 result = result[:LENGTH_LIMIT]
@@ -103,8 +103,7 @@ def run_command(command: str) -> str:
     try:
         completed_process = subprocess.run(
             command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             shell=True,
         )
