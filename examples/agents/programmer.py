@@ -45,9 +45,10 @@ def list_files(directory: str) -> str:
         if len(result) > LENGTH_LIMIT:
             result = result[:LENGTH_LIMIT]
             result += "\n... (truncated)"
-        return result
     except Exception as e:
         return json.dumps([str(e)])
+    else:
+        return result
 
 
 @weave.op()
@@ -64,9 +65,10 @@ def write_to_file(path: str, content: str) -> str:
     try:
         with open(path, "w") as f:
             f.write(content)
-        return "File written successfully."
     except Exception as e:
         return str(e)
+    else:
+        return "File written successfully."
 
 
 @weave.op()

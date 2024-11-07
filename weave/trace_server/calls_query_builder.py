@@ -757,7 +757,7 @@ def process_query_to_conditions(
                 position_operation = "positionCaseInsensitive"
             cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
         else:
-            raise ValueError(f"Unknown operation type: {operation}")
+            raise TypeError(f"Unknown operation type: {operation}")
 
         return cond
 
@@ -790,7 +790,7 @@ def process_query_to_conditions(
         ):
             return process_operation(operand)
         else:
-            raise ValueError(f"Unknown operand type: {operand}")
+            raise TypeError(f"Unknown operand type: {operand}")
 
     filter_cond = process_operation(query.expr_)
 

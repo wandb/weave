@@ -37,7 +37,7 @@ def serve(
 ) -> None:
     parsed_ref = parse_uri(model_ref)
     if not isinstance(parsed_ref, ObjectRef):
-        raise ValueError(f"Expected a weave artifact uri, got {parsed_ref}")
+        raise TypeError(f"Expected a weave artifact uri, got {parsed_ref}")
     ref_project = parsed_ref.project
     project_override = project or os.getenv("PROJECT_NAME")
     if project_override:
