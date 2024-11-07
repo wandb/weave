@@ -973,3 +973,37 @@ async def test_feedback_is_correctly_linked(client):
             id=list(score.calls())[0].id,
         ).uri()
     )
+
+
+@pytest.mark.asyncio
+async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
+    @weave.op
+    def predict(text: str) -> str:
+        return text
+
+    class MyScorer(Scorer):
+        @weave.op
+        def score(self, text, output) -> bool:
+            return text == output
+
+    scorer = MyScorer()
+    eval = weave.Evaluation(
+        dataset=[{"text": "hello"}],
+        scorers=[scorer],
+    )
+    res = await eval.evaluate(predict)
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            include_feedback=True,
+            filter=tsi.CallsFilter(op_names=[get_ref(predict).uri()]),
+        )
+    )
+    assert len(calls.calls) == 1
+    assert calls.calls[0].summary["weave"]["feedback"]
+    feedbacks = calls.calls[0].summary["weave"]["feedback"]
+    assert len(feedbacks) == 1
+    feedback = feedbacks[0]
+    assert feedback["feedback_type"] == "wandb.runnable.MyScorer"
+    assert feedback["payload"] == {"output": True}
+    assert feedback["runnable_ref"] == get_ref(scorer).uri()
