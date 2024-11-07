@@ -127,9 +127,9 @@ def _apply_fn_defaults_to_inputs(
             ):
                 inputs[param_name] = param.default
             if param.kind == inspect.Parameter.VAR_POSITIONAL:
-                inputs[param_name] = tuple()
+                inputs[param_name] = ()
             elif param.kind == inspect.Parameter.VAR_KEYWORD:
-                inputs[param_name] = dict()
+                inputs[param_name] = {}
     return inputs
 
 
@@ -439,7 +439,7 @@ def _do_call(
                 op, call, *pargs.args, __should_raise=__should_raise, **pargs.kwargs
             )
             if inspect.iscoroutine(execute_result):
-                raise Exception(
+                raise TypeError(
                     "Internal error: Expected `_execute_call` to return a sync result"
                 )
             execute_result = cast(tuple[Any, "Call"], execute_result)
@@ -482,7 +482,7 @@ async def _do_call_async(
                 op, call, *args, __should_raise=__should_raise, **kwargs
             )
             if not inspect.iscoroutine(execute_result):
-                raise Exception(
+                raise TypeError(
                     "Internal error: Expected `_execute_call` to return a coroutine"
                 )
             execute_result = cast(
