@@ -53,7 +53,7 @@ export const MessagePanel = ({
     message.tool_calls != null && message.tool_calls.length > 0;
   const hasContent = message.content != null && message.content.length > 0;
 
-  const responseIndexes = hasToolCalls
+  const responseIndexes: number[] | undefined = hasToolCalls
     ? message
         .tool_calls!.map(
           (toolCall: ToolCallWithResponse) => toolCall.response?.original_index

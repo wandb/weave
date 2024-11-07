@@ -17,7 +17,7 @@ export const MessagePanelPart = ({
       const reformat = JSON.stringify(JSON.parse(value), null, 2);
       return <CodeEditor language="json" value={reformat} />;
     }
-    
+
     // Markdown is slowing down chat view, disable for now
     // Bring back if we can find a faster way to render markdown
     // if (isLikelyMarkdown(value)) {

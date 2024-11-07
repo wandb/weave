@@ -93,7 +93,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           }
         />
         {playgroundStates[idx].traceCall?.id && (
-          <CopyableId id={playgroundStates[idx]!.traceCall!.id} type="Call" />
+          <CopyableId id={playgroundStates[idx]!.traceCall!.id!} type="Call" />
         )}
       </Box>
       <Box
