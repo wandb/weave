@@ -8,11 +8,9 @@ from weave.trace.op import Op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.serializer import get_serializer_by_id, get_serializer_for_obj
 
-KNOWN_TYPES = [
-    "PIL.Image.Image",
-    # in future, could generalize as
-    # {target_cls.__module__}.{target_cls.__qualname__}
-]
+# in future, could generalize as
+# {target_cls.__module__}.{target_cls.__qualname__}
+KNOWN_TYPES = ["PIL.Image.Image", "wave.Wave_read"]
 
 
 def encode_custom_obj(obj: Any) -> Optional[dict]:
