@@ -1,0 +1,58 @@
+from typing import Optional
+
+import jsonschema
+from pydantic import Field, field_validator
+
+from weave.trace_server.interface.base_object_classes import base_object_def
+
+ANNOTATION_COLUMN_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "enum": ["string", "number", "boolean", "categorical"],
+        },
+        "max_length": {"type": "number"},
+        "min": {"type": "number"},
+        "max": {"type": "number"},
+        "options": {"type": "array", "items": {"type": ["string", "number"]}},
+    },
+    "required": ["type"],
+}
+
+
+class AnnotationColumn(base_object_def.BaseObject):
+    json_schema: dict = Field(
+        default={},
+        description="Expected to be valid JSON Schema",
+        examples=[
+            # String feedback
+            {"type": "string", "max_length": 100},
+            # Number feedback
+            {"type": "number", "min": 0, "max": 100},
+            # Boolean feedback
+            {"type": "boolean"},
+            # Categorical feedback
+            {"type": "categorical", "options": ["option1", "option2"]},
+        ],
+    )
+
+    # If true, all unique creators will have their
+    # own value for this feedback type. Otherwise,
+    # by default, the value is shared and can be edited.
+    unique_among_creators: bool = False
+
+    # If provided, this feedback type will only be shown
+    # when a call is generated from the given op ref
+    op_scope: Optional[list[str]] = Field(
+        default=None,
+        examples=[
+            ["weave:///entity/project/op/name:digest"],
+            ["weave:///entity/project/op/name:*"],
+        ],
+    )
+
+    @field_validator("json_schema")
+    def validate_json_schema(cls, v: dict) -> dict:
+        jsonschema.validate(v, ANNOTATION_COLUMN_JSON_SCHEMA)
+        return v
