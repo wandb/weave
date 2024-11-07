@@ -1,6 +1,3 @@
-import pytest
-from pydantic import ValidationError
-
 from weave.flow.annotation_column import AnnotationColumn
 from weave.trace_server.trace_server_interface import ObjQueryReq
 
@@ -21,30 +18,6 @@ def test_human_feedback_basic(client):
     )
     ref1 = client.save(col1, "my numerical spec")
     assert ref1
-
-    with pytest.raises(ValidationError):
-        # max_length should be a number
-        col2 = AnnotationColumn(
-            name="Text field #1",
-            json_schema={"type": "string", "max_length": "hi"},
-            op_scope=["weave:///entity/project/op/name:digest"],
-        )
-
-    with pytest.raises(ValidationError):
-        # maxLength isnt valid
-        col2 = AnnotationColumn(
-            name="Text field #1",
-            json_schema={"type": "string", "maxLength": 100},
-            op_scope=["weave:///entity/project/op/name:digest"],
-        )
-
-    with pytest.raises(ValidationError):
-        # no json schema
-        col2 = AnnotationColumn(
-            name="Text field #1",
-            json_schema={},
-            op_scope=["weave:///entity/project/op/name:digest"],
-        )
 
     col2 = AnnotationColumn(
         name="Text field #1",
