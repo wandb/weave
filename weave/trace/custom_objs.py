@@ -56,6 +56,17 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
     }
 
 
+def _decode_custom_obj_with_op(
+    encoded_path_contents: Mapping[str, Union[str, bytes]], load_instance_op: Op
+) -> Any:
+    # Disables tracing so that calls to loading data itself don't get traced
+    load_instance_op._tracing_enabled = False  # type: ignore
+    art = MemTraceFilesArtifact(encoded_path_contents, metadata={})
+    res = load_instance_op(art, "obj")
+    res.art = art
+    return res
+
+
 def decode_custom_obj(
     weave_type: dict,
     encoded_path_contents: Mapping[str, Union[str, bytes]],
@@ -71,16 +82,12 @@ def decode_custom_obj(
             found_serializer = True
             load_instance_op = serializer.load
 
-            # Disables tracing so that calls to loading data itself don't get traced
-            load_instance_op._tracing_enabled = False  # type: ignore
-            art = MemTraceFilesArtifact(encoded_path_contents, metadata={})
             try:
-                res = load_instance_op(art, "obj")
+                return _decode_custom_obj_with_op(
+                    encoded_path_contents, load_instance_op
+                )
             except Exception as e:
                 pass
-            else:
-                res.art = art
-                return res
 
     # Otherwise, fall back to load_instance_op
     if not found_serializer:
@@ -97,14 +104,9 @@ def decode_custom_obj(
                 f"Failed to load op needed to decode object of type `{_type}`. See logs above for more information."
             )
 
-    load_instance_op._tracing_enabled = False  # type: ignore
-    art = MemTraceFilesArtifact(encoded_path_contents, metadata={})
     try:
-        res = load_instance_op(art, "obj")
+        return _decode_custom_obj_with_op(encoded_path_contents, load_instance_op)
     except Exception as e:
         raise DecodeCustomObjectError(
             f"Failed to decode object of type `{_type}`. See logs above for more information."
         ) from e
-    else:
-        res.art = art
-        return res
