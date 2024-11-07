@@ -1,18 +1,19 @@
-import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
-import {Button} from '@wandb/weave/components/Button';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {makeRefCall} from '@wandb/weave/util/refs';
-import React, {useState} from 'react';
+import { useViewerInfo } from '@wandb/weave/common/hooks/useViewerInfo';
+import { Button } from '@wandb/weave/components/Button';
+import { Tailwind } from '@wandb/weave/components/Tailwind';
+import { makeRefCall } from '@wandb/weave/util/refs';
+import React, { useState } from 'react';
 
-import {Icon} from '../../../../../Icon';
-import {HumanFeedbackCell} from './HumanFeedback';
-import {tsHumanFeedbackColumn} from './humanFeedbackTypes';
+import { Icon } from '../../../../../Icon';
+import { HumanFeedbackCell } from './HumanFeedback';
+import { tsHumanFeedbackColumn } from './humanFeedbackTypes';
 
 type HumanFeedbackSidebarProps = {
   feedbackColumns: tsHumanFeedbackColumn[];
   callID: string;
   entity: string;
   project: string;
+  onNextCall?: () => void;
 };
 
 export const HumanFeedbackSidebar = ({
@@ -20,6 +21,7 @@ export const HumanFeedbackSidebar = ({
   callID,
   entity,
   project,
+  onNextCall = () => console.log('Next call clicked'),
 }: HumanFeedbackSidebarProps) => {
   const callRef = makeRefCall(entity, project, callID);
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
@@ -44,7 +46,7 @@ export const HumanFeedbackSidebar = ({
             <Button icon="settings" size="small" variant="ghost" />
           )}
         </div>
-        <div className="mx-6 h-full flex-grow">
+        <div className="mx-6 h-full flex-grow overflow-auto">
           <div>
             <button
               className="text-md hover:bg-gray-100 flex w-full items-center justify-between px-6 py-8 font-semibold"
@@ -85,6 +87,15 @@ export const HumanFeedbackSidebar = ({
               </div>
             )}
           </div>
+        </div>
+        <div className="border-t border-moon-300 p-12 mr-4">
+          <Button
+            onClick={onNextCall}
+            variant="primary"
+            className="w-full"
+            size="large">
+            Done →
+          </Button>
         </div>
       </div>
     </Tailwind>
