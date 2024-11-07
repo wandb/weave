@@ -482,14 +482,14 @@ def test_op_return_sync_generator_exception(client):
             size -= 1
             yield size
             if size == 5:
-                raise Exception("test")
+                raise ValueError("test")
 
     add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     try:
         for item in fn():
             pass
-    except Exception:
+    except ValueError:
         pass
 
     res = client.server.calls_query(
@@ -515,14 +515,14 @@ async def test_op_return_async_generator_exception(client):
             size -= 1
             yield size
             if size == 5:
-                raise Exception("test")
+                raise ValueError("test")
 
     add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     try:
         async for item in fn():
             pass
-    except Exception:
+    except ValueError:
         pass
 
     res = client.server.calls_query(
@@ -550,7 +550,7 @@ def test_op_return_sync_iterator_exception(client):
             if self.size == 0:
                 raise StopIteration
             if self.size == 5:
-                raise Exception("test")
+                raise ValueError("test")
             self.size -= 1
             return self.size
 
@@ -563,7 +563,7 @@ def test_op_return_sync_iterator_exception(client):
     try:
         for item in fn():
             pass
-    except Exception:
+    except ValueError:
         pass
 
     res = client.server.calls_query(
@@ -592,7 +592,7 @@ async def test_op_return_async_iterator_exception(client):
             if self.size == 0:
                 raise StopAsyncIteration
             if self.size == 5:
-                raise Exception("test")
+                raise ValueError("test")
             self.size -= 1
             return self.size
 
@@ -605,7 +605,7 @@ async def test_op_return_async_iterator_exception(client):
     try:
         async for item in fn():
             pass
-    except Exception:
+    except ValueError:
         pass
 
     res = client.server.calls_query(

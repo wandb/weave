@@ -1,7 +1,8 @@
 import logging
 import typing
+from collections.abc import Sequence
 from types import CoroutineType
-from typing import Any, Optional, Sequence
+from typing import Any, Optional
 
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
@@ -232,8 +233,8 @@ def isinstance_namedtuple(obj: Any) -> bool:
 
 def _load_custom_obj_files(
     project_id: str, server: TraceServerInterface, file_digests: dict
-) -> typing.Dict[str, bytes]:
-    loaded_files: typing.Dict[str, bytes] = {}
+) -> dict[str, bytes]:
+    loaded_files: dict[str, bytes] = {}
     for name, digest in file_digests.items():
         file_response = server.file_content_read(
             FileContentReadReq(project_id=project_id, digest=digest)

@@ -1,13 +1,17 @@
 # Clickhouse Trace Server Manager
 import logging
 import os
-import typing
+from typing import Optional
 
 from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server.costs.insert_costs import insert_costs, should_insert_costs
 
 logger = logging.getLogger(__name__)
+
+
+class MigrationError(RuntimeError):
+    """Raised when a migration error occurs."""
 
 
 class ClickHouseTraceServerMigrator:
@@ -22,7 +26,7 @@ class ClickHouseTraceServerMigrator:
         self._initialize_migration_db()
 
     def apply_migrations(
-        self, target_db: str, target_version: typing.Optional[int] = None
+        self, target_db: str, target_version: Optional[int] = None
     ) -> None:
         status = self._get_migration_status(target_db)
         logger.info(f"""`{target_db}` migration status: {status}""")
@@ -67,7 +71,7 @@ class ClickHouseTraceServerMigrator:
         """
         )
 
-    def _get_migration_status(self, db_name: str) -> typing.Dict:
+    def _get_migration_status(self, db_name: str) -> dict:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
         select_columns = ", ".join(column_names)
         query = f"""
@@ -84,26 +88,26 @@ class ClickHouseTraceServerMigrator:
         res = self.ch_client.query(query)
         result_rows = res.result_rows
         if res is None or len(result_rows) == 0:
-            raise Exception("Migration table not found")
+            raise MigrationError("Migration table not found")
 
         return dict(zip(column_names, result_rows[0]))
 
     def _get_migrations(
         self,
-    ) -> typing.Dict[int, typing.Dict[str, typing.Optional[str]]]:
+    ) -> dict[int, dict[str, Optional[str]]]:
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_files = os.listdir(migration_dir)
-        migration_map: typing.Dict[int, typing.Dict[str, typing.Optional[str]]] = {}
+        migration_map: dict[int, dict[str, Optional[str]]] = {}
         max_version = 0
         for file in migration_files:
             if not file.endswith(".up.sql") and not file.endswith(".down.sql"):
-                raise Exception(f"Invalid migration file: {file}")
+                raise MigrationError(f"Invalid migration file: {file}")
             file_name_parts = file.split("_", 1)
             if len(file_name_parts) <= 1:
-                raise Exception(f"Invalid migration file: {file}")
+                raise MigrationError(f"Invalid migration file: {file}")
             version = int(file_name_parts[0], 10)
             if version < 1:
-                raise Exception(f"Invalid migration file: {file}")
+                raise MigrationError(f"Invalid migration file: {file}")
 
             is_up = file.endswith(".up.sql")
 
@@ -112,40 +116,46 @@ class ClickHouseTraceServerMigrator:
 
             if is_up:
                 if migration_map[version]["up"] is not None:
-                    raise Exception(f"Duplicate migration file for version {version}")
+                    raise MigrationError(
+                        f"Duplicate migration file for version {version}"
+                    )
                 migration_map[version]["up"] = file
             else:
                 if migration_map[version]["down"] is not None:
-                    raise Exception(f"Duplicate migration file for version {version}")
+                    raise MigrationError(
+                        f"Duplicate migration file for version {version}"
+                    )
                 migration_map[version]["down"] = file
 
             if version > max_version:
                 max_version = version
 
         if len(migration_map) == 0:
-            raise Exception("No migrations found")
+            raise MigrationError("No migrations found")
 
         if max_version != len(migration_map):
-            raise Exception(
+            raise MigrationError(
                 f"Invalid migration versioning. Expected {max_version} migrations but found {len(migration_map)}"
             )
 
         for version in range(1, max_version + 1):
             if version not in migration_map:
-                raise Exception(f"Missing migration file for version {version}")
+                raise MigrationError(f"Missing migration file for version {version}")
             if migration_map[version]["up"] is None:
-                raise Exception(f"Missing up migration file for version {version}")
+                raise MigrationError(f"Missing up migration file for version {version}")
             if migration_map[version]["down"] is None:
-                raise Exception(f"Missing down migration file for version {version}")
+                raise MigrationError(
+                    f"Missing down migration file for version {version}"
+                )
 
         return migration_map
 
     def _determine_migrations_to_apply(
         self,
         current_version: int,
-        migration_map: typing.Dict,
-        target_version: typing.Optional[int] = None,
-    ) -> typing.List[typing.Tuple[int, str]]:
+        migration_map: dict,
+        target_version: Optional[int] = None,
+    ) -> list[tuple[int, str]]:
         if target_version is None:
             target_version = len(migration_map)
             # Do not run down migrations if not explicitly requesting target_version
@@ -155,20 +165,20 @@ class ClickHouseTraceServerMigrator:
                 )
                 return []
         if target_version < 0 or target_version > len(migration_map):
-            raise Exception(f"Invalid target version: {target_version}")
+            raise MigrationError(f"Invalid target version: {target_version}")
 
         if target_version > current_version:
             res = []
             for i in range(current_version + 1, target_version + 1):
                 if migration_map[i]["up"] is None:
-                    raise Exception(f"Missing up migration file for version {i}")
+                    raise MigrationError(f"Missing up migration file for version {i}")
                 res.append((i, f"{migration_map[i]['up']}"))
             return res
         if target_version < current_version:
             res = []
             for i in range(current_version, target_version, -1):
                 if migration_map[i]["down"] is None:
-                    raise Exception(f"Missing down migration file for version {i}")
+                    raise MigrationError(f"Missing down migration file for version {i}")
                 res.append((i - 1, f"{migration_map[i]['down']}"))
             return res
 
@@ -180,7 +190,7 @@ class ClickHouseTraceServerMigrator:
         logger.info(f"Applying migration {migration_file} to `{target_db}`")
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_file_path = os.path.join(migration_dir, migration_file)
-        with open(migration_file_path, "r") as f:
+        with open(migration_file_path) as f:
             migration_sql = f.read()
         self.ch_client.command(
             f"""
