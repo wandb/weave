@@ -19,7 +19,7 @@ class BoxedInt(int):
     _id: int | None = None
     ref: Ref | None = None
 
-    def __deepcopy__(self, memo: dict) -> "BoxedInt":
+    def __deepcopy__(self, memo: dict) -> BoxedInt:
         res = BoxedInt(self)
         memo[id(self)] = res
         return res
@@ -29,7 +29,7 @@ class BoxedFloat(float):
     _id: int | None = None
     ref: Ref | None = None
 
-    def __deepcopy__(self, memo: dict) -> "BoxedFloat":
+    def __deepcopy__(self, memo: dict) -> BoxedFloat:
         res = BoxedFloat(self)
         memo[id(self)] = res
         return res
@@ -39,7 +39,7 @@ class BoxedStr(str):
     _id: int | None = None
     ref: Ref | None = None
 
-    def __deepcopy__(self, memo: dict) -> "BoxedStr":
+    def __deepcopy__(self, memo: dict) -> BoxedStr:
         res = BoxedStr(self)
         memo[id(self)] = res
         return res
@@ -54,7 +54,7 @@ class BoxedDatetime(datetime.datetime):
             and self.timestamp() == other.timestamp()
         )
 
-    def __deepcopy__(self, memo: dict) -> "BoxedDatetime":
+    def __deepcopy__(self, memo: dict) -> BoxedDatetime:
         res = BoxedDatetime.fromtimestamp(self.timestamp(), tz=datetime.timezone.utc)
         memo[id(self)] = res
         return res
@@ -69,7 +69,7 @@ class BoxedTimedelta(datetime.timedelta):
             and self.total_seconds() == other.total_seconds()
         )
 
-    def __deepcopy__(self, memo: dict) -> "BoxedTimedelta":
+    def __deepcopy__(self, memo: dict) -> BoxedTimedelta:
         res = BoxedTimedelta(seconds=self.total_seconds())
         memo[id(self)] = res
         return res
@@ -87,7 +87,7 @@ class BoxedNDArray(np.ndarray):
         if obj is None:
             return
 
-    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> "BoxedNDArray":
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> BoxedNDArray:
         memo = memo or {}
         res = np.asarray(self).view(BoxedNDArray)
         memo[id(self)] = res
