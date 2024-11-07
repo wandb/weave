@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from typing import Any
 
 from pydantic import field_validator
@@ -6,6 +6,7 @@ from pydantic import field_validator
 import weave
 from weave.flow.obj import Object
 from weave.trace.vals import WeaveTable
+from weave.trace.weave_client import Call
 
 
 def short_str(obj: Any, limit: int = 25) -> str:
@@ -66,6 +67,11 @@ class Dataset(Object):
                     "Attempted to construct a Dataset row with an empty dict."
                 )
         return rows
+
+    @classmethod
+    def from_calls(cls, calls: Iterable[Call]) -> "Dataset":
+        calls_as_dicts = [call.to_dict() for call in calls]
+        return cls(rows=calls_as_dicts)
 
     def __iter__(self) -> Iterator[dict]:
         return iter(self.rows)

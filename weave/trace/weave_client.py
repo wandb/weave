@@ -39,7 +39,7 @@ from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.settings import client_parallelism
 from weave.trace.table import Table
-from weave.trace.util import deprecated
+from weave.trace.util import deprecated, safe_to_dict
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
@@ -339,6 +339,10 @@ class Call:
             call_ref_uri=score_call_ref.uri(),
             runnable_ref_uri=scorer_op_ref.uri(),
         )
+
+    def to_dict(self) -> dict:
+        d = {"op_name": self.op_name, **safe_to_dict(self)}
+        return d
 
 
 class CallsIter:

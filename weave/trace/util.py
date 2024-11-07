@@ -1,10 +1,32 @@
+from __future__ import annotations
+
+import inspect
 import warnings
 from collections.abc import Iterable, Iterator
+from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 from contextvars import Context, copy_context
+from dataclasses import fields
 from functools import partial, wraps
 from threading import Thread as _Thread
-from typing import Any, Callable, Optional
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Protocol,
+    TypeVar,
+    runtime_checkable,
+)
+
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
+
+T = TypeVar("T")
+
+
+@runtime_checkable
+class Dataclass(Protocol):
+    __dataclass_fields__: dict
 
 
 class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
@@ -47,7 +69,7 @@ class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
         self,
         fn: Callable,
         *iterables: Iterable[Iterable],
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
         chunksize: int = 1,
     ) -> Iterator:
         contexts = [copy_context() for _ in range(len(list(iterables[0])))]
@@ -137,6 +159,35 @@ def deprecated(new_name: str) -> Callable[[Callable[..., Any]], Callable[..., An
         return wrapper
 
     return deco
+
+
+def safe_to_dict(
+    obj: DataclassInstance,
+    include_private: bool = False,
+    include_properties: bool = False,
+) -> dict[str, Any]:
+    if include_private:
+        obj_fields = [f.name for f in fields(obj)]
+    else:
+        obj_fields = [f.name for f in fields(obj) if not f.name.startswith("_")]
+
+    if include_properties:
+        props = [
+            k
+            for k, _ in inspect.getmembers(
+                obj.__class__,
+                lambda x: isinstance(x, property),
+            )
+        ]
+        obj_fields += props
+
+    return {f: getattr(obj, f) for f in obj_fields}
+
+
+def maybe_resolve_future(fut: Future[T] | T) -> T:
+    if isinstance(fut, Future):
+        return fut.result()
+    return fut
 
 
 # rename for cleaner export
