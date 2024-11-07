@@ -135,7 +135,7 @@ export const CallScoresViewer: React.FC<{
     {
       field: 'scorer',
       headerName: 'Scorer',
-      width: 100,
+      width: 150,
       renderCell: params => {
         return params.row.feedback.feedback_type.split('.').pop();
       },
@@ -178,7 +178,6 @@ export const CallScoresViewer: React.FC<{
             sx={{
               width: '100%',
               display: 'flex',
-              justifyContent: 'center',
               height: '100%',
               lineHeight: '20px',
               alignItems: 'center',
@@ -203,7 +202,7 @@ export const CallScoresViewer: React.FC<{
     },
     {
       field: 'run',
-      headerName: 'Run',
+      headerName: '',
       width: 70,
       renderCell: (params: any) =>
         actionRunnableRefs.has(params.row.feedback.runnable_ref) ? (
