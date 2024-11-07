@@ -31,12 +31,7 @@ import threading
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-from typing import (
-    Any,
-    Optional,
-    Union,
-    cast,
-)
+from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -50,9 +45,7 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
-from weave.trace_server.base_object_class_util import (
-    process_incoming_object,
-)
+from weave.trace_server.base_object_class_util import process_incoming_object
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -1405,7 +1398,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query = query.where(req.query)
         prepared = query.prepare(database_type="clickhouse")
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
-        return tsi.FeedbackPurgeRes(num_deleted=query_result.rowcount)
+        print(query_result.summary)
+        return tsi.FeedbackPurgeRes(num_deleted=query_result.summary["rowcount"])
 
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
         # To replace, first purge, then if successful, create.
