@@ -45,7 +45,7 @@ export const PlaygroundCallStats = ({call}: {call: TraceCallSchema}) => {
 
   return (
     <Tailwind>
-      <div className="flex w-full items-center justify-center gap-8 py-8 text-sm text-moon-500">
+      <div className="flex w-full flex-wrap items-center justify-center gap-8 py-8 text-sm text-moon-500">
         <span>Latency: {latency}ms</span>
         <span>•</span>
         {(call.output as any)?.choices?.[0]?.finish_reason && (

@@ -1,6 +1,6 @@
-import {Switch} from '@mui/material';
 import Box from '@mui/material/Box';
-import {MOON_250, TEAL_500} from '@wandb/weave/common/css/color.styles';
+import {MOON_250} from '@wandb/weave/common/css/color.styles';
+import {Switch} from '@wandb/weave/components';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import {Tag} from '@wandb/weave/components/Tag';
 import React, {SetStateAction} from 'react';
@@ -46,9 +46,10 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
             <Tabs.Trigger
               key={idx}
               value={idx.toString()}
-              onClick={() => setSettingsTab(idx)}>
+              onClick={() => setSettingsTab(idx)}
+              className="max-w-[120px]">
               {playgroundStates.length > 1 && <Tag label={`${idx + 1}`} />}
-              {state.model}
+              <span className=" truncate">{state.model}</span>
             </Tabs.Trigger>
           ))}
         </Tabs.List>
@@ -160,31 +161,27 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   alignItems: 'center',
                   justifyContent: 'space-between',
                 }}>
-                <span>Track this LLM call with Weave</span>
-                <Switch
+                <label
+                  className="cursor-pointer"
+                  htmlFor="trackWithWeaveSwitch">
+                  Track this LLM call with Weave
+                </label>
+                <Switch.Root
+                  id="trackWithWeaveSwitch"
+                  size="small"
                   checked={playgroundStates[idx].trackLLMCall}
-                  onChange={() =>
+                  onCheckedChange={() =>
                     setPlaygroundStateField(
                       idx,
                       'trackLLMCall',
                       !playgroundStates[idx].trackLLMCall
                     )
-                  }
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: TEAL_500,
-                      '&:hover': {
-                        backgroundColor: `${TEAL_500}/[.5]`,
-                      },
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: TEAL_500,
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked:hover': {
-                      backgroundColor: `${TEAL_500}/[.5]`,
-                    },
-                  }}
-                />
+                  }>
+                  <Switch.Thumb
+                    size="small"
+                    checked={playgroundStates[idx].trackLLMCall}
+                  />
+                </Switch.Root>
               </Box>
             </Box>
           </Tabs.Content>

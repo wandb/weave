@@ -1,6 +1,5 @@
-import {MenuItem, TextField} from '@mui/material';
-import {MOON_250, TEAL_400} from '@wandb/weave/common/css/color.styles';
-import {Icon} from '@wandb/weave/components/Icon';
+import {Box} from '@mui/material';
+import {Select} from '@wandb/weave/components/Form/Select';
 import React from 'react';
 
 import {LLM_MAX_TOKENS} from '../llmMaxTokens';
@@ -11,64 +10,38 @@ interface LLMDropdownProps {
 }
 
 export const LLMDropdown: React.FC<LLMDropdownProps> = ({value, onChange}) => {
-  const handleChange = (
-    event: React.SyntheticEvent,
-    newValue: string | null
-  ) => {
-    if (newValue) {
-      const maxTokens =
-        LLM_MAX_TOKENS[newValue as keyof typeof LLM_MAX_TOKENS]?.max_tokens ||
-        0;
-      onChange(newValue, maxTokens);
-    }
-  };
+  const options = Object.keys(LLM_MAX_TOKENS).map(llm => ({
+    value: llm,
+    label: llm,
+  }));
 
   return (
-    <TextField
-      select
-      value={value}
-      onChange={e => handleChange(e, e.target.value)}
-      size="small"
-      slotProps={{
-        select: {
-          IconComponent: props => <Icon {...props} name="chevron-down" />,
-        },
-      }}
+    <Box
       sx={{
-        width: '100%',
-        minWidth: '100px',
-        height: '32px',
-        padding: 0,
-        fontFamily: 'Source Sans Pro',
-        fontSize: '16px',
-        '& .MuiSelect-select': {
-          fontFamily: 'Source Sans Pro',
-          fontSize: '16px',
-          height: '16px',
+        width: '150px',
+        '& #react-select-2-listbox': {
+          width: '300px',
+          maxHeight: '500px',
         },
-        '& .MuiMenuItem-root': {
-          fontFamily: 'Source Sans Pro',
-          fontSize: '16px',
-        },
-        '& .MuiInputBase-root': {
-          height: '32px',
-          paddingY: '4px',
-        },
-        '& .MuiOutlinedInput-notchedOutline': {
-          border: `1px solid ${MOON_250}`,
-        },
-        '& .Mui-focused .MuiOutlinedInput-notchedOutline': {
-          border: `1px solid ${MOON_250}`,
-        },
-        '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
-          border: `1px solid ${TEAL_400}`,
+        '& #react-select-2-listbox > div': {
+          maxHeight: '500px',
         },
       }}>
-      {Object.keys(LLM_MAX_TOKENS).map(llmWithToken => (
-        <MenuItem key={llmWithToken} value={llmWithToken}>
-          {llmWithToken}
-        </MenuItem>
-      ))}
-    </TextField>
+      <Select
+        value={options.find(opt => opt.value === value)}
+        onChange={option => {
+          if (option) {
+            const maxTokens =
+              LLM_MAX_TOKENS[
+                (option as {value: string}).value as keyof typeof LLM_MAX_TOKENS
+              ]?.max_tokens || 0;
+            onChange((option as {value: string}).value, maxTokens);
+          }
+        }}
+        options={options}
+        size="medium"
+        isSearchable
+      />
+    </Box>
   );
 };
