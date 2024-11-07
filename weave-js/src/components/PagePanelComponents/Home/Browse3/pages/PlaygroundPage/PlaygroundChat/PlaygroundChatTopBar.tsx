@@ -4,6 +4,7 @@ import {Tag} from '@wandb/weave/components/Tag';
 import React from 'react';
 import {useHistory} from 'react-router-dom';
 
+import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
 import {CopyableId} from '../../common/Id';
 import {OptionalTraceCallSchema, PlaygroundState} from '../types';
 import {LLMDropdown} from './LLMDropdown';
@@ -50,12 +51,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
       project_id: `${entity}/${project}`,
       id: '',
       inputs: {
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful assistant.',
-          },
-        ],
+        messages: [DEFAULT_SYSTEM_MESSAGE],
       },
     } as OptionalTraceCallSchema);
   };
