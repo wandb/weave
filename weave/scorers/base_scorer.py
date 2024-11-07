@@ -1,5 +1,7 @@
+import inspect
+from collections.abc import Sequence
 from numbers import Number
-from typing import Any, Callable, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Optional, Union
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -8,6 +10,7 @@ import weave
 from weave.flow.obj import Object
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, as_op, is_op
+from weave.trace.weave_client import sanitize_object_name
 
 
 class Scorer(Object):
@@ -16,7 +19,8 @@ class Scorer(Object):
         description="A mapping from column names in the dataset to the names expected by the scorer",
     )
 
-    def score(self, input: Any, target: Any, output: Any) -> Any:
+    @weave.op
+    def score(self, *, output: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
 
     @weave.op()
@@ -84,7 +88,8 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
 
 def get_scorer_attributes(
     scorer: Union[Callable, Op, Scorer],
-) -> Tuple[str, Callable, Callable]:
+) -> tuple[str, Callable, Callable]:
+    score_fn: Union[Op, Callable[..., Any]]
     if weave_isinstance(scorer, Scorer):
         scorer_name = scorer.name
         if scorer_name is None:
@@ -106,4 +111,22 @@ def get_scorer_attributes(
         summarize_fn = auto_summarize  # type: ignore
     else:
         raise ValueError(f"Unknown scorer type: {scorer}")
+
+    if scorer_name:
+        scorer_name = sanitize_object_name(scorer_name)
+
     return (scorer_name, score_fn, summarize_fn)  # type: ignore
+
+
+def _has_oldstyle_scorers(scorers: list[Union[Callable, Op, Scorer]]) -> bool:
+    """Check if any scorers use the deprecated 'model_output' parameter."""
+    for scorer in scorers:
+        _, score_fn, _ = get_scorer_attributes(scorer)
+        if is_op(score_fn):
+            score_fn = as_op(score_fn)
+            score_signature = score_fn.signature
+        else:
+            score_signature = inspect.signature(score_fn)
+        if "model_output" in score_signature.parameters:
+            return True
+    return False

@@ -35,6 +35,7 @@ type TextFieldProps = {
   type?: string;
   autoComplete?: string;
   dataTest?: string;
+  step?: number;
 };
 
 export const TextField = ({
@@ -55,6 +56,7 @@ export const TextField = ({
   type,
   autoComplete,
   dataTest,
+  step,
 }: TextFieldProps) => {
   const textFieldSize = size ?? 'medium';
   const leftPaddingForIcon = textFieldSize === 'medium' ? 'pl-34' : 'pl-36';
@@ -129,6 +131,7 @@ export const TextField = ({
             type={type}
             autoComplete={autoComplete}
             data-test={dataTest}
+            step={step}
           />
           {extraActions}
         </div>

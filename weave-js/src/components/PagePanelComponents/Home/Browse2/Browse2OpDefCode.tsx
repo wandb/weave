@@ -3,8 +3,26 @@ import Box from '@mui/material/Box';
 import {Loading} from '@wandb/weave/components/Loading';
 import React, {FC} from 'react';
 
+import {sanitizeString} from '../../../../util/sanitizeSecrets';
 import {Alert} from '../../../Alert';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
+
+function detectLanguage(uri: string, code: string) {
+  // Simple language detection based on file extension or content
+  if (uri.endsWith('.py')) {
+    return 'python';
+  }
+  if (uri.endsWith('.js') || uri.endsWith('.ts')) {
+    return 'javascript';
+  }
+  if (code.includes('def ') || code.includes('import ')) {
+    return 'python';
+  }
+  if (code.includes('function ') || code.includes('const ')) {
+    return 'javascript';
+  }
+  return 'plaintext';
+}
 
 export const Browse2OpDefCode: FC<{uri: string; maxRowsInView?: number}> = ({
   uri,
@@ -37,12 +55,15 @@ export const Browse2OpDefCode: FC<{uri: string; maxRowsInView?: number}> = ({
     );
   }
 
+  const sanitized = sanitizeString(text.result ?? '');
+  const detectedLanguage = detectLanguage(uri, sanitized);
+
   const inner = (
     <Editor
       height={'100%'}
-      defaultLanguage="python"
+      defaultLanguage={detectedLanguage}
       loading={text.loading}
-      value={text.result ?? ''}
+      value={sanitized}
       options={{
         readOnly: true,
         minimap: {enabled: false},
@@ -52,7 +73,7 @@ export const Browse2OpDefCode: FC<{uri: string; maxRowsInView?: number}> = ({
     />
   );
   if (maxRowsInView) {
-    const totalLines = text.result?.split('\n').length ?? 0;
+    const totalLines = sanitized.split('\n').length ?? 0;
     const showLines = Math.min(totalLines, maxRowsInView);
     const lineHeight = 18;
     const padding = 20;

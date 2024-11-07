@@ -1,10 +1,13 @@
 import asyncio
 import inspect
+import logging
 import textwrap
 import time
 import traceback
-from typing import Any, Callable, Coroutine, Optional, Union, cast
+from collections.abc import Coroutine
+from typing import Any, Callable, Literal, Optional, Union, cast
 
+from pydantic import PrivateAttr
 from rich import print
 from rich.console import Console
 
@@ -15,6 +18,7 @@ from weave.flow.model import Model, get_infer_method
 from weave.flow.obj import Object
 from weave.scorers import (
     Scorer,
+    _has_oldstyle_scorers,
     auto_summarize,
     get_scorer_attributes,
     transpose,
@@ -28,7 +32,7 @@ from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, get_ref
 
 console = Console()
-
+logger = logging.getLogger(__name__)
 
 INVALID_MODEL_ERROR = (
     "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
@@ -111,13 +115,16 @@ class Evaluation(Object):
     preprocess_model_input: Optional[Callable] = None
     trials: int = 1
 
+    # internal attr to track whether to use the new `output` or old `model_output` key for outputs
+    _output_key: Literal["output", "model_output"] = PrivateAttr("output")
+
     def model_post_init(self, __context: Any) -> None:
         scorers: list[Union[Callable, Scorer, Op]] = []
         for scorer in self.scorers or []:
             if isinstance(scorer, Scorer):
                 pass
             elif isinstance(scorer, type):
-                raise ValueError(
+                raise TypeError(
                     f"Scorer {scorer.__name__} must be an instance, not a class. Did you forget to instantiate?"
                 )
             elif callable(scorer) and not is_op(scorer):
@@ -127,6 +134,14 @@ class Evaluation(Object):
             else:
                 raise ValueError(f"Invalid scorer: {scorer}")
             scorers.append(scorer)
+
+        # Determine output key based on scorer types
+        if _has_oldstyle_scorers(scorers):
+            self._output_key = "model_output"
+            util.warn_once(
+                logger,
+                "Using 'model_output' key for compatibility with older scorers. Please update scorers to use 'output' parameter.",
+            )
         self.scorers = scorers
 
         if isinstance(self.dataset, list):
@@ -225,6 +240,7 @@ class Evaluation(Object):
 
         scores = {}  # TODO: Consider moving scorer setup and checks out of `predict_and_score`
         scorers = cast(list[Union[Op, Scorer]], self.scorers or [])
+
         for scorer in scorers:
             scorer_self = None
             if weave_isinstance(scorer, Scorer):
@@ -237,10 +253,12 @@ class Evaluation(Object):
                 score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
 
-            if (
-                "model_output" not in score_arg_names
-                and "output" not in score_arg_names
-            ):
+            # the actual kwarg name depends on the scorer
+            if "output" in score_arg_names:
+                score_output_name = "output"
+            elif "model_output" in score_arg_names:
+                score_output_name = "model_output"
+            else:
                 message = textwrap.dedent(
                     f"""
                     Scorer {scorer_name} must have an `output` or `model_output` argument, to receive the
@@ -301,7 +319,7 @@ class Evaluation(Object):
 
                                         You are mapping `{arg}` to `{dataset_column_name}`, but `{dataset_column_name}`
                                         was not found in the dataset columns.
-                                        
+
                                         Available dataset columns: {list(example.keys())}
 
                                         Hint:
@@ -315,7 +333,7 @@ class Evaluation(Object):
                                     You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
 
                                     `score` method argument `{arg}` is not found in the dataset columns and is not mapped in `column_map`.
-                                    
+
                                     Available dataset columns: {list(example.keys())}
                                     `column_map`: {scorer.column_map}
 
@@ -339,7 +357,7 @@ class Evaluation(Object):
                     raise ValueError(
                         f"{score_fn} expects arguments: {score_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
                     )
-            score_args["output"] = model_output
+            score_args[score_output_name] = model_output
 
             try:
                 if is_op(score_fn) and model_call:
@@ -354,7 +372,12 @@ class Evaluation(Object):
                     result, score_call = await async_call_op(score_fn, **score_args)
                     wc = get_weave_client()
                     if wc:
-                        wc._send_score_call(model_call, score_call)
+                        # Very important: if the score is generated from a Scorer subclass,
+                        # then scorer_ref_uri will be None, and we will use the op_name from
+                        # the score_call instead.
+                        scorer_ref = get_ref(scorer_self) if scorer_self else None
+                        scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
+                        wc._send_score_call(model_call, score_call, scorer_ref_uri)
 
                 else:
                     # I would not expect this path to be hit, but keeping it for
@@ -370,7 +393,7 @@ class Evaluation(Object):
                     for param in score_signature.parameters.values()
                     if param.default == inspect.Parameter.empty
                 ]
-                required_arg_names.remove("output")
+                required_arg_names.remove(score_output_name)
 
                 message = textwrap.dedent(
                     f"""
@@ -378,11 +401,11 @@ class Evaluation(Object):
 
                                         If using the `Scorer` weave class, you can set the `scorer.column_map`
                     attribute to map scorer argument names to dataset columns.
-                    
+
                     For example, if the `score` expects "output", "input" and "ground_truth" and we have a dataset
                     with columns "question" and "answer", `column_map` can be used to map the non-output parameter like so:
                     {{"input": "question", "ground_truth": "answer"}}
-                    
+
                     scorer argument names: {score_arg_names}
                     dataset keys: {example.keys()}
                     scorer.column_map: {getattr(scorer, 'column_map', '{}')}
@@ -397,7 +420,7 @@ class Evaluation(Object):
             scores[scorer_name] = result
 
         return {
-            "output": model_output,
+            self._output_key: model_output,
             "scores": scores,
             "model_latency": model_latency,
         }
@@ -421,7 +444,6 @@ class Evaluation(Object):
                 model_output_summary = auto_summarize(vals)
                 if model_output_summary:
                     summary[name] = model_output_summary
-
         return summary
 
     async def get_eval_results(
@@ -441,7 +463,7 @@ class Evaluation(Object):
             except Exception as e:
                 print("Predict and score failed")
                 traceback.print_exc()
-                return {"output": None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
             return eval_row
 
         n_complete = 0
@@ -458,7 +480,7 @@ class Evaluation(Object):
             #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
             # )
             if eval_row is None:
-                eval_row = {"output": None, "scores": {}}
+                eval_row = {self._output_key: None, "scores": {}}
             else:
                 eval_row["scores"] = eval_row.get("scores", {})
             for scorer in self.scorers or []:

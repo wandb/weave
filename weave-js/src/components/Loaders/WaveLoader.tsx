@@ -12,7 +12,7 @@ const Dot = React.memo(
     );
 
     const classes = classNames(
-      'rounded-full bg-moon-650 dark:bg-moon-350 animate-wave',
+      'rounded-full bg-moon-350 dark:bg-moon-650 animate-wave',
       {
         'h-8 w-8': size === 'huge',
         'h-6 w-6': size === 'small',

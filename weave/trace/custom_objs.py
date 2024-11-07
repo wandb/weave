@@ -1,4 +1,5 @@
-from typing import Any, Dict, Mapping, Optional, Union
+from collections.abc import Mapping
+from typing import Any, Optional, Union
 
 from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
 from weave.trace.context.weave_client_context import require_weave_client
@@ -47,7 +48,7 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
 
 
 def decode_custom_obj(
-    weave_type: Dict,
+    weave_type: dict,
     encoded_path_contents: Mapping[str, Union[str, bytes]],
     load_instance_op_uri: Optional[str],
 ) -> Any:

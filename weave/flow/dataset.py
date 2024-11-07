@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from typing import Any
 
 from pydantic import field_validator
@@ -54,7 +55,7 @@ class Dataset(Object):
             raise ValueError("Attempted to construct a Dataset with an empty list.")
         for row in rows.rows:
             if not isinstance(row, dict):
-                raise ValueError(
+                raise TypeError(
                     "Attempted to construct a Dataset with a non-dict object. Found type: "
                     + str(type(row))
                     + " of row: "
@@ -65,3 +66,6 @@ class Dataset(Object):
                     "Attempted to construct a Dataset row with an empty dict."
                 )
         return rows
+
+    def __iter__(self) -> Iterator[dict]:
+        return iter(self.rows)
