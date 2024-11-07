@@ -1,5 +1,62 @@
 {
   "$defs": {
+    "HumanAnnotationColumn": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "json_schema": {
+          "title": "Json Schema",
+          "type": "object"
+        },
+        "unique_among_creators": {
+          "default": false,
+          "title": "Unique Among Creators",
+          "type": "boolean"
+        },
+        "op_scope": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Scope"
+        }
+      },
+      "required": [
+        "json_schema"
+      ],
+      "title": "HumanAnnotationColumn",
+      "type": "object"
+    },
     "Leaderboard": {
       "properties": {
         "name": {
@@ -181,12 +238,16 @@
     },
     "Leaderboard": {
       "$ref": "#/$defs/Leaderboard"
+    },
+    "HumanAnnotationColumn": {
+      "$ref": "#/$defs/HumanAnnotationColumn"
     }
   },
   "required": [
     "TestOnlyExample",
     "TestOnlyNestedBaseObject",
-    "Leaderboard"
+    "Leaderboard",
+    "HumanAnnotationColumn"
   ],
   "title": "CompositeBaseObject",
   "type": "object"
