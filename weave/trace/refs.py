@@ -27,8 +27,14 @@ class Ref:
         d = {}
         for f in fields(self):
             v = getattr(self, f.name)
+
             # Must resolve the future to remove the lock which causes issues when deepcopying
-            d[f.name] = v.result() if isinstance(v, Future) else v
+            if isinstance(v, Future):
+                v = v.result()
+
+            # Since we resolved the future already, also set here to save on resolving twice.
+            d[f.name] = v
+            self.__dict__[f.name] = v
 
         res = self.__class__(**d)
         memo[id(self)] = res

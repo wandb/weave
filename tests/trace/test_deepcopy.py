@@ -136,7 +136,10 @@ def test_deepcopy_ref_with_future(client):
     future.set_result("digest")
 
     ref = ObjectRef("entity", "project", "name", future)
-    res = deepcopy(ref)  # this should not error
+    res = deepcopy(ref)  # previously this would error
+
+    assert res == ref
+    assert id(res) != id(ref)
 
 
 # # Not sure about the implications here yet
