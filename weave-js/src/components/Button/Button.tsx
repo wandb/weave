@@ -156,14 +156,26 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     );
 
     const [isTooltipOpen, setIsTooltipOpen] = useState(false);
+    const handleMouseEnter = () => {
+      setIsTooltipOpen(true);
+    };
+
+    const handleMouseLeave = () => {
+      setIsTooltipOpen(false);
+    };
+
     if (tooltip) {
       return (
         <Tailwind style={wrapperStyles}>
           <Tooltip.Provider>
             <Tooltip.Root open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
               <Tooltip.Trigger asChild>
-                {/* span is needed so tooltip works on disabled buttons */}
-                <span className="[display:inherit]">{button}</span>
+                <span
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}>
+                  {/* span is needed so tooltip works on disabled buttons */}
+                  <span className="[display:inherit]">{button}</span>
+                </span>
               </Tooltip.Trigger>
               <Tooltip.Portal>
                 <Tooltip.Content
