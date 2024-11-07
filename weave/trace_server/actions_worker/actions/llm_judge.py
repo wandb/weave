@@ -44,14 +44,14 @@ def do_llm_judge_action(
     completion = trace_server.completions_create(
         CompletionsCreateReq(
             project_id=project_id,
-            inputs=dict(
-                model=model,
-                messages=[
+            inputs={
+                "model": model,
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": json.dumps(args)},
                 ],
-                response_format=response_format,
-            ),
+                "response_format": response_format,
+            },
             track_llm_call=False,
         )
     )

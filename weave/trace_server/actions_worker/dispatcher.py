@@ -60,11 +60,11 @@ def execute_batch(
     # 1. Lookup the action definition
     parsed_ref = parse_internal_uri(batch_req.action_ref)
     if parsed_ref.project_id != project_id:
-        raise ValueError(
+        raise TypeError(
             f"Action ref {batch_req.action_ref} does not match project_id {project_id}"
         )
     if not isinstance(parsed_ref, InternalObjectRef):
-        raise ValueError(f"Action ref {batch_req.action_ref} is not an object ref")
+        raise TypeError(f"Action ref {batch_req.action_ref} is not an object ref")
 
     action_def_read = trace_server.obj_read(
         ObjReadReq(
@@ -124,7 +124,7 @@ def publish_results_as_feedback(
     weave_ref = InternalCallRef(project_id, call_id).uri()
     parsed_action_ref = parse_internal_uri(action_ref)
     if not isinstance(parsed_action_ref, (InternalObjectRef, InternalOpRef)):
-        raise ValueError(f"Invalid action ref: {action_ref}")
+        raise TypeError(f"Invalid action ref: {action_ref}")
     action_name = parsed_action_ref.name
     return trace_server.feedback_create(
         FeedbackCreateReq(
