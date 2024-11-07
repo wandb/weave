@@ -1,32 +1,25 @@
+import {Box} from '@material-ui/core';
+import {GridColDef} from '@mui/x-data-grid-pro';
 import {Button} from '@wandb/weave/components/Button/Button';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
+import {parseRef} from '@wandb/weave/react';
 import {makeRefCall} from '@wandb/weave/util/refs';
-import React, {useCallback, useMemo, useState} from 'react';
+import _ from 'lodash';
+import React, {useMemo, useState} from 'react';
 
 import {CellValue} from '../../../Browse2/CellValue';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
-// import {ActionDefinitionType} from '../../collections/actionCollection';
+import {SmallRef} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid'; // Import the StyledDataGrid component
 import {useBaseObjectInstances} from '../wfReactInterface/baseObjectClassQuery';
 import {WEAVE_REF_SCHEME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
-import {ActionDefinition} from '../wfReactInterface/generatedBaseObjectClasses.zod';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {Feedback} from '../wfReactInterface/traceServerClientTypes';
-import {
-  convertISOToDate,
-  projectIdFromParts,
-} from '../wfReactInterface/tsDataModelHooks';
+import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
-type CallActionRow = {
-  actionRef: string;
-  actionDef: ActionDefinition;
-  runCount: number;
-  lastResult?: unknown;
-  lastRanAt?: Date;
-};
 // New RunButton component
 const RunButton: React.FC<{
   actionRef: string;
@@ -74,7 +67,7 @@ const RunButton: React.FC<{
   );
 };
 
-export const CallActionsViewer: React.FC<{
+export const CallScoresViewer: React.FC<{
   call: CallSchema;
 }> = props => {
   const {useFeedback} = useWFHooks();
@@ -98,31 +91,11 @@ export const CallActionsViewer: React.FC<{
       filter: {latest_only: true},
     }).result ?? []
   ).sort((a, b) => (a.val.name ?? '').localeCompare(b.val.name ?? ''));
-  const verifiedActionFeedbacks: Array<{
-    data: any;
-    feedbackRaw: Feedback;
-  }> = useMemo(() => {
-    return (feedbackQuery.result ?? [])
-      .filter(f => f.feedback_type?.startsWith('wandb.runnable'))
-      .map(feedback => {
-        return {data: feedback.payload.output, feedbackRaw: feedback};
-      });
-  }, [feedbackQuery.result]);
 
-  const getFeedbackForAction = useCallback(
-    (actionRef: string) => {
-      return verifiedActionFeedbacks.filter(
-        feedback => feedback.feedbackRaw.runnable_ref === actionRef
-      );
-    },
-    [verifiedActionFeedbacks]
-  );
-  console.log(verifiedActionFeedbacks);
-
-  const allCallActions: CallActionRow[] = useMemo(() => {
-    return (
+  const actionRunnableRefs = useMemo(() => {
+    return new Set(
       actionDefinitions.map(actionDefinition => {
-        const actionDefinitionRefUri = objectVersionKeyToRefUri({
+        return objectVersionKeyToRefUri({
           scheme: WEAVE_REF_SCHEME,
           weaveKind: 'object',
           entity: props.call.entity,
@@ -131,50 +104,97 @@ export const CallActionsViewer: React.FC<{
           versionHash: actionDefinition.digest,
           path: '',
         });
-        const feedbacks = getFeedbackForAction(actionDefinitionRefUri);
-        const selectedFeedback =
-          feedbacks.length > 0 ? feedbacks[0] : undefined;
-        return {
-          actionRef: actionDefinitionRefUri,
-          actionDef: actionDefinition.val,
-          runCount: feedbacks.length,
-          lastRanAt: selectedFeedback
-            ? convertISOToDate(selectedFeedback.feedbackRaw.created_at + 'Z')
-            : undefined,
-          lastResult: selectedFeedback ? selectedFeedback.data : undefined,
-        };
-      }) ?? []
+      })
     );
-  }, [
-    actionDefinitions,
-    getFeedbackForAction,
-    props.call.entity,
-    props.call.project,
-  ]);
+  }, [actionDefinitions, props.call.entity, props.call.project]);
 
-  const columns = [
-    {field: 'action', headerName: 'Action', flex: 1},
-    {field: 'runCount', headerName: 'Run Count', flex: 1},
+  const runnableFeedbacks: Feedback[] = useMemo(() => {
+    return (feedbackQuery.result ?? []).filter(
+      f =>
+        f.feedback_type?.startsWith('wandb.runnable') && f.runnable_ref !== null
+    );
+  }, [feedbackQuery.result]);
+
+  const rows = useMemo(() => {
+    return _.sortBy(
+      Object.entries(_.groupBy(runnableFeedbacks, f => f.feedback_type)).map(
+        ([runnableRef, fs]) => {
+          const val = _.reverse(_.sortBy(fs, 'created_at'))[0];
+          return {
+            id: val.feedback_type,
+            feedback: val,
+            runCount: fs.length,
+          };
+        }
+      ),
+      s => s.feedback.feedback_type
+    );
+  }, [runnableFeedbacks]);
+
+  const columns: Array<GridColDef<(typeof rows)[number]>> = [
+    {
+      field: 'scorer',
+      headerName: 'Scorer',
+      width: 100,
+      renderCell: params => {
+        return params.row.feedback.feedback_type.split('.').pop();
+      },
+    },
+    {
+      field: 'runnable_ref',
+      headerName: 'Logic',
+      width: 60,
+      renderCell: params => {
+        return (
+          <Box
+            sx={{
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'center',
+              height: '100%',
+              lineHeight: '20px',
+              alignItems: 'center',
+            }}>
+            <SmallRef
+              objRef={parseRef(params.row.feedback.runnable_ref ?? '')}
+              iconOnly={true}
+            />
+          </Box>
+        );
+      },
+    },
+    {field: 'runCount', headerName: 'Runs', width: 55},
     {
       field: 'lastResult',
       headerName: 'Last Result',
       flex: 1,
       renderCell: (params: any) => {
-        const value = params.row.lastResult;
+        const value = params.row.feedback.payload.output;
         if (value == null) {
           return <NotApplicable />;
         }
-        return <CellValue value={value} isExpanded={false} />;
+        return (
+          <Box
+            sx={{
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'center',
+              height: '100%',
+              lineHeight: '20px',
+              alignItems: 'center',
+            }}>
+            <CellValue value={value} isExpanded={false} />
+          </Box>
+        );
       },
     },
     {
       field: 'lastRanAt',
       headerName: 'Last Ran At',
-      flex: 1,
+      width: 100,
       renderCell: (params: any) => {
-        const value = params.row.lastRanAt
-          ? params.row.lastRanAt.getTime() / 1000
-          : undefined;
+        const createdAt = new Date(params.row.feedback.created_at + 'Z');
+        const value = createdAt ? createdAt.getTime() / 1000 : undefined;
         if (value == null) {
           return <NotApplicable />;
         }
@@ -184,27 +204,20 @@ export const CallActionsViewer: React.FC<{
     {
       field: 'run',
       headerName: 'Run',
-      flex: 1,
-      renderCell: (params: any) => (
-        <RunButton
-          actionRef={params.row.actionRef}
-          callId={props.call.callId}
-          entity={props.call.entity}
-          project={props.call.project}
-          refetchFeedback={feedbackQuery.refetch}
-        />
-      ),
+      width: 70,
+      renderCell: (params: any) =>
+        actionRunnableRefs.has(params.row.feedback.runnable_ref) ? (
+          <RunButton
+            actionRef={params.row.feedback.runnable_ref}
+            callId={props.call.callId}
+            entity={props.call.entity}
+            project={props.call.project}
+            refetchFeedback={feedbackQuery.refetch}
+          />
+        ) : null,
     },
   ];
 
-  const rows = allCallActions.map((action, index) => ({
-    id: index,
-    action: action.actionDef.name,
-    runCount: action.runCount,
-    lastResult: action.lastResult,
-    lastRanAt: action.lastRanAt,
-    actionRef: action.actionRef,
-  }));
   return (
     <>
       <StyledDataGrid
