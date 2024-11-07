@@ -30,17 +30,7 @@ import logging
 import threading
 from collections import defaultdict
 from contextlib import contextmanager
-from typing import (
-    Any,
-    Dict,
-    Iterator,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Union,
-    cast,
-)
+from typing import Any, Dict, Iterator, Optional, Sequence, Set, Tuple, Union, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -706,24 +696,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         # 1. Read the entire object from the db based on id and digest
-        # 2. Set deleted_at to the current time
-        # 3. Insert this object into object_versions
-        #    - This object should be IDENTICAL to the original, including
-        #      the created_at time, this will become the only copy of the
-        #      object when the db deduplicates on primary key
+        # 2. Check if object has any children refs
+        # 3. For each child ref, find all objects that also reference it
+        # 4. If any dependents are found, skip this object, else add to delete list
+        # 5. For all in delete list:
+        #    - Set deleted_at to the current time
+        #    - Insert this object into object_versions
+        #      - This object should be IDENTICAL to the original, including
+        #        the created_at time, this will become the only copy of the
+        #        object when the db deduplicates on primary key
         db_obj = self._obj_read(
-            req.project_id,
-            req.object_id,
-            req.digest,
-            metadata_only=False
+            req.project_id, req.object_id, req.digest, metadata_only=False
         )
-
         delete_insertables: list[ObjDeleteCHInsertable] = []
 
-        print("DELETING OBJECT", req.project_id, db_obj.kind, db_obj.object_id, db_obj.digest)
-
-        # if req.include_children:
-        if True:
+        if req.include_children:
             obj_refs = db_obj.refs
 
             # for each child ref, find all objects that also reference it
@@ -735,48 +722,53 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     metadata_only=True,
                     limit=1000,
                 )
-                print("REF", obj_ref, "DEPENDENTS\n", dependents)
 
                 if len(dependents) > 0:
-                    print("CHILD HAS DEPENDENTS, SKIPPING CHILD DELETE")
                     continue
 
                 # no dependents, so we can delete this object
-                # read from db
                 child_obj = ri.parse_internal_uri(obj_ref)
                 if not isinstance(child_obj, ri.InternalObjectRef):
-                    raise ValueError(f"Expected InternalObjectRef, got {type(child_obj)}")
-                
+                    raise ValueError(
+                        f"Expected InternalObjectRef, got {type(child_obj)}"
+                    )
+
                 child_ch_obj = self._obj_read(
                     child_obj.project_id,
                     child_obj.name,
                     child_obj.version,
                     metadata_only=False,
                 )
-                delete_insertables.append(ObjDeleteCHInsertable(
-                    project_id=child_ch_obj.project_id,
-                    object_id=child_ch_obj.object_id,
-                    digest=child_ch_obj.digest,
-                    kind=child_ch_obj.kind,
-                    val_dump=child_ch_obj.val_dump,
-                    refs=child_ch_obj.refs,
-                    base_object_class=child_ch_obj.base_object_class,
-                    deleted_at=datetime.datetime.now(datetime.timezone.utc),
-                    created_at=_ensure_datetimes_have_tz_strict(child_ch_obj.created_at),
-                ))
+                delete_insertables.append(
+                    ObjDeleteCHInsertable(
+                        project_id=child_ch_obj.project_id,
+                        object_id=child_ch_obj.object_id,
+                        digest=child_ch_obj.digest,
+                        kind=child_ch_obj.kind,
+                        val_dump=child_ch_obj.val_dump,
+                        refs=child_ch_obj.refs,
+                        base_object_class=child_ch_obj.base_object_class,
+                        deleted_at=datetime.datetime.now(datetime.timezone.utc),
+                        created_at=_ensure_datetimes_have_tz_strict(
+                            child_ch_obj.created_at
+                        ),
+                    )
+                )
 
-        delete_insertables.append(ObjDeleteCHInsertable(
-            project_id=req.project_id,
-            object_id=req.object_id,
-            digest=req.digest,
-            kind=db_obj.kind,
-            val_dump=db_obj.val_dump,
-            refs=db_obj.refs,
-            base_object_class=db_obj.base_object_class,
-            deleted_at=datetime.datetime.now(datetime.timezone.utc),
-            # ! Use the original created_at time !
-            created_at=_ensure_datetimes_have_tz_strict(db_obj.created_at),
-        ))
+        delete_insertables.append(
+            ObjDeleteCHInsertable(
+                project_id=req.project_id,
+                object_id=req.object_id,
+                digest=req.digest,
+                kind=db_obj.kind,
+                val_dump=db_obj.val_dump,
+                refs=db_obj.refs,
+                base_object_class=db_obj.base_object_class,
+                deleted_at=datetime.datetime.now(datetime.timezone.utc),
+                # ! Use the original created_at time !
+                created_at=_ensure_datetimes_have_tz_strict(db_obj.created_at),
+            )
+        )
         self._insert(
             "object_versions",
             data=[list(ch_obj.model_dump().values()) for ch_obj in delete_insertables],
@@ -1992,6 +1984,7 @@ def _ensure_datetimes_have_tz(
     if dt.tzinfo is None:
         return dt.replace(tzinfo=datetime.timezone.utc)
     return dt
+
 
 def _ensure_datetimes_have_tz_strict(
     dt: datetime.datetime,
