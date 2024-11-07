@@ -396,6 +396,9 @@ const handleErrorResponse = (responses: any): boolean => {
   if (Array.isArray(responses)) {
     return responses.some((response: any) => handleErrorResponse(response));
   } else {
+    if (!responses) {
+      return true;
+    }
     if (responses.error) {
       toast(responses.error, {
         type: 'error',
