@@ -57,7 +57,8 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
 
 
 def _decode_custom_obj_with_op(
-    encoded_path_contents: Mapping[str, Union[str, bytes]], load_instance_op: Op
+    encoded_path_contents: Mapping[str, Union[str, bytes]],
+    load_instance_op: Op,
 ) -> Any:
     # Disables tracing so that calls to loading data itself don't get traced
     load_instance_op._tracing_enabled = False  # type: ignore
