@@ -4,7 +4,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
 import React, {useState} from 'react';
 
-import {LLM_MAX_TOKENS} from '../PlaygroundChat/llmMaxTokens';
+import {LLM_MAX_TOKENS} from '../llmMaxTokens';
 import {PlaygroundState} from '../types';
 import {FunctionDrawer} from './FunctionDrawer';
 

@@ -6,7 +6,7 @@ import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
-import {usePlaygroundState, DEFAULT_SYSTEM_MESSAGE} from './usePlaygroundState';
+import {DEFAULT_SYSTEM_MESSAGE, usePlaygroundState} from './usePlaygroundState';
 
 export type PlaygroundPageProps = {
   entity: string;

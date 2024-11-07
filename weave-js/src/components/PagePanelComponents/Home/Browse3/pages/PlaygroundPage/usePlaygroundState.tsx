@@ -1,6 +1,6 @@
 import {SetStateAction, useCallback, useState} from 'react';
 
-import {LLMMaxTokensKey} from './PlaygroundChat/llmMaxTokens';
+import {LLMMaxTokensKey} from './llmMaxTokens';
 import {
   OptionalTraceCallSchema,
   PlaygroundResponseFormats,

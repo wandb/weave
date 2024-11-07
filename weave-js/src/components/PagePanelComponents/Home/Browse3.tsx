@@ -680,17 +680,6 @@ const useParamsDecoded = <T extends object>() => {
   }, [params]);
 };
 
-const PlaygroundPageBinding = () => {
-  const params = useParamsDecoded<Browse3TabItemParams>();
-  return (
-    <PlaygroundPage
-      entity={params.entity}
-      project={params.project}
-      callId={params.itemName}
-    />
-  );
-};
-
 const CallPageBinding = () => {
   useCallPeekRedirect();
   const params = useParamsDecoded<Browse3TabItemParams>();

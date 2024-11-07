@@ -4,9 +4,9 @@ import {Tag} from '@wandb/weave/components/Tag';
 import React from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
 import {CopyableId} from '../../common/Id';
 import {OptionalTraceCallSchema, PlaygroundState} from '../types';
+import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
 import {LLMDropdown} from './LLMDropdown';
 
 type PlaygroundChatTopBarProps = {

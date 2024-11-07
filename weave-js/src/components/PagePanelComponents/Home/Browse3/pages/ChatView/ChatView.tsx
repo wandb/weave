@@ -1,11 +1,11 @@
 import React, {useEffect, useMemo, useRef} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
+import {DEFAULT_SYSTEM_MESSAGE} from '../PlaygroundPage/usePlaygroundState';
+import {ChatEmptyStateCallout} from './ChatEmptyStateCallout';
 import {ChoicesView} from './ChoicesView';
 import {MessageList} from './MessageList';
 import {Chat} from './types';
-import {DEFAULT_SYSTEM_MESSAGE} from '../PlaygroundPage/usePlaygroundState';
-import {ChatEmptyStateCallout} from './ChatEmptyStateCallout';
 
 type ChatViewProps = {
   chat: Chat;

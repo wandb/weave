@@ -3,7 +3,7 @@ import {MOON_250, TEAL_400} from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
 import React from 'react';
 
-import {LLM_MAX_TOKENS} from './llmMaxTokens';
+import {LLM_MAX_TOKENS} from '../llmMaxTokens';
 
 interface LLMDropdownProps {
   value: string;
