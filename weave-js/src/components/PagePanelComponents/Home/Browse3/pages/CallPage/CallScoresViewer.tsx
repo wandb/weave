@@ -93,17 +93,20 @@ export const CallScoresViewer: React.FC<{
   ).sort((a, b) => (a.val.name ?? '').localeCompare(b.val.name ?? ''));
 
   const actionRunnableRefs = useMemo(() => {
-    return new Set(
+    return _.fromPairs(
       actionDefinitions.map(actionDefinition => {
-        return objectVersionKeyToRefUri({
-          scheme: WEAVE_REF_SCHEME,
-          weaveKind: 'object',
-          entity: props.call.entity,
-          project: props.call.project,
-          objectId: actionDefinition.object_id,
-          versionHash: actionDefinition.digest,
-          path: '',
-        });
+        return [
+          'wandb.runnable.' + actionDefinition.object_id,
+          objectVersionKeyToRefUri({
+            scheme: WEAVE_REF_SCHEME,
+            weaveKind: 'object',
+            entity: props.call.entity,
+            project: props.call.project,
+            objectId: actionDefinition.object_id,
+            versionHash: actionDefinition.digest,
+            path: '',
+          }),
+        ];
       })
     );
   }, [actionDefinitions, props.call.entity, props.call.project]);
@@ -115,21 +118,33 @@ export const CallScoresViewer: React.FC<{
     );
   }, [feedbackQuery.result]);
 
-  const rows = useMemo(() => {
-    return _.sortBy(
-      Object.entries(_.groupBy(runnableFeedbacks, f => f.feedback_type)).map(
-        ([runnableRef, fs]) => {
-          const val = _.reverse(_.sortBy(fs, 'created_at'))[0];
-          return {
-            id: val.feedback_type,
-            feedback: val,
-            runCount: fs.length,
-          };
-        }
-      ),
-      s => s.feedback.feedback_type
-    );
+  const scoredRows = useMemo(() => {
+    return Object.entries(
+      _.groupBy(runnableFeedbacks, f => f.feedback_type)
+    ).map(([runnableRef, fs]) => {
+      const val = _.reverse(_.sortBy(fs, 'created_at'))[0];
+      return {
+        id: val.feedback_type,
+        feedback: val,
+        runCount: fs.length,
+      };
+    });
   }, [runnableFeedbacks]);
+
+  const rows = useMemo(() => {
+    const additionalRows = actionDefinitions
+      .map(actionDefinition => {
+        return {
+          id: 'wandb.runnable.' + actionDefinition.object_id,
+          feedback: null,
+          runCount: 0,
+        };
+      })
+      .filter(row => !scoredRows.some(r => r.id === row.id));
+    return _.sortBy([...scoredRows, ...additionalRows], s => s.id);
+  }, [actionDefinitions, scoredRows]);
+
+  console.log('actionDefinitions', actionDefinitions);
 
   const columns: Array<GridColDef<(typeof rows)[number]>> = [
     {
@@ -137,7 +152,7 @@ export const CallScoresViewer: React.FC<{
       headerName: 'Scorer',
       width: 150,
       renderCell: params => {
-        return params.row.feedback.feedback_type.split('.').pop();
+        return params.row.id.split('.').pop();
       },
     },
     {
@@ -145,6 +160,9 @@ export const CallScoresViewer: React.FC<{
       headerName: 'Logic',
       width: 60,
       renderCell: params => {
+        if (params.row.feedback == null) {
+          return null;
+        }
         return (
           <Box
             sx={{
@@ -168,7 +186,10 @@ export const CallScoresViewer: React.FC<{
       field: 'lastResult',
       headerName: 'Last Result',
       flex: 1,
-      renderCell: (params: any) => {
+      renderCell: params => {
+        if (params.row.feedback == null) {
+          return null;
+        }
         const value = params.row.feedback.payload.output;
         if (value == null) {
           return <NotApplicable />;
@@ -191,7 +212,10 @@ export const CallScoresViewer: React.FC<{
       field: 'lastRanAt',
       headerName: 'Last Ran At',
       width: 100,
-      renderCell: (params: any) => {
+      renderCell: params => {
+        if (params.row.feedback == null) {
+          return null;
+        }
         const createdAt = new Date(params.row.feedback.created_at + 'Z');
         const value = createdAt ? createdAt.getTime() / 1000 : undefined;
         if (value == null) {
@@ -204,16 +228,18 @@ export const CallScoresViewer: React.FC<{
       field: 'run',
       headerName: '',
       width: 70,
-      renderCell: (params: any) =>
-        actionRunnableRefs.has(params.row.feedback.runnable_ref) ? (
+      renderCell: params => {
+        const actionRef = actionRunnableRefs[params.row.id];
+        return actionRef ? (
           <RunButton
-            actionRef={params.row.feedback.runnable_ref}
+            actionRef={actionRef}
             callId={props.call.callId}
             entity={props.call.entity}
             project={props.call.project}
             refetchFeedback={feedbackQuery.refetch}
           />
-        ) : null,
+        ) : null;
+      },
     },
   ];
 
