@@ -25,11 +25,13 @@ export const useChatFunctions = (
       const updatedTraceCall = JSON.parse(JSON.stringify(prevTraceCall));
       const newTraceCall = clearTraceCall(updatedTraceCall);
       if (newTraceCall && newTraceCall.inputs?.messages) {
+        // Remove the message and all responses to it
         newTraceCall.inputs.messages = newTraceCall.inputs.messages.filter(
           (_: any, index: number) =>
             index !== messageIndex && !responseIndexes?.includes(index)
         );
 
+        // If there are no messages left, add a system message
         if (newTraceCall.inputs.messages.length === 0) {
           newTraceCall.inputs.messages = [
             {
@@ -52,6 +54,7 @@ export const useChatFunctions = (
       const updatedTraceCall = JSON.parse(JSON.stringify(prevTraceCall));
       const newTraceCall = clearTraceCall(updatedTraceCall);
       if (newTraceCall && newTraceCall.inputs?.messages) {
+        // Replace the message
         newTraceCall.inputs.messages[messageIndex] = newMessage;
       }
       return updatedTraceCall;
@@ -68,6 +71,7 @@ export const useChatFunctions = (
           (newTraceCall.output as TraceCallOutput).choices &&
           Array.isArray((newTraceCall.output as TraceCallOutput).choices)
         ) {
+          // Add all the choices as messages
           (newTraceCall.output as TraceCallOutput).choices!.forEach(
             (choice: any) => {
               if (choice.message) {
@@ -75,8 +79,10 @@ export const useChatFunctions = (
               }
             }
           );
+          // Set the choices to undefined
           (newTraceCall.output as TraceCallOutput).choices = undefined;
         }
+        // Add the new message
         newTraceCall.inputs.messages.push(newMessage);
       }
       return updatedTraceCall;
@@ -89,6 +95,7 @@ export const useChatFunctions = (
       const newTraceCall = clearTraceCall(updatedTraceCall);
       const output = newTraceCall?.output as TraceCallOutput;
       if (output && Array.isArray(output.choices)) {
+        // Remove the choice
         output.choices = output.choices.filter(
           (_, index: number) => index !== choiceIndex
         );

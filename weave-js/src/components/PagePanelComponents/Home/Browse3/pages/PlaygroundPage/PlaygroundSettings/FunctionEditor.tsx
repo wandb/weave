@@ -51,15 +51,17 @@ export const FunctionEditor: React.FC<FunctionEditorProps> = ({
         'name' in json &&
         (functions[index] || functions.every(func => func.name !== json.name))
       ) {
-        setFunctions(prevFunctions => {
-          const newFunctions = [...prevFunctions];
-          if (index < newFunctions.length) {
-            newFunctions[index] = json;
-          } else {
-            newFunctions.push(json);
+        setFunctions(
+          (prevFunctions: Array<{name: string; [key: string]: any}>) => {
+            const newFunctions = [...prevFunctions];
+            if (index < newFunctions.length) {
+              newFunctions[index] = json;
+            } else {
+              newFunctions.push(json);
+            }
+            return newFunctions;
           }
-          return newFunctions;
-        });
+        );
       } else {
         console.error('Function JSON must have a name property');
       }

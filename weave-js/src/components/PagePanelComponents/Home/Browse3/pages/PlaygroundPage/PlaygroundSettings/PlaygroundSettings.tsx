@@ -5,7 +5,7 @@ import * as Tabs from '@wandb/weave/components/Tabs';
 import {Tag} from '@wandb/weave/components/Tag';
 import React, {SetStateAction} from 'react';
 
-import {PlaygroundState} from '../types';
+import {PlaygroundState, PlaygroundStateKey} from '../types';
 import {FunctionEditor} from './FunctionEditor';
 import {PlaygroundSlider} from './PlaygroundSlider';
 import {ResponseFormatEditor} from './ResponseFormatEditor';
@@ -13,10 +13,10 @@ import {StopSequenceEditor} from './StopSequenceEditor';
 
 export type PlaygroundSettingsProps = {
   playgroundStates: PlaygroundState[];
-  setPlaygroundStateField: <K extends keyof PlaygroundState>(
+  setPlaygroundStateField: (
     index: number,
-    field: K,
-    value: SetStateAction<PlaygroundState[K]>
+    field: PlaygroundStateKey,
+    value: SetStateAction<PlaygroundState[PlaygroundStateKey]>
   ) => void;
   settingsTab: number;
   setSettingsTab: (tab: number) => void;
@@ -59,7 +59,11 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 playgroundState={playgroundState}
                 functions={playgroundState.functions}
                 setFunctions={value =>
-                  setPlaygroundStateField(idx, 'functions', value)
+                  setPlaygroundStateField(
+                    idx,
+                    'functions',
+                    value as Array<{name: string; [key: string]: any}>
+                  )
                 }
               />
 

@@ -4,7 +4,7 @@ import React, {KeyboardEvent, useState} from 'react';
 
 type StopSequenceEditorProps = {
   stopSequences: string[];
-  setStopSequences: React.Dispatch<React.SetStateAction<string[]>>;
+  setStopSequences: (value: string[]) => void;
 };
 
 export const StopSequenceEditor: React.FC<StopSequenceEditorProps> = ({

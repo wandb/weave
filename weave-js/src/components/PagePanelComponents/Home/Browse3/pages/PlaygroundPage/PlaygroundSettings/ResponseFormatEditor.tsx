@@ -11,9 +11,7 @@ const RESPONSE_FORMATS: PlaygroundResponseFormats[] = Object.values(
 
 type ResponseFormatEditorProps = {
   responseFormat: PlaygroundResponseFormats;
-  setResponseFormat: React.Dispatch<
-    React.SetStateAction<PlaygroundResponseFormats>
-  >;
+  setResponseFormat: (value: PlaygroundResponseFormats) => void;
 };
 
 export const ResponseFormatEditor: React.FC<ResponseFormatEditorProps> = ({

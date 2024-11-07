@@ -9,7 +9,7 @@ import {CallChat} from '../../CallPage/CallChat';
 import {Message} from '../../ChatView/types';
 import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
-import {PlaygroundState} from '../types';
+import {PlaygroundState, PlaygroundStateKey} from '../types';
 import {getInputFromPlaygroundState} from '../usePlaygroundState';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
@@ -21,10 +21,10 @@ export type PlaygroundChatProps = {
   project: string;
   setPlaygroundStates: (states: PlaygroundState[]) => void;
   playgroundStates: PlaygroundState[];
-  setPlaygroundStateField: <K extends keyof PlaygroundState>(
+  setPlaygroundStateField: (
     index: number,
-    field: K,
-    value: SetStateAction<PlaygroundState[K]>
+    field: PlaygroundStateKey,
+    value: SetStateAction<PlaygroundState[PlaygroundStateKey]>
   ) => void;
   setSettingsTab: (callIndex: number | null) => void;
   settingsTab: number | null;
