@@ -38,6 +38,10 @@ type HumanFeedbackProps = {
   focused?: boolean;
 };
 
+// pending feedback promises, used to wait for all pending feedback to complete
+// when clicking the next button in the sidebar outside of this component
+const pendingFeedbackPromises = new Set<Promise<boolean>>();
+
 export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
   const getTsClient = useGetTraceServerClientContext();
   const tsClient = getTsClient();
@@ -81,21 +85,34 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
         feedbackColumnRef,
         value,
       };
+
       // TODO(gst): use replace when feedback is updated within 10 seconds of the previous feedback
       const createRequest = createFeedbackRequest(requestProps);
-      const res = await tsClient.feedbackCreate(createRequest);
-      if ('detail' in res) {
-        const errorRes = res as FeedbackCreateError;
-        toast(`Feedback create failed: ${errorRes.detail}`, {
-          type: 'error',
+      const promise = tsClient
+        .feedbackCreate(createRequest)
+        .then(res => {
+          if ('detail' in res) {
+            const errorRes = res as FeedbackCreateError;
+            toast(`Feedback create failed: ${errorRes.detail}`, {
+              type: 'error',
+            });
+            return false;
+          }
+          const successRes = res as FeedbackCreateSuccess;
+          return !!successRes.id;
+        })
+        .catch(error => {
+          toast(`Error in onAddFeedback: ${error}`, {
+            type: 'error',
+          });
+          return false;
+        })
+        .finally(() => {
+          pendingFeedbackPromises.delete(promise);
         });
-        return false;
-      }
-      const successRes = res as FeedbackCreateSuccess;
-      if (successRes.id) {
-        return true;
-      }
-      return false;
+
+      pendingFeedbackPromises.add(promise);
+      return await promise;
     } catch (error) {
       toast(`Error in onAddFeedback: ${error}`, {
         type: 'error',
@@ -360,19 +377,22 @@ export const NumericalFeedbackColumn = ({
     setValue(defaultValue?.toString() ?? '');
   }, [defaultValue]);
 
-  const getVal = (v: string) => {
-    if (v === '') {
-      return null;
-    }
-    if (isInteger) {
+  const getVal = useCallback(
+    (v: string) => {
+      if (v === '') {
+        return null;
+      }
+      if (isInteger) {
+        return v;
+      }
+      const floatRegExp = new RegExp('^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$');
+      if (!floatRegExp.test(v)) {
+        return null;
+      }
       return v;
-    }
-    const floatRegExp = new RegExp('^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$');
-    if (!floatRegExp.test(v)) {
-      return null;
-    }
-    return v;
-  };
+    },
+    [isInteger]
+  );
 
   const onValueChange = useCallback(
     (v: string) => {
@@ -394,7 +414,7 @@ export const NumericalFeedbackColumn = ({
       }
       debouncedFn(parsedVal);
     },
-    [value, min, max, debouncedFn]
+    [value, min, max, isInteger, debouncedFn, getVal]
   );
 
   return (
@@ -596,4 +616,11 @@ export const BinaryFeedbackColumn = ({
       </div>
     </Tailwind>
   );
+};
+
+export const waitForPendingFeedback = async (): Promise<void> => {
+  if (pendingFeedbackPromises.size === 0) {
+    return;
+  }
+  await Promise.all(Array.from(pendingFeedbackPromises));
 };
