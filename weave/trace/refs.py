@@ -1,6 +1,6 @@
-import dataclasses
 import urllib
 from concurrent.futures import Future
+from dataclasses import asdict, dataclass, fields
 from typing import Any, Optional, Union, cast
 
 from weave.trace_server import refs_internal
@@ -15,16 +15,22 @@ class WeaveDigestError(ValueError):
     """Raised when a digest is invalid."""
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class Ref:
     def uri(self) -> str:
         raise NotImplementedError
 
     def as_param_dict(self) -> dict:
-        return dataclasses.asdict(self)
+        return asdict(self)
+
+    def __deepcopy__(self, memo: dict) -> "Ref":
+        d = {f.name: getattr(self, f.name) for f in fields(self)}
+        res = self.__class__(**d)
+        memo[id(self)] = res
+        return res
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class TableRef(Ref):
     entity: str
     project: str
@@ -75,7 +81,7 @@ class TableRef(Ref):
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class RefWithExtra(Ref):
     def with_extra(self, extra: tuple[Union[str, Future[str]], ...]) -> "RefWithExtra":
         params = self.as_param_dict()
@@ -95,7 +101,7 @@ class RefWithExtra(Ref):
         return self.with_extra((TABLE_ROW_ID_EDGE_NAME, item_digest))
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class ObjectRef(RefWithExtra):
     entity: str
     project: str
@@ -204,7 +210,7 @@ class ObjectRef(RefWithExtra):
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class OpRef(ObjectRef):
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/op/{self.name}:{self.digest}"
@@ -213,7 +219,7 @@ class OpRef(ObjectRef):
         return u
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class CallRef(RefWithExtra):
     entity: str
     project: str

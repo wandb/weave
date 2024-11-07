@@ -848,6 +848,17 @@ class CostPurgeRes(BaseModel):
     pass
 
 
+class ActionsExecuteBatchReq(BaseModel):
+    project_id: str
+    action_ref: str
+    call_ids: list[str]
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ActionsExecuteBatchRes(BaseModel):
+    pass
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -889,6 +900,11 @@ class TraceServerInterface(Protocol):
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
+
+    # Action API
+    def actions_execute_batch(
+        self, req: ActionsExecuteBatchReq
+    ) -> ActionsExecuteBatchRes: ...
 
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...
