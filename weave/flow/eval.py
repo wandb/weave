@@ -372,7 +372,9 @@ class Evaluation(Object):
                     result, score_call = await async_call_op(score_fn, **score_args)
                     wc = get_weave_client()
                     if wc:
-                        wc._send_score_call(model_call, score_call)
+                        scorer_ref = get_ref(scorer_self) if scorer_self else None
+                        scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
+                        wc._send_score_call(model_call, score_call, scorer_ref_uri)
 
                 else:
                     # I would not expect this path to be hit, but keeping it for

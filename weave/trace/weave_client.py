@@ -330,10 +330,10 @@ class Call:
             raise ValueError("Score call has no ref")
         client._add_score(
             call_ref_uri=self_ref.uri(),
-            score_name=score_name,
+            runnable_ref_name=score_name,
             score_results=score_results,
             scorer_call_ref_uri=score_call_ref.uri(),
-            scorer_op_ref_uri=scorer_op_ref.uri(),
+            runnable_ref_uri=scorer_op_ref.uri(),
         )
 
 
@@ -1101,7 +1101,9 @@ class WeaveClient:
         return res.results
 
     @trace_sentry.global_trace_sentry.watch()
-    def _send_score_call(self, predict_call: Call, score_call: Call) -> Future[str]:
+    def _send_score_call(
+        self, predict_call: Call, score_call: Call, scorer_ref_uri: Optional[str] = None
+    ) -> Future[str]:
         """(Private) Adds a score to a call. This is particularly useful
         for adding evaluation metrics to a call.
         """
@@ -1115,19 +1117,19 @@ class WeaveClient:
             if scorer_call_ref is None:
                 raise ValueError("Score call must have a ref")
             scorer_call_ref_uri = scorer_call_ref.uri()
-            scorer_op_ref_uri = score_call.op_name
-            scorer_op_ref = parse_uri(scorer_op_ref_uri)
-            if not isinstance(scorer_op_ref, OpRef):
-                raise ValueError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
-            score_name = scorer_op_ref.name
+            runnable_ref_uri = scorer_ref_uri or score_call.op_name
+            runnable_ref = parse_uri(runnable_ref_uri)
+            if not isinstance(runnable_ref, (OpRef, ObjectRef)):
+                raise ValueError(f"Invalid scorer op ref: {runnable_ref_uri}")
+            score_name = runnable_ref.name
             score_results = score_call.output
 
             return self._add_score(
                 call_ref_uri=call_ref_uri,
-                score_name=score_name,
+                runnable_ref_name=score_name,
                 score_results=score_results,
                 scorer_call_ref_uri=scorer_call_ref_uri,
-                scorer_op_ref_uri=scorer_op_ref_uri,
+                runnable_ref_uri=runnable_ref_uri,
             )
 
         return self.future_executor.defer(send_score_call)
@@ -1137,10 +1139,10 @@ class WeaveClient:
         self,
         *,
         call_ref_uri: str,
-        score_name: str,
+        runnable_ref_name: str,
         score_results: Any,
         scorer_call_ref_uri: str,
-        scorer_op_ref_uri: str,
+        runnable_ref_uri: str,
         # , supervision: dict
     ) -> str:
         """(Private) Low-level, non object-oriented method for adding a score to a call.
@@ -1155,14 +1157,14 @@ class WeaveClient:
         scorer_call_ref = parse_uri(scorer_call_ref_uri)
         if not isinstance(scorer_call_ref, CallRef):
             raise ValueError(f"Invalid scorer call ref: {scorer_call_ref_uri}")
-        scorer_op_ref = parse_uri(scorer_op_ref_uri)
-        if not isinstance(scorer_op_ref, OpRef):
-            raise ValueError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
+        runnable_ref = parse_uri(runnable_ref_uri)
+        if not isinstance(runnable_ref, (OpRef, ObjectRef)):
+            raise ValueError(f"Invalid scorer op ref: {runnable_ref_uri}")
 
         # Validate score_name (we might want to relax this in the future)
-        if score_name != scorer_op_ref.name:
+        if runnable_ref_name != runnable_ref.name:
             raise ValueError(
-                f"Score name {score_name} does not match scorer op name {scorer_op_ref.name}"
+                f"Score name {runnable_ref_name} does not match scorer op name {runnable_ref.name}"
             )
 
         # Prepare the result payload - we purposely do not map to refs here
@@ -1178,9 +1180,9 @@ class WeaveClient:
         freq = FeedbackCreateReq(
             project_id=self._project_id(),
             weave_ref=call_ref_uri,
-            feedback_type="wandb.runnable." + score_name,
+            feedback_type="wandb.runnable." + runnable_ref_name,
             payload=payload,
-            runnable_ref=scorer_op_ref_uri,
+            runnable_ref=runnable_ref_uri,
             call_ref=scorer_call_ref_uri,
         )
         response = self.server.feedback_create(freq)
