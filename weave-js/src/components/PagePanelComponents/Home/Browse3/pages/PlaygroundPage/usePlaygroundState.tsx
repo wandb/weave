@@ -123,8 +123,9 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
     function: func,
   }));
   return {
-    // Adding this to prevent the exact same call from not getting run when i want it too
-    request_key: `${Date.now()}-${Math.random()}`,
+    // Adding this to prevent the exact same call from not getting run
+    // eg running the same call in parallel
+    key: Math.random() * 1000,
 
     messages: state.traceCall?.inputs?.messages,
     model: state.model,

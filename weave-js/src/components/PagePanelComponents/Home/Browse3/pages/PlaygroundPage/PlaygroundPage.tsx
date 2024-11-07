@@ -17,7 +17,7 @@ export type PlaygroundPageProps = {
 export const PlaygroundPage = (props: PlaygroundPageProps) => {
   return (
     <SimplePageLayout
-      title={'Playground'}
+      title={'Playground (preview)'}
       hideTabsIfSingle
       tabs={[
         {
@@ -79,7 +79,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
     }
     // Only set the call the first time the page loads, and we get the call
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.callId]);
+  }, [call.loading]);
 
   useEffect(() => {
     setPlaygroundStates(prev => {

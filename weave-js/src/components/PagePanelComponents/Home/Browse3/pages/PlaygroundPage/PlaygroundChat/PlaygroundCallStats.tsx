@@ -48,8 +48,14 @@ export const PlaygroundCallStats = ({call}: {call: TraceCallSchema}) => {
       <div className="flex w-full items-center justify-center gap-8 py-8 text-sm text-moon-500">
         <span>Latency: {latency}ms</span>
         <span>•</span>
-        {/* <span>Finish reason: {choice.finish_reason}</span>
-      <span>•</span> */}
+        {(call.output as any)?.choices?.[0]?.finish_reason && (
+          <>
+            <span>
+              Finish reason: {(call.output as any).choices[0].finish_reason}
+            </span>
+            <span>•</span>
+          </>
+        )}
         <span>{totalTokens} tokens</span>
         <span>•</span>
         {callLink && (
@@ -64,7 +70,6 @@ export const PlaygroundCallStats = ({call}: {call: TraceCallSchema}) => {
             View trace
           </Button>
         )}
-        {/* <span>•</span> */}
         {weaveRef && <Reactions weaveRef={weaveRef} forceVisible={true} />}
       </div>
     </Tailwind>
