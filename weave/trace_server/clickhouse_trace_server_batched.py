@@ -49,6 +49,7 @@ from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.base_object_class_util import (
     process_incoming_object,
 )
@@ -1405,6 +1406,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
+
+    def actions_execute_batch(
+        self, req: tsi.ActionsExecuteBatchReq
+    ) -> tsi.ActionsExecuteBatchRes:
+        if len(req.call_ids) == 0:
+            return tsi.ActionsExecuteBatchRes()
+        if len(req.call_ids) > 1:
+            # This is temporary until we setup our batching infrastructure
+            raise NotImplementedError("Batching actions is not yet supported")
+
+        # For now, we just execute in-process if it is a single action
+        execute_batch(
+            batch_req=req,
+            trace_server=self,
+        )
+
+        return tsi.ActionsExecuteBatchRes()
 
     def completions_create(
         self, req: tsi.CompletionsCreateReq

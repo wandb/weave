@@ -17,11 +17,13 @@ export const MessagePanelPart = ({
       const reformat = JSON.stringify(JSON.parse(value), null, 2);
       return <CodeEditor language="json" value={reformat} />;
     }
-    // Markdown is slowing down chat view, maybe bring this back if users complain
+    
+    // Markdown is slowing down chat view, disable for now
+    // Bring back if we can find a faster way to render markdown
     // if (isLikelyMarkdown(value)) {
     //   return <Markdown content={value} />;
     // }
-    return <div className="whitespace-break-spaces">{value}</div>;
+    return <span className="whitespace-break-spaces">{value}</span>;
   }
   if (value.type === 'text' && 'text' in value) {
     return <div className="whitespace-break-spaces">{value.text}</div>;
