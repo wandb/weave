@@ -1,15 +1,15 @@
-import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
-import {Button} from '@wandb/weave/components/Button';
-import {parseRef} from '@wandb/weave/react';
-import {makeRefCall} from '@wandb/weave/util/refs';
-import React, {useEffect, useState} from 'react';
+import { useViewerInfo } from '@wandb/weave/common/hooks/useViewerInfo';
+import { Button } from '@wandb/weave/components/Button';
+import { parseRef } from '@wandb/weave/react';
+import { makeRefCall } from '@wandb/weave/util/refs';
+import React, { useEffect, useState } from 'react';
 
-import {Icon} from '../../../../../Icon';
-import {useCreateBaseObjectInstance} from '../../pages/wfReactInterface/baseObjectClassQuery';
-import {projectIdFromParts} from '../../pages/wfReactInterface/tsDataModelHooks';
-import {ConfigureHumanFeedback} from './ConfigureHumanFeedback';
-import {HumanFeedbackCell, waitForPendingFeedback} from './HumanFeedback';
-import {tsHumanAnnotationColumn} from './humanFeedbackTypes';
+import { Icon } from '../../../../../Icon';
+import { useCreateBaseObjectInstance } from '../../pages/wfReactInterface/baseObjectClassQuery';
+import { projectIdFromParts } from '../../pages/wfReactInterface/tsDataModelHooks';
+import { ConfigureHumanFeedback } from './ConfigureHumanFeedback';
+import { HumanFeedbackCell, waitForPendingFeedback } from './HumanFeedback';
+import { tsHumanAnnotationColumn } from './humanFeedbackTypes';
 
 type HumanFeedbackSidebarProps = {
   feedbackColumns: tsHumanAnnotationColumn[];
