@@ -1,5 +1,6 @@
 import {SetStateAction, useCallback, useState} from 'react';
 
+import {LLMMaxTokensKey} from './PlaygroundChat/llmMaxTokens';
 import {
   OptionalTraceCallSchema,
   PlaygroundResponseFormats,
@@ -28,9 +29,9 @@ const DEFAULT_PLAYGROUND_STATE = {
   topP: 1,
   frequencyPenalty: 0,
   presencePenalty: 0,
-  nTimes: 1,
+  //   nTimes: 1,
   maxTokensLimit: 16384,
-  model: 'gpt-4o-mini',
+  model: 'gpt-4o-mini' as LLMMaxTokensKey,
 };
 
 export const usePlaygroundState = () => {
@@ -84,9 +85,9 @@ export const usePlaygroundState = () => {
             }
           }
         }
-        if (inputs.n) {
-          newState.nTimes = parseInt(inputs.n, 10);
-        }
+        // if (inputs.n) {
+        //   newState.nTimes = parseInt(inputs.n, 10);
+        // }
         if (inputs.temperature) {
           newState.temperature = parseFloat(inputs.temperature);
         }
@@ -133,7 +134,7 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
     top_p: state.topP,
     frequency_penalty: state.frequencyPenalty,
     presence_penalty: state.presencePenalty,
-    n: state.nTimes,
+    // n: state.nTimes,
     response_format: {
       type: state.responseFormat,
     },

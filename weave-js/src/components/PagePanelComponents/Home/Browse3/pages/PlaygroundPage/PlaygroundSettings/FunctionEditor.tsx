@@ -1,8 +1,11 @@
-import {Box, Chip} from '@mui/material';
+import {Box, Chip, Tooltip} from '@mui/material';
 import {styled} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
+import {Icon} from '@wandb/weave/components/Icon';
 import React, {useState} from 'react';
 
+import {LLM_MAX_TOKENS} from '../PlaygroundChat/llmMaxTokens';
+import {PlaygroundState} from '../types';
 import {FunctionDrawer} from './FunctionDrawer';
 
 const StyledChip = styled(Chip)(({theme}) => ({
@@ -22,6 +25,7 @@ const StyledChip = styled(Chip)(({theme}) => ({
 }));
 
 type FunctionEditorProps = {
+  playgroundState: PlaygroundState;
   functions: Array<{name: string; [key: string]: any}>;
   setFunctions: React.Dispatch<
     React.SetStateAction<Array<{name: string; [key: string]: any}>>
@@ -29,6 +33,7 @@ type FunctionEditorProps = {
 };
 
 export const FunctionEditor: React.FC<FunctionEditorProps> = ({
+  playgroundState,
   functions,
   setFunctions,
 }) => {
@@ -74,7 +79,16 @@ export const FunctionEditor: React.FC<FunctionEditorProps> = ({
         flexDirection: 'column',
         gap: '8px',
       }}>
-      <span>Functions</span>
+      <Box sx={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+        Functions
+        {!LLM_MAX_TOKENS[playgroundState.model]?.supports_function_calling && (
+          <Tooltip title="This model does not support functions">
+            <span>
+              <Icon name="warning" className="text-sienna-500" />
+            </span>
+          </Tooltip>
+        )}
+      </Box>
       <Box sx={{display: 'flex', flexDirection: 'column', gap: 1}}>
         {functions.map((func, index) => (
           <StyledChip

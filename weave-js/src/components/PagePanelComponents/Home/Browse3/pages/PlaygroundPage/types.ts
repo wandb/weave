@@ -1,5 +1,5 @@
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
-import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {LLMMaxTokensKey} from './PlaygroundChat/llmMaxTokens';
 
 export enum PlaygroundResponseFormats {
   Text = 'text',
@@ -20,14 +20,11 @@ export type PlaygroundState = {
   topP: number;
   frequencyPenalty: number;
   presencePenalty: number;
-  nTimes: number;
+  //   nTimes: number;
   maxTokensLimit: number;
-  model: string;
+  model: LLMMaxTokensKey;
 };
 
 export type PlaygroundStateKey = keyof PlaygroundState;
 
 export type OptionalTraceCallSchema = Partial<TraceCallSchema>;
-export type OptionalCallSchema = Partial<CallSchema> & {
-  traceCall?: OptionalTraceCallSchema;
-};

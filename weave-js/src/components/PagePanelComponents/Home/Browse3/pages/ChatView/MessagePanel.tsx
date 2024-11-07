@@ -9,7 +9,7 @@ import {StyledTextArea} from '../PlaygroundPage/StyledTextarea';
 import {MessagePanelPart} from './MessagePanelPart';
 import {ShowMoreButton} from './ShowMoreButton';
 import {ToolCalls} from './ToolCalls';
-import {Message} from './types';
+import {Message, ToolCallWithResponse} from './types';
 
 type MessagePanelProps = {
   index: number;
@@ -49,8 +49,17 @@ export const MessagePanel = ({
   const isUser = message.role === 'user';
   const isSystemPrompt = message.role === 'system';
   const isTool = message.role === 'tool';
-  const hasToolCalls = !!message.tool_calls && message.tool_calls.length > 0;
-  const hasContent = !!message.content && message.content.length > 0;
+  const hasToolCalls =
+    message.tool_calls != null && message.tool_calls.length > 0;
+  const hasContent = message.content != null && message.content.length > 0;
+
+  const responseIndexes = hasToolCalls
+    ? message
+        .tool_calls!.map(
+          (toolCall: ToolCallWithResponse) => toolCall.response?.original_index
+        )
+        .filter(idx => idx != null)
+    : undefined;
 
   return (
     <div className={classNames('flex gap-8', {'mt-32': !isTool})}>
@@ -165,6 +174,7 @@ export const MessagePanel = ({
               isNested={isNested ?? false}
               contentRef={contentRef}
               setEditorHeight={setEditorHeight}
+              responseIndexes={responseIndexes}
             />
           )}
         </div>
@@ -274,6 +284,7 @@ type PlaygroundMessagePanelButtonsProps = {
   isNested: boolean;
   contentRef: React.RefObject<HTMLDivElement>;
   setEditorHeight: (height: number | null) => void;
+  responseIndexes?: number[];
 };
 
 const PlaygroundMessagePanelButtons: React.FC<
@@ -286,6 +297,7 @@ const PlaygroundMessagePanelButtons: React.FC<
   isNested,
   contentRef,
   setEditorHeight,
+  responseIndexes,
 }) => {
   const {deleteMessage, deleteChoice, retry} = usePlaygroundContext();
 
@@ -300,7 +312,13 @@ const PlaygroundMessagePanelButtons: React.FC<
           variant="quiet"
           size="small"
           startIcon="randomize-reset-reload"
-          onClick={() => retry?.(index, isChoice)}>
+          onClick={() => retry?.(index, isChoice)}
+          tooltip={
+            !hasContent
+              ? 'We currently do not support retrying functions'
+              : 'Retry'
+          }
+          disabled={!hasContent}>
           Retry
         </Button>
         <Button
@@ -331,7 +349,7 @@ const PlaygroundMessagePanelButtons: React.FC<
             if (isChoice) {
               deleteChoice?.(index);
             } else {
-              deleteMessage?.(index);
+              deleteMessage?.(index, responseIndexes);
             }
           }}
           tooltip={

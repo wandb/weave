@@ -16,13 +16,18 @@ export const useChatFunctions = (
       | SetStateAction<PlaygroundState[keyof PlaygroundState]>
   ) => void
 ) => {
-  const deleteMessage = (callIndex: number, messageIndex: number) => {
+  const deleteMessage = (
+    callIndex: number,
+    messageIndex: number,
+    responseIndexes?: number[]
+  ) => {
     setPlaygroundStateField(callIndex, 'traceCall', prevTraceCall => {
       const updatedTraceCall = JSON.parse(JSON.stringify(prevTraceCall));
       const newTraceCall = clearTraceCall(updatedTraceCall);
       if (newTraceCall && newTraceCall.inputs?.messages) {
         newTraceCall.inputs.messages = newTraceCall.inputs.messages.filter(
-          (_: any, index: number) => index !== messageIndex
+          (_: any, index: number) =>
+            index !== messageIndex && !responseIndexes?.includes(index)
         );
 
         if (newTraceCall.inputs.messages.length === 0) {

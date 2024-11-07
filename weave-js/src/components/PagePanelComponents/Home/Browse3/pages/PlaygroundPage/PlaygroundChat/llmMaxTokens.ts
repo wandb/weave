@@ -1,7 +1,7 @@
 // This is a mapping of LLM names to their max token limits.
 // Directly from the pycache model_providers.json in trace_server.
 // Some are commented out because they are not supported when Josiah tried on Oct 30, 2024.
-export const llmMaxTokens = {
+export const LLM_MAX_TOKENS = {
   'gpt-4o-mini': {max_tokens: 16384, supports_function_calling: true},
   'claude-3-5-sonnet-20240620': {
     max_tokens: 8192,
@@ -179,3 +179,5 @@ export const llmMaxTokens = {
   // "text-moderation-latest": 0,
   // "text-moderation-stable": 0
 };
+
+export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;

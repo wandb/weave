@@ -15,7 +15,7 @@ const DRAWER_ANIMATION_BUFFER_TIME = 400;
 type CallChatProps = {
   call: TraceCallSchema;
   isPlayground?: boolean;
-  deleteMessage?: (messageIndex: number) => void;
+  deleteMessage?: (messageIndex: number, responseIndexes?: number[]) => void;
   editMessage?: (messageIndex: number, newMessage: any) => void;
   deleteChoice?: (choiceIndex: number) => void;
   addMessage?: (newMessage: any) => void;

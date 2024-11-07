@@ -74,7 +74,6 @@ export const PlaygroundChat = ({
     callIndex: number,
     updatedStates: PlaygroundState[]
   ) => {
-    console.log(updatedStates[callIndex], callIndex);
     const inputs = getInputFromPlaygroundState(updatedStates[callIndex]);
 
     return getTsClient().completionsCreate({
@@ -302,8 +301,8 @@ export const PlaygroundChat = ({
                       <CallChat
                         call={state.traceCall as TraceCallSchema}
                         isPlayground
-                        deleteMessage={messageIndex =>
-                          deleteMessage(idx, messageIndex)
+                        deleteMessage={(messageIndex, responseIndexes) =>
+                          deleteMessage(idx, messageIndex, responseIndexes)
                         }
                         editMessage={(messageIndex, newMessage) =>
                           editMessage(idx, messageIndex, newMessage)

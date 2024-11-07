@@ -56,6 +56,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
           <Tabs.Content key={idx} value={idx.toString()}>
             <Box sx={{display: 'flex', flexDirection: 'column', gap: 2, mt: 2}}>
               <FunctionEditor
+                playgroundState={playgroundState}
                 functions={playgroundState.functions}
                 setFunctions={value =>
                   setPlaygroundStateField(idx, 'functions', value)
@@ -129,7 +130,9 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 value={playgroundState.presencePenalty}
               />
 
-              <PlaygroundSlider
+              {/* TODO: Add this back in, N times to run is not supported for all models */}
+              {/* Shawn said to run multiple requests if its not supported */}
+              {/* <PlaygroundSlider
                 min={1}
                 max={100}
                 step={1}
@@ -138,7 +141,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 }
                 label="n times to run"
                 value={playgroundState.nTimes}
-              />
+              /> */}
 
               <Box
                 sx={{

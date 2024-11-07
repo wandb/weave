@@ -3,7 +3,7 @@ import {MOON_250, TEAL_400} from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
 import React from 'react';
 
-import {llmMaxTokens} from './llm_max_tokens';
+import {LLM_MAX_TOKENS} from './llmMaxTokens';
 
 interface LLMDropdownProps {
   value: string;
@@ -17,7 +17,8 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({value, onChange}) => {
   ) => {
     if (newValue) {
       const maxTokens =
-        llmMaxTokens[newValue as keyof typeof llmMaxTokens]?.max_tokens || 0;
+        LLM_MAX_TOKENS[newValue as keyof typeof LLM_MAX_TOKENS]?.max_tokens ||
+        0;
       onChange(newValue, maxTokens);
     }
   };
@@ -63,7 +64,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({value, onChange}) => {
           border: `1px solid ${TEAL_400}`,
         },
       }}>
-      {Object.keys(llmMaxTokens).map(llmWithToken => (
+      {Object.keys(LLM_MAX_TOKENS).map(llmWithToken => (
         <MenuItem key={llmWithToken} value={llmWithToken}>
           {llmWithToken}
         </MenuItem>

@@ -95,7 +95,7 @@ const OneToolCall = ({toolCall}: OneToolCallProps) => {
             message={
               toolCall.response ?? {
                 role: 'tool',
-                content: 'Enter output e.g. "success" or "$143',
+                content: 'Enter output e.g. "success" or "$143"',
               }
             }
           />
