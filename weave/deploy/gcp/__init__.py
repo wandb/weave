@@ -255,7 +255,7 @@ def deploy(
     dir = compile(model_ref, model_method, wandb_project, auth_entity, base_image)
     ref = parse_uri(model_ref)
     if not isinstance(ref, ObjectRef):
-        raise ValueError(f"Expected a weave object uri, got {type(ref)}")
+        raise TypeError(f"Expected a weave object uri, got {type(ref)}")
     name = safe_name(f"{ref.project}-{ref.name}")
     project = wandb_project or ref.project
     key = env.weave_wandb_api_key()
@@ -310,7 +310,7 @@ def develop(
     )
     model_uri = parse_uri(model_ref)
     if not isinstance(model_uri, ObjectRef):
-        raise ValueError(f"Expected a weave object uri, got {type(model_uri)}")
+        raise TypeError(f"Expected a weave object uri, got {type(model_uri)}")
     name = safe_name(model_uri.name)
     docker = shutil.which("docker")
     if docker is None:

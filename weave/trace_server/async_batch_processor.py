@@ -66,7 +66,7 @@ class AsyncBatchProcessor(Generic[T]):
                         # 413: payload too large, don't raise just log
                         if get_raise_on_captured_errors():
                             raise
-                        logger.error(f"Error processing batch: {e}")
+                        logger.exception(f"Error processing batch: {e}")
                     else:
                         raise e
 

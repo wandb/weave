@@ -47,7 +47,7 @@ def assert_correct_summary(summary: dict, trace_name: str):
     assert summary["weave"]["latency_ms"] > 0
 
 
-@pytest.mark.retry(max_attempts=5, delay=5)
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 def test_content_generation(client):
     import google.generativeai as genai
@@ -69,7 +69,7 @@ def test_content_generation(client):
     assert_correct_summary(call.summary, trace_name)
 
 
-@pytest.mark.retry(max_attempts=5, delay=5)
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 def test_content_generation_stream(client):
     import google.generativeai as genai
@@ -95,7 +95,7 @@ def test_content_generation_stream(client):
     assert_correct_summary(call.summary, trace_name)
 
 
-@pytest.mark.retry(max_attempts=5, delay=5)
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
 async def test_content_generation_async(client):
