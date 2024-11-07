@@ -41,7 +41,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
         width: 'calc(100% - 32px)',
         maxHeight: '500px',
         minWidth: '500px',
-        maxWidth: '650px',
+        maxWidth: '800px',
         border: `2px solid ${TEAL_500}`,
         padding: '8px',
         paddingLeft: '12px',

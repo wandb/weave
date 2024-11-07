@@ -296,7 +296,7 @@ export const PlaygroundChat = ({
                   paddingX: '16px',
                 }}>
                 <Tailwind>
-                  <div className="h-full pb-32">
+                  <div className="mx-auto h-full min-w-[400px] max-w-[800px] pb-8">
                     {state.traceCall && (
                       <CallChat
                         call={state.traceCall as TraceCallSchema}

@@ -86,7 +86,7 @@ const OneToolCall = ({toolCall}: OneToolCallProps) => {
 
       {/* The tool call response */}
       {(toolCall.response || isPlayground) && (
-        <div className="px-16 pb-16">
+        <div className="px-16">
           <MessagePanel
             isNested
             pendingToolResponseId={toolCall.response ? undefined : toolCall.id}

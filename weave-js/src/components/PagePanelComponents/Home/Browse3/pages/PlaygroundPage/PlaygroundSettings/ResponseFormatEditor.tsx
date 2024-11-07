@@ -24,6 +24,7 @@ export const ResponseFormatEditor: React.FC<ResponseFormatEditorProps> = ({
         display: 'flex',
         flexDirection: 'column',
         gap: '8px',
+        pb: '4px',
       }}>
       <span>Response format</span>
       <TextField

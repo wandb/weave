@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useRef} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
-import {DEFAULT_SYSTEM_MESSAGE} from '../PlaygroundPage/usePlaygroundState';
+import {DEFAULT_SYSTEM_MESSAGE_CONTENT} from '../PlaygroundPage/usePlaygroundState';
 import {ChatEmptyStateCallout} from './ChatEmptyStateCallout';
 import {ChoicesView} from './ChoicesView';
 import {MessageList} from './MessageList';
@@ -29,11 +29,11 @@ export const ChatView = ({chat}: ChatViewProps) => {
 
   const showEmptyStateCallout =
     chat.request?.messages.length === 1 &&
-    chat.request.messages[0] === DEFAULT_SYSTEM_MESSAGE &&
+    chat.request.messages[0].content === DEFAULT_SYSTEM_MESSAGE_CONTENT &&
     (chatResult?.choices.length === 0 || chatResult?.choices === undefined);
 
   return (
-    <div>
+    <div className="flex flex-col pb-32">
       <MessageList
         messages={chat.request?.messages || []}
         scrollLastMessage={scrollLastMessage}

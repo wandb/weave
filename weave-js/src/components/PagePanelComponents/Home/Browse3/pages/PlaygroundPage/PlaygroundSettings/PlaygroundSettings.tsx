@@ -54,7 +54,13 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
         </Tabs.List>
         {playgroundStates.map((playgroundState, idx) => (
           <Tabs.Content key={idx} value={idx.toString()}>
-            <Box sx={{display: 'flex', flexDirection: 'column', gap: 2, mt: 2}}>
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+                mt: 2,
+              }}>
               <FunctionEditor
                 playgroundState={playgroundState}
                 functions={playgroundState.functions}

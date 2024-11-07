@@ -62,9 +62,9 @@ export const MessagePanel = ({
     : undefined;
 
   return (
-    <div className={classNames('flex gap-8', {'mt-32': !isTool})}>
+    <div className={classNames('flex gap-8', {'mt-24': !isTool})}>
       {!isNested && (
-        <div className="w-40">
+        <div className="w-32">
           {!isUser && !isTool && (
             <Callout
               size="small"
@@ -77,16 +77,23 @@ export const MessagePanel = ({
       )}
 
       <div
-        className={classNames('relative overflow-visible py-8', {
+        className={classNames('relative overflow-visible', {
           'pb-40': isOverflowing && isShowingMore,
           'border-t border-moon-250': isTool,
           'rounded-lg border border-moon-250': isSystemPrompt,
           'bg-cactus-300/[0.24]': isUser,
           'w-3/4': isTool || hasToolCalls || isStructuredOutput || editorHeight,
-          'w-full': isSystemPrompt || isNested,
-          'max-w-3xl': !(isSystemPrompt || isNested),
+          'w-full':
+            isSystemPrompt ||
+            isNested ||
+            isTool ||
+            hasToolCalls ||
+            isStructuredOutput ||
+            editorHeight,
+          'max-w-3xl': isUser,
           'ml-auto': isUser,
           'mr-auto': !isUser,
+          'py-8': hasContent,
         })}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}>
@@ -130,7 +137,7 @@ export const MessagePanel = ({
                     className={classNames(
                       hasToolCalls ? 'pb-8' : '',
                       ' text-sm',
-                      isNested ? '' : 'px-16'
+                      {'px-16': isSystemPrompt || isUser}
                     )}>
                     {_.isString(message.content) ? (
                       <MessagePanelPart
@@ -146,9 +153,9 @@ export const MessagePanel = ({
                 )}
                 {hasToolCalls && (
                   <div
-                    className={classNames(
-                      hasContent ? 'border-t border-moon-250 pt-8' : ''
-                    )}>
+                    className={classNames({
+                      'border-t border-moon-250 pt-8': hasContent,
+                    })}>
                     <ToolCalls toolCalls={message.tool_calls!} />
                   </div>
                 )}

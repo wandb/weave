@@ -80,6 +80,7 @@ export const FunctionEditor: React.FC<FunctionEditorProps> = ({
         display: 'flex',
         flexDirection: 'column',
         gap: '8px',
+        pb: '4px',
       }}>
       <Box sx={{display: 'flex', gap: '8px', alignItems: 'center'}}>
         Functions
