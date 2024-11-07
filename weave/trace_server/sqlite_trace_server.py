@@ -989,6 +989,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             req.payload["detoned"] = detoned
             req.payload["detoned_alias"] = emoji.demojize(detoned)
             res_payload = req.payload
+        else:
+            res_payload = req.payload
 
         feedback_id = generate_id()
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
