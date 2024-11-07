@@ -1364,7 +1364,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             "wb_user_id": req.wb_user_id,
             "creator": req.creator,
             "feedback_type": req.feedback_type,
-            "payload": req.payload,
+            "payload": payload,
             "created_at": created_at,
             "annotation_ref": req.annotation_ref,
             "runnable_ref": req.runnable_ref,
