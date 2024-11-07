@@ -40,6 +40,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
   const [settingsTab, setSettingsTab] = useState<number | null>(null);
 
   const {useCall, useCalls} = useWFHooks();
+
   const call = useCall(
     useMemo(() => {
       return props.callId

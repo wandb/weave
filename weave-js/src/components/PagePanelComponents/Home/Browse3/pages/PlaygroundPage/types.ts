@@ -1,5 +1,6 @@
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
-import {LLMMaxTokensKey} from './PlaygroundChat/llmMaxTokens';
+import {LLMMaxTokensKey} from './llmMaxTokens';
+
 
 export enum PlaygroundResponseFormats {
   Text = 'text',

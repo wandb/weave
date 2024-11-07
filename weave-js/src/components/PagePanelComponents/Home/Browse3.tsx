@@ -531,6 +531,14 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/tables`}>
           <TablesPageBinding />
         </Route>
+        {/* PLAYGROUND */}
+        <Route
+          path={[
+            `${projectRoot}/playground/:itemName`,
+            `${projectRoot}/playground`,
+          ]}>
+          <PlaygroundPageBinding />
+        </Route>
       </Switch>
     </Box>
   );
@@ -1052,6 +1060,17 @@ const AppBarLink = (props: ComponentProps<typeof RouterLink>) => (
     component={RouterLink}
   />
 );
+
+const PlaygroundPageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+  return (
+    <PlaygroundPage
+      entity={params.entity}
+      project={params.project}
+      callId={params.itemName}
+    />
+  );
+};
 
 const Browse3Breadcrumbs: FC = props => {
   const params = useParamsDecoded<Browse3Params>();
