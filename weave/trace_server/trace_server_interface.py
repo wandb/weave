@@ -740,7 +740,7 @@ class FeedbackPurgeReq(BaseModel):
 
 
 class FeedbackPurgeRes(BaseModel):
-    num_deleted: int
+    pass
 
 
 class FeedbackReplaceReq(FeedbackCreateReq):

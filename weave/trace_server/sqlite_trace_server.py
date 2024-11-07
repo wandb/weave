@@ -14,9 +14,7 @@ import emoji
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.base_object_class_util import (
-    process_incoming_object,
-)
+from weave.trace_server.base_object_class_util import process_incoming_object
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.feedback import (
@@ -1052,7 +1050,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         with self.lock:
             cursor.execute(prepared.sql, prepared.parameters)
             conn.commit()
-        return tsi.FeedbackPurgeRes(num_deleted=cursor.rowcount)
+        return tsi.FeedbackPurgeRes()
 
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
         purge_request = tsi.FeedbackPurgeReq(
@@ -1066,14 +1064,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 }
             },
         )
-        purge_result = self.feedback_purge(purge_request)
-        if purge_result.num_deleted == 0:
-            raise InvalidRequest(f"Failed to purge feedback with id {req.feedback_id}")
-        if purge_result.num_deleted > 1:
-            raise InvalidRequest(
-                f"Purged more than one feedback with id {req.feedback_id}"
-            )
-
+        self.feedback_purge(purge_request)
         create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
         create_result = self.feedback_create(create_req)
 

@@ -7,9 +7,11 @@ from tests.trace.util import client_is_sqlite
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
-from weave.trace_server.trace_server_interface import (FeedbackCreateReq,
-                                                       FeedbackQueryReq,
-                                                       FeedbackReplaceReq)
+from weave.trace_server.trace_server_interface import (
+    FeedbackCreateReq,
+    FeedbackQueryReq,
+    FeedbackReplaceReq,
+)
 
 
 def test_client_feedback(client) -> None:
@@ -46,6 +48,40 @@ def test_client_feedback(client) -> None:
     assert len(trace_object2.feedback) == 0
     feedbacks = client.get_feedback()
     assert len(feedbacks) == 2
+
+
+def test_feedback_create_server_response(client) -> None:
+    feedbacks = client.get_feedback()
+    assert len(feedbacks) == 0
+
+    ref = "weave:///test/project/obj/123:abc"
+    note = {"note": "this is a note on call1"}
+    emoji = {"emoji": "👍"}
+
+    feedback_emoji_res = client.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=client._project_id(),
+            weave_ref=ref,
+            feedback_type="wandb.reaction.1",
+            payload=emoji,
+        )
+    )
+    assert feedback_emoji_res.payload == {
+        "emoji": "👍",
+        "alias": ":thumbs_up:",
+        "detoned": "👍",
+        "detoned_alias": ":thumbs_up:",
+    }
+
+    feedback_note_res = client.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=client._project_id(),
+            weave_ref=ref,
+            feedback_type="wandb.note",
+            payload=note,
+        )
+    )
+    assert feedback_note_res.payload == note
 
 
 def test_custom_feedback(client) -> None:
@@ -543,6 +579,7 @@ def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
     assert len(calls) == 2
     assert [c.id for c in calls] == [ids[2], ids[0]]
 
+
 def test_feedback_replace(client) -> None:
     # Create initial feedback
     create_req = FeedbackCreateReq(
@@ -577,7 +614,7 @@ def test_feedback_replace(client) -> None:
     replaced_feedback = client.server.feedback_replace(replace_req)
 
     # Verify the replacement
-    assert replaced_feedback.feedback_type == "note"
+    assert note_feedback.id != replaced_feedback.id
     assert replaced_feedback.payload == {"note": "Updated feedback"}
 
     # Verify the other feedback remains unchanged
@@ -606,5 +643,5 @@ def test_feedback_replace(client) -> None:
     )
     replaced_feedback = client.server.feedback_replace(replace_req)
 
-    assert replaced_feedback.feedback_type == "reaction"
+    assert replaced_feedback.id != initial_feedback.id
     assert replaced_feedback.payload == {"emoji": "👍"}
