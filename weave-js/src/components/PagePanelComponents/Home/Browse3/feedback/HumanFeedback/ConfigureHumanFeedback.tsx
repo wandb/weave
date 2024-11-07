@@ -99,7 +99,7 @@ export const ConfigureHumanFeedback: React.FC<ConfigureHumanFeedbackProps> = ({
         <Button
           variant="ghost"
           icon="settings"
-          tooltip="Configure Human Feedback"
+          tooltip="Configure human feedback"
           onClick={onClickConfigure}
         />
       </span>
@@ -248,6 +248,7 @@ export const ConfigureHumanFeedback: React.FC<ConfigureHumanFeedbackProps> = ({
                       Json schema
                     </label>
                     <CodeEditor
+                      language="json"
                       value={editing.jsonSchema}
                       onChange={value =>
                         setEditing({...editing, jsonSchema: value})

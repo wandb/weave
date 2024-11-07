@@ -63,23 +63,23 @@ export const HumanFeedbackSidebar = ({
   // handle shift + down arrow key, capture so the other handler
   // doesn't also trigger.
   useEffect(() => {
-    const handleDocumentKeyDown = (event: KeyboardEvent) => {
+    const handleArrowDownKey = (event: KeyboardEvent) => {
       if (event.shiftKey && event.key === 'ArrowDown') {
         event.preventDefault();
         handleDone();
       }
     };
-    const handleWindowKeyDown = (event: KeyboardEvent) => {
-      if (event.shiftKey && event.key === 'ArrowDown') {
+    const handleArrowUpKey = (event: KeyboardEvent) => {
+      if (event.key === 'ArrowUp') {
         event.preventDefault();
         handleDone();
       }
     };
-    document.addEventListener('keydown', handleDocumentKeyDown);
-    window.addEventListener('keydown', handleWindowKeyDown);
+    document.addEventListener('keydown', handleArrowDownKey);
+    window.addEventListener('keydown', handleArrowUpKey);
     return () => {
-      document.removeEventListener('keydown', handleDocumentKeyDown);
-      window.removeEventListener('keydown', handleWindowKeyDown);
+      document.removeEventListener('keydown', handleArrowDownKey);
+      window.removeEventListener('keydown', handleArrowUpKey);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
