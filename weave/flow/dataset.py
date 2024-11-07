@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from typing import Any
 
 from pydantic import field_validator
@@ -65,3 +66,6 @@ class Dataset(Object):
                     "Attempted to construct a Dataset row with an empty dict."
                 )
         return rows
+
+    def __iter__(self) -> Iterator[dict]:
+        return iter(self.rows)
