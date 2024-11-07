@@ -1,4 +1,4 @@
-from typing import Any, Type
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
@@ -9,19 +9,21 @@ from weave.scorers.base_scorer import Scorer
 class PydanticScorer(Scorer):
     """Validate the model output against a pydantic model."""
 
-    model: Type[BaseModel]
+    model: type[BaseModel]
 
     @weave.op
     def score(self, output: Any) -> dict:
         if isinstance(output, str):
             try:
                 self.model.model_validate_json(output)
-                return {"valid_pydantic": True}
             except ValidationError:
                 return {"valid_pydantic": False}
+            else:
+                return {"valid_pydantic": True}
         else:
             try:
                 self.model.model_validate(output)
-                return {"valid_pydantic": True}
             except ValidationError:
                 return {"valid_pydantic": False}
+            else:
+                return {"valid_pydantic": True}

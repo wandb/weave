@@ -3,16 +3,12 @@ import logging
 import sys
 import traceback
 import weakref
+from collections.abc import AsyncIterator, Generator, Iterator
 from typing import (
     Any,
-    AsyncIterator,
     Callable,
-    Dict,
-    Generator,
     Generic,
-    Iterator,
     Optional,
-    Type,
     TypeVar,
     Union,
 )
@@ -124,13 +120,14 @@ class _IteratorWrapper(Generic[V]):
                 if get_raise_on_captured_errors():
                     raise
                 log_once(logger.error, ON_YIELD_MSG.format(traceback.format_exc()))
-            return value
         except (StopIteration, StopAsyncIteration) as e:
             self._call_on_close_once()
             raise
         except Exception as e:
             self._call_on_error_once(e)
             raise
+        else:
+            return value
 
     def __aiter__(self) -> "_IteratorWrapper":
         return self
@@ -162,13 +159,14 @@ class _IteratorWrapper(Generic[V]):
                 if get_raise_on_captured_errors():
                     raise
                 log_once(logger.error, ON_AYIELD_MSG.format(traceback.format_exc()))
-            return value
         except (StopAsyncIteration, StopIteration) as e:
             self._call_on_close_once()
             raise StopAsyncIteration
         except Exception as e:
             self._call_on_error_once(e)
             raise
+        else:
+            return value
 
     def __del__(self) -> None:
         self._call_on_close_once()
@@ -231,11 +229,11 @@ class _IteratorWrapper(Generic[V]):
 
 def add_accumulator(
     op: Op,
-    make_accumulator: Callable[[Dict], Callable[[S, V], S]],
+    make_accumulator: Callable[[dict], Callable[[S, V], S]],
     *,
-    should_accumulate: Optional[Callable[[Dict], bool]] = None,
+    should_accumulate: Optional[Callable[[dict], bool]] = None,
     on_finish_post_processor: Optional[Callable[[Any], Any]] = None,
-    iterator_wrapper: Type[_IteratorWrapper] = _IteratorWrapper,
+    iterator_wrapper: type[_IteratorWrapper] = _IteratorWrapper,
 ) -> Op:
     """This is to be used internally only - specifically designed for integrations with streaming libraries.
 
@@ -264,7 +262,7 @@ def add_accumulator(
     """
 
     def on_output(
-        value: Iterator[V], on_finish: FinishCallbackType, inputs: Dict
+        value: Iterator[V], on_finish: FinishCallbackType, inputs: dict
     ) -> Iterator:
         def wrapped_on_finish(value: Any, e: Optional[BaseException] = None) -> None:
             if on_finish_post_processor is not None:
@@ -292,7 +290,7 @@ def _build_iterator_from_accumulator_for_op(
     value: Iterator[V],
     accumulator: Callable,
     on_finish: FinishCallbackType,
-    iterator_wrapper: Type["_IteratorWrapper"] = _IteratorWrapper,
+    iterator_wrapper: type["_IteratorWrapper"] = _IteratorWrapper,
 ) -> "_IteratorWrapper":
     acc: _Accumulator = _Accumulator(accumulator)
 

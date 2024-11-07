@@ -6,31 +6,16 @@ from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
 
 
-def assert_sql(cq: CallsQuery, exp_queries, exp_params):
-    pb = ParamBuilder("pb")
-    queries = cq.as_sql(pb)
-    params = pb.get_params()
-
-    for qr, qe in zip(queries, exp_queries):
-        exp_formatted = sqlparse.format(qe, reindent=True)
-        found_formatted = sqlparse.format(qr, reindent=True)
-
-        assert exp_formatted == found_formatted
-
-    assert exp_params == params
-
-
 def test_query_baseline() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     assert_sql(
         cq,
-        [
-            """
+        """
         SELECT calls_merged.id AS id
         FROM calls_merged
-        WHERE project_id = {pb_0:String}
-        GROUP BY (project_id,id)
+        WHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((
                 any(calls_merged.deleted_at) IS NULL
@@ -42,8 +27,7 @@ def test_query_baseline() -> None:
                ))
             ))
         )
-        """
-        ],
+        """,
         {"pb_0": "project"},
     )
 
@@ -54,14 +38,13 @@ def test_query_light_column() -> None:
     cq.add_field("started_at")
     assert_sql(
         cq,
-        [
-            """
+        """
         SELECT
             calls_merged.id AS id,
             any(calls_merged.started_at) AS started_at
         FROM calls_merged
-        WHERE project_id = {pb_0:String}
-        GROUP BY (project_id,id)
+        WHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((
                 any(calls_merged.deleted_at) IS NULL
@@ -73,8 +56,7 @@ def test_query_light_column() -> None:
                ))
             ))
         )
-        """
-        ],
+        """,
         {"pb_0": "project"},
     )
 
@@ -85,14 +67,13 @@ def test_query_heavy_column() -> None:
     cq.add_field("inputs")
     assert_sql(
         cq,
-        [
-            """
+        """
         SELECT
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        WHERE project_id = {pb_0:String}
-        GROUP BY (project_id,id)
+        WHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((
                 any(calls_merged.deleted_at) IS NULL
@@ -104,8 +85,7 @@ def test_query_heavy_column() -> None:
                ))
             ))
         )
-        """
-        ],
+        """,
         {"pb_0": "project"},
     )
 
@@ -123,14 +103,13 @@ def test_query_heavy_column_simple_filter() -> None:
     )
     assert_sql(
         cq,
-        [
-            """
+        """
         WITH filtered_calls AS (
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            WHERE project_id = {pb_1:String}
-            GROUP BY (project_id,id)
+            WHERE calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
@@ -142,13 +121,12 @@ def test_query_heavy_column_simple_filter() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
         WHERE
-            project_id = {pb_2:String}
+            calls_merged.project_id = {pb_1:String}
         AND
-            (id IN filtered_calls)
-        GROUP BY (project_id,id)
-        """
-        ],
-        {"pb_0": ["a", "b"], "pb_1": "project", "pb_2": "project"},
+            (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        """,
+        {"pb_0": ["a", "b"], "pb_1": "project"},
     )
 
 
@@ -166,14 +144,13 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
     )
     assert_sql(
         cq,
-        [
-            """
+        """
         WITH filtered_calls AS (
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            WHERE project_id = {pb_1:String}
-            GROUP BY (project_id,id)
+            WHERE calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
@@ -185,14 +162,13 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
         WHERE
-            project_id = {pb_2:String}
+            calls_merged.project_id = {pb_1:String}
         AND
-            (id IN filtered_calls)
-        GROUP BY (project_id,id)
+            (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC
-        """
-        ],
-        {"pb_0": ["a", "b"], "pb_1": "project", "pb_2": "project"},
+        """,
+        {"pb_0": ["a", "b"], "pb_1": "project"},
     )
 
 
@@ -211,14 +187,13 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
     )
     assert_sql(
         cq,
-        [
-            """
+        """
         WITH filtered_calls AS (
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            WHERE project_id = {pb_1:String}
-            GROUP BY (project_id,id)
+            WHERE calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
             AND
@@ -234,14 +209,13 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
         WHERE
-            project_id = {pb_2:String}
+            calls_merged.project_id = {pb_1:String}
         AND
-            (id IN filtered_calls)
-        GROUP BY (project_id,id)
+            (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC
-        """
-        ],
-        {"pb_0": ["a", "b"], "pb_1": "project", "pb_2": "project"},
+        """,
+        {"pb_0": ["a", "b"], "pb_1": "project"},
     )
 
 
@@ -279,14 +253,13 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
     )
     assert_sql(
         cq,
-        [
-            """
+        """
         WITH filtered_calls AS (
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            WHERE project_id = {pb_2:String}
-            GROUP BY (project_id,id)
+            WHERE calls_merged.project_id = {pb_2:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.wb_user_id) = {pb_0:String}))
             AND
@@ -302,105 +275,37 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
         WHERE
-            project_id = {pb_5:String}
+            calls_merged.project_id = {pb_2:String}
         AND
-            (id IN filtered_calls)
-        GROUP BY (project_id,id)
-        HAVING (
-            JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) = {pb_4:String}
-        )
-        ORDER BY any(calls_merged.started_at) DESC
-        LIMIT 10
-        """
-        ],
-        {
-            "pb_0": "my_user_id",
-            "pb_1": ["a", "b"],
-            "pb_2": "project",
-            "pb_3": '$."param"."val"',
-            "pb_4": "hello",
-            "pb_5": "project",
-        },
-    )
-
-
-def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_conditions_two_step() -> (
-    None
-):
-    cq = CallsQuery(project_id="project")
-    cq.add_field("id")
-    cq.add_field("inputs")
-    cq.add_order("started_at", "desc")
-    cq.set_limit(10)
-    cq.set_hardcoded_filter(
-        HardCodedFilter(
-            filter=tsi.CallsFilter(
-                op_names=["a", "b"],
-            )
-        )
-    )
-    cq.add_condition(
-        tsi_query.AndOperation.model_validate(
-            {
-                "$and": [
-                    {
-                        "$eq": [
-                            {"$getField": "inputs.param.val"},
-                            {"$literal": "hello"},
-                        ]
-                    },  # <-- heavy condition
-                    {
-                        "$eq": [{"$getField": "wb_user_id"}, {"$literal": "my_user_id"}]
-                    },  # <-- light condition
-                ]
-            }
-        )
-    )
-    cq.set_filtered_output_param("filtered_calls")
-    assert_sql(
-        cq,
-        [
-            """
-        SELECT
-            calls_merged.id AS id
-        FROM calls_merged
-        WHERE project_id = {pb_2:String}
-        GROUP BY (project_id,id)
-        HAVING (
-            ((any(calls_merged.wb_user_id) = {pb_0:String}))
-        AND
-            ((any(calls_merged.deleted_at) IS NULL))
-        AND
-            ((NOT ((any(calls_merged.started_at) IS NULL))))
-        AND
-            (any(calls_merged.op_name) IN {pb_1:Array(String)})
-        )""",
-            """
-        SELECT
-            calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump
-        FROM calls_merged
-        WHERE
-            project_id = {pb_5:String}
-        AND
-            (id IN {filtered_calls:Array(String)})
-        GROUP BY (project_id,id)
+            (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) = {pb_4:String}
         )
         ORDER BY any(calls_merged.started_at) DESC
         LIMIT 10
         """,
-        ],
         {
             "pb_0": "my_user_id",
             "pb_1": ["a", "b"],
             "pb_2": "project",
             "pb_3": '$."param"."val"',
             "pb_4": "hello",
-            "pb_5": "project",
         },
     )
+
+
+def assert_sql(cq: CallsQuery, exp_query, exp_params):
+    pb = ParamBuilder("pb")
+    query = cq.as_sql(pb)
+    params = pb.get_params()
+
+    assert exp_params == params
+
+    exp_formatted = sqlparse.format(exp_query, reindent=True)
+    found_formatted = sqlparse.format(query, reindent=True)
+
+    assert exp_formatted == found_formatted
 
 
 def test_query_light_column_with_costs() -> None:
@@ -418,14 +323,13 @@ def test_query_light_column_with_costs() -> None:
     )
     assert_sql(
         cq,
-        [
-            """
+        """
         WITH
             filtered_calls AS (
                 SELECT calls_merged.id AS id
                 FROM calls_merged
-                WHERE project_id = {pb_1:String}
-                GROUP BY (project_id, id)
+                WHERE calls_merged.project_id = {pb_1:String}
+                GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING (((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
                 AND (any(calls_merged.op_name) IN {pb_0:Array(String)}))),
@@ -434,9 +338,9 @@ def test_query_light_column_with_costs() -> None:
                     calls_merged.id AS id,
                     any(calls_merged.started_at) AS started_at
                 FROM calls_merged
-                WHERE project_id = {pb_2:String}
-                    AND (id IN filtered_calls)
-                GROUP BY (project_id, id)),
+                WHERE calls_merged.project_id = {pb_1:String}
+                    AND (calls_merged.id IN filtered_calls)
+                GROUP BY (calls_merged.project_id, calls_merged.id)),
             -- From the all_calls we get the usage data for LLMs
             llm_usage AS (
                 SELECT
@@ -529,14 +433,254 @@ def test_query_light_column_with_costs() -> None:
                     '}' )
                 ) AS summary_dump
             FROM ranked_prices
-            WHERE (rank = {pb_3:UInt64})
+            WHERE (rank = {pb_2:UInt64})
             GROUP BY id, started_at
-        """
-        ],
+        """,
         {
             "pb_0": ["a", "b"],
             "pb_1": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
-            "pb_2": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
-            "pb_3": 1,
+            "pb_2": 1,
+        },
+    )
+
+
+def test_query_with_simple_feedback_sort() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_order("feedback.[wandb.runnable.my_op].payload.output.expected", "desc")
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+        LEFT JOIN feedback ON
+            (feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_4:String},
+            '/call/',
+            calls_merged.id))
+        WHERE
+            calls_merged.project_id = {pb_4:String}
+            AND calls_merged.project_id = {pb_4:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            (((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        ORDER BY
+            (NOT (JSONType(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_1:String},
+            {pb_2:String}) = 'Null'
+                OR JSONType(anyIf(feedback.payload_dump,
+                feedback.feedback_type = {pb_0:String}),
+                {pb_1:String},
+                {pb_2:String}) IS NULL)) desc,
+            toFloat64OrNull(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_3:String})) DESC,
+            toString(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_3:String})) DESC
+        """,
+        {
+            "pb_0": "wandb.runnable.my_op",
+            "pb_1": "output",
+            "pb_2": "expected",
+            "pb_3": '$."output"."expected"',
+            "pb_4": "project",
+        },
+    )
+
+
+def test_query_with_simple_feedback_sort_with_op_name() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.set_hardcoded_filter(
+        HardCodedFilter(
+            filter={"op_names": ["weave-trace-internal:///project/op/my_op:1234567890"]}
+        )
+    )
+    cq.add_order("feedback.[wandb.runnable.my_op].payload.output.expected", "desc")
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS
+        (
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+        WHERE
+            calls_merged.project_id = {pb_1:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            (((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                    AND (any(calls_merged.op_name) IN {pb_0:Array(String)})))
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+        LEFT JOIN feedback ON
+            (feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_1:String},
+            '/call/',
+            calls_merged.id))
+        WHERE
+            calls_merged.project_id = {pb_1:String}
+            AND calls_merged.project_id = {pb_1:String}
+            AND (calls_merged.id IN filtered_calls)
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        ORDER BY
+            (NOT (JSONType(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_2:String}),
+            {pb_3:String},
+            {pb_4:String}) = 'Null'
+                OR JSONType(anyIf(feedback.payload_dump,
+                feedback.feedback_type = {pb_2:String}),
+                {pb_3:String},
+                {pb_4:String}) IS NULL)) desc,
+            toFloat64OrNull(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_2:String}),
+            {pb_5:String})) DESC,
+            toString(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_2:String}),
+            {pb_5:String})) DESC
+        """,
+        {
+            "pb_0": ["weave-trace-internal:///project/op/my_op:1234567890"],
+            "pb_1": "project",
+            "pb_2": "wandb.runnable.my_op",
+            "pb_3": "output",
+            "pb_4": "expected",
+            "pb_5": '$."output"."expected"',
+        },
+    )
+
+
+def test_query_with_simple_feedback_filter() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {
+                        "$getField": "feedback.[wandb.runnable.my_op].payload.output.expected"
+                    },
+                    {
+                        "$getField": "feedback.[wandb.runnable.my_op].payload.output.found"
+                    },
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+        LEFT JOIN feedback ON
+            (feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_3:String},
+            '/call/',
+            calls_merged.id))
+        WHERE
+            calls_merged.project_id = {pb_3:String}
+            AND calls_merged.project_id = {pb_3:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            (((JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_1:String}) > JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_2:String})))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": "wandb.runnable.my_op",
+            "pb_1": '$."output"."expected"',
+            "pb_2": '$."output"."found"',
+            "pb_3": "project",
+        },
+    )
+
+
+def test_query_with_simple_feedback_sort_and_filter() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {
+                        "$getField": "feedback.[wandb.runnable.my_op].payload.output.expected"
+                    },
+                    {"$literal": "a"},
+                ]
+            }
+        )
+    )
+    cq.add_order("feedback.[wandb.runnable.my_op].payload.output.score", "desc")
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+        LEFT JOIN feedback ON
+            (feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_6:String},
+            '/call/',
+            calls_merged.id))
+        WHERE
+            calls_merged.project_id = {pb_6:String}
+            AND calls_merged.project_id = {pb_6:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            (((JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_1:String}) = {pb_2:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        ORDER BY
+            (NOT (JSONType(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_3:String},
+            {pb_4:String}) = 'Null'
+                OR JSONType(anyIf(feedback.payload_dump,
+                feedback.feedback_type = {pb_0:String}),
+                {pb_3:String},
+                {pb_4:String}) IS NULL)) desc,
+            toFloat64OrNull(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_5:String})) DESC,
+            toString(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_5:String})) DESC
+        """,
+        {
+            "pb_0": "wandb.runnable.my_op",
+            "pb_1": '$."output"."expected"',
+            "pb_2": "a",
+            "pb_3": "output",
+            "pb_4": "score",
+            "pb_5": '$."output"."score"',
+            "pb_6": "project",
         },
     )

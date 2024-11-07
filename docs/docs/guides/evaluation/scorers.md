@@ -330,7 +330,7 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
 
     scorer = HallucinationFreeScorer(
         client=llm_client,
-        model_id="gpt4o"
+        model_id="gpt-4o"
     )
     ```
 
@@ -391,7 +391,7 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
 
     scorer = SummarizationScorer(
         client=llm_client,
-        model_id="gpt4o"
+        model_id="gpt-4o"
     )
     ```
 

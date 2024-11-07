@@ -143,7 +143,7 @@ class EasyPrompt(UserList, Prompt):
             for item in item:
                 self.append(item)
         else:
-            raise ValueError(f"Cannot append {item} of type {type(item)} to Prompt")
+            raise TypeError(f"Cannot append {item} of type {type(item)} to Prompt")
 
     def __iadd__(self, item: Any) -> "Prompt":
         self.append(item)
@@ -236,13 +236,13 @@ class EasyPrompt(UserList, Prompt):
     # TODO: Any should be Dataset but there is a circular dependency issue
     def bind_rows(self, dataset: Union[list[dict], Any]) -> list["Prompt"]:
         rows = dataset if isinstance(dataset, list) else dataset.rows
-        bound: list["Prompt"] = []
+        bound: list[Prompt] = []
         for row in rows:
             bound.append(self.copy().bind(row))
         return bound
 
     @overload
-    def __getitem__(self, index: SupportsIndex) -> Any: ...
+    def __getitem__(self, key: SupportsIndex) -> Any: ...
 
     @overload
     def __getitem__(self, key: slice) -> "EasyPrompt": ...
@@ -401,7 +401,7 @@ class EasyPrompt(UserList, Prompt):
     @staticmethod
     def load(fp: IO) -> "EasyPrompt":
         if isinstance(fp, str):  # Common mistake
-            raise ValueError(
+            raise TypeError(
                 "Prompt.load() takes a file-like object, not a string. Did you mean Prompt.e()?"
             )
         data = json.load(fp)
@@ -411,7 +411,7 @@ class EasyPrompt(UserList, Prompt):
     @staticmethod
     def load_file(filepath: Union[str, Path]) -> "Prompt":
         expanded_path = os.path.expanduser(str(filepath))
-        with open(expanded_path, "r") as f:
+        with open(expanded_path) as f:
             return EasyPrompt.load(f)
 
     def dump(self, fp: IO) -> None:

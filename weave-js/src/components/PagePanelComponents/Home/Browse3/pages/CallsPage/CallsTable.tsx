@@ -8,12 +8,13 @@
 
 import {
   Autocomplete,
+  Box,
   Chip,
   FormControl,
   ListItem,
   Tooltip,
+  Typography,
 } from '@mui/material';
-import {Box, Typography} from '@mui/material';
 import {
   GridColDef,
   GridColumnVisibilityModel,
@@ -32,6 +33,7 @@ import {Icon} from '@wandb/weave/components/Icon';
 import React, {
   FC,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -43,7 +45,11 @@ import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {TailwindContents} from '../../../../../Tailwind';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
-import {useWeaveflowCurrentRouteContext} from '../../context';
+import {TableRowSelectionContext} from '../../../Browse3';
+import {
+  useWeaveflowCurrentRouteContext,
+  WeaveflowPeekContext,
+} from '../../context';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
@@ -80,12 +86,14 @@ import {
   RefreshButton,
 } from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
-import {WFHighLevelCallFilter} from './callsTableFilter';
-import {getEffectiveFilter} from './callsTableFilter';
-import {useOpVersionOptions} from './callsTableFilter';
-import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
-import {useInputObjectVersionOptions} from './callsTableFilter';
-import {useOutputObjectVersionOptions} from './callsTableFilter';
+import {
+  ALL_TRACES_OR_CALLS_REF_KEY,
+  getEffectiveFilter,
+  useInputObjectVersionOptions,
+  useOpVersionOptions,
+  useOutputObjectVersionOptions,
+  WFHighLevelCallFilter,
+} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
@@ -271,6 +279,11 @@ export const CallsTable: FC<{
       setCallsResult([]);
       setCallsTotal(0);
       callsEffectiveFilter.current = effectiveFilter;
+      // Refetch the calls IFF the filter has changed, this is a
+      // noop if the calls query is already loading, but if the filter
+      // has no effective impact (frozen vs. not frozen) we need to
+      // manually refetch
+      calls.refetch();
     } else if (!calls.loading) {
       setCallsResult(calls.result);
       setCallsTotal(calls.total);
@@ -482,6 +495,13 @@ export const CallsTable: FC<{
       }
     }
   }, [rowIds, peekId]);
+  const {setRowIds} = useContext(TableRowSelectionContext);
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  useEffect(() => {
+    if (!isPeeking && setRowIds) {
+      setRowIds(rowIds);
+    }
+  }, [rowIds, isPeeking, setRowIds]);
 
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {
@@ -747,12 +767,15 @@ export const CallsTable: FC<{
           )}
           <div className="flex items-center gap-6">
             <Switch.Root
+              id="tracesMetricsSwitch"
               size="small"
               checked={isMetricsChecked}
               onCheckedChange={setMetricsChecked}>
               <Switch.Thumb size="small" checked={isMetricsChecked} />
             </Switch.Root>
-            Metrics
+            <label className="cursor-pointer" htmlFor="tracesMetricsSwitch">
+              Metrics
+            </label>
           </div>
           {selectedInputObjectVersion && (
             <Chip

@@ -47,7 +47,7 @@ def assert_correct_summary(summary: dict, trace_name: str):
     assert summary["weave"]["latency_ms"] > 0
 
 
-@pytest.mark.retry(max_attempts=5)
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 def test_content_generation(client):
     import google.generativeai as genai
@@ -65,12 +65,11 @@ def test_content_generation(client):
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.generativeai.GenerativeModel.generate_content"
     assert call.output is not None
-    # TODO: Re-enable after dictify is fixed
-    # assert_correct_output_shape(call.output)
-    # assert_correct_summary(call.summary, trace_name)
+    assert_correct_output_shape(call.output)
+    assert_correct_summary(call.summary, trace_name)
 
 
-@pytest.mark.retry(max_attempts=5)
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 def test_content_generation_stream(client):
     import google.generativeai as genai
@@ -92,12 +91,11 @@ def test_content_generation_stream(client):
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.generativeai.GenerativeModel.generate_content"
     assert call.output is not None
-    # TODO: Re-enable after dictify is fixed
-    # assert_correct_output_shape(call.output)
-    # assert_correct_summary(call.summary, trace_name)
+    assert_correct_output_shape(call.output)
+    assert_correct_summary(call.summary, trace_name)
 
 
-@pytest.mark.retry(max_attempts=5)
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
 async def test_content_generation_async(client):
@@ -116,6 +114,5 @@ async def test_content_generation_async(client):
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.generativeai.GenerativeModel.generate_content_async"
     assert call.output is not None
-    # TODO: Re-enable after dictify is fixed
-    # assert_correct_output_shape(call.output)
-    # assert_correct_summary(call.summary, trace_name)
+    assert_correct_output_shape(call.output)
+    assert_correct_summary(call.summary, trace_name)
