@@ -143,7 +143,7 @@ class EasyPrompt(UserList, Prompt):
             for item in item:
                 self.append(item)
         else:
-            raise ValueError(f"Cannot append {item} of type {type(item)} to Prompt")
+            raise TypeError(f"Cannot append {item} of type {type(item)} to Prompt")
 
     def __iadd__(self, item: Any) -> "Prompt":
         self.append(item)
@@ -401,7 +401,7 @@ class EasyPrompt(UserList, Prompt):
     @staticmethod
     def load(fp: IO) -> "EasyPrompt":
         if isinstance(fp, str):  # Common mistake
-            raise ValueError(
+            raise TypeError(
                 "Prompt.load() takes a file-like object, not a string. Did you mean Prompt.e()?"
             )
         data = json.load(fp)

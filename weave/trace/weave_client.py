@@ -83,6 +83,10 @@ from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTrace
 ALLOW_MIXED_PROJECT_REFS = False
 
 
+class OpNameError(ValueError):
+    """Raised when an op name is invalid."""
+
+
 def dataclasses_asdict_one_level(obj: Any) -> dict[str, Any]:
     # dataclasses.asdict is recursive. We don't want that when json encoding
     return {f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}
@@ -99,7 +103,7 @@ def get_obj_name(val: Any) -> str:
         else:
             name = f"{val.__class__.__name__}"
     if not isinstance(name, str):
-        raise ValueError(f"Object's name attribute is not a string: {name}")
+        raise TypeError(f"Object's name attribute is not a string: {name}")
     return name
 
 
@@ -205,7 +209,7 @@ class Call:
             self.__dict__["_op_name"] = self._op_name.result()
 
         if not isinstance(self._op_name, str):
-            raise Exception(f"Call op_name is not a string: {self._op_name}")
+            raise OpNameError(f"Call op_name is not a string: {self._op_name}")
 
         return self._op_name
 
@@ -557,7 +561,7 @@ class WeaveClient:
 
         ref = self._save_object(val, name, branch)
         if not isinstance(ref, ObjectRef):
-            raise ValueError(f"Expected ObjectRef, got {ref}")
+            raise TypeError(f"Expected ObjectRef, got {ref}")
         return self.get(ref)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1118,7 +1122,7 @@ class WeaveClient:
             scorer_op_ref_uri = score_call.op_name
             scorer_op_ref = parse_uri(scorer_op_ref_uri)
             if not isinstance(scorer_op_ref, OpRef):
-                raise ValueError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
+                raise TypeError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
             score_name = scorer_op_ref.name
             score_results = score_call.output
 
@@ -1151,13 +1155,13 @@ class WeaveClient:
         # Parse the refs (acts as validation)
         call_ref = parse_uri(call_ref_uri)
         if not isinstance(call_ref, CallRef):
-            raise ValueError(f"Invalid call ref: {call_ref_uri}")
+            raise TypeError(f"Invalid call ref: {call_ref_uri}")
         scorer_call_ref = parse_uri(scorer_call_ref_uri)
         if not isinstance(scorer_call_ref, CallRef):
-            raise ValueError(f"Invalid scorer call ref: {scorer_call_ref_uri}")
+            raise TypeError(f"Invalid scorer call ref: {scorer_call_ref_uri}")
         scorer_op_ref = parse_uri(scorer_op_ref_uri)
         if not isinstance(scorer_op_ref, OpRef):
-            raise ValueError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
+            raise TypeError(f"Invalid scorer op ref: {scorer_op_ref_uri}")
 
         # Validate score_name (we might want to relax this in the future)
         if score_name != scorer_op_ref.name:
@@ -1521,9 +1525,10 @@ def safe_current_wb_run_id() -> Optional[str]:
         wandb_run = wandb.run
         if wandb_run is None:
             return None
-        return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
     except ImportError:
         return None
+    else:
+        return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
 
 
 def check_wandb_run_matches(

@@ -69,15 +69,11 @@ export const EMPTY_PROPS_LEADERBOARDS: EmptyProps = {
     'Use leaderboards to summarize and compare the performance of your models.',
   moreInformation: (
     <>
-      Learn{' '}
-      <TargetBlank href="https://wandb.me/weave_evals">
-        evaluation basics
+      Follow the{' '}
+      <TargetBlank href="https://weave-docs.wandb.ai/reference/gen_notebooks/leaderboard_quickstart">
+        leaderboard quickstart
       </TargetBlank>{' '}
-      or follow our tutorial to{' '}
-      <TargetBlank href="http://wandb.me/weave_eval_tut">
-        set up an evaluation pipeline
-      </TargetBlank>
-      .
+      to create leaderboards for your evaluations.
     </>
   ),
 };

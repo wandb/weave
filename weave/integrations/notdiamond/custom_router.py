@@ -140,7 +140,7 @@ def _build_dataframe(
     df_rows = []
     score_col_name = None
     for row in dataset.rows:
-        _df_row = dict()
+        _df_row = {}
         for col, val in row.items():
             if col == "scores":
                 col, val = _get_score_column(model, val, score_col_name=score_col_name)
