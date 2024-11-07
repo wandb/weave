@@ -106,12 +106,12 @@ export type ObjectVersionKey =
   | WandbArtifactObjectVersionKey
   | WeaveObjectVersionKey;
 
-export type ObjectVersionSchema = ObjectVersionKey & {
+export type ObjectVersionSchema<T extends any = any> = ObjectVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
   baseObjectClass: string | null;
   createdAtMs: number;
-  val: any;
+  val: T;
 };
 
 export type ObjectVersionFilter = {

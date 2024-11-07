@@ -583,7 +583,7 @@ def load_instance(
         )
         return None
 
-    od: "Op" = getattr(mod, last_op_function.name)
+    od: Op = getattr(mod, last_op_function.name)
     return od
 
 

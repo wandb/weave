@@ -4,7 +4,8 @@ import contextlib
 import os
 import threading
 import time
-from typing import Any, Iterator, Optional, Union
+from collections.abc import Iterator
+from typing import Any, Optional, Union
 
 # TODO: type_serializers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
@@ -22,6 +23,7 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
+from weave.trace_server.interface.base_object_classes import leaderboard
 
 
 def init(
@@ -109,6 +111,12 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
                 ref.name,
                 ref.digest,
             )
+        elif isinstance(obj, leaderboard.Leaderboard):
+            url = urls.leaderboard_path(
+                ref.entity,
+                ref.project,
+                ref.name,
+            )
         # TODO(gst): once frontend has direct dataset/model links
         # elif isinstance(obj, weave_client.Dataset):
         else:
@@ -149,7 +157,7 @@ def ref(location: str) -> weave_client.ObjectRef:
 
     uri = parse_uri(location)
     if not isinstance(uri, weave_client.ObjectRef):
-        raise ValueError("Expected an object ref")
+        raise TypeError("Expected an object ref")
     return uri
 
 

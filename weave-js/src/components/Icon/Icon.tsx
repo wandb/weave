@@ -60,10 +60,12 @@ import {ReactComponent as ImportDocument} from '../../assets/icons/icon-document
 import {ReactComponent as ImportDocumentation} from '../../assets/icons/icon-documentation.svg';
 import {ReactComponent as ImportDownload} from '../../assets/icons/icon-download.svg';
 import {ReactComponent as ImportDraft} from '../../assets/icons/icon-draft.svg';
+import {ReactComponent as ImportDragGrip} from '../../assets/icons/icon-drag-grip.svg';
 import {ReactComponent as ImportDragGripHorizontal} from '../../assets/icons/icon-drag-grip-horizontal.svg';
 import {ReactComponent as ImportEducationAcademic} from '../../assets/icons/icon-education-academic.svg';
 import {ReactComponent as ImportEmailAt} from '../../assets/icons/icon-email-at.svg';
 import {ReactComponent as ImportEmailEnvelope} from '../../assets/icons/icon-email-envelope.svg';
+import {ReactComponent as ImportEnterReturn} from '../../assets/icons/icon-enter-return.svg';
 import {ReactComponent as ImportExpandRight} from '../../assets/icons/icon-expand-right.svg';
 import {ReactComponent as ImportExpandUncollapse} from '../../assets/icons/icon-expand-uncollapse.svg';
 import {ReactComponent as ImportExportShareUpload} from '../../assets/icons/icon-export-share-upload.svg';
@@ -125,6 +127,7 @@ import {ReactComponent as ImportLogoColab} from '../../assets/icons/icon-logo-co
 import {ReactComponent as ImportMagicWandStar} from '../../assets/icons/icon-magic-wand-star.svg';
 import {ReactComponent as ImportMagicWandStick} from '../../assets/icons/icon-magic-wand-stick.svg';
 import {ReactComponent as ImportMarkdown} from '../../assets/icons/icon-markdown.svg';
+import {ReactComponent as ImportMarker} from '../../assets/icons/icon-marker.svg';
 import {ReactComponent as ImportMenu} from '../../assets/icons/icon-menu.svg';
 import {ReactComponent as ImportMicrophoneAudio} from '../../assets/icons/icon-microphone-audio.svg';
 import {ReactComponent as ImportMillerColumns} from '../../assets/icons/icon-miller-columns.svg';
@@ -139,6 +142,7 @@ import {ReactComponent as ImportOpenaiLogo} from '../../assets/icons/icon-openai
 import {ReactComponent as ImportOrchestrationLaunch} from '../../assets/icons/icon-orchestration-launch.svg';
 import {ReactComponent as ImportOrganizationCorporate} from '../../assets/icons/icon-organization-corporate.svg';
 import {ReactComponent as ImportOverflowHorizontal} from '../../assets/icons/icon-overflow-horizontal.svg';
+import {ReactComponent as ImportOverflowVertical} from '../../assets/icons/icon-overflow-vertical.svg';
 import {ReactComponent as ImportPanTool} from '../../assets/icons/icon-pan-tool.svg';
 import {ReactComponent as ImportPanTool1} from '../../assets/icons/icon-pan-tool-1.svg';
 import {ReactComponent as ImportPanel} from '../../assets/icons/icon-panel.svg';
@@ -170,6 +174,7 @@ import {ReactComponent as ImportRedditSocial} from '../../assets/icons/icon-redd
 import {ReactComponent as ImportRedo} from '../../assets/icons/icon-redo.svg';
 import {ReactComponent as ImportRegex} from '../../assets/icons/icon-regex.svg';
 import {ReactComponent as ImportRegistries} from '../../assets/icons/icon-registries.svg';
+import {ReactComponent as ImportReloadRefresh} from '../../assets/icons/icon-reload-refresh.svg';
 import {ReactComponent as ImportRemove} from '../../assets/icons/icon-remove.svg';
 import {ReactComponent as ImportRemoveAlt} from '../../assets/icons/icon-remove-alt.svg';
 import {ReactComponent as ImportReport} from '../../assets/icons/icon-report.svg';
@@ -182,6 +187,7 @@ import {ReactComponent as ImportRowHeightSmall} from '../../assets/icons/icon-ro
 import {ReactComponent as ImportRowHeightXlarge} from '../../assets/icons/icon-row-height-xlarge.svg';
 import {ReactComponent as ImportRun} from '../../assets/icons/icon-run.svg';
 import {ReactComponent as ImportRunningRepeat} from '../../assets/icons/icon-running-repeat.svg';
+import {ReactComponent as ImportSandboxPlayground} from '../../assets/icons/icon-sandbox-playground.svg';
 import {ReactComponent as ImportSave} from '../../assets/icons/icon-save.svg';
 import {ReactComponent as ImportScikitLogo} from '../../assets/icons/icon-scikit-logo.svg';
 import {ReactComponent as ImportSearch} from '../../assets/icons/icon-search.svg';
@@ -202,6 +208,7 @@ import {ReactComponent as ImportStar} from '../../assets/icons/icon-star.svg';
 import {ReactComponent as ImportStarFilled} from '../../assets/icons/icon-star-filled.svg';
 import {ReactComponent as ImportStop} from '../../assets/icons/icon-stop.svg';
 import {ReactComponent as ImportStopped} from '../../assets/icons/icon-stopped.svg';
+import {ReactComponent as ImportSwap} from '../../assets/icons/icon-swap.svg';
 import {ReactComponent as ImportSweepBayes} from '../../assets/icons/icon-sweep-bayes.svg';
 import {ReactComponent as ImportSweepGrid} from '../../assets/icons/icon-sweep-grid.svg';
 import {ReactComponent as ImportSweepRandomSearch} from '../../assets/icons/icon-sweep-random-search.svg';
@@ -443,6 +450,9 @@ export const IconDownload = (props: SVGIconProps) => (
 export const IconDraft = (props: SVGIconProps) => (
   <ImportDraft {...updateIconProps(props)} />
 );
+export const IconDragGrip = (props: SVGIconProps) => (
+  <ImportDragGrip {...updateIconProps(props)} />
+);
 export const IconDragGripHorizontal = (props: SVGIconProps) => (
   <ImportDragGripHorizontal {...updateIconProps(props)} />
 );
@@ -454,6 +464,9 @@ export const IconEmailAt = (props: SVGIconProps) => (
 );
 export const IconEmailEnvelope = (props: SVGIconProps) => (
   <ImportEmailEnvelope {...updateIconProps(props)} />
+);
+export const IconEnterReturn = (props: SVGIconProps) => (
+  <ImportEnterReturn {...updateIconProps(props)} />
 );
 export const IconExpandRight = (props: SVGIconProps) => (
   <ImportExpandRight {...updateIconProps(props)} />
@@ -638,6 +651,9 @@ export const IconMagicWandStick = (props: SVGIconProps) => (
 export const IconMarkdown = (props: SVGIconProps) => (
   <ImportMarkdown {...updateIconProps(props)} />
 );
+export const IconMarker = (props: SVGIconProps) => (
+  <ImportMarker {...updateIconProps(props)} />
+);
 export const IconMenu = (props: SVGIconProps) => (
   <ImportMenu {...updateIconProps(props)} />
 );
@@ -679,6 +695,9 @@ export const IconOrganizationCorporate = (props: SVGIconProps) => (
 );
 export const IconOverflowHorizontal = (props: SVGIconProps) => (
   <ImportOverflowHorizontal {...updateIconProps(props)} />
+);
+export const IconOverflowVertical = (props: SVGIconProps) => (
+  <ImportOverflowVertical {...updateIconProps(props)} />
 );
 export const IconPanTool = (props: SVGIconProps) => (
   <ImportPanTool {...updateIconProps(props)} />
@@ -773,6 +792,9 @@ export const IconRegex = (props: SVGIconProps) => (
 export const IconRegistries = (props: SVGIconProps) => (
   <ImportRegistries {...updateIconProps(props)} />
 );
+export const IconReloadRefresh = (props: SVGIconProps) => (
+  <ImportReloadRefresh {...updateIconProps(props)} />
+);
 export const IconRemove = (props: SVGIconProps) => (
   <ImportRemove {...updateIconProps(props)} />
 );
@@ -808,6 +830,9 @@ export const IconRun = (props: SVGIconProps) => (
 );
 export const IconRunningRepeat = (props: SVGIconProps) => (
   <ImportRunningRepeat {...updateIconProps(props)} />
+);
+export const IconSandboxPlayground = (props: SVGIconProps) => (
+  <ImportSandboxPlayground {...updateIconProps(props)} />
 );
 export const IconSave = (props: SVGIconProps) => (
   <ImportSave {...updateIconProps(props)} />
@@ -868,6 +893,9 @@ export const IconStop = (props: SVGIconProps) => (
 );
 export const IconStopped = (props: SVGIconProps) => (
   <ImportStopped {...updateIconProps(props)} />
+);
+export const IconSwap = (props: SVGIconProps) => (
+  <ImportSwap {...updateIconProps(props)} />
 );
 export const IconSweepBayes = (props: SVGIconProps) => (
   <ImportSweepBayes {...updateIconProps(props)} />
@@ -1072,10 +1100,12 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   documentation: IconDocumentation,
   download: IconDownload,
   draft: IconDraft,
+  'drag-grip': IconDragGrip,
   'drag-grip-horizontal': IconDragGripHorizontal,
   'education-academic': IconEducationAcademic,
   'email-at': IconEmailAt,
   'email-envelope': IconEmailEnvelope,
+  'enter-return': IconEnterReturn,
   'expand-right': IconExpandRight,
   'expand-uncollapse': IconExpandUncollapse,
   'export-share-upload': IconExportShareUpload,
@@ -1137,6 +1167,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'magic-wand-star': IconMagicWandStar,
   'magic-wand-stick': IconMagicWandStick,
   markdown: IconMarkdown,
+  marker: IconMarker,
   menu: IconMenu,
   'microphone-audio': IconMicrophoneAudio,
   'miller-columns': IconMillerColumns,
@@ -1151,6 +1182,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'orchestration-launch': IconOrchestrationLaunch,
   'organization-corporate': IconOrganizationCorporate,
   'overflow-horizontal': IconOverflowHorizontal,
+  'overflow-vertical': IconOverflowVertical,
   'pan-tool': IconPanTool,
   'pan-tool-1': IconPanTool1,
   panel: IconPanel,
@@ -1182,6 +1214,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   redo: IconRedo,
   regex: IconRegex,
   registries: IconRegistries,
+  'reload-refresh': IconReloadRefresh,
   remove: IconRemove,
   'remove-alt': IconRemoveAlt,
   report: IconReport,
@@ -1194,6 +1227,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'row-height-xlarge': IconRowHeightXlarge,
   run: IconRun,
   'running-repeat': IconRunningRepeat,
+  'sandbox-playground': IconSandboxPlayground,
   save: IconSave,
   'scikit-logo': IconScikitLogo,
   search: IconSearch,
@@ -1214,6 +1248,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'star-filled': IconStarFilled,
   stop: IconStop,
   stopped: IconStopped,
+  swap: IconSwap,
   'sweep-bayes': IconSweepBayes,
   'sweep-grid': IconSweepGrid,
   'sweep-random-search': IconSweepRandomSearch,
