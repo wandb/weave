@@ -21,7 +21,11 @@ def test_content_generation(client):
 
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "vertexai.GenerativeModel.generate_content"
-    assert "paris" in str(call.output).lower()
+    output = call.output
+    assert "paris" in output["candidates"][0]["content"]["parts"][0]["text"].lower()
+    assert output["candidates"][0]["content"]["role"] == "model"
+    assert output["candidates"][0]["finish_reason"] == "STOP"
+    assert "gemini-1.5-flash" in output["model_version"]
 
 
 @pytest.mark.retry(max_attempts=5)
@@ -44,7 +48,9 @@ def test_content_generation_stream(client):
 
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "vertexai.GenerativeModel.generate_content"
-    assert "paris" in str(call.output).lower()
+    output = call.output
+    assert "paris" in output["candidates"][0]["content"]["parts"][0]["text"].lower()
+    assert output["candidates"][0]["content"]["role"] == "model"
 
 
 @pytest.mark.retry(max_attempts=5)
@@ -66,7 +72,11 @@ async def test_content_generation_async(client):
 
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "vertexai.GenerativeModel.generate_content_async"
-    assert "paris" in str(call.output).lower()
+    output = call.output
+    assert "paris" in output["candidates"][0]["content"]["parts"][0]["text"].lower()
+    assert output["candidates"][0]["content"]["role"] == "model"
+    assert output["candidates"][0]["finish_reason"] == "STOP"
+    assert "gemini-1.5-flash" in output["model_version"]
 
 
 @pytest.mark.retry(max_attempts=5)
@@ -98,4 +108,6 @@ async def test_content_generation_async_stream(client):
 
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "vertexai.GenerativeModel.generate_content_async"
-    assert "paris" in str(call.output).lower()
+    output = call.output
+    assert "paris" in output["candidates"][0]["content"]["parts"][0]["text"].lower()
+    assert output["candidates"][0]["content"]["role"] == "model"
