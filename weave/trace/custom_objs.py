@@ -58,26 +58,30 @@ def decode_custom_obj(
     encoded_path_contents: Mapping[str, Union[str, bytes]],
     load_instance_op_uri: Optional[str],
 ) -> Any:
-    if weave_type["type"] in KNOWN_TYPES:
-        serializer = get_serializer_by_id(weave_type["type"])
-        if serializer is None:
-            raise ValueError(f"No serializer found for {weave_type}")
-        load_instance_op = serializer.load
-    elif load_instance_op_uri is not None:
+    _type = weave_type["type"]
+    found_serializer = False
+
+    # First, try to load the object using a known serializer
+    if _type in KNOWN_TYPES:
+        serializer = get_serializer_by_id(_type)
+        if serializer is not None:
+            found_serializer = True
+            load_instance_op = serializer.load
+
+    # Otherwise, fall back to load_instance_op
+    if not found_serializer:
+        if load_instance_op_uri is None:
+            raise ValueError(f"No serializer found for `{_type}`")
+
         ref = parse_uri(load_instance_op_uri)
         if not isinstance(ref, ObjectRef):
-            raise ValueError(f"Expected ObjectRef, got {load_instance_op_uri}")
-        wc = require_weave_client()
-        load_instance_op = wc.get(ref)
+            raise TypeError(f"Expected ObjectRef, got `{type(ref)}`")
+
+        load_instance_op = ref.get()
         if load_instance_op is None:
             raise ValueError(
-                f"Failed to load op needed to decode object of type {weave_type}. See logs above for more information."
+                f"Failed to load op needed to decode object of type `{_type}`. See logs above for more information."
             )
-    else:
-        serializer = get_serializer_by_id(weave_type["type"])
-        if serializer is None:
-            raise ValueError(f"No serializer found for {weave_type}")
-        load_instance_op = serializer.load
 
     # Disables tracing so that calls to loading data itself don't get traced
     load_instance_op._tracing_enabled = False  # type: ignore
