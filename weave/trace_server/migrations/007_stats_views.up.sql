@@ -33,7 +33,6 @@ CREATE TABLE table_rows_stats
 (
     project_id String,
     digest String,
-    refs SimpleAggregateFunction(any, Array(String)),
     size_bytes SimpleAggregateFunction(any, UInt64),
     created_at SimpleAggregateFunction(min, DateTime64(3)),
     updated_at SimpleAggregateFunction(max, DateTime64(3))
@@ -46,7 +45,6 @@ AS
 SELECT
     table_rows.project_id,
     table_rows.digest,
-    anySimpleState(table_rows.refs) as refs,
     anySimpleState(length(table_rows.val_dump)) AS size_bytes,
     minSimpleState(table_rows.created_at) AS created_at,
     maxSimpleState(table_rows.created_at) AS updated_at
@@ -63,7 +61,6 @@ CREATE TABLE object_versions_stats
     object_id String,
     digest String,
     base_object_class SimpleAggregateFunction(any, Nullable(String)),
-    refs SimpleAggregateFunction(any, Array(String)),
     size_bytes SimpleAggregateFunction(any, UInt64),
     created_at SimpleAggregateFunction(min, DateTime64(3)),
     updated_at SimpleAggregateFunction(max, DateTime64(3))
@@ -79,7 +76,6 @@ SELECT
     object_versions.object_id,
     object_versions.digest,
     anySimpleState(object_versions.base_object_class) AS base_object_class,
-    anySimpleState(object_versions.refs) AS refs,
     anySimpleState(length(object_versions.val_dump)) AS size_bytes,
     minSimpleState(object_versions.created_at) AS created_at,
     maxSimpleState(object_versions.created_at) AS updated_at
@@ -134,12 +130,10 @@ CREATE TABLE calls_merged_stats
     started_at SimpleAggregateFunction(any, Nullable(DateTime64(3))),
     attributes_size_bytes SimpleAggregateFunction(any, Nullable(UInt64)),
     inputs_size_bytes SimpleAggregateFunction(any, Nullable(UInt64)),
-    input_refs SimpleAggregateFunction(groupArrayArray, Array(String)),
     ended_at SimpleAggregateFunction(any, Nullable(DateTime64(3))),
     output_size_bytes SimpleAggregateFunction(any, Nullable(UInt64)),
     summary_size_bytes SimpleAggregateFunction(any, Nullable(UInt64)),
-    exception SimpleAggregateFunction(any, Nullable(String)),
-    output_refs SimpleAggregateFunction(groupArrayArray, Array(String)),
+    exception_size_bytes SimpleAggregateFunction(any, Nullable(UInt64)),
     wb_user_id SimpleAggregateFunction(any, Nullable(String)),
     wb_run_id SimpleAggregateFunction(any, Nullable(String)),
     updated_at SimpleAggregateFunction(max, DateTime64(3)),
@@ -161,12 +155,10 @@ SELECT
     anySimpleState(call_parts.started_at) as started_at,
     anySimpleState(length(call_parts.attributes_dump)) as attributes_size_bytes,
     anySimpleState(length(call_parts.inputs_dump)) as inputs_size_bytes,
-    anySimpleState(call_parts.input_refs) as input_refs,
     anySimpleState(call_parts.ended_at) as ended_at,
     anySimpleState(length(call_parts.output_dump)) as output_size_bytes,
     anySimpleState(length(call_parts.summary_dump)) as summary_size_bytes,
-    anySimpleState(call_parts.exception) as exception,
-    anySimpleState(call_parts.output_refs) as output_refs,
+    anySimpleState(length(call_parts.exception)) as exception_size_bytes,
     anySimpleState(call_parts.wb_user_id) as wb_user_id,
     anySimpleState(call_parts.wb_run_id) as wb_run_id,
     anySimpleState(call_parts.deleted_at) as deleted_at,
