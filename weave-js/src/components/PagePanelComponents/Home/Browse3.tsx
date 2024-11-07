@@ -492,13 +492,6 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/calls/:itemName`}>
           <CallPageBinding />
         </Route>
-        <Route
-          path={[
-            `${projectRoot}/playground/:itemName`,
-            `${projectRoot}/playground`,
-          ]}>
-          <PlaygroundPageBinding />
-        </Route>
         <Route path={`${projectRoot}/:tab(evaluations|traces|calls)`}>
           <CallsPageBinding />
         </Route>
@@ -680,6 +673,7 @@ const useParamsDecoded = <T extends object>() => {
   }, [params]);
 };
 
+// TODO(tim/weaveflow_improved_nav): Generalize this
 const CallPageBinding = () => {
   useCallPeekRedirect();
   const params = useParamsDecoded<Browse3TabItemParams>();
