@@ -12,6 +12,9 @@ from weave.trace_server.trace_server_interface import (
 )
 
 
+# Note: the word count action spec is super simple
+#  whereas the llm one requires the full litellm code path.
+# The LLM tests are in `test_actions_lifecycle_llm_judge.py`.
 def test_action_lifecycle_word_count(client: WeaveClient):
     if client_is_sqlite(client):
         return pytest.skip("skipping for sqlite")
@@ -32,6 +35,7 @@ def test_action_lifecycle_word_count(client: WeaveClient):
     action_ref_uri = published_ref.uri()
 
     # Part 2: Demonstrate manual feedback (this is not user-facing)
+    # This could be it's own test, but it's convenient to have it here.
     @weave.op
     def example_op(input: str) -> str:
         return input + "!!!"
