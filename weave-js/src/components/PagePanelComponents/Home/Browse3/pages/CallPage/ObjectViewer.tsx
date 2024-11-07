@@ -100,9 +100,11 @@ export const ObjectViewer = ({
   const dataRefs = useMemo(() => getRefs(data).filter(isExpandableRef), [data]);
 
   // Expanded refs are the explicit set of refs that have been expanded by the user. Note that
-  // this might contain nested refs not in the `dataRefs` set. The keys are refs and the values
-  // are the paths at which the refs were expanded.
-  const [expandedRefs, setExpandedRefs] = useState<{[ref: string]: string}>({});
+  // this might contain nested refs not in the `dataRefs` set. The keys are object paths at which the refs were expanded
+  // and the values are the corresponding ref string.
+  const [expandedRefs, setExpandedRefs] = useState<{[path: string]: string}>(
+    {}
+  );
 
   // `addExpandedRef` is a function that can be used to add an expanded ref to the `expandedRefs` state.
   const addExpandedRef = useCallback((path: string, ref: string) => {
