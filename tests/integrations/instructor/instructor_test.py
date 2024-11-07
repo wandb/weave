@@ -208,7 +208,7 @@ def test_instructor_iterable_sync_stream(
             },
         ],
     )
-    _ = [user for user in users]
+    _ = list(users)
 
     calls = list(client.calls())
     assert len(calls) == 2
@@ -325,7 +325,7 @@ list of speakers.
         ],
         stream=True,
     )
-    _ = [extraction for extraction in extraction_stream]
+    _ = list(extraction_stream)
 
     calls = list(client.calls())
     assert len(calls) == 2

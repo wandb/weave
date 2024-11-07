@@ -114,9 +114,10 @@ def _async_call(
             result = q.get(True, timeout)
             if isinstance(result, Exception):
                 raise result.with_traceback(sys.exc_info()[2])
-            return result, thread
         except queue.Empty:
             return None, thread
+        else:
+            return result, thread
 
     return wrapper
 
