@@ -66,6 +66,17 @@ def decode_custom_obj(
             found_serializer = True
             load_instance_op = serializer.load
 
+            # Disables tracing so that calls to loading data itself don't get traced
+            art = MemTraceFilesArtifact(encoded_path_contents, metadata={})
+            load_instance_op._tracing_enabled = False  # type: ignore
+            try:
+                res = load_instance_op(art, "obj")
+            except Exception as e:
+                pass
+            else:
+                res.art = art
+                return res
+
     # Otherwise, fall back to load_instance_op
     if not found_serializer:
         if load_instance_op_uri is None:
@@ -81,10 +92,12 @@ def decode_custom_obj(
                 f"Failed to load op needed to decode object of type `{_type}`. See logs above for more information."
             )
 
-    # Disables tracing so that calls to loading data itself don't get traced
     load_instance_op._tracing_enabled = False  # type: ignore
-
     art = MemTraceFilesArtifact(encoded_path_contents, metadata={})
-    res = load_instance_op(art, "obj")
-    res.art = art
-    return res
+    try:
+        res = load_instance_op(art, "obj")
+    except Exception as e:
+        pass
+    else:
+        res.art = art
+        return res
