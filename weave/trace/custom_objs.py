@@ -15,7 +15,11 @@ class DecodeCustomObjectError(Exception):
 
 # in future, could generalize as
 # {target_cls.__module__}.{target_cls.__qualname__}
-KNOWN_TYPES = ["PIL.Image.Image", "wave.Wave_read"]
+KNOWN_TYPES = {
+    "Op",
+    "PIL.Image.Image",
+    "wave.Wave_read",
+}
 
 
 def encode_custom_obj(obj: Any) -> Optional[dict]:
@@ -71,7 +75,7 @@ def _decode_custom_obj(
 def decode_custom_obj(
     weave_type: dict,
     encoded_path_contents: Mapping[str, Union[str, bytes]],
-    load_instance_op_uri: Optional[str],
+    load_instance_op_uri: Optional[str] = None,
 ) -> Any:
     _type = weave_type["type"]
     found_serializer = False
