@@ -17,6 +17,7 @@ export const IconNames = {
   Boolean: 'boolean',
   BoxPlot: 'box-plot',
   Bug: 'bug',
+  BuzzBot10: 'buzz-bot10',
   CategoryMultimodal: 'category-multimodal',
   ChartHorizontalBars: 'chart-horizontal-bars',
   ChartPie: 'chart-pie',
