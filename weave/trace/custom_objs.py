@@ -8,6 +8,11 @@ from weave.trace.op import Op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.serializer import get_serializer_by_id, get_serializer_for_obj
 
+
+class DecodeCustomObjectError(Exception):
+    """An error that occurs while decoding a custom object."""
+
+
 # in future, could generalize as
 # {target_cls.__module__}.{target_cls.__qualname__}
 KNOWN_TYPES = ["PIL.Image.Image", "wave.Wave_read"]
@@ -67,8 +72,8 @@ def decode_custom_obj(
             load_instance_op = serializer.load
 
             # Disables tracing so that calls to loading data itself don't get traced
-            art = MemTraceFilesArtifact(encoded_path_contents, metadata={})
             load_instance_op._tracing_enabled = False  # type: ignore
+            art = MemTraceFilesArtifact(encoded_path_contents, metadata={})
             try:
                 res = load_instance_op(art, "obj")
             except Exception as e:
@@ -97,7 +102,9 @@ def decode_custom_obj(
     try:
         res = load_instance_op(art, "obj")
     except Exception as e:
-        pass
+        raise DecodeCustomObjectError(
+            f"Failed to decode object of type `{_type}`. See logs above for more information."
+        ) from e
     else:
         res.art = art
         return res
