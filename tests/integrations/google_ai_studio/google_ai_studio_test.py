@@ -197,7 +197,8 @@ def test_send_message_stream(client):
         ),
         stream=True,
     )
-    _ = [r for r in response]
+    chunks = [r.text for r in response]
+    assert len(chunks) > 1
 
     calls = list(client.calls())
     # `send_message` is using `GenerativeModel.generate_content under the hood
