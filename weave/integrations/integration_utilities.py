@@ -1,6 +1,7 @@
 import hashlib
 import re
-from typing import Any, Iterable, Union
+from collections.abc import Iterable
+from typing import Any, Union
 
 from weave.trace.refs import OpRef, parse_uri
 from weave.trace.weave_client import Call, CallsIter

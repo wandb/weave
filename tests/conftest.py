@@ -6,7 +6,7 @@ import subprocess
 import time
 import typing
 import urllib
-from typing import Iterator
+from collections.abc import Iterator
 
 import pytest
 import requests
@@ -323,6 +323,12 @@ class TestOnlyUserInjectingExternalTraceServer(
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         req.wb_user_id = self._user_id
         return super().cost_create(req)
+
+    def actions_execute_batch(
+        self, req: tsi.ActionsExecuteBatchReq
+    ) -> tsi.ActionsExecuteBatchRes:
+        req.wb_user_id = self._user_id
+        return super().actions_execute_batch(req)
 
 
 # https://docs.pytest.org/en/7.1.x/example/simple.html#pytest-current-test-environment-variable

@@ -1,8 +1,13 @@
 import importlib
+from collections.abc import AsyncIterator, Iterator
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Union
-
-from typing_extensions import AsyncIterator, Iterator
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Optional,
+    Union,
+)
 
 import weave
 from weave.trace.op_extensions.accumulator import _IteratorWrapper, add_accumulator
@@ -64,7 +69,7 @@ def anthropic_accumulator(
 
 
 # Unlike other integrations, streaming is based on input flag
-def should_use_accumulator(inputs: Dict) -> bool:
+def should_use_accumulator(inputs: dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 

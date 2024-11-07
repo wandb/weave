@@ -1,5 +1,4 @@
-from typing import Dict, Type
-
+from weave.trace_server.interface.base_object_classes.actions import ActionDefinition
 from weave.trace_server.interface.base_object_classes.base_object_def import BaseObject
 from weave.trace_server.interface.base_object_classes.human_annotation_column import (
     HumanAnnotationColumn,
@@ -10,10 +9,10 @@ from weave.trace_server.interface.base_object_classes.test_only_example import (
     TestOnlyNestedBaseObject,
 )
 
-BASE_OBJECT_REGISTRY: Dict[str, Type[BaseObject]] = {}
+BASE_OBJECT_REGISTRY: dict[str, type[BaseObject]] = {}
 
 
-def register_base_object(cls: Type[BaseObject]) -> None:
+def register_base_object(cls: type[BaseObject]) -> None:
     """
     Register a BaseObject class in the global registry.
 
@@ -26,4 +25,5 @@ def register_base_object(cls: Type[BaseObject]) -> None:
 register_base_object(TestOnlyExample)
 register_base_object(TestOnlyNestedBaseObject)
 register_base_object(Leaderboard)
+register_base_object(ActionDefinition)
 register_base_object(HumanAnnotationColumn)
