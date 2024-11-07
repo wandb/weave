@@ -1,14 +1,18 @@
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
+import {parseRef} from '@wandb/weave/react';
 import {makeRefCall} from '@wandb/weave/util/refs';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 
 import {Icon} from '../../../../../Icon';
+import {useCreateBaseObjectInstance} from '../../pages/wfReactInterface/baseObjectClassQuery';
+import {projectIdFromParts} from '../../pages/wfReactInterface/tsDataModelHooks';
+import {ConfigureHumanFeedback} from './ConfigureHumanFeedback';
 import {HumanFeedbackCell, waitForPendingFeedback} from './HumanFeedback';
-import {tsHumanFeedbackColumn} from './humanFeedbackTypes';
+import {tsHumanAnnotationColumn} from './humanFeedbackTypes';
 
 type HumanFeedbackSidebarProps = {
-  feedbackColumns: tsHumanFeedbackColumn[];
+  feedbackColumns: tsHumanAnnotationColumn[];
   callID: string;
   entity: string;
   project: string;
@@ -24,18 +28,19 @@ export const HumanFeedbackSidebar = ({
 }: HumanFeedbackSidebarProps) => {
   const callRef = makeRefCall(entity, project, callID);
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-
+  const createHumanFeedback = useCreateBaseObjectInstance(
+    'HumanAnnotationColumn'
+  );
+  // Initialize column visibility model with all columns enabled
+  const [columnVisibilityModel, setColumnVisibilityModel] = useState<
+    Record<string, boolean>
+  >(feedbackColumns.reduce((acc, col) => ({...acc, [col.ref]: true}), {}));
   const [isExpanded, setIsExpanded] = useState(true);
-  const feedbackCellCount = feedbackColumns.length ?? 0;
 
   // Sort columns so we always get the same order
-  feedbackColumns.sort((a, b) => a.name.localeCompare(b.name));
-
-  if (loadingUserInfo) {
-    return null;
-  }
-
-  const viewer = userInfo ? userInfo.id : null;
+  const sortedVisibleColumns = feedbackColumns
+    .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
+    .filter(col => columnVisibilityModel[col.ref]);
 
   const handleDone = async () => {
     // Wait for any pending feedback to complete
@@ -44,32 +49,80 @@ export const HumanFeedbackSidebar = ({
     onNextCall?.();
   };
 
+  const onSaveColumn = (column: tsHumanAnnotationColumn) => {
+    const objectRef = parseRef(column.ref);
+    return createHumanFeedback({
+      obj: {
+        project_id: projectIdFromParts({entity, project}),
+        object_id: objectRef.artifactName,
+        val: column,
+      },
+    });
+  };
+
+  // handle shift + down arrow key, capture so the other handler
+  // doesn't also trigger.
+  useEffect(() => {
+    const handleDocumentKeyDown = (event: KeyboardEvent) => {
+      if (event.shiftKey && event.key === 'ArrowDown') {
+        event.preventDefault();
+        handleDone();
+      }
+    };
+    const handleWindowKeyDown = (event: KeyboardEvent) => {
+      if (event.shiftKey && event.key === 'ArrowDown') {
+        event.preventDefault();
+        handleDone();
+      }
+    };
+    document.addEventListener('keydown', handleDocumentKeyDown);
+    window.addEventListener('keydown', handleWindowKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleDocumentKeyDown);
+      window.removeEventListener('keydown', handleWindowKeyDown);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loadingUserInfo) {
+    return null;
+  }
+  const viewer = userInfo ? userInfo.id : null;
+
   return (
     <div className="flex h-full flex-col bg-white">
       <div className="justify-left flex w-full border-b border-moon-300 p-12">
         <div className="text-lg font-semibold">Feedback</div>
         <div className="flex-grow" />
-        {false && (
-          // Enable when we have a proper settings page
-          <Button icon="settings" size="small" variant="ghost" />
-        )}
+        <ConfigureHumanFeedback
+          columns={feedbackColumns}
+          columnVisibilityModel={columnVisibilityModel}
+          setColumnVisibilityModel={setColumnVisibilityModel}
+          onSaveColumn={onSaveColumn}
+        />
       </div>
       <div className="mx-6 h-full flex-grow overflow-auto">
         <div>
           <button
             className="text-md hover:bg-gray-100 flex w-full items-center justify-between px-6 py-8 font-semibold"
             onClick={() => setIsExpanded(!isExpanded)}>
-            <div className="mb-8 flex items-center">
+            <div className="mb-8 flex w-full items-center">
               <div className="text-lg">Human scores</div>
               <div className="bg-gray-200 ml-4 mt-2 rounded-full px-2 text-xs font-medium">
-                {feedbackCellCount}
+                {sortedVisibleColumns.length}
+              </div>
+              <div className="flex-grow" />
+              <div className="mr-4 mt-2 rounded-full px-2 text-xs font-medium">
+                {feedbackColumns.length - sortedVisibleColumns.length} hidden
               </div>
             </div>
-            <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} />
+            <div className="mb-6 flex items-center">
+              <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} />
+            </div>
           </button>
           {isExpanded && (
             <div>
-              {feedbackColumns?.map((field, index) => (
+              {sortedVisibleColumns?.map((field, index) => (
                 <div key={field.ref}>
                   <div className="bg-gray-50 text-md px-6 py-0 font-semibold">
                     {field.name}

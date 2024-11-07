@@ -19,7 +19,7 @@ import {
 import {
   HumanAnnotationPayload,
   HumanFeedback,
-  tsHumanFeedbackColumn,
+  tsHumanAnnotationColumn,
 } from './humanFeedbackTypes';
 
 // Constants
@@ -32,7 +32,7 @@ type HumanFeedbackProps = {
   entity: string;
   project: string;
   viewer: string | null;
-  hfColumn: tsHumanFeedbackColumn;
+  hfColumn: tsHumanAnnotationColumn;
   callRef: string;
   readOnly?: boolean;
   focused?: boolean;

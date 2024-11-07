@@ -1,16 +1,8 @@
+import {HumanAnnotationColumn} from '../../pages/wfReactInterface/generatedBaseObjectClasses.zod';
 import {Feedback} from '../../pages/wfReactInterface/traceServerClientTypes';
 
-export type tsHumanFeedbackColumn = HumanFeedbackColumn & {
+export type tsHumanAnnotationColumn = HumanAnnotationColumn & {
   ref: string;
-};
-
-export type HumanFeedbackColumn = {
-  name: string;
-  description: string;
-
-  json_schema: Record<string, any>;
-  unique_among_creators?: boolean;
-  op_scope?: string[];
 };
 
 export type HumanAnnotationPayload = {

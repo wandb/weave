@@ -9,13 +9,13 @@ import {projectIdFromParts} from '../../pages/wfReactInterface/tsDataModelHooks'
 import {objectVersionKeyToRefUri} from '../../pages/wfReactInterface/utilities';
 import {
   HumanAnnotationPayload,
-  tsHumanFeedbackColumn,
+  tsHumanAnnotationColumn,
 } from './humanFeedbackTypes';
 
 export const useHumanFeedbackOptions = (
   entity: string,
   project: string
-): tsHumanFeedbackColumn[] => {
+): tsHumanAnnotationColumn[] => {
   const req: TraceObjQueryReq = {
     project_id: projectIdFromParts({entity, project}),
     filter: {
