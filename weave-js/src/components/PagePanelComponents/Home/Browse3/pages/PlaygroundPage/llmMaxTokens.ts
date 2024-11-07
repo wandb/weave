@@ -118,6 +118,66 @@ export const LLM_MAX_TOKENS = {
   'o1-mini': {max_tokens: 65536, supports_function_calling: true},
   'o1-preview-2024-09-12': {max_tokens: 32768, supports_function_calling: true},
   'o1-preview': {max_tokens: 32768, supports_function_calling: true},
+
+  // These were all in our model_providers.json (but dont work)
+  // Leaving them here for now, just in case someone asks why they arent in the list.
+  // This seems like a dupe of claude-3-5-sonnet-20241022.
+  // 'anthropic/claude-3-5-sonnet-20241022': 8192,
+
+  // 422 Unprocessable Entity
+  // 'claude-2.1': 8191,
+  // 'claude-2': 8191,
+  // 'claude-instant-1.2': 8191,
+  // 'claude-instant-1': 8191,
+
+  // error litellm.BadRequestError: OpenAIException - Error code: 400 - {'error': {'message': "[{'type': 'string_type', 'loc': ('body', 'stop', 'str'), 'msg': 'Input should be a valid string', 'input': []}, {'type': 'too_short', 'loc': ('body', 'stop', 'list[str]'), 'msg': 'List should have at least 1 item after validation, not 0', 'input': [], 'ctx': {'field_type': 'List', 'min_length': 1, 'actual_length': 0}}, {'type': 'too_short', 'loc': ('body', 'stop', 'list[list[int]]'), 'msg': 'List should have at least 1 item after validation, not 0', 'input': [], 'ctx': {'field_type': 'List', 'min_length': 1, 'actual_length': 0}}]", 'type': 'invalid_request_error', 'param': None, 'code': None}}
+  // 'chatgpt-4o-latest': 4096,
+  // 'gpt-4o-audio-preview-2024-10-01': 16384,
+  // 'gpt-4o-audio-preview': 16384,
+
+  // error litellm.NotFoundError: OpenAIException - Error code: 404 - {'error': {'message': 'The model `ft:gpt-3.5-turbo-0125` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+  // 'ft:gpt-3.5-turbo-0125': 4096,
+  // 'ft:gpt-3.5-turbo-0613': 4096,
+  // 'ft:gpt-3.5-turbo-1106': 4096,
+  // 'ft:gpt-3.5-turbo': 4096,
+  // 'ft:gpt-4-0613': 4096,
+  // 'ft:gpt-4o-2024-08-06': 16384,
+  // 'ft:gpt-4o-mini-2024-07-18': 16384,
+  // 'gpt-4-32k-0613': 4096,
+  // 'gpt-4-32k': 4096,
+  // 'groq/llama-3.1-405b-reasoning': 8192,
+  // 'groq/llama2-70b-4096': 4096,
+
+  // error litellm.NotFoundError: OpenAIException - Error code: 404 - {'error': {'message': 'The model `gpt-3.5-turbo-0301` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+  // 'gpt-3.5-turbo-0301': 4096,
+  // 'gpt-3.5-turbo-0613': 4096,
+  // 'gpt-3.5-turbo-16k-0613': 4096,
+  // 'gpt-4-1106-vision-preview': 4096,
+  // 'gpt-4-vision-preview': 4096,
+
+  // error litellm.NotFoundError: VertexAIException - {
+  //   "error": {
+  //     "code": 404,
+  //     "message": "models/gemini-gemma-2-27b-it is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.",
+  //     "status": "NOT_FOUND"
+  //   }
+  // }
+  // 'gemini/gemini-gemma-2-27b-it': 8192,
+  // 'gemini/gemini-gemma-2-9b-it': 8192,
+
+  // error litellm.NotFoundError: VertexAIException - {
+  //   "error": {
+  //     "code": 404,
+  //     "message": "Gemini 1.0 Pro Vision has been deprecated on July 12, 2024. Consider switching to different model, for example gemini-1.5-flash.",
+  //     "status": "NOT_FOUND"
+  //   }
+  // }
+  //   'gemini/gemini-pro-vision': 2048,
+
+  // These are 0 tokens, idk why we would want to use them.
+  // "text-moderation-007": 0,
+  // "text-moderation-latest": 0,
+  // "text-moderation-stable": 0
 };
 
 export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;
