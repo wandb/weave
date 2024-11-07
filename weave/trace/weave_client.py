@@ -332,11 +332,11 @@ class Call:
         score_call_ref = get_ref(score_call)
         if score_call_ref is None:
             raise ValueError("Score call has no ref")
-        client._add_score(
-            call_ref_uri=self_ref.uri(),
+        client._add_runnable_feedback(
+            weave_ref_uri=self_ref.uri(),
             runnable_ref_name=score_name,
-            score_results=score_results,
-            scorer_call_ref_uri=score_call_ref.uri(),
+            output=score_results,
+            call_ref_uri=score_call_ref.uri(),
             runnable_ref_uri=scorer_op_ref.uri(),
         )
 
@@ -1106,7 +1106,10 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def _send_score_call(
-        self, predict_call: Call, score_call: Call, scorer_ref_uri: Optional[str] = None
+        self,
+        predict_call: Call,
+        score_call: Call,
+        scorer_object_ref_uri: Optional[str] = None,
     ) -> Future[str]:
         """(Private) Adds a score to a call. This is particularly useful
         for adding evaluation metrics to a call.
@@ -1116,36 +1119,34 @@ class WeaveClient:
             call_ref = get_ref(predict_call)
             if call_ref is None:
                 raise ValueError("Predict call must have a ref")
-            call_ref_uri = call_ref.uri()
+            weave_ref_uri = call_ref.uri()
             scorer_call_ref = get_ref(score_call)
             if scorer_call_ref is None:
                 raise ValueError("Score call must have a ref")
             scorer_call_ref_uri = scorer_call_ref.uri()
-            runnable_ref_uri = scorer_ref_uri or score_call.op_name
-            runnable_ref = parse_uri(runnable_ref_uri)
-            if not isinstance(runnable_ref, (OpRef, ObjectRef)):
-                raise TypeError(f"Invalid scorer op ref: {runnable_ref_uri}")
-            score_name = runnable_ref.name
+
+            # If scorer_object_ref_uri is provided, it is used as the runnable_ref_uri
+            # Otherwise, we use the op_name from the score_call. This should happen
+            # when there is a Scorer subclass that is the source of the score call.
+            runnable_ref_uri = scorer_object_ref_uri or score_call.op_name
             score_results = score_call.output
 
-            return self._add_score(
-                call_ref_uri=call_ref_uri,
-                runnable_ref_name=score_name,
-                score_results=score_results,
-                scorer_call_ref_uri=scorer_call_ref_uri,
+            return self._add_runnable_feedback(
+                weave_ref_uri=weave_ref_uri,
+                output=score_results,
+                call_ref_uri=scorer_call_ref_uri,
                 runnable_ref_uri=runnable_ref_uri,
             )
 
         return self.future_executor.defer(send_score_call)
 
     @trace_sentry.global_trace_sentry.watch()
-    def _add_score(
+    def _add_runnable_feedback(
         self,
         *,
+        weave_ref_uri: str,
+        output: Any,
         call_ref_uri: str,
-        runnable_ref_name: str,
-        score_results: Any,
-        scorer_call_ref_uri: str,
         runnable_ref_uri: str,
         # , supervision: dict
     ) -> str:
@@ -1155,25 +1156,19 @@ class WeaveClient:
         - Should we somehow include supervision (ie. the ground truth) in the payload?
         """
         # Parse the refs (acts as validation)
-        call_ref = parse_uri(call_ref_uri)
+        call_ref = parse_uri(weave_ref_uri)
         if not isinstance(call_ref, CallRef):
-            raise TypeError(f"Invalid call ref: {call_ref_uri}")
-        scorer_call_ref = parse_uri(scorer_call_ref_uri)
+            raise TypeError(f"Invalid call ref: {weave_ref_uri}")
+        scorer_call_ref = parse_uri(call_ref_uri)
         if not isinstance(scorer_call_ref, CallRef):
-            raise TypeError(f"Invalid scorer call ref: {scorer_call_ref_uri}")
+            raise TypeError(f"Invalid scorer call ref: {call_ref_uri}")
         runnable_ref = parse_uri(runnable_ref_uri)
         if not isinstance(runnable_ref, (OpRef, ObjectRef)):
             raise TypeError(f"Invalid scorer op ref: {runnable_ref_uri}")
 
-        # Validate score_name (we might want to relax this in the future)
-        if runnable_ref_name != runnable_ref.name:
-            raise TypeError(
-                f"Score name {runnable_ref_name} does not match scorer op name {runnable_ref.name}"
-            )
-
         # Prepare the result payload - we purposely do not map to refs here
         # because we prefer to have the raw data.
-        results_json = to_json(score_results, self._project_id(), self)
+        results_json = to_json(output, self._project_id(), self)
 
         # # Prepare the supervision payload
 
@@ -1183,11 +1178,11 @@ class WeaveClient:
 
         freq = FeedbackCreateReq(
             project_id=self._project_id(),
-            weave_ref=call_ref_uri,
-            feedback_type="wandb.runnable." + runnable_ref_name,
+            weave_ref=weave_ref_uri,
+            feedback_type="wandb.runnable." + runnable_ref.name,
             payload=payload,
             runnable_ref=runnable_ref_uri,
-            call_ref=scorer_call_ref_uri,
+            call_ref=call_ref_uri,
         )
         response = self.server.feedback_create(freq)
 
