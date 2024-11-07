@@ -1,8 +1,14 @@
 import os
 
 import pytest
+from pydantic import BaseModel
 
 from weave.integrations.integration_utilities import op_name_from_ref
+
+
+class Recipe(BaseModel):
+    recipe_name: str
+    ingredients: list[str]
 
 
 # NOTE: These asserts are slightly more relaxed than other integrations because we can't yet save
@@ -45,6 +51,31 @@ def assert_correct_summary(summary: dict, trace_name: str):
     assert summary["weave"]["status"] == "success"
     assert summary["weave"]["trace_name"] == trace_name
     assert summary["weave"]["latency_ms"] > 0
+
+
+def is_part_presence_in_content_parts(parts: list[dict], part_type: str) -> bool:
+    for part in parts:
+        if part_type in part:
+            return True
+    return False
+
+
+def assert_code_execution(output: dict):
+    assert is_part_presence_in_content_parts(
+        output["candidates"][0]["content"]["parts"], "text"
+    )
+    assert is_part_presence_in_content_parts(
+        output["candidates"][0]["content"]["parts"], "executable_code"
+    )
+    assert is_part_presence_in_content_parts(
+        output["candidates"][0]["content"]["parts"], "code_execution_result"
+    )
+    assert output["candidates"][0]["content"]["role"] == "model"
+    assert isinstance(output["usage_metadata"], dict)
+    assert isinstance(output["usage_metadata"]["prompt_token_count"], int)
+    assert isinstance(output["usage_metadata"]["candidates_token_count"], int)
+    assert isinstance(output["usage_metadata"]["total_token_count"], int)
+    assert isinstance(output["usage_metadata"]["cached_content_token_count"], int)
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
@@ -116,7 +147,7 @@ async def test_content_generation_async(client):
     assert_correct_summary(call.summary, trace_name)
 
 
-@pytest.mark.retry(max_attempts=5)
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 def test_send_message(client):
     import google.generativeai as genai
@@ -125,10 +156,8 @@ def test_send_message(client):
     model = genai.GenerativeModel(model_name="gemini-1.5-pro", tools="code_execution")
     chat = model.start_chat()
     chat.send_message(
-        (
-            "What is the sum of the first 50 prime numbers? "
-            "Generate and run code for the calculation, and make sure you get all 50."
-        )
+        "What is the sum of the first 50 prime numbers? "
+        "Generate and run code for the calculation, and make sure you get all 50."
     )
 
     calls = list(client.calls())
@@ -140,16 +169,20 @@ def test_send_message(client):
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.generativeai.ChatSession.send_message"
-    assert "executable_code" in str(call.output).lower()
+    assert call.output is not None
+    output = call.output
+    assert_code_execution(output)
 
     call = calls[1]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.generativeai.GenerativeModel.generate_content"
-    assert "executable_code" in str(call.output).lower()
+    assert call.output is not None
+    output = call.output
+    assert_code_execution(output)
 
 
-@pytest.mark.retry(max_attempts=5)
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 def test_send_message_stream(client):
     import google.generativeai as genai
@@ -175,16 +208,20 @@ def test_send_message_stream(client):
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.generativeai.ChatSession.send_message"
-    assert "executable_code" in str(call.output).lower()
+    assert call.output is not None
+    output = call.output
+    assert_code_execution(output)
 
     call = calls[1]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.generativeai.GenerativeModel.generate_content"
-    assert "executable_code" in str(call.output).lower()
+    assert call.output is not None
+    output = call.output
+    assert_code_execution(output)
 
 
-@pytest.mark.retry(max_attempts=5)
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
 async def test_send_message_async(client):
@@ -194,10 +231,8 @@ async def test_send_message_async(client):
     model = genai.GenerativeModel(model_name="gemini-1.5-pro", tools="code_execution")
     chat = model.start_chat()
     await chat.send_message_async(
-        (
-            "What is the sum of the first 50 prime numbers? "
-            "Generate and run code for the calculation, and make sure you get all 50."
-        )
+        "What is the sum of the first 50 prime numbers? "
+        "Generate and run code for the calculation, and make sure you get all 50."
     )
 
     calls = list(client.calls())
@@ -208,11 +243,15 @@ async def test_send_message_async(client):
     call = calls[0]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
-    assert trace_name == "google.generativeai.ChatSession.send_message_async"
-    assert "executable_code" in str(call.output).lower()
+    assert trace_name == "google.generativeai.ChatSession.send_message"
+    assert call.output is not None
+    output = call.output
+    assert_code_execution(output)
 
     call = calls[1]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
-    assert trace_name == "google.generativeai.GenerativeModel.generate_content_async"
-    assert "executable_code" in str(call.output).lower()
+    assert trace_name == "google.generativeai.GenerativeModel.generate_content"
+    assert call.output is not None
+    output = call.output
+    assert_code_execution(output)
