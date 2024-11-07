@@ -224,6 +224,7 @@ export const ConfigureHumanFeedback: React.FC<ConfigureHumanFeedbackProps> = ({
                     </label>
                     <TextField
                       value={editing.column?.name ?? ''}
+                      disabled={true}
                       onChange={value => {
                         if (editing.column) {
                           setEditing({
