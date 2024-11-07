@@ -205,6 +205,20 @@ export const browse2Context = {
   ) => {
     throw new Error('Not implemented');
   },
+  compareCallsUri: (
+    entityName: string,
+    projectName: string,
+    callIds: string[]
+  ) => {
+    throw new Error('Not implemented');
+  },
+  compareObjectsUri: (
+    entityName: string,
+    projectName: string,
+    objectSpecifiers: string[]
+  ) => {
+    throw new Error('Not implemented');
+  },
 };
 
 export const browse3ContextGen = (
@@ -449,6 +463,26 @@ export const browse3ContextGen = (
         leaderboardName ? `/${leaderboardName}` : ''
       }${edit ? '?edit=true' : ''}`;
     },
+    compareCallsUri: (
+      entityName: string,
+      projectName: string,
+      callIds: string[]
+    ) => {
+      const params = callIds
+        .map(id => 'call=' + encodeURIComponent(id))
+        .join('&');
+      return `${projectRoot(entityName, projectName)}/compare?${params}`;
+    },
+    compareObjectsUri: (
+      entityName: string,
+      projectName: string,
+      objectSpecifiers: string[]
+    ) => {
+      const params = objectSpecifiers
+        .map(id => 'obj=' + encodeURIComponent(id))
+        .join('&');
+      return `${projectRoot(entityName, projectName)}/compare?${params}`;
+    },
   };
   return browse3Context;
 };
@@ -541,6 +575,16 @@ type RouteType = {
     projectName: string,
     leaderboardName?: string,
     edit?: boolean
+  ) => string;
+  compareCallsUri: (
+    entityName: string,
+    projectName: string,
+    callIds: string[]
+  ) => string;
+  compareObjectsUri: (
+    entityName: string,
+    projectName: string,
+    objectSpecifiers: string[]
   ) => string;
 };
 
@@ -662,6 +706,16 @@ const useMakePeekingRouter = (): RouteType => {
       ...args: Parameters<typeof baseContext.leaderboardsUIUrl>
     ) => {
       return setSearchParam(PEEK_PARAM, baseContext.leaderboardsUIUrl(...args));
+    },
+    compareCallsUri: (
+      ...args: Parameters<typeof baseContext.compareCallsUri>
+    ) => {
+      return setSearchParam(PEEK_PARAM, baseContext.compareCallsUri(...args));
+    },
+    compareObjectsUri: (
+      ...args: Parameters<typeof baseContext.compareObjectsUri>
+    ) => {
+      return setSearchParam(PEEK_PARAM, baseContext.compareObjectsUri(...args));
     },
   };
 };
