@@ -1,6 +1,6 @@
-from typing import Any, Literal, Union
+from typing import Any, Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from weave.trace_server.interface.base_object_classes import base_object_def
 
@@ -26,8 +26,15 @@ ActionSpecType = Union[
 ]
 
 
-# TODO: Make sure we really like this name - it is permanent
 class ActionDefinition(base_object_def.BaseObject):
-    # Pyright doesn't like this override
-    # name: str
     spec: ActionSpecType = Field(..., discriminator="action_type")
+
+    # This is needed because the name field is optional in the base class, but required
+    # in the derived class. Pyright doesn't like having a stricter type
+    # `Variable is mutable so its type is invariant`: Override type "str" is not the same as base type "str | None".
+    # Therefore, we just validate the name as a post-init method.
+    @field_validator("name")
+    def name_must_be_set(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            raise ValueError("name must be set")
+        return v
