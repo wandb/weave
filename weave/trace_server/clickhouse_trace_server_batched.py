@@ -1342,8 +1342,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             req.payload["detoned"] = detoned
             req.payload["detoned_alias"] = emoji.demojize(detoned)
             res_payload = req.payload
-        else:
-            res_payload = req.payload
 
         feedback_id = generate_id()
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
@@ -1421,7 +1419,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self.feedback_purge(purge_request)
         create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
         create_result = self.feedback_create(create_req)
-        return tsi.FeedbackReplaceRes(**create_result.model_dump())
+        return tsi.FeedbackReplaceRes(
+            id=create_result.id,
+            created_at=create_result.created_at,
+            wb_user_id=create_result.wb_user_id,
+            payload=create_result.payload,
+        )
 
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq

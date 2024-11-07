@@ -50,40 +50,6 @@ def test_client_feedback(client) -> None:
     assert len(feedbacks) == 2
 
 
-def test_feedback_create_server_response(client) -> None:
-    feedbacks = client.get_feedback()
-    assert len(feedbacks) == 0
-
-    ref = "weave:///test/project/obj/123:abc"
-    note = {"note": "this is a note on call1"}
-    emoji = {"emoji": "👍"}
-
-    feedback_emoji_res = client.server.feedback_create(
-        tsi.FeedbackCreateReq(
-            project_id=client._project_id(),
-            weave_ref=ref,
-            feedback_type="wandb.reaction.1",
-            payload=emoji,
-        )
-    )
-    assert feedback_emoji_res.payload == {
-        "emoji": "👍",
-        "alias": ":thumbs_up:",
-        "detoned": "👍",
-        "detoned_alias": ":thumbs_up:",
-    }
-
-    feedback_note_res = client.server.feedback_create(
-        tsi.FeedbackCreateReq(
-            project_id=client._project_id(),
-            weave_ref=ref,
-            feedback_type="wandb.note",
-            payload=note,
-        )
-    )
-    assert feedback_note_res.payload == note
-
-
 def test_custom_feedback(client) -> None:
     feedbacks = client.get_feedback()
     assert len(feedbacks) == 0
@@ -615,7 +581,6 @@ def test_feedback_replace(client) -> None:
 
     # Verify the replacement
     assert note_feedback.id != replaced_feedback.id
-    assert replaced_feedback.payload == {"note": "Updated feedback"}
 
     # Verify the other feedback remains unchanged
     query_res = client.server.feedback_query(
@@ -644,4 +609,15 @@ def test_feedback_replace(client) -> None:
     replaced_feedback = client.server.feedback_replace(replace_req)
 
     assert replaced_feedback.id != initial_feedback.id
-    assert replaced_feedback.payload == {"emoji": "👍"}
+
+    # Verify the latest feedback payload
+    query_res = client.server.feedback_query(
+        FeedbackQueryReq(
+            project_id="test/project", fields=["id", "feedback_type", "payload"]
+        )
+    )
+    feedbacks = query_res.result
+    assert len(feedbacks) == 2
+    new_feedback = next(f for f in feedbacks if f["id"] == replaced_feedback.id)
+    assert new_feedback["feedback_type"] == "reaction"
+    assert new_feedback["payload"] == {"emoji": "👍"}
