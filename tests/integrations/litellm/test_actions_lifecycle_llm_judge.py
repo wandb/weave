@@ -25,9 +25,7 @@ from weave.trace_server.trace_server_interface import (
 
 class DummySecretFetcher:
     def fetch(self, secret_name: str) -> dict:
-        return {
-            "secrets": {secret_name: os.environ.get(secret_name, "DUMMY_SECRET_VALUE")}
-        }
+        return {"secrets": {secret_name: os.getenv(secret_name, "DUMMY_SECRET_VALUE")}}
 
 
 primitive_mock_response = {

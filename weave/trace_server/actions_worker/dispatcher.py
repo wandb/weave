@@ -12,7 +12,10 @@ from weave.trace_server.interface.base_object_classes.actions import (
     ContainsWordsActionSpec,
     LlmJudgeActionSpec,
 )
-from weave.trace_server.interface.feedback_types import RunnablePayloadSchema
+from weave.trace_server.interface.feedback_types import (
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+    RunnablePayloadSchema,
+)
 from weave.trace_server.refs_internal import (
     InternalCallRef,
     InternalObjectRef,
@@ -127,7 +130,7 @@ def publish_results_as_feedback(
         FeedbackCreateReq(
             project_id=project_id,
             weave_ref=weave_ref,
-            feedback_type="wandb.runnable." + action_name,
+            feedback_type=RUNNABLE_FEEDBACK_TYPE_PREFIX + "." + action_name,
             runnable_ref=action_ref,
             payload=RunnablePayloadSchema(output=result).model_dump(),
             wb_user_id=wb_user_id,
