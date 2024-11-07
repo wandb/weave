@@ -18,6 +18,7 @@ export {
   IconBoolean,
   IconBoxPlot,
   IconBug,
+  IconBuzzBot10,
   IconCategoryMultimodal,
   IconChartHorizontalBars,
   IconChartPie,
