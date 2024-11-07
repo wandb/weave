@@ -58,7 +58,7 @@ export const MessagePanel = ({
         .tool_calls!.map(
           (toolCall: ToolCallWithResponse) => toolCall.response?.original_index
         )
-        .filter(idx => idx != null)
+        .filter(idx => idx != undefined)
     : undefined;
 
   return (
