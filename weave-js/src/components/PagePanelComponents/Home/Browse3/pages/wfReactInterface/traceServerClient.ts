@@ -12,7 +12,7 @@ import {
   TraceRefsReadBatchReq,
   TraceRefsReadBatchRes,
 } from './traceServerClientTypes';
-import {DirectTraceServerClient} from './traceServerDirectClient';
+import { DirectTraceServerClient } from './traceServerDirectClient';
 
 const DEFAULT_BATCH_INTERVAL = 150;
 const MAX_REFS_PER_BATCH = 1000;
@@ -110,7 +110,7 @@ export class TraceServerClient extends DirectTraceServerClient {
   public feedbackCreate(req: FeedbackCreateReq): Promise<FeedbackCreateRes> {
     const res = super.feedbackCreate(req).then(createRes => {
       const feedbackRefResolved =
-        req.payload?.feedback_ref ?? this.FEEDBACK_REF_DEFAULT;
+        req.annotation_ref ?? this.FEEDBACK_REF_DEFAULT;
       const listeners =
         this.onFeedbackListeners[feedbackRefResolved][req.weave_ref] ?? [];
       listeners.forEach(listener => listener());
@@ -136,7 +136,7 @@ export class TraceServerClient extends DirectTraceServerClient {
   public feedbackReplace(req: FeedbackReplaceReq): Promise<FeedbackReplaceRes> {
     const res = super.feedbackReplace(req).then(replaceRes => {
       const feedbackRefResolved =
-        req.payload?.feedback_ref ?? this.FEEDBACK_REF_DEFAULT;
+        req.annotation_ref ?? this.FEEDBACK_REF_DEFAULT;
       const listeners =
         this.onFeedbackListeners[feedbackRefResolved][req.weave_ref] ?? [];
       listeners.forEach(listener => listener());

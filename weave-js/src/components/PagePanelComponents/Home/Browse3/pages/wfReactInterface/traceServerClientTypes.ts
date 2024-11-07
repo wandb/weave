@@ -1,4 +1,4 @@
-import {Query} from './traceServerClientInterface/query';
+import { Query } from './traceServerClientInterface/query';
 type ExtraKeysAllowed = {
   [key: string]: any;
 };
@@ -144,6 +144,10 @@ export type FeedbackCreateReq = {
   weave_ref: string;
   feedback_type: string;
   payload: Record<string, any>;
+  annotation_ref?: string;
+  runnable_ref?: string;
+  call_ref?: string;
+  trigger_ref?: string;
 };
 
 export type FeedbackCreateSuccess = {
