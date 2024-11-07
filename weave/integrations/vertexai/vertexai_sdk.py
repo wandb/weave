@@ -1,14 +1,21 @@
 import importlib
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Optional
-
+import rich
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 from weave.trace.weave_client import Call
+from weave.trace.serialize import dictify
 
 if TYPE_CHECKING:
     from vertexai.generative_models import GenerationResponse
+
+
+def vertexai_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+    if "self" in inputs:
+        inputs["self"] = dictify(inputs["self"], maxdepth=5)
+    return inputs
 
 
 def vertexai_accumulator(
@@ -56,6 +63,7 @@ def vertexai_on_finish(
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
     if output:
+        call.output = dictify(output)
         usage[model_name].update(
             {
                 "prompt_tokens": output.usage_metadata.prompt_token_count,
@@ -66,10 +74,12 @@ def vertexai_on_finish(
     if call.summary is not None:
         call.summary.update(summary_update)
 
+    # call.inputs["self"] = dictify(call.inputs["self"], maxdepth=0)
+
 
 def vertexai_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op()(fn)
+        op = weave.op(postprocess_inputs=vertexai_postprocess_inputs)(fn)
         op.name = name  # type: ignore
         op._set_on_finish_handler(vertexai_on_finish)
         return add_accumulator(
@@ -92,7 +102,7 @@ def vertexai_wrapper_async(name: str) -> Callable[[Callable], Callable]:
             return _async_wrapper
 
         "We need to do this so we can check if `stream` is used"
-        op = weave.op()(_fn_wrapper(fn))
+        op = weave.op(postprocess_inputs=vertexai_postprocess_inputs)(_fn_wrapper(fn))
         op.name = name  # type: ignore
         op._set_on_finish_handler(vertexai_on_finish)
         return add_accumulator(
