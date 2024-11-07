@@ -1,6 +1,6 @@
 import {SetStateAction, useCallback, useState} from 'react';
 
-import {LLMMaxTokensKey} from './PlaygroundChat/llmMaxTokens';
+import {LLMMaxTokensKey} from './llmMaxTokens';
 import {
   OptionalTraceCallSchema,
   PlaygroundResponseFormats,
@@ -8,15 +8,18 @@ import {
   PlaygroundStateKey,
 } from './types';
 
+export const DEFAULT_SYSTEM_MESSAGE_CONTENT =
+  'You are an AI assistant designed to assist users by providing clear, concise, and helpful responses.';
+
+export const DEFAULT_SYSTEM_MESSAGE = {
+  role: 'system',
+  content: DEFAULT_SYSTEM_MESSAGE_CONTENT,
+};
+
 const DEFAULT_PLAYGROUND_STATE = {
   traceCall: {
     inputs: {
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a helpful assistant.',
-        },
-      ],
+      messages: [DEFAULT_SYSTEM_MESSAGE],
     },
   },
   trackLLMCall: true,

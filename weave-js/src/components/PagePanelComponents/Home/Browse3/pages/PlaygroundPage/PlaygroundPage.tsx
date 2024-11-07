@@ -4,7 +4,7 @@ import React, {useEffect, useMemo, useState} from 'react';
 
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
-import {usePlaygroundState} from './usePlaygroundState';
+import {DEFAULT_SYSTEM_MESSAGE, usePlaygroundState} from './usePlaygroundState';
 
 export type PlaygroundPageProps = {
   entity: string;
@@ -61,12 +61,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
     ) {
       setPlaygroundStateField(0, 'traceCall', {
         inputs: {
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a helpful assistant.',
-            },
-          ],
+          messages: [DEFAULT_SYSTEM_MESSAGE],
         },
         project_id: `${props.entity}/${props.project}`,
       });
