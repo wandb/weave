@@ -98,6 +98,7 @@ def tests(session, shard):
 
     session.run(
         "pytest",
+        "--strict-markers",
         "--cov=weave",
         "--cov-report=html",
         "--cov-branch",

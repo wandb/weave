@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 import pandas as pd
 from notdiamond.toolkit.custom_router import CustomRouter
@@ -20,7 +20,7 @@ def train_router(
     api_key: Optional[str] = None,
 ) -> CustomRouter:
     """Currently only supports EvaluationResults with a single score column."""
-    router_dataset: Dict[str, pd.DataFrame] = {}
+    router_dataset: dict[str, pd.DataFrame] = {}
 
     for model, eval_results in model_evals.items():
         if isinstance(model, weave.Model):
@@ -49,8 +49,8 @@ def evaluate_router(
     response_column: str,
     preference_id: str,
     api_key: Optional[str] = None,
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    router_dataset: Dict[str, pd.DataFrame] = {}
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    router_dataset: dict[str, pd.DataFrame] = {}
 
     for model, dataset in model_datasets.items():
         score_column, model_df = _build_dataframe(model, dataset)
@@ -83,7 +83,8 @@ def evaluate_router(
     class _DummyEvalModel(weave.Model):
         model_results: pd.DataFrame
 
-        def predict(self, prompt: str) -> Dict[str, Any]:
+        @weave.op
+        def predict(self, prompt: str) -> dict[str, Any]:
             response, score = self.model_results[
                 self.model_results[prompt_column] == prompt
             ][["response", "score"]].values[0]
@@ -92,13 +93,13 @@ def evaluate_router(
     class BestRoutedModel(_DummyEvalModel):
         model_name: str
 
-        @weave.op()
-        def predict(self, prompt: str) -> Dict[str, Any]:
+        @weave.op
+        def predict(self, prompt: str) -> dict[str, Any]:
             return super().predict(prompt)
 
     class NotDiamondRoutedModel(_DummyEvalModel):
-        @weave.op()
-        def predict(self, prompt: str) -> Dict[str, Any]:
+        @weave.op
+        def predict(self, prompt: str) -> dict[str, Any]:
             return super().predict(prompt)
 
     best_provider_model = BestRoutedModel(
@@ -111,7 +112,7 @@ def evaluate_router(
 
 def _get_score_column(
     model: str, scores: dict, score_col_name: Optional[str] = None
-) -> Tuple[str, float]:
+) -> tuple[str, float]:
     """
     Extract a single score from the nested `scores` column.
         - raise for multiple scores
@@ -135,11 +136,11 @@ def _get_score_column(
 
 def _build_dataframe(
     model: str, dataset: Union[EvaluationResults, weave.Dataset]
-) -> Tuple[str, pd.DataFrame]:
+) -> tuple[str, pd.DataFrame]:
     df_rows = []
     score_col_name = None
     for row in dataset.rows:
-        _df_row = dict()
+        _df_row = {}
         for col, val in row.items():
             if col == "scores":
                 col, val = _get_score_column(model, val, score_col_name=score_col_name)

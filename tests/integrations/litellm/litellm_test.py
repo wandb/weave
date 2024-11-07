@@ -1,6 +1,7 @@
 import os
+from collections.abc import Generator
 from importlib.metadata import version
-from typing import Any, Generator
+from typing import Any
 
 import litellm
 import pytest

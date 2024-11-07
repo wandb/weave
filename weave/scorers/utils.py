@@ -22,4 +22,4 @@ def stringify(output: Any) -> str:
     elif isinstance(output, BaseModel):
         return output.model_dump_json(indent=2)
     else:
-        raise ValueError(f"Unsupported model output type: {type(output)}")
+        raise TypeError(f"Unsupported model output type: {type(output)}")
