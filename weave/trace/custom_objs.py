@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
 from weave.trace.context.weave_client_context import require_weave_client
@@ -56,9 +56,9 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
     }
 
 
-def _decode_custom_obj_with_op(
+def _decode_custom_obj(
     encoded_path_contents: Mapping[str, Union[str, bytes]],
-    load_instance_op: Op,
+    load_instance_op: Callable[..., Any],
 ) -> Any:
     # Disables tracing so that calls to loading data itself don't get traced
     load_instance_op._tracing_enabled = False  # type: ignore
@@ -84,9 +84,7 @@ def decode_custom_obj(
             load_instance_op = serializer.load
 
             try:
-                return _decode_custom_obj_with_op(
-                    encoded_path_contents, load_instance_op
-                )
+                return _decode_custom_obj(encoded_path_contents, load_instance_op)
             except Exception as e:
                 pass
 
@@ -99,14 +97,15 @@ def decode_custom_obj(
         if not isinstance(ref, ObjectRef):
             raise TypeError(f"Expected ObjectRef, got `{type(ref)}`")
 
-        load_instance_op = ref.get()
+        wc = require_weave_client()
+        load_instance_op = wc.get(ref)
         if load_instance_op is None:
             raise ValueError(
                 f"Failed to load op needed to decode object of type `{_type}`. See logs above for more information."
             )
 
     try:
-        return _decode_custom_obj_with_op(encoded_path_contents, load_instance_op)
+        return _decode_custom_obj(encoded_path_contents, load_instance_op)
     except Exception as e:
         raise DecodeCustomObjectError(
             f"Failed to decode object of type `{_type}`. See logs above for more information."
