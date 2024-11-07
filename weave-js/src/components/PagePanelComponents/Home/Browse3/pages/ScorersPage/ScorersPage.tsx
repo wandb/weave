@@ -24,10 +24,8 @@ export const ScorersPage: React.FC<{
       title="Scorers"
       tabs={[
         {
-          // It is true that this panel can show more than LLM Judges, but the
-          // branding is better
-          label: 'Configurable Judges',
-          content: <ActionDefinitionsTab entity={entity} project={project} />,
+          label: 'Programmatic Scorers',
+          content: <CodeScorersTab entity={entity} project={project} />,
         },
         // This is a placeholder for Griffin's annotation column manager section
         // {
@@ -35,8 +33,10 @@ export const ScorersPage: React.FC<{
         //   content: <HumanScorersTab entity={entity} project={project} />,
         // },
         {
-          label: 'Programmatic Scorers',
-          content: <CodeScorersTab entity={entity} project={project} />,
+          // It is true that this panel can show more than LLM Judges, but the
+          // branding is better
+          label: 'Configurable Judges',
+          content: <ActionDefinitionsTab entity={entity} project={project} />,
         },
       ]}
       headerContent={undefined}
