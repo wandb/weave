@@ -982,9 +982,9 @@ async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
         return text
 
     class MyScorer(Scorer):
-        @weave.op()
-        def score(self, text, model_output) -> bool:
-            return text == model_output
+        @weave.op
+        def score(self, text, output) -> bool:
+            return text == output
 
     scorer = MyScorer()
     eval = weave.Evaluation(

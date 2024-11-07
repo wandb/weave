@@ -42,6 +42,7 @@ from weave.trace.table import Table
 from weave.trace.util import deprecated
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.ids import generate_id
+from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
@@ -1178,7 +1179,7 @@ class WeaveClient:
         freq = FeedbackCreateReq(
             project_id=self._project_id(),
             weave_ref=weave_ref_uri,
-            feedback_type="wandb.runnable." + runnable_ref.name,
+            feedback_type=RUNNABLE_FEEDBACK_TYPE_PREFIX + "." + runnable_ref.name,
             payload=payload,
             runnable_ref=runnable_ref_uri,
             call_ref=call_ref_uri,
