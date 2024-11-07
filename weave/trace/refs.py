@@ -11,6 +11,10 @@ OBJECT_ATTR_EDGE_NAME = refs_internal.OBJECT_ATTR_EDGE_NAME
 TABLE_ROW_ID_EDGE_NAME = refs_internal.TABLE_ROW_ID_EDGE_NAME
 
 
+class WeaveDigestError(ValueError):
+    """Raised when a digest is invalid."""
+
+
 @dataclasses.dataclass(frozen=True)
 class Ref:
     def uri(self) -> str:
@@ -42,7 +46,7 @@ class TableRef(Ref):
             self.__dict__["_digest"] = self._digest.result()
 
         if not isinstance(self._digest, str):
-            raise Exception(f"TableRef digest is not a string: {self._digest}")
+            raise WeaveDigestError(f"TableRef digest is not a string: {self._digest}")
 
         refs_internal.validate_no_slashes(self._digest, "digest")
         refs_internal.validate_no_colons(self._digest, "digest")
@@ -56,7 +60,9 @@ class TableRef(Ref):
             self.__dict__["_row_digests"] = self._row_digests.result()
 
         if not isinstance(self._row_digests, list):
-            raise Exception(f"TableRef row_digests is not a list: {self._row_digests}")
+            raise WeaveDigestError(
+                f"TableRef row_digests is not a list: {self._row_digests}"
+            )
 
         return self._row_digests
 
@@ -123,7 +129,7 @@ class ObjectRef(RefWithExtra):
             self.__dict__["_digest"] = self._digest.result()
 
         if not isinstance(self._digest, str):
-            raise Exception(f"ObjectRef digest is not a string: {self._digest}")
+            raise WeaveDigestError(f"ObjectRef digest is not a string: {self._digest}")
 
         refs_internal.validate_no_slashes(self._digest, "digest")
         refs_internal.validate_no_colons(self._digest, "digest")
@@ -144,6 +150,19 @@ class ObjectRef(RefWithExtra):
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
+    def objectify(self, obj: Any) -> Any:
+        """Convert back to higher level object."""
+        class_name = getattr(obj, "_class_name", None)
+        if "EasyPrompt" == class_name:
+            from weave.flow.prompt.prompt import EasyPrompt
+
+            prompt = EasyPrompt.from_obj(obj)
+            # We want to use the ref on the object (and not self) as it will have had
+            # version number or latest alias resolved to a specific digest.
+            prompt.__dict__["ref"] = obj.ref
+            return prompt
+        return obj
+
     def get(self) -> Any:
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
@@ -153,21 +172,20 @@ class ObjectRef(RefWithExtra):
 
         gc = get_weave_client()
         if gc is not None:
-            return gc.get(self)
+            return self.objectify(gc.get(self))
 
         # Special case: If the user is attempting to fetch an object but has not
         # yet initialized the client, we can initialize a client to
         # fetch the object. It is critical to reset the client after fetching the
         # object to avoid any side effects in user code.
-        if gc is None:
-            init_client = init_weave(
-                f"{self.entity}/{self.project}", ensure_project_exists=False
-            )
-            try:
-                res = init_client.client.get(self)
-            finally:
-                init_client.reset()
-            return res
+        init_client = init_weave(
+            f"{self.entity}/{self.project}", ensure_project_exists=False
+        )
+        try:
+            res = init_client.client.get(self)
+        finally:
+            init_client.reset()
+        return self.objectify(res)
 
     def is_descended_from(self, potential_ancestor: "ObjectRef") -> bool:
         if self.entity != potential_ancestor.entity:
@@ -224,6 +242,13 @@ class CallRef(RefWithExtra):
 AnyRef = Union[ObjectRef, TableRef, CallRef, OpRef]
 
 
+def parse_name_version(name_version: str) -> tuple[str, str]:
+    if ":" in name_version:
+        name, version = name_version.rsplit(":", maxsplit=1)
+        return name, version
+    return name_version, "latest"
+
+
 def parse_uri(uri: str) -> AnyRef:
     if not uri.startswith("weave:///"):
         raise ValueError(f"Invalid URI: {uri}")
@@ -239,12 +264,12 @@ def parse_uri(uri: str) -> AnyRef:
     if kind == "call":
         return CallRef(entity=entity, project=project, id=remaining[0], _extra=extra)
     elif kind == "object":
-        name, version = remaining[0].split(":")
+        name, version = parse_name_version(remaining[0])
         return ObjectRef(
             entity=entity, project=project, name=name, _digest=version, _extra=extra
         )
     elif kind == "op":
-        name, version = remaining[0].split(":")
+        name, version = parse_name_version(remaining[0])
         return OpRef(
             entity=entity, project=project, name=name, _digest=version, _extra=extra
         )
@@ -254,5 +279,5 @@ def parse_uri(uri: str) -> AnyRef:
 
 def parse_op_uri(uri: str) -> OpRef:
     if not isinstance(parsed := parse_uri(uri), OpRef):
-        raise ValueError(f"URI is not for an Op: {uri}")
+        raise TypeError(f"URI is not for an Op: {uri}")
     return parsed

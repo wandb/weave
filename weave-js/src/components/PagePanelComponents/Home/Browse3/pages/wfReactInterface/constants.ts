@@ -20,7 +20,9 @@ export const OP_CATEGORIES = [
   'tune',
 ] as const;
 export const KNOWN_BASE_OBJECT_CLASSES = [
+  'Prompt',
   'Model',
   'Dataset',
   'Evaluation',
+  'Leaderboard',
 ] as const;

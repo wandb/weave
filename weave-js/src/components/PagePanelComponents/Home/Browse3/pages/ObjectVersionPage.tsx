@@ -3,6 +3,7 @@ import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEve
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
+import {BytesStoredInfoIcon} from '../../../../BytesStoredInfoIcon';
 import {Icon, IconName} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
@@ -26,9 +27,12 @@ import {
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
 import {EvaluationLeaderboardTab} from './LeaderboardTab';
+import {TabPrompt} from './TabPrompt';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
+import {TabUsePrompt} from './TabUsePrompt';
+import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
 import {useWFHooks} from './wfReactInterface/context';
 import {
   objectVersionKeyToRefUri,
@@ -44,9 +48,11 @@ type ObjectIconProps = {
   baseObjectClass: KnownBaseObjectClassType;
 };
 const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
+  Prompt: 'forum-chat-bubble',
   Model: 'model',
   Dataset: 'table',
-  Evaluation: 'benchmark-square',
+  Evaluation: 'baseline-alt',
+  Leaderboard: 'benchmark-square',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
@@ -117,18 +123,14 @@ const ObjectVersionPageInner: React.FC<{
   );
   const objectVersionCount = (objectVersions.result ?? []).length;
   const baseObjectClass = useMemo(() => {
-    if (objectVersion.baseObjectClass === 'Dataset') {
-      return 'Dataset';
-    }
-    if (objectVersion.baseObjectClass === 'Model') {
-      return 'Model';
-    }
-    if (objectVersion.baseObjectClass === 'Evaluation') {
-      return 'Evaluation';
-    }
-    return null;
+    const s = objectVersion.baseObjectClass;
+    return KNOWN_BASE_OBJECT_CLASSES.includes(s as KnownBaseObjectClassType)
+      ? (s as KnownBaseObjectClassType)
+      : null;
   }, [objectVersion.baseObjectClass]);
   const refUri = objectVersionKeyToRefUri(objectVersion);
+
+  const showPromptTab = objectVersion.val._class_name === 'EasyPrompt';
 
   const minimalColumns = useMemo(() => {
     return ['id', 'op_name', 'project_id'];
@@ -190,6 +192,11 @@ const ObjectVersionPageInner: React.FC<{
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
 
+  const bytesStored = useMemo(
+    () => (data.result?.[0] ? JSON.stringify(data.result?.[0]).length : 0),
+    [data.result]
+  );
+
   if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;
   }
@@ -238,6 +245,18 @@ const ObjectVersionPageInner: React.FC<{
                   Subpath: refExtra,
                 }
               : {}),
+            'Bytes stored': (
+              <>
+                {data.loading ? (
+                  <LoadingDots />
+                ) : (
+                  <BytesStoredInfoIcon
+                    bytesStored={bytesStored}
+                    weaveKind="object"
+                  />
+                )}
+              </>
+            ),
             // 'Type Version': (
             //   <TypeVersionLink
             //     entityName={entityName}
@@ -276,6 +295,26 @@ const ObjectVersionPageInner: React.FC<{
       //   },
       // ]}
       tabs={[
+        ...(showPromptTab
+          ? [
+              {
+                label: 'Prompt',
+                content: (
+                  <ScrollableTabContent>
+                    {data.loading ? (
+                      <CenteredAnimatedLoader />
+                    ) : (
+                      <TabPrompt
+                        entity={entityName}
+                        project={projectName}
+                        data={viewerDataAsObject}
+                      />
+                    )}
+                  </ScrollableTabContent>
+                ),
+              },
+            ]
+          : []),
         ...(isEvaluation && evalHasCalls
           ? [
               {
@@ -322,23 +361,33 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'Use',
           content: (
-            <Tailwind>
-              {baseObjectClass === 'Dataset' ? (
-                <TabUseDataset
-                  name={objectName}
-                  uri={refUri}
-                  versionIndex={objectVersionIndex}
-                />
-              ) : baseObjectClass === 'Model' ? (
-                <TabUseModel
-                  name={objectName}
-                  uri={refUri}
-                  projectName={projectName}
-                />
-              ) : (
-                <TabUseObject name={objectName} uri={refUri} />
-              )}
-            </Tailwind>
+            <ScrollableTabContent>
+              <Tailwind>
+                {baseObjectClass === 'Prompt' ? (
+                  <TabUsePrompt
+                    name={objectName}
+                    uri={refUri}
+                    entityName={entityName}
+                    projectName={projectName}
+                    data={viewerDataAsObject}
+                  />
+                ) : baseObjectClass === 'Dataset' ? (
+                  <TabUseDataset
+                    name={objectName}
+                    uri={refUri}
+                    versionIndex={objectVersionIndex}
+                  />
+                ) : baseObjectClass === 'Model' ? (
+                  <TabUseModel
+                    name={objectName}
+                    uri={refUri}
+                    projectName={projectName}
+                  />
+                ) : (
+                  <TabUseObject name={objectName} uri={refUri} />
+                )}
+              </Tailwind>
+            </ScrollableTabContent>
           ),
         },
 

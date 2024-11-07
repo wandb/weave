@@ -1,9 +1,10 @@
 import warnings
+from collections.abc import Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 from contextvars import Context, copy_context
 from functools import partial, wraps
 from threading import Thread as _Thread
-from typing import Any, Callable, Iterable, Iterator, Optional
+from typing import Any, Callable, Optional
 
 
 class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
@@ -71,7 +72,7 @@ class ContextAwareThread(_Thread):
     (see call_context.py), but new threads do not automatically copy context from
     the parent, which can cause the call context to be lost -- not good!  This
     class automates contextvar copying so using this thread "just works" as the
-    user probaly expects.
+    user probably expects.
 
     You can achieve the same effect without this class by instead writing:
 

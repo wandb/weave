@@ -1,10 +1,16 @@
 import logging
 import typing
-from typing import Any, Optional, Sequence
+from collections.abc import Sequence
+from types import CoroutineType
+from typing import Any, Optional
 
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
+from weave.trace.sanitize import REDACT_KEYS, REDACTED_VALUE
+from weave.trace_server.interface.base_object_classes.base_object_registry import (
+    BASE_OBJECT_REGISTRY,
+)
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -16,7 +22,9 @@ if typing.TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
 
 
-def to_json(obj: Any, project_id: str, client: "WeaveClient") -> Any:
+def to_json(
+    obj: Any, project_id: str, client: "WeaveClient", use_dictify: bool = False
+) -> Any:
     if isinstance(obj, TableRef):
         return obj.uri()
     elif isinstance(obj, ObjectRef):
@@ -24,14 +32,17 @@ def to_json(obj: Any, project_id: str, client: "WeaveClient") -> Any:
     elif isinstance(obj, ObjectRecord):
         res = {"_type": obj._class_name}
         for k, v in obj.__dict__.items():
-            res[k] = to_json(v, project_id, client)
+            res[k] = to_json(v, project_id, client, use_dictify)
         return res
     elif isinstance_namedtuple(obj):
-        return {k: to_json(v, project_id, client) for k, v in obj._asdict().items()}
+        return {
+            k: to_json(v, project_id, client, use_dictify)
+            for k, v in obj._asdict().items()
+        }
     elif isinstance(obj, (list, tuple)):
-        return [to_json(v, project_id, client) for v in obj]
+        return [to_json(v, project_id, client, use_dictify) for v in obj]
     elif isinstance(obj, dict):
-        return {k: to_json(v, project_id, client) for k, v in obj.items()}
+        return {k: to_json(v, project_id, client, use_dictify) for k, v in obj.items()}
 
     if isinstance(obj, (int, float, str, bool)) or obj is None:
         return obj
@@ -39,6 +50,12 @@ def to_json(obj: Any, project_id: str, client: "WeaveClient") -> Any:
     # This still blocks potentially on large-file i/o.
     encoded = custom_objs.encode_custom_obj(obj)
     if encoded is None:
+        if (
+            use_dictify
+            and not isinstance(obj, ALWAYS_STRINGIFY)
+            and not has_custom_repr(obj)
+        ):
+            return dictify(obj)
         return fallback_encode(obj)
     result = _build_result_from_encoded(encoded, project_id, client)
 
@@ -98,6 +115,11 @@ def is_primitive(obj: Any) -> bool:
     return isinstance(obj, (int, float, str, bool, type(None)))
 
 
+def has_custom_repr(obj: Any) -> bool:
+    """Return True if the object has a custom __repr__ method."""
+    return obj.__class__.__repr__ is not object.__repr__
+
+
 def dictify(
     obj: Any, maxdepth: int = 0, depth: int = 1, seen: Optional[set[int]] = None
 ) -> Any:
@@ -123,23 +145,31 @@ def dictify(
     elif isinstance(obj, (list, tuple)):
         return [dictify(v, maxdepth, depth + 1, seen) for v in obj]
     elif isinstance(obj, dict):
-        return {k: dictify(v, maxdepth, depth + 1, seen) for k, v in obj.items()}
+        dict_result = {}
+        for k, v in obj.items():
+            if k in REDACT_KEYS:
+                dict_result[k] = REDACTED_VALUE
+            else:
+                dict_result[k] = dictify(v, maxdepth, depth + 1, seen)
+        return dict_result
 
     if hasattr(obj, "to_dict"):
         try:
             as_dict = obj.to_dict()
             if isinstance(as_dict, dict):
-                result = {}
+                to_dict_result = {}
                 for k, v in as_dict.items():
-                    if maxdepth == 0 or depth < maxdepth:
-                        result[k] = dictify(v, maxdepth, depth + 1)
+                    if k in REDACT_KEYS:
+                        to_dict_result[k] = REDACTED_VALUE
+                    elif maxdepth == 0 or depth < maxdepth:
+                        to_dict_result[k] = dictify(v, maxdepth, depth + 1)
                     else:
-                        result[k] = stringify(v)
-                return result
+                        to_dict_result[k] = stringify(v)
+                return to_dict_result
         except Exception:
             raise ValueError("to_dict failed")
 
-    result = {}
+    result: dict[Any, Any] = {}
     result["__class__"] = {
         "module": obj.__class__.__module__,
         "qualname": obj.__class__.__qualname__,
@@ -151,10 +181,13 @@ def dictify(
             for i, item in enumerate(obj):
                 result[i] = dictify(item, maxdepth, depth + 1, seen)
         except Exception:
-            raise ValueError("fallback dictify failed")
+            return stringify(obj)
     else:
         for attr in dir(obj):
             if attr.startswith("_"):
+                continue
+            if attr in REDACT_KEYS:
+                result[attr] = REDACTED_VALUE
                 continue
             try:
                 val = getattr(obj, attr)
@@ -165,12 +198,12 @@ def dictify(
                 else:
                     result[attr] = stringify(val)
             except Exception:
-                raise ValueError("fallback dictify failed")
+                return stringify(obj)
     return result
 
 
 # TODO: Investigate why dictifying Logger causes problems
-ALWAYS_STRINGIFY = (logging.Logger,)
+ALWAYS_STRINGIFY = (logging.Logger, CoroutineType)
 
 
 # Note: Max depth not picked scientifically, just trying to keep things under control.
@@ -178,13 +211,18 @@ DEFAULT_MAX_DICTIFY_DEPTH = 10
 
 
 def fallback_encode(obj: Any) -> Any:
-    # TODO: Should we try to compute an object size and skip if too big?
-    if isinstance(obj, ALWAYS_STRINGIFY):
-        return stringify(obj)
+    rep = None
     try:
-        return dictify(obj, maxdepth=DEFAULT_MAX_DICTIFY_DEPTH)
+        rep = repr(obj)
     except Exception:
-        return stringify(obj)
+        try:
+            rep = str(obj)
+        except Exception:
+            rep = f"<{type(obj).__name__}: {id(obj)}>"
+    if isinstance(rep, str):
+        if len(rep) > MAX_STR_LEN:
+            rep = rep[:MAX_STR_LEN] + "..."
+    return rep
 
 
 def isinstance_namedtuple(obj: Any) -> bool:
@@ -195,8 +233,8 @@ def isinstance_namedtuple(obj: Any) -> bool:
 
 def _load_custom_obj_files(
     project_id: str, server: TraceServerInterface, file_digests: dict
-) -> typing.Dict[str, bytes]:
-    loaded_files: typing.Dict[str, bytes] = {}
+) -> dict[str, bytes]:
+    loaded_files: dict[str, bytes] = {}
     for name, digest in file_digests.items():
         file_response = server.file_content_read(
             FileContentReadReq(project_id=project_id, digest=digest)
@@ -220,6 +258,12 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             return custom_objs.decode_custom_obj(
                 obj["weave_type"], files, obj.get("load_op")
             )
+        elif (
+            isinstance(val_type, str)
+            and obj.get("_class_name") == val_type
+            and (baseObject := BASE_OBJECT_REGISTRY.get(val_type))
+        ):
+            return baseObject.model_validate(obj)
         else:
             return ObjectRecord(
                 {k: from_json(v, project_id, server) for k, v in obj.items()}
