@@ -334,7 +334,6 @@ class Call:
             raise ValueError("Score call has no ref")
         client._add_runnable_feedback(
             weave_ref_uri=self_ref.uri(),
-            runnable_ref_name=score_name,
             output=score_results,
             call_ref_uri=score_call_ref.uri(),
             runnable_ref_uri=scorer_op_ref.uri(),
