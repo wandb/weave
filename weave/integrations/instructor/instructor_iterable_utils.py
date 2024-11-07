@@ -8,10 +8,10 @@ from weave.trace.op_extensions.accumulator import add_accumulator
 
 
 def instructor_iterable_accumulator(
-    acc: Optional[BaseModel], value: BaseModel
+    acc: Optional[list[BaseModel]], value: BaseModel
 ) -> list[BaseModel]:
     if acc is None:
-        acc = [value]
+        return [value]
     if acc[-1] != value:
         acc.append(value)
     return acc
@@ -29,7 +29,7 @@ def should_accumulate_iterable(inputs: dict) -> bool:
 
 def instructor_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op()(fn)
+        op = weave.op(fn)
         op.name = name  # type: ignore
         return add_accumulator(
             op,  # type: ignore
@@ -50,7 +50,7 @@ def instructor_wrapper_async(name: str) -> Callable[[Callable], Callable]:
             return _async_wrapper
 
         "We need to do this so we can check if `stream` is used"
-        op = weave.op()(_fn_wrapper(fn))
+        op = weave.op(_fn_wrapper(fn))
         op.name = name  # type: ignore
         return add_accumulator(
             op,  # type: ignore

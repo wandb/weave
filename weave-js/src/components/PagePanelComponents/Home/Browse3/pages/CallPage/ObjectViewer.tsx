@@ -73,7 +73,7 @@ type RefValues = Record<string, any>; // ref URI to value
 
 type TruncatedStore = {[key: string]: {values: any; index: number}};
 
-const RESOVLED_REF_KEY = '_ref';
+const RESOLVED_REF_KEY = '_ref';
 
 export const ARRAY_TRUNCATION_LENGTH = 50;
 const TRUNCATION_KEY = '__weave_array_truncated__';
@@ -163,13 +163,13 @@ export const ObjectViewer = ({
         if (typeof val === 'object' && val !== null) {
           val = {
             ...v,
-            [RESOVLED_REF_KEY]: r,
+            [RESOLVED_REF_KEY]: r,
           };
         } else {
           // This makes it so that runs pointing to primitives can still be expanded in the table.
           val = {
             '': v,
-            [RESOVLED_REF_KEY]: r,
+            [RESOLVED_REF_KEY]: r,
           };
         }
       }
@@ -182,7 +182,7 @@ export const ObjectViewer = ({
         isWeaveRef(context.value) &&
         refValues[context.value] != null &&
         // Don't expand _ref keys
-        context.path.tail() !== RESOVLED_REF_KEY
+        context.path.tail() !== RESOLVED_REF_KEY
       ) {
         dirty = true;
         return refValues[context.value];
