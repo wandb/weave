@@ -5,21 +5,6 @@ from pydantic import Field, field_validator
 
 from weave.trace_server.interface.base_object_classes import base_object_def
 
-ANNOTATION_COLUMN_JSON_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "type": {
-            "type": "string",
-            "enum": ["string", "number", "boolean", "categorical"],
-        },
-        "max_length": {"type": "number"},
-        "min": {"type": "number"},
-        "max": {"type": "number"},
-        "options": {"type": "array", "items": {"type": ["string", "number"]}},
-    },
-    "required": ["type"],
-}
-
 
 class AnnotationColumn(base_object_def.BaseObject):
     json_schema: dict = Field(
@@ -54,5 +39,10 @@ class AnnotationColumn(base_object_def.BaseObject):
 
     @field_validator("json_schema")
     def validate_json_schema(cls, v: dict) -> dict:
-        jsonschema.validate(v, ANNOTATION_COLUMN_JSON_SCHEMA)
+        try:
+            jsonschema.validate(None, v)
+        except jsonschema.exceptions.SchemaError as e:
+            raise e
+        except jsonschema.exceptions.ValidationError:
+            pass  # we don't care that `None` does not conform
         return v
