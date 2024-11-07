@@ -12,7 +12,7 @@ import {
   TraceRefsReadBatchReq,
   TraceRefsReadBatchRes,
 } from './traceServerClientTypes';
-import { DirectTraceServerClient } from './traceServerDirectClient';
+import {DirectTraceServerClient} from './traceServerDirectClient';
 
 const DEFAULT_BATCH_INTERVAL = 150;
 const MAX_REFS_PER_BATCH = 1000;
@@ -25,9 +25,9 @@ export class TraceServerClient extends DirectTraceServerClient {
   }> = [];
   private onDeleteListeners: Array<() => void>;
   private onRenameListeners: Array<() => void>;
-  // weave_ref -> feedback_ref -> callback
-  // For feedback without a feedback_ref, (the default case)
-  // the key is the empty string (this.FEEDBACK_REF_DEFAULT).
+  // weave_ref -> feedback_type -> callback
+  // For feedback without a feedback_type, (the default case)
+  // the key is the empty string (this.FEEDBACK_TYPE_DEFAULT).
   private onFeedbackListeners: Record<
     string,
     Record<string, Array<() => void>>
@@ -42,7 +42,7 @@ export class TraceServerClient extends DirectTraceServerClient {
     this.onFeedbackListeners = {};
   }
 
-  private FEEDBACK_REF_DEFAULT = '';
+  private FEEDBACK_TYPE_DEFAULT = '';
 
   /**
    * Registers a callback to be called when a delete operation occurs.
@@ -71,24 +71,24 @@ export class TraceServerClient extends DirectTraceServerClient {
   public registerOnFeedbackListener(
     weaveRef: string,
     callback: () => void,
-    feedbackRef?: string
+    feedbackType?: string
   ): () => void {
-    const feedbackRefResolved = feedbackRef ?? this.FEEDBACK_REF_DEFAULT;
-    if (!(feedbackRefResolved in this.onFeedbackListeners)) {
-      this.onFeedbackListeners[feedbackRefResolved] = {};
+    const feedbackTypeResolved = feedbackType ?? this.FEEDBACK_TYPE_DEFAULT;
+    if (!(feedbackTypeResolved in this.onFeedbackListeners)) {
+      this.onFeedbackListeners[feedbackTypeResolved] = {};
     }
-    if (!(weaveRef in this.onFeedbackListeners[feedbackRefResolved])) {
-      this.onFeedbackListeners[feedbackRefResolved][weaveRef] = [];
+    if (!(weaveRef in this.onFeedbackListeners[feedbackTypeResolved])) {
+      this.onFeedbackListeners[feedbackTypeResolved][weaveRef] = [];
     }
-    this.onFeedbackListeners[feedbackRefResolved][weaveRef].push(callback);
+    this.onFeedbackListeners[feedbackTypeResolved][weaveRef].push(callback);
     return () => {
-      const newListeners = this.onFeedbackListeners[feedbackRefResolved][
+      const newListeners = this.onFeedbackListeners[feedbackTypeResolved][
         weaveRef
       ].filter(listener => listener !== callback);
       if (newListeners.length) {
-        this.onFeedbackListeners[feedbackRefResolved][weaveRef] = newListeners;
+        this.onFeedbackListeners[feedbackTypeResolved][weaveRef] = newListeners;
       } else {
-        delete this.onFeedbackListeners[feedbackRefResolved][weaveRef];
+        delete this.onFeedbackListeners[feedbackTypeResolved][weaveRef];
       }
     };
   }
@@ -109,10 +109,10 @@ export class TraceServerClient extends DirectTraceServerClient {
 
   public feedbackCreate(req: FeedbackCreateReq): Promise<FeedbackCreateRes> {
     const res = super.feedbackCreate(req).then(createRes => {
-      const feedbackRefResolved =
-        req.annotation_ref ?? this.FEEDBACK_REF_DEFAULT;
+      const feedbackTypeResolved =
+        req.feedback_type ?? this.FEEDBACK_TYPE_DEFAULT;
       const listeners =
-        this.onFeedbackListeners[feedbackRefResolved][req.weave_ref] ?? [];
+        this.onFeedbackListeners[feedbackTypeResolved][req.weave_ref] ?? [];
       listeners.forEach(listener => listener());
       return createRes;
     });
@@ -135,10 +135,10 @@ export class TraceServerClient extends DirectTraceServerClient {
 
   public feedbackReplace(req: FeedbackReplaceReq): Promise<FeedbackReplaceRes> {
     const res = super.feedbackReplace(req).then(replaceRes => {
-      const feedbackRefResolved =
-        req.annotation_ref ?? this.FEEDBACK_REF_DEFAULT;
+      const feedbackTypeResolved =
+        req.feedback_type ?? this.FEEDBACK_TYPE_DEFAULT;
       const listeners =
-        this.onFeedbackListeners[feedbackRefResolved][req.weave_ref] ?? [];
+        this.onFeedbackListeners[feedbackTypeResolved][req.weave_ref] ?? [];
       listeners.forEach(listener => listener());
       return replaceRes;
     });

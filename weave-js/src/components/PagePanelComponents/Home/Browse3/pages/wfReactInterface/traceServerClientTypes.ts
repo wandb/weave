@@ -1,4 +1,4 @@
-import { Query } from './traceServerClientInterface/query';
+import {Query} from './traceServerClientInterface/query';
 type ExtraKeysAllowed = {
   [key: string]: any;
 };
