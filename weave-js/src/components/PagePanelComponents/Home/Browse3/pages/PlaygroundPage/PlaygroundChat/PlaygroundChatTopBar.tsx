@@ -9,7 +9,6 @@ import {OptionalTraceCallSchema, PlaygroundState} from '../types';
 import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
 import {LLMDropdown} from './LLMDropdown';
 
-
 type PlaygroundChatTopBarProps = {
   idx: number;
   settingsTab: number | null;
