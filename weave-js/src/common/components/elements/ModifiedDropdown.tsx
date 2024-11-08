@@ -445,9 +445,11 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         </div>
       );
     };
+    console.log('passProps', passProps);
     return wrapWithDragDrop(
       <Dropdown
         {...passProps}
+        // className='ui selection dropdown custom-modified-dropdown"'
         options={displayOptions}
         lazyLoad
         selectOnNavigation={false}
@@ -507,6 +509,10 @@ export const OptionWithTooltip: React.FC<OptionWithTooltipProps> = ({text}) => {
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
+        padding: '4px 8px',
+        height: '32px',
+        display: 'flex',
+        alignItems: 'center',
       }}>
       {showTooltip ? (
         <Tooltip
@@ -525,6 +531,7 @@ export const OptionWithTooltip: React.FC<OptionWithTooltipProps> = ({text}) => {
           trigger={<span>{text}</span>}
         />
       ) : (
+        // <span style={{padding: '8px', overflow: 'hidden'}}>{text}</span>
         text
       )}
     </div>
