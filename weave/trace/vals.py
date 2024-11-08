@@ -376,12 +376,12 @@ class WeaveTable(Traceable):
             yield res
 
     def _remote_iter(self) -> Generator[dict, None, None]:
+        if self.table_ref is None:
+            return
+
         page_index = 0
         page_size = 100
         while True:
-            if self.table_ref is None:
-                break
-
             response = self.server.table_query(
                 TableQueryReq(
                     project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
@@ -402,7 +402,7 @@ class WeaveTable(Traceable):
                 )
                 self._prefetched_rows = None
 
-            for ndx, item in enumerate(response.rows):
+            for i, item in enumerate(response.rows):
                 new_ref = self.ref.with_item(item.digest) if self.ref else None
                 # Here, we use the raw rows if they exist, otherwise we use the
                 # rows from the server. This is a temporary trick to ensure
@@ -413,13 +413,9 @@ class WeaveTable(Traceable):
                 val = (
                     item.val
                     if self._prefetched_rows is None
-                    else self._prefetched_rows[ndx]
+                    else self._prefetched_rows[i]
                 )
-                res = from_json(
-                    val,
-                    self.table_ref.entity + "/" + self.table_ref.project,
-                    self.server,
-                )
+                res = from_json(val, self.table_ref.project_id, self.server)
                 res = make_trace_obj(res, new_ref, self.server, self.root)
                 yield res
 
