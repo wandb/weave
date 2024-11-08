@@ -1,11 +1,11 @@
-from weave.flow.annotation_column import AnnotationColumn
+from weave.flow.annotation_spec import AnnotationSpec
 from weave.trace_server.trace_server_interface import ObjQueryReq
 
 
 def test_human_feedback_basic(client):
     # create a human feedback spec
 
-    col1 = AnnotationColumn(
+    col1 = AnnotationSpec(
         name="Numerical field #1",
         description="A numerical field with a range of -1 to 1",
         json_schema={
@@ -19,7 +19,7 @@ def test_human_feedback_basic(client):
     ref1 = client.save(col1, "my numerical spec")
     assert ref1
 
-    col2 = AnnotationColumn(
+    col2 = AnnotationSpec(
         name="Text field #1",
         json_schema={"type": "string", "max_length": 100},
         op_scope=["weave:///entity/project/op/name:digest"],
@@ -32,7 +32,7 @@ def test_human_feedback_basic(client):
         ObjQueryReq.model_validate(
             {
                 "project_id": client._project_id(),
-                "filter": {"base_object_classes": ["AnnotationColumn"]},
+                "filter": {"base_object_classes": ["AnnotationSpec"]},
             }
         )
     )
