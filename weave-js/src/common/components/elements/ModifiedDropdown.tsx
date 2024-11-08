@@ -34,6 +34,7 @@ import {Omit} from '../../types/base';
 import {makePropsAreEqual} from '../../util/shouldUpdate';
 import {Struct} from '../../util/types';
 import {Option} from '../../util/uihelpers';
+import {IconChevronDown} from '../../../components/Icon';
 
 type LabelCoord = {
   top: number;
@@ -445,11 +446,10 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         </div>
       );
     };
-    console.log('passProps', passProps);
+
     return wrapWithDragDrop(
       <Dropdown
         {...passProps}
-        // className='ui selection dropdown custom-modified-dropdown"'
         options={displayOptions}
         lazyLoad
         selectOnNavigation={false}
@@ -472,6 +472,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
           }
         }}
         trigger={renderTrigger()}
+        icon={<IconChevronDown />}
       />
     );
   },
@@ -509,7 +510,7 @@ export const OptionWithTooltip: React.FC<OptionWithTooltipProps> = ({text}) => {
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
-        padding: '4px 8px',
+        // padding: '4px 8px',
         height: '32px',
         display: 'flex',
         alignItems: 'center',
@@ -531,7 +532,6 @@ export const OptionWithTooltip: React.FC<OptionWithTooltipProps> = ({text}) => {
           trigger={<span>{text}</span>}
         />
       ) : (
-        // <span style={{padding: '8px', overflow: 'hidden'}}>{text}</span>
         text
       )}
     </div>
