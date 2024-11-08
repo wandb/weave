@@ -9,10 +9,8 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tiff", ".tif", ".webp"}
 
 def strip_exif(image_path: Path) -> bool:
     """Strip EXIF data from an image file if present.
-
     Args:
         image_path: Path to the image file
-
     Returns:
         bool: True if successful, False if failed
     """
@@ -20,10 +18,6 @@ def strip_exif(image_path: Path) -> bool:
         with Image.open(image_path) as img:
             if not img.getexif():
                 return True
-
-            # Convert RGBA to RGB if needed (some formats don't support RGBA)
-            if img.mode == "RGBA":
-                img = img.convert("RGB")
 
             # Create a new image without EXIF
             data = list(img.getdata())
