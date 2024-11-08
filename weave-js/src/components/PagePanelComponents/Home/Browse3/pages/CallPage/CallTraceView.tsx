@@ -598,10 +598,6 @@ export const useCallFlattenedTraceTree = (
         ? traceCallMap[callToExpand.parentId]
         : null;
     }
-    // If fake main call, expand it
-    if (mainCall.parentId != null && !traceCallMap[mainCall.parentId]) {
-      expandKeys.add(mainCall.parentId);
-    }
     return {
       rows,
       selectedCall,

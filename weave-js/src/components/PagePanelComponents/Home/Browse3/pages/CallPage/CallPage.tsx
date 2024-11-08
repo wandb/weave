@@ -267,8 +267,6 @@ const CallPageInnerVertical: FC<{
     return <Loading centered />;
   }
 
-  console.log('CallPageInnerVertical', tree);
-
   return (
     <SimplePageLayoutWithHeader
       headerExtra={
