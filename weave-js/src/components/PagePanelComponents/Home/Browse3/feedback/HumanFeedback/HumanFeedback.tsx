@@ -19,11 +19,11 @@ import {
 import {
   HumanAnnotationPayload,
   HumanFeedback,
-  tsHumanAnnotationColumn,
+  tsHumanAnnotationSpec,
 } from './humanFeedbackTypes';
 
 // Constants
-const HUMAN_FEEDBACK_TYPE = 'wandb.human_annotation.1';
+const HUMAN_FEEDBACK_BASE_TYPE = 'wandb.annotation';
 const FEEDBACK_TYPE_OPTIONS = ['text', 'number', 'boolean', 'categorical'];
 const DEBOUNCE_VAL = 200;
 
@@ -32,7 +32,7 @@ type HumanFeedbackProps = {
   entity: string;
   project: string;
   viewer: string | null;
-  hfColumn: tsHumanAnnotationColumn;
+  hfSpec: tsHumanAnnotationSpec;
   callRef: string;
   readOnly?: boolean;
   focused?: boolean;
@@ -53,7 +53,7 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
     weaveRef: props.callRef,
   });
   const foundFeedbackCallRef = query?.result?.[0]?.weave_ref;
-  const feedbackColumnRef = props.hfColumn.ref;
+  const feedbackSpecRef = props.hfSpec.ref;
 
   useEffect(() => {
     if (!props.readOnly) {
@@ -82,7 +82,7 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
         project: props.project,
         viewer: props.viewer,
         callRef: props.callRef,
-        feedbackColumnRef,
+        feedbackSpecRef,
         value,
       };
 
@@ -127,7 +127,7 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
     }
 
     const feedbackRefMatches = (feedback: HumanFeedback) =>
-      feedback.payload.annotation_column_ref === feedbackColumnRef;
+      feedback.annotation_ref === feedbackSpecRef;
 
     const currFeedback = query.result?.filter((feedback: HumanFeedback) =>
       feedbackRefMatches(feedback)
@@ -137,17 +137,17 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
     }
 
     setFoundFeedback(currFeedback);
-  }, [query?.result, query?.loading, feedbackColumnRef]);
+  }, [query?.result, query?.loading, feedbackSpecRef]);
 
   const extractedValues = useMemo(
-    () => extractFeedbackValues(foundFeedback, props.viewer, feedbackColumnRef),
-    [foundFeedback, props.viewer, feedbackColumnRef]
+    () => extractFeedbackValues(foundFeedback, props.viewer, feedbackSpecRef),
+    [foundFeedback, props.viewer, feedbackSpecRef]
   );
   const {rawValues, mostRecentVal} = extractedValues;
 
   const type = useMemo(
-    () => inferTypeFromJsonSchema(props.hfColumn.json_schema),
-    [props.hfColumn.json_schema]
+    () => inferTypeFromJsonSchema(props.hfSpec.json_schema ?? {}),
+    [props.hfSpec.json_schema]
   );
 
   if (query?.loading) {
@@ -165,7 +165,7 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
     <div className="w-full py-4">
       <FeedbackComponentSelector
         type={type}
-        jsonSchema={props.hfColumn.json_schema}
+        jsonSchema={props.hfSpec.json_schema ?? {}}
         focused={props.focused ?? false}
         onAddFeedback={onAddFeedback}
         foundValue={mostRecentVal}
@@ -290,7 +290,7 @@ type FeedbackRequestProps = {
   project: string;
   viewer: string | null;
   callRef: string;
-  feedbackColumnRef: string;
+  feedbackSpecRef: string;
   value: any;
 };
 
@@ -300,24 +300,24 @@ const createFeedbackRequest = ({
   project,
   viewer,
   callRef,
-  feedbackColumnRef,
+  feedbackSpecRef,
   value,
 }: FeedbackRequestProps) => {
-  const parsedRef = parseRef(feedbackColumnRef);
+  const parsedRef = parseRef(feedbackSpecRef);
   const humanAnnotationPayload: HumanAnnotationPayload = {
-    annotation_column_ref: feedbackColumnRef,
     value: {
       [parsedRef.artifactName]: {
         [parsedRef?.artifactVersion]: value,
       },
     },
   };
-
+  const feedbackType = `${HUMAN_FEEDBACK_BASE_TYPE}.${parsedRef.artifactName}`;
   const baseRequest = {
     project_id: `${entity}/${project}`,
     weave_ref: callRef,
     creator: viewer,
-    feedback_type: HUMAN_FEEDBACK_TYPE,
+    feedback_type: feedbackType,
+    annotation_ref: feedbackSpecRef,
     payload: humanAnnotationPayload,
     sort_by: [{created_at: 'desc'}],
   };

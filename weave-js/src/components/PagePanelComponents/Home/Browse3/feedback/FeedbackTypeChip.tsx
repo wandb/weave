@@ -15,6 +15,9 @@ export const FeedbackTypeChip = ({feedbackType}: FeedbackTypeChipProps) => {
   } else if (feedbackType === 'wandb.note.1') {
     color = 'gold';
     label = 'Note';
+  } else if (feedbackType.startsWith('wandb.annotation.')) {
+    color = 'sienna';
+    label = 'Annotation';
   }
   return <Pill color={color} label={label} />;
 };

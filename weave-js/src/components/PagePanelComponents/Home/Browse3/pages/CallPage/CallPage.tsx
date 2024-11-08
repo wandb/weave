@@ -15,8 +15,8 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
-import {HumanFeedbackSidebar} from '../../feedback/HumanFeedback/HumanFeedbackSidebar';
-import {useHumanFeedbackOptions} from '../../feedback/HumanFeedback/tsHumanFeedback';
+import {FeedbackSidebar} from '../../feedback/HumanFeedback/FeedbackSidebar';
+import {useHumanFeedbackSpecs} from '../../feedback/HumanFeedback/tsHumanFeedback';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
@@ -196,7 +196,7 @@ const CallPageInnerVertical: FC<{
       )
     );
   }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
-  const feedbackOptions = useHumanFeedbackOptions(call.entity, call.project);
+  const humanFeedbackSpecs = useHumanFeedbackSpecs(call.entity, call.project);
 
   const tree = useCallFlattenedTraceTree(call, path ?? null);
   const {rows, expandKeys, loading, costLoading, selectedCall} = tree;
@@ -315,7 +315,7 @@ const CallPageInnerVertical: FC<{
             </Box>
           )}
           <Box sx={{marginLeft: showPaginationContols ? 0 : 'auto'}}>
-            {feedbackOptions && (
+            {humanFeedbackSpecs && (
               <Button
                 icon="marker"
                 tooltip={`${
@@ -342,8 +342,8 @@ const CallPageInnerVertical: FC<{
       feedbackSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="flex h-full flex-col">
-            <HumanFeedbackSidebar
-              feedbackColumns={feedbackOptions}
+            <FeedbackSidebar
+              humanFeedbackSpecs={humanFeedbackSpecs}
               callID={currentCall.callId}
               entity={currentCall.entity}
               project={currentCall.project}
