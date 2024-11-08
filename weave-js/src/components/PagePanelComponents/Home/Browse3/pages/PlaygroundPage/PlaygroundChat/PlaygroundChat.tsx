@@ -30,6 +30,7 @@ export const PlaygroundChat = ({
 }: PlaygroundChatProps) => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLoading, setIsLoading] = useState(false);
+  const chatPercentWidth = 100 / playgroundStates.length;
 
   return (
     <Box
@@ -88,16 +89,8 @@ export const PlaygroundChat = ({
                 sx={{
                   position: 'absolute',
                   top: '8px',
-                  left:
-                    idx === 0
-                      ? '8px'
-                      : `calc(${(idx * 100) / playgroundStates.length}% + 8px)`,
-                  right:
-                    idx === playgroundStates.length - 1 ? '8px' : undefined,
-                  width:
-                    idx === playgroundStates.length - 1
-                      ? undefined
-                      : `calc(${100 / playgroundStates.length}% - 16px)`,
+                  left: `calc(${idx * chatPercentWidth}% + 8px)`,
+                  width: `calc(${chatPercentWidth}% - 16px)`,
                   zIndex: 10,
                 }}>
                 <PlaygroundChatTopBar

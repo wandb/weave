@@ -34,6 +34,8 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   setPlaygroundStates,
 }) => {
   const history = useHistory();
+  const isLastChat = idx === playgroundStates.length - 1;
+  const onlyOneChat = playgroundStates.length === 1;
 
   const clearCall = (index: number) => {
     history.push(`/${entity}/${project}/weave/playground`);
@@ -47,7 +49,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   };
 
   const handleCompare = () => {
-    if (playgroundStates.length < 2) {
+    if (onlyOneChat) {
       setPlaygroundStates([
         ...playgroundStates,
         JSON.parse(JSON.stringify(playgroundStates[0])),
@@ -70,7 +72,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           alignItems: 'center',
           backgroundColor: 'white',
         }}>
-        {playgroundStates.length > 1 && <Tag label={`${idx + 1}`} />}
+        {!onlyOneChat && <Tag label={`${idx + 1}`} />}
         {playgroundStates[idx].traceCall?.id && (
           <CopyableId id={playgroundStates[idx]!.traceCall!.id!} type="Call" />
         )}
@@ -89,7 +91,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           variant="ghost"
           onClick={() => clearCall(idx)}
         />
-        {playgroundStates.length < 2 ? (
+        {onlyOneChat ? (
           <Button
             tooltip={'Add chat'}
             endIcon="swap"
@@ -115,7 +117,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
             Remove
           </Button>
         )}
-        {idx === playgroundStates.length - 1 && (
+        {isLastChat && (
           <Button
             tooltip={'Chat settings'}
             icon="settings-parameters"
