@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 from weave.trace_server.interface.base_object_classes import base_object_def
 
 
-class LlmJudgeActionSpec(BaseModel):
+class LlmJudgeActionConfig(BaseModel):
     action_type: Literal["llm_judge"] = "llm_judge"
     # TODO: Remove this restriction (probably after initial release. We need to cross
     # reference which LiteLLM models support structured outputs)
@@ -15,19 +15,19 @@ class LlmJudgeActionSpec(BaseModel):
     response_schema: dict[str, Any]
 
 
-class ContainsWordsActionSpec(BaseModel):
+class ContainsWordsActionConfig(BaseModel):
     action_type: Literal["contains_words"] = "contains_words"
     target_words: list[str]
 
 
-ActionSpecType = Union[
-    LlmJudgeActionSpec,
-    ContainsWordsActionSpec,
+ActionConfigType = Union[
+    LlmJudgeActionConfig,
+    ContainsWordsActionConfig,
 ]
 
 
-class ActionDefinition(base_object_def.BaseObject):
-    spec: ActionSpecType = Field(..., discriminator="action_type")
+class ActionSpec(base_object_def.BaseObject):
+    config: ActionConfigType = Field(..., discriminator="action_type")
 
     # This is needed because the name field is optional in the base class, but required
     # in the derived class. Pyright doesn't like having a stricter type
