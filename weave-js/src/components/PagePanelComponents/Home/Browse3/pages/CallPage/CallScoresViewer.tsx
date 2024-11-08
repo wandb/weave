@@ -20,6 +20,9 @@ import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
+
+const RUNNABLE_REF_PREFIX = 'wandb.runnable';
+
 // New RunButton component
 const RunButton: React.FC<{
   actionRef: string;
@@ -96,7 +99,7 @@ export const CallScoresViewer: React.FC<{
     return _.fromPairs(
       actionDefinitions.map(actionDefinition => {
         return [
-          'wandb.runnable.' + actionDefinition.object_id,
+          RUNNABLE_REF_PREFIX + '.' + actionDefinition.object_id,
           objectVersionKeyToRefUri({
             scheme: WEAVE_REF_SCHEME,
             weaveKind: 'object',
@@ -114,7 +117,7 @@ export const CallScoresViewer: React.FC<{
   const runnableFeedbacks: Feedback[] = useMemo(() => {
     return (feedbackQuery.result ?? []).filter(
       f =>
-        f.feedback_type?.startsWith('wandb.runnable') && f.runnable_ref !== null
+        f.feedback_type?.startsWith(RUNNABLE_REF_PREFIX) && f.runnable_ref !== null
     );
   }, [feedbackQuery.result]);
 
@@ -135,7 +138,7 @@ export const CallScoresViewer: React.FC<{
     const additionalRows = actionDefinitions
       .map(actionDefinition => {
         return {
-          id: 'wandb.runnable.' + actionDefinition.object_id,
+          id: RUNNABLE_REF_PREFIX + '.' + actionDefinition.object_id,
           feedback: null,
           runCount: 0,
         };
@@ -152,7 +155,7 @@ export const CallScoresViewer: React.FC<{
       headerName: 'Scorer',
       width: 150,
       renderCell: params => {
-        return params.row.id.split('.').pop();
+        return params.row.id.slice(RUNNABLE_REF_PREFIX.length + 1);
       },
     },
     {
