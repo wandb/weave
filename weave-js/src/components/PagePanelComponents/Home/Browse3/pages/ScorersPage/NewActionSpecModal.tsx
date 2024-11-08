@@ -10,23 +10,23 @@ import React, {FC, useEffect, useState} from 'react';
 import {DynamicConfigForm} from '../../DynamicConfigForm';
 import {ReusableDrawer} from '../../ReusableDrawer';
 import {
-  ActionDefinition,
-  ActionDefinitionSchema,
+  ActionSpec,
+  ActionSpecSchema,
   ActionType,
 } from '../wfReactInterface/generatedBaseObjectClasses.zod';
-import {actionDefinitionConfigurationSpecs} from './actionDefinitionConfigurationSpecs';
+import {actionSpecConfigurationSpecs} from './actionSpecConfigurations';
 
-interface NewActionDefinitionModalProps {
+interface NewActionSpecModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (newAction: ActionDefinition) => void;
+  onSave: (newAction: ActionSpec) => void;
   initialTemplate?: {
     actionType: ActionType;
     template: {name: string; config: Record<string, any>};
   } | null;
 }
 
-export const NewActionDefinitionModal: FC<NewActionDefinitionModalProps> = ({
+export const NewActionSpecModal: FC<NewActionSpecModalProps> = ({
   open,
   onClose,
   onSave,
@@ -36,8 +36,8 @@ export const NewActionDefinitionModal: FC<NewActionDefinitionModalProps> = ({
   const [selectedActionType, setSelectedActionType] =
     useState<ActionType>('llm_judge');
   const [config, setConfig] = useState<Record<string, any>>({});
-  const selectedActionDefinitionConfigurationSpec =
-    actionDefinitionConfigurationSpecs[selectedActionType];
+  const selectedActionSpecConfigurationSpec =
+    actionSpecConfigurationSpecs[selectedActionType];
 
   useEffect(() => {
     if (initialTemplate) {
@@ -51,12 +51,12 @@ export const NewActionDefinitionModal: FC<NewActionDefinitionModalProps> = ({
   }, [initialTemplate]);
 
   const handleSave = () => {
-    if (!selectedActionDefinitionConfigurationSpec) {
+    if (!selectedActionSpecConfigurationSpec) {
       return;
     }
-    const newAction = ActionDefinitionSchema.parse({
+    const newAction = ActionSpecSchema.parse({
       name,
-      spec: selectedActionDefinitionConfigurationSpec.convert(config as any),
+      config: selectedActionSpecConfigurationSpec.convert(config as any),
     });
     onSave(newAction);
     setConfig({});
@@ -85,7 +85,7 @@ export const NewActionDefinitionModal: FC<NewActionDefinitionModalProps> = ({
         <Select
           value={selectedActionType}
           onChange={e => setSelectedActionType(e.target.value as ActionType)}>
-          {Object.entries(actionDefinitionConfigurationSpecs).map(
+          {Object.entries(actionSpecConfigurationSpecs).map(
             ([actionType, spec], ndx) => (
               <MenuItem key={actionType} value={actionType}>
                 {spec.name}
@@ -94,11 +94,9 @@ export const NewActionDefinitionModal: FC<NewActionDefinitionModalProps> = ({
           )}
         </Select>
       </FormControl>
-      {selectedActionDefinitionConfigurationSpec && (
+      {selectedActionSpecConfigurationSpec && (
         <DynamicConfigForm
-          configSchema={
-            selectedActionDefinitionConfigurationSpec.inputFriendlySchema
-          }
+          configSchema={selectedActionSpecConfigurationSpec.inputFriendlySchema}
           config={config}
           setConfig={setConfig}
           onValidChange={setIsValid}

@@ -20,7 +20,6 @@ import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
-
 const RUNNABLE_REF_PREFIX = 'wandb.runnable';
 
 // New RunButton component
@@ -85,8 +84,8 @@ export const CallScoresViewer: React.FC<{
     weaveRef,
   });
 
-  const actionDefinitions = (
-    useBaseObjectInstances('ActionDefinition', {
+  const actionSpecs = (
+    useBaseObjectInstances('ActionSpec', {
       project_id: projectIdFromParts({
         entity: props.call.entity,
         project: props.call.project,
@@ -97,27 +96,28 @@ export const CallScoresViewer: React.FC<{
 
   const actionRunnableRefs = useMemo(() => {
     return _.fromPairs(
-      actionDefinitions.map(actionDefinition => {
+      actionSpecs.map(actionSpec => {
         return [
-          RUNNABLE_REF_PREFIX + '.' + actionDefinition.object_id,
+          RUNNABLE_REF_PREFIX + '.' + actionSpec.object_id,
           objectVersionKeyToRefUri({
             scheme: WEAVE_REF_SCHEME,
             weaveKind: 'object',
             entity: props.call.entity,
             project: props.call.project,
-            objectId: actionDefinition.object_id,
-            versionHash: actionDefinition.digest,
+            objectId: actionSpec.object_id,
+            versionHash: actionSpec.digest,
             path: '',
           }),
         ];
       })
     );
-  }, [actionDefinitions, props.call.entity, props.call.project]);
+  }, [actionSpecs, props.call.entity, props.call.project]);
 
   const runnableFeedbacks: Feedback[] = useMemo(() => {
     return (feedbackQuery.result ?? []).filter(
       f =>
-        f.feedback_type?.startsWith(RUNNABLE_REF_PREFIX) && f.runnable_ref !== null
+        f.feedback_type?.startsWith(RUNNABLE_REF_PREFIX) &&
+        f.runnable_ref !== null
     );
   }, [feedbackQuery.result]);
 
@@ -135,19 +135,19 @@ export const CallScoresViewer: React.FC<{
   }, [runnableFeedbacks]);
 
   const rows = useMemo(() => {
-    const additionalRows = actionDefinitions
-      .map(actionDefinition => {
+    const additionalRows = actionSpecs
+      .map(actionSpec => {
         return {
-          id: RUNNABLE_REF_PREFIX + '.' + actionDefinition.object_id,
+          id: RUNNABLE_REF_PREFIX + '.' + actionSpec.object_id,
           feedback: null,
           runCount: 0,
         };
       })
       .filter(row => !scoredRows.some(r => r.id === row.id));
     return _.sortBy([...scoredRows, ...additionalRows], s => s.id);
-  }, [actionDefinitions, scoredRows]);
+  }, [actionSpecs, scoredRows]);
 
-  console.log('actionDefinitions', actionDefinitions);
+  console.log('actionSpecs', actionSpecs);
 
   const columns: Array<GridColDef<(typeof rows)[number]>> = [
     {

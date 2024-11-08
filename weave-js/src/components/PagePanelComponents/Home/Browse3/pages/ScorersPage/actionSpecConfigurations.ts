@@ -1,5 +1,5 @@
 /**
- * This file contains the definition of `actionDefinitionConfigurationSpecs` which
+ * This file contains the definition of `actionSpecConfigurationSpecs` which
  * is a mapping from action type to the specification of the configuration schema
  * for that action.
  *
@@ -41,7 +41,7 @@ const ConfiguredLlmJudgeActionFriendlySchema = z.object({
 
 // End of `ConfiguredLlmJudgeActionFriendlySchema`
 
-type actionDefinitionConfigurationSpec<
+type actionSpecConfigurationSpec<
   A extends z.ZodTypeAny = z.ZodTypeAny,
   F extends z.ZodTypeAny = z.ZodTypeAny
 > = {
@@ -55,8 +55,8 @@ type actionDefinitionConfigurationSpec<
   }>;
 };
 
-export const actionDefinitionConfigurationSpecs: Partial<
-  Record<ActionType, actionDefinitionConfigurationSpec>
+export const actionSpecConfigurationSpecs: Partial<
+  Record<ActionType, actionSpecConfigurationSpec>
 > = {
   llm_judge: {
     name: 'LLM Judge',

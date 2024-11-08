@@ -8,12 +8,12 @@ import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
 import {useCreateBaseObjectInstance} from '../wfReactInterface/baseObjectClassQuery';
 import {
-  ActionDefinition,
+  ActionSpec,
   ActionType,
 } from '../wfReactInterface/generatedBaseObjectClasses.zod';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
-import {actionDefinitionConfigurationSpecs} from './actionDefinitionConfigurationSpecs';
-import {NewActionDefinitionModal} from './NewActionDefinitionModal';
+import {actionSpecConfigurationSpecs} from './actionSpecConfigurations';
+import {NewActionSpecModal} from './NewActionSpecModal';
 
 export const ScorersPage: React.FC<{
   entity: string;
@@ -36,7 +36,7 @@ export const ScorersPage: React.FC<{
           // It is true that this panel can show more than LLM Judges, but the
           // branding is better
           label: 'Configurable Judges',
-          content: <ActionDefinitionsTab entity={entity} project={project} />,
+          content: <ActionSpecsTab entity={entity} project={project} />,
         },
       ]}
       headerContent={undefined}
@@ -59,7 +59,7 @@ const CodeScorersTab: React.FC<{
   );
 };
 
-const ActionDefinitionsTab: React.FC<{
+const ActionSpecsTab: React.FC<{
   entity: string;
   project: string;
 }> = ({entity, project}) => {
@@ -68,8 +68,7 @@ const ActionDefinitionsTab: React.FC<{
     actionType: ActionType;
     template: {name: string; config: Record<string, any>};
   } | null>(null);
-  const createCollectionObject =
-    useCreateBaseObjectInstance('ActionDefinition');
+  const createCollectionObject = useCreateBaseObjectInstance('ActionSpec');
   const [lastUpdatedTimestamp, setLastUpdatedTimestamp] = useState(0);
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
@@ -102,7 +101,7 @@ const ActionDefinitionsTab: React.FC<{
     setSelectedTemplate(null);
   };
 
-  const handleSaveModal = (newAction: ActionDefinition) => {
+  const handleSaveModal = (newAction: ActionSpec) => {
     let objectId = newAction.name;
     // Remove non alphanumeric characters
     // TODO: reconcile this null-name issue
@@ -159,7 +158,7 @@ const ActionDefinitionsTab: React.FC<{
           />
         </Box>
         <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
-          {Object.entries(actionDefinitionConfigurationSpecs).flatMap(
+          {Object.entries(actionSpecConfigurationSpecs).flatMap(
             ([actionType, spec]) =>
               spec.templates.map(template => (
                 <MenuItem
@@ -181,10 +180,10 @@ const ActionDefinitionsTab: React.FC<{
         entity={entity}
         project={project}
         initialFilter={{
-          baseObjectClass: 'ActionDefinition',
+          baseObjectClass: 'ActionSpec',
         }}
       />
-      <NewActionDefinitionModal
+      <NewActionSpecModal
         open={isModalOpen}
         onClose={handleCloseModal}
         onSave={handleSaveModal}

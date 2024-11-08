@@ -171,7 +171,7 @@ export const FilterableObjectVersionsTable: React.FC<{
       propsEmpty = EMPTY_PROPS_LEADERBOARDS;
     } else if (base === 'Scorer') {
       propsEmpty = EMPTY_PROPS_PROGRAMATIC_SCORERS;
-    } else if (base === 'ActionDefinition') {
+    } else if (base === 'ActionSpec') {
       propsEmpty = EMPTY_PROPS_ACTION_DEFINITIONS;
     }
     return <Empty {...propsEmpty} />;
