@@ -18,6 +18,7 @@ import {ReactComponent as ImportBookDictionary} from '../../assets/icons/icon-bo
 import {ReactComponent as ImportBoolean} from '../../assets/icons/icon-boolean.svg';
 import {ReactComponent as ImportBoxPlot} from '../../assets/icons/icon-box-plot.svg';
 import {ReactComponent as ImportBug} from '../../assets/icons/icon-bug.svg';
+import {ReactComponent as ImportBuzzBot10} from '../../assets/icons/icon-buzz-bot10.svg';
 import {ReactComponent as ImportCategoryMultimodal} from '../../assets/icons/icon-category-multimodal.svg';
 import {ReactComponent as ImportChartHorizontalBars} from '../../assets/icons/icon-chart-horizontal-bars.svg';
 import {ReactComponent as ImportChartPie} from '../../assets/icons/icon-chart-pie.svg';
@@ -323,6 +324,9 @@ export const IconBoxPlot = (props: SVGIconProps) => (
 );
 export const IconBug = (props: SVGIconProps) => (
   <ImportBug {...updateIconProps(props)} />
+);
+export const IconBuzzBot10 = (props: SVGIconProps) => (
+  <ImportBuzzBot10 {...updateIconProps(props)} />
 );
 export const IconCategoryMultimodal = (props: SVGIconProps) => (
   <ImportCategoryMultimodal {...updateIconProps(props)} />
@@ -1058,6 +1062,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   boolean: IconBoolean,
   'box-plot': IconBoxPlot,
   bug: IconBug,
+  'buzz-bot10': IconBuzzBot10,
   'category-multimodal': IconCategoryMultimodal,
   'chart-horizontal-bars': IconChartHorizontalBars,
   'chart-pie': IconChartPie,

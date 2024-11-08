@@ -94,6 +94,7 @@ import {OpPage} from './Browse3/pages/OpPage';
 import {OpsPage} from './Browse3/pages/OpsPage';
 import {OpVersionPage} from './Browse3/pages/OpVersionPage';
 import {OpVersionsPage} from './Browse3/pages/OpVersionsPage';
+import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
@@ -522,6 +523,14 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/tables`}>
           <TablesPageBinding />
+        </Route>
+        {/* PLAYGROUND */}
+        <Route
+          path={[
+            `${projectRoot}/playground/:itemName`,
+            `${projectRoot}/playground`,
+          ]}>
+          <PlaygroundPageBinding />
         </Route>
       </Switch>
     </Box>
@@ -1034,6 +1043,17 @@ const AppBarLink = (props: ComponentProps<typeof RouterLink>) => (
     component={RouterLink}
   />
 );
+
+const PlaygroundPageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+  return (
+    <PlaygroundPage
+      entity={params.entity}
+      project={params.project}
+      callId={params.itemName}
+    />
+  );
+};
 
 const Browse3Breadcrumbs: FC = props => {
   const params = useParamsDecoded<Browse3Params>();
