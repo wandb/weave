@@ -469,9 +469,16 @@ export const useCallFlattenedTraceTree = (
         childCallLookup
       );
       pathPrefix = updatePath(pathPrefix, currentCall.spanName, idx);
-      currentCall = currentCall.parentId
-        ? traceCallMap[currentCall.parentId]
-        : null;
+      if (currentCall.parentId) {
+        if (!traceCallMap[currentCall.parentId]) {
+          // Cant find parent, assume it doesn't exist
+          currentCall.parentId = null;
+        } else {
+          currentCall = traceCallMap[currentCall.parentId];
+        }
+      } else {
+        currentCall = null;
+      }
     }
 
     // Add a parent row
