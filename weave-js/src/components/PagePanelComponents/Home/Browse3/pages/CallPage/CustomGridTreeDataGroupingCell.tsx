@@ -1,20 +1,20 @@
-import { ExpandMore, KeyboardArrowRight } from '@mui/icons-material';
-import { ButtonProps } from '@mui/material';
+import {ExpandMore, KeyboardArrowRight} from '@mui/icons-material';
+import {ButtonProps} from '@mui/material';
 import Box from '@mui/material/Box';
 import MuiButton from '@mui/material/Button';
-import { GridRenderCellParams, useGridApiContext } from '@mui/x-data-grid-pro';
+import {GridRenderCellParams, useGridApiContext} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, { FC, MouseEvent, useMemo } from 'react';
+import React, {FC, MouseEvent, useMemo} from 'react';
 import styled from 'styled-components';
 
-import { MOON_500 } from '../../../../../../common/css/color.styles';
-import { IconParentBackUp } from '../../../../../Icon';
-import { Tooltip } from '../../../../../Tooltip';
-import { opNiceName } from '../common/Links';
-import { StatusChip } from '../common/StatusChip';
-import { CallSchema } from '../wfReactInterface/wfDataModelHooksInterface';
-import { TraceCostStats } from './cost/TraceCostStats';
-import { CursorBox } from './CursorBox';
+import {MOON_500} from '../../../../../../common/css/color.styles';
+import {IconParentBackUp} from '../../../../../Icon';
+import {Tooltip} from '../../../../../Tooltip';
+import {opNiceName} from '../common/Links';
+import {StatusChip} from '../common/StatusChip';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {TraceCostStats} from './cost/TraceCostStats';
+import {CursorBox} from './CursorBox';
 
 const INSET_SPACING = 54;
 const TREE_COLOR = '#aaaeb2';
@@ -42,7 +42,6 @@ export const CustomGridTreeDataGroupingCell: FC<
     costLoading: boolean;
   }
 > = props => {
-  console.log('CustomGridTreeDataGroupingCell', props);
   const {id, field, rowNode, row} = props;
   const {isParentRow} = row;
   const call = row.call as CallSchema | undefined;
@@ -61,10 +60,6 @@ export const CustomGridTreeDataGroupingCell: FC<
 
     event.stopPropagation();
   };
-
-  if (call == null) {
-    return <div></div>;
-  }
 
   const hasCountRow = apiRef.current.getRowNode('HIDDEN_SIBLING_COUNT') != null;
   const isLastChild = useMemo(() => {
@@ -94,6 +89,10 @@ export const CustomGridTreeDataGroupingCell: FC<
   ) : null;
 
   const isHiddenCount = id === 'HIDDEN_SIBLING_COUNT';
+
+  if (call == null) {
+    return <div />;
+  }
 
   const box = (
     <CursorBox
