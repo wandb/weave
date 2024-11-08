@@ -6,10 +6,6 @@ import {Tag} from '@wandb/weave/components/Tag';
 import React, {SetStateAction} from 'react';
 
 import {PlaygroundState, PlaygroundStateKey} from '../types';
-// import {FunctionEditor} from './FunctionEditor';
-// import {PlaygroundSlider} from './PlaygroundSlider';
-// import {ResponseFormatEditor} from './ResponseFormatEditor';
-// import {StopSequenceEditor} from './StopSequenceEditor';
 
 export type PlaygroundSettingsProps = {
   playgroundStates: PlaygroundState[];
