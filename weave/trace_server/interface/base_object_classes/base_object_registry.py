@@ -1,6 +1,6 @@
 from weave.trace_server.interface.base_object_classes.actions import ActionDefinition
-from weave.trace_server.interface.base_object_classes.annotation_column import (
-    AnnotationColumn,
+from weave.trace_server.interface.base_object_classes.annotation_spec import (
+    AnnotationSpec,
 )
 from weave.trace_server.interface.base_object_classes.base_object_def import BaseObject
 from weave.trace_server.interface.base_object_classes.leaderboard import Leaderboard
@@ -26,4 +26,4 @@ register_base_object(TestOnlyExample)
 register_base_object(TestOnlyNestedBaseObject)
 register_base_object(Leaderboard)
 register_base_object(ActionDefinition)
-register_base_object(AnnotationColumn)
+register_base_object(AnnotationSpec)

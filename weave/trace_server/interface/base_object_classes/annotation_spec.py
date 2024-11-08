@@ -6,7 +6,7 @@ from pydantic import Field, field_validator
 from weave.trace_server.interface.base_object_classes import base_object_def
 
 
-class AnnotationColumn(base_object_def.BaseObject):
+class AnnotationSpec(base_object_def.BaseObject):
     json_schema: dict = Field(
         default={},
         description="Expected to be valid JSON Schema",

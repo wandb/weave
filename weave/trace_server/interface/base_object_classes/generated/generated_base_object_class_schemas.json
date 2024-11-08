@@ -51,32 +51,7 @@
       "title": "ActionDefinition",
       "type": "object"
     },
-    "ContainsWordsActionSpec": {
-      "properties": {
-        "action_type": {
-          "const": "contains_words",
-          "default": "contains_words",
-          "enum": [
-            "contains_words"
-          ],
-          "title": "Action Type",
-          "type": "string"
-        },
-        "target_words": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Target Words",
-          "type": "array"
-        }
-      },
-      "required": [
-        "target_words"
-      ],
-      "title": "ContainsWordsActionSpec",
-      "type": "object"
-    },
-    "HumanAnnotationColumn": {
+    "AnnotationSpec": {
       "properties": {
         "name": {
           "anyOf": [
@@ -103,6 +78,29 @@
           "title": "Description"
         },
         "json_schema": {
+          "default": {},
+          "description": "Expected to be valid JSON Schema",
+          "examples": [
+            {
+              "max_length": 100,
+              "type": "string"
+            },
+            {
+              "max": 100,
+              "min": 0,
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "options": [
+                "option1",
+                "option2"
+              ],
+              "type": "categorical"
+            }
+          ],
           "title": "Json Schema",
           "type": "object"
         },
@@ -124,13 +122,43 @@
             }
           ],
           "default": null,
+          "examples": [
+            [
+              "weave:///entity/project/op/name:digest"
+            ],
+            [
+              "weave:///entity/project/op/name:*"
+            ]
+          ],
           "title": "Op Scope"
         }
       },
+      "title": "AnnotationSpec",
+      "type": "object"
+    },
+    "ContainsWordsActionSpec": {
+      "properties": {
+        "action_type": {
+          "const": "contains_words",
+          "default": "contains_words",
+          "enum": [
+            "contains_words"
+          ],
+          "title": "Action Type",
+          "type": "string"
+        },
+        "target_words": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Target Words",
+          "type": "array"
+        }
+      },
       "required": [
-        "json_schema"
+        "target_words"
       ],
-      "title": "HumanAnnotationColumn",
+      "title": "ContainsWordsActionSpec",
       "type": "object"
     },
     "Leaderboard": {
@@ -354,8 +382,8 @@
     "ActionDefinition": {
       "$ref": "#/$defs/ActionDefinition"
     },
-    "HumanAnnotationColumn": {
-      "$ref": "#/$defs/HumanAnnotationColumn"
+    "AnnotationSpec": {
+      "$ref": "#/$defs/AnnotationSpec"
     }
   },
   "required": [
@@ -363,7 +391,7 @@
     "TestOnlyNestedBaseObject",
     "Leaderboard",
     "ActionDefinition",
-    "HumanAnnotationColumn"
+    "AnnotationSpec"
   ],
   "title": "CompositeBaseObject",
   "type": "object"
