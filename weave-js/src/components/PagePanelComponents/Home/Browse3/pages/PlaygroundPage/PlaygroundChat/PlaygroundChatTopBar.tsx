@@ -7,6 +7,7 @@ import {useHistory} from 'react-router-dom';
 import {CopyableId} from '../../common/Id';
 import {OptionalTraceCallSchema, PlaygroundState} from '../types';
 import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
+import {LLMDropdown} from './LLMDropdown';
 
 type PlaygroundChatTopBarProps = {
   idx: number;
@@ -57,6 +58,16 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
     }
   };
 
+  const handleModelChange = (
+    index: number,
+    model: string,
+    maxTokens: number
+  ) => {
+    setPlaygroundStateField(index, 'model', model);
+    setPlaygroundStateField(index, 'maxTokensLimit', maxTokens);
+    setPlaygroundStateField(index, 'maxTokens', maxTokens / 2);
+  };
+
   return (
     <Box
       sx={{
@@ -73,6 +84,12 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           backgroundColor: 'white',
         }}>
         {!onlyOneChat && <Tag label={`${idx + 1}`} />}
+        <LLMDropdown
+          value={playgroundStates[idx].model}
+          onChange={(model, maxTokens) =>
+            handleModelChange(idx, model, maxTokens)
+          }
+        />
         {playgroundStates[idx].traceCall?.id && (
           <CopyableId id={playgroundStates[idx]!.traceCall!.id!} type="Call" />
         )}
