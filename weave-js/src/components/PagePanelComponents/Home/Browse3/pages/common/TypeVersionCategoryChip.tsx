@@ -1,7 +1,7 @@
 import React from 'react';
 
-import {Pill, TagColorName} from '../../../../../Tag';
-import {KnownBaseObjectClassType} from '../wfReactInterface/wfDataModelHooksInterface';
+import { Pill, TagColorName } from '../../../../../Tag';
+import { KnownBaseObjectClassType } from '../wfReactInterface/wfDataModelHooksInterface';
 
 const colorMap: Record<KnownBaseObjectClassType, TagColorName> = {
   Prompt: 'purple',
@@ -9,6 +9,7 @@ const colorMap: Record<KnownBaseObjectClassType, TagColorName> = {
   Dataset: 'green',
   Evaluation: 'cactus',
   Leaderboard: 'gold',
+  Scorer: 'purple',
   AnnotationSpec: 'sienna',
 };
 

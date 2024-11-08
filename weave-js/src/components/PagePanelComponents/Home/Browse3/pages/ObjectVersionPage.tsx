@@ -1,18 +1,17 @@
 import Box from '@mui/material/Box';
-import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {useMemo} from 'react';
+import { useObjectViewEvent } from '@wandb/weave/integrations/analytics/useViewEvents';
+import React, { useMemo } from 'react';
 
-import {maybePluralizeWord} from '../../../../../core/util/string';
-import {BytesStoredInfoIcon} from '../../../../BytesStoredInfoIcon';
-import {Icon, IconName} from '../../../../Icon';
-import {LoadingDots} from '../../../../LoadingDots';
-import {Tailwind} from '../../../../Tailwind';
-import {Tooltip} from '../../../../Tooltip';
-import {NotFoundPanel} from '../NotFoundPanel';
-import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
-import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
-import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
-import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
+import { maybePluralizeWord } from '../../../../../core/util/string';
+import { Icon, IconName } from '../../../../Icon';
+import { LoadingDots } from '../../../../LoadingDots';
+import { Tailwind } from '../../../../Tailwind';
+import { Tooltip } from '../../../../Tooltip';
+import { NotFoundPanel } from '../NotFoundPanel';
+import { CustomWeaveTypeProjectContext } from '../typeViews/CustomWeaveTypeDispatcher';
+import { WeaveCHTableSourceRefContext } from './CallPage/DataTableView';
+import { ObjectViewerSection } from './CallPage/ObjectViewerSection';
+import { WFHighLevelCallFilter } from './CallsPage/callsTableFilter';
 import {
   CallLink,
   CallsLink,
@@ -20,20 +19,20 @@ import {
   objectVersionText,
   OpVersionLink,
 } from './common/Links';
-import {CenteredAnimatedLoader} from './common/Loader';
+import { CenteredAnimatedLoader } from './common/Loader';
 import {
   ScrollableTabContent,
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
-import {EvaluationLeaderboardTab} from './LeaderboardTab';
-import {TabPrompt} from './TabPrompt';
-import {TabUseDataset} from './TabUseDataset';
-import {TabUseModel} from './TabUseModel';
-import {TabUseObject} from './TabUseObject';
-import {TabUsePrompt} from './TabUsePrompt';
-import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
-import {useWFHooks} from './wfReactInterface/context';
+import { EvaluationLeaderboardTab } from './LeaderboardTab';
+import { TabPrompt } from './TabPrompt';
+import { TabUseDataset } from './TabUseDataset';
+import { TabUseModel } from './TabUseModel';
+import { TabUseObject } from './TabUseObject';
+import { TabUsePrompt } from './TabUsePrompt';
+import { KNOWN_BASE_OBJECT_CLASSES } from './wfReactInterface/constants';
+import { useWFHooks } from './wfReactInterface/context';
 import {
   objectVersionKeyToRefUri,
   refUriToOpVersionKey,
@@ -53,6 +52,7 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Dataset: 'table',
   Evaluation: 'baseline-alt',
   Leaderboard: 'benchmark-square',
+  Scorer: 'type-number-alt',
   AnnotationSpec: 'forum-chat-bubble',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
@@ -193,11 +193,6 @@ const ObjectVersionPageInner: React.FC<{
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
 
-  const bytesStored = useMemo(
-    () => (data.result?.[0] ? JSON.stringify(data.result?.[0]).length : 0),
-    [data.result]
-  );
-
   if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;
   }
@@ -246,18 +241,6 @@ const ObjectVersionPageInner: React.FC<{
                   Subpath: refExtra,
                 }
               : {}),
-            'Bytes stored': (
-              <>
-                {data.loading ? (
-                  <LoadingDots />
-                ) : (
-                  <BytesStoredInfoIcon
-                    bytesStored={bytesStored}
-                    weaveKind="object"
-                  />
-                )}
-              </>
-            ),
             // 'Type Version': (
             //   <TypeVersionLink
             //     entityName={entityName}
