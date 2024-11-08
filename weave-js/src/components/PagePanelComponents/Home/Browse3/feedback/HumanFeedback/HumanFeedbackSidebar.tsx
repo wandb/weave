@@ -1,15 +1,15 @@
-import { useViewerInfo } from '@wandb/weave/common/hooks/useViewerInfo';
-import { Button } from '@wandb/weave/components/Button';
-import { parseRef } from '@wandb/weave/react';
-import { makeRefCall } from '@wandb/weave/util/refs';
-import React, { useEffect, useState } from 'react';
+import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
+import {Button} from '@wandb/weave/components/Button';
+import {parseRef} from '@wandb/weave/react';
+import {makeRefCall} from '@wandb/weave/util/refs';
+import React, {useEffect, useState} from 'react';
 
-import { Icon } from '../../../../../Icon';
-import { useCreateBaseObjectInstance } from '../../pages/wfReactInterface/baseObjectClassQuery';
-import { projectIdFromParts } from '../../pages/wfReactInterface/tsDataModelHooks';
-import { ConfigureHumanFeedback } from './ConfigureHumanFeedback';
-import { HumanFeedbackCell, waitForPendingFeedback } from './HumanFeedback';
-import { tsHumanAnnotationColumn } from './humanFeedbackTypes';
+import {Icon} from '../../../../../Icon';
+import {useCreateBaseObjectInstance} from '../../pages/wfReactInterface/baseObjectClassQuery';
+import {projectIdFromParts} from '../../pages/wfReactInterface/tsDataModelHooks';
+import {ConfigureHumanFeedback} from './ConfigureHumanFeedback';
+import {HumanFeedbackCell, waitForPendingFeedback} from './HumanFeedback';
+import {tsHumanAnnotationColumn} from './humanFeedbackTypes';
 
 type HumanFeedbackSidebarProps = {
   feedbackColumns: tsHumanAnnotationColumn[];
@@ -28,9 +28,7 @@ export const HumanFeedbackSidebar = ({
 }: HumanFeedbackSidebarProps) => {
   const callRef = makeRefCall(entity, project, callID);
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const createHumanFeedback = useCreateBaseObjectInstance(
-    'HumanAnnotationColumn'
-  );
+  const createHumanFeedback = useCreateBaseObjectInstance('AnnotationColumn');
   // Initialize column visibility model with all columns enabled
   const [columnVisibilityModel, setColumnVisibilityModel] = useState<
     Record<string, boolean>
@@ -124,11 +122,11 @@ export const HumanFeedbackSidebar = ({
             <div>
               {sortedVisibleColumns?.map((field, index) => (
                 <div key={field.ref}>
-                  <div className="bg-gray-50 text-md px-6 py-0 font-semibold">
+                  <div className="bg-gray-50 text-md px-6 font-semibold">
                     {field.name}
                   </div>
                   {field.description && (
-                    <div className="bg-gray-50 font-italic px-6 py-4 text-sm text-moon-700 ">
+                    <div className="bg-gray-50 font-italic mt-4 px-6 text-sm text-moon-700 ">
                       {field.description}
                     </div>
                   )}

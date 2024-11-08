@@ -1,17 +1,17 @@
-import { Popover } from '@mui/material';
-import { Switch } from '@wandb/weave/components';
-import { Button } from '@wandb/weave/components/Button';
-import { CodeEditor } from '@wandb/weave/components/CodeEditor';
+import {Popover} from '@mui/material';
+import {Switch} from '@wandb/weave/components';
+import {Button} from '@wandb/weave/components/Button';
+import {CodeEditor} from '@wandb/weave/components/CodeEditor';
 import {
   DraggableGrow,
   DraggableHandle,
 } from '@wandb/weave/components/DraggablePopups';
-import { TextField } from '@wandb/weave/components/Form/TextField';
-import { Tailwind } from '@wandb/weave/components/Tailwind';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {TextField} from '@wandb/weave/components/Form/TextField';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 
-import { TraceObjCreateRes } from '../../pages/wfReactInterface/traceServerClientTypes';
-import { tsHumanAnnotationColumn } from './humanFeedbackTypes';
+import {TraceObjCreateRes} from '../../pages/wfReactInterface/traceServerClientTypes';
+import {tsHumanAnnotationColumn} from './humanFeedbackTypes';
 
 type ConfigureHumanFeedbackProps = {
   columnVisibilityModel: Record<string, boolean>;
@@ -81,15 +81,15 @@ export const ConfigureHumanFeedback: React.FC<ConfigureHumanFeedbackProps> = ({
       return;
     }
     onSaveColumn(updatedColumn)
-        .then(() => {
-            setEditing({isEditing: false, column: null, jsonSchema: '', error: ''})
-        })
-        .catch((e) => {
-            setEditing({
-                ...editing,
-                error: e.toString()
-            })
+      .then(() => {
+        setEditing({isEditing: false, column: null, jsonSchema: '', error: ''});
+      })
+      .catch(e => {
+        setEditing({
+          ...editing,
+          error: e.toString(),
         });
+      });
   };
 
   // Listen to changes in the code editor

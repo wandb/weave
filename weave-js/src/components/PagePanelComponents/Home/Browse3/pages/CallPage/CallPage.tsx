@@ -182,7 +182,8 @@ const CallPageInnerVertical: FC<{
 
   const [showFeedbackExpand, setShowFeedbackExpand] = useState(false);
   const onToggleFeedbackExpand = useCallback(() => {
-    setShowFeedbackExpand(!showFeedbackExpand);
+    const curShowFeedbackExpand = showFeedbackExpand;
+    setShowFeedbackExpand(!curShowFeedbackExpand);
     history.replace(
       currentRouter.callUIUrl(
         call.entity,
@@ -191,7 +192,7 @@ const CallPageInnerVertical: FC<{
         call.callId,
         path,
         showTraceTree,
-        !showFeedbackExpand
+        !curShowFeedbackExpand
       )
     );
   }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
