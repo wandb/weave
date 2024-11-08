@@ -95,6 +95,7 @@ import {OpsPage} from './Browse3/pages/OpsPage';
 import {OpVersionPage} from './Browse3/pages/OpVersionPage';
 import {OpVersionsPage} from './Browse3/pages/OpVersionsPage';
 import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
+import {ScorersPage} from './Browse3/pages/ScorersPage/ScorersPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
@@ -157,6 +158,7 @@ const tabOptions = [
   'leaderboards',
   'boards',
   'tables',
+  'scorers',
 ];
 const tabs = tabOptions.join('|');
 const browse3Paths = (projectRoot: string) => [
@@ -497,6 +499,9 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
+        </Route>
+        <Route path={`${projectRoot}/:tab(scorers)`}>
+          <ScorersPageBinding />
         </Route>
         <Route
           path={[
@@ -992,6 +997,11 @@ const CompareEvaluationsBinding = () => {
       setSelectedMetrics={setSelectedMetrics}
     />
   );
+};
+
+const ScorersPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  return <ScorersPage entity={entity} project={project} />;
 };
 
 const LeaderboardPageBinding = () => {
