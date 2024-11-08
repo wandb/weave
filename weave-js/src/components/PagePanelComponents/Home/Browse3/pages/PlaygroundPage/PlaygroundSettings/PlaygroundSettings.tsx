@@ -36,9 +36,9 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
         borderLeft: `1px solid ${MOON_250}`,
         display: 'flex',
         flexDirection: 'column',
-        width: '400px',
-        minWidth: '260px',
+        width: '320px',
         overflowY: 'scroll',
+        flexShrink: 0,
       }}>
       <Tabs.Root value={settingsTab.toString()}>
         <Tabs.List>
@@ -49,7 +49,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
               onClick={() => setSettingsTab(idx)}
               className="max-w-[120px]">
               {playgroundStates.length > 1 && <Tag label={`${idx + 1}`} />}
-              <span className=" truncate">{state.model}</span>
+              <span className="truncate">{state.model}</span>
             </Tabs.Trigger>
           ))}
         </Tabs.List>

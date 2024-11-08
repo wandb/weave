@@ -44,6 +44,8 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
     setPlaygroundStateField(index, 'maxTokensLimit', maxTokens);
     setPlaygroundStateField(index, 'maxTokens', maxTokens / 2);
   };
+  const isLastChat = idx === playgroundStates.length - 1;
+  const onlyOneChat = playgroundStates.length === 1;
 
   const clearCall = (index: number) => {
     history.push(`/${entity}/${project}/weave/playground`);
@@ -57,8 +59,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   };
 
   const handleCompare = () => {
-    if (playgroundStates.length < 2) {
-      //   setCalls([calls[0], JSON.parse(JSON.stringify(calls[0]))]);
+    if (onlyOneChat) {
       setPlaygroundStates([
         ...playgroundStates,
         JSON.parse(JSON.stringify(playgroundStates[0])),
@@ -81,7 +82,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           alignItems: 'center',
           backgroundColor: 'white',
         }}>
-        {playgroundStates.length > 1 && <Tag label={`${idx + 1}`} />}
+        {!onlyOneChat && <Tag label={`${idx + 1}`} />}
         <LLMDropdown
           value={playgroundStates[idx].model}
           onChange={(model, maxTokens) =>
@@ -106,7 +107,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           variant="ghost"
           onClick={() => clearCall(idx)}
         />
-        {playgroundStates.length < 2 ? (
+        {onlyOneChat ? (
           <Button
             tooltip={'Add chat'}
             endIcon="swap"
@@ -125,7 +126,6 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
               if (settingsTab === idx) {
                 setSettingsTab(0);
               }
-              //   setCalls(calls.filter((_, index) => index !== idx));
               setPlaygroundStates(
                 playgroundStates.filter((_, index) => index !== idx)
               );
@@ -133,7 +133,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
             Remove
           </Button>
         )}
-        {idx === playgroundStates.length - 1 && (
+        {isLastChat && (
           <Button
             tooltip={'Chat settings'}
             icon="settings-parameters"
