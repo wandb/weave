@@ -35,15 +35,6 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   setPlaygroundStates,
 }) => {
   const history = useHistory();
-  const handleModelChange = (
-    index: number,
-    model: string,
-    maxTokens: number
-  ) => {
-    setPlaygroundStateField(index, 'model', model);
-    setPlaygroundStateField(index, 'maxTokensLimit', maxTokens);
-    setPlaygroundStateField(index, 'maxTokens', maxTokens / 2);
-  };
   const isLastChat = idx === playgroundStates.length - 1;
   const onlyOneChat = playgroundStates.length === 1;
 
@@ -65,6 +56,16 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
         JSON.parse(JSON.stringify(playgroundStates[0])),
       ]);
     }
+  };
+
+  const handleModelChange = (
+    index: number,
+    model: string,
+    maxTokens: number
+  ) => {
+    setPlaygroundStateField(index, 'model', model);
+    setPlaygroundStateField(index, 'maxTokensLimit', maxTokens);
+    setPlaygroundStateField(index, 'maxTokens', maxTokens / 2);
   };
 
   return (

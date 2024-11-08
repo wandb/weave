@@ -31,6 +31,7 @@ export const PlaygroundPage = (props: PlaygroundPageProps) => {
 
 export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
   const {
+    setPlaygroundStates,
     playgroundStates,
     setPlaygroundStates,
     setPlaygroundStateField,
