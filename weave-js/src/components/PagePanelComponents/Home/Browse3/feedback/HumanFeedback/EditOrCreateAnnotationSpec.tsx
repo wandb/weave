@@ -3,28 +3,40 @@ import {Button} from '@wandb/weave/components/Button';
 import {CodeEditor} from '@wandb/weave/components/CodeEditor';
 import {DraggableHandle} from '@wandb/weave/components/DraggablePopups';
 import {TextField} from '@wandb/weave/components/Form/TextField';
-import React, {useEffect} from 'react';
+import {parseRef} from '@wandb/weave/react';
+import React, {useEffect, useState} from 'react';
 
+import {useCreateBaseObjectInstance} from '../../pages/wfReactInterface/baseObjectClassQuery';
 import {AnnotationSpec} from '../../pages/wfReactInterface/generatedBaseObjectClasses.zod';
-import {TraceObjCreateRes} from '../../pages/wfReactInterface/traceServerClientTypes';
+import {sanitizeObjectId} from '../../pages/wfReactInterface/traceServerDirectClient';
+import {projectIdFromParts} from '../../pages/wfReactInterface/tsDataModelHooks';
 import {tsHumanAnnotationSpec} from './humanFeedbackTypes';
-import {EditingState} from './ManageHumanFeedback';
 
-type EditAnnotationSpecProps = {
-  editState: EditingState;
-  setEditState: React.Dispatch<React.SetStateAction<EditingState>>;
-  onSave: (
-    spec: tsHumanAnnotationSpec | AnnotationSpec
-  ) => Promise<TraceObjCreateRes>;
+type EditOrCreateAnnotationSpecProps = {
+  entityName: string;
+  projectName: string;
+  spec?: AnnotationSpec;
+  onSaveCB?: () => void;
   onBackButtonClick?: () => void;
 };
 
-export const EditAnnotationSpec: React.FC<EditAnnotationSpecProps> = ({
-  editState,
-  setEditState,
-  onSave,
-  onBackButtonClick,
-}) => {
+type EditingState = {
+  spec: AnnotationSpec | null;
+  jsonSchema: string;
+  error: string;
+};
+
+export const EditOrCreateAnnotationSpec: React.FC<
+  EditOrCreateAnnotationSpecProps
+> = ({entityName, projectName, spec, onSaveCB, onBackButtonClick}) => {
+  const createHumanFeedback = useCreateBaseObjectInstance('AnnotationSpec');
+  const [editState, setEditState] = useState<EditingState>({
+    spec: spec ?? {},
+    jsonSchema: JSON.stringify(spec?.json_schema ?? {}, null, 2),
+    error: '',
+  });
+  const action = spec === undefined ? 'Create' : 'Edit';
+
   const handleColumnSave = (updatedSpec: AnnotationSpec) => {
     try {
       updatedSpec.json_schema = JSON.parse(editState.jsonSchema);
@@ -32,10 +44,23 @@ export const EditAnnotationSpec: React.FC<EditAnnotationSpecProps> = ({
       setEditState({...editState, error: `Invalid JSON schema: ${e}`});
       return;
     }
-    onSave(updatedSpec)
+
+    createHumanFeedback({
+      obj: {
+        project_id: projectIdFromParts({
+          entity: entityName,
+          project: projectName,
+        }),
+        object_id: objectIdFromSpec(updatedSpec),
+        val: updatedSpec,
+      },
+    })
       .then(() => {
-        setEditState({isEditing: false, spec: null, jsonSchema: '', error: ''});
-        toast('Saved column', {type: 'success'});
+        toast(
+          `Saved annotation spec: ${sanitizeObjectId(updatedSpec.name ?? '')}`,
+          {type: 'success'}
+        );
+        onSaveCB?.();
       })
       .catch(e => {
         setEditState({
@@ -66,7 +91,9 @@ export const EditAnnotationSpec: React.FC<EditAnnotationSpecProps> = ({
               onClick={onBackButtonClick}
               className="mr-4"
             />
-            <div className="flex-auto text-xl font-semibold">Edit column</div>
+            <div className="flex-auto text-xl font-semibold">
+              {action} annotation
+            </div>
           </div>
         </DraggableHandle>
       )}
@@ -76,7 +103,7 @@ export const EditAnnotationSpec: React.FC<EditAnnotationSpecProps> = ({
           <label className="mb-1 block text-sm font-semibold">Name</label>
           <TextField
             value={editState.spec?.name ?? ''}
-            disabled={true}
+            disabled={action === 'Edit'}
             onChange={value => {
               if (editState.spec) {
                 setEditState({
@@ -130,4 +157,14 @@ export const EditAnnotationSpec: React.FC<EditAnnotationSpecProps> = ({
       </div>
     </>
   );
+};
+
+const objectIdFromSpec = (spec: tsHumanAnnotationSpec | AnnotationSpec) => {
+  if ('ref' in spec) {
+    return parseRef(spec.ref).artifactName;
+  }
+  if (spec.name == null) {
+    throw new Error('No ref or name provided for annotation spec');
+  }
+  return sanitizeObjectId(spec.name);
 };

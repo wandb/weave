@@ -169,9 +169,9 @@ export const SimplePageLayoutWithHeader: FC<{
   headerContent: ReactNode;
   leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
-  isSidebarOpen?: boolean;
-  isFeedbackSidebarOpen?: boolean;
-  feedbackSidebarContent?: ReactNode;
+  isLeftSidebarOpen?: boolean;
+  isRightSidebarOpen?: boolean;
+  rightSidebarContent?: ReactNode;
 }> = props => {
   const {tabs} = props;
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
@@ -250,7 +250,7 @@ export const SimplePageLayoutWithHeader: FC<{
           minWidth={150}
           defaultWidth={200}
           maxWidth="50%"
-          isDrawerOpen={props.isSidebarOpen ?? false}
+          isDrawerOpen={props.isLeftSidebarOpen ?? false}
           drawer={props.leftSidebar}
           main={
             <Box
@@ -302,7 +302,7 @@ export const SimplePageLayoutWithHeader: FC<{
             </Box>
           }
         />
-        {props.isFeedbackSidebarOpen && (
+        {props.isRightSidebarOpen && (
           <Box
             sx={{
               width: '35%',
@@ -313,7 +313,7 @@ export const SimplePageLayoutWithHeader: FC<{
               borderLeft: '1px solid #e0e0e0',
               backgroundColor: 'white',
             }}>
-            {props.feedbackSidebarContent}
+            {props.rightSidebarContent}
           </Box>
         )}
       </div>

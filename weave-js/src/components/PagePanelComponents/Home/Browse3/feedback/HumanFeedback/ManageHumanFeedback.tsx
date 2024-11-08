@@ -5,49 +5,34 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useState} from 'react';
 
 import {AnnotationSpec} from '../../pages/wfReactInterface/generatedBaseObjectClasses.zod';
-import {TraceObjCreateRes} from '../../pages/wfReactInterface/traceServerClientTypes';
-import {EditAnnotationSpec} from './EditAnnotationSpec';
+import {EditOrCreateAnnotationSpec} from './EditOrCreateAnnotationSpec';
 import {tsHumanAnnotationSpec} from './humanFeedbackTypes';
 import {ToggleColumnVisibility} from './ToggleColumnVisibility';
 
 type ManageHumanFeedbackProps = {
+  entityName: string;
+  projectName: string;
   columnVisibilityModel: Record<string, boolean>;
   setColumnVisibilityModel: (model: Record<string, boolean>) => void;
   specs: tsHumanAnnotationSpec[];
-  onSaveSpec: (
-    spec: tsHumanAnnotationSpec | AnnotationSpec
-  ) => Promise<TraceObjCreateRes>;
-};
-
-export type EditingState = {
-  isEditing: boolean;
-  spec: tsHumanAnnotationSpec | AnnotationSpec | null;
-  jsonSchema: string;
-  error: string;
 };
 
 export const ManageHumanFeedback: React.FC<ManageHumanFeedbackProps> = ({
+  entityName,
+  projectName,
   columnVisibilityModel,
   setColumnVisibilityModel,
   specs,
-  onSaveSpec,
 }) => {
-  const [editState, setEditState] = useState<EditingState>({
-    isEditing: false,
-    spec: null,
-    jsonSchema: '',
-    error: '',
-  });
+  const [editingSpec, setEditingSpec] = useState<
+    tsHumanAnnotationSpec | AnnotationSpec | null
+  >(null);
   const ref = React.useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   const onClickConfigure = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(anchorEl ? null : ref.current);
-    setEditState({isEditing: false, spec: null, jsonSchema: '', error: ''});
-  };
-
-  const handleBack = () => {
-    setEditState({isEditing: false, spec: null, jsonSchema: '', error: ''});
+    setEditingSpec(null);
   };
 
   const open = Boolean(anchorEl);
@@ -89,31 +74,25 @@ export const ManageHumanFeedback: React.FC<ManageHumanFeedbackProps> = ({
             <div className="mb-4 flex gap-2">
               <div
                 className={`h-0.5 w-12 ${
-                  editState.isEditing ? 'bg-teal-300' : 'bg-moon-300'
+                  editingSpec ? 'bg-teal-300' : 'bg-moon-300'
                 }`}
               />
             </div>
 
-            {editState.isEditing ? (
-              <EditAnnotationSpec
-                editState={editState}
-                setEditState={setEditState}
-                onSave={onSaveSpec}
-                onBackButtonClick={handleBack}
+            {editingSpec ? (
+              <EditOrCreateAnnotationSpec
+                entityName={entityName}
+                projectName={projectName}
+                onSaveCB={() => setEditingSpec(null)}
+                onBackButtonClick={() => setEditingSpec(null)}
+                spec={editingSpec}
               />
             ) : (
               <ToggleColumnVisibility
                 columns={specs}
                 columnVisibilityModel={columnVisibilityModel}
                 setColumnVisibilityModel={setColumnVisibilityModel}
-                onEdit={spec =>
-                  setEditState({
-                    isEditing: true,
-                    spec,
-                    jsonSchema: '',
-                    error: '',
-                  })
-                }
+                onEdit={setEditingSpec}
               />
             )}
           </div>

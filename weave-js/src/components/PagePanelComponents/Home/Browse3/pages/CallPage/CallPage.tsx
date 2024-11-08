@@ -337,9 +337,9 @@ const CallPageInnerVertical: FC<{
           </Box>
         </Box>
       }
-      isSidebarOpen={showTraceTree}
-      isFeedbackSidebarOpen={showFeedbackExpand}
-      feedbackSidebarContent={
+      isLeftSidebarOpen={showTraceTree}
+      isRightSidebarOpen={showFeedbackExpand}
+      rightSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="flex h-full flex-col">
             <FeedbackSidebar

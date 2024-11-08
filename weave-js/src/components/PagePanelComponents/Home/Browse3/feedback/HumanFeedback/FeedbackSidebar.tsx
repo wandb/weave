@@ -1,13 +1,9 @@
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
-import {parseRef} from '@wandb/weave/react';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useEffect, useState} from 'react';
 
-import {useCreateBaseObjectInstance} from '../../pages/wfReactInterface/baseObjectClassQuery';
-import {AnnotationSpec} from '../../pages/wfReactInterface/generatedBaseObjectClasses.zod';
-import {projectIdFromParts} from '../../pages/wfReactInterface/tsDataModelHooks';
 import {HumanFeedbackCell, waitForPendingFeedback} from './HumanFeedback';
 import {tsHumanAnnotationSpec} from './humanFeedbackTypes';
 import {ManageHumanFeedback} from './ManageHumanFeedback';
@@ -111,31 +107,16 @@ const FeedbackSidebarHeader = ({
   columnVisibilityModel,
   setColumnVisibilityModel,
 }: FeedbackSidebarHeaderProps) => {
-  const createHumanFeedback = useCreateBaseObjectInstance('AnnotationSpec');
-
-  const onSaveSpec = (spec: tsHumanAnnotationSpec | AnnotationSpec) => {
-    if (!('ref' in spec)) {
-      throw new Error('Feedback spec must have a ref to save in the sidebar.');
-    }
-    const objectRef = parseRef(spec.ref);
-    return createHumanFeedback({
-      obj: {
-        project_id: projectIdFromParts({entity, project}),
-        object_id: objectRef.artifactName,
-        val: spec,
-      },
-    });
-  };
-
   return (
     <div className="justify-left flex w-full border-b border-moon-300 p-12">
       <div className="text-lg font-semibold">Feedback</div>
       <div className="flex-grow" />
       <ManageHumanFeedback
+        entityName={entity}
+        projectName={project}
         specs={humanFeedbackSpecs}
         columnVisibilityModel={columnVisibilityModel}
         setColumnVisibilityModel={setColumnVisibilityModel}
-        onSaveSpec={onSaveSpec}
       />
     </div>
   );
