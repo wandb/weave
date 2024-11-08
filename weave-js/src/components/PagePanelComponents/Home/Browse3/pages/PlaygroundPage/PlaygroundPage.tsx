@@ -4,8 +4,8 @@ import React, {useEffect, useMemo, useState} from 'react';
 
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
-import {DEFAULT_SYSTEM_MESSAGE, usePlaygroundState} from './usePlaygroundState';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
+import {DEFAULT_SYSTEM_MESSAGE, usePlaygroundState} from './usePlaygroundState';
 
 export type PlaygroundPageProps = {
   entity: string;
