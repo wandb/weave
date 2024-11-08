@@ -1,15 +1,15 @@
-import {GridColDef, GridRowHeightParams} from '@mui/x-data-grid-pro';
+import { GridColDef, GridRowHeightParams } from '@mui/x-data-grid-pro';
 import React from 'react';
 
-import {Timestamp} from '../../../../Timestamp';
-import {UserLink} from '../../../../UserLink';
-import {CellValueString} from '../../Browse2/CellValueString';
-import {CopyableId} from '../pages/common/Id';
-import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
-import {StyledDataGrid} from '../StyledDataGrid';
-import {FeedbackGridActions} from './FeedbackGridActions';
-import {FeedbackTypeChip} from './FeedbackTypeChip';
-import {extractValFromHumanAnnotationPayload} from './HumanFeedback/tsHumanFeedback';
+import { Timestamp } from '../../../../Timestamp';
+import { UserLink } from '../../../../UserLink';
+import { CellValueString } from '../../Browse2/CellValueString';
+import { CopyableId } from '../pages/common/Id';
+import { Feedback } from '../pages/wfReactInterface/traceServerClientTypes';
+import { StyledDataGrid } from '../StyledDataGrid';
+import { FeedbackGridActions } from './FeedbackGridActions';
+import { FeedbackTypeChip } from './FeedbackTypeChip';
+import { extractValFromHumanAnnotationPayload } from './HumanFeedback/tsHumanFeedback';
 
 type FeedbackGridInnerProps = {
   feedback: Feedback[];
@@ -43,7 +43,7 @@ export const FeedbackGridInner = ({
         if (params.row.feedback_type === 'wandb.reaction.1') {
           return params.row.payload.emoji;
         }
-        if (params.row.feedback_type === 'wandb.human_annotation.1') {
+        if (params.row.feedback_type.startsWith('wandb.annotationSpec')) {
           const val = extractValFromHumanAnnotationPayload(params.row.payload);
           return <CellValueString value={JSON.stringify(val ?? null)} />;
         }
