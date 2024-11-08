@@ -6,6 +6,7 @@ import {Tag} from '@wandb/weave/components/Tag';
 import React, {SetStateAction} from 'react';
 
 import {PlaygroundState, PlaygroundStateKey} from '../types';
+import {PlaygroundSlider} from './PlaygroundSlider';
 
 export type PlaygroundSettingsProps = {
   playgroundStates: PlaygroundState[];
@@ -58,6 +59,58 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 gap: '4px',
                 mt: 2,
               }}>
+              <PlaygroundSlider
+                min={0}
+                max={2}
+                step={0.01}
+                setValue={value =>
+                  setPlaygroundStateField(idx, 'temperature', value)
+                }
+                label="Temperature"
+                value={playgroundState.temperature}
+              />
+
+              <PlaygroundSlider
+                min={0}
+                max={playgroundState.maxTokensLimit || 100}
+                step={1}
+                setValue={value =>
+                  setPlaygroundStateField(idx, 'maxTokens', value)
+                }
+                label="Maximum tokens"
+                value={playgroundState.maxTokens}
+              />
+
+              <PlaygroundSlider
+                min={0}
+                max={1}
+                step={0.01}
+                setValue={value => setPlaygroundStateField(idx, 'topP', value)}
+                label="Top P"
+                value={playgroundState.topP}
+              />
+
+              <PlaygroundSlider
+                min={0}
+                max={1}
+                step={0.01}
+                setValue={value =>
+                  setPlaygroundStateField(idx, 'frequencyPenalty', value)
+                }
+                label="Frequency penalty"
+                value={playgroundState.frequencyPenalty}
+              />
+
+              <PlaygroundSlider
+                min={0}
+                max={1}
+                step={0.01}
+                setValue={value =>
+                  setPlaygroundStateField(idx, 'presencePenalty', value)
+                }
+                label="Presence penalty"
+                value={playgroundState.presencePenalty}
+              />
               <Box
                 sx={{
                   width: '100%',
