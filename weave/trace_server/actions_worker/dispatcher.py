@@ -7,10 +7,10 @@ from weave.trace_server.actions_worker.actions.contains_words import (
 )
 from weave.trace_server.actions_worker.actions.llm_judge import do_llm_judge_action
 from weave.trace_server.interface.base_object_classes.actions import (
-    ActionDefinition,
-    ActionSpecType,
-    ContainsWordsActionSpec,
-    LlmJudgeActionSpec,
+    ActionConfigType,
+    ActionSpec,
+    ContainsWordsActionConfig,
+    LlmJudgeActionConfig,
 )
 from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
@@ -33,12 +33,12 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 
-ActionFnType = Callable[[str, ActionDefinition, CallSchema, TraceServerInterface], Any]
+ActionFnType = Callable[[str, ActionSpec, CallSchema, TraceServerInterface], Any]
 
 
-dispatch_map: dict[type[ActionSpecType], ActionFnType] = {
-    LlmJudgeActionSpec: do_llm_judge_action,
-    ContainsWordsActionSpec: do_contains_words_action,
+dispatch_map: dict[type[ActionConfigType], ActionFnType] = {
+    LlmJudgeActionConfig: do_llm_judge_action,
+    ContainsWordsActionConfig: do_contains_words_action,
 }
 
 
@@ -73,7 +73,7 @@ def execute_batch(
             digest=parsed_ref.version,
         )
     )
-    action_def = ActionDefinition.model_validate(action_def_read.obj.val)
+    action_def = ActionSpec.model_validate(action_def_read.obj.val)
 
     # Lookup the calls
     calls_query = trace_server.calls_query(
@@ -98,14 +98,14 @@ def execute_batch(
 def dispatch_action(
     project_id: str,
     action_ref: str,
-    action_def: ActionDefinition,
+    action_def: ActionSpec,
     target_call: CallSchema,
     wb_user_id: str,
     trace_server: TraceServerInterface,
 ) -> ActionResult:
-    action_type = type(action_def.spec)
+    action_type = type(action_def.config)
     action_fn = dispatch_map[action_type]
-    result = action_fn(project_id, action_def.spec, target_call, trace_server)
+    result = action_fn(project_id, action_def.config, target_call, trace_server)
     feedback_res = publish_results_as_feedback(
         target_call, action_ref, result, wb_user_id, trace_server
     )
