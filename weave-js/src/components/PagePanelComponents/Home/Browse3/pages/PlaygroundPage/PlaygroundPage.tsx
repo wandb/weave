@@ -4,6 +4,7 @@ import React, {useEffect, useMemo, useState} from 'react';
 
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
+import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
 import {DEFAULT_SYSTEM_MESSAGE, usePlaygroundState} from './usePlaygroundState';
 
@@ -30,6 +31,7 @@ export const PlaygroundPage = (props: PlaygroundPageProps) => {
 
 export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
   const {
+    setPlaygroundStates,
     playgroundStates,
     setPlaygroundStateField,
     setPlaygroundStateFromTraceCall,
@@ -88,13 +90,15 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           <WeaveLoader />
         </Box>
       ) : (
-        <Box
-          sx={{
-            height: '100%',
-            width: '100%',
-          }}>
-          <div>Playground</div>
-        </Box>
+        <PlaygroundChat
+          playgroundStates={playgroundStates}
+          setPlaygroundStates={setPlaygroundStates}
+          setPlaygroundStateField={setPlaygroundStateField}
+          entity={props.entity}
+          project={props.project}
+          setSettingsTab={setSettingsTab}
+          settingsTab={settingsTab}
+        />
       )}
       {settingsTab !== null && (
         <PlaygroundSettings
