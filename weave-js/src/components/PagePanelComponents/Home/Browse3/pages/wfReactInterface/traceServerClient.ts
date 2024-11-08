@@ -26,8 +26,6 @@ export class TraceServerClient extends DirectTraceServerClient {
   private onDeleteListeners: Array<() => void>;
   private onRenameListeners: Array<() => void>;
   // weave_ref -> feedback_type -> callback
-  // For feedback without a feedback_type, (the default case)
-  // the key is the empty string (this.FEEDBACK_TYPE_DEFAULT).
   private onFeedbackListeners: Record<
     string,
     Record<string, Array<() => void>>
@@ -74,21 +72,21 @@ export class TraceServerClient extends DirectTraceServerClient {
     feedbackType?: string
   ): () => void {
     const feedbackTypeResolved = feedbackType ?? this.FEEDBACK_TYPE_DEFAULT;
-    if (!(feedbackTypeResolved in this.onFeedbackListeners)) {
-      this.onFeedbackListeners[feedbackTypeResolved] = {};
+    if (!(weaveRef in this.onFeedbackListeners)) {
+      this.onFeedbackListeners[weaveRef] = {};
     }
-    if (!(weaveRef in this.onFeedbackListeners[feedbackTypeResolved])) {
-      this.onFeedbackListeners[feedbackTypeResolved][weaveRef] = [];
+    if (!(feedbackTypeResolved in this.onFeedbackListeners[weaveRef])) {
+      this.onFeedbackListeners[weaveRef][feedbackTypeResolved] = [];
     }
-    this.onFeedbackListeners[feedbackTypeResolved][weaveRef].push(callback);
+    this.onFeedbackListeners[weaveRef][feedbackTypeResolved].push(callback);
     return () => {
-      const newListeners = this.onFeedbackListeners[feedbackTypeResolved][
-        weaveRef
+      const newListeners = this.onFeedbackListeners[weaveRef][
+        feedbackTypeResolved
       ].filter(listener => listener !== callback);
       if (newListeners.length) {
-        this.onFeedbackListeners[feedbackTypeResolved][weaveRef] = newListeners;
+        this.onFeedbackListeners[weaveRef][feedbackTypeResolved] = newListeners;
       } else {
-        delete this.onFeedbackListeners[feedbackTypeResolved][weaveRef];
+        delete this.onFeedbackListeners[weaveRef][feedbackTypeResolved];
       }
     };
   }
@@ -109,10 +107,13 @@ export class TraceServerClient extends DirectTraceServerClient {
 
   public feedbackCreate(req: FeedbackCreateReq): Promise<FeedbackCreateRes> {
     const res = super.feedbackCreate(req).then(createRes => {
-      const feedbackTypeResolved =
-        req.feedback_type ?? this.FEEDBACK_TYPE_DEFAULT;
       const listeners =
-        this.onFeedbackListeners[feedbackTypeResolved][req.weave_ref] ?? [];
+        this.onFeedbackListeners[req.weave_ref]?.[req.feedback_type] ?? [];
+      listeners.push(
+        ...(this.onFeedbackListeners?.[req.weave_ref]?.[
+          this.FEEDBACK_TYPE_DEFAULT
+        ] ?? [])
+      );
       listeners.forEach(listener => listener());
       return createRes;
     });
@@ -135,10 +136,14 @@ export class TraceServerClient extends DirectTraceServerClient {
 
   public feedbackReplace(req: FeedbackReplaceReq): Promise<FeedbackReplaceRes> {
     const res = super.feedbackReplace(req).then(replaceRes => {
-      const feedbackTypeResolved =
-        req.feedback_type ?? this.FEEDBACK_TYPE_DEFAULT;
       const listeners =
-        this.onFeedbackListeners[feedbackTypeResolved][req.weave_ref] ?? [];
+        this.onFeedbackListeners[req.weave_ref]?.[req.feedback_type] ?? [];
+      // also fire the default feedback type listeners
+      listeners.push(
+        ...(this.onFeedbackListeners?.[req.weave_ref]?.[
+          this.FEEDBACK_TYPE_DEFAULT
+        ] ?? [])
+      );
       listeners.forEach(listener => listener());
       return replaceRes;
     });
