@@ -1,4 +1,4 @@
-from weave.trace_server.interface.base_object_classes.actions import ActionDefinition
+from weave.trace_server.interface.base_object_classes.actions import ActionSpec
 from weave.trace_server.interface.base_object_classes.annotation_spec import (
     AnnotationSpec,
 )
@@ -25,5 +25,5 @@ def register_base_object(cls: type[BaseObject]) -> None:
 register_base_object(TestOnlyExample)
 register_base_object(TestOnlyNestedBaseObject)
 register_base_object(Leaderboard)
-register_base_object(ActionDefinition)
+register_base_object(ActionSpec)
 register_base_object(AnnotationSpec)

@@ -16,7 +16,7 @@ from tests.integrations.litellm.client_completions_create_test import (
 from tests.trace.util import client_is_sqlite
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.interface.base_object_classes.actions import (
-    ActionDefinition,
+    ActionSpec,
 )
 from weave.trace_server.trace_server_interface import (
     ActionsExecuteBatchReq,
@@ -69,9 +69,9 @@ def test_action_lifecycle_llm_judge_primitive(client: WeaveClient):
     action_name = "response_is_mindful"
 
     published_ref = weave.publish(
-        ActionDefinition(
+        ActionSpec(
             name=action_name,
-            spec={
+            config={
                 "action_type": "llm_judge",
                 "model": "gpt-4o-mini",
                 "prompt": "Is the response mindful?",
@@ -154,9 +154,9 @@ def test_action_lifecycle_llm_judge_structured(client: WeaveClient):
     action_name = "response_is_mindful"
 
     published_ref = weave.publish(
-        ActionDefinition(
+        ActionSpec(
             name=action_name,
-            spec={
+            config={
                 "action_type": "llm_judge",
                 "model": "gpt-4o-mini",
                 "prompt": "Is the response mindful?",
