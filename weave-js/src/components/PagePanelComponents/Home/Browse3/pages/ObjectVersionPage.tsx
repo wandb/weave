@@ -53,7 +53,7 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Dataset: 'table',
   Evaluation: 'baseline-alt',
   Leaderboard: 'benchmark-square',
-  AnnotationColumn: 'forum-chat-bubble',
+  AnnotationSpec: 'forum-chat-bubble',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {

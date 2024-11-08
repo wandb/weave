@@ -28,7 +28,7 @@ export const HumanFeedbackSidebar = ({
 }: HumanFeedbackSidebarProps) => {
   const callRef = makeRefCall(entity, project, callID);
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const createHumanFeedback = useCreateBaseObjectInstance('AnnotationColumn');
+  const createHumanFeedback = useCreateBaseObjectInstance('AnnotationSpec');
   // Initialize column visibility model with all columns enabled
   const [columnVisibilityModel, setColumnVisibilityModel] = useState<
     Record<string, boolean>

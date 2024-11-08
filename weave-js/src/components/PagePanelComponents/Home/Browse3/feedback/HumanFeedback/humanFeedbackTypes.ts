@@ -1,7 +1,7 @@
-import {AnnotationColumn} from '../../pages/wfReactInterface/generatedBaseObjectClasses.zod';
+import {AnnotationSpec} from '../../pages/wfReactInterface/generatedBaseObjectClasses.zod';
 import {Feedback} from '../../pages/wfReactInterface/traceServerClientTypes';
 
-export type tsHumanAnnotationColumn = AnnotationColumn & {
+export type tsHumanAnnotationColumn = AnnotationSpec & {
   ref: string;
 };
 

@@ -25,5 +25,5 @@ export const KNOWN_BASE_OBJECT_CLASSES = [
   'Dataset',
   'Evaluation',
   'Leaderboard',
-  'AnnotationColumn',
+  'AnnotationSpec',
 ] as const;

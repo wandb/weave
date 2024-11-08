@@ -15,14 +15,14 @@ export const LeaderboardSchema = z.object({
 });
 export type Leaderboard = z.infer<typeof LeaderboardSchema>;
 
-export const AnnotationColumnSchema = z.object({
+export const AnnotationSpecSchema = z.object({
   name: z.string().optional(),
   description: z.union([z.null(), z.string()]).optional(),
   json_schema: z.record(z.any()),
   unique_among_creators: z.boolean().optional(),
   op_scope: z.union([z.null(), z.array(z.string())]),
 });
-export type AnnotationColumn = z.infer<typeof AnnotationColumnSchema>;
+export type AnnotationSpec = z.infer<typeof AnnotationSpecSchema>;
 
 // ----- TEST OBJECTS -----
 export const TestOnlyNestedBaseModelSchema = z.object({
@@ -53,7 +53,7 @@ export type TestOnlyExample = z.infer<typeof TestOnlyExampleSchema>;
 // ----- REGISTRY -----
 export const baseObjectClassRegistry = {
   Leaderboard: LeaderboardSchema,
-  AnnotationColumn: AnnotationColumnSchema,
+  AnnotationSpec: AnnotationSpecSchema,
   TestOnlyExample: TestOnlyExampleSchema,
   TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,
 };

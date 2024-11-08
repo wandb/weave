@@ -22,7 +22,7 @@ export const useHumanFeedbackOptions = (
       latest_only: true,
     },
   };
-  const res = useBaseObjectInstances('AnnotationColumn', req);
+  const res = useBaseObjectInstances('AnnotationSpec', req);
   const [cols, setCols] = useState<TraceObjSchema[] | null>(null);
 
   useEffect(() => {
