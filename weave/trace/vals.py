@@ -363,12 +363,12 @@ class WeaveTable(Traceable):
                 yield from self._remote_iter()
                 return
 
-        for ndx, row in enumerate(self._prefetched_rows):
+        for i, _ in enumerate(self._prefetched_rows):
             next_id_future = wc.future_executor.defer(
-                lambda ndx_closure=ndx: cached_table_ref.row_digests[ndx_closure]
+                lambda ndx_closure=i: cached_table_ref.row_digests[ndx_closure]
             )
             new_ref = self.ref.with_item(next_id_future)
-            val = self._prefetched_rows[ndx]
+            val = self._prefetched_rows[i]
             res = from_json(
                 val, self.table_ref.entity + "/" + self.table_ref.project, self.server
             )
