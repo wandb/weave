@@ -24,7 +24,7 @@ def test_action_lifecycle_word_count(client: WeaveClient):
     published_ref = weave.publish(
         ActionSpec(
             name=action_name,
-            spec={
+            config={
                 "action_type": "contains_words",
                 "target_words": ["mindful", "demure"],
             },

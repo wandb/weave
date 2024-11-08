@@ -71,7 +71,7 @@ def test_action_lifecycle_llm_judge_primitive(client: WeaveClient):
     published_ref = weave.publish(
         ActionSpec(
             name=action_name,
-            spec={
+            config={
                 "action_type": "llm_judge",
                 "model": "gpt-4o-mini",
                 "prompt": "Is the response mindful?",
@@ -156,7 +156,7 @@ def test_action_lifecycle_llm_judge_structured(client: WeaveClient):
     published_ref = weave.publish(
         ActionSpec(
             name=action_name,
-            spec={
+            config={
                 "action_type": "llm_judge",
                 "model": "gpt-4o-mini",
                 "prompt": "Is the response mindful?",
