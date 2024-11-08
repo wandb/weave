@@ -3,7 +3,6 @@ import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEve
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
-import {BytesStoredInfoIcon} from '../../../../BytesStoredInfoIcon';
 import {Icon, IconName} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
@@ -192,11 +191,6 @@ const ObjectVersionPageInner: React.FC<{
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
 
-  const bytesStored = useMemo(
-    () => (data.result?.[0] ? JSON.stringify(data.result?.[0]).length : 0),
-    [data.result]
-  );
-
   if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;
   }
@@ -245,18 +239,6 @@ const ObjectVersionPageInner: React.FC<{
                   Subpath: refExtra,
                 }
               : {}),
-            'Bytes stored': (
-              <>
-                {data.loading ? (
-                  <LoadingDots />
-                ) : (
-                  <BytesStoredInfoIcon
-                    bytesStored={bytesStored}
-                    weaveKind="object"
-                  />
-                )}
-              </>
-            ),
             // 'Type Version': (
             //   <TypeVersionLink
             //     entityName={entityName}
