@@ -1,5 +1,166 @@
 {
   "$defs": {
+    "ActionDefinition": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "spec": {
+          "discriminator": {
+            "mapping": {
+              "contains_words": "#/$defs/ContainsWordsActionSpec",
+              "llm_judge": "#/$defs/LlmJudgeActionSpec"
+            },
+            "propertyName": "action_type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/LlmJudgeActionSpec"
+            },
+            {
+              "$ref": "#/$defs/ContainsWordsActionSpec"
+            }
+          ],
+          "title": "Spec"
+        }
+      },
+      "required": [
+        "spec"
+      ],
+      "title": "ActionDefinition",
+      "type": "object"
+    },
+    "AnnotationSpec": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "json_schema": {
+          "default": {},
+          "description": "Expected to be valid JSON Schema",
+          "examples": [
+            {
+              "max_length": 100,
+              "type": "string"
+            },
+            {
+              "max": 100,
+              "min": 0,
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "options": [
+                "option1",
+                "option2"
+              ],
+              "type": "categorical"
+            }
+          ],
+          "title": "Json Schema",
+          "type": "object"
+        },
+        "unique_among_creators": {
+          "default": false,
+          "title": "Unique Among Creators",
+          "type": "boolean"
+        },
+        "op_scope": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "examples": [
+            [
+              "weave:///entity/project/op/name:digest"
+            ],
+            [
+              "weave:///entity/project/op/name:*"
+            ]
+          ],
+          "title": "Op Scope"
+        }
+      },
+      "title": "AnnotationSpec",
+      "type": "object"
+    },
+    "ContainsWordsActionSpec": {
+      "properties": {
+        "action_type": {
+          "const": "contains_words",
+          "default": "contains_words",
+          "enum": [
+            "contains_words"
+          ],
+          "title": "Action Type",
+          "type": "string"
+        },
+        "target_words": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Target Words",
+          "type": "array"
+        }
+      },
+      "required": [
+        "target_words"
+      ],
+      "title": "ContainsWordsActionSpec",
+      "type": "object"
+    },
     "Leaderboard": {
       "properties": {
         "name": {
@@ -73,6 +234,42 @@
         "summary_metric_path"
       ],
       "title": "LeaderboardColumn",
+      "type": "object"
+    },
+    "LlmJudgeActionSpec": {
+      "properties": {
+        "action_type": {
+          "const": "llm_judge",
+          "default": "llm_judge",
+          "enum": [
+            "llm_judge"
+          ],
+          "title": "Action Type",
+          "type": "string"
+        },
+        "model": {
+          "enum": [
+            "gpt-4o",
+            "gpt-4o-mini"
+          ],
+          "title": "Model",
+          "type": "string"
+        },
+        "prompt": {
+          "title": "Prompt",
+          "type": "string"
+        },
+        "response_schema": {
+          "title": "Response Schema",
+          "type": "object"
+        }
+      },
+      "required": [
+        "model",
+        "prompt",
+        "response_schema"
+      ],
+      "title": "LlmJudgeActionSpec",
       "type": "object"
     },
     "TestOnlyExample": {
@@ -181,12 +378,20 @@
     },
     "Leaderboard": {
       "$ref": "#/$defs/Leaderboard"
+    },
+    "ActionDefinition": {
+      "$ref": "#/$defs/ActionDefinition"
+    },
+    "AnnotationSpec": {
+      "$ref": "#/$defs/AnnotationSpec"
     }
   },
   "required": [
     "TestOnlyExample",
     "TestOnlyNestedBaseObject",
-    "Leaderboard"
+    "Leaderboard",
+    "ActionDefinition",
+    "AnnotationSpec"
   ],
   "title": "CompositeBaseObject",
   "type": "object"
