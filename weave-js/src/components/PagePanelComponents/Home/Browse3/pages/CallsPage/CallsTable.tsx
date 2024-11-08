@@ -261,6 +261,8 @@ export const CallsTable: FC<{
     expandedRefCols
   );
 
+  console.log('calls', calls);
+
   // Here, we only update our local state once the calls have loaded.
   // If we were not to do this, we would see a flicker of an empty table
   // before the calls are loaded. Since the columns are data-driven, this
@@ -390,7 +392,7 @@ export const CallsTable: FC<{
     columnIsRefExpanded,
     allowedColumnPatterns,
     onAddFilter,
-    calls.costsLoading
+    calls.extrasLoading
   );
 
   // This contains columns which are suitable for selection and raw data
