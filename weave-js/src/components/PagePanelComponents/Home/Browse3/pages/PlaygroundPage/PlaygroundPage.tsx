@@ -4,6 +4,7 @@ import React, {useEffect, useMemo, useState} from 'react';
 
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
+import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
 import {DEFAULT_SYSTEM_MESSAGE, usePlaygroundState} from './usePlaygroundState';
 
 export type PlaygroundPageProps = {
@@ -15,7 +16,7 @@ export type PlaygroundPageProps = {
 export const PlaygroundPage = (props: PlaygroundPageProps) => {
   return (
     <SimplePageLayout
-      title={'Playground (dev)'}
+      title={'Playground (preview)'}
       hideTabsIfSingle
       tabs={[
         {
@@ -29,13 +30,13 @@ export const PlaygroundPage = (props: PlaygroundPageProps) => {
 
 export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
   const {
-    setPlaygroundStateFromTraceCall,
     playgroundStates,
     setPlaygroundStateField,
+    setPlaygroundStateFromTraceCall,
   } = usePlaygroundState();
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [settingsTab, setSettingsTab] = useState<number | null>(null);
+  const [settingsTab, setSettingsTab] = useState<number | null>(0);
 
   const {useCall} = useWFHooks();
   const call = useCall(
@@ -87,9 +88,22 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           <WeaveLoader />
         </Box>
       ) : (
-        <div>Playground</div>
+        <Box
+          sx={{
+            height: '100%',
+            width: '100%',
+          }}>
+          <div>Playground</div>
+        </Box>
       )}
-      {settingsTab !== null && <div>Settings</div>}
+      {settingsTab !== null && (
+        <PlaygroundSettings
+          playgroundStates={playgroundStates}
+          setPlaygroundStateField={setPlaygroundStateField}
+          settingsTab={settingsTab}
+          setSettingsTab={setSettingsTab}
+        />
+      )}
     </Box>
   );
 };
