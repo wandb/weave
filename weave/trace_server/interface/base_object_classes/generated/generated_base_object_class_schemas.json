@@ -1,6 +1,6 @@
 {
   "$defs": {
-    "ActionDefinition": {
+    "ActionSpec": {
       "properties": {
         "name": {
           "anyOf": [
@@ -26,32 +26,117 @@
           "default": null,
           "title": "Description"
         },
-        "spec": {
+        "config": {
           "discriminator": {
             "mapping": {
-              "contains_words": "#/$defs/ContainsWordsActionSpec",
-              "llm_judge": "#/$defs/LlmJudgeActionSpec"
+              "contains_words": "#/$defs/ContainsWordsActionConfig",
+              "llm_judge": "#/$defs/LlmJudgeActionConfig"
             },
             "propertyName": "action_type"
           },
           "oneOf": [
             {
-              "$ref": "#/$defs/LlmJudgeActionSpec"
+              "$ref": "#/$defs/LlmJudgeActionConfig"
             },
             {
-              "$ref": "#/$defs/ContainsWordsActionSpec"
+              "$ref": "#/$defs/ContainsWordsActionConfig"
             }
           ],
-          "title": "Spec"
+          "title": "Config"
         }
       },
       "required": [
-        "spec"
+        "config"
       ],
-      "title": "ActionDefinition",
+      "title": "ActionSpec",
       "type": "object"
     },
-    "ContainsWordsActionSpec": {
+    "AnnotationSpec": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "json_schema": {
+          "default": {},
+          "description": "Expected to be valid JSON Schema",
+          "examples": [
+            {
+              "max_length": 100,
+              "type": "string"
+            },
+            {
+              "max": 100,
+              "min": 0,
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "options": [
+                "option1",
+                "option2"
+              ],
+              "type": "categorical"
+            }
+          ],
+          "title": "Json Schema",
+          "type": "object"
+        },
+        "unique_among_creators": {
+          "default": false,
+          "title": "Unique Among Creators",
+          "type": "boolean"
+        },
+        "op_scope": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "examples": [
+            [
+              "weave:///entity/project/op/name:digest"
+            ],
+            [
+              "weave:///entity/project/op/name:*"
+            ]
+          ],
+          "title": "Op Scope"
+        }
+      },
+      "title": "AnnotationSpec",
+      "type": "object"
+    },
+    "ContainsWordsActionConfig": {
       "properties": {
         "action_type": {
           "const": "contains_words",
@@ -73,7 +158,7 @@
       "required": [
         "target_words"
       ],
-      "title": "ContainsWordsActionSpec",
+      "title": "ContainsWordsActionConfig",
       "type": "object"
     },
     "Leaderboard": {
@@ -151,7 +236,7 @@
       "title": "LeaderboardColumn",
       "type": "object"
     },
-    "LlmJudgeActionSpec": {
+    "LlmJudgeActionConfig": {
       "properties": {
         "action_type": {
           "const": "llm_judge",
@@ -184,7 +269,7 @@
         "prompt",
         "response_schema"
       ],
-      "title": "LlmJudgeActionSpec",
+      "title": "LlmJudgeActionConfig",
       "type": "object"
     },
     "TestOnlyExample": {
@@ -294,15 +379,19 @@
     "Leaderboard": {
       "$ref": "#/$defs/Leaderboard"
     },
-    "ActionDefinition": {
-      "$ref": "#/$defs/ActionDefinition"
+    "ActionSpec": {
+      "$ref": "#/$defs/ActionSpec"
+    },
+    "AnnotationSpec": {
+      "$ref": "#/$defs/AnnotationSpec"
     }
   },
   "required": [
     "TestOnlyExample",
     "TestOnlyNestedBaseObject",
     "Leaderboard",
-    "ActionDefinition"
+    "ActionSpec",
+    "AnnotationSpec"
   ],
   "title": "CompositeBaseObject",
   "type": "object"
