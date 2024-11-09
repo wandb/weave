@@ -406,7 +406,10 @@ export const NumericalFeedbackColumn = ({
           ? parseInt(val, 10)
           : parseFloat(val)
         : null;
-      if (parsedVal && (parsedVal < min || parsedVal > max)) {
+      if (
+        (val !== '' && parsedVal == null) ||
+        (parsedVal && (parsedVal < min || parsedVal > max))
+      ) {
         setError(true);
         return;
       } else {
