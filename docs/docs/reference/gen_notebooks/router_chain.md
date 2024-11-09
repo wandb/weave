@@ -93,7 +93,7 @@ We'll explore how to build a prompt routing system using LangChain and Weave. We
 
 
 ```python
-class PhysicsPromptTemplate(weave.Object):
+class PhysicsPromptTemplate(weave.Model):
     system_prompt: str
     category: str = "Physics"
 
@@ -110,7 +110,7 @@ class PhysicsPromptTemplate(weave.Object):
 
       return text
 
-class MathPromptTemplate(weave.Object):
+class MathPromptTemplate(weave.Model):
     system_prompt: str
     category: str = "Math"
 
@@ -222,7 +222,7 @@ def prompt_router(input):
     formatted_prompt = selected_prompt.format(query=input["query"])
     print("Formatted Prompt:", formatted_prompt)
 
-    category = "MATH" if most_similar == math_template else "PHYSICS"
+    category = "Math" if most_similar == math_template else "Physics"
     print(f"Using {category}")
 
     # Return both the selected prompt and the category
@@ -313,7 +313,7 @@ model = ChainModel(model_name='gpt-4', prompt_router=prompt_router)
 results = await evaluation.evaluate(model)
 ```
 
-# Evaluating Category Alignment in Routing
+## Evaluating Category Alignment in Routing
 
  Similar to evaluating the final output, we assess routing accuracy by categorizing each query against an expected category (e.g., "Math" or "Physics") to verify that `prompt_router` selects the correct prompt template.
 
