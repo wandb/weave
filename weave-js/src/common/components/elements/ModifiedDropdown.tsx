@@ -34,6 +34,7 @@ import {Omit} from '../../types/base';
 import {makePropsAreEqual} from '../../util/shouldUpdate';
 import {Struct} from '../../util/types';
 import {Option} from '../../util/uihelpers';
+import {IconChevronDown} from '../../../components/Icon';
 
 type LabelCoord = {
   top: number;
@@ -445,6 +446,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         </div>
       );
     };
+
     return wrapWithDragDrop(
       <Dropdown
         {...passProps}
@@ -470,6 +472,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
           }
         }}
         trigger={renderTrigger()}
+        icon={<IconChevronDown />}
       />
     );
   },
@@ -507,6 +510,10 @@ export const OptionWithTooltip: React.FC<OptionWithTooltipProps> = ({text}) => {
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
+        // padding: '4px 8px',
+        height: '32px',
+        display: 'flex',
+        alignItems: 'center',
       }}>
       {showTooltip ? (
         <Tooltip
