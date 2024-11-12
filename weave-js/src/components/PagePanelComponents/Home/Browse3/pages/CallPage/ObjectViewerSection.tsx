@@ -154,19 +154,21 @@ const ObjectViewerSectionNonEmpty = ({
     setExpandedIds([]);
   };
 
-  const isExpandAllLarge = getGroupIds().length > EXPANDED_IDS_LENGTH;
+  const isExpandAllSmall =
+    !!apiRef?.current?.getAllRowIds &&
+    getGroupIds().length < EXPANDED_IDS_LENGTH;
 
   const onClickExpanded = () => {
     if (mode === 'expanded') {
       setTreeExpanded(true);
     }
     setMode('expanded');
-    if (isExpandAllLarge) {
+    if (isExpandAllSmall) {
+      setExpandedIds(getGroupIds());
+    } else {
       setExpandedIds(
         getGroupIds().slice(0, expandedIds.length + EXPANDED_IDS_LENGTH)
       );
-    } else {
-      setExpandedIds(getGroupIds());
     }
   };
 
@@ -199,9 +201,9 @@ const ObjectViewerSectionNonEmpty = ({
           active={mode === 'expanded'}
           onClick={onClickExpanded}
           tooltip={
-            isExpandAllLarge
-              ? `Expand next ${EXPANDED_IDS_LENGTH} rows`
-              : 'Expand all'
+            isExpandAllSmall
+              ? 'Expand all'
+              : `Expand next ${EXPANDED_IDS_LENGTH} rows`
           }
         />
         <Button
