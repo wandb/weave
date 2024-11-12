@@ -8,6 +8,7 @@ import React, {SetStateAction} from 'react';
 import {PlaygroundState, PlaygroundStateKey} from '../types';
 import {FunctionEditor} from './FunctionEditor';
 import {PlaygroundSlider} from './PlaygroundSlider';
+import {ResponseFormatEditor} from './ResponseFormatEditor';
 import {StopSequenceEditor} from './StopSequenceEditor';
 
 export type PlaygroundSettingsProps = {
@@ -70,6 +71,13 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                     'functions',
                     value as Array<{name: string; [key: string]: any}>
                   )
+                }
+              />
+
+              <ResponseFormatEditor
+                responseFormat={playgroundState.responseFormat}
+                setResponseFormat={value =>
+                  setPlaygroundStateField(idx, 'responseFormat', value)
                 }
               />
 
