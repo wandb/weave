@@ -86,10 +86,11 @@ export const FunctionDrawer: React.FC<FunctionDrawerProps> = ({
     buttonTooltip = 'Function JSON has no name';
   } else if (
     drawerFunctionIndex !== null &&
-    parsedFunctionJSON &&
     functions.some(
       (func, idx) =>
-        func.name === parsedFunctionJSON.name && idx !== drawerFunctionIndex
+        parsedFunctionJSON?.name &&
+        func.name === parsedFunctionJSON.name &&
+        idx !== drawerFunctionIndex
     )
   ) {
     buttonTooltip = 'Function with this name already exists';
