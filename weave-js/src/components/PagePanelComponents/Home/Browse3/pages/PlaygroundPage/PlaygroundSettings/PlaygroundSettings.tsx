@@ -7,6 +7,7 @@ import React, {SetStateAction} from 'react';
 
 import {PlaygroundState, PlaygroundStateKey} from '../types';
 import {PlaygroundSlider} from './PlaygroundSlider';
+import {StopSequenceEditor} from './StopSequenceEditor';
 
 export type PlaygroundSettingsProps = {
   playgroundStates: PlaygroundState[];
@@ -79,6 +80,13 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 }
                 label="Maximum tokens"
                 value={playgroundState.maxTokens}
+              />
+
+              <StopSequenceEditor
+                stopSequences={playgroundState.stopSequences}
+                setStopSequences={value =>
+                  setPlaygroundStateField(idx, 'stopSequences', value)
+                }
               />
 
               <PlaygroundSlider
