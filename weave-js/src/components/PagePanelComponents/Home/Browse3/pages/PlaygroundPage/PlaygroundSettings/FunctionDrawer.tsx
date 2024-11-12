@@ -49,11 +49,11 @@ export const FunctionDrawer: React.FC<FunctionDrawerProps> = ({
   // if updating, set the function JSON to current function
   useEffect(() => {
     setFunctionJSON(
-      drawerFunctionIndex !== null
+      isUpdating
         ? JSON.stringify(functions[drawerFunctionIndex], null, 2) ?? ''
         : ''
     );
-  }, [drawerFunctionIndex, functions]);
+  }, [drawerFunctionIndex, isUpdating, functions]);
 
   const handleAddFunction = () => {
     if (drawerFunctionIndex !== null) {
@@ -64,7 +64,7 @@ export const FunctionDrawer: React.FC<FunctionDrawerProps> = ({
   };
 
   let jsonValidationError = null;
-  let parsedFunctionJSON = null;
+  let parsedFunctionJSON: Record<string, any> | null = null;
   try {
     parsedFunctionJSON = JSON.parse(functionJSON);
     JSON.stringify(parsedFunctionJSON, null, 2);
@@ -80,15 +80,17 @@ export const FunctionDrawer: React.FC<FunctionDrawerProps> = ({
   } else if (!!jsonValidationError) {
     buttonTooltip = jsonValidationError;
   } else if (
-    typeof parsedFunctionJSON.name !== 'string' ||
-    !parsedFunctionJSON.name
+    typeof parsedFunctionJSON?.name !== 'string' ||
+    !parsedFunctionJSON?.name
   ) {
     buttonTooltip = 'Function JSON has no name';
   } else if (
     drawerFunctionIndex !== null &&
     functions.some(
       (func, idx) =>
-        func.name === parsedFunctionJSON.name && idx !== drawerFunctionIndex
+        parsedFunctionJSON?.name &&
+        func.name === parsedFunctionJSON.name &&
+        idx !== drawerFunctionIndex
     )
   ) {
     buttonTooltip = 'Function with this name already exists';
