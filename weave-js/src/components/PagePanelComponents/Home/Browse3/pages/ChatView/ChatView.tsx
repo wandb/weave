@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useRef} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
-import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundChat/PlaygroundContext';
+import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
 import {DEFAULT_SYSTEM_MESSAGE_CONTENT} from '../PlaygroundPage/usePlaygroundState';
 import {ChatEmptyStateCallout} from './ChatEmptyStateCallout';
 import {ChoicesView} from './ChoicesView';
