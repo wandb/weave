@@ -79,7 +79,10 @@ export const FunctionDrawer: React.FC<FunctionDrawerProps> = ({
     buttonTooltip = 'Function JSON is empty';
   } else if (!!jsonValidationError) {
     buttonTooltip = jsonValidationError;
-  } else if (parsedFunctionJSON.name === null) {
+  } else if (
+    typeof parsedFunctionJSON.name !== 'string' ||
+    !parsedFunctionJSON.name
+  ) {
     buttonTooltip = 'Function JSON has no name';
   } else if (
     drawerFunctionIndex !== null &&
