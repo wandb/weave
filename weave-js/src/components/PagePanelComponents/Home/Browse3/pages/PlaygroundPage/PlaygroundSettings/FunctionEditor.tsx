@@ -85,18 +85,19 @@ export const FunctionEditor: React.FC<FunctionEditorProps> = ({
           </Tooltip>
         )}
       </Box>
-      <Box sx={{display: 'flex', flexDirection: 'column', gap: 1}}>
-        {functions.map((func, index) => (
-          <StyledChip
-            key={index}
-            label={func.name}
-            onDelete={() => handleDeleteFunction(func.name)}
-            size="small"
-            onClick={() => setDrawerFunctionIndex(index)}
-          />
-        ))}
-      </Box>
-
+      {functions.length > 0 && (
+        <Box sx={{display: 'flex', flexDirection: 'column', gap: 1}}>
+          {functions.map((func, index) => (
+            <StyledChip
+              key={index}
+              label={func.name}
+              onDelete={() => handleDeleteFunction(func.name)}
+              size="small"
+              onClick={() => setDrawerFunctionIndex(index)}
+            />
+          ))}
+        </Box>
+      )}
       <Button
         startIcon="add-new"
         variant="secondary"
