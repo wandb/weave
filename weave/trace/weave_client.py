@@ -617,14 +617,12 @@ class WeaveClient:
     def get_calls(
         self,
         filter: Optional[CallsFilter] = None,
-        include_costs: Optional[bool] = False,
+        include_costs: bool = False,
     ) -> CallsIter:
         if filter is None:
             filter = CallsFilter()
 
-        return CallsIter(
-            self.server, self._project_id(), filter, include_costs or False
-        )
+        return CallsIter(self.server, self._project_id(), filter, include_costs)
 
     @deprecated(new_name="get_calls")
     def calls(
