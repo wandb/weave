@@ -49,7 +49,7 @@ export const FunctionDrawer: React.FC<FunctionDrawerProps> = ({
   // if updating, set the function JSON to current function
   useEffect(() => {
     setFunctionJSON(
-      drawerFunctionIndex
+      drawerFunctionIndex !== null
         ? JSON.stringify(functions[drawerFunctionIndex], null, 2) ?? ''
         : ''
     );
@@ -82,7 +82,7 @@ export const FunctionDrawer: React.FC<FunctionDrawerProps> = ({
   } else if (parsedFunctionJSON.name === null) {
     buttonTooltip = 'Function JSON has no name';
   } else if (
-    drawerFunctionIndex &&
+    drawerFunctionIndex !== null &&
     functions.some(
       (func, idx) =>
         func.name === parsedFunctionJSON.name && idx !== drawerFunctionIndex
