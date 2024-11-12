@@ -202,7 +202,27 @@ class String:
         if self.isnumeric():
             return float(self)  # type: ignore
         return None
+    
+    @op(name="string-parseNumberWithSeparator", output_type=types.optional(types.Number()))
+    def parse_number_with_separator(
+        self, 
+        thousands_separator: typing.Optional[str], 
+        decimal_separator: typing.Optional[str],
+    ):
+        mNumber = self
+        
+        if thousands_separator:
+            mNumber = mNumber.replace(thousands_separator, '')
+            
+        if decimal_separator:
+            mNumber = mNumber.replace(decimal_separator, '.')
 
+        try:
+            number = float(mNumber)
+        except:
+            number = None
+        
+        return number
 
 types.String.instance_class = String
 
