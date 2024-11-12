@@ -1,17 +1,18 @@
-import {toast} from '@wandb/weave/common/components/elements/Toast';
-import {Button} from '@wandb/weave/components/Button';
-import {DraggableHandle} from '@wandb/weave/components/DraggablePopups';
-import {Select} from '@wandb/weave/components/Form/Select';
-import {TextField} from '@wandb/weave/components/Form/TextField';
-import {parseRef} from '@wandb/weave/react';
-import React, {useEffect, useState} from 'react';
+import { toast } from '@wandb/weave/common/components/elements/Toast';
+import { Button } from '@wandb/weave/components/Button';
+import { DraggableHandle } from '@wandb/weave/components/DraggablePopups';
+import { Select } from '@wandb/weave/components/Form/Select';
+import { TextField } from '@wandb/weave/components/Form/TextField';
+import { parseRef } from '@wandb/weave/react';
+import _ from 'lodash';
+import React, { useEffect, useMemo, useState } from 'react';
 
-import {useCreateBaseObjectInstance} from '../../pages/wfReactInterface/baseObjectClassQuery';
-import {AnnotationSpec} from '../../pages/wfReactInterface/generatedBaseObjectClasses.zod';
-import {sanitizeObjectId} from '../../pages/wfReactInterface/traceServerDirectClient';
-import {projectIdFromParts} from '../../pages/wfReactInterface/tsDataModelHooks';
-import {NumericalTextField} from './HumanFeedback';
-import {FeedbackSchemaType, tsHumanAnnotationSpec} from './humanFeedbackTypes';
+import { useCreateBaseObjectInstance } from '../../pages/wfReactInterface/baseObjectClassQuery';
+import { AnnotationSpec } from '../../pages/wfReactInterface/generatedBaseObjectClasses.zod';
+import { sanitizeObjectId } from '../../pages/wfReactInterface/traceServerDirectClient';
+import { projectIdFromParts } from '../../pages/wfReactInterface/tsDataModelHooks';
+import { NumericalTextField } from './HumanFeedback';
+import { FeedbackSchemaType, tsHumanAnnotationSpec } from './humanFeedbackTypes';
 
 type EditOrCreateAnnotationSpecProps = {
   entityName: string;
@@ -37,7 +38,12 @@ export const EditOrCreateAnnotationSpec: React.FC<
   const action = spec === undefined ? 'Create' : 'Edit';
   const specType: FeedbackSchemaType | undefined =
     editState.spec?.json_schema?.type;
-  const saveDisabled = !editState.spec || !editState.spec.name || !specType;
+
+  const allRequiredFieldsFilled =
+    editState.spec?.name != null && specType != null;
+  const dirty = useMemo(() => {
+    return !_.isEqual(editState.spec, spec);
+  }, [editState.spec, spec]);
 
   const handleSave = (updatedSpec: AnnotationSpec) => {
     try {
@@ -111,6 +117,13 @@ export const EditOrCreateAnnotationSpec: React.FC<
             disabled={action === 'Edit'}
             onChange={value => {
               if (!editState.spec) {
+                return;
+              }
+              if (value === '') {
+                setEditState({
+                  ...editState,
+                  spec: {...editState.spec, name: null},
+                });
                 return;
               }
               setEditState({
@@ -231,7 +244,7 @@ export const EditOrCreateAnnotationSpec: React.FC<
             size="medium"
             variant="primary"
             className="w-full"
-            disabled={saveDisabled}
+            disabled={!allRequiredFieldsFilled || (action === 'Edit' && !dirty)}
             onClick={() => editState.spec && handleSave(editState.spec)}>
             Save
           </Button>
