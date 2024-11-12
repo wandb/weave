@@ -167,7 +167,7 @@ CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
-    "max_memory_usage": 10 * 1024 * 1024 * 1024,  # 10 GiB
+    "max_memory_usage": 16 * 1024 * 1024 * 1024,  # 16 GiB
 }
 
 
@@ -307,6 +307,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # TODO: add support for json extract fields
             # Split out any nested column requests
             columns = [col.split(".")[0] for col in columns]
+
+        # sort the columns such that similar queries are grouped together
+        columns = sorted(columns)
 
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
