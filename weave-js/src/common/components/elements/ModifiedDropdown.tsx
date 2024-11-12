@@ -77,6 +77,7 @@ export interface ModifiedDropdownExtraProps {
   resultLimitMessage?: string;
   style?: CSSProperties;
   hideText?: boolean;
+  useIcon?: boolean;
 
   optionTransform?(option: Option): Option;
 }
@@ -472,7 +473,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         }}
         trigger={renderTrigger()}
         icon={
-          passProps.className === 'runs-selector-modified-dropdown' ? (
+          passProps.useIcon ? (
             passProps.open ? (
               <IconChevronUp />
             ) : (
