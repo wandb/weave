@@ -17,10 +17,11 @@ import {
   DropdownItemProps,
   Icon,
   Label,
+  LabelProps,
   StrictDropdownProps,
 } from 'semantic-ui-react';
-import {LabelProps} from 'semantic-ui-react';
 
+import {IconChevronDown, IconChevronUp} from '../../../components/Icon';
 import {
   DragDropProvider,
   DragDropState,
@@ -470,6 +471,15 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
           }
         }}
         trigger={renderTrigger()}
+        icon={
+          passProps.className === 'runs-selector-modified-dropdown' ? (
+            passProps.open ? (
+              <IconChevronUp />
+            ) : (
+              <IconChevronDown />
+            )
+          ) : undefined
+        }
       />
     );
   },
