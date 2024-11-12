@@ -5,6 +5,8 @@ import {
   FeedbackCreateRes,
   FeedbackPurgeReq,
   FeedbackPurgeRes,
+  FeedbackReplaceReq,
+  FeedbackReplaceRes,
   TraceCallsDeleteReq,
   TraceCallUpdateReq,
   TraceRefsReadBatchReq,
@@ -23,7 +25,11 @@ export class TraceServerClient extends DirectTraceServerClient {
   }> = [];
   private onDeleteListeners: Array<() => void>;
   private onRenameListeners: Array<() => void>;
-  private onFeedbackListeners: Record<string, Array<() => void>>;
+  // weave_ref -> feedback_type -> callback
+  private onFeedbackListeners: Record<
+    string,
+    Record<string, Array<() => void>>
+  >;
 
   constructor(baseUrl: string) {
     super(baseUrl);
@@ -33,6 +39,8 @@ export class TraceServerClient extends DirectTraceServerClient {
     this.onRenameListeners = [];
     this.onFeedbackListeners = {};
   }
+
+  private FEEDBACK_TYPE_DEFAULT = '';
 
   /**
    * Registers a callback to be called when a delete operation occurs.
@@ -60,20 +68,25 @@ export class TraceServerClient extends DirectTraceServerClient {
   }
   public registerOnFeedbackListener(
     weaveRef: string,
-    callback: () => void
+    callback: () => void,
+    feedbackType?: string
   ): () => void {
+    const feedbackTypeResolved = feedbackType ?? this.FEEDBACK_TYPE_DEFAULT;
     if (!(weaveRef in this.onFeedbackListeners)) {
-      this.onFeedbackListeners[weaveRef] = [];
+      this.onFeedbackListeners[weaveRef] = {};
     }
-    this.onFeedbackListeners[weaveRef].push(callback);
+    if (!(feedbackTypeResolved in this.onFeedbackListeners[weaveRef])) {
+      this.onFeedbackListeners[weaveRef][feedbackTypeResolved] = [];
+    }
+    this.onFeedbackListeners[weaveRef][feedbackTypeResolved].push(callback);
     return () => {
-      const newListeners = this.onFeedbackListeners[weaveRef].filter(
-        listener => listener !== callback
-      );
+      const newListeners = this.onFeedbackListeners[weaveRef][
+        feedbackTypeResolved
+      ].filter(listener => listener !== callback);
       if (newListeners.length) {
-        this.onFeedbackListeners[weaveRef] = newListeners;
+        this.onFeedbackListeners[weaveRef][feedbackTypeResolved] = newListeners;
       } else {
-        delete this.onFeedbackListeners[weaveRef];
+        delete this.onFeedbackListeners[weaveRef][feedbackTypeResolved];
       }
     };
   }
@@ -94,7 +107,13 @@ export class TraceServerClient extends DirectTraceServerClient {
 
   public feedbackCreate(req: FeedbackCreateReq): Promise<FeedbackCreateRes> {
     const res = super.feedbackCreate(req).then(createRes => {
-      const listeners = this.onFeedbackListeners[req.weave_ref] ?? [];
+      const listeners =
+        this.onFeedbackListeners[req.weave_ref]?.[req.feedback_type] ?? [];
+      listeners.push(
+        ...(this.onFeedbackListeners?.[req.weave_ref]?.[
+          this.FEEDBACK_TYPE_DEFAULT
+        ] ?? [])
+      );
       listeners.forEach(listener => listener());
       return createRes;
     });
@@ -106,9 +125,27 @@ export class TraceServerClient extends DirectTraceServerClient {
       //       information about the refs that were modified.
       //       For now, just call all registered feedback listeners.
       for (const listeners of Object.values(this.onFeedbackListeners)) {
-        listeners.forEach(listener => listener());
+        for (const listenersForWeaveRef of Object.values(listeners)) {
+          listenersForWeaveRef.forEach(listener => listener());
+        }
       }
       return purgeRes;
+    });
+    return res;
+  }
+
+  public feedbackReplace(req: FeedbackReplaceReq): Promise<FeedbackReplaceRes> {
+    const res = super.feedbackReplace(req).then(replaceRes => {
+      const listeners =
+        this.onFeedbackListeners[req.weave_ref]?.[req.feedback_type] ?? [];
+      // also fire the default feedback type listeners
+      listeners.push(
+        ...(this.onFeedbackListeners?.[req.weave_ref]?.[
+          this.FEEDBACK_TYPE_DEFAULT
+        ] ?? [])
+      );
+      listeners.forEach(listener => listener());
+      return replaceRes;
     });
     return res;
   }

@@ -144,6 +144,10 @@ export type FeedbackCreateReq = {
   weave_ref: string;
   feedback_type: string;
   payload: Record<string, any>;
+  annotation_ref?: string;
+  runnable_ref?: string;
+  call_ref?: string;
+  trigger_ref?: string;
 };
 
 export type FeedbackCreateSuccess = {
@@ -190,6 +194,16 @@ export type FeedbackPurgeError = {
   detail: string;
 };
 export type FeedbackPurgeRes = FeedbackPurgeSuccess | FeedbackPurgeError;
+
+export type FeedbackReplaceReq = FeedbackCreateReq & {
+  feedback_id: string;
+};
+export type FeedbackReplaceSuccess = {};
+export type FeedbackReplaceError = {
+  detail: string;
+};
+export type FeedbackReplaceRes = FeedbackCreateRes;
+
 interface TraceObjectsFilter {
   base_object_classes?: string[];
   object_ids?: string[];
