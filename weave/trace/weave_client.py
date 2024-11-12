@@ -628,7 +628,7 @@ class WeaveClient:
     def calls(
         self,
         filter: Optional[CallsFilter] = None,
-        include_costs: Optional[bool] = False,
+        include_costs: bool = False,
     ) -> CallsIter:
         return self.get_calls(filter=filter, include_costs=include_costs)
 
