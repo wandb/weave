@@ -156,7 +156,7 @@ const ObjectViewerSectionNonEmpty = ({
 
   const isExpandAllSmall =
     !!apiRef?.current?.getAllRowIds &&
-    getGroupIds().length < EXPANDED_IDS_LENGTH;
+    getGroupIds().length - expandedIds.length < EXPANDED_IDS_LENGTH;
 
   const onClickExpanded = () => {
     if (mode === 'expanded') {
