@@ -1,9 +1,9 @@
 import {Drawer} from '@mui/material';
 import {Alert} from '@wandb/weave/components/Alert';
 import {Button} from '@wandb/weave/components/Button';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useEffect, useState} from 'react';
 
-import {Tailwind} from '../../../../../../Tailwind';
 import {StyledTextArea} from '../StyledTextarea';
 
 type FunctionDrawerProps = {
@@ -38,11 +38,30 @@ export const FunctionDrawer: React.FC<FunctionDrawerProps> = ({
   onAddFunction,
   functions,
 }) => {
+  const isUpdating =
+    drawerFunctionIndex !== null && drawerFunctionIndex < functions.length;
   const [functionJSON, setFunctionJSON] = useState(
     drawerFunctionIndex !== null
       ? JSON.stringify(functions[drawerFunctionIndex], null, 2) ?? ''
       : ''
   );
+
+  // if updating, set the function JSON to current function
+  useEffect(() => {
+    setFunctionJSON(
+      drawerFunctionIndex
+        ? JSON.stringify(functions[drawerFunctionIndex], null, 2) ?? ''
+        : ''
+    );
+  }, [drawerFunctionIndex, functions]);
+
+  const handleAddFunction = () => {
+    if (drawerFunctionIndex !== null) {
+      onAddFunction(functionJSON, drawerFunctionIndex);
+    }
+    setFunctionJSON('');
+    onClose();
+  };
 
   let jsonValidationError = null;
   let parsedFunctionJSON = null;
@@ -53,51 +72,26 @@ export const FunctionDrawer: React.FC<FunctionDrawerProps> = ({
     jsonValidationError = `${err}`;
   }
 
-  const handleAddFunction = () => {
-    if (drawerFunctionIndex !== null) {
-      onAddFunction(functionJSON, drawerFunctionIndex);
-    }
-    setFunctionJSON('');
-    onClose();
-  };
+  let disableActionButton = true;
+  let buttonTooltip = '';
 
-  useEffect(() => {
-    setFunctionJSON(
-      drawerFunctionIndex !== null
-        ? JSON.stringify(functions[drawerFunctionIndex], null, 2) ?? ''
-        : ''
-    );
-  }, [drawerFunctionIndex, functions]);
-
-  const checkFunctionName = (name: string, index: number) => {
-    return functions.some((func, idx) => func.name === name && idx !== index);
-  };
-
-  const disableActionButton =
-    functionJSON.length === 0 ||
-    !functionJSON.trim() ||
-    !!jsonValidationError ||
-    parsedFunctionJSON.name === null ||
-    checkFunctionName(parsedFunctionJSON.name, drawerFunctionIndex ?? 0);
-
-  let buttonTooltip = `${
-    drawerFunctionIndex !== null && drawerFunctionIndex < functions.length
-      ? 'Update'
-      : 'Add'
-  } function`;
-
-  if (disableActionButton) {
-    if (functionJSON.length === 0 || !functionJSON.trim()) {
-      buttonTooltip = 'Function JSON is empty';
-    } else if (!!jsonValidationError) {
-      buttonTooltip = jsonValidationError;
-    } else if (parsedFunctionJSON.name === null) {
-      buttonTooltip = 'Function JSON has no name';
-    } else if (
-      checkFunctionName(parsedFunctionJSON.name, drawerFunctionIndex ?? 0)
-    ) {
-      buttonTooltip = 'Function with this name already exists';
-    }
+  if (functionJSON.length === 0 || !functionJSON.trim()) {
+    buttonTooltip = 'Function JSON is empty';
+  } else if (!!jsonValidationError) {
+    buttonTooltip = jsonValidationError;
+  } else if (parsedFunctionJSON.name === null) {
+    buttonTooltip = 'Function JSON has no name';
+  } else if (
+    drawerFunctionIndex &&
+    functions.some(
+      (func, idx) =>
+        func.name === parsedFunctionJSON.name && idx !== drawerFunctionIndex
+    )
+  ) {
+    buttonTooltip = 'Function with this name already exists';
+  } else {
+    disableActionButton = false;
+    buttonTooltip = `${isUpdating ? 'Update' : 'Add'} function`;
   }
 
   return (
@@ -150,10 +144,7 @@ export const FunctionDrawer: React.FC<FunctionDrawerProps> = ({
               onClick={handleAddFunction}
               disabled={disableActionButton}
               tooltip={buttonTooltip}>
-              {drawerFunctionIndex !== null &&
-              drawerFunctionIndex < functions.length
-                ? 'Update'
-                : 'Add'}
+              {isUpdating ? 'Update' : 'Add'}
             </Button>
           </div>
         </div>

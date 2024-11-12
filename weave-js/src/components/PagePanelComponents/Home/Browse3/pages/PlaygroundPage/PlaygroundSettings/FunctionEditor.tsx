@@ -45,12 +45,7 @@ export const FunctionEditor: React.FC<FunctionEditorProps> = ({
   const handleAddFunction = (functionJSON: string, index: number) => {
     try {
       const json = JSON.parse(functionJSON);
-      if (
-        typeof json === 'object' &&
-        json !== null &&
-        'name' in json &&
-        (functions[index] || functions.every(func => func.name !== json.name))
-      ) {
+      if (typeof json === 'object') {
         setFunctions(
           (prevFunctions: Array<{name: string; [key: string]: any}>) => {
             const newFunctions = [...prevFunctions];
@@ -62,8 +57,6 @@ export const FunctionEditor: React.FC<FunctionEditorProps> = ({
             return newFunctions;
           }
         );
-      } else {
-        console.error('Function JSON must have a name property');
       }
     } catch (err) {
       console.error('Error parsing function json', err);

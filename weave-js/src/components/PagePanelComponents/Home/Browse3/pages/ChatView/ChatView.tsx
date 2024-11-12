@@ -1,6 +1,7 @@
 import React, {useEffect, useMemo, useRef} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
+import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundChat/PlaygroundContext';
 import {DEFAULT_SYSTEM_MESSAGE_CONTENT} from '../PlaygroundPage/usePlaygroundState';
 import {ChatEmptyStateCallout} from './ChatEmptyStateCallout';
 import {ChoicesView} from './ChoicesView';
@@ -27,7 +28,10 @@ export const ChatView = ({chat}: ChatViewProps) => {
     }
   }, [chatResult]);
 
+  const {isPlayground} = usePlaygroundContext();
+
   const showEmptyStateCallout =
+    isPlayground &&
     chat.request?.messages.length === 1 &&
     chat.request.messages[0].content === DEFAULT_SYSTEM_MESSAGE_CONTENT &&
     (chatResult?.choices.length === 0 || chatResult?.choices === undefined);

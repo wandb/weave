@@ -33,7 +33,6 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
   const {
     setPlaygroundStates,
     playgroundStates,
-    setPlaygroundStates,
     setPlaygroundStateField,
     setPlaygroundStateFromTraceCall,
   } = usePlaygroundState();
