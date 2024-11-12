@@ -17,14 +17,13 @@ import {
   FeedbackCreateSuccess,
 } from '../../pages/wfReactInterface/traceServerClientTypes';
 import {
+  FEEDBACK_TYPE_OPTIONS,
+  HUMAN_FEEDBACK_BASE_TYPE,
   HumanAnnotationPayload,
   HumanFeedback,
   tsHumanAnnotationSpec,
 } from './humanFeedbackTypes';
 
-// Constants
-const HUMAN_FEEDBACK_BASE_TYPE = 'wandb.annotation';
-const FEEDBACK_TYPE_OPTIONS = ['text', 'number', 'boolean', 'categorical'];
 const DEBOUNCE_VAL = 200;
 
 // Interfaces
@@ -36,11 +35,10 @@ type HumanFeedbackProps = {
   callRef: string;
   readOnly?: boolean;
   focused?: boolean;
+  setUnsavedFeedbackChanges: React.Dispatch<
+    React.SetStateAction<Array<() => Promise<boolean>>>
+  >;
 };
-
-// pending feedback promises, used to wait for all pending feedback to complete
-// when clicking the next button in the sidebar outside of this component
-const pendingFeedbackPromises = new Set<Promise<boolean>>();
 
 export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
   const getTsClient = useGetTraceServerClientContext();
@@ -87,7 +85,7 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
       };
 
       // TODO(gst): use replace when feedback is updated within 10 seconds of the previous feedback
-      const createRequest = createFeedbackRequest(requestProps);
+      const createRequest = generateFeedbackRequestPayload(requestProps);
       const promise = tsClient
         .feedbackCreate(createRequest)
         .then(res => {
@@ -106,12 +104,7 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
             type: 'error',
           });
           return false;
-        })
-        .finally(() => {
-          pendingFeedbackPromises.delete(promise);
         });
-
-      pendingFeedbackPromises.add(promise);
       return await promise;
     } catch (error) {
       toast(`Error in onAddFeedback: ${error}`, {
@@ -143,7 +136,7 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
     () => extractFeedbackValues(foundFeedback, props.viewer, feedbackSpecRef),
     [foundFeedback, props.viewer, feedbackSpecRef]
   );
-  const {rawValues, mostRecentVal} = extractedValues;
+  const {rawValues, mostRecentVal, viewerFeedbackVal} = extractedValues;
 
   const type = useMemo(
     () => inferTypeFromJsonSchema(props.hfSpec.json_schema ?? {}),
@@ -160,7 +153,10 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
       </div>
     );
   }
-
+  let foundValue = mostRecentVal;
+  if (props.hfSpec.unique_among_creators) {
+    foundValue = viewerFeedbackVal;
+  }
   return (
     <div className="w-full py-4">
       <FeedbackComponentSelector
@@ -168,7 +164,9 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
         jsonSchema={props.hfSpec.json_schema ?? {}}
         focused={props.focused ?? false}
         onAddFeedback={onAddFeedback}
-        foundValue={mostRecentVal}
+        foundValue={foundValue}
+        feedbackSpecRef={feedbackSpecRef}
+        setUnsavedFeedbackChanges={props.setUnsavedFeedbackChanges}
       />
     </div>
   );
@@ -180,55 +178,81 @@ const FeedbackComponentSelector: React.FC<{
   focused: boolean;
   onAddFeedback: (value: any) => Promise<boolean>;
   foundValue: string | number | null;
-}> = React.memo(({type, jsonSchema, focused, onAddFeedback, foundValue}) => {
-  switch (type) {
-    case 'number':
-      return (
-        <NumericalFeedbackColumn
-          min={jsonSchema.min}
-          max={jsonSchema.max}
-          isInteger={jsonSchema.is_integer}
-          onAddFeedback={onAddFeedback}
-          defaultValue={foundValue as number | null}
-          focused={focused}
-        />
-      );
-    case 'text':
-      return (
-        <TextFeedbackColumn
-          onAddFeedback={onAddFeedback}
-          defaultValue={foundValue as string | null}
-          focused={focused}
-        />
-      );
-    case 'categorical':
-      return (
-        <CategoricalFeedbackColumn
-          options={jsonSchema.options}
-          onAddFeedback={onAddFeedback}
-          defaultValue={foundValue as string | null}
-          focused={focused}
-        />
-      );
-    case 'boolean':
-      return (
-        <BinaryFeedbackColumn
-          onAddFeedback={onAddFeedback}
-          defaultValue={foundValue as string | null}
-          focused={focused}
-        />
-      );
-    default:
-      // Return a text column by default
-      return (
-        <TextFeedbackColumn
-          onAddFeedback={onAddFeedback}
-          defaultValue={foundValue as string | null}
-          focused={focused}
-        />
-      );
+  feedbackSpecRef: string;
+  setUnsavedFeedbackChanges: React.Dispatch<
+    React.SetStateAction<Array<() => Promise<boolean>>>
+  >;
+}> = React.memo(
+  ({
+    type,
+    jsonSchema,
+    focused,
+    onAddFeedback,
+    foundValue,
+    feedbackSpecRef,
+    setUnsavedFeedbackChanges,
+  }) => {
+    const wrappedOnAddFeedback = useCallback(
+      async (value: any) => {
+        setUnsavedFeedbackChanges(curr => [
+          ...curr,
+          () => onAddFeedback(value),
+        ]);
+        return true;
+      },
+      [onAddFeedback, setUnsavedFeedbackChanges]
+    );
+
+    switch (type) {
+      case 'number':
+        return (
+          <NumericalFeedbackColumn
+            min={jsonSchema.min}
+            max={jsonSchema.max}
+            isInteger={jsonSchema.is_integer}
+            onAddFeedback={wrappedOnAddFeedback}
+            defaultValue={foundValue as number | null}
+            focused={focused}
+          />
+        );
+      case 'text':
+        return (
+          <TextFeedbackColumn
+            onAddFeedback={wrappedOnAddFeedback}
+            defaultValue={foundValue as string | null}
+            focused={focused}
+          />
+        );
+      case 'array':
+        return (
+          <CategoricalFeedbackColumn
+            options={jsonSchema.options}
+            onAddFeedback={wrappedOnAddFeedback}
+            defaultValue={foundValue as string | null}
+            focused={focused}
+          />
+        );
+      case 'boolean':
+        return (
+          <BinaryFeedbackColumn
+            onAddFeedback={wrappedOnAddFeedback}
+            defaultValue={foundValue as string | null}
+            focused={focused}
+          />
+        );
+      default:
+        // Return a text column by default
+        return (
+          <TextFeedbackColumn
+            onAddFeedback={wrappedOnAddFeedback}
+            defaultValue={foundValue as string | null}
+            focused={focused}
+            maxLength={jsonSchema.max_length}
+          />
+        );
+    }
   }
-});
+);
 
 type ExtractedFeedbackValues = {
   // The leaves of the feedback tree, just the raw values
@@ -295,7 +319,7 @@ type FeedbackRequestProps = {
 };
 
 // Utility function for creating feedback request
-const createFeedbackRequest = ({
+const generateFeedbackRequestPayload = ({
   entity,
   project,
   viewer,
@@ -321,22 +345,12 @@ const createFeedbackRequest = ({
     payload: humanAnnotationPayload,
     sort_by: [{created_at: 'desc'}],
   };
-
   return baseRequest;
 };
 
 const inferTypeFromJsonSchema = (jsonSchema: Record<string, any>) => {
-  if (jsonSchema.type in FEEDBACK_TYPE_OPTIONS) {
+  if (FEEDBACK_TYPE_OPTIONS.includes(jsonSchema.type)) {
     return jsonSchema.type;
-  }
-  if (jsonSchema.min !== undefined || jsonSchema.max !== undefined) {
-    return 'number';
-  }
-  if (jsonSchema.max_length !== undefined) {
-    return 'text';
-  }
-  if (jsonSchema.options !== undefined) {
-    return 'categorical';
   }
   toast(`Unknown feedback type from spec: ${JSON.stringify(jsonSchema)}`, {
     type: 'warning',
@@ -359,9 +373,6 @@ export const NumericalFeedbackColumn = ({
   focused?: boolean;
   isInteger?: boolean;
 }) => {
-  const [value, setValue] = useState<string>(defaultValue?.toString() ?? '');
-  const [error, setError] = useState<boolean>(false);
-
   const debouncedFn = useMemo(
     () =>
       _.debounce((val: number | null) => onAddFeedback?.(val), DEBOUNCE_VAL),
@@ -373,68 +384,15 @@ export const NumericalFeedbackColumn = ({
     };
   }, [debouncedFn]);
 
-  useEffect(() => {
-    setValue(defaultValue?.toString() ?? '');
-  }, [defaultValue]);
-
-  const getVal = useCallback(
-    (v: string) => {
-      if (v === '') {
-        return null;
-      }
-      if (isInteger) {
-        return v;
-      }
-      const floatRegExp = new RegExp('^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$');
-      if (!floatRegExp.test(v)) {
-        return null;
-      }
-      return v;
-    },
-    [isInteger]
-  );
-
-  const onValueChange = useCallback(
-    (v: string) => {
-      const val = getVal(v);
-      if (val === value) {
-        return;
-      }
-      setValue(v);
-      const parsedVal = val
-        ? isInteger
-          ? parseInt(val, 10)
-          : parseFloat(val)
-        : null;
-      if (
-        (val !== '' && parsedVal == null) ||
-        (parsedVal && (parsedVal < min || parsedVal > max))
-      ) {
-        setError(true);
-        return;
-      } else {
-        setError(false);
-      }
-      debouncedFn(parsedVal);
-    },
-    [value, min, max, isInteger, debouncedFn, getVal]
-  );
-
   return (
-    <div className="w-full">
-      <TextField
-        autoFocus={focused}
-        type={isInteger ? 'number' : 'text'}
-        value={value?.toString() ?? ''}
-        onChange={onValueChange}
-        placeholder=""
-        step={isInteger ? 1 : 0.001}
-        errorState={error}
-      />
-      <div className="mb-1 text-xs text-moon-500">
-        min: {min}, max: {max}
-      </div>
-    </div>
+    <NumericalTextField
+      value={defaultValue}
+      onChange={debouncedFn}
+      min={min}
+      max={max}
+      isInteger={isInteger}
+      autoFocus={focused}
+    />
   );
 };
 
@@ -442,10 +400,12 @@ export const TextFeedbackColumn = ({
   onAddFeedback,
   defaultValue,
   focused,
+  maxLength,
 }: {
   onAddFeedback?: (value: string) => Promise<boolean>;
   defaultValue: string | null;
   focused?: boolean;
+  maxLength?: number;
 }) => {
   const [value, setValue] = useState<string>(defaultValue ?? '');
 
@@ -478,8 +438,14 @@ export const TextFeedbackColumn = ({
         autoFocus={focused}
         value={value}
         onChange={onValueChange}
+        maxLength={maxLength}
         placeholder="..."
       />
+      {maxLength && (
+        <div className="mb-1 text-xs text-moon-500">
+          {`character max: ${maxLength}`}
+        </div>
+      )}
     </div>
   );
 };
@@ -621,9 +587,102 @@ export const BinaryFeedbackColumn = ({
   );
 };
 
-export const waitForPendingFeedback = async (): Promise<void> => {
-  if (pendingFeedbackPromises.size === 0) {
-    return;
-  }
-  await Promise.all(Array.from(pendingFeedbackPromises));
+export interface NumericalTextFieldProps {
+  value: number | null;
+  onChange: (value: number | null) => void;
+  min?: number;
+  max?: number;
+  isInteger?: boolean;
+  autoFocus?: boolean;
+  placeholder?: string;
+}
+
+export const NumericalTextField: React.FC<NumericalTextFieldProps> = ({
+  value,
+  onChange,
+  min,
+  max,
+  isInteger,
+  autoFocus,
+  placeholder,
+}) => {
+  const [textValue, setTextValue] = useState<string>(value?.toString() ?? '');
+  const [error, setError] = useState<boolean>(false);
+
+  useEffect(() => {
+    setTextValue(value?.toString() ?? '');
+  }, [value]);
+
+  const getVal = useCallback(
+    (v: string) => {
+      if (v === '') {
+        return null;
+      }
+      if (isInteger) {
+        const intRegExp = new RegExp('^[+-]?[0-9]+$');
+        return intRegExp.test(v) ? v : null;
+      }
+      const floatRegExp = new RegExp('^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$');
+      return floatRegExp.test(v) ? v : null;
+    },
+    [isInteger]
+  );
+
+  const onValueChange = useCallback(
+    (v: string) => {
+      // Allow empty string
+      if (v === '') {
+        setTextValue('');
+        setError(false);
+        onChange(null);
+        return;
+      }
+
+      const val = getVal(v);
+      if (val === textValue) {
+        return;
+      }
+      setTextValue(v);
+
+      // If val is null but v isn't empty, there's a format error
+      if (val === null) {
+        setError(true);
+        return;
+      }
+
+      const parsedVal = isInteger ? parseInt(val, 10) : parseFloat(val);
+      if (
+        (min != null && parsedVal < min) ||
+        (max != null && parsedVal > max)
+      ) {
+        setError(true);
+        return;
+      }
+
+      setError(false);
+      onChange(parsedVal);
+    },
+    [textValue, min, max, isInteger, onChange, getVal]
+  );
+
+  return (
+    <div className="w-full">
+      <TextField
+        autoFocus={autoFocus}
+        type={isInteger ? 'number' : 'text'}
+        value={textValue}
+        onChange={onValueChange}
+        placeholder={placeholder}
+        step={isInteger ? 1 : 0.001}
+        errorState={error}
+      />
+      {(min != null || max != null) && (
+        <div className="mb-1 text-xs text-moon-500">
+          {min != null && `min: ${min}`}
+          {min != null && max != null && ', '}
+          {max != null && `max: ${max}`}
+        </div>
+      )}
+    </div>
+  );
 };

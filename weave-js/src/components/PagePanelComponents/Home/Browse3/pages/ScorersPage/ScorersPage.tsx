@@ -34,7 +34,7 @@ export const ScorersPage: React.FC<{
       headerContent={undefined}
       headerExtra={
         <Button
-          className="mx-8 my-4"
+          className="p-5 pr-8"
           icon="add-new"
           onClick={() => setIsDrawerOpen(true)}>
           Create scorer
@@ -53,6 +53,11 @@ export const ScorersPage: React.FC<{
 };
 
 type ScorerType = 'programmatic' | 'action_spec' | 'human_annotation';
+type OptionType = {
+  label: string;
+  value: ScorerType;
+  isDisabled: boolean;
+};
 
 const CreateScorerDrawer = ({
   entityName,
@@ -63,12 +68,15 @@ const CreateScorerDrawer = ({
   projectName: string;
   onClose: () => void;
 }) => {
-  const [selectedType, setSelectedType] = useState<ScorerType>('programmatic');
-  const options: Array<{label: string; value: ScorerType}> = [
-    {label: 'Programmatic scorer', value: 'programmatic'},
-    {label: 'Action spec scorer', value: 'action_spec'},
-    {label: 'Human annotation', value: 'human_annotation'},
+  const options: OptionType[] = [
+    {label: 'Programmatic scorer', value: 'programmatic', isDisabled: true},
+    {label: 'Human annotation', value: 'human_annotation', isDisabled: false},
+    {label: 'Action spec scorer', value: 'action_spec', isDisabled: true},
   ];
+  const defaultScorerType = options.find(opt => !opt.isDisabled);
+  const [selectedType, setSelectedType] = useState<ScorerType>(
+    defaultScorerType!.value
+  );
 
   const renderContent = () => {
     switch (selectedType) {
@@ -97,13 +105,16 @@ const CreateScorerDrawer = ({
           <div className="flex-grow" />
           <Button icon="close" onClick={onClose} variant="ghost" />
         </div>
-        <div className="my-12">
-          <div className="text-md mb-4 font-semibold">Select a scorer type</div>
-          <Select
+        <div className="my-8">
+          <div className="text-md mb-4 font-semibold">Scorer type</div>
+          <Select<{label: string; value: ScorerType}>
             value={options.find(opt => opt.value === selectedType)}
-            onChange={option =>
-              setSelectedType(option?.value ?? 'programmatic')
-            }
+            onChange={option => {
+              if (option) {
+                setSelectedType(option.value);
+              }
+            }}
+            defaultValue={defaultScorerType}
             options={options}
           />
         </div>
@@ -115,9 +126,9 @@ const CreateScorerDrawer = ({
 
 // Stub components for each scorer type
 const CreateProgrammaticScorer: React.FC = () => {
-  return <div>Programmatic Scorer Form (TODO)</div>;
+  return <div>Programmatic Scorer Form</div>;
 };
 
 const CreateActionSpecScorer: React.FC = () => {
-  return <div>Action Spec Scorer Form (TODO)</div>;
+  return <div>Action Spec Scorer Form</div>;
 };

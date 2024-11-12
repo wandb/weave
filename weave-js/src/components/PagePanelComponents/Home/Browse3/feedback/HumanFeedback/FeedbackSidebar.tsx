@@ -1,10 +1,11 @@
+import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useEffect, useState} from 'react';
 
-import {HumanFeedbackCell, waitForPendingFeedback} from './HumanFeedback';
+import {HumanFeedbackCell} from './HumanFeedback';
 import {tsHumanAnnotationSpec} from './humanFeedbackTypes';
 import {ManageHumanFeedback} from './ManageHumanFeedback';
 
@@ -30,25 +31,48 @@ export const FeedbackSidebar = ({
   );
   const [feedbackVisibilityModel, setFeedbackVisibilityModel] =
     useState<Record<string, boolean>>(humanFeedbackMap);
+  const [isSaving, setIsSaving] = useState(false);
+  const [unsavedFeedbackChanges, setUnsavedFeedbackChanges] = useState<
+    Array<() => Promise<boolean>>
+  >([]);
 
-  const handleDone = async () => {
-    // Wait for any pending feedback to complete
-    await waitForPendingFeedback();
-    onNextCall?.();
+  const save = async () => {
+    setIsSaving(true);
+    try {
+      // Save all pending feedback changes
+      const savePromises = unsavedFeedbackChanges.map(saveFn => saveFn());
+      const results = await Promise.all(savePromises);
+
+      // Check if any saves failed
+      if (results.some(result => !result)) {
+        throw new Error('Not all feedback changes saved');
+      }
+
+      // Clear the unsaved changes after successful save
+      setUnsavedFeedbackChanges([]);
+    } catch (error) {
+      console.error('Error saving feedback:', error);
+      toast(`Error saving feedback: ${error}`, {
+        type: 'error',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
+
   // handle shift + down arrow key, capture so the other handler
-  // doesn't also trigger.
+  // doesn't also trigger without saving.
   useEffect(() => {
     const handleArrowDownKey = (event: KeyboardEvent) => {
       if (event.shiftKey && event.key === 'ArrowDown') {
         event.preventDefault();
-        handleDone();
+        save().then(() => onNextCall?.());
       }
     };
     const handleArrowUpKey = (event: KeyboardEvent) => {
       if (event.key === 'ArrowUp') {
         event.preventDefault();
-        handleDone();
+        save().then(() => onNextCall?.());
       }
     };
     document.addEventListener('keydown', handleArrowDownKey);
@@ -76,16 +100,17 @@ export const FeedbackSidebar = ({
           callID={callID}
           humanFeedbackSpecs={humanFeedbackSpecs}
           columnVisibilityModel={feedbackVisibilityModel}
+          setUnsavedFeedbackChanges={setUnsavedFeedbackChanges}
         />
       </div>
-      <div className="mr-4 border-t border-moon-300 p-12">
+      <div className="flex w-full border-t border-moon-300 p-6 pr-10">
         <Button
-          onClick={handleDone}
+          onClick={save}
           variant="primary"
           className="w-full"
-          size="large"
-          endIcon="chevron-next">
-          Done
+          disabled={isSaving || unsavedFeedbackChanges.length === 0}
+          size="large">
+          {isSaving ? 'Saving...' : 'Save'}
         </Button>
       </div>
     </div>
@@ -111,13 +136,16 @@ const FeedbackSidebarHeader = ({
     <div className="justify-left flex w-full border-b border-moon-300 p-12">
       <div className="text-lg font-semibold">Feedback</div>
       <div className="flex-grow" />
-      <ManageHumanFeedback
-        entityName={entity}
-        projectName={project}
-        specs={humanFeedbackSpecs}
-        columnVisibilityModel={columnVisibilityModel}
-        setColumnVisibilityModel={setColumnVisibilityModel}
-      />
+      {/* Revisit managing human feedback when saved views land */}
+      {false && (
+        <ManageHumanFeedback
+          entityName={entity}
+          projectName={project}
+          specs={humanFeedbackSpecs}
+          columnVisibilityModel={columnVisibilityModel}
+          setColumnVisibilityModel={setColumnVisibilityModel}
+        />
+      )}
     </div>
   );
 };
@@ -128,6 +156,9 @@ type HumanFeedbackSectionProps = {
   callID: string;
   humanFeedbackSpecs: tsHumanAnnotationSpec[];
   columnVisibilityModel: Record<string, boolean>;
+  setUnsavedFeedbackChanges: React.Dispatch<
+    React.SetStateAction<Array<() => Promise<boolean>>>
+  >;
 };
 
 const HumanFeedbackSection = ({
@@ -136,6 +167,7 @@ const HumanFeedbackSection = ({
   callID,
   humanFeedbackSpecs,
   columnVisibilityModel,
+  setUnsavedFeedbackChanges,
 }: HumanFeedbackSectionProps) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const sortedVisibleColumns = humanFeedbackSpecs
@@ -158,6 +190,7 @@ const HumanFeedbackSection = ({
           project={project}
           callID={callID}
           humanFeedbackSpecs={sortedVisibleColumns}
+          setUnsavedFeedbackChanges={setUnsavedFeedbackChanges}
         />
       )}
     </div>
@@ -187,9 +220,11 @@ const HumanFeedbackHeader = ({
           {numHumanFeedbackSpecsVisible}
         </div>
         <div className="flex-grow" />
-        <div className="mr-4 mt-2 rounded-full px-2 text-xs font-medium">
-          {numHumanFeedbackSpecsHidden} hidden
-        </div>
+        {numHumanFeedbackSpecsHidden > 0 && (
+          <div className="mr-4 mt-2 rounded-full px-2 text-xs font-medium">
+            {numHumanFeedbackSpecsHidden} hidden
+          </div>
+        )}
       </div>
       <div className="mb-6 flex items-center">
         <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} />
@@ -203,6 +238,9 @@ type HumanFeedbackInputsProps = {
   project: string;
   callID: string;
   humanFeedbackSpecs: tsHumanAnnotationSpec[];
+  setUnsavedFeedbackChanges: React.Dispatch<
+    React.SetStateAction<Array<() => Promise<boolean>>>
+  >;
 };
 
 const HumanFeedbackInputs = ({
@@ -210,6 +248,7 @@ const HumanFeedbackInputs = ({
   project,
   callID,
   humanFeedbackSpecs,
+  setUnsavedFeedbackChanges,
 }: HumanFeedbackInputsProps) => {
   const callRef = makeRefCall(entity, project, callID);
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
@@ -240,6 +279,7 @@ const HumanFeedbackInputs = ({
               project={project}
               viewer={viewer}
               readOnly={false}
+              setUnsavedFeedbackChanges={setUnsavedFeedbackChanges}
             />
           </div>
         </div>

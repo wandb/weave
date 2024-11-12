@@ -81,8 +81,24 @@ export const FeedbackGrid = ({
     );
   }
 
+  // Combine annotationed feedback on (feedback_type, creator)
+  const combined = _.groupBy(
+    query.result.filter(f => f.feedback_type.startsWith('wandb.annotation.')),
+    f => `${f.feedback_type}-${f.creator}`
+  );
+  // only keep the most recent feedback for each primary key
+  const combinedFiltered = Object.values(combined).map(
+    fs => fs.sort((a, b) => b.created_at - a.created_at)[0]
+  );
+  // add the non-annotation feedback to the combined object
+  combinedFiltered.push(
+    ...query.result.filter(
+      f => !f.feedback_type.startsWith('wandb.annotation.')
+    )
+  );
+
   // Group by feedback on this object vs. descendent objects
-  const grouped = _.groupBy(query.result, f =>
+  const grouped = _.groupBy(combinedFiltered, f =>
     f.weave_ref.substring(weaveRef.length)
   );
   const paths = Object.keys(grouped).sort();
