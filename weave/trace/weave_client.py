@@ -615,9 +615,7 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def get_calls(
-        self,
-        filter: Optional[CallsFilter] = None,
-        include_costs: bool = False,
+        self, filter: Optional[CallsFilter] = None, include_costs: bool = False
     ) -> CallsIter:
         if filter is None:
             filter = CallsFilter()
@@ -626,9 +624,7 @@ class WeaveClient:
 
     @deprecated(new_name="get_calls")
     def calls(
-        self,
-        filter: Optional[CallsFilter] = None,
-        include_costs: bool = False,
+        self, filter: Optional[CallsFilter] = None, include_costs: bool = False
     ) -> CallsIter:
         return self.get_calls(filter=filter, include_costs=include_costs)
 
