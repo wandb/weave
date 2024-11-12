@@ -6,7 +6,10 @@ import {Tag} from '@wandb/weave/components/Tag';
 import React, {SetStateAction} from 'react';
 
 import {PlaygroundState, PlaygroundStateKey} from '../types';
+import {FunctionEditor} from './FunctionEditor';
 import {PlaygroundSlider} from './PlaygroundSlider';
+import {ResponseFormatEditor} from './ResponseFormatEditor';
+import {StopSequenceEditor} from './StopSequenceEditor';
 
 export type PlaygroundSettingsProps = {
   playgroundStates: PlaygroundState[];
@@ -59,6 +62,25 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 gap: '4px',
                 mt: 2,
               }}>
+              <FunctionEditor
+                playgroundState={playgroundState}
+                functions={playgroundState.functions}
+                setFunctions={value =>
+                  setPlaygroundStateField(
+                    idx,
+                    'functions',
+                    value as Array<{name: string; [key: string]: any}>
+                  )
+                }
+              />
+
+              <ResponseFormatEditor
+                responseFormat={playgroundState.responseFormat}
+                setResponseFormat={value =>
+                  setPlaygroundStateField(idx, 'responseFormat', value)
+                }
+              />
+
               <PlaygroundSlider
                 min={0}
                 max={2}
@@ -79,6 +101,13 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 }
                 label="Maximum tokens"
                 value={playgroundState.maxTokens}
+              />
+
+              <StopSequenceEditor
+                stopSequences={playgroundState.stopSequences}
+                setStopSequences={value =>
+                  setPlaygroundStateField(idx, 'stopSequences', value)
+                }
               />
 
               <PlaygroundSlider

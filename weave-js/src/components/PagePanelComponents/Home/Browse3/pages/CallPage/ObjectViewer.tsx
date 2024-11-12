@@ -647,7 +647,7 @@ const ShowMoreButtons = ({
       sx={{
         display: 'flex',
         width: '100%',
-        justifyContent: 'flex-end',
+        justifyContent: 'flex-start',
         gap: 1,
       }}>
       {truncatedCount > ARRAY_TRUNCATION_LENGTH && (
