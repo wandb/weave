@@ -3,11 +3,7 @@ import Prism from 'prismjs';
 import React, {useEffect, useRef, useState} from 'react';
 
 import {Alert} from '../../../../../Alert';
-<<<<<<< HEAD
-import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundChat/PlaygroundContext';
-=======
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
->>>>>>> josiah/playground-chatview-improvements
 import {MessagePanel} from './MessagePanel';
 import {ToolCallWithResponse} from './types';
 
