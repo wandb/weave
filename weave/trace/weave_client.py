@@ -683,10 +683,8 @@ class WeaveClient:
             inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
         else:
             inputs_postprocessed = inputs_redacted
-
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
-        call_id = generate_id()
 
         if parent is None and use_stack:
             parent = call_context.get_current_call()
@@ -711,6 +709,7 @@ class WeaveClient:
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
+        call_id = generate_id()
         call = Call(
             _op_name=op_name_future,
             project_id=self._project_id(),
@@ -725,6 +724,7 @@ class WeaveClient:
         if callable(name_func := display_name):
             display_name = name_func(call)
         call.display_name = display_name
+
         if parent is not None:
             parent._children.append(call)
 
