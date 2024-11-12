@@ -7,7 +7,7 @@ import React, {useEffect, useState} from 'react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {ChatView} from '../ChatView/ChatView';
 import {useCallAsChat} from '../ChatView/hooks';
-import {PlaygroundContext} from '../PlaygroundPage/PlaygroundChat/PlaygroundContext';
+import {PlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 
 const DRAWER_ANIMATION_BUFFER_TIME = 400;

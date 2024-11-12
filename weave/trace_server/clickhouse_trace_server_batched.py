@@ -308,6 +308,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # Split out any nested column requests
             columns = [col.split(".")[0] for col in columns]
 
+        # sort the columns such that similar queries are grouped together
+        columns = sorted(columns)
+
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
             summary_columns = ["summary", "summary_dump"]

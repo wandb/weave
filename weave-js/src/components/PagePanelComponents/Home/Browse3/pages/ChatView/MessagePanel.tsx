@@ -4,7 +4,7 @@ import classNames from 'classnames';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 
-import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundChat/PlaygroundContext';
+import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
 import {StyledTextArea} from '../PlaygroundPage/StyledTextarea';
 import {MessagePanelPart} from './MessagePanelPart';
 import {ShowMoreButton} from './ShowMoreButton';

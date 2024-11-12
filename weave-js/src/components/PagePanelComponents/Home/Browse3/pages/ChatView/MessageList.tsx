@@ -51,7 +51,6 @@ const processToolCallMessages = (messages: Messages) => {
     }
 
     // Otherwise, we need to associate the tool calls with their responses.
-
     // Get all the next messages where role = tool, these are all the responses
     const toolMessages: Message[] = [];
     while (i + 1 < messages.length && messages[i + 1].role === 'tool') {

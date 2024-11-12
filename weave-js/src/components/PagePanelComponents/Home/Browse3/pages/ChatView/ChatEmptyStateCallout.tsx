@@ -3,7 +3,7 @@ import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React from 'react';
 
-import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundChat/PlaygroundContext';
+import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
 
 const DEFAULT_EMPTY_STATE_MESSAGE = 'How can I help you today?';
 const DEFAULT_MESSAGES: Array<{message: string; icon: IconName}> = [

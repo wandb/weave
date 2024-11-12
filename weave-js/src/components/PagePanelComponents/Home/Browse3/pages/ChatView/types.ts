@@ -34,6 +34,7 @@ export type ToolCall = {
   };
 };
 
+// Used to store the response of a tool call in the message history.
 export type ToolCallWithResponse = ToolCall & {
   response?: Message;
 };
