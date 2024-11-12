@@ -6,6 +6,7 @@ import {Tag} from '@wandb/weave/components/Tag';
 import React, {SetStateAction} from 'react';
 
 import {PlaygroundState, PlaygroundStateKey} from '../types';
+import {FunctionEditor} from './FunctionEditor';
 import {PlaygroundSlider} from './PlaygroundSlider';
 import {StopSequenceEditor} from './StopSequenceEditor';
 
@@ -60,6 +61,18 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 gap: '4px',
                 mt: 2,
               }}>
+              <FunctionEditor
+                playgroundState={playgroundState}
+                functions={playgroundState.functions}
+                setFunctions={value =>
+                  setPlaygroundStateField(
+                    idx,
+                    'functions',
+                    value as Array<{name: string; [key: string]: any}>
+                  )
+                }
+              />
+
               <PlaygroundSlider
                 min={0}
                 max={2}
