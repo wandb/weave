@@ -199,10 +199,10 @@ export const EMPTY_PROPS_PROGRAMMATIC_SCORERS: EmptyProps = {
   ),
 };
 
-export const EMPTY_PROPS_ACTION_DEFINITIONS: EmptyProps = {
+export const EMPTY_PROPS_ACTION_SPECS: EmptyProps = {
   icon: 'automation-robot-arm' as const,
-  heading: 'No configurations yet',
+  heading: 'No Actions yet',
   description:
-    'Create new configuration by clicking "Create new" in the top right.',
+    'Use Actions to define workloads to be executed by Weave servers (for example: LLM Judges) ',
   moreInformation: <></>,
 };
