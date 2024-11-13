@@ -10,8 +10,11 @@ import {Message} from '../../ChatView/types';
 import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundState, PlaygroundStateKey} from '../types';
+<<<<<<< HEAD
 import {getInputFromPlaygroundState} from '../usePlaygroundState';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
+=======
+>>>>>>> master
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
 import {clearTraceCall, useChatFunctions} from './useChatFunctions';
@@ -40,6 +43,10 @@ export const PlaygroundChat = ({
   settingsTab,
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
+<<<<<<< HEAD
+=======
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+>>>>>>> master
   const [isLoading, setIsLoading] = useState(false);
   const getTsClient = useGetTraceServerClientContext();
 
@@ -342,7 +349,6 @@ export const PlaygroundChat = ({
           </React.Fragment>
         ))}
       </Box>
-
       <PlaygroundChatInput
         chatText={chatText}
         setChatText={setChatText}
