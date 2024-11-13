@@ -305,8 +305,8 @@ const CallPageInnerVertical: FC<{
           </Box>
         </Box>
       }
-      isSidebarOpen={showTraceTree}
       headerContent={<CallOverview call={currentCall} />}
+      isLeftSidebarOpen={showTraceTree}
       leftSidebar={
         <Tailwind style={{display: 'contents'}}>
           <div className="h-full bg-moon-50">

@@ -13,7 +13,8 @@ import React, {
 } from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
-import {SplitPanel} from './SplitPanel';
+import {SplitPanel as SplitPanelRight} from './SplitPanelRight';
+import {TraceTreeSplitPanel} from './TraceTreeSplitPanel';
 import {isPrimitive} from './util';
 
 type SimplePageLayoutContextType = {
@@ -169,7 +170,9 @@ export const SimplePageLayoutWithHeader: FC<{
   headerContent: ReactNode;
   leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
-  isSidebarOpen?: boolean;
+  isLeftSidebarOpen?: boolean;
+  isRightSidebarOpen?: boolean;
+  rightSidebarContent?: ReactNode;
 }> = props => {
   const {tabs} = props;
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
@@ -243,64 +246,98 @@ export const SimplePageLayoutWithHeader: FC<{
         {props.headerExtra}
         {simplePageLayoutContextValue.headerSuffix}
       </Box>
-      <div style={{flex: '1 1 auto', overflow: 'hidden'}}>
-        <SplitPanel
+      <div style={{flex: '1 1 auto', overflow: 'hidden', display: 'flex'}}>
+        <TraceTreeSplitPanel
           minWidth={150}
           defaultWidth={200}
           maxWidth="50%"
-          isDrawerOpen={props.isSidebarOpen ?? false}
+          isDrawerOpen={props.isLeftSidebarOpen ?? false}
           drawer={props.leftSidebar}
           main={
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                flexGrow: 1,
-                height: '100%',
-                overflow: 'hidden',
-              }}>
-              <Box
-                sx={{
-                  maxHeight: '50%',
-                  flex: '0 0 auto',
-                  width: '100%',
-                  overflow: 'auto',
-                  pt: 1,
-                  px: 2,
-                  alignContent: 'center',
-                }}>
-                {props.headerContent}
-              </Box>
-              {(!props.hideTabsIfSingle || tabs.length > 1) && (
-                <Tabs.Root
-                  style={{margin: '12px 16px 0 16px'}}
-                  value={tabs[tabValue].label}
-                  onValueChange={handleTabChange}>
-                  <Tabs.List>
-                    {tabs.map(tab => (
-                      <Tabs.Trigger
-                        key={tab.label}
-                        value={tab.label}
-                        className="h-[30px] text-sm">
-                        {tab.label}
-                      </Tabs.Trigger>
-                    ))}
-                  </Tabs.List>
-                </Tabs.Root>
-              )}
-              <Box
-                sx={{
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  flex: '1 1 auto',
-                }}>
-                <ErrorBoundary key={tabId}>{tabContent}</ErrorBoundary>
-              </Box>
-            </Box>
+            <SplitPanelRight
+              minWidth={150}
+              defaultWidth={200}
+              maxWidth="50%"
+              drawer={props.rightSidebarContent}
+              isDrawerOpen={props.isRightSidebarOpen ?? false}
+              main={
+                <MainPeekContent
+                  headerContent={props.headerContent}
+                  tabContent={tabContent}
+                  tabs={props.tabs}
+                  tabId={tabId}
+                  tabValue={tabValue}
+                  hideTabsIfSingle={props.hideTabsIfSingle}
+                  handleTabChange={handleTabChange}
+                />
+              }
+            />
           }
         />
       </div>
+    </Box>
+  );
+};
+
+const MainPeekContent: FC<{
+  headerContent: ReactNode;
+  tabs: Array<{
+    label: string;
+    content: ReactNode;
+  }>;
+  tabContent: ReactNode;
+  tabId: string;
+  tabValue: number;
+  hideTabsIfSingle?: boolean;
+  handleTabChange: (newValue: string) => void;
+}> = props => {
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        flexGrow: 1,
+        height: '100%',
+        overflow: 'hidden',
+      }}>
+      <Box
+        sx={{
+          maxHeight: '50%',
+          flex: '0 0 auto',
+          width: '100%',
+          overflow: 'auto',
+          pt: 1,
+          px: 2,
+          alignContent: 'center',
+        }}>
+        {props.headerContent}
+      </Box>
+      {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
+        <Tabs.Root
+          style={{margin: '12px 16px 0 16px'}}
+          value={props.tabs[props.tabValue].label}
+          onValueChange={props.handleTabChange}>
+          <Tabs.List>
+            {props.tabs.map(tab => (
+              <Tabs.Trigger
+                key={tab.label}
+                value={tab.label}
+                className="h-[30px] text-sm">
+                {tab.label}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        </Tabs.Root>
+      )}
+      <Box
+        sx={{
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          flex: '1 1 auto',
+        }}>
+        <ErrorBoundary key={props.tabId}>{props.tabContent}</ErrorBoundary>
+      </Box>
     </Box>
   );
 };
