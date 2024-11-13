@@ -1,9 +1,10 @@
 import {Callout} from '@wandb/weave/components/Callout';
 import classNames from 'classnames';
 import _ from 'lodash';
-import React from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 
 import {MessagePanelPart} from './MessagePanelPart';
+import {ShowMoreButton} from './ShowMoreButton';
 import {ToolCalls} from './ToolCalls';
 import {Message} from './types';
 
@@ -21,6 +22,16 @@ export const MessagePanel = ({
   isStructuredOutput,
   isNested,
 }: MessagePanelProps) => {
+  const [isShowingMore, setIsShowingMore] = useState(false);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (contentRef.current) {
+      setIsOverflowing(contentRef.current.scrollHeight > 400);
+    }
+  }, [message.content]);
+
   const isUser = message.role === 'user';
   const isSystemPrompt = message.role === 'system';
   const isTool = message.role === 'tool';
@@ -45,6 +56,7 @@ export const MessagePanel = ({
 
       <div
         className={classNames('relative overflow-visible', {
+          'pb-40': isOverflowing && isShowingMore,
           'border-t border-moon-250': isTool,
           'rounded-lg border border-moon-250': isSystemPrompt,
           'bg-cactus-300/[0.24]': isUser,
@@ -71,7 +83,12 @@ export const MessagePanel = ({
             </div>
           )}
 
-          <div className={classNames('w-full overflow-y-hidden')}>
+          <div
+            ref={contentRef}
+            className={classNames('w-full overflow-y-hidden', {
+              'max-h-[400px]': !isShowingMore,
+              'max-h-full': isShowingMore,
+            })}>
             {hasContent && (
               <div
                 className={classNames(hasToolCalls ? 'pb-8' : '', ' text-sm', {
@@ -98,6 +115,14 @@ export const MessagePanel = ({
               </div>
             )}
           </div>
+
+          {isOverflowing && (
+            <ShowMoreButton
+              isUser={isUser}
+              isShowingMore={isShowingMore}
+              setIsShowingMore={setIsShowingMore}
+            />
+          )}
         </div>
       </div>
     </div>
