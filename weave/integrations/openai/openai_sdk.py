@@ -364,25 +364,7 @@ def create_wrapper_async(
                 return True
             return False
 
-            op_kwargs = settings.options.model_dump()
-            op_kwargs = settings.options.model_dump()
-            op_kwargs = settings.options.model_dump()
-
-        print(f"{op_kwargs=}")
-
         op_kwargs = settings.options.model_dump()
-
-        print(f"{op_kwargs=}")
-
-        op_kwargs = settings.options.model_dump()
-            op_kwargs = settings.options.model_dump()
-
-        print(f"{op_kwargs=}")
-
-        op_kwargs = settings.options.model_dump()
-
-        print(f"{op_kwargs=}")
-
         op = weave.op(**op_kwargs)(_add_stream_options(fn))
         op.name = name  # type: ignore
         op._set_on_input_handler(openai_on_input_handler)
