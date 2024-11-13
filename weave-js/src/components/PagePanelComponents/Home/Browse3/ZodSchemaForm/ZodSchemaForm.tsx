@@ -16,9 +16,9 @@ import {Delete, Help} from '@mui/icons-material';
 import React, {useEffect, useMemo, useState} from 'react';
 import {z} from 'zod';
 
-import {parseRefMaybe} from '../Browse2/SmallRef';
+import {parseRefMaybe} from '../../Browse2/SmallRef';
 
-interface DynamicConfigFormProps {
+interface ZSFormProps {
   configSchema: z.ZodType<any>;
   config: Record<string, any>;
   setConfig: (config: Record<string, any>) => void;
@@ -117,7 +117,7 @@ const DiscriminatedUnionField: React.FC<{
         ))}
       </Select>
       <Box mt={2}>
-        <DynamicConfigForm
+        <ZSForm
           configSchema={filteredSchema}
           config={value || {}}
           setConfig={newConfig => {
@@ -161,7 +161,7 @@ const NestedForm: React.FC<{
       <FormControl fullWidth margin="dense">
         <InputLabel>{keyName}</InputLabel>
         <Box ml={2}>
-          <DynamicConfigForm
+          <ZSForm
             configSchema={unwrappedSchema as z.ZodObject<any>}
             config={config}
             setConfig={setConfig}
@@ -814,7 +814,7 @@ const DescriptionTooltip: React.FC<{description?: string}> = ({description}) => 
   );
 };
 
-export const DynamicConfigForm: React.FC<DynamicConfigFormProps> = ({
+export const ZSForm: React.FC<ZSFormProps> = ({
   configSchema,
   config,
   setConfig,

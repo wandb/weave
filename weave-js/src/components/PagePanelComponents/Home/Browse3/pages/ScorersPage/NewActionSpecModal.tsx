@@ -7,8 +7,8 @@ import {
 } from '@material-ui/core';
 import React, {FC, useEffect, useState} from 'react';
 
-import {DynamicConfigForm} from '../../DynamicConfigForm';
 import {ReusableDrawer} from '../../ReusableDrawer';
+import {ZSForm} from '../../ZodSchemaForm/ZodSchemaForm';
 import {
   ActionSpec,
   ActionSpecSchema,
@@ -95,7 +95,7 @@ export const NewActionSpecModal: FC<NewActionSpecModalProps> = ({
         </Select>
       </FormControl>
       {selectedActionSpecConfigurationSpec && (
-        <DynamicConfigForm
+        <ZSForm
           configSchema={selectedActionSpecConfigurationSpec.inputFriendlySchema}
           config={config}
           setConfig={setConfig}
