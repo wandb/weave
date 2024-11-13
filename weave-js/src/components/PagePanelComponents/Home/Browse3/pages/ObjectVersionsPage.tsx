@@ -33,7 +33,7 @@ import {
   EMPTY_PROPS_LEADERBOARDS,
   EMPTY_PROPS_MODEL,
   EMPTY_PROPS_OBJECTS,
-  EMPTY_PROPS_PROGRAMATIC_SCORERS,
+  EMPTY_PROPS_PROGRAMMATIC_SCORERS,
   EMPTY_PROPS_PROMPTS,
 } from './common/EmptyContent';
 import {
@@ -170,7 +170,7 @@ export const FilterableObjectVersionsTable: React.FC<{
     } else if (base === 'Leaderboard') {
       propsEmpty = EMPTY_PROPS_LEADERBOARDS;
     } else if (base === 'Scorer') {
-      propsEmpty = EMPTY_PROPS_PROGRAMATIC_SCORERS;
+      propsEmpty = EMPTY_PROPS_PROGRAMMATIC_SCORERS;
     } else if (base === 'ActionSpec') {
       propsEmpty = EMPTY_PROPS_ACTION_DEFINITIONS;
     }

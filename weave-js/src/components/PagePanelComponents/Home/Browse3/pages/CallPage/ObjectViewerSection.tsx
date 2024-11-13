@@ -153,17 +153,22 @@ const ObjectViewerSectionNonEmpty = ({
     setMode('collapsed');
     setExpandedIds([]);
   };
+
+  const isExpandAllSmall =
+    !!apiRef?.current?.getAllRowIds &&
+    getGroupIds().length - expandedIds.length < EXPANDED_IDS_LENGTH;
+
   const onClickExpanded = () => {
     if (mode === 'expanded') {
       setTreeExpanded(true);
     }
     setMode('expanded');
-    if (getGroupIds().length > EXPANDED_IDS_LENGTH) {
+    if (isExpandAllSmall) {
+      setExpandedIds(getGroupIds());
+    } else {
       setExpandedIds(
         getGroupIds().slice(0, expandedIds.length + EXPANDED_IDS_LENGTH)
       );
-    } else {
-      setExpandedIds(getGroupIds());
     }
   };
 
@@ -195,7 +200,11 @@ const ObjectViewerSectionNonEmpty = ({
           icon="expand-uncollapse"
           active={mode === 'expanded'}
           onClick={onClickExpanded}
-          tooltip={`Expand next ${EXPANDED_IDS_LENGTH} rows`}
+          tooltip={
+            isExpandAllSmall
+              ? 'Expand all'
+              : `Expand next ${EXPANDED_IDS_LENGTH} rows`
+          }
         />
         <Button
           variant="quiet"

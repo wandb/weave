@@ -184,7 +184,8 @@ export const EMPTY_NO_TRACE_SERVER: EmptyProps = {
   ),
 };
 
-export const EMPTY_PROPS_PROGRAMATIC_SCORERS: EmptyProps = {
+
+export const EMPTY_PROPS_PROGRAMMATIC_SCORERS: EmptyProps = {
   icon: 'type-number-alt' as const,
   heading: 'No programmatic scorers yet',
   description: 'Create programmatic scorers in Python.',
@@ -198,6 +199,7 @@ export const EMPTY_PROPS_PROGRAMATIC_SCORERS: EmptyProps = {
     </>
   ),
 };
+
 
 export const EMPTY_PROPS_ACTION_DEFINITIONS: EmptyProps = {
   icon: 'automation-robot-arm' as const,
