@@ -1,18 +1,18 @@
-import {toast} from '@wandb/weave/common/components/elements/Toast';
-import {Button} from '@wandb/weave/components/Button';
-import {DraggableHandle} from '@wandb/weave/components/DraggablePopups';
-import {Select} from '@wandb/weave/components/Form/Select';
-import {TextField} from '@wandb/weave/components/Form/TextField';
-import {parseRef} from '@wandb/weave/react';
+import { toast } from '@wandb/weave/common/components/elements/Toast';
+import { Button } from '@wandb/weave/components/Button';
+import { DraggableHandle } from '@wandb/weave/components/DraggablePopups';
+import { Select } from '@wandb/weave/components/Form/Select';
+import { TextField } from '@wandb/weave/components/Form/TextField';
+import { parseRef } from '@wandb/weave/react';
 import _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
-import {useCreateBaseObjectInstance} from '../../pages/wfReactInterface/baseObjectClassQuery';
-import {AnnotationSpec} from '../../pages/wfReactInterface/generatedBaseObjectClasses.zod';
-import {sanitizeObjectId} from '../../pages/wfReactInterface/traceServerDirectClient';
-import {projectIdFromParts} from '../../pages/wfReactInterface/tsDataModelHooks';
-import {NumericalTextField} from './HumanFeedback';
-import {FeedbackSchemaType, tsHumanAnnotationSpec} from './humanFeedbackTypes';
+import { useCreateBaseObjectInstance } from '../../pages/wfReactInterface/baseObjectClassQuery';
+import { AnnotationSpec } from '../../pages/wfReactInterface/generatedBaseObjectClasses.zod';
+import { sanitizeObjectId } from '../../pages/wfReactInterface/traceServerDirectClient';
+import { projectIdFromParts } from '../../pages/wfReactInterface/tsDataModelHooks';
+import { NumericalTextField } from './HumanFeedback';
+import { FeedbackSchemaType, tsHumanAnnotationSpec } from './humanFeedbackTypes';
 
 type EditOrCreateAnnotationSpecProps = {
   entityName: string;
@@ -31,6 +31,7 @@ export const EditOrCreateAnnotationSpec: React.FC<
   EditOrCreateAnnotationSpecProps
 > = ({entityName, projectName, spec, onSaveCB, onBackButtonClick}) => {
   const createHumanFeedback = useCreateBaseObjectInstance('AnnotationSpec');
+  const [currSpec, setCurrSpec] = useState<AnnotationSpec | undefined>(spec);
   const [editState, setEditState] = useState<EditingState>({
     spec: spec ?? {},
     error: '',
@@ -42,8 +43,8 @@ export const EditOrCreateAnnotationSpec: React.FC<
   const allRequiredFieldsFilled =
     editState.spec?.name != null && specType != null;
   const dirty = useMemo(() => {
-    return !_.isEqual(editState.spec, spec);
-  }, [editState.spec, spec]);
+    return !_.isEqual(editState.spec, currSpec);
+  }, [editState.spec, currSpec]);
 
   const handleSave = (updatedSpec: AnnotationSpec) => {
     try {
@@ -80,6 +81,7 @@ export const EditOrCreateAnnotationSpec: React.FC<
           `Saved annotation spec: ${sanitizeObjectId(updatedSpec.name ?? '')}`,
           {type: 'success'}
         );
+        setCurrSpec(updatedSpec);
         onSaveCB?.();
       })
       .catch(e => {
