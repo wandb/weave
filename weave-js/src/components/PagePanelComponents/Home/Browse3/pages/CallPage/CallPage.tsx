@@ -10,6 +10,7 @@ import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TableRowSelectionContext} from '../../../Browse3';
 import {
+  FEEDBACK_EXPAND_PARAM,
   TRACETREE_PARAM,
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
@@ -157,6 +158,10 @@ const CallPageInnerVertical: FC<{
     TRACETREE_PARAM in query
       ? query[TRACETREE_PARAM] === '1'
       : !isEvaluateOp(call.spanName);
+  const showFeedbackExpand =
+    FEEDBACK_EXPAND_PARAM in query
+      ? query[FEEDBACK_EXPAND_PARAM] === '1'
+      : false;
 
   const onToggleTraceTree = useCallback(() => {
     history.replace(
@@ -166,7 +171,8 @@ const CallPageInnerVertical: FC<{
         call.traceId,
         call.callId,
         path,
-        !showTraceTree
+        !showTraceTree,
+        showFeedbackExpand
       )
     );
   }, [
@@ -178,12 +184,9 @@ const CallPageInnerVertical: FC<{
     history,
     path,
     showTraceTree,
+    showFeedbackExpand,
   ]);
-
-  const [showFeedbackExpand, setShowFeedbackExpand] = useState(false);
   const onToggleFeedbackExpand = useCallback(() => {
-    const curShowFeedbackExpand = showFeedbackExpand;
-    setShowFeedbackExpand(!curShowFeedbackExpand);
     history.replace(
       currentRouter.callUIUrl(
         call.entity,
@@ -192,7 +195,7 @@ const CallPageInnerVertical: FC<{
         call.callId,
         path,
         showTraceTree,
-        !curShowFeedbackExpand
+        !showFeedbackExpand
       )
     );
   }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
