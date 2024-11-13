@@ -1,8 +1,6 @@
 import {createContext, useContext} from 'react';
 
-// Create a new context for the isPlayground value, and the playground chat functions
-// isPlayground is the only required value
-export const PlaygroundContext = createContext<{
+export type PlaygroundContextType = {
   isPlayground: boolean;
   deleteMessage?: (messageIndex: number, responseIndexes?: number[]) => void;
   editMessage?: (messageIndex: number, newMessage: any) => void;
@@ -15,7 +13,13 @@ export const PlaygroundContext = createContext<{
     content: string,
     toolCallId?: string
   ) => void;
-}>({isPlayground: false});
+};
+
+// Create a new context for the isPlayground value, and the playground chat functions
+// isPlayground is the only required value
+export const PlaygroundContext = createContext<PlaygroundContextType>({
+  isPlayground: false,
+});
 
 // Create a custom hook to use the PlaygroundContext
 export const usePlaygroundContext = () => useContext(PlaygroundContext);

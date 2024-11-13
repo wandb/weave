@@ -7,37 +7,22 @@ import React, {useEffect, useState} from 'react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {ChatView} from '../ChatView/ChatView';
 import {useCallAsChat} from '../ChatView/hooks';
-import {PlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
+import {
+  PlaygroundContext,
+  PlaygroundContextType,
+} from '../PlaygroundPage/PlaygroundContext';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 
 const DRAWER_ANIMATION_BUFFER_TIME = 400;
 
 type CallChatProps = {
   call: TraceCallSchema;
-  isPlayground?: boolean;
-  deleteMessage?: (messageIndex: number, responseIndexes?: number[]) => void;
-  editMessage?: (messageIndex: number, newMessage: any) => void;
-  deleteChoice?: (choiceIndex: number) => void;
-  addMessage?: (newMessage: any) => void;
-  editChoice?: (choiceIndex: number, newChoice: any) => void;
-  retry?: (messageIndex: number, isChoice?: boolean) => void;
-  sendMessage?: (
-    role: 'assistant' | 'user' | 'tool',
-    content: string,
-    toolCallId?: string
-  ) => void;
-};
+} & PlaygroundContextType;
 
 export const CallChat = ({
   call,
   isPlayground = false,
-  deleteMessage,
-  editMessage,
-  deleteChoice,
-  addMessage,
-  editChoice,
-  retry,
-  sendMessage,
+  ...playgroundContext
 }: CallChatProps) => {
   const chat = useCallAsChat(call);
   const [drawerAnimationBuffer, setDrawerAnimationBuffer] = useState(true);
@@ -56,13 +41,7 @@ export const CallChat = ({
     <PlaygroundContext.Provider
       value={{
         isPlayground,
-        deleteMessage,
-        editMessage,
-        deleteChoice,
-        addMessage,
-        editChoice,
-        retry,
-        sendMessage,
+        ...playgroundContext,
       }}>
       <ChatView chat={chat} />
     </PlaygroundContext.Provider>
