@@ -956,7 +956,7 @@ const useRootObjectVersions = (
       setObjectVersionRes({
         loading: false,
         error: null,
-        result: res.objs.map(convertTraceServerObjectVersionToSchema),
+        result: res.objs?.map(convertTraceServerObjectVersionToSchema) ?? [],
       });
     };
     const onError = (e: any) => {
