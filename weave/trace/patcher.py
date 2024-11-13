@@ -1,21 +1,19 @@
 import logging
 from collections.abc import Sequence
-from typing import Any, Callable, Optional
+from dataclasses import dataclass
+from typing import Any, Callable, Optional, Protocol
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 
 logger = logging.getLogger(__name__)
 
 
-class Patcher:
-    def attempt_patch(self) -> bool:
-        raise NotImplementedError()
-
-    def undo_patch(self) -> bool:
-        raise NotImplementedError()
+class Patcher(Protocol):
+    def attempt_patch(self, *args, **kwargs) -> bool: ...
+    def undo_patch(self, *args, **kwargs) -> bool: ...
 
 
-class MultiPatcher(Patcher):
+class MultiPatcher:
     def __init__(self, patchers: Sequence[Patcher]) -> None:
         self.patchers = patchers
 
@@ -44,13 +42,13 @@ class MultiPatcher(Patcher):
         return all_successful
 
 
+@dataclass
 class _SymbolTarget:
-    def __init__(self, base_symbol: Any, attr: str) -> None:
-        self.base_symbol = base_symbol
-        self.attr = attr
+    base_symbol: Any
+    attr: str
 
 
-class SymbolPatcher(Patcher):
+class SymbolPatcher:
     _get_base_symbol: Callable
     _attribute_name: str
     _make_new_value: Callable
