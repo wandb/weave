@@ -2,6 +2,7 @@ import typing
 
 from weave.trace import autopatch, errors, init_message, trace_sentry, weave_client
 from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.settings import PatchSettings
 from weave.trace_server import sqlite_trace_server
 from weave.trace_server_bindings import remote_http_trace_server
 
@@ -63,7 +64,9 @@ Args:
 
 
 def init_weave(
-    project_name: str, ensure_project_exists: bool = True
+    project_name: str,
+    ensure_project_exists: bool = True,
+    patch_settings: typing.Optional[PatchSettings] = None,
 ) -> InitializedClient:
     global _current_inited_client
     if _current_inited_client is not None:
@@ -120,7 +123,7 @@ def init_weave(
     # autopatching is only supported for the wandb client, because OpenAI calls are not
     # logged in local mode currently. When that's fixed, this autopatch call can be
     # moved to InitializedClient.__init__
-    autopatch.autopatch()
+    autopatch.autopatch(settings=patch_settings)
 
     username = get_username()
     try:

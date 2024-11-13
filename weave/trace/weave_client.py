@@ -615,29 +615,21 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def get_calls(
-        self,
-        filter: Optional[CallsFilter] = None,
-        include_costs: Optional[bool] = False,
+        self, filter: Optional[CallsFilter] = None, include_costs: bool = False
     ) -> CallsIter:
         if filter is None:
             filter = CallsFilter()
 
-        return CallsIter(
-            self.server, self._project_id(), filter, include_costs or False
-        )
+        return CallsIter(self.server, self._project_id(), filter, include_costs)
 
     @deprecated(new_name="get_calls")
     def calls(
-        self,
-        filter: Optional[CallsFilter] = None,
-        include_costs: Optional[bool] = False,
+        self, filter: Optional[CallsFilter] = None, include_costs: bool = False
     ) -> CallsIter:
         return self.get_calls(filter=filter, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
-    def get_call(
-        self, call_id: str, include_costs: Optional[bool] = False
-    ) -> WeaveObject:
+    def get_call(self, call_id: str, include_costs: bool = False) -> WeaveObject:
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
@@ -651,7 +643,7 @@ class WeaveClient:
         return make_client_call(self.entity, self.project, response_call, self.server)
 
     @deprecated(new_name="get_call")
-    def call(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
+    def call(self, call_id: str, include_costs: bool = False) -> WeaveObject:
         return self.get_call(call_id=call_id, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -691,10 +683,8 @@ class WeaveClient:
             inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
         else:
             inputs_postprocessed = inputs_redacted
-
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
-        call_id = generate_id()
 
         if parent is None and use_stack:
             parent = call_context.get_current_call()
@@ -719,6 +709,7 @@ class WeaveClient:
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
+        call_id = generate_id()
         call = Call(
             _op_name=op_name_future,
             project_id=self._project_id(),
@@ -733,6 +724,7 @@ class WeaveClient:
         if callable(name_func := display_name):
             display_name = name_func(call)
         call.display_name = display_name
+
         if parent is not None:
             parent._children.append(call)
 

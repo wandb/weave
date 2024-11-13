@@ -18,6 +18,7 @@ from weave.trace.context.call_context import get_current_call, require_current_c
 from weave.trace.op import as_op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.settings import (
+    PatchSettings,
     UserSettings,
     parse_and_apply_settings,
     should_disable_weave,
@@ -30,6 +31,7 @@ def init(
     project_name: str,
     *,
     settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
+    patch_settings: Optional[PatchSettings] = None,
 ) -> weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
@@ -41,6 +43,8 @@ def init(
 
     Args:
         project_name: The name of the Weights & Biases project to log to.
+        settings: User settings applied to all weave ops.
+        patch_settings: Patch settings applied to auto-patched functions, e.g. OpenAI's create.
 
     Returns:
         A Weave client.
@@ -50,7 +54,7 @@ def init(
     if should_disable_weave():
         return weave_init.init_weave_disabled().client
 
-    return weave_init.init_weave(project_name).client
+    return weave_init.init_weave(project_name, patch_settings=patch_settings).client
 
 
 @contextlib.contextmanager
