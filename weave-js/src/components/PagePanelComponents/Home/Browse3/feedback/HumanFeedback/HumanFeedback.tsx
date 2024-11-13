@@ -36,7 +36,7 @@ type HumanFeedbackProps = {
   readOnly?: boolean;
   focused?: boolean;
   setUnsavedFeedbackChanges: React.Dispatch<
-    React.SetStateAction<Array<() => Promise<boolean>>>
+    React.SetStateAction<Record<string, () => Promise<boolean>>>
   >;
 };
 
@@ -180,7 +180,7 @@ const FeedbackComponentSelector: React.FC<{
   foundValue: string | number | null;
   feedbackSpecRef: string;
   setUnsavedFeedbackChanges: React.Dispatch<
-    React.SetStateAction<Array<() => Promise<boolean>>>
+    React.SetStateAction<Record<string, () => Promise<boolean>>>
   >;
 }> = React.memo(
   ({
@@ -194,13 +194,13 @@ const FeedbackComponentSelector: React.FC<{
   }) => {
     const wrappedOnAddFeedback = useCallback(
       async (value: any) => {
-        setUnsavedFeedbackChanges(curr => [
+        setUnsavedFeedbackChanges(curr => ({
           ...curr,
-          () => onAddFeedback(value),
-        ]);
+          [feedbackSpecRef]: () => onAddFeedback(value),
+        }));
         return true;
       },
-      [onAddFeedback, setUnsavedFeedbackChanges]
+      [onAddFeedback, setUnsavedFeedbackChanges, feedbackSpecRef]
     );
 
     switch (type) {
@@ -241,15 +241,7 @@ const FeedbackComponentSelector: React.FC<{
           />
         );
       default:
-        // Return a text column by default
-        return (
-          <TextFeedbackColumn
-            onAddFeedback={wrappedOnAddFeedback}
-            defaultValue={foundValue as string | null}
-            focused={focused}
-            maxLength={jsonSchema.max_length}
-          />
-        );
+        return <></>;
     }
   }
 );

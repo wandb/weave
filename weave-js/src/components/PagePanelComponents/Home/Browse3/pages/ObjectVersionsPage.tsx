@@ -119,6 +119,9 @@ export const FilterableObjectVersionsTable: React.FC<{
   project: string;
   frozenFilter?: WFHighLevelObjectVersionFilter;
   initialFilter?: WFHighLevelObjectVersionFilter;
+  objectTitle?: string;
+  hideCategoryColumn?: boolean;
+  hideCreatedAtColumn?: boolean;
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
@@ -188,8 +191,11 @@ export const FilterableObjectVersionsTable: React.FC<{
       )}>
       <ObjectVersionsTable
         objectVersions={objectVersions}
+        objectTitle={props.objectTitle}
         hidePropsAsColumns={!!effectivelyLatestOnly}
         hidePeerVersionsColumn={!effectivelyLatestOnly}
+        hideCategoryColumn={props.hideCategoryColumn}
+        hideCreatedAtColumn={props.hideCreatedAtColumn}
       />
     </FilterLayoutTemplate>
   );

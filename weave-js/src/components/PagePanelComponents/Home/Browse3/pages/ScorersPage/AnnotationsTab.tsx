@@ -10,6 +10,8 @@ export const AnnotationsTab: React.FC<{
     <FilterableObjectVersionsTable
       entity={entity}
       project={project}
+      objectTitle="Scorer"
+      hideCategoryColumn
       initialFilter={{
         baseObjectClass: 'AnnotationSpec',
       }}
