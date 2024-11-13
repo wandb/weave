@@ -1,25 +1,24 @@
-
-import {Box} from '@material-ui/core';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
-import {Button} from '@wandb/weave/components/Button/Button';
-import React, {FC, useState} from 'react';
+// import {Box} from '@material-ui/core';
+// import Menu from '@mui/material/Menu';
+// import MenuItem from '@mui/material/MenuItem';
+// import {Button} from '@wandb/weave/components/Button/Button';
+// import React, {FC, useState} from 'react';
 import React from 'react';
 
+// import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
-import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
-import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
-import {useCreateBaseObjectInstance} from '../wfReactInterface/baseObjectClassQuery';
-import {
-  ActionSpec,
-  ActionType,
-} from '../wfReactInterface/generatedBaseObjectClasses.zod';
-import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
-import {actionSpecConfigurationSpecs} from './actionSpecConfigurations';
+// import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
+// import {useCreateBaseObjectInstance} from '../wfReactInterface/baseObjectClassQuery';
+// import {
+//   ActionSpec,
+//   ActionType,
+// } from '../wfReactInterface/generatedBaseObjectClasses.zod';
+// import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
+// import {actionSpecConfigurationSpecs} from './actionSpecConfigurations';
 import {ActionSpecsTab} from './ActionSpecsTab';
 import {AnnotationsTab} from './AnnotationsTab';
 import {ProgrammaticScorersTab} from './CoreScorersTab';
-import {NewActionSpecModal} from './NewActionSpecModal';
+// import {NewActionSpecModal} from './NewActionSpecModal';
 
 export const ScorersPage: React.FC<{
   entity: string;
