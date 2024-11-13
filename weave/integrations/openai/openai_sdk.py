@@ -366,6 +366,16 @@ def create_wrapper_async(
 
             op_kwargs = settings.options.model_dump()
             op_kwargs = settings.options.model_dump()
+            op_kwargs = settings.options.model_dump()
+
+        print(f"{op_kwargs=}")
+
+        op_kwargs = settings.options.model_dump()
+
+        print(f"{op_kwargs=}")
+
+        op_kwargs = settings.options.model_dump()
+            op_kwargs = settings.options.model_dump()
 
         print(f"{op_kwargs=}")
 
