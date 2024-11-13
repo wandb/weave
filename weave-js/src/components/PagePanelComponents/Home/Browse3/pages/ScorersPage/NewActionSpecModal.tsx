@@ -95,12 +95,16 @@ export const NewActionSpecModal: FC<NewActionSpecModalProps> = ({
         </Select>
       </FormControl>
       {selectedActionSpecConfigurationSpec && (
-        <ZSForm
-          configSchema={selectedActionSpecConfigurationSpec.inputFriendlySchema}
-          config={config}
-          setConfig={setConfig}
-          onValidChange={setIsValid}
-        />
+        <div style={{margin: '0px 2px'}}>
+          <ZSForm
+            configSchema={
+              selectedActionSpecConfigurationSpec.inputFriendlySchema
+            }
+            config={config}
+            setConfig={setConfig}
+            onValidChange={setIsValid}
+          />
+        </div>
       )}
     </ReusableDrawer>
   );

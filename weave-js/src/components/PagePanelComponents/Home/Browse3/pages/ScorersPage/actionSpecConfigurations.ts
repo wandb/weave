@@ -17,29 +17,32 @@ import {ActionType} from '../wfReactInterface/generatedBaseObjectClasses.zod';
 
 // Define `ConfiguredLlmJudgeActionFriendlySchema`
 const SimpleResponseFormatSchema = z
-  .enum(['boolean', 'number', 'string'])
-  .default('boolean');
+  .enum(['Boolean', 'Number', 'String'])
+  .default('Boolean');
 
 const StructuredResponseFormatSchema = z.record(SimpleResponseFormatSchema);
 
 const ResponseFormatSchema = z.discriminatedUnion('type', [
   z.object({
-    type: z.literal('simple'),
-    schema: SimpleResponseFormatSchema,
+    type: z.literal('Boolean'),
   }),
   z.object({
-    type: z.literal('structured'),
-    schema: StructuredResponseFormatSchema,
+    type: z.literal('Number'),
+  }),
+  z.object({
+    type: z.literal('String'),
+  }),
+  z.object({
+    type: z.literal('Object'),
+    Schema: StructuredResponseFormatSchema,
   }),
 ]);
 
 const ConfiguredLlmJudgeActionFriendlySchema = z.object({
-  model: z
-    .enum(['gpt-4o-mini', 'gpt-4o'])
-    .default('gpt-4o-mini')
-    .describe('Model to use for judging. Please configure OPENAPI_API_KEY in team settings.'),
-  prompt: z.string().min(3),
-  response_schema: ResponseFormatSchema,
+  Model: z.enum(['gpt-4o-mini', 'gpt-4o']).default('gpt-4o-mini'),
+  // .describe('Model to use for judging. Please configure OPENAPI_API_KEY in team settings.'),
+  Prompt: z.string().min(3),
+  'Response Schema': ResponseFormatSchema,
 });
 
 // End of `ConfiguredLlmJudgeActionFriendlySchema`
@@ -71,12 +74,16 @@ export const actionSpecConfigurationSpecs: Partial<
       let responseFormat: z.infer<
         typeof LlmJudgeActionSpecSchema
       >['response_schema'];
-      if (data.response_schema.type === 'simple') {
-        responseFormat = {type: data.response_schema.schema};
+      if (data['Response Schema'].type === 'Boolean') {
+        responseFormat = {type: 'boolean'};
+      } else if (data['Response Schema'].type === 'Number') {
+        responseFormat = {type: 'number'};
+      } else if (data['Response Schema'].type === 'String') {
+        responseFormat = {type: 'string'};
       } else {
         responseFormat = {
           type: 'object',
-          properties: _.mapValues(data.response_schema.schema, value => ({
+          properties: _.mapValues(data['Response Schema'].Schema, value => ({
             type: value as 'boolean' | 'number' | 'string',
           })),
           additionalProperties: false,
@@ -84,8 +91,8 @@ export const actionSpecConfigurationSpecs: Partial<
       }
       return {
         action_type: 'llm_judge',
-        model: data.model,
-        prompt: data.prompt,
+        model: data.Model,
+        prompt: data.Prompt,
         response_schema: responseFormat,
       };
     },

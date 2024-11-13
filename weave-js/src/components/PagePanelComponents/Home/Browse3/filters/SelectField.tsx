@@ -61,7 +61,8 @@ export const SelectField = ({
 }: SelectFieldProps) => {
   const internalOptions = _.cloneDeep(options);
   const allOptions: FieldOption[] = internalOptions.flatMap(
-    (groupOption: SelectFieldOption) => (groupOption as GroupedOption).options
+    (groupOption: SelectFieldOption) =>
+      (groupOption as GroupedOption).options ?? [groupOption as FieldOption]
   );
   let isDisabled = false;
   let selectedOption = allOptions.find(o => o.value === value);

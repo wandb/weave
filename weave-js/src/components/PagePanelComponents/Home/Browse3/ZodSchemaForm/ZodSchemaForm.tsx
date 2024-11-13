@@ -6,8 +6,6 @@ import {
   FormControlLabel,
   IconButton,
   InputLabel,
-  MenuItem,
-  Select,
   TextField,
   Tooltip,
   Typography,
@@ -16,7 +14,7 @@ import {Delete, Help} from '@mui/icons-material';
 import React, {useEffect, useMemo, useState} from 'react';
 import {z} from 'zod';
 
-import {parseRefMaybe} from '../../Browse2/SmallRef';
+import {SelectField} from '../filters/SelectField';
 
 interface ZSFormProps {
   configSchema: z.ZodType<any>;
@@ -52,6 +50,17 @@ const unwrapSchema = (schema: z.ZodTypeAny): z.ZodTypeAny => {
   return schema;
 };
 
+const distiminatorOptionToValue = (
+  option: z.ZodTypeAny,
+  discriminator: string
+) => {
+  return option._def.shape()[discriminator]._def.value;
+};
+
+const Label: React.FC<{label: string}> = ({label}) => {
+  return <InputLabel style={{marginBottom: '12px'}}>{label}</InputLabel>  
+};
+
 const DiscriminatedUnionField: React.FC<{
   keyName: string;
   fieldSchema: z.ZodDiscriminatedUnion<
@@ -67,7 +76,8 @@ const DiscriminatedUnionField: React.FC<{
   const options = fieldSchema._def.options;
 
   const currentType =
-    value?.[discriminator] || options[0]._def.shape()[discriminator]._def.value;
+    value?.[discriminator] ||
+    distiminatorOptionToValue(options[0], discriminator);
 
   const handleTypeChange = (newType: string) => {
     const selectedOption = options.find(
@@ -101,21 +111,19 @@ const DiscriminatedUnionField: React.FC<{
     }, {} as Record<string, z.ZodTypeAny>)
   );
 
+
+
   return (
     <FormControl fullWidth margin="dense">
-      <InputLabel>{keyName}</InputLabel>
-      <Select
+      <Label label={keyName} />
+      <SelectField
+        options={options.map(option => {
+          const v = distiminatorOptionToValue(option, discriminator);
+          return {value: v, label: v};
+        })}
         value={currentType}
-        onChange={e => handleTypeChange(e.target.value as string)}
-        fullWidth>
-        {options.map(option => (
-          <MenuItem
-            key={option._def.shape()[discriminator]._def.value}
-            value={option._def.shape()[discriminator]._def.value}>
-            {option._def.shape()[discriminator]._def.value}
-          </MenuItem>
-        ))}
-      </Select>
+        onSelectField={v => handleTypeChange(v as string)}
+      />
       <Box mt={2}>
         <ZSForm
           configSchema={filteredSchema}
@@ -159,7 +167,7 @@ const NestedForm: React.FC<{
   if (isZodType(fieldSchema, s => s instanceof z.ZodObject)) {
     return (
       <FormControl fullWidth margin="dense">
-        <InputLabel>{keyName}</InputLabel>
+        <Label label={keyName} />
         <Box ml={2}>
           <ZSForm
             configSchema={unwrappedSchema as z.ZodObject<any>}
@@ -317,7 +325,7 @@ const ArrayField: React.FC<{
 
   return (
     <FormControl fullWidth margin="dense">
-      <InputLabel>{keyName}</InputLabel>
+      <Label label={keyName} />
       {arrayValue.map((item, index) => (
         <Box
           key={index}
@@ -363,6 +371,8 @@ const ArrayField: React.FC<{
   );
 };
 
+
+
 const EnumField: React.FC<{
   keyName: string;
   fieldSchema: z.ZodTypeAny;
@@ -380,7 +390,7 @@ const EnumField: React.FC<{
   config,
   setConfig,
 }) => {
-  const options = unwrappedSchema.options;
+  const options: string[] = unwrappedSchema.options;
 
   // Determine the default value
   const defaultValue = React.useMemo(() => {
@@ -405,34 +415,20 @@ const EnumField: React.FC<{
     <FormControl fullWidth margin="dense">
       <Box display="flex" alignItems="center">
         {keyName !== '' ? (
-          <InputLabel>{keyName}</InputLabel>
+          <Label label={keyName} />
         ) : (
           <div style={{height: '1px'}} />
         )}
         <DescriptionTooltip description={getFieldDescription(fieldSchema)} />
       </Box>
-      <Select
-        fullWidth
-        value={selectedValue}
-        onChange={e =>
-          updateConfig(targetPath, e.target.value, config, setConfig)
-        }>
-        {options.map((option: string) => {
-          let displayValue = option;
-          const ref = parseRefMaybe(displayValue);
-          if (ref) {
-            displayValue = `${ref.artifactName} [${ref.artifactVersion.slice(
-              0,
-              8
-            )}]`;
-          }
-          return (
-            <MenuItem key={option} value={option}>
-              {displayValue}
-            </MenuItem>
-          );
+      <SelectField
+        options={options.map(option => {
+          const v = option;
+          return {value: v, label: v};
         })}
-      </Select>
+        value={selectedValue}
+        onSelectField={v => updateConfig(targetPath, v, config, setConfig)}
+      />
     </FormControl>
   );
 };
@@ -519,7 +515,7 @@ const RecordField: React.FC<{
 
   return (
     <FormControl fullWidth margin="dense">
-      <InputLabel>{keyName}</InputLabel>
+      <Label label={keyName} />
       {internalPairs.map(({key, value: innerValue}, index) => (
         <Box key={index} display="flex" alignItems="center">
           <TextField
@@ -801,7 +797,9 @@ const getFieldDescription = (schema: z.ZodTypeAny): string | undefined => {
   return undefined;
 };
 
-const DescriptionTooltip: React.FC<{description?: string}> = ({description}) => {
+const DescriptionTooltip: React.FC<{description?: string}> = ({
+  description,
+}) => {
   if (!description) {
     return null;
   }
