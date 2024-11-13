@@ -553,15 +553,18 @@ const RE_WEAVE_CALL_REF_PATHNAME = new RegExp(
 
 export const parseRef = (ref: string): ObjectRef => {
   const url = new URL(ref);
-  let splitLimit: number;
+  let maxSplitsToMake: number;
+  let allowableNumSeparations: number[];
 
   const isWandbArtifact = url.protocol.startsWith('wandb-artifact');
   const isLocalArtifact = url.protocol.startsWith('local-artifact');
   const isWeaveRef = url.protocol.startsWith('weave');
   if (isWandbArtifact) {
-    splitLimit = 4;
+    maxSplitsToMake = 4;
+    allowableNumSeparations = [3, 4];
   } else if (isLocalArtifact) {
-    splitLimit = 2;
+    maxSplitsToMake = 2;
+    allowableNumSeparations = [2];
   } else if (isWeaveRef) {
     return parseWeaveRef(ref);
   } else {
@@ -571,9 +574,9 @@ export const parseRef = (ref: string): ObjectRef => {
   // Decode the URI pathname to handle URL-encoded characters, required
   // in some browsers (safari)
   const decodedUri = decodeURIComponent(url.pathname);
-  const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
+  const splitUri = decodedUri.replace(/^\/+/, '').split('/', maxSplitsToMake);
 
-  if (splitUri.length !== splitLimit) {
+  if (!allowableNumSeparations.includes(splitUri.length)) {
     throw new Error(`Invalid Artifact URI: ${url}`);
   }
 

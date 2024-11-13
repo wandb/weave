@@ -103,3 +103,17 @@ export function isVersionAlias(alias: {alias: string}): boolean {
 export function getDescriptionSummary(artifactDescription: string) {
   return artifactDescription.split('\n')[0];
 }
+
+
+const REGISTRY_PROJECT_PREFIX = 'wandb-registry-';
+
+export function isArtifactRegistryProject(projectName: string) {
+  return projectName.startsWith(REGISTRY_PROJECT_PREFIX);
+}
+
+export function fetchRegistryName(projectName: string) {
+  if (isArtifactRegistryProject(projectName)) {
+    return projectName.substring(REGISTRY_PROJECT_PREFIX.length);
+  }
+  return "";
+}

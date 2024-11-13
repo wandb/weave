@@ -6,6 +6,8 @@ import {
   ObjectRef,
   parseRef,
   refUri,
+  WandbArtifactRef,
+  WeaveObjectRef,
 } from '@wandb/weave/react';
 import React, {FC} from 'react';
 
@@ -18,6 +20,8 @@ import {
   ObjectVersionKey,
   OpVersionKey,
 } from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import { useArtifactWeaveReference } from '@wandb/weave/common/hooks/useArtifactWeaveReference';
+import { fetchArtifactRefPageUrl } from './url';
 
 const getRootType = (t: Type): Type => {
   if (
@@ -76,8 +80,98 @@ export const objectRefDisplayName = (
   throw new Error('Unknown ref type');
 };
 
-export const SmallRef: FC<{
-  objRef: ObjectRef;
+export const SmallRefBox: FC<{
+  iconName: IconName;
+  text: string;
+  iconOnly?: boolean;
+}> = ({iconName, text, iconOnly = false}) => (
+  <Box display="flex" alignItems="center">
+    <Box
+      mr="4px"
+      bgcolor={hexToRGB(MOON_300, 0.48)}
+      sx={{
+        height: '22px',
+        width: '22px',
+        borderRadius: '16px',
+        display: 'flex',
+        flex: '0 0 22px',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
+      <Icon name={iconName} width={14} height={14} />
+    </Box>
+    {!iconOnly && (
+      <Box
+        sx={{
+          height: '22px',
+          flex: 1,
+          minWidth: 0,
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          textOverflow: 'ellipsis',
+        }}>
+        {text}
+      </Box>
+    )}
+  </Box>
+);
+
+export const SmallArtifactRef: FC<{
+  objRef: WandbArtifactRef;
+  iconOnly?: boolean;
+}> = ({objRef}) => {
+  const {loading, artInfo} = useArtifactWeaveReference({
+    entityName: objRef.entityName,
+    projectName: objRef.projectName,
+    artifactName: objRef.artifactName + ":" + objRef.artifactVersion,
+  });
+  if (loading) {
+    return <SmallRefBox iconName={IconNames.Loading} text="Loading..." />;
+  }
+
+  const artifactUrl = artInfo ? fetchArtifactRefPageUrl({
+    entityName: objRef.entityName,
+    projectName: objRef.projectName,
+    artifactName: objRef.artifactName,
+    artifactVersion: objRef.artifactVersion,
+    artifactType: artInfo?.artifactType,
+      orgName: artInfo?.orgName,
+    }) : null;
+  console.log("ARTIFACT URL", artifactUrl);
+
+  const Content = (
+    <Box
+      sx={{
+        width: '100%',
+        minHeight: '38px',
+        display: 'flex',
+        alignItems: 'center',
+        cursor: artifactUrl ? 'pointer' : 'not-allowed',
+      }}
+      title={artifactUrl ? undefined : "No link detected for this wandb artifact reference"}
+    >
+      <SmallRefBox
+        iconName={artifactUrl ? IconNames.OpenNewTab : IconNames.Warning}
+        text={`${objRef.artifactName}:${objRef.artifactVersion}`}
+      />
+    </Box>
+  );
+
+  return artifactUrl ? (
+    <Link
+      $variant="secondary"
+      style={{width: '100%'}}
+      as="a"
+      href={artifactUrl}
+      target="_blank"
+      rel="noopener noreferrer">
+      {Content}
+    </Link>
+  ) : Content;
+};
+
+export const SmallWeaveRef: FC<{
+  objRef: WeaveObjectRef;
   wfTable?: WFDBTableType;
   iconOnly?: boolean;
 }> = ({objRef, wfTable, iconOnly = false}) => {
@@ -90,40 +184,26 @@ export const SmallRef: FC<{
   let objVersionKey: ObjectVersionKey | null = null;
   let opVersionKey: OpVersionKey | null = null;
 
-  const isArtifactRef = isWandbArtifactRef(objRef);
-  const isWeaveObjRef = isWeaveObjectRef(objRef);
-
-  if (isArtifactRef) {
-    objVersionKey = {
-      scheme: 'wandb-artifact',
+  if (objRef.weaveKind === 'op') {
+    opVersionKey = {
       entity: objRef.entityName,
       project: objRef.projectName,
+      opId: objRef.artifactName,
+      versionHash: objRef.artifactVersion,
+    };
+  } else {
+    objVersionKey = {
+      scheme: 'weave',
+      entity: objRef.entityName,
+      project: objRef.projectName,
+      weaveKind: objRef.weaveKind,
       objectId: objRef.artifactName,
       versionHash: objRef.artifactVersion,
-      path: objRef.artifactPath,
+      path: '',
       refExtra: objRef.artifactRefExtra,
     };
-  } else if (isWeaveObjRef) {
-    if (objRef.weaveKind === 'op') {
-      opVersionKey = {
-        entity: objRef.entityName,
-        project: objRef.projectName,
-        opId: objRef.artifactName,
-        versionHash: objRef.artifactVersion,
-      };
-    } else {
-      objVersionKey = {
-        scheme: 'weave',
-        entity: objRef.entityName,
-        project: objRef.projectName,
-        weaveKind: objRef.weaveKind,
-        objectId: objRef.artifactName,
-        versionHash: objRef.artifactVersion,
-        path: '',
-        refExtra: objRef.artifactRefExtra,
-      };
-    }
   }
+
   const objectVersion = useObjectVersion(objVersionKey);
   const opVersion = useOpVersion(opVersionKey);
   const versionIndex =
@@ -153,42 +233,10 @@ export const SmallRef: FC<{
   } else if (rootTypeName === 'OpDef') {
     icon = IconNames.JobProgramCode;
   }
-  const Item = (
-    <Box display="flex" alignItems="center">
-      <Box
-        mr="4px"
-        bgcolor={hexToRGB(MOON_300, 0.48)}
-        sx={{
-          height: '22px',
-          width: '22px',
-          borderRadius: '16px',
-          display: 'flex',
-          flex: '0 0 22px',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}>
-        <Icon name={icon} width={14} height={14} />
-      </Box>
-      {!iconOnly && (
-        <Box
-          sx={{
-            height: '22px',
-            flex: 1,
-            minWidth: 0,
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-            textOverflow: 'ellipsis',
-          }}>
-          {label}
-        </Box>
-      )}
-    </Box>
-  );
+  const Item = <SmallRefBox iconName={icon} text={label} iconOnly={iconOnly} />;
+
   if (refTypeQuery.loading) {
     return Item;
-  }
-  if (!isArtifactRef && !isWeaveObjRef) {
-    return <div>[Error: non wandb ref]</div>;
   }
   return (
     <Link
@@ -199,6 +247,26 @@ export const SmallRef: FC<{
       to={peekingRouter.refUIUrl(rootTypeName, objRef, wfTable)}>
       {Item}
     </Link>
+  );
+};
+
+export const SmallRef: FC<{
+  objRef: ObjectRef;
+  wfTable?: WFDBTableType;
+  iconOnly?: boolean;
+}> = ({objRef, wfTable, iconOnly = false}) => {
+  const isArtifactRef = isWandbArtifactRef(objRef);
+  const isWeaveObjRef = isWeaveObjectRef(objRef);
+
+  if (!isArtifactRef && !isWeaveObjRef) {
+    return <div>[Error: non wandb ref]</div>;
+  }
+
+  if (isArtifactRef) {
+    return <SmallArtifactRef objRef={objRef} />;
+  }
+  return (
+    <SmallWeaveRef objRef={objRef} wfTable={wfTable} iconOnly={iconOnly} />
   );
 };
 

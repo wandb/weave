@@ -2,7 +2,7 @@ import React, {useMemo} from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
-import {isWeaveRef} from '../../filters/common';
+import {isWeaveRef, isArtifactRef} from '../../filters/common';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {
@@ -72,6 +72,9 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
     ) {
       return <WeaveCHTable tableRefUri={data.value} />;
     }
+    return <SmallRef objRef={parseRef(data.value)} />;
+  }
+  if (isArtifactRef(data.value)) {
     return <SmallRef objRef={parseRef(data.value)} />;
   }
 
