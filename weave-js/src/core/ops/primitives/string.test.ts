@@ -947,42 +947,72 @@ describe('opStringLevenshtein', () => {
 });
 
 async function parseNumberWithSeparatorQuery(
-  str: string, 
+  str: string,
   thousandsSeparator: string | null,
-  decimalSeparator: string | null,
+  decimalSeparator: string | null
 ) {
   return (await testClient()).query(
-      opParseNumberWithSeparator({
-        str: constString(str),
-        thousands_separator: thousandsSeparator ? constString(thousandsSeparator) : constNone(),
-        decimal_separator: decimalSeparator ? constString(decimalSeparator) : constNone(),
-      })
-    )
+    opParseNumberWithSeparator({
+      str: constString(str),
+      thousands_separator: thousandsSeparator
+        ? constString(thousandsSeparator)
+        : constNone(),
+      decimal_separator: decimalSeparator
+        ? constString(decimalSeparator)
+        : constNone(),
+    })
+  );
 }
 
 describe('opParseNumberWithSeparator', () => {
   it('parses the specified thousands separator', async () => {
-    await expect(parseNumberWithSeparatorQuery("123,456,008", ",", null)).resolves.toEqual(123456008.0)
-    await expect(parseNumberWithSeparatorQuery("123,456,008", ".", null)).resolves.toEqual(123)
-    await expect(parseNumberWithSeparatorQuery("123,456.008", ",", null)).resolves.toEqual(123456.008)
-    await expect(parseNumberWithSeparatorQuery("123_456_008", "_", null)).resolves.toEqual(123456008.0)
-    await expect(parseNumberWithSeparatorQuery("123 456 008", " ", null)).resolves.toEqual(123456008.0)
-    await expect(parseNumberWithSeparatorQuery("123.456.008", ".", null)).resolves.toEqual(123456008.0)
+    await expect(
+      parseNumberWithSeparatorQuery('123,456,008', ',', null)
+    ).resolves.toEqual(123456008.0);
+    await expect(
+      parseNumberWithSeparatorQuery('123,456,008', '.', null)
+    ).resolves.toEqual(123);
+    await expect(
+      parseNumberWithSeparatorQuery('123,456.008', ',', null)
+    ).resolves.toEqual(123456.008);
+    await expect(
+      parseNumberWithSeparatorQuery('123_456_008', '_', null)
+    ).resolves.toEqual(123456008.0);
+    await expect(
+      parseNumberWithSeparatorQuery('123 456 008', ' ', null)
+    ).resolves.toEqual(123456008.0);
+    await expect(
+      parseNumberWithSeparatorQuery('123.456.008', '.', null)
+    ).resolves.toEqual(123456008.0);
   });
-
 
   it('parses the specified decimal separator', async () => {
-    await expect(parseNumberWithSeparatorQuery("123456.008", null, ".")).resolves.toEqual(123456.008)
-    await expect(parseNumberWithSeparatorQuery("123456,008", null, ",")).resolves.toEqual(123456.008)
-    await expect(parseNumberWithSeparatorQuery("123456008", null, ".")).resolves.toEqual(123456008.0)
-    await expect(parseNumberWithSeparatorQuery("123,456,008", null, ".")).resolves.toEqual(123)
+    await expect(
+      parseNumberWithSeparatorQuery('123456.008', null, '.')
+    ).resolves.toEqual(123456.008);
+    await expect(
+      parseNumberWithSeparatorQuery('123456,008', null, ',')
+    ).resolves.toEqual(123456.008);
+    await expect(
+      parseNumberWithSeparatorQuery('123456008', null, '.')
+    ).resolves.toEqual(123456008.0);
+    await expect(
+      parseNumberWithSeparatorQuery('123,456,008', null, '.')
+    ).resolves.toEqual(123);
   });
 
-
   it('parses both the specified thousands separator and decimal separator', async () => {
-    await expect(parseNumberWithSeparatorQuery("123,456.008", ",", ".")).resolves.toEqual(123456.008)
-    await expect(parseNumberWithSeparatorQuery("123.456,008", ".", ",")).resolves.toEqual(123456.008)
-    await expect(parseNumberWithSeparatorQuery("123 456,008", " ", ",")).resolves.toEqual(123456.008)
-    await expect(parseNumberWithSeparatorQuery("123 456,008", ",", ".")).resolves.toEqual(123)
+    await expect(
+      parseNumberWithSeparatorQuery('123,456.008', ',', '.')
+    ).resolves.toEqual(123456.008);
+    await expect(
+      parseNumberWithSeparatorQuery('123.456,008', '.', ',')
+    ).resolves.toEqual(123456.008);
+    await expect(
+      parseNumberWithSeparatorQuery('123 456,008', ' ', ',')
+    ).resolves.toEqual(123456.008);
+    await expect(
+      parseNumberWithSeparatorQuery('123 456,008', ',', '.')
+    ).resolves.toEqual(123);
   });
 });

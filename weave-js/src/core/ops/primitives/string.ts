@@ -411,29 +411,33 @@ export const opParseNumberWithSeparator = makeStringOp({
   description: `Parse a string to a number`,
   argDescriptions: {
     str: `The ${docType('string')} to parse.`,
-    thousands_separator: "The delimiter used to partition the string into thousands groupings.",
-    decimal_separator: "The symbol used to separate the integer part of the number from the fractional part.",
+    thousands_separator:
+      'The delimiter used to partition the string into thousands groupings.',
+    decimal_separator:
+      'The symbol used to separate the integer part of the number from the fractional part.',
   },
-  returnValueDescription: `A floating point number, if the ${docType('string')} is a valid numeral, and null otherwise.`,
+  returnValueDescription: `A floating point number, if the ${docType(
+    'string'
+  )} is a valid numeral, and null otherwise.`,
   returnType: inputTypes => maybe('string'),
   resolver: ({str, thousands_separator, decimal_separator}) => {
     if (!str) {
-      return null
+      return null;
     }
 
     let maybeNumber = str;
 
     if (thousands_separator) {
-      maybeNumber = maybeNumber.replaceAll(thousands_separator, '')
+      maybeNumber = maybeNumber.replaceAll(thousands_separator, '');
     }
 
     if (decimal_separator) {
-      maybeNumber = maybeNumber.replace(decimal_separator, '.')
+      maybeNumber = maybeNumber.replace(decimal_separator, '.');
     }
 
     return parseFloat(maybeNumber) || null;
-  }
-})
+  },
+});
 
 // Levenshtein distance is the minimum number of single-character
 // edits it would take to go from one string to another
