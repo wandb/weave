@@ -5,7 +5,15 @@
 
 import {hexToRGB, MOON_250} from '@wandb/weave/common/css/globals.styles';
 import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
-import React, {ReactNode, useCallback, useRef, useState} from 'react';
+import {throttle} from 'lodash';
+import React, {
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {AutoSizer} from 'react-virtualized';
 import styled from 'styled-components';
 
@@ -64,7 +72,9 @@ export const SplitPanel = ({
   defaultWidth = '30%',
 }: SplitPanelProps) => {
   const ref = useRef<HTMLDivElement>(null);
-  //  We store the drawer width and height in local storage so that it persists
+  const dragStartXRef = useRef<number>(0);
+  const dragStartWidthRef = useRef<number>(0);
+
   const [width, setWidth] = useLocalStorage(
     'weaveflow-tracetree-width-number',
     defaultWidth
@@ -72,34 +82,68 @@ export const SplitPanel = ({
 
   const [isDragging, setIsDragging] = useState(false);
 
-  const onMouseDown = useCallback(() => {
-    setIsDragging(true);
-  }, [setIsDragging]);
+  const onMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      setIsDragging(true);
+      dragStartXRef.current = e.clientX;
+      dragStartWidthRef.current = typeof width === 'number' ? width : 0;
+      e.preventDefault();
+    },
+    [width]
+  );
+
   const onMouseUp = useCallback(() => {
     setIsDragging(false);
-  }, [setIsDragging]);
+  }, []);
+
   const onMouseLeave = useCallback(() => {
     setIsDragging(false);
-  }, [setIsDragging]);
-  const onMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) {
-      const panel = (e.target as HTMLElement).parentElement!;
-      const bounds = panel.getBoundingClientRect();
-      const x = e.clientX - bounds.left;
-      if (minWidth && x < getWidth(minWidth, bounds.width)) {
-        return;
-      }
-      if (maxWidth && x > getWidth(maxWidth, bounds.width)) {
-        return;
-      }
-      setWidth(x);
-    }
-  };
+  }, []);
 
-  // TODO: Might be nice to change the cursor if user has gone beyond the min/max width
+  const throttledSetWidth = useMemo(
+    () =>
+      throttle((newWidth: number) => {
+        setWidth(newWidth);
+      }, 16),
+    [setWidth]
+  );
+
+  useEffect(() => {
+    return () => {
+      throttledSetWidth.cancel();
+    };
+  }, [throttledSetWidth]);
+
+  const onMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isDragging) {
+        return;
+      }
+
+      const deltaX = e.clientX - dragStartXRef.current;
+      const newWidth = dragStartWidthRef.current + deltaX;
+
+      const bounds = ref.current?.getBoundingClientRect();
+      if (!bounds) {
+        return;
+      }
+
+      const minW = minWidth ? getWidth(minWidth, bounds.width) : 0;
+      const maxW = maxWidth ? getWidth(maxWidth, bounds.width) : bounds.width;
+
+      if (newWidth < minW || newWidth > maxW) {
+        return;
+      }
+
+      throttledSetWidth(newWidth);
+    },
+    [isDragging, minWidth, maxWidth, throttledSetWidth]
+  );
+
   const cursor = isDragging ? 'col-resize' : undefined;
   const pointerEvents = isDragging ? 'none' : 'auto';
   const userSelect = isDragging ? 'none' : 'auto';
+
   return (
     <AutoSizer style={{width: '100%', height: '100%'}}>
       {panelDim => {
@@ -107,20 +151,15 @@ export const SplitPanel = ({
         let numW = getWidth(width, panelW);
         const minW = minWidth ? getWidth(minWidth, panelW) : 0;
         let maxW = maxWidth ? getWidth(maxWidth, panelW) : panelW;
-        // Max width constraint might be inconsistent with min constraint.
-        // E.g. a percentage constraint when the panel is resized to extremes.
+
         if (maxW < minW) {
           maxW = minW;
         }
-        // width value in state may violate constraints because of browser size change.
         if (numW < minW) {
           numW = minW;
         } else if (numW > maxW) {
           numW = maxW;
         }
-
-        const leftPanelR = numW;
-        const rightPanelL = isDrawerOpen ? numW + DIVIDER_LINE_WIDTH : 0;
 
         return (
           <div
@@ -131,31 +170,44 @@ export const SplitPanel = ({
               height: '100%',
               position: 'relative',
               cursor,
+              overflow: 'hidden',
             }}
             onMouseMove={onMouseMove}
             onMouseUp={onMouseUp}
             onMouseLeave={onMouseLeave}>
-            <div style={{userSelect, pointerEvents}}>
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                userSelect,
+                pointerEvents,
+              }}>
               {isDrawerOpen && (
                 <div
                   style={{
                     position: 'absolute',
-                    inset: `0 ${leftPanelR}px 0 0`,
-                    overflow: 'auto',
-                    width: leftPanelR,
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    width: numW,
+                    overflow: 'hidden',
+                    willChange: isDragging ? 'transform, width' : 'auto',
                   }}>
                   {drawer}
                 </div>
               )}
               <div
-                className="right"
                 style={{
                   position: 'absolute',
                   top: 0,
-                  bottom: 0,
+                  left: isDrawerOpen ? numW + DIVIDER_WIDTH : 0,
                   right: 0,
-                  left: rightPanelL,
+                  bottom: 0,
                   overflow: 'hidden',
+                  willChange: isDragging ? 'left' : 'auto',
                 }}>
                 {main}
               </div>
@@ -164,7 +216,7 @@ export const SplitPanel = ({
               <Divider
                 className="divider"
                 onMouseDown={onMouseDown}
-                left={numW - DIVIDER_BORDER_WIDTH}
+                left={numW}
               />
             )}
           </div>

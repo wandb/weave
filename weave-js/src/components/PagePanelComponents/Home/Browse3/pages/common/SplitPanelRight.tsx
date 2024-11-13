@@ -107,20 +107,15 @@ export const SplitPanel = ({
         let numW = getWidth(width, panelW);
         const minW = minWidth ? getWidth(minWidth, panelW) : 0;
         let maxW = maxWidth ? getWidth(maxWidth, panelW) : panelW;
-        // Max width constraint might be inconsistent with min constraint.
-        // E.g. a percentage constraint when the panel is resized to extremes.
+
         if (maxW < minW) {
           maxW = minW;
         }
-        // width value in state may violate constraints because of browser size change.
         if (numW < minW) {
           numW = minW;
         } else if (numW > maxW) {
           numW = maxW;
         }
-
-        const rightPanelW = numW;
-        const mainPanelR = isDrawerOpen ? numW + DIVIDER_LINE_WIDTH : 0;
 
         return (
           <div
@@ -131,20 +126,30 @@ export const SplitPanel = ({
               height: '100%',
               position: 'relative',
               cursor,
+              overflow: 'hidden',
             }}
             onMouseMove={onMouseMove}
             onMouseUp={onMouseUp}
             onMouseLeave={onMouseLeave}>
-            <div style={{userSelect, pointerEvents}}>
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                userSelect,
+                pointerEvents,
+              }}>
               <div
-                className="main-right"
                 style={{
                   position: 'absolute',
                   top: 0,
-                  bottom: 0,
                   left: 0,
-                  right: mainPanelR,
+                  right: isDrawerOpen ? numW + DIVIDER_WIDTH : 0,
+                  bottom: 0,
                   overflow: 'hidden',
+                  willChange: isDragging ? 'right' : 'auto',
                 }}>
                 {main}
               </div>
@@ -152,9 +157,13 @@ export const SplitPanel = ({
                 <div
                   style={{
                     position: 'absolute',
-                    inset: `0 0 0 ${panelW - rightPanelW}px`,
-                    overflow: 'auto',
-                    width: rightPanelW,
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: numW,
+                    overflow: 'hidden',
+                    transform: `translateX(0)`,
+                    willChange: isDragging ? 'transform' : 'auto',
                   }}>
                   {drawer}
                 </div>
@@ -164,7 +173,7 @@ export const SplitPanel = ({
               <Divider
                 className="divider"
                 onMouseDown={onMouseDown}
-                right={numW - DIVIDER_BORDER_WIDTH}
+                right={numW}
               />
             )}
           </div>
