@@ -1,7 +1,7 @@
 import {createContext, useContext} from 'react';
 
 export type PlaygroundContextType = {
-  isPlayground: boolean;
+  isPlayground?: boolean;
   deleteMessage?: (messageIndex: number, responseIndexes?: number[]) => void;
   editMessage?: (messageIndex: number, newMessage: any) => void;
   deleteChoice?: (choiceIndex: number) => void;
