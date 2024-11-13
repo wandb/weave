@@ -948,14 +948,14 @@ describe('opStringLevenshtein', () => {
 
 async function parseNumberWithSeparatorQuery(
   str: string, 
-  thousands_separator: string | null,
-  decimal_separator: string | null,
+  thousandsSeparator: string | null,
+  decimalSeparator: string | null,
 ) {
   return (await testClient()).query(
       opParseNumberWithSeparator({
         str: constString(str),
-        thousands_separator: thousands_separator ? constString(thousands_separator) : constNone(),
-        decimal_separator: decimal_separator ? constString(decimal_separator) : constNone(),
+        thousands_separator: thousandsSeparator ? constString(thousandsSeparator) : constNone(),
+        decimal_separator: decimalSeparator ? constString(decimalSeparator) : constNone(),
       })
     )
 }
