@@ -34,7 +34,10 @@ const ResponseFormatSchema = z.discriminatedUnion('type', [
 ]);
 
 const ConfiguredLlmJudgeActionFriendlySchema = z.object({
-  model: z.enum(['gpt-4o-mini', 'gpt-4o']).default('gpt-4o-mini'),
+  model: z
+    .enum(['gpt-4o-mini', 'gpt-4o'])
+    .default('gpt-4o-mini')
+    .describe('Model to use for judging. Please configure OPENAPI_API_KEY in team settings.'),
   prompt: z.string().min(3),
   response_schema: ResponseFormatSchema,
 });

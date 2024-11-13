@@ -9,9 +9,10 @@ import {
   MenuItem,
   Select,
   TextField,
+  Tooltip,
   Typography,
 } from '@material-ui/core';
-import {Delete} from '@mui/icons-material';
+import {Delete, Help} from '@mui/icons-material';
 import React, {useEffect, useMemo, useState} from 'react';
 import {z} from 'zod';
 
@@ -263,16 +264,19 @@ const NestedForm: React.FC<{
   }
 
   return (
-    <TextField
-      fullWidth
-      label={keyName}
-      type={fieldType}
-      value={currentValue ?? ''}
-      onChange={e =>
-        updateConfig(currentPath, e.target.value, config, setConfig)
-      }
-      margin="dense"
-    />
+    <Box display="flex" alignItems="center" width="100%">
+      <TextField
+        fullWidth
+        label={keyName}
+        type={fieldType}
+        value={currentValue ?? ''}
+        onChange={e =>
+          updateConfig(currentPath, e.target.value, config, setConfig)
+        }
+        margin="dense"
+      />
+      <DescriptionTooltip description={getFieldDescription(fieldSchema)} />
+    </Box>
   );
 };
 
@@ -399,11 +403,14 @@ const EnumField: React.FC<{
 
   return (
     <FormControl fullWidth margin="dense">
-      {keyName !== '' ? (
-        <InputLabel>{keyName}</InputLabel>
-      ) : (
-        <div style={{height: '1px'}} />
-      )}
+      <Box display="flex" alignItems="center">
+        {keyName !== '' ? (
+          <InputLabel>{keyName}</InputLabel>
+        ) : (
+          <div style={{height: '1px'}} />
+        )}
+        <DescriptionTooltip description={getFieldDescription(fieldSchema)} />
+      </Box>
       <Select
         fullWidth
         value={selectedValue}
@@ -677,22 +684,25 @@ const NumberField: React.FC<{
   // }, [value, defaultValue, targetPath, config, setConfig]);
 
   return (
-    <TextField
-      fullWidth
-      label={keyName}
-      type="number"
-      value={value ?? ''}
-      onChange={e => {
-        const newValue =
-          e.target.value === '' ? undefined : Number(e.target.value);
-        if (newValue !== undefined && (newValue < min || newValue > max)) {
-          return;
-        }
-        updateConfig(targetPath, newValue, config, setConfig);
-      }}
-      inputProps={{min, max}}
-      margin="dense"
-    />
+    <Box display="flex" alignItems="center" width="100%">
+      <TextField
+        fullWidth
+        label={keyName}
+        type="number"
+        value={value ?? ''}
+        onChange={e => {
+          const newValue =
+            e.target.value === '' ? undefined : Number(e.target.value);
+          if (newValue !== undefined && (newValue < min || newValue > max)) {
+            return;
+          }
+          updateConfig(targetPath, newValue, config, setConfig);
+        }}
+        inputProps={{min, max}}
+        margin="dense"
+      />
+      <DescriptionTooltip description={getFieldDescription(fieldSchema)} />
+    </Box>
   );
 };
 
@@ -764,17 +774,43 @@ const BooleanField: React.FC<{
   }, [value, defaultValue, targetPath, config, setConfig]);
 
   return (
-    <FormControlLabel
-      control={
-        <Checkbox
-          checked={value ?? defaultValue}
-          onChange={e =>
-            updateConfig(targetPath, e.target.checked, config, setConfig)
-          }
-        />
-      }
-      label={keyName}
-    />
+    <Box display="flex" alignItems="center">
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={value ?? defaultValue}
+            onChange={e =>
+              updateConfig(targetPath, e.target.checked, config, setConfig)
+            }
+          />
+        }
+        label={keyName}
+      />
+      <DescriptionTooltip description={getFieldDescription(fieldSchema)} />
+    </Box>
+  );
+};
+
+const getFieldDescription = (schema: z.ZodTypeAny): string | undefined => {
+  if ('description' in schema._def) {
+    return schema._def.description;
+  }
+  if (schema instanceof z.ZodOptional || schema instanceof z.ZodDefault) {
+    return getFieldDescription(schema._def.innerType);
+  }
+  return undefined;
+};
+
+const DescriptionTooltip: React.FC<{description?: string}> = ({description}) => {
+  if (!description) {
+    return null;
+  }
+  return (
+    <Tooltip title={description}>
+      <IconButton size="small">
+        <Help fontSize="small" />
+      </IconButton>
+    </Tooltip>
   );
 };
 
