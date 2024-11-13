@@ -21,9 +21,9 @@ If True, prints a link to the Weave UI when calling a weave op.
 
 import os
 from contextvars import ContextVar
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 SETTINGS_PREFIX = "WEAVE_"
 
@@ -142,4 +142,21 @@ def _optional_int(name: str) -> Optional[int]:
     return _context_vars[name].get()
 
 
-__doc_spec__ = [UserSettings]
+class PatchOptions(BaseModel):
+    # These currently mirror the `op` decorator args to provide a consistent interface
+    # when working with auto-patched functions.
+    call_display_name: Optional[Union[str, Callable[[Any], str]]] = None
+    postprocess_inputs: Optional[Callable[[dict[str, Any]], dict[str, Any]]] = None
+    postprocess_output: Optional[Callable[[Any], Any]] = None
+
+
+class OpenAIPatchSettings(BaseModel):
+    enabled: bool = True
+    options: PatchOptions = Field(default_factory=PatchOptions)
+
+
+class PatchSettings(BaseModel):
+    openai: OpenAIPatchSettings = Field(default_factory=OpenAIPatchSettings)
+
+
+__doc_spec__ = [UserSettings, PatchSettings]

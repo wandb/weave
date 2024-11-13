@@ -6,6 +6,7 @@ import weave
 from weave.trace.op import Op, ProcessedInputs
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.settings import OpenAIPatchSettings
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
@@ -302,6 +303,7 @@ def openai_on_input_handler(
 
 def create_wrapper_sync(
     name: str,
+    settings: OpenAIPatchSettings,
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         "We need to do this so we can check if `stream` is used"
@@ -322,7 +324,8 @@ def create_wrapper_sync(
                 return True
             return False
 
-        op = weave.op()(_add_stream_options(fn))
+        op_kwargs = settings.options.model_dump()
+        op = weave.op(**op_kwargs)(_add_stream_options(fn))
         op.name = name  # type: ignore
         op._set_on_input_handler(openai_on_input_handler)
         return add_accumulator(
@@ -342,6 +345,7 @@ def create_wrapper_sync(
 # it manually here...
 def create_wrapper_async(
     name: str,
+    settings: OpenAIPatchSettings,
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         "We need to do this so we can check if `stream` is used"
@@ -360,7 +364,16 @@ def create_wrapper_async(
                 return True
             return False
 
-        op = weave.op()(_add_stream_options(fn))
+            op_kwargs = settings.options.model_dump()
+            op_kwargs = settings.options.model_dump()
+
+        print(f"{op_kwargs=}")
+
+        op_kwargs = settings.options.model_dump()
+
+        print(f"{op_kwargs=}")
+
+        op = weave.op(**op_kwargs)(_add_stream_options(fn))
         op.name = name  # type: ignore
         op._set_on_input_handler(openai_on_input_handler)
         return add_accumulator(
@@ -375,18 +388,23 @@ def create_wrapper_async(
     return wrapper
 
 
-symbol_patchers = [
-    # Patch the Completions.create method
-    SymbolPatcher(
-        lambda: importlib.import_module("openai.resources.chat.completions"),
-        "Completions.create",
-        create_wrapper_sync(name="openai.chat.completions.create"),
-    ),
-    SymbolPatcher(
-        lambda: importlib.import_module("openai.resources.chat.completions"),
-        "AsyncCompletions.create",
-        create_wrapper_async(name="openai.chat.completions.create"),
-    ),
-]
-
-openai_patcher = MultiPatcher(symbol_patchers)  # type: ignore
+def get_openai_patcher(settings: OpenAIPatchSettings) -> MultiPatcher:
+    symbol_patchers = [
+        SymbolPatcher(
+            lambda: importlib.import_module("openai.resources.chat.completions"),
+            "Completions.create",
+            create_wrapper_sync(
+                name="openai.chat.completions.create",
+                settings=settings,
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("openai.resources.chat.completions"),
+            "AsyncCompletions.create",
+            create_wrapper_async(
+                name="openai.chat.completions.create",
+                settings=settings,
+            ),
+        ),
+    ]
+    return MultiPatcher(symbol_patchers)

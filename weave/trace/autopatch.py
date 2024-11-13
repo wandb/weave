@@ -4,8 +4,11 @@ This module should not require any dependencies beyond the standard library. It 
 check if libraries are installed and imported and patch in the case that they are.
 """
 
+from weave.integrations.openai.openai_sdk import get_openai_patcher
+from weave.trace.settings import PatchSettings
 
-def autopatch() -> None:
+
+def autopatch(settings: PatchSettings = None) -> None:
     from weave.integrations.anthropic.anthropic_sdk import anthropic_patcher
     from weave.integrations.cerebras.cerebras_sdk import cerebras_patcher
     from weave.integrations.cohere.cohere_sdk import cohere_patcher
@@ -20,9 +23,12 @@ def autopatch() -> None:
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
     from weave.integrations.mistral import mistral_patcher
     from weave.integrations.notdiamond.tracing import notdiamond_patcher
-    from weave.integrations.openai.openai_sdk import openai_patcher
 
-    openai_patcher.attempt_patch()
+    if settings is None:
+        return
+
+    # OpenAI
+    get_openai_patcher(settings.openai).attempt_patch()
     mistral_patcher.attempt_patch()
     litellm_patcher.attempt_patch()
     llamaindex_patcher.attempt_patch()
