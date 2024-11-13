@@ -166,13 +166,6 @@ export const useProjectSidebar = (
           //   iconName: IconNames.TypeNumberAlt,
           // },
           {
-            type: 'button' as const,
-            name: 'Scorers',
-            slug: 'weave/scorers',
-            isShown: isWeaveOnly,
-            iconName: IconNames.TypeNumberAlt,
-          },
-          {
             type: 'divider' as const,
             key: 'dividerWithinWeave-2',
             isShown: isWeaveOnly,
