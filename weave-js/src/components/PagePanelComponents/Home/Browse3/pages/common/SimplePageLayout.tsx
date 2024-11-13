@@ -13,8 +13,8 @@ import React, {
 } from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
-import {SplitPanel} from './SplitPanel';
 import {SplitPanel as SplitPanelRight} from './SplitPanelRight';
+import {TraceTreeSplitPanel} from './TraceTreeSplitPanel';
 import {isPrimitive} from './util';
 
 type SimplePageLayoutContextType = {
@@ -247,7 +247,7 @@ export const SimplePageLayoutWithHeader: FC<{
         {simplePageLayoutContextValue.headerSuffix}
       </Box>
       <div style={{flex: '1 1 auto', overflow: 'hidden', display: 'flex'}}>
-        <SplitPanel
+        <TraceTreeSplitPanel
           minWidth={150}
           defaultWidth={200}
           maxWidth="50%"
@@ -255,6 +255,9 @@ export const SimplePageLayoutWithHeader: FC<{
           drawer={props.leftSidebar}
           main={
             <SplitPanelRight
+              minWidth={150}
+              defaultWidth={200}
+              maxWidth="50%"
               drawer={props.rightSidebarContent}
               isDrawerOpen={props.isRightSidebarOpen ?? false}
               main={

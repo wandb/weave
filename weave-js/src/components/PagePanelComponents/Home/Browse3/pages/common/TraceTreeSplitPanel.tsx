@@ -63,7 +63,7 @@ const getWidth = (value: number | string, total: number): number => {
   return parseFloat(value);
 };
 
-export const SplitPanel = ({
+export const TraceTreeSplitPanel = ({
   main,
   drawer,
   isDrawerOpen,
@@ -192,7 +192,7 @@ export const SplitPanel = ({
                     top: 0,
                     left: 0,
                     bottom: 0,
-                    width: numW,
+                    width: numW + DIVIDER_WIDTH / 2,
                     overflow: 'hidden',
                     willChange: isDragging ? 'transform, width' : 'auto',
                   }}>
