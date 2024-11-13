@@ -235,25 +235,29 @@ def get_ranked_prices(
             tsi.Query(
                 **{
                     "$expr": {
-                        "$and": [
+                        "$or": [
                             {
-                                "$or": [
+                                "$eq": [
                                     {
-                                        "$eq": [
-                                            {
-                                                "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
-                                            },
-                                            {"$literal": project_id},
-                                        ]
+                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
                                     },
+                                    {"$literal": project_id},
+                                ]
+                            },
+                            {
+                                "$eq": [
                                     {
-                                        "$eq": [
-                                            {
-                                                "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
-                                            },
-                                            {"$literal": DEFAULT_PRICING_LEVEL_ID},
-                                        ]
+                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
                                     },
+                                    {"$literal": DEFAULT_PRICING_LEVEL_ID},
+                                ]
+                            },
+                            {
+                                "$eq": [
+                                    {
+                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
+                                    },
+                                    {"$literal": ""},
                                 ]
                             },
                         ]
