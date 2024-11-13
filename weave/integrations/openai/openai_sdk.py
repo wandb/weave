@@ -6,7 +6,7 @@ import weave
 from weave.trace.op import Op, ProcessedInputs
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
-from weave.trace.settings import OpenAIPatchSettings
+from weave.trace.settings import IntegrationSettings
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
@@ -303,7 +303,7 @@ def openai_on_input_handler(
 
 def create_wrapper_sync(
     name: str,
-    settings: OpenAIPatchSettings,
+    settings: IntegrationSettings,
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         "We need to do this so we can check if `stream` is used"
@@ -345,7 +345,7 @@ def create_wrapper_sync(
 # it manually here...
 def create_wrapper_async(
     name: str,
-    settings: OpenAIPatchSettings,
+    settings: IntegrationSettings,
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         "We need to do this so we can check if `stream` is used"
@@ -380,7 +380,7 @@ def create_wrapper_async(
     return wrapper
 
 
-def get_openai_patcher(settings: OpenAIPatchSettings) -> MultiPatcher:
+def get_openai_patcher(settings: IntegrationSettings) -> MultiPatcher:
     symbol_patchers = [
         SymbolPatcher(
             lambda: importlib.import_module("openai.resources.chat.completions"),

@@ -142,21 +142,42 @@ def _optional_int(name: str) -> Optional[int]:
     return _context_vars[name].get()
 
 
-class PatchOptions(BaseModel):
-    # These currently mirror the `op` decorator args to provide a consistent interface
-    # when working with auto-patched functions.
+class OpSettings(BaseModel):
+    """Settings for weave ops intended to be used to configure auto-patched functions.
+
+    These currently mirror the `op` decorator args to provide a consistent interface
+    when working with auto-patched functions.  See the `op` decorator for more details."""
+
     call_display_name: Optional[Union[str, Callable[[Any], str]]] = None
     postprocess_inputs: Optional[Callable[[dict[str, Any]], dict[str, Any]]] = None
     postprocess_output: Optional[Callable[[Any], Any]] = None
 
 
-class OpenAIPatchSettings(BaseModel):
+class IntegrationSettings(BaseModel):
+    """Settings for a specific integration.
+
+    By default, integrations are enabled and have no additional op options set."""
+
     enabled: bool = True
-    options: PatchOptions = Field(default_factory=PatchOptions)
+    options: OpSettings = Field(default_factory=OpSettings)
 
 
 class PatchSettings(BaseModel):
-    openai: OpenAIPatchSettings = Field(default_factory=OpenAIPatchSettings)
+    """Settings for configuring auto-patching integrations."""
+
+    openai: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    mistral: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    litellm: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    llamaindex: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    langchain: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    anthropic: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    groq: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    instructor: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    dspy: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    cerebras: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    cohere: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    google_genai: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    notdiamond: IntegrationSettings = Field(default_factory=IntegrationSettings)
 
 
 __doc_spec__ = [UserSettings, PatchSettings]
