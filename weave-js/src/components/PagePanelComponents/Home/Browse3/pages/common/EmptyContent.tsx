@@ -1,8 +1,8 @@
 import React from 'react';
 
-import {TargetBlank} from '../../../../../../common/util/links';
-import {EmptyProps} from './Empty';
-import {Link} from './Links';
+import { TargetBlank } from '../../../../../../common/util/links';
+import { EmptyProps } from './Empty';
+import { Link } from './Links';
 
 export const EMPTY_PROPS_TRACES: EmptyProps = {
   icon: 'layout-tabs' as const,
@@ -213,11 +213,7 @@ export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
   description: 'Create annotations in Python.',
   moreInformation: (
     <>
-      Learn more about{' '}
-      <TargetBlank href="https://weave-docs.wandb.ai/guides/annotations">
-        creating and using annotations
-      </TargetBlank>
-      .
+      More information about creating and using annotation specifications for human labeling coming soon.
     </>
   ),
 };
