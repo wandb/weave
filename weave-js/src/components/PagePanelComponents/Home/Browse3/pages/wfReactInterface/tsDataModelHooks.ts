@@ -980,6 +980,9 @@ const useRootObjectVersions = (
   }, [doFetch]);
 
   useEffect(() => {
+    if (opts?.skip) {
+      return;
+    }
     return getTsClient().registerOnObjectListener(doFetch);
   }, [getTsClient, doFetch]);
 
