@@ -984,7 +984,7 @@ const useRootObjectVersions = (
       return;
     }
     return getTsClient().registerOnObjectListener(doFetch);
-  }, [getTsClient, doFetch]);
+  }, [getTsClient, doFetch, opts?.skip]);
 
   return useMemo(() => {
     if (opts?.skip) {
