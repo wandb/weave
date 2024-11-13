@@ -26,7 +26,6 @@ import {
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
 import {EvaluationLeaderboardTab} from './LeaderboardTab';
-import {TabEditAnnotationSpec} from './TabEditAnnotationSpec';
 import {TabPrompt} from './TabPrompt';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
@@ -378,20 +377,6 @@ const ObjectVersionPageInner: React.FC<{
             </ScrollableTabContent>
           ),
         },
-        ...(isAnnotationSpec
-          ? [
-              {
-                label: 'Edit',
-                content: (
-                  <TabEditAnnotationSpec
-                    entityName={entityName}
-                    projectName={projectName}
-                    objectVersion={objectVersion}
-                  />
-                ),
-              },
-            ]
-          : []),
 
         // {
         //   label: 'Metadata',
