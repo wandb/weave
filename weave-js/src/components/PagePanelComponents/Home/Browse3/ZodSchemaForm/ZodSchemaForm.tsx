@@ -1,20 +1,25 @@
 import {
   Box,
-  Button,
+  // Button,
   Checkbox,
   FormControl,
   FormControlLabel,
   IconButton,
   InputLabel,
-  TextField,
+  // TextField,
   Tooltip,
   Typography,
 } from '@material-ui/core';
 import {Delete, Help} from '@mui/icons-material';
+import { Button } from '@wandb/weave/components/Button';
+import { TextField } from '@wandb/weave/components/Form/TextField';
 import React, {useEffect, useMemo, useState} from 'react';
 import {z} from 'zod';
 
 import {SelectField} from '../filters/SelectField';
+
+const GAP_BETWEEN_ITEMS_PX = 20;
+const GAP_BETWEEN_LABEL_AND_FIELD_PX = 10;
 
 interface ZSFormProps {
   configSchema: z.ZodType<any>;
@@ -58,7 +63,7 @@ const distiminatorOptionToValue = (
 };
 
 const Label: React.FC<{label: string}> = ({label}) => {
-  return <InputLabel style={{marginBottom: '12px'}}>{label}</InputLabel>  
+  return <InputLabel style={{marginBottom: GAP_BETWEEN_LABEL_AND_FIELD_PX + 'px'}}>{label}</InputLabel>  
 };
 
 const DiscriminatedUnionField: React.FC<{
@@ -114,7 +119,7 @@ const DiscriminatedUnionField: React.FC<{
 
 
   return (
-    <FormControl fullWidth margin="dense">
+    <FormControl fullWidth style={{marginBottom: GAP_BETWEEN_ITEMS_PX + 'px'}}>
       <Label label={keyName} />
       <SelectField
         options={options.map(option => {
@@ -166,7 +171,7 @@ const NestedForm: React.FC<{
 
   if (isZodType(fieldSchema, s => s instanceof z.ZodObject)) {
     return (
-      <FormControl fullWidth margin="dense">
+      <FormControl fullWidth style={{marginBottom: GAP_BETWEEN_ITEMS_PX + 'px'}}>
         <Label label={keyName} />
         <Box ml={2}>
           <ZSForm
@@ -272,19 +277,21 @@ const NestedForm: React.FC<{
   }
 
   return (
-    <Box display="flex" alignItems="center" width="100%">
+
+    <FormControl fullWidth style={{marginBottom: GAP_BETWEEN_ITEMS_PX + 'px'}}>
+    <Label label={keyName} />
       <TextField
-        fullWidth
-        label={keyName}
+        // fullWidth
+        // label={keyName}
         type={fieldType}
         value={currentValue ?? ''}
-        onChange={e =>
-          updateConfig(currentPath, e.target.value, config, setConfig)
+        onChange={value =>
+          updateConfig(currentPath, value, config, setConfig)
         }
-        margin="dense"
+        size="medium"
       />
       <DescriptionTooltip description={getFieldDescription(fieldSchema)} />
-    </Box>
+    </FormControl>
   );
 };
 
@@ -324,7 +331,7 @@ const ArrayField: React.FC<{
   }, [arrayValue, minItems, elementSchema, targetPath, config, setConfig]);
 
   return (
-    <FormControl fullWidth margin="dense">
+    <FormControl fullWidth style={{marginBottom: GAP_BETWEEN_ITEMS_PX + 'px'}}>
       <Label label={keyName} />
       {arrayValue.map((item, index) => (
         <Box
@@ -381,6 +388,7 @@ const EnumField: React.FC<{
   value: any;
   config: Record<string, any>;
   setConfig: (config: Record<string, any>) => void;
+  noMarginBottom?: boolean;
 }> = ({
   keyName,
   fieldSchema,
@@ -389,6 +397,7 @@ const EnumField: React.FC<{
   value,
   config,
   setConfig,
+  noMarginBottom,
 }) => {
   const options: string[] = unwrappedSchema.options;
 
@@ -412,7 +421,7 @@ const EnumField: React.FC<{
   }, [value, selectedValue, targetPath, config, setConfig]);
 
   return (
-    <FormControl fullWidth margin="dense">
+    <FormControl fullWidth style={{marginBottom: noMarginBottom ? '0px' : GAP_BETWEEN_ITEMS_PX +'px'}}>
       <Box display="flex" alignItems="center">
         {keyName !== '' ? (
           <Label label={keyName} />
@@ -514,28 +523,30 @@ const RecordField: React.FC<{
   };
 
   return (
-    <FormControl fullWidth margin="dense">
+    <FormControl fullWidth style={{marginBottom: GAP_BETWEEN_ITEMS_PX + 'px'}}>
       <Label label={keyName} />
       {internalPairs.map(({key, value: innerValue}, index) => (
-        <Box key={index} display="flex" alignItems="center">
+        <Box key={index} display="flex" alignItems="center" style={{width: '100%', gap : 4, alignItems: 'center', height: '35px', marginBottom: '4px'}}>
+          <Box flexGrow={1}>
           <TextField
-            fullWidth
             value={key}
-            onChange={e => {
+            onChange={value => {
               if (
                 internalPairs.some(
-                  (pair, i) => i !== index && pair.key === e.target.value
+                  (pair, i) => i !== index && pair.key === value
                 )
               ) {
                 // Prevent duplicate keys
                 return;
               }
-              updateInternalPair(index, e.target.value, innerValue);
+              updateInternalPair(index, value, innerValue);
             }}
-            margin="dense"
           />
-          {isZodType(valueSchema, s => s instanceof z.ZodEnum) ? (
-            <EnumField
+          </Box>
+          <Box flexGrow={1}>
+            {isZodType(valueSchema, s => s instanceof z.ZodEnum) ? (
+              <EnumField
+              noMarginBottom
               keyName={``}
               fieldSchema={valueSchema}
               unwrappedSchema={unwrappedValueSchema as z.ZodEnum<any>}
@@ -552,18 +563,27 @@ const RecordField: React.FC<{
             />
           ) : (
             <TextField
-              fullWidth
               value={innerValue}
-              onChange={e => updateInternalPair(index, key, e.target.value)}
-              margin="dense"
+              onChange={value => updateInternalPair(index, key, value)}
             />
           )}
-          <IconButton onClick={() => removePair(index)}>
-            <Delete />
-          </IconButton>
+          </Box>
+          <Button
+            size="small"
+            variant="quiet"
+            icon="delete"
+            tooltip="Remove this key"
+            onClick={() => removePair(index)}
+          />
         </Box>
       ))}
-      <Button onClick={addNewPair}>Add Item</Button>
+      <Button 
+        // style={{marginTop: '8px'}}
+        size="small"
+        variant="secondary"
+        onClick={addNewPair}>
+        Add Key
+      </Button>
     </FormControl>
   );
 };
@@ -668,37 +688,24 @@ const NumberField: React.FC<{
   const max =
     (unwrappedSchema._def.checks.find(check => check.kind === 'max') as any)
       ?.value ?? undefined;
-  // const defaultValue =
-  //   fieldSchema instanceof z.ZodDefault
-  //     ? fieldSchema._def.defaultValue()
-  //     : undefined;
-
-  // useEffect(() => {
-  //   if (value === undefined && defaultValue !== undefined) {
-  //     updateConfig(targetPath, defaultValue, config, setConfig);
-  //   }
-  // }, [value, defaultValue, targetPath, config, setConfig]);
 
   return (
-    <Box display="flex" alignItems="center" width="100%">
+    <FormControl fullWidth style={{marginBottom: GAP_BETWEEN_ITEMS_PX + 'px'}}>
+      <Label label={keyName} />
       <TextField
-        fullWidth
-        label={keyName}
         type="number"
-        value={value ?? ''}
-        onChange={e => {
+        value={(value ?? '').toString()}
+        onChange={value => {
           const newValue =
-            e.target.value === '' ? undefined : Number(e.target.value);
+            value === '' ? undefined : Number(value);
           if (newValue !== undefined && (newValue < min || newValue > max)) {
             return;
           }
           updateConfig(targetPath, newValue, config, setConfig);
         }}
-        inputProps={{min, max}}
-        margin="dense"
       />
       <DescriptionTooltip description={getFieldDescription(fieldSchema)} />
-    </Box>
+    </FormControl>
   );
 };
 
@@ -729,14 +736,8 @@ const LiteralField: React.FC<{
 
   return (
     <TextField
-      fullWidth
-      label={keyName}
+    disabled
       value={literalValue}
-      InputProps={{
-        readOnly: true,
-      }}
-      margin="dense"
-      variant="filled"
     />
   );
 };

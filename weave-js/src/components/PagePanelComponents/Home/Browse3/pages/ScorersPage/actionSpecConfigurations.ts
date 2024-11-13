@@ -34,7 +34,7 @@ const ResponseFormatSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('Object'),
-    Schema: StructuredResponseFormatSchema,
+    Keys: StructuredResponseFormatSchema,
   }),
 ]);
 
@@ -83,7 +83,7 @@ export const actionSpecConfigurationSpecs: Partial<
       } else {
         responseFormat = {
           type: 'object',
-          properties: _.mapValues(data['Response Schema'].Schema, value => ({
+          properties: _.mapValues(data['Response Schema'].Keys, value => ({
             type: value as 'boolean' | 'number' | 'string',
           })),
           additionalProperties: false,
