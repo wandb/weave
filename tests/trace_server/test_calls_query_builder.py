@@ -391,7 +391,10 @@ def test_query_light_column_with_costs() -> None:
                             llm_token_prices.effective_date DESC
                     ) AS rank
                 FROM llm_usage
-                LEFT JOIN llm_token_prices ON (llm_usage.llm_id = llm_token_prices.llm_id))
+                LEFT JOIN llm_token_prices ON (llm_usage.llm_id = llm_token_prices.llm_id)
+                WHERE ((llm_token_prices.pricing_level_id = {pb_2:String})
+                    OR (llm_token_prices.pricing_level_id = {pb_3:String})
+                    OR (llm_token_prices.pricing_level_id = {pb_4:String})))
             -- Final Select, which just selects the correct fields, and adds a costs object
             SELECT
                 id,
@@ -433,13 +436,16 @@ def test_query_light_column_with_costs() -> None:
                     '}' )
                 ) AS summary_dump
             FROM ranked_prices
-            WHERE (rank = {pb_2:UInt64})
+            WHERE (rank = {pb_5:UInt64})
             GROUP BY id, started_at
         """,
         {
             "pb_0": ["a", "b"],
             "pb_1": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
-            "pb_2": 1,
+            "pb_2": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
+            "pb_3": "default",
+            "pb_4": "",
+            "pb_5": 1,
         },
     )
 
