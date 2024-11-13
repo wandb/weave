@@ -170,7 +170,6 @@ export type Feedback = {
   creator: string | null; // display name
   created_at: string;
   feedback_type: string;
-  annotation_ref?: string;
   payload: Record<string, any>;
   annotation_ref?: string;
   runnable_ref?: string;
