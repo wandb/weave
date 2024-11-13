@@ -198,3 +198,18 @@ export const EMPTY_PROPS_PROGRAMMATIC_SCORERS: EmptyProps = {
     </>
   ),
 };
+
+export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
+  icon: 'forum-chat-bubble' as const,
+  heading: 'No annotations yet',
+  description: 'Create annotations in Python.',
+  moreInformation: (
+    <>
+      Learn more about{' '}
+      <TargetBlank href="https://weave-docs.wandb.ai/guides/annotations">
+        creating and using annotations
+      </TargetBlank>
+      .
+    </>
+  ),
+};
