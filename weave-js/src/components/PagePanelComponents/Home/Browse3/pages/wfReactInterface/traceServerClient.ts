@@ -7,6 +7,8 @@ import {
   FeedbackPurgeRes,
   TraceCallsDeleteReq,
   TraceCallUpdateReq,
+  TraceObjCreateReq,
+  TraceObjCreateRes,
   TraceRefsReadBatchReq,
   TraceRefsReadBatchRes,
 } from './traceServerClientTypes';
@@ -24,6 +26,7 @@ export class TraceServerClient extends DirectTraceServerClient {
   private onDeleteListeners: Array<() => void>;
   private onRenameListeners: Array<() => void>;
   private onFeedbackListeners: Record<string, Array<() => void>>;
+  private onObjectListeners: Array<() => void>;
 
   constructor(baseUrl: string) {
     super(baseUrl);
@@ -32,6 +35,7 @@ export class TraceServerClient extends DirectTraceServerClient {
     this.onDeleteListeners = [];
     this.onRenameListeners = [];
     this.onFeedbackListeners = {};
+    this.onObjectListeners = [];
   }
 
   /**
@@ -78,6 +82,15 @@ export class TraceServerClient extends DirectTraceServerClient {
     };
   }
 
+  public registerOnObjectListener(callback: () => void): () => void {
+    this.onObjectListeners.push(callback);
+    return () => {
+      this.onObjectListeners = this.onObjectListeners.filter(
+        listener => listener !== callback
+      );
+    };
+  }
+
   public callsDelete(req: TraceCallsDeleteReq): Promise<void> {
     const res = super.callsDelete(req).then(() => {
       this.onDeleteListeners.forEach(listener => listener());
@@ -88,6 +101,14 @@ export class TraceServerClient extends DirectTraceServerClient {
   public callUpdate(req: TraceCallUpdateReq): Promise<void> {
     const res = super.callUpdate(req).then(() => {
       this.onRenameListeners.forEach(listener => listener());
+    });
+    return res;
+  }
+
+  public objCreate(req: TraceObjCreateReq): Promise<TraceObjCreateRes> {
+    const res = super.objCreate(req).then(createRes => {
+      this.onObjectListeners.forEach(listener => listener());
+      return createRes;
     });
     return res;
   }

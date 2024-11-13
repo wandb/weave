@@ -16,19 +16,22 @@ import {
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
-import {TEAL_600} from '../../../../../common/css/color.styles';
-import {ErrorPanel} from '../../../../ErrorPanel';
-import {Loading} from '../../../../Loading';
-import {LoadingDots} from '../../../../LoadingDots';
-import {Timestamp} from '../../../../Timestamp';
-import {useWeaveflowRouteContext} from '../context';
-import {StyledDataGrid} from '../StyledDataGrid';
-import {basicField} from './common/DataTable';
-import {Empty} from './common/Empty';
+import { TEAL_600 } from '../../../../../common/css/color.styles';
+import { ErrorPanel } from '../../../../ErrorPanel';
+import { Loading } from '../../../../Loading';
+import { LoadingDots } from '../../../../LoadingDots';
+import { Timestamp } from '../../../../Timestamp';
+import { useWeaveflowRouteContext } from '../context';
+import { StyledDataGrid } from '../StyledDataGrid';
+import { basicField } from './common/DataTable';
+import { Empty } from './common/Empty';
 import {
   EMPTY_PROPS_ANNOTATIONS,
+
+
+
   EMPTY_PROPS_DATASETS,
   EMPTY_PROPS_LEADERBOARDS,
   EMPTY_PROPS_MODEL,
@@ -42,24 +45,24 @@ import {
   ObjectVersionsLink,
   objectVersionText,
 } from './common/Links';
-import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
-import {SimplePageLayout} from './common/SimplePageLayout';
+import { FilterLayoutTemplate } from './common/SimpleFilterableDataTable';
+import { SimplePageLayout } from './common/SimplePageLayout';
 import {
   buildDynamicColumns,
   prepareFlattenedDataForTable,
 } from './common/tabularListViews/columnBuilder';
-import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
-import {useControllableState, useURLSearchParamsDict} from './util';
+import { TypeVersionCategoryChip } from './common/TypeVersionCategoryChip';
+import { useControllableState, useURLSearchParamsDict } from './util';
 import {
   KNOWN_BASE_OBJECT_CLASSES,
   OBJECT_ATTR_EDGE_NAME,
 } from './wfReactInterface/constants';
-import {useWFHooks} from './wfReactInterface/context';
+import { useWFHooks } from './wfReactInterface/context';
 import {
   isTableRef,
   makeRefExpandedPayload,
 } from './wfReactInterface/tsDataModelHooksCallRefExpansion';
-import {objectVersionKeyToRefUri} from './wfReactInterface/utilities';
+import { objectVersionKeyToRefUri } from './wfReactInterface/utilities';
 import {
   KnownBaseObjectClassType,
   ObjectVersionSchema,
@@ -174,6 +177,8 @@ export const FilterableObjectVersionsTable: React.FC<{
       propsEmpty = EMPTY_PROPS_LEADERBOARDS;
     } else if (base === 'Scorer') {
       propsEmpty = EMPTY_PROPS_PROGRAMMATIC_SCORERS;
+    } else if (base === 'ActionSpec') {
+      propsEmpty = EMPTY_PROPS_ACTION_SPECS;
     } else if (base === 'AnnotationSpec') {
       propsEmpty = EMPTY_PROPS_ANNOTATIONS;
     }
