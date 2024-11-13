@@ -26,6 +26,7 @@ import {
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
 import {EvaluationLeaderboardTab} from './LeaderboardTab';
+import {TabEditAnnotationSpec} from './TabEditAnnotationSpec';
 import {TabPrompt} from './TabPrompt';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
@@ -54,6 +55,7 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Leaderboard: 'benchmark-square',
   Scorer: 'type-number-alt',
   ActionSpec: 'rocket-launch',
+  AnnotationSpec: 'forum-chat-bubble',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
@@ -188,6 +190,8 @@ const ObjectVersionPageInner: React.FC<{
     return viewerData;
   }, [viewerData]);
 
+  const isAnnotationSpec =
+    baseObjectClass === 'AnnotationSpec' && refExtra == null;
   const isDataset = baseObjectClass === 'Dataset' && refExtra == null;
   const isEvaluation = baseObjectClass === 'Evaluation' && refExtra == null;
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
@@ -374,6 +378,20 @@ const ObjectVersionPageInner: React.FC<{
             </ScrollableTabContent>
           ),
         },
+        ...(isAnnotationSpec
+          ? [
+              {
+                label: 'Edit',
+                content: (
+                  <TabEditAnnotationSpec
+                    entityName={entityName}
+                    projectName={projectName}
+                    objectVersion={objectVersion}
+                  />
+                ),
+              },
+            ]
+          : []),
 
         // {
         //   label: 'Metadata',

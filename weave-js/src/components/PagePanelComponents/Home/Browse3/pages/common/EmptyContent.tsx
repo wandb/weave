@@ -206,3 +206,18 @@ export const EMPTY_PROPS_ACTION_SPECS: EmptyProps = {
     'Use Actions to define workloads to be executed by Weave servers (for example: LLM Judges) ',
   moreInformation: <></>,
 };
+
+export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
+  icon: 'forum-chat-bubble' as const,
+  heading: 'No annotations yet',
+  description: 'Create annotations in Python.',
+  moreInformation: (
+    <>
+      Learn more about{' '}
+      <TargetBlank href="https://weave-docs.wandb.ai/guides/annotations">
+        creating and using annotations
+      </TargetBlank>
+      .
+    </>
+  ),
+};
