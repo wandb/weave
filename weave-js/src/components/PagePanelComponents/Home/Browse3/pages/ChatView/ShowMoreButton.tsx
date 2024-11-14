@@ -17,7 +17,7 @@ export const ShowMoreButton = ({
       className={classNames(
         'absolute bottom-0 left-0 flex w-full items-center justify-center pb-4 pt-20',
         !isShowingMore
-          ? `from-34% bg-gradient-to-t ${
+          ? `from-34% rounded-b-xl bg-gradient-to-t ${
               isUser ? 'from-cactus-300/[0.24]' : 'from-moon-50'
             } to-transparent`
           : ''

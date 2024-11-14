@@ -30,7 +30,7 @@ export const MessagePanel = ({
     if (contentRef.current) {
       setIsOverflowing(contentRef.current.scrollHeight > 400);
     }
-  }, [message.content]);
+  }, [message.content, contentRef?.current?.scrollHeight]);
 
   const isUser = message.role === 'user';
   const isSystemPrompt = message.role === 'system';
