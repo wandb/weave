@@ -4,13 +4,13 @@
  * backed by the "Trace Server" engine.
  */
 
-import {isSimpleTypeShape, union} from '@wandb/weave/core/model/helpers';
+import { isSimpleTypeShape, union } from '@wandb/weave/core/model/helpers';
 import * as _ from 'lodash';
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import * as Types from '../../../../../../core/model/types';
-import {useDeepMemo} from '../../../../../../hookUtils';
-import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import { useDeepMemo } from '../../../../../../hookUtils';
+import { isWeaveObjectRef, parseRef } from '../../../../../../react';
 import {
   callCache,
   objectVersionCache,
@@ -23,11 +23,11 @@ import {
   WEAVE_REF_PREFIX,
 } from './constants';
 import * as traceServerClient from './traceServerClient';
-import {useGetTraceServerClientContext} from './traceServerClientContext';
-import {Query} from './traceServerClientInterface/query';
+import { useGetTraceServerClientContext } from './traceServerClientContext';
+import { Query } from './traceServerClientInterface/query';
 import * as traceServerTypes from './traceServerClientTypes';
-import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
-import {opVersionRefOpName, refUriToObjectVersionKey} from './utilities';
+import { useClientSideCallRefExpansion } from './tsDataModelHooksCallRefExpansion';
+import { opVersionRefOpName, refUriToObjectVersionKey } from './utilities';
 import {
   CallFilter,
   CallKey,
@@ -653,6 +653,86 @@ const useFeedback = (
       mounted = false;
     };
   }, [deepKey, getTsClient, doReload, sortBy]);
+
+  return {...result, refetch};
+};
+
+const useFeedbackByTypeAndCallRefs = (
+  entity: string,
+  project: string,
+  feedbackType: string,
+  callRefs: string[],
+  sortBy?: traceServerTypes.SortBy[]
+) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  const [result, setResult] = useState<
+    LoadableWithError<traceServerTypes.Feedback[]>
+  >({
+    loading: false,
+    result: null,
+    error: null,
+  });
+  const [doReload, setDoReload] = useState(false);
+  const refetch = useCallback(() => {
+    setDoReload(true);
+  }, [setDoReload]);
+
+  const deepCallRefs = useDeepMemo(callRefs);
+
+  useEffect(() => {
+    let mounted = true;
+    if (doReload) {
+      setDoReload(false);
+    }
+    if (!deepCallRefs || deepCallRefs.length === 0) {
+      return;
+    }
+    setResult({loading: true, result: null, error: null});
+    getTsClient()
+      .feedbackQuery({
+        project_id: projectIdFromParts({
+          entity,
+          project,
+        }),
+        query: {
+          $expr: {
+            $and: [
+              {
+                $contains: {
+                  input: {$getField: 'feedback_type'},
+                  substr: {$literal: feedbackType},
+                },
+              },
+              {
+                $in: [
+                  {$getField: 'weave_ref'},
+                  deepCallRefs.map(ref => ({$literal: ref})),
+                ],
+              },
+            ],
+          },
+        },
+        sort_by: sortBy ?? [{field: 'created_at', direction: 'desc'}],
+      })
+      .then(res => {
+        if (!mounted) {
+          return;
+        }
+        if ('result' in res) {
+          setResult({loading: false, result: res.result, error: null});
+        }
+      })
+      .catch(err => {
+        if (!mounted) {
+          return;
+        }
+        setResult({loading: false, result: null, error: err});
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [deepCallRefs, getTsClient, doReload, sortBy]);
 
   return {...result, refetch};
 };
@@ -1720,6 +1800,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useRefsData,
   useApplyMutationsToRef,
   useFeedback,
+  useFeedbackByTypeAndCallRefs,
   useFileContent,
   useTableRowsQuery,
   useTableQueryStats,

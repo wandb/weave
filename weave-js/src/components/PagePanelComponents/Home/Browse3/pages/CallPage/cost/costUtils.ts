@@ -2,8 +2,8 @@ import {
   LLMCostSchema,
   LLMUsageSchema,
 } from '../../wfReactInterface/traceServerClientTypes';
-import {CallSchema} from '../../wfReactInterface/wfDataModelHooksInterface';
-import {DEFAULT_COST_DATA, isCostDataKey, isUsageDataKey} from './costTypes';
+import { CallSchema } from '../../wfReactInterface/wfDataModelHooksInterface';
+import { DEFAULT_COST_DATA, isCostDataKey, isUsageDataKey } from './costTypes';
 
 const COST_PARAM_PREFIX = 'summary.weave.costs.';
 

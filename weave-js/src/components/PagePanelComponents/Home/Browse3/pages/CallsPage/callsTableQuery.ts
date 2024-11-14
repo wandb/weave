@@ -3,19 +3,20 @@ import {
   GridPaginationModel,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
-import {useCallback, useMemo} from 'react';
+import { useCallback, useMemo } from 'react';
 
-import {useDeepMemo} from '../../../../../../hookUtils';
-import {isValuelessOperator} from '../../filters/common';
-import {addCostsToCallResults} from '../CallPage/cost';
-import {operationConverter} from '../common/tabularListViews/operators';
-import {useWFHooks} from '../wfReactInterface/context';
-import {Query} from '../wfReactInterface/traceServerClientInterface/query';
+import { parseRef } from '@wandb/weave/react';
+import { makeRefCall } from '@wandb/weave/util/refs';
+import { useDeepMemo } from '../../../../../../hookUtils';
+import { isValuelessOperator } from '../../filters/common';
+import { operationConverter } from '../common/tabularListViews/operators';
+import { useWFHooks } from '../wfReactInterface/context';
+import { Query } from '../wfReactInterface/traceServerClientInterface/query';
 import {
   CallFilter,
   CallSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
-import {WFHighLevelCallFilter} from './callsTableFilter';
+import { WFHighLevelCallFilter } from './callsTableFilter';
 
 /**
  * This Hook is responsible for bridging the gap between the CallsTable
@@ -120,20 +121,69 @@ export const useCallsForQuery = (
     callsStats.refetch();
   }, [calls, callsStats, costs]);
 
+  // query for feeback
+  const {useFeedbackByTypeAndCallRefs} = useWFHooks();
+  const feedbackQuery = useFeedbackByTypeAndCallRefs(
+    entity,
+    project,
+    'wandb.annotation.',
+    callResults.map(call => makeRefCall(entity, project, call.callId))
+  );
+
+  // map of callId to the latest feedback of each feedback_type
+  const feedbackByType: Record<string, Record<string, any>> | undefined = useMemo(() => {
+    return feedbackQuery.result?.reduce((acc: Record<string, Record<string, any>>, curr) => {
+      const callId = parseRef(curr.weave_ref).artifactName;
+      if (!acc[callId]) {
+        acc[callId] = {};
+      }
+      // Store feedback by feedback_type, newer entries will overwrite older ones
+      if (curr.feedback_type) {
+        acc[callId][curr.feedback_type] = curr;
+      }
+      return acc;
+    }, {});
+  }, [feedbackQuery.result]);
+
+  const callResultsWithFeedback = useMemo(() => {
+    let callResultsWithFeedback = callResults;
+    if (feedbackByType) {
+      callResultsWithFeedback = callResultsWithFeedback.map(call => {
+        return {
+          ...call,
+          traceCall: {
+            ...call.traceCall,
+            feedback: feedbackByType[call.callId]?.['payload'],
+          },
+        };
+      });
+    }
+    return callResultsWithFeedback;
+  }, [callResults, costResults, feedbackByType]);
+
   return useMemo(() => {
+    if (calls.loading) {
+      return {
+        costsLoading: costs.loading,
+        loading: calls.loading,
+        result: [],
+        total: 0,
+        refetch: refetch,
+      };
+    }
+
     return {
       costsLoading: costs.loading,
       loading: calls.loading,
       // Return faster calls query results until cost query finishes
-      result: calls.loading
-        ? []
-        : costResults.length > 0
-        ? addCostsToCallResults(callResults, costResults)
-        : callResults,
+      // result: costResults.length > 0
+      //   ? addCostsToCallResults(callResultsWithFeedback, costResults)
+      //   : callResultsWithFeedback,
+      result: callResultsWithFeedback,
       total,
       refetch,
     };
-  }, [callResults, calls.loading, total, costs.loading, costResults, refetch]);
+  }, [callResults, calls.loading, total, costs.loading, costResults, refetch, callResultsWithFeedback]);
 };
 
 export const useFilterSortby = (

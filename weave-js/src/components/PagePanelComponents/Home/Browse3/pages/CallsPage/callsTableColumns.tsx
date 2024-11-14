@@ -8,41 +8,41 @@ import {
   GridColumnGroupingModel,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
-import {LoadingDots} from '@wandb/weave/components/LoadingDots';
-import {Tooltip} from '@wandb/weave/components/Tooltip';
-import {UserLink} from '@wandb/weave/components/UserLink';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import { LoadingDots } from '@wandb/weave/components/LoadingDots';
+import { Tooltip } from '@wandb/weave/components/Tooltip';
+import { UserLink } from '@wandb/weave/components/UserLink';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
-import {TEAL_600} from '../../../../../../common/css/color.styles';
-import {monthRoundedTime} from '../../../../../../common/util/time';
-import {isWeaveObjectRef, parseRef} from '../../../../../../react';
-import {makeRefCall} from '../../../../../../util/refs';
-import {Timestamp} from '../../../../../Timestamp';
-import {Reactions} from '../../feedback/Reactions';
-import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
-import {isWeaveRef} from '../../filters/common';
+import { TEAL_600 } from '../../../../../../common/css/color.styles';
+import { monthRoundedTime } from '../../../../../../common/util/time';
+import { isWeaveObjectRef, parseRef } from '../../../../../../react';
+import { makeRefCall } from '../../../../../../util/refs';
+import { Timestamp } from '../../../../../Timestamp';
+import { Reactions } from '../../feedback/Reactions';
+import { CellFilterWrapper, OnAddFilter } from '../../filters/CellFilterWrapper';
+import { isWeaveRef } from '../../filters/common';
 import {
   getCostsFromCellParams,
   getTokensFromCellParams,
 } from '../CallPage/cost';
-import {CallLink} from '../common/Links';
-import {StatusChip} from '../common/StatusChip';
-import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
-import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
+import { CallLink } from '../common/Links';
+import { StatusChip } from '../common/StatusChip';
+import { buildDynamicColumns } from '../common/tabularListViews/columnBuilder';
+import { TraceCallSchema } from '../wfReactInterface/traceServerClientTypes';
 import {
   convertISOToDate,
   traceCallLatencyS,
   traceCallStatusCode,
 } from '../wfReactInterface/tsDataModelHooks';
-import {opVersionRefOpName} from '../wfReactInterface/utilities';
+import { opVersionRefOpName } from '../wfReactInterface/utilities';
 import {
   insertPath,
   isDynamicCallColumn,
   pathToString,
   stringToPath,
 } from './callsTableColumnsUtil';
-import {WFHighLevelCallFilter} from './callsTableFilter';
-import {OpVersionIndexText} from './OpVersionIndexText';
+import { WFHighLevelCallFilter } from './callsTableFilter';
+import { OpVersionIndexText } from './OpVersionIndexText';
 
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.weave'];
 
@@ -134,7 +134,7 @@ export const useCallsTableColumns = (
         userDefinedColumnWidths,
         allowedColumnPatterns,
         onAddFilter,
-        costsLoading
+        costsLoading,
       ),
     [
       entity,
@@ -177,7 +177,7 @@ function buildCallsTableColumns(
   userDefinedColumnWidths: Record<string, number>,
   allowedColumnPatterns?: string[],
   onAddFilter?: OnAddFilter,
-  costsLoading: boolean = false
+  costsLoading: boolean = false,
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
