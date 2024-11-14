@@ -88,6 +88,8 @@ export const formatTokenCost = (cost: number): string => {
   return `$${cost.toFixed(2)}`;
 };
 
+// TODO(Josiah): this is here because sometimes the cost query is not returning all the ids I believe for unfinished calls,
+// to get this cost uptake out, this function can be removed, once that is fixed
 export const addCostsToCallResults = (
   callResults: CallSchema[],
   costResults: CallSchema[]
