@@ -22,7 +22,7 @@ from weave.trace.ipython import (
     is_running_interactively,
 )
 from weave.trace.mem_artifact import MemTraceFilesArtifact
-from weave.trace.op import Op, as_op, is_op
+from weave.trace.op import Op, is_op
 from weave.trace.refs import ObjectRef
 from weave.trace_server.trace_server_interface_util import str_digest
 
@@ -261,10 +261,6 @@ def reconstruct_signature(fn: typing.Callable) -> str:
 
 
 def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
-    if is_op(fn):
-        fn = as_op(fn)
-        fn = fn.resolve_fn
-
     if not settings.should_capture_code():
         # This digest is kept for op versioning purposes
         digest = str_digest(inspect.getsource(fn))
@@ -506,7 +502,7 @@ def dedupe_list(original_list: list[str]) -> list[str]:
 
 
 def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None:
-    result = get_code_deps_safe(obj.resolve_fn, artifact)
+    result = get_code_deps_safe(obj, artifact)
     import_code = result["import_code"]
     code = result["code"]
     warnings = result["warnings"]
