@@ -73,12 +73,13 @@ export const PaginationControls: FC<{
   }, [handleKeyDown]);
 
   const disabled = !rowIdInTable(call.callId);
+  const disabledMsg = 'Paging is disabled after navigating to a parent call';
 
   return (
     <Box>
       <Button
         icon="sort-ascending"
-        tooltip="Previous call. (Shift + Arrow Up)"
+        tooltip={disabled ? disabledMsg : 'Previous call. (Shift + Arrow Up)'}
         variant="ghost"
         onClick={onPreviousCall}
         className="mr-2"
@@ -86,7 +87,7 @@ export const PaginationControls: FC<{
       />
       <Button
         icon="sort-descending"
-        tooltip="Next call. (Shift + Arrow Down)"
+        tooltip={disabled ? disabledMsg : 'Next call. (Shift + Arrow Down)'}
         variant="ghost"
         onClick={onNextCall}
         disabled={disabled}
