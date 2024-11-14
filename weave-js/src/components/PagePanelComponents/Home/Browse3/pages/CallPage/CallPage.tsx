@@ -33,6 +33,7 @@ import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
+import {PaginationControls} from './PaginationControls';
 export const CallPage: FC<{
   entity: string;
   project: string;
@@ -201,65 +202,9 @@ const CallPageInnerVertical: FC<{
     }
   }, [callComplete]);
 
-  // Call navigation by arrow keys and buttons
-  const {getNextRowId, getPreviousRowId, rowIdsConfigured} = useContext(
-    TableRowSelectionContext
-  );
+  const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const showPaginationContols = isPeeking && rowIdsConfigured;
-  const onNextCall = useCallback(() => {
-    const nextCallId = getNextRowId?.(currentCall.callId);
-    if (nextCallId) {
-      history.replace(
-        currentRouter.callUIUrl(
-          currentCall.entity,
-          currentCall.project,
-          currentCall.traceId,
-          nextCallId,
-          path,
-          showTraceTree
-        )
-      );
-    }
-  }, [currentCall, currentRouter, history, path, showTraceTree, getNextRowId]);
-  const onPreviousCall = useCallback(() => {
-    const previousRowId = getPreviousRowId?.(currentCall.callId);
-    if (previousRowId) {
-      history.replace(
-        currentRouter.callUIUrl(
-          currentCall.entity,
-          currentCall.project,
-          currentCall.traceId,
-          previousRowId,
-          path,
-          showTraceTree
-        )
-      );
-    }
-  }, [
-    currentCall,
-    currentRouter,
-    history,
-    path,
-    showTraceTree,
-    getPreviousRowId,
-  ]);
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      if (event.key === 'ArrowDown' && event.shiftKey) {
-        onNextCall();
-      } else if (event.key === 'ArrowUp' && event.shiftKey) {
-        onPreviousCall();
-      }
-    },
-    [onNextCall, onPreviousCall]
-  );
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [handleKeyDown]);
 
   const callTabs = useCallTabs(currentCall);
 
@@ -278,21 +223,7 @@ const CallPageInnerVertical: FC<{
             alignItems: 'center',
           }}>
           {showPaginationContols && (
-            <Box>
-              <Button
-                icon="sort-ascending"
-                tooltip="Previous call. (Shift + Arrow Up)"
-                variant="ghost"
-                onClick={onPreviousCall}
-                className="mr-2"
-              />
-              <Button
-                icon="sort-descending"
-                tooltip="Next call. (Shift + Arrow Down)"
-                variant="ghost"
-                onClick={onNextCall}
-              />
-            </Box>
+            <PaginationControls call={call} path={path} />
           )}
           <Box sx={{marginLeft: showPaginationContols ? 0 : 'auto'}}>
             <Button
