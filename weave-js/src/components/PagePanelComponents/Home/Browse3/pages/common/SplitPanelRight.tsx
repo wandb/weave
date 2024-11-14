@@ -9,7 +9,7 @@ import React, {ReactNode, useCallback, useRef, useState} from 'react';
 import {AutoSizer} from 'react-virtualized';
 import styled from 'styled-components';
 
-type SplitPanelProps = {
+type SplitPanelRightProps = {
   drawer?: ReactNode;
   main: ReactNode;
   isDrawerOpen: boolean;
@@ -22,7 +22,7 @@ const DIVIDER_LINE_WIDTH = 1;
 const DIVIDER_BORDER_WIDTH = 4;
 const DIVIDER_WIDTH = 2 * DIVIDER_BORDER_WIDTH + DIVIDER_LINE_WIDTH;
 
-const Divider = styled.span<{right: number}>`
+const DividerRight = styled.span<{right: number}>`
   background-color: ${MOON_250};
   border-left: ${DIVIDER_BORDER_WIDTH}px solid transparent;
   border-right: ${DIVIDER_BORDER_WIDTH}px solid transparent;
@@ -42,7 +42,7 @@ const Divider = styled.span<{right: number}>`
     border-right-color: ${hexToRGB(MOON_250, 0.5)};
   }
 `;
-Divider.displayName = 'S.DividerRight';
+DividerRight.displayName = 'S.DividerRight';
 
 // Handle percent or pixel specification.
 const getWidth = (value: number | string, total: number): number => {
@@ -55,16 +55,15 @@ const getWidth = (value: number | string, total: number): number => {
   return parseFloat(value);
 };
 
-export const SplitPanel = ({
+export const SplitPanelRight = ({
   main,
   drawer,
   isDrawerOpen,
   minWidth,
   maxWidth,
   defaultWidth = '30%',
-}: SplitPanelProps) => {
+}: SplitPanelRightProps) => {
   const ref = useRef<HTMLDivElement>(null);
-  //  We store the drawer width and height in local storage so that it persists
   const [width, setWidth] = useLocalStorage(
     'weaveflow-rightpanel-width-number',
     defaultWidth
@@ -96,7 +95,6 @@ export const SplitPanel = ({
     }
   };
 
-  // TODO: Might be nice to change the cursor if user has gone beyond the min/max width
   const cursor = isDragging ? 'col-resize' : undefined;
   const pointerEvents = isDragging ? 'none' : 'auto';
   const userSelect = isDragging ? 'none' : 'auto';
@@ -170,7 +168,7 @@ export const SplitPanel = ({
               )}
             </div>
             {isDrawerOpen && (
-              <Divider
+              <DividerRight
                 className="divider"
                 onMouseDown={onMouseDown}
                 right={numW}

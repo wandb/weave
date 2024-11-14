@@ -13,7 +13,7 @@ import React, {
 } from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
-import {SplitPanel as SplitPanelRight} from './SplitPanelRight';
+import {SplitPanelRight} from './SplitPanelRight';
 import {TraceTreeSplitPanel} from './TraceTreeSplitPanel';
 import {isPrimitive} from './util';
 
@@ -31,7 +31,7 @@ export const SimplePageLayout: FC<{
     label: string;
     content: ReactNode;
   }>;
-  leftSidebar?: ReactNode;
+  leftSidebarContent?: ReactNode;
   hideTabsIfSingle?: boolean;
   headerExtra?: ReactNode;
 }> = props => {
@@ -133,7 +133,7 @@ export const SimplePageLayout: FC<{
           flexDirection: 'row',
           flex: '1 1 auto',
         }}>
-        {props.leftSidebar && (
+        {props.leftSidebarContent && (
           <Box
             sx={{
               width: '35%',
@@ -143,7 +143,7 @@ export const SimplePageLayout: FC<{
               maxHeight: '100%',
               borderRight: `1px solid ${MOON_200}`,
             }}>
-            {props.leftSidebar}
+            {props.leftSidebarContent}
           </Box>
         )}
         <Box
@@ -168,9 +168,11 @@ export const SimplePageLayoutWithHeader: FC<{
   }>;
   headerExtra?: ReactNode;
   headerContent: ReactNode;
-  leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
+  // Left sidebar
   isLeftSidebarOpen?: boolean;
+  leftSidebarContent?: ReactNode;
+  // Right sidebar
   isRightSidebarOpen?: boolean;
   rightSidebarContent?: ReactNode;
 }> = props => {
@@ -246,13 +248,13 @@ export const SimplePageLayoutWithHeader: FC<{
         {props.headerExtra}
         {simplePageLayoutContextValue.headerSuffix}
       </Box>
-      <div style={{flex: '1 1 auto', overflow: 'hidden', display: 'flex'}}>
+      <div style={{flex: '1 1 auto', overflow: 'hidden'}}>
         <TraceTreeSplitPanel
           minWidth={150}
           defaultWidth={200}
           maxWidth="50%"
           isDrawerOpen={props.isLeftSidebarOpen ?? false}
-          drawer={props.leftSidebar}
+          drawer={props.leftSidebarContent}
           main={
             <SplitPanelRight
               minWidth={150}

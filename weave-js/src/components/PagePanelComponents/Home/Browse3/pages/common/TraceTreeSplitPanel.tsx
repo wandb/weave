@@ -17,7 +17,7 @@ import React, {
 import {AutoSizer} from 'react-virtualized';
 import styled from 'styled-components';
 
-type SplitPanelProps = {
+type TraceTreeSplitPanelProps = {
   drawer?: ReactNode;
   main: ReactNode;
   isDrawerOpen: boolean;
@@ -30,7 +30,7 @@ const DIVIDER_LINE_WIDTH = 1;
 const DIVIDER_BORDER_WIDTH = 4;
 const DIVIDER_WIDTH = 2 * DIVIDER_BORDER_WIDTH + DIVIDER_LINE_WIDTH;
 
-const Divider = styled.span<{left: number}>`
+const DividerLeft = styled.span<{left: number}>`
   background-color: ${MOON_250};
   border-left: ${DIVIDER_BORDER_WIDTH}px solid transparent;
   border-right: ${DIVIDER_BORDER_WIDTH}px solid transparent;
@@ -50,7 +50,7 @@ const Divider = styled.span<{left: number}>`
     border-right-color: ${hexToRGB(MOON_250, 0.5)};
   }
 `;
-Divider.displayName = 'S.Divider';
+DividerLeft.displayName = 'S.DividerLeft';
 
 // Handle percent or pixel specification.
 const getWidth = (value: number | string, total: number): number => {
@@ -70,7 +70,7 @@ export const TraceTreeSplitPanel = ({
   minWidth,
   maxWidth,
   defaultWidth = '30%',
-}: SplitPanelProps) => {
+}: TraceTreeSplitPanelProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const dragStartXRef = useRef<number>(0);
   const dragStartWidthRef = useRef<number>(0);
@@ -82,6 +82,20 @@ export const TraceTreeSplitPanel = ({
 
   const [isDragging, setIsDragging] = useState(false);
 
+  // Throttle the width setting to 16ms (60fps)
+  const throttledSetWidth = useMemo(
+    () =>
+      throttle((newWidth: number) => {
+        setWidth(newWidth);
+      }, 16),
+    [setWidth]
+  );
+  useEffect(() => {
+    return () => {
+      throttledSetWidth.cancel();
+    };
+  }, [throttledSetWidth]);
+
   const onMouseDown = useCallback(
     (e: React.MouseEvent) => {
       setIsDragging(true);
@@ -91,30 +105,12 @@ export const TraceTreeSplitPanel = ({
     },
     [width]
   );
-
   const onMouseUp = useCallback(() => {
     setIsDragging(false);
   }, []);
-
   const onMouseLeave = useCallback(() => {
     setIsDragging(false);
   }, []);
-
-  // Throttle the width setting to 16ms (60fps)
-  const throttledSetWidth = useMemo(
-    () =>
-      throttle((newWidth: number) => {
-        setWidth(newWidth);
-      }, 16),
-    [setWidth]
-  );
-
-  useEffect(() => {
-    return () => {
-      throttledSetWidth.cancel();
-    };
-  }, [throttledSetWidth]);
-
   const onMouseMove = useCallback(
     (e: React.MouseEvent) => {
       if (!isDragging) {
@@ -214,7 +210,7 @@ export const TraceTreeSplitPanel = ({
               </div>
             </div>
             {isDrawerOpen && (
-              <Divider
+              <DividerLeft
                 className="divider"
                 onMouseDown={onMouseDown}
                 left={numW}
