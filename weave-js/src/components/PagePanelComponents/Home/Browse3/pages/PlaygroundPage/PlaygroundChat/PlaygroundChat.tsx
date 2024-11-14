@@ -294,29 +294,26 @@ export const PlaygroundChat = ({
                     {state.traceCall && (
                       <CallChat
                         call={state.traceCall as TraceCallSchema}
-                        isPlayground
-                        deleteMessage={(messageIndex, responseIndexes) =>
-                          deleteMessage(idx, messageIndex, responseIndexes)
-                        }
-                        editMessage={(messageIndex, newMessage) =>
-                          editMessage(idx, messageIndex, newMessage)
-                        }
-                        deleteChoice={choiceIndex =>
-                          deleteChoice(idx, choiceIndex)
-                        }
-                        addMessage={newMessage => addMessage(idx, newMessage)}
-                        editChoice={(choiceIndex, newChoice) =>
-                          editChoice(idx, choiceIndex, newChoice)
-                        }
-                        retry={(messageIndex: number, isChoice?: boolean) =>
-                          handleRetry(idx, messageIndex, isChoice)
-                        }
-                        sendMessage={(
-                          role: 'assistant' | 'user' | 'tool',
-                          content: string,
-                          toolCallId?: string
-                        ) => {
-                          handleSend(role, idx, content, toolCallId);
+                        playgroundContext={{
+                          isPlayground: true,
+                          deleteMessage: (messageIndex, responseIndexes) =>
+                            deleteMessage(idx, messageIndex, responseIndexes),
+                          editMessage: (messageIndex, newMessage) =>
+                            editMessage(idx, messageIndex, newMessage),
+                          deleteChoice: choiceIndex =>
+                            deleteChoice(idx, choiceIndex),
+                          addMessage: newMessage => addMessage(idx, newMessage),
+                          editChoice: (choiceIndex, newChoice) =>
+                            editChoice(idx, choiceIndex, newChoice),
+                          retry: (messageIndex: number, isChoice?: boolean) =>
+                            handleRetry(idx, messageIndex, isChoice),
+                          sendMessage: (
+                            role: 'assistant' | 'user' | 'tool',
+                            content: string,
+                            toolCallId?: string
+                          ) => {
+                            handleSend(role, idx, content, toolCallId);
+                          },
                         }}
                       />
                     )}
