@@ -1,12 +1,12 @@
 import {Box} from '@material-ui/core';
 import {GOLD_300, GOLD_650} from '@wandb/weave/common/css/color.styles';
+import { Icon, IconNames } from '@wandb/weave/components/Icon';
 import React, {FC, useCallback, useState} from 'react';
 import {z} from 'zod';
 
+import { AutocompleteWithLabel } from './FormComponents';
 import {ScorerFormProps} from './ScorerForms';
 import {ZSForm} from './ZodSchemaForm';
-import { Icon, IconNames } from '@wandb/weave/components/Icon';
-import { AutocompleteWithLabel } from './FormComponents';
 
 const JSONTypeNames = z.enum(['Boolean', 'Number', 'String']);
 const ObjectJsonResponseFormat = z.object({
