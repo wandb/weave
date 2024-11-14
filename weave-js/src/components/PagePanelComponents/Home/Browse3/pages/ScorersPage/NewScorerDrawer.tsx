@@ -77,11 +77,18 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
   const [selectedScorerType, setSelectedScorerType] = useState<ScorerType>(
     initialScorerType ?? 'ANNOTATION'
   );
-  useEffect(() => {
-    setSelectedScorerType(initialScorerType ?? 'ANNOTATION');
-  }, [initialScorerType]);
   const [formData, setFormData] = useState<any>(null);
   const [isFormValid, setIsFormValid] = useState(false);
+
+  const setScorerTypeAndResetForm = useCallback((scorerType: ScorerType) => {
+    setSelectedScorerType(scorerType);
+    setFormData(null);
+    setIsFormValid(false);
+  }, []);
+
+  useEffect(() => {
+    setScorerTypeAndResetForm(initialScorerType ?? 'ANNOTATION');
+  }, [initialScorerType, setScorerTypeAndResetForm]);
 
   const handleFormDataChange = useCallback((isValid: boolean, data: any) => {
     setIsFormValid(isValid);
@@ -118,7 +125,7 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
           </Box>
         )}
         onChange={value =>
-          value && setSelectedScorerType(value.value as ScorerType)
+          value && setScorerTypeAndResetForm(value.value as ScorerType)
         }
       />
       <ScorerFormComponent onDataChange={handleFormDataChange} />
