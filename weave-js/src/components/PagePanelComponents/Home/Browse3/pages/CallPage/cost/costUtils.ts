@@ -108,22 +108,23 @@ export const addCostsToCallResults = (
 
   return callResults.map(call => {
     if (call.callId && costDict[call.callId]) {
+      if (!call.traceCall) {
+        return call;
+      }
       // Merge cost fields into existing call data
       const merged = {
         ...call,
-        traceCall: call.traceCall
-          ? {
-              ...call.traceCall,
-              summary: {
-                ...call.traceCall?.summary,
-                weave: {
-                  ...call.traceCall?.summary?.weave,
-                  costs: costDict[call.callId].summary.weave.costs,
-                },
-              },
-              usage: costDict[call.callId].summary.usage,
-            }
-          : undefined,
+        traceCall: {
+          ...call.traceCall,
+          summary: {
+            ...call.traceCall?.summary,
+            weave: {
+              ...call.traceCall?.summary?.weave,
+              costs: costDict[call.callId].summary.weave.costs,
+            },
+          },
+          usage: costDict[call.callId].summary.usage,
+        },
       };
       return merged;
     }
