@@ -40,14 +40,8 @@ INVALID_MODEL_ERROR = (
 )
 
 
-def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutine:
-    is_async = False
-    if is_op(func):
-        func = as_op(func)
-        is_async = inspect.iscoroutinefunction(func.resolve_fn)
-    else:
-        is_async = inspect.iscoroutinefunction(func)
-    if is_async:
+def async_call(func: Callable, *args: Any, **kwargs: Any) -> Coroutine:
+    if inspect.iscoroutinefunction(func):
         return func(*args, **kwargs)  # type: ignore
     return asyncio.to_thread(func, *args, **kwargs)
 
