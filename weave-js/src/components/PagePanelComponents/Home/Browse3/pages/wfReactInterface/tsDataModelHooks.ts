@@ -956,7 +956,7 @@ const useRootObjectVersions = (
       setObjectVersionRes({
         loading: false,
         error: null,
-        result: res.objs.map(convertTraceServerObjectVersionToSchema),
+        result: res.objs?.map(convertTraceServerObjectVersionToSchema) ?? [],
       });
     };
     const onError = (e: any) => {
@@ -980,8 +980,11 @@ const useRootObjectVersions = (
   }, [doFetch]);
 
   useEffect(() => {
+    if (opts?.skip) {
+      return;
+    }
     return getTsClient().registerOnObjectListener(doFetch);
-  }, [getTsClient, doFetch]);
+  }, [getTsClient, doFetch, opts?.skip]);
 
   return useMemo(() => {
     if (opts?.skip) {
