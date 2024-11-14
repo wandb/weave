@@ -22,8 +22,9 @@ export const useChatFunctions = (
     responseIndexes?: number[]
   ) => {
     setPlaygroundStateField(callIndex, 'traceCall', prevTraceCall => {
-      const updatedTraceCall = JSON.parse(JSON.stringify(prevTraceCall));
-      const newTraceCall = clearTraceCall(updatedTraceCall);
+      const newTraceCall = clearTraceCall(
+        JSON.parse(JSON.stringify(prevTraceCall))
+      );
       if (newTraceCall && newTraceCall.inputs?.messages) {
         // Remove the message and all responses to it
         newTraceCall.inputs.messages = newTraceCall.inputs.messages.filter(
@@ -36,7 +37,7 @@ export const useChatFunctions = (
           newTraceCall.inputs.messages = [DEFAULT_SYSTEM_MESSAGE];
         }
       }
-      return updatedTraceCall;
+      return newTraceCall;
     });
   };
 
@@ -46,20 +47,22 @@ export const useChatFunctions = (
     newMessage: Message
   ) => {
     setPlaygroundStateField(callIndex, 'traceCall', prevTraceCall => {
-      const updatedTraceCall = JSON.parse(JSON.stringify(prevTraceCall));
-      const newTraceCall = clearTraceCall(updatedTraceCall);
+      const newTraceCall = clearTraceCall(
+        JSON.parse(JSON.stringify(prevTraceCall))
+      );
       if (newTraceCall && newTraceCall.inputs?.messages) {
         // Replace the message
         newTraceCall.inputs.messages[messageIndex] = newMessage;
       }
-      return updatedTraceCall;
+      return newTraceCall;
     });
   };
 
   const addMessage = (callIndex: number, newMessage: Message) => {
     setPlaygroundStateField(callIndex, 'traceCall', prevTraceCall => {
-      const updatedTraceCall = JSON.parse(JSON.stringify(prevTraceCall));
-      const newTraceCall = clearTraceCall(updatedTraceCall);
+      const newTraceCall = clearTraceCall(
+        JSON.parse(JSON.stringify(prevTraceCall))
+      );
       if (newTraceCall && newTraceCall.inputs?.messages) {
         if (
           newTraceCall.output &&
@@ -80,14 +83,15 @@ export const useChatFunctions = (
         // Add the new message
         newTraceCall.inputs.messages.push(newMessage);
       }
-      return updatedTraceCall;
+      return newTraceCall;
     });
   };
 
   const deleteChoice = (callIndex: number, choiceIndex: number) => {
     setPlaygroundStateField(callIndex, 'traceCall', prevTraceCall => {
-      const updatedTraceCall = JSON.parse(JSON.stringify(prevTraceCall));
-      const newTraceCall = clearTraceCall(updatedTraceCall);
+      const newTraceCall = clearTraceCall(
+        JSON.parse(JSON.stringify(prevTraceCall))
+      );
       const output = newTraceCall?.output as TraceCallOutput;
       if (output && Array.isArray(output.choices)) {
         // Remove the choice
@@ -98,7 +102,7 @@ export const useChatFunctions = (
           newTraceCall.output = output;
         }
       }
-      return updatedTraceCall;
+      return newTraceCall;
     });
   };
 
@@ -108,8 +112,9 @@ export const useChatFunctions = (
     newChoice: Choice
   ) => {
     setPlaygroundStateField(callIndex, 'traceCall', prevTraceCall => {
-      const updatedTraceCall = JSON.parse(JSON.stringify(prevTraceCall));
-      const newTraceCall = clearTraceCall(updatedTraceCall);
+      const newTraceCall = clearTraceCall(
+        JSON.parse(JSON.stringify(prevTraceCall))
+      );
       if (
         newTraceCall?.output &&
         Array.isArray((newTraceCall.output as TraceCallOutput).choices)
@@ -127,7 +132,7 @@ export const useChatFunctions = (
           content: newChoice.message?.content,
         });
       }
-      return updatedTraceCall;
+      return newTraceCall;
     });
   };
 
