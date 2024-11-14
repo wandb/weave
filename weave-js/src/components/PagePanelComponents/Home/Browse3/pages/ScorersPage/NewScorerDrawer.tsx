@@ -3,7 +3,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
 import React, {FC, ReactNode, useCallback, useEffect, useState} from 'react';
 
-import {AutocompleteWithLabel} from './FormComponents';
+import {AutocompleteWithLabel} from '../../ZodSchemaForm/FormComponents';
 import {LLMJudgeScorerForm} from './LLMJudgeScorerForm';
 import {
   AnnotationScorerForm,

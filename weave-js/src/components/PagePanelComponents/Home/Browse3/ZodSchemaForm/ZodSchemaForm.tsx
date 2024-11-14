@@ -18,7 +18,7 @@ import {
   GAP_BETWEEN_ITEMS_PX,
   GAP_BETWEEN_LABEL_AND_FIELD_PX,
   TextFieldWithLabel,
-} from '../pages/ScorersPage/FormComponents';
+} from './FormComponents';
 
 interface ZSFormProps {
   configSchema: z.ZodType<any>;
