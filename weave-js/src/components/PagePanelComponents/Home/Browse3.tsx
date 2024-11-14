@@ -94,6 +94,8 @@ import {OpPage} from './Browse3/pages/OpPage';
 import {OpsPage} from './Browse3/pages/OpsPage';
 import {OpVersionPage} from './Browse3/pages/OpVersionPage';
 import {OpVersionsPage} from './Browse3/pages/OpVersionsPage';
+import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
+import {ScorersPage} from './Browse3/pages/ScorersPage/ScorersPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
@@ -156,6 +158,7 @@ const tabOptions = [
   'leaderboards',
   'boards',
   'tables',
+  'scorers',
 ];
 const tabs = tabOptions.join('|');
 const browse3Paths = (projectRoot: string) => [
@@ -497,6 +500,9 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
         </Route>
+        <Route path={`${projectRoot}/:tab(scorers)`}>
+          <ScorersPageBinding />
+        </Route>
         <Route
           path={[
             `${projectRoot}/leaderboards/:itemName`,
@@ -522,6 +528,14 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/tables`}>
           <TablesPageBinding />
+        </Route>
+        {/* PLAYGROUND */}
+        <Route
+          path={[
+            `${projectRoot}/playground/:itemName`,
+            `${projectRoot}/playground`,
+          ]}>
+          <PlaygroundPageBinding />
         </Route>
       </Switch>
     </Box>
@@ -985,6 +999,11 @@ const CompareEvaluationsBinding = () => {
   );
 };
 
+const ScorersPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  return <ScorersPage entity={entity} project={project} />;
+};
+
 const LeaderboardPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
   const {entity, project, itemName: leaderboardName} = params;
@@ -1034,6 +1053,17 @@ const AppBarLink = (props: ComponentProps<typeof RouterLink>) => (
     component={RouterLink}
   />
 );
+
+const PlaygroundPageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+  return (
+    <PlaygroundPage
+      entity={params.entity}
+      project={params.project}
+      callId={params.itemName}
+    />
+  );
+};
 
 const Browse3Breadcrumbs: FC = props => {
   const params = useParamsDecoded<Browse3Params>();

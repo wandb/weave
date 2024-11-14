@@ -16,6 +16,8 @@ import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 
 import {
+  ActionsExecuteBatchReq,
+  ActionsExecuteBatchRes,
   ContentType,
   FeedbackCreateReq,
   FeedbackCreateRes,
@@ -282,6 +284,15 @@ export class DirectTraceServerClient {
   public feedbackPurge(req: FeedbackPurgeReq): Promise<FeedbackPurgeRes> {
     return this.makeRequest<FeedbackPurgeReq, FeedbackPurgeRes>(
       '/feedback/purge',
+      req
+    );
+  }
+
+  public actionsExecuteBatch(
+    req: ActionsExecuteBatchReq
+  ): Promise<ActionsExecuteBatchRes> {
+    return this.makeRequest<ActionsExecuteBatchReq, ActionsExecuteBatchRes>(
+      '/actions/execute_batch',
       req
     );
   }

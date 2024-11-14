@@ -69,15 +69,11 @@ export const EMPTY_PROPS_LEADERBOARDS: EmptyProps = {
     'Use leaderboards to summarize and compare the performance of your models.',
   moreInformation: (
     <>
-      Learn{' '}
-      <TargetBlank href="https://wandb.me/weave_evals">
-        evaluation basics
+      Follow the{' '}
+      <TargetBlank href="https://weave-docs.wandb.ai/reference/gen_notebooks/leaderboard_quickstart">
+        leaderboard quickstart
       </TargetBlank>{' '}
-      or follow our tutorial to{' '}
-      <TargetBlank href="http://wandb.me/weave_eval_tut">
-        set up an evaluation pipeline
-      </TargetBlank>
-      .
+      to create leaderboards for your evaluations.
     </>
   ),
 };
@@ -186,4 +182,27 @@ export const EMPTY_NO_TRACE_SERVER: EmptyProps = {
       return to <Link to="..">your project homepage</Link>.
     </>
   ),
+};
+
+export const EMPTY_PROPS_PROGRAMMATIC_SCORERS: EmptyProps = {
+  icon: 'type-number-alt' as const,
+  heading: 'No programmatic scorers yet',
+  description: 'Create programmatic scorers in Python.',
+  moreInformation: (
+    <>
+      Learn more about{' '}
+      <TargetBlank href="https://weave-docs.wandb.ai/guides/evaluation/scorers#class-based-scorers">
+        creating and using scorers
+      </TargetBlank>{' '}
+      in evaluations.
+    </>
+  ),
+};
+
+export const EMPTY_PROPS_ACTION_SPECS: EmptyProps = {
+  icon: 'automation-robot-arm' as const,
+  heading: 'No Actions yet',
+  description:
+    'Use Actions to define workloads to be executed by Weave servers (for example: LLM Judges) ',
+  moreInformation: <></>,
 };
