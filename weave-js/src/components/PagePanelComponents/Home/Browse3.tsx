@@ -1143,11 +1143,13 @@ const Browse3Breadcrumbs: FC = props => {
 
 export const TableRowSelectionContext = React.createContext<{
   rowIdsConfigured: boolean;
+  rowIdInTable: (id: string) => boolean;
   setRowIds?: (rowIds: string[]) => void;
   getNextRowId?: (currentId: string) => string | null;
   getPreviousRowId?: (currentId: string) => string | null;
 }>({
   rowIdsConfigured: false,
+  rowIdInTable: (id: string) => false,
   setRowIds: () => {},
   getNextRowId: () => null,
   getPreviousRowId: () => null,
@@ -1158,6 +1160,10 @@ const TableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
 }) => {
   const [rowIds, setRowIds] = useState<string[]>([]);
   const rowIdsConfigured = useMemo(() => rowIds.length > 0, [rowIds]);
+  const rowIdInTable = useCallback(
+    (currentId: string) => rowIds.includes(currentId),
+    [rowIds]
+  );
 
   const getNextRowId = useCallback(
     (currentId: string) => {
@@ -1183,7 +1189,13 @@ const TableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
 
   return (
     <TableRowSelectionContext.Provider
-      value={{rowIdsConfigured, setRowIds, getNextRowId, getPreviousRowId}}>
+      value={{
+        rowIdsConfigured,
+        rowIdInTable,
+        setRowIds,
+        getNextRowId,
+        getPreviousRowId,
+      }}>
       {children}
     </TableRowSelectionContext.Provider>
   );

@@ -1,6 +1,7 @@
 export const IconNames = {
   AddNew: 'add-new',
   AddReaction: 'add-reaction',
+  AddToReport: 'add-to-report',
   AdminShieldSafe: 'admin-shield-safe',
   AmazonSagemaker: 'amazon-sagemaker',
   Area: 'area',
@@ -136,6 +137,8 @@ export const IconNames = {
   ModelOnDark: 'model-on-dark',
   Molecule: 'molecule',
   MusicAudio: 'music-audio',
+  NewSectionAbove: 'new-section-above',
+  NewSectionBelow: 'new-section-below',
   Number: 'number',
   OpenNewTab: 'open-new-tab',
   OpenaiLogo: 'openai-logo',
