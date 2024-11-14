@@ -6,6 +6,7 @@ import React, {SetStateAction, useState} from 'react';
 import {CallChat} from '../../CallPage/CallChat';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundState, PlaygroundStateKey} from '../types';
+import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
 import {useChatFunctions} from './useChatFunctions';
@@ -162,6 +163,21 @@ export const PlaygroundChat = ({
                     )}
                   </div>
                 </Tailwind>
+              </Box>
+              <Box
+                sx={{
+                  width: '100%',
+                  maxWidth: '800px',
+                  padding: '8px',
+                  paddingLeft: '12px',
+                  marginX: 'auto',
+                  marginBottom: '16px',
+                }}>
+                {state.traceCall.summary && (
+                  <PlaygroundCallStats
+                    call={state.traceCall as TraceCallSchema}
+                  />
+                )}
               </Box>
             </Box>
           </React.Fragment>
