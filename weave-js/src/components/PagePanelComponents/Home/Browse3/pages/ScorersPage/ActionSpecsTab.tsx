@@ -13,6 +13,7 @@ import {
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {actionSpecConfigurationSpecs} from './actionSpecConfigurations';
 import {NewActionSpecModal} from './NewActionSpecModal';
+import {NewScorerDrawer} from './NewScorerDrawer';
 
 export const ActionSpecsTab: React.FC<{
   entity: string;
@@ -138,11 +139,11 @@ export const ActionSpecsTab: React.FC<{
           baseObjectClass: 'ActionSpec',
         }}
       />
-      <NewActionSpecModal
+      <NewScorerDrawer
         open={isModalOpen}
         onClose={handleCloseModal}
-        onSave={handleSaveModal}
-        initialTemplate={selectedTemplate}
+        // onSave={handleSaveModal}
+        // initialTemplate={selectedTemplate}
       />
     </Box>
   );

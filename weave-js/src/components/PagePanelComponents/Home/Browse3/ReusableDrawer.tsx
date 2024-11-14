@@ -1,4 +1,5 @@
-import {Box, Button, Drawer, Typography} from '@material-ui/core';
+import {Box, Drawer} from '@material-ui/core';
+import {Button} from '@wandb/weave/components/Button/Button';
 import React, {FC, ReactNode} from 'react';
 
 interface ReusableDrawerProps {
@@ -34,28 +35,44 @@ export const ReusableDrawer: FC<ReusableDrawerProps> = ({
           width: '40vw',
           marginTop: '60px',
           height: '100%',
-          bgcolor: 'background.paper',
-          p: 4,
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'auto',
+          overflow: 'hidden',
         }}>
-        <Typography variant="h6" component="h2">
-          {title}
-        </Typography>
+        <Box
+          sx={{
+            flex: '0 0 auto',
+            borderBottom: '1px solid #e0e0e0',
+            p: '10px',
+            display: 'flex',
+            fontWeight: 600,
+          }}>
+          <Box sx={{flexGrow: 1}}>{title}</Box>
+          <Button size="small" variant="quiet" icon="close" onClick={onClose} />
+        </Box>
 
-        <Box sx={{flexGrow: 1, overflow: 'auto', my: 2}}>{children}</Box>
+        <Box
+          sx={{
+            flexGrow: 1,
+            overflow: 'auto',
+            p: 4,
+          }}>
+          {children}
+        </Box>
 
-        <Box sx={{display: 'flex', justifyContent: 'flex-end'}}>
-          <Button onClick={onClose} style={{marginRight: 8}}>
-            Cancel
-          </Button>
+        <Box
+          sx={{
+            display: 'flex',
+            flex: '0 0 auto',
+            borderTop: '1px solid #e0e0e0',
+            p: '10px',
+          }}>
           <Button
             onClick={onSave}
-            variant="contained"
             color="primary"
-            disabled={saveDisabled}>
-            Save
+            disabled={saveDisabled}
+            className="w-full">
+            Create scorer
           </Button>
         </Box>
       </Box>

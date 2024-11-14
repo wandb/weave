@@ -7,7 +7,6 @@ import React from 'react';
 import {components, OptionProps, SingleValueProps} from 'react-select';
 
 import {Tooltip} from '../../../../Tooltip';
-import {getFieldLabel} from './common';
 
 type FieldOption = {
   readonly value: string;
@@ -26,16 +25,7 @@ export type SelectFieldOption = FieldOption | GroupedOption;
 type SelectFieldProps = {
   options: SelectFieldOption[];
   value: string;
-  onSelectField: (name: string) => void;
-};
-
-const Option = (props: OptionProps<FieldOption, false, GroupedOption>) => {
-  const {description} = props.data;
-  const opt = <components.Option {...props} />;
-  if (!description) {
-    return opt;
-  }
-  return <Tooltip trigger={<span>{opt}</span>} content={description} />;
+  onSelect: (name: string) => void;
 };
 
 const OptionLabel = (props: SelectFieldOption) => {
@@ -46,18 +36,18 @@ const OptionLabel = (props: SelectFieldOption) => {
 // What is shown in the input field when a value is selected.
 // For groups like input and output we want that prefix,
 // while for fields like Called we want the pretty name not the internal field.
-const SingleValue = ({
-  children,
-  ...props
-}: SingleValueProps<FieldOption, false, GroupedOption>) => {
-  const label = getFieldLabel(props.data.value);
-  return <components.SingleValue {...props}>{label}</components.SingleValue>;
-};
+// const SingleValue = ({
+//   children,
+//   ...props
+// }: SingleValueProps<FieldOption, false, GroupedOption>) => {
+//   const label = getFieldLabel(props.data.value);
+//   return <components.SingleValue {...props}>{label}</components.SingleValue>;
+// };
 
-export const SelectField = ({
+export const FormSelectField = ({
   options,
   value,
-  onSelectField,
+  onSelect,
 }: SelectFieldProps) => {
   const internalOptions = _.cloneDeep(options);
   const allOptions: FieldOption[] = internalOptions.flatMap(
@@ -79,7 +69,7 @@ export const SelectField = ({
 
   const onReactSelectChange = (option: FieldOption | null) => {
     if (option) {
-      onSelectField(option.value);
+      onSelect(option.value);
     }
   };
 
@@ -90,7 +80,7 @@ export const SelectField = ({
       placeholder="Select column"
       value={selectedOption}
       onChange={onReactSelectChange}
-      components={{Option, SingleValue}}
+      //   components={{Option, SingleValue}}
       formatOptionLabel={OptionLabel}
       isDisabled={isDisabled}
       autoFocus
