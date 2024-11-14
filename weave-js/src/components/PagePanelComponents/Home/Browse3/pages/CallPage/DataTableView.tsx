@@ -28,10 +28,13 @@ import React, {
 } from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {
+  isWeaveObjectRef,
+  parseRef,
+  parseRefMaybe,
+} from '../../../../../../react';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {CellValue} from '../../../Browse2/CellValue';
-import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
