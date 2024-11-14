@@ -70,9 +70,13 @@ import {
   useControllableState,
   useURLSearchParamsDict,
 } from '../util';
+import {useBaseObjectInstances} from '../wfReactInterface/baseObjectClassQuery';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
-import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
+import {
+  projectIdFromParts,
+  traceCallToUICallSchema,
+} from '../wfReactInterface/tsDataModelHooks';
 import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -518,6 +522,50 @@ export const CallsTable: FC<{
     entity,
     project
   );
+
+  // Fetch annotation columns and make them hidden by default
+  const annotationColumns = useBaseObjectInstances('AnnotationSpec', {
+    project_id: projectIdFromParts({entity, project}),
+    filter: {
+      latest_only: true,
+    },
+  });
+  useEffect(() => {
+    if (!annotationColumns.result || annotationColumns.result.length === 0) {
+      return;
+    }
+    if (!setColumnVisibilityModel || !columnVisibilityModel) {
+      return;
+    }
+    // Check if we need to update - only update if any annotation columns are missing from the model
+    const needsUpdate = annotationColumns.result.some(
+      col => columnVisibilityModel[`feedback.${col.object_id}`] === undefined
+    );
+
+    if (!needsUpdate) {
+      return;
+    }
+
+    const annotationColumnVisiblityFalse = annotationColumns.result.reduce(
+      (acc, col) => {
+        // Only add columns that aren't already in the model
+        if (columnVisibilityModel[`feedback.${col.object_id}`] === undefined) {
+          acc[`feedback.${col.object_id}`] = false;
+        }
+        return acc;
+      },
+      {} as Record<string, boolean>
+    );
+
+    setColumnVisibilityModel({
+      ...columnVisibilityModel,
+      ...annotationColumnVisiblityFalse,
+    });
+  }, [
+    annotationColumns.result,
+    columnVisibilityModel,
+    setColumnVisibilityModel,
+  ]);
 
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
