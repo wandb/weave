@@ -30,7 +30,7 @@ export const MessagePanel = ({
 
   return (
     <div className={classNames('flex gap-8', {'mt-24': !isTool})}>
-      {!isNested && (
+      {!isNested && !isSystemPrompt && (
         <div className="w-32">
           {!isUser && !isTool && (
             <Callout
@@ -44,9 +44,9 @@ export const MessagePanel = ({
       )}
 
       <div
-        className={classNames('relative overflow-visible', {
+        className={classNames('relative overflow-visible rounded-lg', {
           'border-t border-moon-250': isTool,
-          'rounded-lg border border-moon-250': isSystemPrompt,
+          'bg-moon-50': isSystemPrompt,
           'bg-cactus-300/[0.24]': isUser,
           'w-full': !isUser,
           'max-w-3xl': isUser,
@@ -57,7 +57,7 @@ export const MessagePanel = ({
         <div>
           {isSystemPrompt && (
             <div className="flex justify-between px-16">
-              <div className="text-base font-semibold">
+              <div className="text-sm text-moon-500">
                 {message.role.charAt(0).toUpperCase() + message.role.slice(1)}
               </div>
             </div>
