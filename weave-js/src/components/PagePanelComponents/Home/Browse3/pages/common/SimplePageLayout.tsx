@@ -13,8 +13,8 @@ import React, {
 } from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
-import {SplitPanelRight} from './SplitPanelRight';
-import {TraceTreeSplitPanel} from './TraceTreeSplitPanel';
+import {SplitPanelLeft} from './Panels/SplitPanelLeft';
+import {SplitPanelRight} from './Panels/SplitPanelRight';
 import {isPrimitive} from './util';
 
 type SimplePageLayoutContextType = {
@@ -249,7 +249,7 @@ export const SimplePageLayoutWithHeader: FC<{
         {simplePageLayoutContextValue.headerSuffix}
       </Box>
       <div style={{flex: '1 1 auto', overflow: 'hidden'}}>
-        <TraceTreeSplitPanel
+        <SplitPanelLeft
           minWidth={150}
           defaultWidth={200}
           maxWidth="50%"
@@ -263,7 +263,7 @@ export const SimplePageLayoutWithHeader: FC<{
               drawer={props.rightSidebarContent}
               isDrawerOpen={props.isRightSidebarOpen ?? false}
               main={
-                <MainPeekContent
+                <SimpleTabView
                   headerContent={props.headerContent}
                   tabContent={tabContent}
                   tabs={props.tabs}
@@ -281,7 +281,7 @@ export const SimplePageLayoutWithHeader: FC<{
   );
 };
 
-const MainPeekContent: FC<{
+const SimpleTabView: FC<{
   headerContent: ReactNode;
   tabs: Array<{
     label: string;

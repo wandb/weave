@@ -17,7 +17,7 @@ import React, {
 import {AutoSizer} from 'react-virtualized';
 import styled from 'styled-components';
 
-type TraceTreeSplitPanelProps = {
+type SplitPanelLeftProps = {
   drawer?: ReactNode;
   main: ReactNode;
   isDrawerOpen: boolean;
@@ -63,14 +63,14 @@ const getWidth = (value: number | string, total: number): number => {
   return parseFloat(value);
 };
 
-export const TraceTreeSplitPanel = ({
+export const SplitPanelLeft = ({
   main,
   drawer,
   isDrawerOpen,
   minWidth,
   maxWidth,
   defaultWidth = '30%',
-}: TraceTreeSplitPanelProps) => {
+}: SplitPanelLeftProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const dragStartXRef = useRef<number>(0);
   const dragStartWidthRef = useRef<number>(0);
