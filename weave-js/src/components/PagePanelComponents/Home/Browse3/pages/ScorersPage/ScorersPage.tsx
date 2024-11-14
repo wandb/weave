@@ -6,7 +6,12 @@ import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {ActionSpecsTab} from './ActionSpecsTab';
 import {AnnotationsTab} from './AnnotationsTab';
 import {ProgrammaticScorersTab} from './CoreScorersTab';
-import {NewScorerDrawer, ScorerType, scorerTypeRecord} from './NewScorerDrawer';
+import {
+  HUMAN_ANNOTATION_VALUE,
+  NewScorerDrawer,
+  ScorerType,
+  scorerTypeRecord,
+} from './NewScorerDrawer';
 
 export const ScorersPage: React.FC<{
   entity: string;
@@ -49,10 +54,10 @@ export const ScorersPage: React.FC<{
           </Button>
         }
         headerContent={undefined}
-        notifySelectedTab={tab =>
+        onTabSelectedCallback={tab =>
           setSelectedTab(
             Object.values(scorerTypeRecord).find(t => t.label === tab)?.value ??
-              'ANNOTATION'
+              HUMAN_ANNOTATION_VALUE
           )
         }
       />

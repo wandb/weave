@@ -11,10 +11,16 @@ import {
 } from './ScorerForms';
 
 const HUMAN_ANNOTATION_LABEL = 'Human annotations';
+export const HUMAN_ANNOTATION_VALUE = 'ANNOTATION';
 const ACTION_LABEL = 'LLM judges';
+const ACTION_VALUE = 'ACTION';
 const PROGRAMMATIC_LABEL = 'Functional scorers';
+const PROGRAMMATIC_VALUE = 'PROGRAMMATIC';
 
-export type ScorerType = 'PROGRAMMATIC' | 'ANNOTATION' | 'ACTION';
+export type ScorerType =
+  | typeof HUMAN_ANNOTATION_VALUE
+  | typeof ACTION_VALUE
+  | typeof PROGRAMMATIC_VALUE;
 type OptionType = {label: string; value: ScorerType; icon: IconName};
 
 interface ScorerTypeConfig extends OptionType {
@@ -29,7 +35,7 @@ export interface ScorerFormProps {
 export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig> = {
   ANNOTATION: {
     label: HUMAN_ANNOTATION_LABEL,
-    value: 'ANNOTATION',
+    value: HUMAN_ANNOTATION_VALUE,
     icon: IconNames.UsersTeam,
     Component: AnnotationScorerForm,
     onSave: async data => {
@@ -39,7 +45,7 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig> = {
   },
   ACTION: {
     label: ACTION_LABEL,
-    value: 'ACTION',
+    value: ACTION_VALUE,
     icon: IconNames.RobotServiceMember,
     Component: ActionScorerForm,
     onSave: async data => {
@@ -49,7 +55,7 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig> = {
   },
   PROGRAMMATIC: {
     label: PROGRAMMATIC_LABEL,
-    value: 'PROGRAMMATIC',
+    value: PROGRAMMATIC_VALUE,
     icon: IconNames.CodeAlt,
     Component: ProgrammaticScorerForm,
     onSave: async data => {
@@ -75,13 +81,20 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
   initialScorerType,
 }) => {
   const [selectedScorerType, setSelectedScorerType] = useState<ScorerType>(
-    initialScorerType ?? 'ANNOTATION'
+    initialScorerType ?? HUMAN_ANNOTATION_VALUE
   );
-  useEffect(() => {
-    setSelectedScorerType(initialScorerType ?? 'ANNOTATION');
-  }, [initialScorerType]);
   const [formData, setFormData] = useState<any>(null);
   const [isFormValid, setIsFormValid] = useState(false);
+
+  const setScorerTypeAndResetForm = useCallback((scorerType: ScorerType) => {
+    setSelectedScorerType(scorerType);
+    setFormData(null);
+    setIsFormValid(false);
+  }, []);
+
+  useEffect(() => {
+    setScorerTypeAndResetForm(initialScorerType ?? HUMAN_ANNOTATION_VALUE);
+  }, [initialScorerType, setScorerTypeAndResetForm]);
 
   const handleFormDataChange = useCallback((isValid: boolean, data: any) => {
     setIsFormValid(isValid);
@@ -118,7 +131,7 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
           </Box>
         )}
         onChange={value =>
-          value && setSelectedScorerType(value.value as ScorerType)
+          value && setScorerTypeAndResetForm(value.value as ScorerType)
         }
       />
       <ScorerFormComponent onDataChange={handleFormDataChange} />
