@@ -1,8 +1,8 @@
 import React, {FC, useCallback, useState} from 'react';
 import {z} from 'zod';
 
-import {ZSForm} from '../../ZodSchemaForm/ZodSchemaForm';
 import {ScorerFormProps} from './ScorerForms';
+import {ZSForm} from './ZodSchemaForm';
 
 const JSONTypeNames = z.enum(['Boolean', 'Number', 'String']);
 const ObjectJsonResponseFormat = z.object({
