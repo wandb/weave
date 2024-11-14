@@ -406,7 +406,7 @@ def test_calls_delete_cascade(client):
     evaluate_calls = list(weave.as_op(evaluation.evaluate).calls())
     assert len(evaluate_calls) == 1
     eval_call = evaluate_calls[0]
-    eval_call_children = list(eval_call.children())
+    eval_call_children = list(eval_call.children)
     assert len(eval_call_children) == 3
 
     # delete the evaluation, should cascade to all the calls and sub-calls
@@ -764,7 +764,7 @@ def test_evaluate(client):
     evaluate_calls = list(weave.as_op(evaluation.evaluate).calls())
     assert len(evaluate_calls) == 1
     eval_call = evaluate_calls[0]
-    eval_call_children = list(eval_call.children())
+    eval_call_children = list(eval_call.children)
     assert len(eval_call_children) == 3
 
     # TODO: walk the whole graph and make sure all the refs and relationships

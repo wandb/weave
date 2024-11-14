@@ -76,7 +76,7 @@ def flatten_calls(calls: Union[Iterable[Call], CallsIter], *, depth: int = 0) ->
     lst = []
     for call in calls:
         lst.append((call, depth))
-        lst.extend(flatten_calls(call.children(), depth=depth + 1))
+        lst.extend(flatten_calls(call.children, depth=depth + 1))
     return lst
 
 
