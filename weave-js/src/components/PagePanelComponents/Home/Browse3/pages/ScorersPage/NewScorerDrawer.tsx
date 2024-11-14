@@ -3,7 +3,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
 import React, {FC, ReactNode, useCallback, useEffect, useState} from 'react';
 
-import {ActionScorerForm} from './ActionScorerForm';
+
 import {AutocompleteWithLabel} from './FormComponents';
 import {
   AnnotationScorerForm,
@@ -44,7 +44,7 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
     label: LLM_JUDGE_LABEL,
     value: LLM_JUDGE_VALUE,
     icon: IconNames.RobotServiceMember,
-    Component: ActionScorerForm,
+    Component: () => <>TODO</>,
     onSave: async data => {
       // Implementation for saving llm judge scorer
       console.log('TODO: save llm judge scorer', data);
