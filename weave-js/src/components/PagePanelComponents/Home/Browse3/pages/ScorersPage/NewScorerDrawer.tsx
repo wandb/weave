@@ -13,14 +13,14 @@ import {
 
 const HUMAN_ANNOTATION_LABEL = 'Human annotation';
 export const HUMAN_ANNOTATION_VALUE = 'ANNOTATION';
-const ACTION_LABEL = 'LLM judge';
-const ACTION_VALUE = 'ACTION';
+const LLM_JUDGE_LABEL = 'LLM judge';
+const LLM_JUDGE_VALUE = 'LLM_JUDGE';
 const PROGRAMMATIC_LABEL = 'Programmatic scorer';
 const PROGRAMMATIC_VALUE = 'PROGRAMMATIC';
 
 export type ScorerType =
   | typeof HUMAN_ANNOTATION_VALUE
-  | typeof ACTION_VALUE
+  | typeof LLM_JUDGE_VALUE
   | typeof PROGRAMMATIC_VALUE;
 type OptionType = {label: string; value: ScorerType; icon: IconName};
 
@@ -40,14 +40,14 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
       console.log('TODO: save annotation scorer', data);
     },
   },
-  ACTION: {
-    label: ACTION_LABEL,
-    value: ACTION_VALUE,
+  LLM_JUDGE: {
+    label: LLM_JUDGE_LABEL,
+    value: LLM_JUDGE_VALUE,
     icon: IconNames.RobotServiceMember,
     Component: ActionScorerForm,
     onSave: async data => {
-      // Implementation for saving action scorer
-      console.log('TODO: save action scorer', data);
+      // Implementation for saving llm judge scorer
+      console.log('TODO: save llm judge scorer', data);
     },
   },
   PROGRAMMATIC: {

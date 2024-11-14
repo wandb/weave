@@ -15,11 +15,10 @@ import {z} from 'zod';
 
 import {
   AutocompleteWithLabel,
+  GAP_BETWEEN_ITEMS_PX,
+  GAP_BETWEEN_LABEL_AND_FIELD_PX,
   TextFieldWithLabel,
 } from '../pages/ScorersPage/FormComponents';
-
-const GAP_BETWEEN_ITEMS_PX = 20;
-const GAP_BETWEEN_LABEL_AND_FIELD_PX = 10;
 
 interface ZSFormProps {
   configSchema: z.ZodType<any>;
@@ -388,6 +387,7 @@ const EnumField: React.FC<{
   config: Record<string, any>;
   setConfig: (config: Record<string, any>) => void;
   noMarginBottom?: boolean;
+  noLabel?: boolean;
 }> = ({
   keyName,
   fieldSchema,
@@ -397,6 +397,7 @@ const EnumField: React.FC<{
   config,
   setConfig,
   noMarginBottom,
+  noLabel,
 }) => {
   const options: string[] = unwrappedSchema.options;
 
@@ -421,13 +422,16 @@ const EnumField: React.FC<{
 
   return (
     <AutocompleteWithLabel
-      label={keyName}
+      label={noLabel ? undefined : keyName}
       options={options.map(option => ({value: option, label: option}))}
       value={{
         value: selectedValue,
         label: selectedValue,
       }}
       onChange={v => updateConfig(targetPath, v.value, config, setConfig)}
+      style={{
+        marginBottom: noMarginBottom ? '0px' : GAP_BETWEEN_ITEMS_PX + 'px',
+      }}
     />
     // <FormControl
     //   fullWidth
@@ -550,6 +554,9 @@ const RecordField: React.FC<{
           }}>
           <Box flexGrow={1}>
             <TextFieldWithLabel
+              style={{
+                marginBottom: '0px',
+              }}
               value={key}
               onChange={newValue => {
                 if (
@@ -568,7 +575,8 @@ const RecordField: React.FC<{
             {isZodType(valueSchema, s => s instanceof z.ZodEnum) ? (
               <EnumField
                 noMarginBottom
-                keyName={``}
+                noLabel
+                keyName={key}
                 fieldSchema={valueSchema}
                 unwrappedSchema={unwrappedValueSchema as z.ZodEnum<any>}
                 targetPath={[...targetPath, key]}
@@ -586,6 +594,9 @@ const RecordField: React.FC<{
               <TextFieldWithLabel
                 value={innerValue}
                 onChange={newValue => updateInternalPair(index, key, newValue)}
+                style={{
+                  marginBottom: '0px',
+                }}
               />
             )}
           </Box>

@@ -6,7 +6,7 @@ import {ScorerFormProps} from './ScorerForms';
 
 const JSONTypeNames = z.enum(['Boolean', 'Number', 'String']);
 const ObjectJsonResponseFormat = z.object({
-  Type: z.literal('object'),
+  Type: z.literal('Object'),
   Properties: z.record(JSONTypeNames),
 });
 
@@ -32,7 +32,6 @@ export const ActionScorerForm: FC<
   const setConfig = useCallback(
     (newConfig: any) => {
       setConfigRaw(newConfig);
-      console.log(newConfig);
       onDataChange(isValid, newConfig);
     },
     [isValid, onDataChange]
@@ -41,7 +40,6 @@ export const ActionScorerForm: FC<
   const setIsValid = useCallback(
     (newIsValid: boolean) => {
       setIsValidRaw(newIsValid);
-      console.log(newIsValid);
 
       onDataChange(newIsValid, config);
     },

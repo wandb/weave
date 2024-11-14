@@ -3,9 +3,9 @@ import {IconNames} from '@wandb/weave/components/Icon';
 import React, {useState} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
-import {ActionSpecsTab} from './ActionSpecsTab';
 import {AnnotationsTab} from './AnnotationsTab';
 import {ProgrammaticScorersTab} from './CoreScorersTab';
+import {LLMJudgesTab} from './LLMJudgesTab';
 import {
   HUMAN_ANNOTATION_VALUE,
   NewScorerDrawer,
@@ -33,9 +33,9 @@ export const ScorersPage: React.FC<{
             content: <AnnotationsTab entity={entity} project={project} />,
           },
           {
-            label: scorerTypeRecord.ACTION.label,
-            icon: scorerTypeRecord.ACTION.icon,
-            content: <ActionSpecsTab entity={entity} project={project} />,
+            label: scorerTypeRecord.LLM_JUDGE.label,
+            icon: scorerTypeRecord.LLM_JUDGE.icon,
+            content: <LLMJudgesTab entity={entity} project={project} />,
           },
           {
             label: scorerTypeRecord.PROGRAMMATIC.label,

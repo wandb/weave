@@ -3,7 +3,7 @@
 import React from 'react';
 
 import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
-export const ActionSpecsTab: React.FC<{
+export const LLMJudgesTab: React.FC<{
   entity: string;
   project: string;
 }> = ({entity, project}) => {
@@ -12,6 +12,7 @@ export const ActionSpecsTab: React.FC<{
       entity={entity}
       project={project}
       hideCategoryColumn={true}
+      objectTitle="LLM judge"
       initialFilter={{
         // Note: we will need to filter this down to just LLM Judge ActionSpecs, but
         // for now they are the only kind (!!)
