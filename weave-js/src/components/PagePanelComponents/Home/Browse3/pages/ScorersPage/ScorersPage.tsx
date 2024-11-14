@@ -3,9 +3,9 @@ import {IconNames} from '@wandb/weave/components/Icon';
 import React, {useState} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
-import {ActionSpecsTab} from './ActionSpecsTab';
 import {AnnotationsTab} from './AnnotationsTab';
 import {ProgrammaticScorersTab} from './CoreScorersTab';
+import {LLMJudgesTab} from './LLMJudgesTab';
 import {
   HUMAN_ANNOTATION_VALUE,
   NewScorerDrawer,
@@ -28,17 +28,17 @@ export const ScorersPage: React.FC<{
         title="Scorers"
         tabs={[
           {
-            label: scorerTypeRecord.ANNOTATION.label,
+            label: scorerTypeRecord.ANNOTATION.label + 's',
             icon: scorerTypeRecord.ANNOTATION.icon,
             content: <AnnotationsTab entity={entity} project={project} />,
           },
           {
-            label: scorerTypeRecord.ACTION.label,
-            icon: scorerTypeRecord.ACTION.icon,
-            content: <ActionSpecsTab entity={entity} project={project} />,
+            label: scorerTypeRecord.LLM_JUDGE.label + 's',
+            icon: scorerTypeRecord.LLM_JUDGE.icon,
+            content: <LLMJudgesTab entity={entity} project={project} />,
           },
           {
-            label: scorerTypeRecord.PROGRAMMATIC.label,
+            label: scorerTypeRecord.PROGRAMMATIC.label + 's',
             icon: scorerTypeRecord.PROGRAMMATIC.icon,
             content: (
               <ProgrammaticScorersTab entity={entity} project={project} />
@@ -56,8 +56,9 @@ export const ScorersPage: React.FC<{
         headerContent={undefined}
         onTabSelectedCallback={tab =>
           setSelectedTab(
-            Object.values(scorerTypeRecord).find(t => t.label === tab)?.value ??
-              HUMAN_ANNOTATION_VALUE
+            // Hacky that we have to do the `"s"` thing, but it works
+            Object.values(scorerTypeRecord).find(t => t.label + 's' === tab)
+              ?.value ?? HUMAN_ANNOTATION_VALUE
           )
         }
       />
