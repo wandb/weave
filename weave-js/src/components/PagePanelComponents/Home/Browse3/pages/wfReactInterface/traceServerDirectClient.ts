@@ -18,6 +18,8 @@ import fetch from 'isomorphic-unfetch';
 import {
   ActionsExecuteBatchReq,
   ActionsExecuteBatchRes,
+  CompletionsCreateReq,
+  CompletionsCreateRes,
   ContentType,
   FeedbackCreateReq,
   FeedbackCreateRes,
@@ -314,6 +316,22 @@ export class DirectTraceServerClient {
           reject(err);
         });
     });
+  }
+
+  public completionsCreate(
+    req: CompletionsCreateReq
+  ): Promise<CompletionsCreateRes> {
+    try {
+      return this.makeRequest<CompletionsCreateReq, CompletionsCreateRes>(
+        '/completions/create',
+        req
+      );
+    } catch (error: any) {
+      if (error?.api_key_name) {
+        console.error('Missing LLM API key:', error.api_key_name);
+      }
+      return Promise.reject(error);
+    }
   }
 
   private makeRequest = async <QT, ST>(
