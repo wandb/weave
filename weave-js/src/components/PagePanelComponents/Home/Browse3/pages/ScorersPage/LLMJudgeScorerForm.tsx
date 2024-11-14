@@ -1,10 +1,12 @@
 import {Box} from '@material-ui/core';
-import {GOLD_300} from '@wandb/weave/common/css/color.styles';
+import {GOLD_300, GOLD_650} from '@wandb/weave/common/css/color.styles';
 import React, {FC, useCallback, useState} from 'react';
 import {z} from 'zod';
 
 import {ScorerFormProps} from './ScorerForms';
 import {ZSForm} from './ZodSchemaForm';
+import { Icon, IconNames } from '@wandb/weave/components/Icon';
+import { AutocompleteWithLabel } from './FormComponents';
 
 const JSONTypeNames = z.enum(['Boolean', 'Number', 'String']);
 const ObjectJsonResponseFormat = z.object({
@@ -56,7 +58,27 @@ export const LLMJudgeScorerForm: FC<
           marginBottom: '10px',
           borderRadius: '10px',
           backgroundColor: GOLD_300,
-        }}></Box>
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'row',
+          gap: '10px',
+          overflow: 'hidden',
+          flexWrap: 'wrap'
+        }}>
+        <Icon name={IconNames.MagicWandStar} style={{color: GOLD_650, flexShrink: 0}}/>
+          <Box style={{color: GOLD_650}}>Begin with a common LLM Judge template!</Box>
+          <Box style={{flex: 1}}><AutocompleteWithLabel style={{marginBottom: 0}} options={[
+            {
+              label: 'gpt-4o-mini',
+              value: 'gpt-4o-mini',
+            },
+            {
+              label: 'gpt-4o',
+              value: 'gpt-4o',
+            },
+          ]} /></Box>
+        </Box>
       <ZSForm
         configSchema={LLMJudgeScorerFormSchema}
         config={config ?? {}}
