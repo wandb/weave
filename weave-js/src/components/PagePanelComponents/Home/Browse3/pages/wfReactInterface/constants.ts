@@ -27,4 +27,5 @@ export const KNOWN_BASE_OBJECT_CLASSES = [
   'Leaderboard',
   'Scorer',
   'ActionSpec',
+  'AnnotationSpec',
 ] as const;
