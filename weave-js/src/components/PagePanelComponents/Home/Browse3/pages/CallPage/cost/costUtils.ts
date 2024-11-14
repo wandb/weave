@@ -1,7 +1,6 @@
 import {
   LLMCostSchema,
   LLMUsageSchema,
-  TraceCallSchema,
 } from '../../wfReactInterface/traceServerClientTypes';
 import {CallSchema} from '../../wfReactInterface/wfDataModelHooksInterface';
 import {DEFAULT_COST_DATA, isCostDataKey, isUsageDataKey} from './costTypes';
