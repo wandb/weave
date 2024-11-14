@@ -15,8 +15,8 @@ import React, {
 } from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
-import {SplitPanelLeft} from './Panels/SplitPanelLeft';
-import {SplitPanelRight} from './Panels/SplitPanelRight';
+import {SplitPanelLeft} from './SplitPanels/SplitPanelLeft';
+import {SplitPanelRight} from './SplitPanels/SplitPanelRight';
 import {isPrimitive} from './util';
 
 type SimplePageLayoutContextType = {
