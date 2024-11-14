@@ -26,10 +26,10 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import { MOON_200, TEAL_300 } from '@wandb/weave/common/css/color.styles';
-import { Switch } from '@wandb/weave/components';
-import { Checkbox } from '@wandb/weave/components/Checkbox/Checkbox';
-import { Icon } from '@wandb/weave/components/Icon';
+import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
+import {Switch} from '@wandb/weave/components';
+import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
+import {Icon} from '@wandb/weave/components/Icon';
 import React, {
   FC,
   useCallback,
@@ -39,45 +39,45 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { useHistory } from 'react-router-dom';
+import {useHistory} from 'react-router-dom';
 
-import { useViewerInfo } from '../../../../../../common/hooks/useViewerInfo';
-import { A, TargetBlank } from '../../../../../../common/util/links';
-import { TailwindContents } from '../../../../../Tailwind';
-import { flattenObjectPreservingWeaveTypes } from '../../../Browse2/browse2Util';
-import { TableRowSelectionContext } from '../../../Browse3';
+import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
+import {A, TargetBlank} from '../../../../../../common/util/links';
+import {TailwindContents} from '../../../../../Tailwind';
+import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
+import {TableRowSelectionContext} from '../../../Browse3';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
-import { OnAddFilter } from '../../filters/CellFilterWrapper';
-import { getDefaultOperatorForValue } from '../../filters/common';
-import { FilterPanel } from '../../filters/FilterPanel';
-import { DEFAULT_PAGE_SIZE } from '../../grid/pagination';
-import { StyledPaper } from '../../StyledAutocomplete';
-import { StyledDataGrid } from '../../StyledDataGrid';
-import { StyledTextField } from '../../StyledTextField';
-import { ConfirmDeleteModal } from '../CallPage/OverflowMenu';
-import { Empty } from '../common/Empty';
+import {OnAddFilter} from '../../filters/CellFilterWrapper';
+import {getDefaultOperatorForValue} from '../../filters/common';
+import {FilterPanel} from '../../filters/FilterPanel';
+import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
+import {StyledPaper} from '../../StyledAutocomplete';
+import {StyledDataGrid} from '../../StyledDataGrid';
+import {StyledTextField} from '../../StyledTextField';
+import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
+import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
   EMPTY_PROPS_TRACES,
 } from '../common/EmptyContent';
-import { FilterLayoutTemplate } from '../common/SimpleFilterableDataTable';
-import { prepareFlattenedDataForTable } from '../common/tabularListViews/columnBuilder';
+import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
+import {prepareFlattenedDataForTable} from '../common/tabularListViews/columnBuilder';
 import {
   truncateID,
   useControllableState,
   useURLSearchParamsDict,
 } from '../util';
-import { useWFHooks } from '../wfReactInterface/context';
-import { TraceCallSchema } from '../wfReactInterface/traceServerClientTypes';
-import { traceCallToUICallSchema } from '../wfReactInterface/tsDataModelHooks';
-import { EXPANDED_REF_REF_KEY } from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
-import { objectVersionNiceString } from '../wfReactInterface/utilities';
-import { CallSchema } from '../wfReactInterface/wfDataModelHooksInterface';
-import { CallsCharts } from './CallsCharts';
-import { CallsCustomColumnMenu } from './CallsCustomColumnMenu';
+import {useWFHooks} from '../wfReactInterface/context';
+import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
+import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
+import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
+import {objectVersionNiceString} from '../wfReactInterface/utilities';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallsCharts} from './CallsCharts';
+import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
@@ -85,7 +85,7 @@ import {
   PaginationButtons,
   RefreshButton,
 } from './CallsTableButtons';
-import { useCallsTableColumns } from './callsTableColumns';
+import {useCallsTableColumns} from './callsTableColumns';
 import {
   ALL_TRACES_OR_CALLS_REF_KEY,
   getEffectiveFilter,
@@ -94,9 +94,9 @@ import {
   useOutputObjectVersionOptions,
   WFHighLevelCallFilter,
 } from './callsTableFilter';
-import { useCallsForQuery } from './callsTableQuery';
-import { useCurrentFilterIsEvaluationsFilter } from './evaluationsFilter';
-import { ManageColumnsButton } from './ManageColumnsButton';
+import {useCallsForQuery} from './callsTableQuery';
+import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
+import {ManageColumnsButton} from './ManageColumnsButton';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 

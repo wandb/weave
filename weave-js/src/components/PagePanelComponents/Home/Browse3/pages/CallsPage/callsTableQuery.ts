@@ -3,22 +3,21 @@ import {
   GridPaginationModel,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
-import { useCallback, useMemo } from 'react';
+import {parseRef} from '@wandb/weave/react';
+import {makeRefCall} from '@wandb/weave/util/refs';
+import {useCallback, useMemo} from 'react';
 
-import { parseRef } from '@wandb/weave/react';
-import { makeRefCall } from '@wandb/weave/util/refs';
-import { useDeepMemo } from '../../../../../../hookUtils';
-import { isValuelessOperator } from '../../filters/common';
-import { addCostsToCallResults } from '../CallPage/cost';
-import { getNestedValue, mergeCallData } from '../CallPage/cost/costUtils';
-import { operationConverter } from '../common/tabularListViews/operators';
-import { useWFHooks } from '../wfReactInterface/context';
-import { Query } from '../wfReactInterface/traceServerClientInterface/query';
+import {useDeepMemo} from '../../../../../../hookUtils';
+import {isValuelessOperator} from '../../filters/common';
+import {addCostsToCallResults} from '../CallPage/cost';
+import {operationConverter} from '../common/tabularListViews/operators';
+import {useWFHooks} from '../wfReactInterface/context';
+import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {
   CallFilter,
   CallSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
-import { WFHighLevelCallFilter } from './callsTableFilter';
+import {WFHighLevelCallFilter} from './callsTableFilter';
 
 /**
  * This Hook is responsible for bridging the gap between the CallsTable
@@ -134,20 +133,27 @@ export const useCallsForQuery = (
   );
 
   // map of callId to the latest feedback of each feedback_type
-  const feedbackByType: Record<string, Record<string, any>> | undefined = useMemo(() => {
-    return feedbackQuery.result?.reduce((acc: Record<string, Record<string, any>>, curr) => {
-      const callId = parseRef(curr.weave_ref).artifactName;
-      if (!acc[callId]) {
-        acc[callId] = {};
-      }
-      // Store feedback by feedback_type, newer entries will overwrite older ones
-      if (curr.feedback_type) {
-        const feedbackName = curr.feedback_type.replace(feedbackTypeSubstr, '');
-        acc[callId][feedbackName] = getNestedValue(curr.payload)
-      }
-      return acc;
-    }, {});
-  }, [feedbackQuery.result]);
+  const feedbackByType: Record<string, Record<string, any>> | undefined =
+    useMemo(() => {
+      return feedbackQuery.result?.reduce(
+        (acc: Record<string, Record<string, any>>, curr) => {
+          const callId = parseRef(curr.weave_ref).artifactName;
+          if (!acc[callId]) {
+            acc[callId] = {};
+          }
+          // Store feedback by feedback_type, newer entries will overwrite older ones
+          if (curr.feedback_type) {
+            const feedbackName = curr.feedback_type.replace(
+              feedbackTypeSubstr,
+              ''
+            );
+            acc[callId][feedbackName] = getNestedValue(curr.payload);
+          }
+          return acc;
+        },
+        {}
+      );
+    }, [feedbackQuery.result]);
 
   return useMemo(() => {
     if (calls.loading) {
@@ -167,7 +173,15 @@ export const useCallsForQuery = (
       total,
       refetch,
     };
-  }, [callResults, calls.loading, total, costs.loading, costResults, refetch, feedbackByType]);
+  }, [
+    callResults,
+    calls.loading,
+    total,
+    costs.loading,
+    costResults,
+    refetch,
+    feedbackByType,
+  ]);
 };
 
 export const useFilterSortby = (
@@ -266,10 +280,12 @@ const mergeCallData = (
   if (feedbackByType) {
     result = result.map(call => ({
       ...call,
-      traceCall: call.traceCall ? {
-        ...call.traceCall,
-        feedback: feedbackByType[call.callId],
-      } : undefined,
+      traceCall: call.traceCall
+        ? {
+            ...call.traceCall,
+            feedback: feedbackByType[call.callId],
+          }
+        : undefined,
     }));
   }
 

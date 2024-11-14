@@ -2,17 +2,14 @@ import {
   LLMCostSchema,
   LLMUsageSchema,
 } from '../../wfReactInterface/traceServerClientTypes';
-import { CallSchema } from '../../wfReactInterface/wfDataModelHooksInterface';
-import { DEFAULT_COST_DATA, isCostDataKey, isUsageDataKey } from './costTypes';
+import {CallSchema} from '../../wfReactInterface/wfDataModelHooksInterface';
+import {DEFAULT_COST_DATA, isCostDataKey, isUsageDataKey} from './costTypes';
 
 const COST_PARAM_PREFIX = 'summary.weave.costs.';
 const USAGE_PARAM_PREFIX = 'summary.usage.';
 
 // Define which fields are considered cost-related
-const COST_FIELD_PREFIXES = [
-  COST_PARAM_PREFIX,
-  USAGE_PARAM_PREFIX,
-] as const;
+const COST_FIELD_PREFIXES = [COST_PARAM_PREFIX, USAGE_PARAM_PREFIX] as const;
 
 // Helper to check if a field is cost-related
 const isCostField = (key: string): boolean => {
@@ -125,7 +122,7 @@ export const addCostsToCallResults = (
       // Merge cost fields into existing call data
       return {
         ...call,
-        ...costDict[call.callId]
+        ...costDict[call.callId],
       };
     }
     return call;

@@ -4,13 +4,13 @@
  * backed by the "Trace Server" engine.
  */
 
-import { isSimpleTypeShape, union } from '@wandb/weave/core/model/helpers';
+import {isSimpleTypeShape, union} from '@wandb/weave/core/model/helpers';
 import * as _ from 'lodash';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import * as Types from '../../../../../../core/model/types';
-import { useDeepMemo } from '../../../../../../hookUtils';
-import { isWeaveObjectRef, parseRef } from '../../../../../../react';
+import {useDeepMemo} from '../../../../../../hookUtils';
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {
   callCache,
   objectVersionCache,
@@ -23,11 +23,11 @@ import {
   WEAVE_REF_PREFIX,
 } from './constants';
 import * as traceServerClient from './traceServerClient';
-import { useGetTraceServerClientContext } from './traceServerClientContext';
-import { Query } from './traceServerClientInterface/query';
+import {useGetTraceServerClientContext} from './traceServerClientContext';
+import {Query} from './traceServerClientInterface/query';
 import * as traceServerTypes from './traceServerClientTypes';
-import { useClientSideCallRefExpansion } from './tsDataModelHooksCallRefExpansion';
-import { opVersionRefOpName, refUriToObjectVersionKey } from './utilities';
+import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
+import {opVersionRefOpName, refUriToObjectVersionKey} from './utilities';
 import {
   CallFilter,
   CallKey,
