@@ -17,13 +17,10 @@ const DRAWER_ANIMATION_BUFFER_TIME = 400;
 
 type CallChatProps = {
   call: TraceCallSchema;
-} & PlaygroundContextType;
+  playgroundContext?: PlaygroundContextType;
+};
 
-export const CallChat = ({
-  call,
-  isPlayground = false,
-  ...playgroundContext
-}: CallChatProps) => {
+export const CallChat = ({call, playgroundContext}: CallChatProps) => {
   const chat = useCallAsChat(call);
   const [drawerAnimationBuffer, setDrawerAnimationBuffer] = useState(true);
 
@@ -38,11 +35,7 @@ export const CallChat = ({
     return <LoadingDots />;
   }
   return (
-    <PlaygroundContext.Provider
-      value={{
-        isPlayground,
-        ...playgroundContext,
-      }}>
+    <PlaygroundContext.Provider value={playgroundContext}>
       <ChatView chat={chat} />
     </PlaygroundContext.Provider>
   );
