@@ -2,9 +2,9 @@ import React, {FC} from 'react';
 
 import {ScorerFormProps} from './ScorerForms';
 
-export const ActionScorerForm: FC<ScorerFormProps<any>> = ({
+export const LLMJudgeScorerForm: FC<ScorerFormProps<any>> = ({
   data,
   onDataChange,
 }) => {
-  return <div>Action Scorer Form</div>;
+  return <div>LLM Judge Form</div>;
 };
