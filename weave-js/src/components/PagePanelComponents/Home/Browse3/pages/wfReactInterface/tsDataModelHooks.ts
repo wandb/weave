@@ -732,7 +732,15 @@ const useFeedbackByTypeAndCallRefs = (
     return () => {
       mounted = false;
     };
-  }, [deepCallRefs, getTsClient, doReload, sortBy]);
+  }, [
+    deepCallRefs,
+    getTsClient,
+    doReload,
+    sortBy,
+    feedbackType,
+    entity,
+    project,
+  ]);
 
   return {...result, refetch};
 };

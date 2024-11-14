@@ -162,7 +162,7 @@ export const useCallsForQuery = (
         loading: calls.loading,
         result: [],
         total: 0,
-        refetch: refetch,
+        refetch,
       };
     }
 

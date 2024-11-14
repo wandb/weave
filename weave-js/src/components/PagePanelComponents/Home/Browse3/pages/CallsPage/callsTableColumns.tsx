@@ -234,8 +234,8 @@ function buildCallsTableColumns(
       },
     },
     {
-      field: 'feedback',
-      headerName: 'Feedback',
+      field: 'reactions',
+      headerName: 'Reactions',
       width: 150,
       sortable: false,
       filterable: false,

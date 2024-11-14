@@ -8,24 +8,6 @@ import {DEFAULT_COST_DATA, isCostDataKey, isUsageDataKey} from './costTypes';
 const COST_PARAM_PREFIX = 'summary.weave.costs.';
 const USAGE_PARAM_PREFIX = 'summary.usage.';
 
-// Define which fields are considered cost-related
-const COST_FIELD_PREFIXES = [COST_PARAM_PREFIX, USAGE_PARAM_PREFIX] as const;
-
-// Helper to check if a field is cost-related
-const isCostField = (key: string): boolean => {
-  return COST_FIELD_PREFIXES.some(prefix => key.startsWith(prefix));
-};
-
-// Extract just the cost-related fields from an object
-const extractCostFields = (obj: Record<string, any>): Record<string, any> => {
-  return Object.entries(obj).reduce((acc, [key, value]) => {
-    if (isCostField(key)) {
-      acc[key] = value;
-    }
-    return acc;
-  }, {} as Record<string, any>);
-};
-
 export const getCostFromCellParams = (params: {[key: string]: any}) => {
   const costData: {[key: string]: LLMCostSchema} = {};
   for (const key in params) {
@@ -112,18 +94,38 @@ export const addCostsToCallResults = (
 ): CallSchema[] => {
   const costDict = costResults.reduce((acc, costResult) => {
     if (costResult.callId) {
-      acc[costResult.callId] = extractCostFields(costResult);
+      acc[costResult.callId] = {
+        summary: {
+          weave: {
+            costs: costResult.traceCall?.summary?.weave?.costs,
+          },
+          usage: costResult.traceCall?.summary?.usage,
+        },
+      };
     }
     return acc;
-  }, {} as Record<string, Record<string, any>>);
+  }, {} as Record<string, any>);
 
   return callResults.map(call => {
     if (call.callId && costDict[call.callId]) {
       // Merge cost fields into existing call data
-      return {
+      const merged = {
         ...call,
-        ...costDict[call.callId],
+        traceCall: call.traceCall
+          ? {
+              ...call.traceCall,
+              summary: {
+                ...call.traceCall?.summary,
+                weave: {
+                  ...call.traceCall?.summary?.weave,
+                  costs: costDict[call.callId].summary.weave.costs,
+                },
+              },
+              usage: costDict[call.callId].summary.usage,
+            }
+          : undefined,
       };
+      return merged;
     }
     return call;
   });
