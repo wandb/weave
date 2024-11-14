@@ -28,6 +28,7 @@ import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
 import {Empty} from './common/Empty';
 import {
+  EMPTY_PROPS_ACTION_SPECS,
   EMPTY_PROPS_DATASETS,
   EMPTY_PROPS_LEADERBOARDS,
   EMPTY_PROPS_MODEL,
@@ -170,6 +171,8 @@ export const FilterableObjectVersionsTable: React.FC<{
       propsEmpty = EMPTY_PROPS_LEADERBOARDS;
     } else if (base === 'Scorer') {
       propsEmpty = EMPTY_PROPS_PROGRAMMATIC_SCORERS;
+    } else if (base === 'ActionSpec') {
+      propsEmpty = EMPTY_PROPS_ACTION_SPECS;
     }
     return <Empty {...propsEmpty} />;
   }
