@@ -6,6 +6,28 @@ import { CallSchema } from '../../wfReactInterface/wfDataModelHooksInterface';
 import { DEFAULT_COST_DATA, isCostDataKey, isUsageDataKey } from './costTypes';
 
 const COST_PARAM_PREFIX = 'summary.weave.costs.';
+const USAGE_PARAM_PREFIX = 'summary.usage.';
+
+// Define which fields are considered cost-related
+const COST_FIELD_PREFIXES = [
+  COST_PARAM_PREFIX,
+  USAGE_PARAM_PREFIX,
+] as const;
+
+// Helper to check if a field is cost-related
+const isCostField = (key: string): boolean => {
+  return COST_FIELD_PREFIXES.some(prefix => key.startsWith(prefix));
+};
+
+// Extract just the cost-related fields from an object
+const extractCostFields = (obj: Record<string, any>): Record<string, any> => {
+  return Object.entries(obj).reduce((acc, [key, value]) => {
+    if (isCostField(key)) {
+      acc[key] = value;
+    }
+    return acc;
+  }, {} as Record<string, any>);
+};
 
 export const getCostFromCellParams = (params: {[key: string]: any}) => {
   const costData: {[key: string]: LLMCostSchema} = {};
@@ -29,8 +51,8 @@ export const getCostFromCellParams = (params: {[key: string]: any}) => {
 export const getUsageFromCellParams = (params: {[key: string]: any}) => {
   const usage: {[key: string]: LLMUsageSchema} = {};
   for (const key in params) {
-    if (key.startsWith('summary.usage')) {
-      const usageKeys = key.replace('summary.usage.', '').split('.');
+    if (key.startsWith(USAGE_PARAM_PREFIX)) {
+      const usageKeys = key.replace(`${USAGE_PARAM_PREFIX}.`, '').split('.');
       const usageKey = usageKeys.pop() || '';
       if (isUsageDataKey(usageKey)) {
         const model = usageKeys.join('.');
@@ -87,22 +109,24 @@ export const formatTokenCost = (cost: number): string => {
   return `$${cost.toFixed(2)}`;
 };
 
-// TODO(Josiah): this is here because sometimes the cost query is not returning all the ids I believe for unfinished calls,
-// to get this cost uptake out, this function can be removed, once that is fixed
 export const addCostsToCallResults = (
   callResults: CallSchema[],
   costResults: CallSchema[]
-) => {
-  const costDict = costResults.reduce((acc, cost) => {
-    if (cost.callId) {
-      acc[cost.callId] = cost;
+): CallSchema[] => {
+  const costDict = costResults.reduce((acc, costResult) => {
+    if (costResult.callId) {
+      acc[costResult.callId] = extractCostFields(costResult);
     }
     return acc;
-  }, {} as Record<string, CallSchema>);
+  }, {} as Record<string, Record<string, any>>);
 
   return callResults.map(call => {
     if (call.callId && costDict[call.callId]) {
-      return {...call, ...costDict[call.callId]};
+      // Merge cost fields into existing call data
+      return {
+        ...call,
+        ...costDict[call.callId]
+      };
     }
     return call;
   });

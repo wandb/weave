@@ -9,6 +9,8 @@ import { parseRef } from '@wandb/weave/react';
 import { makeRefCall } from '@wandb/weave/util/refs';
 import { useDeepMemo } from '../../../../../../hookUtils';
 import { isValuelessOperator } from '../../filters/common';
+import { addCostsToCallResults } from '../CallPage/cost';
+import { getNestedValue, mergeCallData } from '../CallPage/cost/costUtils';
 import { operationConverter } from '../common/tabularListViews/operators';
 import { useWFHooks } from '../wfReactInterface/context';
 import { Query } from '../wfReactInterface/traceServerClientInterface/query';
@@ -123,10 +125,11 @@ export const useCallsForQuery = (
 
   // query for feeback
   const {useFeedbackByTypeAndCallRefs} = useWFHooks();
+  const feedbackTypeSubstr = 'wandb.annotation.';
   const feedbackQuery = useFeedbackByTypeAndCallRefs(
     entity,
     project,
-    'wandb.annotation.',
+    feedbackTypeSubstr,
     callResults.map(call => makeRefCall(entity, project, call.callId))
   );
 
@@ -139,27 +142,12 @@ export const useCallsForQuery = (
       }
       // Store feedback by feedback_type, newer entries will overwrite older ones
       if (curr.feedback_type) {
-        acc[callId][curr.feedback_type] = curr;
+        const feedbackName = curr.feedback_type.replace(feedbackTypeSubstr, '');
+        acc[callId][feedbackName] = getNestedValue(curr.payload)
       }
       return acc;
     }, {});
   }, [feedbackQuery.result]);
-
-  const callResultsWithFeedback = useMemo(() => {
-    let callResultsWithFeedback = callResults;
-    if (feedbackByType) {
-      callResultsWithFeedback = callResultsWithFeedback.map(call => {
-        return {
-          ...call,
-          traceCall: {
-            ...call.traceCall,
-            feedback: feedbackByType[call.callId]?.['payload'],
-          },
-        };
-      });
-    }
-    return callResultsWithFeedback;
-  }, [callResults, costResults, feedbackByType]);
 
   return useMemo(() => {
     if (calls.loading) {
@@ -175,15 +163,11 @@ export const useCallsForQuery = (
     return {
       costsLoading: costs.loading,
       loading: calls.loading,
-      // Return faster calls query results until cost query finishes
-      // result: costResults.length > 0
-      //   ? addCostsToCallResults(callResultsWithFeedback, costResults)
-      //   : callResultsWithFeedback,
-      result: callResultsWithFeedback,
+      result: mergeCallData(callResults, costResults, feedbackByType),
       total,
       refetch,
     };
-  }, [callResults, calls.loading, total, costs.loading, costResults, refetch, callResultsWithFeedback]);
+  }, [callResults, calls.loading, total, costs.loading, costResults, refetch, feedbackByType]);
 };
 
 export const useFilterSortby = (
@@ -266,4 +250,45 @@ const convertHighLevelFilterToLowLevelFilter = (
       ? [effectiveFilter.parentId]
       : undefined,
   };
+};
+
+// Move mergeCallData into the file directly since it's specific to this use case
+
+const mergeCallData = (
+  baseCallResults: CallSchema[],
+  costResults: CallSchema[],
+  feedbackByType?: Record<string, Record<string, any>>
+): CallSchema[] => {
+  // Start with base results
+  let result = baseCallResults;
+
+  // Add feedback if available
+  if (feedbackByType) {
+    result = result.map(call => ({
+      ...call,
+      traceCall: call.traceCall ? {
+        ...call.traceCall,
+        feedback: feedbackByType[call.callId],
+      } : undefined,
+    }));
+  }
+
+  // Add costs if available
+  if (costResults.length > 0) {
+    result = addCostsToCallResults(result, costResults);
+  }
+
+  return result;
+};
+// Helper to safely get deeply nested values
+const getNestedValue = <T>(obj: any, depth: number = 3): T | undefined => {
+  try {
+    let result = obj;
+    for (let i = 0; i < depth; i++) {
+      result = Object.values(result)[0];
+    }
+    return result as T;
+  } catch {
+    return undefined;
+  }
 };
