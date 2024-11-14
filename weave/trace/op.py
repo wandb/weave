@@ -374,7 +374,7 @@ def call(
     result, call = add.call(1, 2)
     ```
     """
-    if inspect.iscoroutinefunction(op.resolve_fn):
+    if inspect.iscoroutinefunction(op):
         return _do_call_async(
             op, *args, __weave=__weave, __should_raise=__should_raise, **kwargs
         )
