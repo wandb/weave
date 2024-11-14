@@ -173,7 +173,7 @@ export const SimplePageLayoutWithHeader: FC<{
   leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
   isSidebarOpen?: boolean;
-  notifySelectedTab?: (tab: string) => void;
+  onTabSelectedCallback?: (tab: string) => void;
 }> = props => {
   const {tabs} = props;
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
@@ -184,7 +184,7 @@ export const SimplePageLayoutWithHeader: FC<{
   const setAndNotifyTab = useCallback(
     (newValue: string) => {
       setTabId(newValue);
-      props.notifySelectedTab?.(newValue);
+      props.onTabSelectedCallback?.(newValue);
     },
     [props]
   );
@@ -295,7 +295,7 @@ export const SimplePageLayoutWithHeader: FC<{
                         key={tab.label}
                         value={tab.label}
                         className="h-[30px] text-sm">
-                        {tab.icon ? <Icon name={tab.icon} /> : null}
+                        {tab.icon && <Icon name={tab.icon} />}
                         {tab.label}
                       </Tabs.Trigger>
                     ))}
