@@ -1,6 +1,6 @@
 import {Box, SxProps, Theme} from '@mui/material';
 import {MOON_200} from '@wandb/weave/common/css/color.styles';
-import {Icon} from '@wandb/weave/components/Icon';
+import {Icon, IconName} from '@wandb/weave/components/Icon';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import _ from 'lodash';
 import React, {

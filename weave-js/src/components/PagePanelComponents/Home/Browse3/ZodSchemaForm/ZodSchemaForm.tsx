@@ -870,14 +870,14 @@ export const ZSForm: React.FC<ZSFormProps> = ({
   return <>{renderContent()}</>;
 };
 
-const TextFieldWithLabel: FC<
-  {label: string} & React.ComponentProps<typeof TextField>
-> = ({label, ...props}) => (
-  <Box style={{marginBottom: '10px', padding: '0px 2px'}}>
-    <InputLabel style={{marginBottom: '10px', fontSize: '14px'}}>
-      {label}
-    </InputLabel>
+// const TextFieldWithLabel: FC<
+//   {label: string} & React.ComponentProps<typeof TextField>
+// > = ({label, ...props}) => (
+//   <Box style={{marginBottom: '10px', padding: '0px 2px'}}>
+//     <InputLabel style={{marginBottom: '10px', fontSize: '14px'}}>
+//       {label}
+//     </InputLabel>
 
-    <TextField {...props} />
-  </Box>
-);
+//     <TextField {...props} />
+//   </Box>
+// );
