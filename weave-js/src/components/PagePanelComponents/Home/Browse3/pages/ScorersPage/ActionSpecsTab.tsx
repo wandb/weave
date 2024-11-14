@@ -1,3 +1,5 @@
+// TODO: Refactor this to be `LLM Judge` tab and change names everywhere
+
 import React from 'react';
 
 import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
@@ -6,12 +8,15 @@ export const ActionSpecsTab: React.FC<{
   project: string;
 }> = ({entity, project}) => {
   return (
-      <FilterableObjectVersionsTable
-        entity={entity}
-        project={project}
-        initialFilter={{
-          baseObjectClass: 'ActionSpec',
-        }}
-      />
+    <FilterableObjectVersionsTable
+      entity={entity}
+      project={project}
+      hideCategoryColumn={true}
+      initialFilter={{
+        // Note: we will need to filter this down to just LLM Judge ActionSpecs, but
+        // for now they are the only kind (!!)
+        baseObjectClass: 'ActionSpec',
+      }}
+    />
   );
 };

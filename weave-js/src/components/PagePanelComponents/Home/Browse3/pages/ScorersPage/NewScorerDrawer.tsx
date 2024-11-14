@@ -1,20 +1,21 @@
-import {Box, Drawer, InputLabel} from '@material-ui/core';
+import {Box, Drawer} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button';
-import {Select} from '@wandb/weave/components/Form/Select';
 import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
 import React, {FC, ReactNode, useCallback, useEffect, useState} from 'react';
 
+import {ActionScorerForm} from './ActionScorerForm';
+import {AutocompleteWithLabel} from './FormComponents';
 import {
-  ActionScorerForm,
   AnnotationScorerForm,
   ProgrammaticScorerForm,
+  ScorerFormProps,
 } from './ScorerForms';
 
-const HUMAN_ANNOTATION_LABEL = 'Human annotations';
+const HUMAN_ANNOTATION_LABEL = 'Human annotation';
 export const HUMAN_ANNOTATION_VALUE = 'ANNOTATION';
-const ACTION_LABEL = 'LLM judges';
+const ACTION_LABEL = 'LLM judge';
 const ACTION_VALUE = 'ACTION';
-const PROGRAMMATIC_LABEL = 'Functional scorers';
+const PROGRAMMATIC_LABEL = 'Programmatic scorer';
 const PROGRAMMATIC_VALUE = 'PROGRAMMATIC';
 
 export type ScorerType =
@@ -23,16 +24,12 @@ export type ScorerType =
   | typeof PROGRAMMATIC_VALUE;
 type OptionType = {label: string; value: ScorerType; icon: IconName};
 
-interface ScorerTypeConfig extends OptionType {
-  Component: FC<ScorerFormProps>;
-  onSave: (formData: any) => Promise<void>;
+interface ScorerTypeConfig<T> extends OptionType {
+  Component: FC<ScorerFormProps<T>>;
+  onSave: (formData: T) => Promise<void>;
 }
 
-export interface ScorerFormProps {
-  onDataChange: (isValid: boolean, data: any) => void;
-}
-
-export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig> = {
+export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
   ANNOTATION: {
     label: HUMAN_ANNOTATION_LABEL,
     value: HUMAN_ANNOTATION_VALUE,
@@ -134,28 +131,13 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
           value && setScorerTypeAndResetForm(value.value as ScorerType)
         }
       />
-      <ScorerFormComponent onDataChange={handleFormDataChange} />
+      <ScorerFormComponent
+        data={formData}
+        onDataChange={handleFormDataChange}
+      />
     </SaveableDrawer>
   );
 };
-
-type AutocompleteWithLabelType<Option = any> = (
-  props: {
-    label: string;
-  } & React.ComponentProps<typeof Select<Option>>
-) => React.ReactElement;
-
-const AutocompleteWithLabel: AutocompleteWithLabelType = ({
-  label,
-  ...props
-}) => (
-  <Box style={{marginBottom: '10px', padding: '0px 2px'}}>
-    <InputLabel style={{marginBottom: '10px', fontSize: '14px'}}>
-      {label}
-    </InputLabel>
-    <Select {...props} />
-  </Box>
-);
 
 interface SaveableDrawerProps {
   open: boolean;

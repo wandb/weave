@@ -86,7 +86,7 @@ export const actionSpecConfigurationSpecs: Partial<
           properties: _.mapValues(data['Response Schema'].Keys, value => ({
             type: value as 'boolean' | 'number' | 'string',
           })),
-          additionalProperties: false,
+          // additionalProperties: false,
         };
       }
       return {

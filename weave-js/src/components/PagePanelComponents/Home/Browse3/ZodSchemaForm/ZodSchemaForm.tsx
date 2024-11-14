@@ -1,22 +1,22 @@
 import {
   Box,
-  // Button,
   Checkbox,
   FormControl,
   FormControlLabel,
   IconButton,
   InputLabel,
-  // TextField,
   Tooltip,
   Typography,
 } from '@material-ui/core';
 import {Delete, Help} from '@mui/icons-material';
 import {Button} from '@wandb/weave/components/Button';
-import {TextField} from '@wandb/weave/components/Form/TextField';
 import React, {useEffect, useMemo, useState} from 'react';
 import {z} from 'zod';
 
-import {SelectField} from '../filters/SelectField';
+import {
+  AutocompleteWithLabel,
+  TextFieldWithLabel,
+} from '../pages/ScorersPage/FormComponents';
 
 const GAP_BETWEEN_ITEMS_PX = 20;
 const GAP_BETWEEN_LABEL_AND_FIELD_PX = 10;
@@ -121,15 +121,21 @@ const DiscriminatedUnionField: React.FC<{
   );
 
   return (
-    <FormControl fullWidth style={{marginBottom: GAP_BETWEEN_ITEMS_PX + 'px'}}>
-      <Label label={keyName} />
-      <SelectField
-        options={options.map(option => {
-          const v = distiminatorOptionToValue(option, discriminator);
-          return {value: v, label: v};
-        })}
-        value={currentType}
-        onSelectField={v => handleTypeChange(v as string)}
+    <Box style={{marginBottom: GAP_BETWEEN_ITEMS_PX + 'px'}}>
+      <AutocompleteWithLabel
+        label={keyName}
+        options={options.map(option => ({
+          value: distiminatorOptionToValue(option, discriminator),
+          label: distiminatorOptionToValue(option, discriminator),
+        }))}
+        value={{
+          value: currentType,
+          label: currentType,
+        }}
+        onChange={v => {
+          console.log(v);
+          handleTypeChange(v.value as string);
+        }}
       />
       <Box mt={2}>
         <ZSForm
@@ -142,7 +148,7 @@ const DiscriminatedUnionField: React.FC<{
           path={[]}
         />
       </Box>
-    </FormControl>
+    </Box>
   );
 };
 
@@ -281,18 +287,12 @@ const NestedForm: React.FC<{
   }
 
   return (
-    <FormControl fullWidth style={{marginBottom: GAP_BETWEEN_ITEMS_PX + 'px'}}>
-      <Label label={keyName} />
-      <TextField
-        // fullWidth
-        // label={keyName}
-        type={fieldType}
-        value={currentValue ?? ''}
-        onChange={value => updateConfig(currentPath, value, config, setConfig)}
-        size="medium"
-      />
-      <DescriptionTooltip description={getFieldDescription(fieldSchema)} />
-    </FormControl>
+    <TextFieldWithLabel
+      label={keyName}
+      type={fieldType}
+      value={currentValue ?? ''}
+      onChange={value => updateConfig(currentPath, value, config, setConfig)}
+    />
   );
 };
 
@@ -420,28 +420,36 @@ const EnumField: React.FC<{
   }, [value, selectedValue, targetPath, config, setConfig]);
 
   return (
-    <FormControl
-      fullWidth
-      style={{
-        marginBottom: noMarginBottom ? '0px' : GAP_BETWEEN_ITEMS_PX + 'px',
-      }}>
-      <Box display="flex" alignItems="center">
-        {keyName !== '' ? (
-          <Label label={keyName} />
-        ) : (
-          <div style={{height: '1px'}} />
-        )}
-        <DescriptionTooltip description={getFieldDescription(fieldSchema)} />
-      </Box>
-      <SelectField
-        options={options.map(option => {
-          const v = option;
-          return {value: v, label: v};
-        })}
-        value={selectedValue}
-        onSelectField={v => updateConfig(targetPath, v, config, setConfig)}
-      />
-    </FormControl>
+    <AutocompleteWithLabel
+      label={keyName}
+      options={options.map(option => ({value: option, label: option}))}
+      value={{
+        value: selectedValue,
+        label: selectedValue,
+      }}
+      onChange={v => updateConfig(targetPath, v.value, config, setConfig)}
+    />
+    // <FormControl
+    //   fullWidth
+    //   style={{
+    //     marginBottom: noMarginBottom ? '0px' : GAP_BETWEEN_ITEMS_PX + 'px',
+    //   }}>
+    //   <Box display="flex" alignItems="center">
+    //     {keyName !== '' ? (
+    //       <Label label={keyName} />
+    //     ) : (
+    //       <div style={{height: '1px'}} />
+    //     )}
+    //   </Box>
+    //   <SelectField
+    //     options={options.map(option => {
+    //       const v = option;
+    //       return {value: v, label: v};
+    //     })}
+    //     value={selectedValue}
+    //     onSelectField={v => updateConfig(targetPath, v, config, setConfig)}
+    //   />
+    // </FormControl>
   );
 };
 
@@ -541,7 +549,7 @@ const RecordField: React.FC<{
             marginBottom: '4px',
           }}>
           <Box flexGrow={1}>
-            <TextField
+            <TextFieldWithLabel
               value={key}
               onChange={newValue => {
                 if (
@@ -575,7 +583,7 @@ const RecordField: React.FC<{
                 }}
               />
             ) : (
-              <TextField
+              <TextFieldWithLabel
                 value={innerValue}
                 onChange={newValue => updateInternalPair(index, key, newValue)}
               />
@@ -703,24 +711,21 @@ const NumberField: React.FC<{
       ?.value ?? undefined;
 
   return (
-    <FormControl fullWidth style={{marginBottom: GAP_BETWEEN_ITEMS_PX + 'px'}}>
-      <Label label={keyName} />
-      <TextField
-        type="number"
-        value={(value ?? '').toString()}
-        onChange={newValue => {
-          const finalValue = newValue === '' ? undefined : Number(newValue);
-          if (
-            finalValue !== undefined &&
-            (finalValue < min || finalValue > max)
-          ) {
-            return;
-          }
-          updateConfig(targetPath, finalValue, config, setConfig);
-        }}
-      />
-      <DescriptionTooltip description={getFieldDescription(fieldSchema)} />
-    </FormControl>
+    <TextFieldWithLabel
+      label={keyName}
+      type="number"
+      value={(value ?? '').toString()}
+      onChange={newValue => {
+        const finalValue = newValue === '' ? undefined : Number(newValue);
+        if (
+          finalValue !== undefined &&
+          (finalValue < min || finalValue > max)
+        ) {
+          return;
+        }
+        updateConfig(targetPath, finalValue, config, setConfig);
+      }}
+    />
   );
 };
 
@@ -749,7 +754,7 @@ const LiteralField: React.FC<{
     }
   }, [value, literalValue, targetPath, config, setConfig]);
 
-  return <TextField disabled value={literalValue} />;
+  return <TextFieldWithLabel label={keyName} disabled value={literalValue} />;
 };
 
 const BooleanField: React.FC<{
@@ -869,15 +874,3 @@ export const ZSForm: React.FC<ZSFormProps> = ({
 
   return <>{renderContent()}</>;
 };
-
-// const TextFieldWithLabel: FC<
-//   {label: string} & React.ComponentProps<typeof TextField>
-// > = ({label, ...props}) => (
-//   <Box style={{marginBottom: '10px', padding: '0px 2px'}}>
-//     <InputLabel style={{marginBottom: '10px', fontSize: '14px'}}>
-//       {label}
-//     </InputLabel>
-
-//     <TextField {...props} />
-//   </Box>
-// );

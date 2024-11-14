@@ -6,11 +6,10 @@
 import * as z from 'zod';
 
 const JSONTypeNames = z.enum(['boolean', 'number', 'string']);
-const SimpleJsonResponseFormat = z.object({type: JSONTypeNames});
-const ObjectJsonResponseFormat = z.object({
+export const SimpleJsonResponseFormat = z.object({type: JSONTypeNames});
+export const ObjectJsonResponseFormat = z.object({
   type: z.literal('object'),
   properties: z.record(SimpleJsonResponseFormat),
-  additionalProperties: z.literal(false),
 });
 
 export const LlmJudgeActionSpecSchema = z.object({
