@@ -171,6 +171,10 @@ export type Feedback = {
   created_at: string;
   feedback_type: string;
   payload: Record<string, any>;
+  annotation_ref?: string;
+  runnable_ref?: string;
+  call_ref?: string;
+  trigger_ref?: string;
 };
 
 export type FeedbackQuerySuccess = {
@@ -335,3 +339,11 @@ export const fileExtensions = {
   [ContentType.any]: 'jsonl',
   [ContentType.json]: 'json',
 };
+
+export type ActionsExecuteBatchReq = {
+  project_id: string;
+  action_ref: string;
+  call_ids: string[];
+};
+
+export type ActionsExecuteBatchRes = {};

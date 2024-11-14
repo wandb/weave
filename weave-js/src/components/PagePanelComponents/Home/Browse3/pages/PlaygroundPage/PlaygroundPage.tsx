@@ -37,9 +37,8 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
     setPlaygroundStateFromTraceCall,
   } = usePlaygroundState();
 
-  const [settingsTab, setSettingsTab] = useState<number | null>(null);
-
   const {useCall, useCalls} = useWFHooks();
+  const [settingsTab, setSettingsTab] = useState<number | null>(null);
 
   const call = useCall(
     useMemo(() => {
