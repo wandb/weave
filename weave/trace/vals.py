@@ -382,7 +382,7 @@ class WeaveTable(Traceable):
         while True:
             response = self.server.table_query(
                 TableQueryReq(
-                    project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
+                    project_id=self.table_ref.project_id,
                     digest=self.table_ref.digest,
                     offset=page_index * page_size,
                     limit=page_size,
