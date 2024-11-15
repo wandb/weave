@@ -3,8 +3,10 @@ import {Button} from '@wandb/weave/components/Button';
 import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
 import React, {FC, ReactNode, useCallback, useEffect, useState} from 'react';
 
+import {TraceServerClient} from '../wfReactInterface/traceServerClient';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {AutocompleteWithLabel} from './FormComponents';
-import {LLMJudgeScorerForm} from './LLMJudgeScorerForm';
+import * as LLMJudgeScorerForm from './LLMJudgeScorerForm';
 import {
   AnnotationScorerForm,
   ProgrammaticScorerForm,
@@ -26,7 +28,12 @@ type OptionType = {label: string; value: ScorerType; icon: IconName};
 
 interface ScorerTypeConfig<T> extends OptionType {
   Component: FC<ScorerFormProps<T>>;
-  onSave: (formData: T) => Promise<void>;
+  onSave: (
+    entity: string,
+    project: string,
+    formData: T,
+    client: TraceServerClient
+  ) => Promise<any>;
 }
 
 export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
@@ -35,7 +42,7 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
     value: HUMAN_ANNOTATION_VALUE,
     icon: IconNames.UsersTeam,
     Component: AnnotationScorerForm,
-    onSave: async data => {
+    onSave: async (entity, project, data, client) => {
       // Implementation for saving annotation scorer
       console.log('TODO: save annotation scorer', data);
     },
@@ -44,18 +51,15 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
     label: LLM_JUDGE_LABEL,
     value: LLM_JUDGE_VALUE,
     icon: IconNames.RobotServiceMember,
-    Component: LLMJudgeScorerForm,
-    onSave: async data => {
-      // Implementation for saving llm judge scorer
-      console.log('TODO: save llm judge scorer', data);
-    },
+    Component: LLMJudgeScorerForm.LLMJudgeScorerForm,
+    onSave: LLMJudgeScorerForm.onLLMJudgeScorerSave,
   },
   PROGRAMMATIC: {
     label: PROGRAMMATIC_LABEL,
     value: PROGRAMMATIC_VALUE,
     icon: IconNames.CodeAlt,
     Component: ProgrammaticScorerForm,
-    onSave: async data => {
+    onSave: async (entity, project, data, client) => {
       // Implementation for saving programmatic scorer
       console.log('TODO: save programmatic scorer', data);
     },
@@ -67,12 +71,16 @@ const scorerTypeOptions: OptionType[] = Object.values(scorerTypeRecord).map(
 );
 
 interface NewScorerDrawerProps {
+  entity: string;
+  project: string;
   open: boolean;
   onClose: () => void;
   initialScorerType?: ScorerType;
 }
 
 export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
+  entity,
+  project,
   open,
   onClose,
   initialScorerType,
@@ -98,15 +106,22 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
     setFormData(data);
   }, []);
 
+  const getClient = useGetTraceServerClientContext();
+
   const onSave = useCallback(async () => {
     try {
-      await scorerTypeRecord[selectedScorerType].onSave(formData);
+      await scorerTypeRecord[selectedScorerType].onSave(
+        entity,
+        project,
+        formData,
+        getClient()
+      );
       onClose();
     } catch (error) {
       console.error('Failed to create scorer:', error);
       // Handle error appropriately
     }
-  }, [selectedScorerType, formData, onClose]);
+  }, [selectedScorerType, entity, project, formData, getClient, onClose]);
 
   const ScorerFormComponent = scorerTypeRecord[selectedScorerType].Component;
 
