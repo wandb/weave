@@ -6,9 +6,15 @@ import {
 } from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {IconNames} from '@wandb/weave/components/Icon';
+import _ from 'lodash';
 import React, {FC, useCallback, useState} from 'react';
 import {z} from 'zod';
 
+import {LlmJudgeActionSpecSchema} from '../wfReactInterface/baseObjectClasses.zod';
+import {createBaseObjectInstance} from '../wfReactInterface/baseObjectClassQuery';
+import {ActionSpecSchema} from '../wfReactInterface/generatedBaseObjectClasses.zod';
+import {TraceServerClient} from '../wfReactInterface/traceServerClient';
+import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {AutocompleteWithLabel} from './FormComponents';
 import {ScorerFormProps} from './ScorerForms';
 import {ZSForm} from './ZodSchemaForm';
@@ -330,7 +336,42 @@ export const LLMJudgeScorerForm: FC<
 // </Box>
 
 export const onLLMJudgeScorerSave = async (
-  data: z.infer<typeof LLMJudgeScorerFormSchema>
+  entity: string,
+  project: string,
+  data: z.infer<typeof LLMJudgeScorerFormSchema>,
+  client: TraceServerClient
 ) => {
-  console.log('TODO: save llm judge scorer', data);
+  let objectId = data.Name;
+  objectId = objectId.replace(/[^a-zA-Z0-9]/g, '-') ?? '';
+
+  const judgeAction: z.infer<typeof LlmJudgeActionSpecSchema> =
+    LlmJudgeActionSpecSchema.parse({
+      action_type: 'llm_judge',
+      model: data.Model,
+      prompt: data.Prompt,
+      response_schema: {
+        type: data['Response Schema'].Type.toLowerCase(),
+        ...(data['Response Schema'].Type === 'Object'
+          ? {
+              properties: _.mapValues(
+                data['Response Schema'].Properties,
+                v => ({type: v.toLowerCase()})
+              ),
+            }
+          : {}),
+      },
+    });
+
+  const newAction: z.infer<typeof ActionSpecSchema> = ActionSpecSchema.parse({
+    name: objectId,
+    config: judgeAction,
+  });
+
+  return createBaseObjectInstance(client, 'ActionSpec', {
+    obj: {
+      project_id: projectIdFromParts({entity, project}),
+      object_id: objectId,
+      val: newAction,
+    },
+  });
 };
