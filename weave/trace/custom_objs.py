@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable
 
 from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
 from weave.trace.context.weave_client_context import require_weave_client
@@ -22,7 +24,7 @@ KNOWN_TYPES = {
 }
 
 
-def encode_custom_obj(obj: Any) -> Optional[dict]:
+def encode_custom_obj(obj: Any) -> dict | None:
     serializer = get_serializer_for_obj(obj)
     if serializer is None:
         # We silently return None right now. We could warn here. This object
@@ -61,7 +63,7 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
 
 
 def _decode_custom_obj(
-    encoded_path_contents: Mapping[str, Union[str, bytes]],
+    encoded_path_contents: Mapping[str, str | bytes],
     load_instance_op: Callable[..., Any],
 ) -> Any:
     # Disables tracing so that calls to loading data itself don't get traced
@@ -74,8 +76,8 @@ def _decode_custom_obj(
 
 def decode_custom_obj(
     weave_type: dict,
-    encoded_path_contents: Mapping[str, Union[str, bytes]],
-    load_instance_op_uri: Optional[str] = None,
+    encoded_path_contents: Mapping[str, str | bytes],
+    load_instance_op_uri: str | None = None,
 ) -> Any:
     _type = weave_type["type"]
     found_serializer = False
