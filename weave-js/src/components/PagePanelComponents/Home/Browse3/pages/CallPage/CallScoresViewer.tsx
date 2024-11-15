@@ -129,19 +129,9 @@ const useRunnableFeedbackTypeToLatestActionRef = (call: CallSchema, actionSpecs:
   }, [actionSpecs, call.entity, call.project]);
 }
 
-
-
-export const CallScoresViewer: React.FC<{
-  call: CallSchema;
-}> = props => {
-  const actionSpecs = useLatestActionDefinitionsForCall(props.call);
-  const {runnableFeedbacks, refetchFeedback} = useRunnableFeedbacksForCall(props.call);
-  const runnableFeedbackTypeToLatestActionRef = useRunnableFeedbackTypeToLatestActionRef(props.call, actionSpecs);
-
-  
-
-  const scoredRows = useMemo(() => {
-    return Object.entries(
+const useTableRowsForRunnableFeedbacks = (actionSpecs: Array<TraceObjSchemaForBaseObjectClass<'ActionSpec'>>, runnableFeedbacks: Feedback[]) => {
+  const rows = useMemo(() => {
+    const scoredRows = Object.entries(
       _.groupBy(runnableFeedbacks, f => f.feedback_type)
     ).map(([runnableRef, fs]) => {
       const val = _.reverse(_.sortBy(fs, 'created_at'))[0];
@@ -151,9 +141,6 @@ export const CallScoresViewer: React.FC<{
         runCount: fs.length,
       };
     });
-  }, [runnableFeedbacks]);
-
-  const rows = useMemo(() => {
     const additionalRows = actionSpecs
       .map(actionSpec => {
         return {
@@ -164,7 +151,22 @@ export const CallScoresViewer: React.FC<{
       })
       .filter(row => !scoredRows.some(r => r.id === row.id));
     return _.sortBy([...scoredRows, ...additionalRows], s => s.id);
-  }, [actionSpecs, scoredRows]);
+  }, [actionSpecs, runnableFeedbacks]);
+
+  return rows;
+}
+
+
+
+export const CallScoresViewer: React.FC<{
+  call: CallSchema;
+}> = props => {
+  const actionSpecs = useLatestActionDefinitionsForCall(props.call);
+  const {runnableFeedbacks, refetchFeedback} = useRunnableFeedbacksForCall(props.call);
+  const runnableFeedbackTypeToLatestActionRef = useRunnableFeedbackTypeToLatestActionRef(props.call, actionSpecs);
+  const rows = useTableRowsForRunnableFeedbacks(actionSpecs, runnableFeedbacks);
+  
+
 
   const columns: Array<GridColDef<(typeof rows)[number]>> = [
     {
