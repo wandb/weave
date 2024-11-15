@@ -7,7 +7,7 @@ import {
   InputLabel,
   Tooltip,
 } from '@material-ui/core';
-import {Delete, Help} from '@mui/icons-material';
+import {Help} from '@mui/icons-material';
 import {Button} from '@wandb/weave/components/Button';
 import React, {useEffect, useMemo, useState} from 'react';
 import {z} from 'zod';
@@ -363,13 +363,16 @@ const ArrayField: React.FC<{
             />
           </Box>
           <Box mt={1}>
-            <IconButton
+            <Button
+              size="small"
+              variant="ghost"
+              icon="delete"
+              tooltip="Remove this key"
+              disabled={arrayValue.length <= minItems}
               onClick={() =>
                 removeArrayItem(targetPath, index, config, setConfig)
               }
-              disabled={arrayValue.length <= minItems}>
-              <Delete />
-            </IconButton>
+            />
           </Box>
         </Box>
       ))}
@@ -626,24 +629,7 @@ const updateConfig = (
     }
     current = current[targetPath[i]];
   }
-
-  // Convert OrderedRecord to plain object if necessary
-  if (
-    value &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    'keys' in value &&
-    'values' in value
-  ) {
-    const plainObject: Record<string, any> = {};
-    value.keys.forEach((key: string) => {
-      plainObject[key] = value.values[key];
-    });
-    current[targetPath[targetPath.length - 1]] = plainObject;
-  } else {
-    current[targetPath[targetPath.length - 1]] = value;
-  }
-
+  current[targetPath[targetPath.length - 1]] = value;
   setConfig(newConfig);
 };
 
