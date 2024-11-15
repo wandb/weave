@@ -7,20 +7,15 @@ import React, {useEffect, useState} from 'react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {ChatView} from '../ChatView/ChatView';
 import {useCallAsChat} from '../ChatView/hooks';
-import {
-  PlaygroundContext,
-  PlaygroundContextType,
-} from '../PlaygroundPage/PlaygroundContext';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 
 const DRAWER_ANIMATION_BUFFER_TIME = 400;
 
 type CallChatProps = {
   call: TraceCallSchema;
-  playgroundContext?: PlaygroundContextType;
 };
 
-export const CallChat = ({call, playgroundContext}: CallChatProps) => {
+export const CallChat = ({call}: CallChatProps) => {
   const chat = useCallAsChat(call);
   const [drawerAnimationBuffer, setDrawerAnimationBuffer] = useState(true);
 
@@ -34,9 +29,5 @@ export const CallChat = ({call, playgroundContext}: CallChatProps) => {
   if (chat.loading || drawerAnimationBuffer) {
     return <LoadingDots />;
   }
-  return (
-    <PlaygroundContext.Provider value={playgroundContext}>
-      <ChatView chat={chat} />
-    </PlaygroundContext.Provider>
-  );
+  return <ChatView chat={chat} />;
 };
