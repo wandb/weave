@@ -5,10 +5,10 @@ import {
   TEAL_600,
 } from '@wandb/weave/common/css/color.styles';
 import React from 'react';
-import { Link as LinkComp, useHistory } from 'react-router-dom';
-import styled, { css } from 'styled-components';
+import {Link as LinkComp, useHistory} from 'react-router-dom';
+import styled, {css} from 'styled-components';
 
-import { TargetBlank } from '../../../../../../common/util/links';
+import {TargetBlank} from '../../../../../../common/util/links';
 import {
   FEEDBACK_EXPAND_PARAM,
   PATH_PARAM,
@@ -16,10 +16,10 @@ import {
   usePeekLocation,
   useWeaveflowRouteContext,
 } from '../../context';
-import { WFHighLevelCallFilter } from '../CallsPage/callsTableFilter';
-import { WFHighLevelObjectVersionFilter } from '../ObjectVersionsPage';
-import { WFHighLevelOpVersionFilter } from '../OpVersionsPage';
-import { Id } from './Id';
+import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
+import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
+import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
+import {Id} from './Id';
 
 type LinkVariant = 'primary' | 'secondary';
 

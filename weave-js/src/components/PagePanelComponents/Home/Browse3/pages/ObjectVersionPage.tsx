@@ -1,17 +1,17 @@
 import Box from '@mui/material/Box';
-import { useObjectViewEvent } from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, { useMemo } from 'react';
+import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
+import React, {useMemo} from 'react';
 
-import { maybePluralizeWord } from '../../../../../core/util/string';
-import { Icon, IconName } from '../../../../Icon';
-import { LoadingDots } from '../../../../LoadingDots';
-import { Tailwind } from '../../../../Tailwind';
-import { Tooltip } from '../../../../Tooltip';
-import { NotFoundPanel } from '../NotFoundPanel';
-import { CustomWeaveTypeProjectContext } from '../typeViews/CustomWeaveTypeDispatcher';
-import { WeaveCHTableSourceRefContext } from './CallPage/DataTableView';
-import { ObjectViewerSection } from './CallPage/ObjectViewerSection';
-import { WFHighLevelCallFilter } from './CallsPage/callsTableFilter';
+import {maybePluralizeWord} from '../../../../../core/util/string';
+import {Icon, IconName} from '../../../../Icon';
+import {LoadingDots} from '../../../../LoadingDots';
+import {Tailwind} from '../../../../Tailwind';
+import {Tooltip} from '../../../../Tooltip';
+import {NotFoundPanel} from '../NotFoundPanel';
+import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
+import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
+import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
+import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
 import {
   CallLink,
   CallsLink,
@@ -19,21 +19,21 @@ import {
   objectVersionText,
   OpVersionLink,
 } from './common/Links';
-import { CenteredAnimatedLoader } from './common/Loader';
+import {CenteredAnimatedLoader} from './common/Loader';
 import {
   ScrollableTabContent,
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
-import { EvaluationLeaderboardTab } from './LeaderboardTab';
-import { TabEditAnnotationSpec } from './TabEditAnnotationSpec';
-import { TabPrompt } from './TabPrompt';
-import { TabUseDataset } from './TabUseDataset';
-import { TabUseModel } from './TabUseModel';
-import { TabUseObject } from './TabUseObject';
-import { TabUsePrompt } from './TabUsePrompt';
-import { KNOWN_BASE_OBJECT_CLASSES } from './wfReactInterface/constants';
-import { useWFHooks } from './wfReactInterface/context';
+import {EvaluationLeaderboardTab} from './LeaderboardTab';
+import {TabEditAnnotationSpec} from './TabEditAnnotationSpec';
+import {TabPrompt} from './TabPrompt';
+import {TabUseDataset} from './TabUseDataset';
+import {TabUseModel} from './TabUseModel';
+import {TabUseObject} from './TabUseObject';
+import {TabUsePrompt} from './TabUsePrompt';
+import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
+import {useWFHooks} from './wfReactInterface/context';
 import {
   objectVersionKeyToRefUri,
   refUriToOpVersionKey,

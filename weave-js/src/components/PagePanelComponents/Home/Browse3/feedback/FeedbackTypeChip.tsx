@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { Pill, TagColorName } from '../../../../Tag';
+import {Pill, TagColorName} from '../../../../Tag';
 
 type FeedbackTypeChipProps = {
   feedbackType: string;

@@ -1,17 +1,17 @@
-import { Box } from '@mui/material';
+import {Box} from '@mui/material';
 import _ from 'lodash';
-import React, { useEffect } from 'react';
+import React, {useEffect} from 'react';
 
-import { useViewerInfo } from '../../../../../common/hooks/useViewerInfo';
-import { TargetBlank } from '../../../../../common/util/links';
-import { Alert } from '../../../../Alert';
-import { Loading } from '../../../../Loading';
-import { Tailwind } from '../../../../Tailwind';
-import { Empty } from '../pages/common/Empty';
-import { useWFHooks } from '../pages/wfReactInterface/context';
-import { useGetTraceServerClientContext } from '../pages/wfReactInterface/traceServerClientContext';
-import { FeedbackGridInner } from './FeedbackGridInner';
-import { HUMAN_FEEDBACK_BASE_TYPE } from './HumanFeedback/humanFeedbackTypes';
+import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
+import {TargetBlank} from '../../../../../common/util/links';
+import {Alert} from '../../../../Alert';
+import {Loading} from '../../../../Loading';
+import {Tailwind} from '../../../../Tailwind';
+import {Empty} from '../pages/common/Empty';
+import {useWFHooks} from '../pages/wfReactInterface/context';
+import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
+import {FeedbackGridInner} from './FeedbackGridInner';
+import {HUMAN_FEEDBACK_BASE_TYPE} from './HumanFeedback/humanFeedbackTypes';
 
 const ANNOTATION_PREFIX = `${HUMAN_FEEDBACK_BASE_TYPE}.`;
 
@@ -95,9 +95,7 @@ export const FeedbackGrid = ({
   );
   // add the non-annotation feedback to the combined object
   combinedFiltered.push(
-    ...query.result.filter(
-      f => !f.feedback_type.startsWith(ANNOTATION_PREFIX)
-    )
+    ...query.result.filter(f => !f.feedback_type.startsWith(ANNOTATION_PREFIX))
   );
 
   // Group by feedback on this object vs. descendent objects
