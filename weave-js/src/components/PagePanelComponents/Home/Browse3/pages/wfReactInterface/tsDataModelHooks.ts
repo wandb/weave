@@ -657,11 +657,10 @@ const useFeedback = (
   return {...result, refetch};
 };
 
-const useFeedbackByTypeAndCallRefs = (
+const useFeedbackQuery = (
   entity: string,
   project: string,
-  feedbackType: string,
-  callRefs: string[],
+  query: Query,
   sortBy?: traceServerTypes.SortBy[]
 ) => {
   const getTsClient = useGetTraceServerClientContext();
@@ -678,15 +677,10 @@ const useFeedbackByTypeAndCallRefs = (
     setDoReload(true);
   }, [setDoReload]);
 
-  const deepCallRefs = useDeepMemo(callRefs);
-
   useEffect(() => {
     let mounted = true;
     if (doReload) {
       setDoReload(false);
-    }
-    if (!deepCallRefs || deepCallRefs.length === 0) {
-      return;
     }
     setResult({loading: true, result: null, error: null});
     getTsClient()
@@ -695,24 +689,7 @@ const useFeedbackByTypeAndCallRefs = (
           entity,
           project,
         }),
-        query: {
-          $expr: {
-            $and: [
-              {
-                $contains: {
-                  input: {$getField: 'feedback_type'},
-                  substr: {$literal: feedbackType},
-                },
-              },
-              {
-                $in: [
-                  {$getField: 'weave_ref'},
-                  deepCallRefs.map(ref => ({$literal: ref})),
-                ],
-              },
-            ],
-          },
-        },
+        query,
         sort_by: sortBy ?? [{field: 'created_at', direction: 'desc'}],
       })
       .then(res => {
@@ -732,15 +709,7 @@ const useFeedbackByTypeAndCallRefs = (
     return () => {
       mounted = false;
     };
-  }, [
-    deepCallRefs,
-    getTsClient,
-    doReload,
-    sortBy,
-    feedbackType,
-    entity,
-    project,
-  ]);
+  }, [getTsClient, doReload, sortBy, entity, project]);
 
   return {...result, refetch};
 };
@@ -1808,7 +1777,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useRefsData,
   useApplyMutationsToRef,
   useFeedback,
-  useFeedbackByTypeAndCallRefs,
+  useFeedbackQuery,
   useFileContent,
   useTableRowsQuery,
   useTableQueryStats,

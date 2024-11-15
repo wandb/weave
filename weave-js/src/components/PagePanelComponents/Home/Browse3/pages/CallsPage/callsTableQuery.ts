@@ -122,15 +122,34 @@ export const useCallsForQuery = (
     callsStats.refetch();
   }, [calls, callsStats, costs]);
 
-  // query for feeback
-  const {useFeedbackByTypeAndCallRefs} = useWFHooks();
+  // query for annotation feeback
+  const {useFeedbackQuery} = useWFHooks();
   const feedbackTypeSubstr = 'wandb.annotation.';
-  const feedbackQuery = useFeedbackByTypeAndCallRefs(
-    entity,
-    project,
-    feedbackTypeSubstr,
-    callResults.map(call => makeRefCall(entity, project, call.callId))
+  const callRefs = callResults.map(call =>
+    makeRefCall(entity, project, call.callId)
   );
+  const feedbackQueryQuery = useMemo(() => {
+    return {
+      $expr: {
+        $and: [
+          {
+            $contains: {
+              input: {$getField: 'feedback_type'},
+              substr: {$literal: feedbackTypeSubstr},
+            },
+          },
+          {
+            $in: [
+              {$getField: 'weave_ref'},
+              callRefs.map(ref => ({$literal: ref})),
+            ],
+          },
+        ],
+      },
+      // TODO(gst): why does the $contains operator typing fail here...
+    } as Query;
+  }, [feedbackTypeSubstr, callResults]);
+  const feedbackQuery = useFeedbackQuery(entity, project, feedbackQueryQuery);
 
   // map of callId to the latest feedback of each feedback_type
   const feedbackByType: Record<string, Record<string, any>> | undefined =
@@ -266,14 +285,11 @@ const convertHighLevelFilterToLowLevelFilter = (
   };
 };
 
-// Move mergeCallData into the file directly since it's specific to this use case
-
 const mergeCallData = (
   baseCallResults: CallSchema[],
   costResults: CallSchema[],
   feedbackByType?: Record<string, Record<string, any>>
 ): CallSchema[] => {
-  // Start with base results
   let result = baseCallResults;
 
   // Add feedback if available
@@ -296,7 +312,7 @@ const mergeCallData = (
 
   return result;
 };
-// Helper to safely get deeply nested values
+
 const getNestedValue = <T>(obj: any, depth: number = 3): T | undefined => {
   try {
     let result = obj;
