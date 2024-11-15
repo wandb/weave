@@ -1,9 +1,9 @@
-import { Box } from '@mui/material';
-import { Tailwind } from '@wandb/weave/components/Tailwind';
+import {Box} from '@mui/material';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React from 'react';
 
-import { AnnotationSpec } from './wfReactInterface/generatedBaseObjectClasses.zod';
-import { ObjectVersionSchema } from './wfReactInterface/wfDataModelHooksInterface';
+import {AnnotationSpec} from './wfReactInterface/generatedBaseObjectClasses.zod';
+import {ObjectVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
 
 export const TabEditAnnotationSpec = ({
   objectVersion,
