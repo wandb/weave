@@ -387,6 +387,16 @@ symbol_patchers = [
         "AsyncCompletions.create",
         create_wrapper_async(name="openai.chat.completions.create"),
     ),
+    SymbolPatcher(
+        lambda: importlib.import_module("openai.resources.beta.chat.completions"),
+        "Completions.parse",
+        create_wrapper_sync(name="openai.beta.chat.completions.parse"),
+    ),
+    SymbolPatcher(
+        lambda: importlib.import_module("openai.resources.beta.chat.completions"),
+        "AsyncCompletions.parse",
+        create_wrapper_async(name="openai.beta.chat.completions.parse"),
+    ),
 ]
 
 openai_patcher = MultiPatcher(symbol_patchers)  # type: ignore
