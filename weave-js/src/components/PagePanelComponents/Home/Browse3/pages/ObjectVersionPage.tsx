@@ -1,22 +1,21 @@
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
-import {Button} from '@wandb/weave/components/Button';
-import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import numeral from 'numeral';
-import React, {useMemo, useState} from 'react';
+import { Button } from '@wandb/weave/components/Button';
+import { useObjectViewEvent } from '@wandb/weave/integrations/analytics/useViewEvents';
+import React, { useMemo, useState } from 'react';
 
-import {maybePluralizeWord} from '../../../../../core/util/string';
-import {Icon, IconName} from '../../../../Icon';
-import {LoadingDots} from '../../../../LoadingDots';
-import {Tailwind} from '../../../../Tailwind';
-import {Tooltip} from '../../../../Tooltip';
-import {useClosePeek} from '../context';
-import {NotFoundPanel} from '../NotFoundPanel';
-import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
-import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
-import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
-import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
-import {DeleteModal} from './common/DeleteModal';
+import { maybePluralizeWord } from '../../../../../core/util/string';
+import { Icon, IconName } from '../../../../Icon';
+import { LoadingDots } from '../../../../LoadingDots';
+import { Tailwind } from '../../../../Tailwind';
+import { Tooltip } from '../../../../Tooltip';
+import { useClosePeek } from '../context';
+import { NotFoundPanel } from '../NotFoundPanel';
+import { CustomWeaveTypeProjectContext } from '../typeViews/CustomWeaveTypeDispatcher';
+import { WeaveCHTableSourceRefContext } from './CallPage/DataTableView';
+import { ObjectViewerSection } from './CallPage/ObjectViewerSection';
+import { WFHighLevelCallFilter } from './CallsPage/callsTableFilter';
+import { DeleteModal } from './common/DeleteModal';
 import {
   CallLink,
   CallsLink,
@@ -24,20 +23,20 @@ import {
   objectVersionText,
   OpVersionLink,
 } from './common/Links';
-import {CenteredAnimatedLoader} from './common/Loader';
+import { CenteredAnimatedLoader } from './common/Loader';
 import {
   ScrollableTabContent,
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
-import {EvaluationLeaderboardTab} from './LeaderboardTab';
-import {TabPrompt} from './TabPrompt';
-import {TabUseDataset} from './TabUseDataset';
-import {TabUseModel} from './TabUseModel';
-import {TabUseObject} from './TabUseObject';
-import {TabUsePrompt} from './TabUsePrompt';
-import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
-import {useWFHooks} from './wfReactInterface/context';
+import { EvaluationLeaderboardTab } from './LeaderboardTab';
+import { TabPrompt } from './TabPrompt';
+import { TabUseDataset } from './TabUseDataset';
+import { TabUseModel } from './TabUseModel';
+import { TabUseObject } from './TabUseObject';
+import { TabUsePrompt } from './TabUsePrompt';
+import { KNOWN_BASE_OBJECT_CLASSES } from './wfReactInterface/constants';
+import { useWFHooks } from './wfReactInterface/context';
 import {
   objectVersionKeyToRefUri,
   refUriToOpVersionKey,
@@ -55,7 +54,11 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Prompt: 'forum-chat-bubble',
   Model: 'model',
   Dataset: 'table',
-  Evaluation: 'benchmark-square',
+  Evaluation: 'baseline-alt',
+  Leaderboard: 'benchmark-square',
+  Scorer: 'type-number-alt',
+  ActionSpec: 'rocket-launch',
+  AnnotationSpec: 'forum-chat-bubble',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
@@ -201,11 +204,6 @@ const ObjectVersionPageInner: React.FC<{
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
 
-  const bytesStored = useMemo(
-    () => (data.result?.[0] ? JSON.stringify(data.result?.[0]).length : 0),
-    [data.result]
-  );
-
   if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;
   }
@@ -260,15 +258,6 @@ const ObjectVersionPageInner: React.FC<{
                       Subpath: refExtra,
                     }
                   : {}),
-                'Bytes stored': (
-                  <>
-                    {data.loading ? (
-                      <LoadingDots />
-                    ) : (
-                      numeral(bytesStored).format('0.0b')
-                    )}
-                  </>
-                ),
                 // 'Type Version': (
                 //   <TypeVersionLink
                 //     entityName={entityName}
@@ -292,9 +281,7 @@ const ObjectVersionPageInner: React.FC<{
             open={deleteModalOpen}
             onClose={() => setDeleteModalOpen(false)}
             deleteTargetStr={`${objectVersion.objectId}:v${objectVersion.versionIndex}`}
-            onDelete={(includeChildren) =>
-              objectDelete(objectVersion, includeChildren)
-            }
+            onDelete={objectDelete(objectVersion)}
             onSuccess={closePeek}
           />
         </Stack>

@@ -972,9 +972,11 @@ const useObjectVersion = (
   }, [cachedObjectVersion, key, objectVersionRes, error]);
 };
 
-const convertTraceServerObjectVersionToSchema = (
-  obj: traceServerTypes.TraceObjSchema
-): ObjectVersionSchema => {
+export const convertTraceServerObjectVersionToSchema = <
+  T extends traceServerTypes.TraceObjSchema
+>(
+  obj: T
+): ObjectVersionSchema<T['val']> => {
   const [entity, project] = obj.project_id.split('/');
   return {
     scheme: 'weave' as const,
@@ -997,7 +999,7 @@ const useRootObjectVersions = (
   filter: ObjectVersionFilter,
   limit?: number,
   metadataOnly?: boolean,
-  opts?: {skip?: boolean}
+  opts?: {skip?: boolean; noAutoRefresh?: boolean}
 ): LoadableWithError<ObjectVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -1033,7 +1035,7 @@ const useRootObjectVersions = (
       setObjectVersionRes({
         loading: false,
         error: null,
-        result: res.objs.map(convertTraceServerObjectVersionToSchema),
+        result: res.objs?.map(convertTraceServerObjectVersionToSchema) ?? [],
       });
     };
     const onError = (e: any) => {
@@ -1057,8 +1059,14 @@ const useRootObjectVersions = (
   }, [doFetch]);
 
   useEffect(() => {
+    if (opts?.skip) {
+      return;
+    }
+    if (opts?.noAutoRefresh) {
+      return;
+    }
     return getTsClient().registerOnObjectListener(doFetch);
-  }, [getTsClient, doFetch]);
+  }, [getTsClient, doFetch, opts?.skip, opts?.noAutoRefresh]);
 
   return useMemo(() => {
     if (opts?.skip) {
@@ -1075,7 +1083,7 @@ const useObjectDeleteFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
   const objectDelete = useCallback(
-    (key: ObjectVersionKey | OpVersionKey, includeChildren: boolean) => {
+    (key: ObjectVersionKey | OpVersionKey) => {
       let objectId = '';
       if ('objectId' in key) {
         objectId = key.objectId;
@@ -1089,7 +1097,6 @@ const useObjectDeleteFunc = () => {
         }),
         object_id: objectId,
         digest: key.versionHash,
-        include_children: includeChildren,
       });
     },
     [getTsClient]

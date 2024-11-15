@@ -16,6 +16,10 @@ import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 
 import {
+  ActionsExecuteBatchReq,
+  ActionsExecuteBatchRes,
+  CompletionsCreateReq,
+  CompletionsCreateRes,
   ContentType,
   FeedbackCreateReq,
   FeedbackCreateRes,
@@ -34,6 +38,8 @@ import {
   TraceCallUpdateReq,
   TraceFileContentReadReq,
   TraceFileContentReadRes,
+  TraceObjCreateReq,
+  TraceObjCreateRes,
   TraceObjDeleteReq,
   TraceObjQueryReq,
   TraceObjQueryRes,
@@ -236,6 +242,22 @@ export class DirectTraceServerClient {
     );
   }
 
+  public objCreate(req: TraceObjCreateReq): Promise<TraceObjCreateRes> {
+    const initialObjectId = req.obj.object_id;
+    const sanitizedObjectId = sanitizeObjectId(initialObjectId);
+    if (sanitizedObjectId !== initialObjectId) {
+      // Caller is expected to sanitize the object id. We should be doing this
+      // on the server, but it is currently disabled.
+      throw new Error(
+        `Invalid object name: ${initialObjectId}, sanitized to ${sanitizedObjectId}`
+      );
+    }
+    return this.makeRequest<TraceObjCreateReq, TraceObjCreateRes>(
+      '/obj/create',
+      req
+    );
+  }
+
   public tableQuery(req: TraceTableQueryReq): Promise<TraceTableQueryRes> {
     return this.makeRequest<TraceTableQueryReq, TraceTableQueryRes>(
       '/table/query',
@@ -273,6 +295,15 @@ export class DirectTraceServerClient {
     );
   }
 
+  public actionsExecuteBatch(
+    req: ActionsExecuteBatchReq
+  ): Promise<ActionsExecuteBatchRes> {
+    return this.makeRequest<ActionsExecuteBatchReq, ActionsExecuteBatchRes>(
+      '/actions/execute_batch',
+      req
+    );
+  }
+
   public fileContent(
     req: TraceFileContentReadReq
   ): Promise<TraceFileContentReadRes> {
@@ -290,6 +321,22 @@ export class DirectTraceServerClient {
           reject(err);
         });
     });
+  }
+
+  public completionsCreate(
+    req: CompletionsCreateReq
+  ): Promise<CompletionsCreateRes> {
+    try {
+      return this.makeRequest<CompletionsCreateReq, CompletionsCreateRes>(
+        '/completions/create',
+        req
+      );
+    } catch (error: any) {
+      if (error?.api_key_name) {
+        console.error('Missing LLM API key:', error.api_key_name);
+      }
+      return Promise.reject(error);
+    }
   }
 
   private makeRequest = async <QT, ST>(
@@ -380,4 +427,31 @@ export class DirectTraceServerClient {
 
     return prom;
   };
+}
+
+/**
+ * Sanitizes an object name by replacing non-alphanumeric characters with dashes and enforcing length limits.
+ * This matches the Python implementation in weave_client.py.
+ *
+ * @param name The name to sanitize
+ * @returns The sanitized name
+ * @throws Error if the resulting name would be empty
+ */
+export function sanitizeObjectId(name: string): string {
+  // Replace any non-word chars (except dots and underscores) with dashes
+  let res = name.replace(/[^\w._]+/g, '-');
+  // Replace multiple consecutive dashes/dots/underscores with a single dash
+  res = res.replace(/([._-]{2,})+/g, '-');
+  // Remove leading/trailing dashes and underscores
+  res = res.replace(/^[-_]+|[-_]+$/g, '');
+
+  if (!res) {
+    throw new Error(`Invalid object name: ${name}`);
+  }
+
+  if (res.length > 128) {
+    res = res.slice(0, 128);
+  }
+
+  return res;
 }

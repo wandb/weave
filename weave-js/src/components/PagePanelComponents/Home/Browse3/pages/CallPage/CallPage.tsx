@@ -1,14 +1,19 @@
 import Box from '@mui/material/Box';
 import {Loading} from '@wandb/weave/components/Loading';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {FC, useCallback, useEffect, useState} from 'react';
+import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
+import {TableRowSelectionContext} from '../../../Browse3';
+import {
+  TRACETREE_PARAM,
+  useWeaveflowCurrentRouteContext,
+  WeaveflowPeekContext,
+} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {isCallChat} from '../ChatView/hooks';
@@ -28,6 +33,7 @@ import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
+import {PaginationControls} from './PaginationControls';
 export const CallPage: FC<{
   entity: string;
   project: string;
@@ -196,6 +202,10 @@ const CallPageInnerVertical: FC<{
     }
   }, [callComplete]);
 
+  const {rowIdsConfigured} = useContext(TableRowSelectionContext);
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const showPaginationContols = isPeeking && rowIdsConfigured;
+
   const callTabs = useCallTabs(currentCall);
 
   if (loading && !assumeCallIsSelectedCall) {
@@ -205,14 +215,25 @@ const CallPageInnerVertical: FC<{
   return (
     <SimplePageLayoutWithHeader
       headerExtra={
-        <Box>
-          <Button
-            icon="layout-tabs"
-            tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
-            variant="ghost"
-            active={showTraceTree ?? false}
-            onClick={onToggleTraceTree}
-          />
+        <Box
+          sx={{
+            display: 'flex',
+            width: '100%',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}>
+          {showPaginationContols && (
+            <PaginationControls call={call} path={path} />
+          )}
+          <Box sx={{marginLeft: showPaginationContols ? 0 : 'auto'}}>
+            <Button
+              icon="layout-tabs"
+              tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
+              variant="ghost"
+              active={showTraceTree ?? false}
+              onClick={onToggleTraceTree}
+            />
+          </Box>
         </Box>
       }
       isSidebarOpen={showTraceTree}

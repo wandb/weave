@@ -1,10 +1,13 @@
 import {Box, SxProps, Theme} from '@mui/material';
+import {MOON_200} from '@wandb/weave/common/css/color.styles';
+import {Icon, IconName} from '@wandb/weave/components/Icon';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import _ from 'lodash';
 import React, {
   createContext,
   FC,
   ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -69,7 +72,7 @@ export const SimplePageLayout: FC<{
           pb: 0,
           height: 44,
           width: '100%',
-          borderBottom: '1px solid #e0e0e0',
+          borderBottom: `1px solid ${MOON_200}`,
           display: 'flex',
           flexDirection: 'row',
           alignItems: 'center',
@@ -139,7 +142,7 @@ export const SimplePageLayout: FC<{
               overflow: 'hidden',
               height: '100%',
               maxHeight: '100%',
-              borderRight: '1px solid #e0e0e0',
+              borderRight: `1px solid ${MOON_200}`,
             }}>
             {props.leftSidebar}
           </Box>
@@ -162,6 +165,7 @@ export const SimplePageLayoutWithHeader: FC<{
   title?: ReactNode;
   tabs: Array<{
     label: string;
+    icon?: IconName;
     content: ReactNode;
   }>;
   headerExtra?: ReactNode;
@@ -169,6 +173,7 @@ export const SimplePageLayoutWithHeader: FC<{
   leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
   isSidebarOpen?: boolean;
+  onTabSelectedCallback?: (tab: string) => void;
 }> = props => {
   const {tabs} = props;
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
@@ -176,16 +181,35 @@ export const SimplePageLayoutWithHeader: FC<{
   // We try to preserve the selected tab even if the set of tabs changes,
   // falling back to the first tab.
   const [tabId, setTabId] = useState(tabs[0].label);
+  const setAndNotifyTab = useCallback(
+    (newValue: string) => {
+      setTabId(newValue);
+      props.onTabSelectedCallback?.(newValue);
+    },
+    [props]
+  );
+  // If the user has manually selected a tab, always keep that tab selected
+  // otherwise, always default to the leftmost tab. Some calls have chat
+  // tabs, others do not, so unless the user has explicitly selected a different
+  // tab, always show the chat tab when possible.
+  const [userSelectedTab, setUserSelectedTab] = useState(false);
   const idxSelected = tabs.findIndex(t => t.label === tabId);
   const tabValue = idxSelected !== -1 ? idxSelected : 0;
   const handleTabChange = (newValue: string) => {
-    setTabId(newValue);
+    setAndNotifyTab(newValue);
+    setUserSelectedTab(true);
   };
   useEffect(() => {
     if (idxSelected === -1) {
-      setTabId(tabs[0].label);
+      setAndNotifyTab(tabs[0].label);
+      setUserSelectedTab(false);
+    } else if (!userSelectedTab && idxSelected === 1) {
+      // User has not selected a tab, but the current tab is not the leftmost tab.
+      // Default to the leftmost.
+      // Example: view call w/o chat [tab='call'] -> view call w/ chat [tab='call']
+      setAndNotifyTab(tabs[0].label);
     }
-  }, [tabs, idxSelected]);
+  }, [tabs, idxSelected, userSelectedTab, setAndNotifyTab]);
   const tabContent = useMemo(() => tabs[tabValue].content, [tabs, tabValue]);
 
   return (
@@ -212,7 +236,7 @@ export const SimplePageLayoutWithHeader: FC<{
           zIndex: 1,
           backgroundColor: 'white',
           pb: 0,
-          borderBottom: '1px solid #e0e0e0',
+          borderBottom: `1px solid ${MOON_200}`,
           justifyContent: 'flex-start',
         }}>
         {simplePageLayoutContextValue.headerPrefix}
@@ -246,18 +270,20 @@ export const SimplePageLayoutWithHeader: FC<{
                 height: '100%',
                 overflow: 'hidden',
               }}>
-              <Box
-                sx={{
-                  maxHeight: '50%',
-                  flex: '0 0 auto',
-                  width: '100%',
-                  overflow: 'auto',
-                  pt: 1,
-                  px: 2,
-                  alignContent: 'center',
-                }}>
-                {props.headerContent}
-              </Box>
+              {props.headerContent && (
+                <Box
+                  sx={{
+                    maxHeight: '50%',
+                    flex: '0 0 auto',
+                    width: '100%',
+                    overflow: 'auto',
+                    pt: 1,
+                    px: 2,
+                    alignContent: 'center',
+                  }}>
+                  {props.headerContent}
+                </Box>
+              )}
               {(!props.hideTabsIfSingle || tabs.length > 1) && (
                 <Tabs.Root
                   style={{margin: '12px 16px 0 16px'}}
@@ -269,6 +295,7 @@ export const SimplePageLayoutWithHeader: FC<{
                         key={tab.label}
                         value={tab.label}
                         className="h-[30px] text-sm">
+                        {tab.icon && <Icon name={tab.icon} />}
                         {tab.label}
                       </Tabs.Trigger>
                     ))}

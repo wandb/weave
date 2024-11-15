@@ -26,11 +26,12 @@ class LevenshteinScorer(Scorer):
             from Levenshtein import distance
 
             self.distance = distance
-            return self
         except ImportError:
             raise ValueError(
                 "Levenshtein package not found. Please install it with `pip install Levenshtein`"
             )
+        else:
+            return self
 
     @weave.op
     def score(self, output: str, target: str) -> dict:

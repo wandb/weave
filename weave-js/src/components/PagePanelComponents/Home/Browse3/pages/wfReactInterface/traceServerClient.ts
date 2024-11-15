@@ -1,12 +1,16 @@
 import _ from 'lodash';
 
 import {
+  CompletionsCreateReq,
+  CompletionsCreateRes,
   FeedbackCreateReq,
   FeedbackCreateRes,
   FeedbackPurgeReq,
   FeedbackPurgeRes,
   TraceCallsDeleteReq,
   TraceCallUpdateReq,
+  TraceObjCreateReq,
+  TraceObjCreateRes,
   TraceObjDeleteReq,
   TraceRefsReadBatchReq,
   TraceRefsReadBatchRes,
@@ -104,6 +108,14 @@ export class TraceServerClient extends DirectTraceServerClient {
     return res;
   }
 
+  public objCreate(req: TraceObjCreateReq): Promise<TraceObjCreateRes> {
+    const res = super.objCreate(req).then(createRes => {
+      this.onObjectListeners.forEach(listener => listener());
+      return createRes;
+    });
+    return res;
+  }
+
   public feedbackCreate(req: FeedbackCreateReq): Promise<FeedbackCreateRes> {
     const res = super.feedbackCreate(req).then(createRes => {
       const listeners = this.onFeedbackListeners[req.weave_ref] ?? [];
@@ -134,6 +146,12 @@ export class TraceServerClient extends DirectTraceServerClient {
 
   public readBatch(req: TraceRefsReadBatchReq): Promise<TraceRefsReadBatchRes> {
     return this.requestReadBatch(req);
+  }
+
+  public completionsCreate(
+    req: CompletionsCreateReq
+  ): Promise<CompletionsCreateRes> {
+    return super.completionsCreate(req);
   }
 
   private requestReadBatch(

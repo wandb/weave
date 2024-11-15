@@ -18,8 +18,8 @@ interface WeaveImage extends WeaveImageInput {
  * Create a new WeaveImage object
  *
  * @param options The options for this media type
- * @param options.data The raw image data as a Buffer
- * @param options.imageType (Optional) The type of image file, currently only 'png' is supported
+ *    - data: The raw image data as a Buffer
+ *    - imageType: (Optional) The type of image file, currently only 'png' is supported
  *
  * @example
  * const imageBuffer = fs.readFileSync('path/to/image.png');
@@ -52,8 +52,8 @@ export interface WeaveAudio extends WeaveAudioInput {
  * Create a new WeaveAudio object
  *
  * @param options The options for this media type
- * @param options.data The raw audio data as a Buffer
- * @param options.audioType (Optional) The type of audio file, currently only 'wav' is supported
+ *    - data: The raw audio data as a Buffer
+ *    - audioType: (Optional) The type of audio file, currently only 'wav' is supported
  *
  * @example
  * const audioBuffer = fs.readFileSync('path/to/audio.wav');

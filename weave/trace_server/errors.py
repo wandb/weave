@@ -38,3 +38,11 @@ class ObjectDeletedError(Error):
     """Raised when an object has been deleted."""
 
     pass
+
+
+class MissingLLMApiKeyError(Error):
+    """Raised when a LLM API key is missing for completion."""
+
+    def __init__(self, message: str, api_key_name: str):
+        self.api_key_name = api_key_name
+        super().__init__(message)

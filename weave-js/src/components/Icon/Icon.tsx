@@ -2,6 +2,7 @@ import React, {ElementType, SVGProps} from 'react';
 
 import {ReactComponent as ImportAddNew} from '../../assets/icons/icon-add-new.svg';
 import {ReactComponent as ImportAddReaction} from '../../assets/icons/icon-add-reaction.svg';
+import {ReactComponent as ImportAddToReport} from '../../assets/icons/icon-add-to-report.svg';
 import {ReactComponent as ImportAdminShieldSafe} from '../../assets/icons/icon-admin-shield-safe.svg';
 import {ReactComponent as ImportAmazonSagemaker} from '../../assets/icons/icon-amazon-sagemaker.svg';
 import {ReactComponent as ImportArea} from '../../assets/icons/icon-area.svg';
@@ -18,6 +19,7 @@ import {ReactComponent as ImportBookDictionary} from '../../assets/icons/icon-bo
 import {ReactComponent as ImportBoolean} from '../../assets/icons/icon-boolean.svg';
 import {ReactComponent as ImportBoxPlot} from '../../assets/icons/icon-box-plot.svg';
 import {ReactComponent as ImportBug} from '../../assets/icons/icon-bug.svg';
+import {ReactComponent as ImportBuzzBot10} from '../../assets/icons/icon-buzz-bot10.svg';
 import {ReactComponent as ImportCategoryMultimodal} from '../../assets/icons/icon-category-multimodal.svg';
 import {ReactComponent as ImportChartHorizontalBars} from '../../assets/icons/icon-chart-horizontal-bars.svg';
 import {ReactComponent as ImportChartPie} from '../../assets/icons/icon-chart-pie.svg';
@@ -60,6 +62,7 @@ import {ReactComponent as ImportDocument} from '../../assets/icons/icon-document
 import {ReactComponent as ImportDocumentation} from '../../assets/icons/icon-documentation.svg';
 import {ReactComponent as ImportDownload} from '../../assets/icons/icon-download.svg';
 import {ReactComponent as ImportDraft} from '../../assets/icons/icon-draft.svg';
+import {ReactComponent as ImportDragGrip} from '../../assets/icons/icon-drag-grip.svg';
 import {ReactComponent as ImportDragGripHorizontal} from '../../assets/icons/icon-drag-grip-horizontal.svg';
 import {ReactComponent as ImportEducationAcademic} from '../../assets/icons/icon-education-academic.svg';
 import {ReactComponent as ImportEmailAt} from '../../assets/icons/icon-email-at.svg';
@@ -135,12 +138,15 @@ import {ReactComponent as ImportModel} from '../../assets/icons/icon-model.svg';
 import {ReactComponent as ImportModelOnDark} from '../../assets/icons/icon-model-on-dark.svg';
 import {ReactComponent as ImportMolecule} from '../../assets/icons/icon-molecule.svg';
 import {ReactComponent as ImportMusicAudio} from '../../assets/icons/icon-music-audio.svg';
+import {ReactComponent as ImportNewSectionAbove} from '../../assets/icons/icon-new-section-above.svg';
+import {ReactComponent as ImportNewSectionBelow} from '../../assets/icons/icon-new-section-below.svg';
 import {ReactComponent as ImportNumber} from '../../assets/icons/icon-number.svg';
 import {ReactComponent as ImportOpenNewTab} from '../../assets/icons/icon-open-new-tab.svg';
 import {ReactComponent as ImportOpenaiLogo} from '../../assets/icons/icon-openai-logo.svg';
 import {ReactComponent as ImportOrchestrationLaunch} from '../../assets/icons/icon-orchestration-launch.svg';
 import {ReactComponent as ImportOrganizationCorporate} from '../../assets/icons/icon-organization-corporate.svg';
 import {ReactComponent as ImportOverflowHorizontal} from '../../assets/icons/icon-overflow-horizontal.svg';
+import {ReactComponent as ImportOverflowVertical} from '../../assets/icons/icon-overflow-vertical.svg';
 import {ReactComponent as ImportPanTool} from '../../assets/icons/icon-pan-tool.svg';
 import {ReactComponent as ImportPanTool1} from '../../assets/icons/icon-pan-tool-1.svg';
 import {ReactComponent as ImportPanel} from '../../assets/icons/icon-panel.svg';
@@ -274,6 +280,9 @@ export const IconAddNew = (props: SVGIconProps) => (
 export const IconAddReaction = (props: SVGIconProps) => (
   <ImportAddReaction {...updateIconProps(props)} />
 );
+export const IconAddToReport = (props: SVGIconProps) => (
+  <ImportAddToReport {...updateIconProps(props)} />
+);
 export const IconAdminShieldSafe = (props: SVGIconProps) => (
   <ImportAdminShieldSafe {...updateIconProps(props)} />
 );
@@ -321,6 +330,9 @@ export const IconBoxPlot = (props: SVGIconProps) => (
 );
 export const IconBug = (props: SVGIconProps) => (
   <ImportBug {...updateIconProps(props)} />
+);
+export const IconBuzzBot10 = (props: SVGIconProps) => (
+  <ImportBuzzBot10 {...updateIconProps(props)} />
 );
 export const IconCategoryMultimodal = (props: SVGIconProps) => (
   <ImportCategoryMultimodal {...updateIconProps(props)} />
@@ -447,6 +459,9 @@ export const IconDownload = (props: SVGIconProps) => (
 );
 export const IconDraft = (props: SVGIconProps) => (
   <ImportDraft {...updateIconProps(props)} />
+);
+export const IconDragGrip = (props: SVGIconProps) => (
+  <ImportDragGrip {...updateIconProps(props)} />
 );
 export const IconDragGripHorizontal = (props: SVGIconProps) => (
   <ImportDragGripHorizontal {...updateIconProps(props)} />
@@ -673,6 +688,12 @@ export const IconMolecule = (props: SVGIconProps) => (
 export const IconMusicAudio = (props: SVGIconProps) => (
   <ImportMusicAudio {...updateIconProps(props)} />
 );
+export const IconNewSectionAbove = (props: SVGIconProps) => (
+  <ImportNewSectionAbove {...updateIconProps(props)} />
+);
+export const IconNewSectionBelow = (props: SVGIconProps) => (
+  <ImportNewSectionBelow {...updateIconProps(props)} />
+);
 export const IconNumber = (props: SVGIconProps) => (
   <ImportNumber {...updateIconProps(props)} />
 );
@@ -690,6 +711,9 @@ export const IconOrganizationCorporate = (props: SVGIconProps) => (
 );
 export const IconOverflowHorizontal = (props: SVGIconProps) => (
   <ImportOverflowHorizontal {...updateIconProps(props)} />
+);
+export const IconOverflowVertical = (props: SVGIconProps) => (
+  <ImportOverflowVertical {...updateIconProps(props)} />
 );
 export const IconPanTool = (props: SVGIconProps) => (
   <ImportPanTool {...updateIconProps(props)} />
@@ -1034,6 +1058,7 @@ export const IconZoomInTool = (props: SVGIconProps) => (
 const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'add-new': IconAddNew,
   'add-reaction': IconAddReaction,
+  'add-to-report': IconAddToReport,
   'admin-shield-safe': IconAdminShieldSafe,
   'amazon-sagemaker': IconAmazonSagemaker,
   area: IconArea,
@@ -1050,6 +1075,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   boolean: IconBoolean,
   'box-plot': IconBoxPlot,
   bug: IconBug,
+  'buzz-bot10': IconBuzzBot10,
   'category-multimodal': IconCategoryMultimodal,
   'chart-horizontal-bars': IconChartHorizontalBars,
   'chart-pie': IconChartPie,
@@ -1092,6 +1118,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   documentation: IconDocumentation,
   download: IconDownload,
   draft: IconDraft,
+  'drag-grip': IconDragGrip,
   'drag-grip-horizontal': IconDragGripHorizontal,
   'education-academic': IconEducationAcademic,
   'email-at': IconEmailAt,
@@ -1167,12 +1194,15 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'model-on-dark': IconModelOnDark,
   molecule: IconMolecule,
   'music-audio': IconMusicAudio,
+  'new-section-above': IconNewSectionAbove,
+  'new-section-below': IconNewSectionBelow,
   number: IconNumber,
   'open-new-tab': IconOpenNewTab,
   'openai-logo': IconOpenaiLogo,
   'orchestration-launch': IconOrchestrationLaunch,
   'organization-corporate': IconOrganizationCorporate,
   'overflow-horizontal': IconOverflowHorizontal,
+  'overflow-vertical': IconOverflowVertical,
   'pan-tool': IconPanTool,
   'pan-tool-1': IconPanTool1,
   panel: IconPanel,
