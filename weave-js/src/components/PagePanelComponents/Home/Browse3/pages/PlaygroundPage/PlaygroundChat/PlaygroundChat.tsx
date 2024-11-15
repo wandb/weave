@@ -5,6 +5,7 @@ import React, {SetStateAction, useState} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
+import {PlaygroundContext} from '../PlaygroundContext';
 import {PlaygroundState, PlaygroundStateKey} from '../types';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
@@ -132,9 +133,8 @@ export const PlaygroundChat = ({
                 <Tailwind>
                   <div className="mx-auto h-full min-w-[400px] max-w-[800px] pb-8">
                     {state.traceCall && (
-                      <CallChat
-                        call={state.traceCall as TraceCallSchema}
-                        playgroundContext={{
+                      <PlaygroundContext.Provider
+                        value={{
                           isPlayground: true,
                           deleteMessage: (messageIndex, responseIndexes) =>
                             deleteMessage(idx, messageIndex, responseIndexes),
@@ -158,8 +158,9 @@ export const PlaygroundChat = ({
                               content,
                               toolCallId
                             ),
-                        }}
-                      />
+                        }}>
+                        <CallChat call={state.traceCall as TraceCallSchema} />
+                      </PlaygroundContext.Provider>
                     )}
                   </div>
                 </Tailwind>
