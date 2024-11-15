@@ -6,7 +6,6 @@ import {
   IconButton,
   InputLabel,
   Tooltip,
-  Typography,
 } from '@material-ui/core';
 import {Delete, Help} from '@mui/icons-material';
 import {Button} from '@wandb/weave/components/Button';
@@ -433,27 +432,6 @@ const EnumField: React.FC<{
         marginBottom: noMarginBottom ? '0px' : GAP_BETWEEN_ITEMS_PX + 'px',
       }}
     />
-    // <FormControl
-    //   fullWidth
-    //   style={{
-    //     marginBottom: noMarginBottom ? '0px' : GAP_BETWEEN_ITEMS_PX + 'px',
-    //   }}>
-    //   <Box display="flex" alignItems="center">
-    //     {keyName !== '' ? (
-    //       <Label label={keyName} />
-    //     ) : (
-    //       <div style={{height: '1px'}} />
-    //     )}
-    //   </Box>
-    //   <SelectField
-    //     options={options.map(option => {
-    //       const v = option;
-    //       return {value: v, label: v};
-    //     })}
-    //     value={selectedValue}
-    //     onSelectField={v => updateConfig(targetPath, v, config, setConfig)}
-    //   />
-    // </FormControl>
   );
 };
 
@@ -602,7 +580,7 @@ const RecordField: React.FC<{
           </Box>
           <Button
             size="small"
-            variant="quiet"
+            variant="ghost"
             icon="delete"
             tooltip="Remove this key"
             onClick={() => removePair(index)}
@@ -839,6 +817,12 @@ const DescriptionTooltip: React.FC<{description?: string}> = ({
   );
 };
 
+/**
+ * This component renders a form based on a zod schema.
+ * Warning: not all sub types are supported. Add them as needed.
+ * Warning2: not all components use the official wandb components yet,
+ * you might need to update them.
+ */
 export const ZSForm: React.FC<ZSFormProps> = ({
   configSchema,
   config,
@@ -879,7 +863,7 @@ export const ZSForm: React.FC<ZSFormProps> = ({
       ));
     } else {
       console.error('Unsupported schema type', configSchema);
-      return <Typography color="error">Unsupported schema type</Typography>;
+      return <div>Unsupported schema type</div>;
     }
   };
 
