@@ -817,7 +817,6 @@ const DescriptionTooltip: React.FC<{description?: string}> = ({
   );
 };
 
-
 /**
  * This component renders a form based on a zod schema.
  * Warning: not all sub types are supported. Add them as needed.
