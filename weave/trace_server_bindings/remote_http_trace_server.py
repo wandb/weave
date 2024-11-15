@@ -59,10 +59,12 @@ def _is_retryable_exception(e: Exception) -> bool:
         # TODO(np): We need to fix the server to return proper status codes
         # for downstream 401, 403, 404, etc... Those should propagate back to
         # the client.
-        if e.response.status_code == 500:
-            return False
 
-    # Otherwise, retry: Non-500 5xx, OSError, ConnectionError, ConnectionResetError, IOError, etc...
+        # Internal server error, bad gateway, service unavailable, gateway timeout
+        if e.response.status_code in (500, 502, 503, 504):
+            return True
+
+    # Otherwise, retry: OSError, ConnectionError, ConnectionResetError, IOError, etc...
     return True
 
 
