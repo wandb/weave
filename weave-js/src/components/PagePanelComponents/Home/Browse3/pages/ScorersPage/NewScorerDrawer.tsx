@@ -1,10 +1,10 @@
-import {Box, Drawer} from '@material-ui/core';
-import {Button} from '@wandb/weave/components/Button';
-import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
-import React, {FC, ReactNode, useCallback, useEffect, useState} from 'react';
+import { Box, Drawer } from '@material-ui/core';
+import { Button } from '@wandb/weave/components/Button';
+import { Icon, IconName, IconNames } from '@wandb/weave/components/Icon';
+import React, { FC, ReactNode, useCallback, useEffect, useState } from 'react';
 
-import {AutocompleteWithLabel} from './FormComponents';
-import {LLMJudgeScorerForm} from './LLMJudgeScorerForm';
+import { AutocompleteWithLabel } from './FormComponents';
+import { LLMJudgeScorerForm } from './LLMJudgeScorerForm';
 import {
   AnnotationScorerForm,
   ProgrammaticScorerForm,
@@ -35,9 +35,9 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
     value: HUMAN_ANNOTATION_VALUE,
     icon: IconNames.UsersTeam,
     Component: AnnotationScorerForm,
-    onSave: async data => {
+    onSave: async (data: any) => {
       // Implementation for saving annotation scorer
-      console.log('TODO: save annotation scorer', data);
+      console.log('save annotation scorer', data)
     },
   },
   LLM_JUDGE: {

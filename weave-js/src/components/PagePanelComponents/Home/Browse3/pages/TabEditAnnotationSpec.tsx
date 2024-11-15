@@ -1,14 +1,11 @@
-import {Box} from '@mui/material';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
+import { Box } from '@mui/material';
+import { Tailwind } from '@wandb/weave/components/Tailwind';
 import React from 'react';
 
-import {EditOrCreateAnnotationSpec} from '../feedback/HumanFeedback/EditOrCreateAnnotationSpec';
-import {AnnotationSpec} from './wfReactInterface/generatedBaseObjectClasses.zod';
-import {ObjectVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
+import { AnnotationSpec } from './wfReactInterface/generatedBaseObjectClasses.zod';
+import { ObjectVersionSchema } from './wfReactInterface/wfDataModelHooksInterface';
 
 export const TabEditAnnotationSpec = ({
-  entityName,
-  projectName,
   objectVersion,
 }: {
   entityName: string;
@@ -20,11 +17,8 @@ export const TabEditAnnotationSpec = ({
   return (
     <Tailwind>
       <Box className="h-full p-12">
-        <EditOrCreateAnnotationSpec
-          entityName={entityName}
-          projectName={projectName}
-          spec={spec}
-        />
+        <div> coming soon </div>
+        <div>{spec}</div>
       </Box>
     </Tailwind>
   );
