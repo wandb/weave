@@ -97,12 +97,8 @@ export const addCostsToCallResults = (
   const costDict = costResults.reduce((acc, costResult) => {
     if (costResult.callId) {
       acc[costResult.callId] = {
-        summary: {
-          weave: {
-            costs: costResult.traceCall?.summary?.weave?.costs,
-          },
-          usage: costResult.traceCall?.summary?.usage,
-        },
+        costs: costResult.traceCall?.summary?.weave?.costs,
+        usage: costResult.traceCall?.summary?.usage,
       };
     }
     return acc;
@@ -122,10 +118,10 @@ export const addCostsToCallResults = (
             ...call.traceCall?.summary,
             weave: {
               ...call.traceCall?.summary?.weave,
-              costs: costDict[call.callId].summary.weave.costs,
+              costs: costDict[call.callId].costs,
             },
           },
-          usage: costDict[call.callId].summary.usage,
+          usage: costDict[call.callId].usage,
         },
       };
       return merged;
