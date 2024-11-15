@@ -281,7 +281,6 @@ const CallPageInnerVertical: FC<{
               callID={currentCall.callId}
               entity={currentCall.entity}
               project={currentCall.project}
-              onNextCall={onNextCall}
             />
           </div>
         </Tailwind>

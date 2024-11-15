@@ -3,7 +3,7 @@ import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
 import {makeRefCall} from '@wandb/weave/util/refs';
-import React, {useEffect, useState} from 'react';
+import React, {useState} from 'react';
 
 import {HumanFeedbackCell} from './HumanFeedback';
 import {tsHumanAnnotationSpec} from './humanFeedbackTypes';
@@ -13,7 +13,6 @@ type FeedbackSidebarProps = {
   callID: string;
   entity: string;
   project: string;
-  onNextCall?: () => void;
 };
 
 export const FeedbackSidebar = ({
@@ -21,7 +20,6 @@ export const FeedbackSidebar = ({
   callID,
   entity,
   project,
-  onNextCall,
 }: FeedbackSidebarProps) => {
   const [isSaving, setIsSaving] = useState(false);
   const [unsavedFeedbackChanges, setUnsavedFeedbackChanges] = useState<
@@ -53,30 +51,6 @@ export const FeedbackSidebar = ({
       setIsSaving(false);
     }
   };
-
-  // handle shift + down arrow key, capture so the other handler
-  // doesn't also trigger without saving.
-  useEffect(() => {
-    const handleArrowDownKey = (event: KeyboardEvent) => {
-      if (event.shiftKey && event.key === 'ArrowDown') {
-        event.preventDefault();
-        save().then(() => onNextCall?.());
-      }
-    };
-    const handleArrowUpKey = (event: KeyboardEvent) => {
-      if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        save().then(() => onNextCall?.());
-      }
-    };
-    document.addEventListener('keydown', handleArrowDownKey);
-    window.addEventListener('keydown', handleArrowUpKey);
-    return () => {
-      document.removeEventListener('keydown', handleArrowDownKey);
-      window.removeEventListener('keydown', handleArrowUpKey);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return (
     <div className="flex h-full flex-col bg-white">

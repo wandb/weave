@@ -3,10 +3,10 @@
  * to collapse the right panel.
  */
 
-import { hexToRGB, MOON_250 } from '@wandb/weave/common/css/globals.styles';
-import { useLocalStorage } from '@wandb/weave/util/useLocalStorage';
-import React, { ReactNode, useCallback, useRef, useState } from 'react';
-import { AutoSizer } from 'react-virtualized';
+import {hexToRGB, MOON_250} from '@wandb/weave/common/css/globals.styles';
+import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
+import React, {ReactNode, useCallback, useRef, useState} from 'react';
+import {AutoSizer} from 'react-virtualized';
 import styled from 'styled-components';
 
 type SplitPanelProps = {
