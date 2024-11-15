@@ -22,6 +22,8 @@ export const ScorersPage: React.FC<{
     scorerTypeRecord.ANNOTATION.value
   );
 
+  console.log('scorers page');
+
   return (
     <>
       <SimplePageLayoutWithHeader
