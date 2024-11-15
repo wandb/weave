@@ -15,6 +15,16 @@ class LlmJudgeActionConfig(BaseModel):
     # Expected to be valid JSON Schema
     response_schema: dict[str, Any]
 
+    @field_validator("response_schema")
+    def validate_response_schema(cls, v: dict) -> dict:
+        try:
+            jsonschema.validate(None, v)
+        except jsonschema.exceptions.SchemaError as e:
+            raise e
+        except jsonschema.exceptions.ValidationError:
+            pass  # we don't care that `None` does not conform
+        return v
+
 
 class ContainsWordsActionConfig(BaseModel):
     action_type: Literal["contains_words"] = "contains_words"
@@ -38,14 +48,4 @@ class ActionSpec(base_object_def.BaseObject):
     def name_must_be_set(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             raise ValueError("name must be set")
-        return v
-
-    @field_validator("json_schema")
-    def validate_json_schema(cls, v: dict) -> dict:
-        try:
-            jsonschema.validate(None, v)
-        except jsonschema.exceptions.SchemaError as e:
-            raise e
-        except jsonschema.exceptions.ValidationError:
-            pass  # we don't care that `None` does not conform
         return v
