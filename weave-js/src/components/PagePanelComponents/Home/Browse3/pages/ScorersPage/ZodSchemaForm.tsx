@@ -7,10 +7,10 @@ import {
   InputLabel,
   Tooltip,
 } from '@material-ui/core';
-import { Delete, Help } from '@mui/icons-material';
-import { Button } from '@wandb/weave/components/Button';
-import React, { useEffect, useMemo, useState } from 'react';
-import { z } from 'zod';
+import {Delete, Help} from '@mui/icons-material';
+import {Button} from '@wandb/weave/components/Button';
+import React, {useEffect, useMemo, useState} from 'react';
+import {z} from 'zod';
 
 import {
   AutocompleteWithLabel,
@@ -317,6 +317,7 @@ const ArrayField: React.FC<{
   );
   const minItems = unwrappedSchema._def.minLength?.value ?? 0;
   const elementSchema = unwrappedSchema.element;
+  const fieldDescription = getFieldDescription(fieldSchema);
 
   // Ensure the minimum number of items is always present
   React.useEffect(() => {
@@ -331,7 +332,12 @@ const ArrayField: React.FC<{
 
   return (
     <FormControl fullWidth style={{marginBottom: GAP_BETWEEN_ITEMS_PX + 'px'}}>
-      <Label label={keyName} />
+      <Box display="flex" alignItems="center" justifyContent="space-between">
+        <Label label={keyName} />
+        {fieldDescription && (
+          <DescriptionTooltip description={fieldDescription} />
+        )}
+      </Box>
       {arrayValue.map((item, index) => (
         <Box
           key={index}
@@ -368,6 +374,7 @@ const ArrayField: React.FC<{
         </Box>
       ))}
       <Button
+        variant="secondary"
         onClick={() =>
           addArrayItem(targetPath, elementSchema, config, setConfig)
         }>
@@ -624,6 +631,7 @@ const updateConfig = (
   if (
     value &&
     typeof value === 'object' &&
+    !Array.isArray(value) &&
     'keys' in value &&
     'values' in value
   ) {
@@ -698,23 +706,32 @@ const NumberField: React.FC<{
   const max =
     (unwrappedSchema._def.checks.find(check => check.kind === 'max') as any)
       ?.value ?? undefined;
+  const fieldDescription = getFieldDescription(fieldSchema);
 
   return (
-    <TextFieldWithLabel
-      label={keyName}
-      type="number"
-      value={(value ?? '').toString()}
-      onChange={newValue => {
-        const finalValue = newValue === '' ? undefined : Number(newValue);
-        if (
-          finalValue !== undefined &&
-          (finalValue < min || finalValue > max)
-        ) {
-          return;
-        }
-        updateConfig(targetPath, finalValue, config, setConfig);
-      }}
-    />
+    <Box display="flex" alignContent="center" justifyContent="space-between">
+      <TextFieldWithLabel
+        label={keyName}
+        type="number"
+        value={(value ?? '').toString()}
+        style={{width: '100%'}}
+        onChange={newValue => {
+          const finalValue = newValue === '' ? undefined : Number(newValue);
+          if (
+            finalValue !== undefined &&
+            (finalValue < min || finalValue > max)
+          ) {
+            return;
+          }
+          updateConfig(targetPath, finalValue, config, setConfig);
+        }}
+      />
+      {fieldDescription && (
+        <Box display="flex" alignItems="center" sx={{marginTop: '14px'}}>
+          <DescriptionTooltip description={fieldDescription} />
+        </Box>
+      )}
+    </Box>
   );
 };
 

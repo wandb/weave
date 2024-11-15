@@ -1,7 +1,7 @@
-import { Box } from '@material-ui/core';
-import { MOON_200 } from '@wandb/weave/common/css/color.styles';
-import { Link } from '@wandb/weave/common/util/links';
-import React, { FC } from 'react';
+import {Box} from '@material-ui/core';
+import {MOON_200} from '@wandb/weave/common/css/color.styles';
+import {Link} from '@wandb/weave/common/util/links';
+import React, {FC} from 'react';
 
 export interface ScorerFormProps<T> {
   data?: T;

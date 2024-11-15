@@ -1,37 +1,89 @@
+import {Box} from '@material-ui/core';
+import React, {FC, useCallback, useState} from 'react';
+import {z} from 'zod';
 
-import React, { FC } from 'react';
-import { createBaseObjectInstance } from '../wfReactInterface/baseObjectClassQuery';
-import { TraceServerClient } from '../wfReactInterface/traceServerClient';
-import { sanitizeObjectId } from '../wfReactInterface/traceServerDirectClient';
-import { projectIdFromParts } from '../wfReactInterface/tsDataModelHooks';
-import { ScorerFormProps } from "./ScorerForms";
+import {createBaseObjectInstance} from '../wfReactInterface/baseObjectClassQuery';
+import {TraceServerClient} from '../wfReactInterface/traceServerClient';
+import {sanitizeObjectId} from '../wfReactInterface/traceServerDirectClient';
+import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
+import {ScorerFormProps} from './ScorerForms';
+import {ZSForm} from './ZodSchemaForm';
 
+const AnnotationScorerFormSchema = z.object({
+  Name: z.string().min(5),
+  Description: z.string().min(5),
+  Type: z.discriminatedUnion('type', [
+    z.object({
+      type: z.literal('boolean'),
+    }),
+    z.object({
+      type: z.literal('number'),
+      min: z.number().optional().describe('Optional minimum value'),
+      max: z.number().optional().describe('Optional maximum value'),
+    }),
+    z.object({
+      type: z.literal('string'),
+      max_length: z
+        .number()
+        .optional()
+        .describe('Optional maximum length of the string'),
+    }),
+    z.object({
+      type: z.literal('array'),
+      options: z.array(z.string()).describe('List of options to choose from'),
+    }),
+  ]),
+});
 
+export const AnnotationScorerForm: FC<
+  ScorerFormProps<z.infer<typeof AnnotationScorerFormSchema>>
+> = ({data, onDataChange}) => {
+  const [config, setConfig] = useState(data);
+  const [isValid, setIsValid] = useState(false);
 
-export const AnnotationScorerForm: FC<ScorerFormProps<any>> = ({
-  data,
-  onDataChange,
-}) => {
-  console.log('AnnotationScorerForm', data);
-  // Implementation for annotation scorer form
-  return <div>Annotation Scorer Form</div>;
+  const handleConfigChange = useCallback(
+    (newConfig: any) => {
+      setConfig(newConfig);
+      onDataChange(isValid, newConfig);
+    },
+    [isValid, onDataChange]
+  );
+
+  const handleValidChange = useCallback(
+    (newIsValid: boolean) => {
+      setIsValid(newIsValid);
+      onDataChange(newIsValid, config);
+    },
+    [config, onDataChange]
+  );
+
+  return (
+    <Box>
+      <ZSForm
+        configSchema={AnnotationScorerFormSchema}
+        config={config ?? {}}
+        setConfig={handleConfigChange}
+        onValidChange={handleValidChange}
+      />
+    </Box>
+  );
 };
 
 export const onAnnotationScorerSave = async (
   entity: string,
   project: string,
-  data: any,
+  data: z.infer<typeof AnnotationScorerFormSchema>,
   client: TraceServerClient
 ) => {
-  // Implementation for saving annotation scorer
-  console.log('onAnnotationScorerSave', data);
-
-  const objectId = sanitizeObjectId(data.Name);
-  createBaseObjectInstance(client, 'AnnotationSpec', {
+  return createBaseObjectInstance(client, 'AnnotationSpec', {
     obj: {
       project_id: projectIdFromParts({entity, project}),
-      object_id: objectId,
-      val: newAction,
+      object_id: sanitizeObjectId(data.Name),
+      val: {
+        name: data.Name,
+        description: data.Description,
+        json_schema: data.Type,
+      },
     },
   });
 };

@@ -1,17 +1,14 @@
-import { Box, Drawer } from '@material-ui/core';
-import { Button } from '@wandb/weave/components/Button';
-import { Icon, IconName, IconNames } from '@wandb/weave/components/Icon';
-import React, { FC, ReactNode, useCallback, useEffect, useState } from 'react';
+import {Box, Drawer} from '@material-ui/core';
+import {Button} from '@wandb/weave/components/Button';
+import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
+import React, {FC, ReactNode, useCallback, useEffect, useState} from 'react';
 
-import { TraceServerClient } from '../wfReactInterface/traceServerClient';
-import { useGetTraceServerClientContext } from '../wfReactInterface/traceServerClientContext';
+import {TraceServerClient} from '../wfReactInterface/traceServerClient';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import * as AnnotationScorerForm from './AnnotationScorerForm';
-import { AutocompleteWithLabel } from './FormComponents';
+import {AutocompleteWithLabel} from './FormComponents';
 import * as LLMJudgeScorerForm from './LLMJudgeScorerForm';
-import {
-  ProgrammaticScorerForm,
-  ScorerFormProps,
-} from './ScorerForms';
+import {ProgrammaticScorerForm, ScorerFormProps} from './ScorerForms';
 
 const HUMAN_ANNOTATION_LABEL = 'Human annotation';
 export const HUMAN_ANNOTATION_VALUE = 'ANNOTATION';
