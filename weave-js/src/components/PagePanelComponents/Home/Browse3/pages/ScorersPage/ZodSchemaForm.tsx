@@ -156,11 +156,14 @@ const NestedForm: React.FC<{
   config: Record<string, any>;
   setConfig: (config: Record<string, any>) => void;
   path: string[];
-}> = ({keyName, fieldSchema, config, setConfig, path}) => {
+  hideLabel?: boolean;
+}> = ({keyName, fieldSchema, config, setConfig, path, hideLabel}) => {
   const currentPath = [...path, keyName];
   const currentValue = getNestedValue(config, currentPath);
 
   const unwrappedSchema = unwrapSchema(fieldSchema);
+
+  console.log(typeof fieldSchema, fieldSchema);
 
   if (unwrappedSchema instanceof z.ZodDiscriminatedUnion) {
     return (
@@ -180,7 +183,7 @@ const NestedForm: React.FC<{
       <FormControl
         fullWidth
         style={{marginBottom: GAP_BETWEEN_ITEMS_PX + 'px'}}>
-        <Label label={keyName} />
+        {!hideLabel && <Label label={keyName} />}
         <Box ml={2}>
           <ZSForm
             configSchema={unwrappedSchema as z.ZodObject<any>}
@@ -286,7 +289,7 @@ const NestedForm: React.FC<{
 
   return (
     <TextFieldWithLabel
-      label={keyName}
+      label={!hideLabel ? keyName : undefined}
       type={fieldType}
       value={currentValue ?? ''}
       onChange={value => updateConfig(currentPath, value, config, setConfig)}
@@ -344,35 +347,40 @@ const ArrayField: React.FC<{
           display="flex"
           flexDirection="column"
           alignItems="flex-start"
-          mb={2}
-          sx={{
-            borderBottom: '1px solid',
-            p: 2,
+          style={{
+            width: '100%',
+            gap: 4,
+            alignItems: 'center',
+            height: '35px',
+            marginBottom: '4px',
           }}>
-          <Box flexGrow={1} width="100%">
-            <NestedForm
-              keyName={`${index}`}
-              fieldSchema={elementSchema}
-              config={{[`${index}`]: item}}
-              setConfig={newItemConfig => {
-                const newArray = [...arrayValue];
-                newArray[index] = newItemConfig[`${index}`];
-                updateConfig(targetPath, newArray, config, setConfig);
-              }}
-              path={[]}
-            />
-          </Box>
-          <Box mt={1}>
-            <Button
-              size="small"
-              variant="ghost"
-              icon="delete"
-              tooltip="Remove this key"
-              disabled={arrayValue.length <= minItems}
-              onClick={() =>
-                removeArrayItem(targetPath, index, config, setConfig)
-              }
-            />
+          <Box flexGrow={1} width="100%" display="flex" alignItems="center">
+            <Box flexGrow={1}>
+              <NestedForm
+                keyName={`${index}`}
+                fieldSchema={elementSchema}
+                config={{[`${index}`]: item}}
+                setConfig={newItemConfig => {
+                  const newArray = [...arrayValue];
+                  newArray[index] = newItemConfig[`${index}`];
+                  updateConfig(targetPath, newArray, config, setConfig);
+                }}
+                path={[]}
+                hideLabel
+              />
+            </Box>
+            <Box mb={2} ml={1}>
+              <Button
+                size="small"
+                variant="ghost"
+                icon="delete"
+                tooltip="Remove this entry"
+                disabled={arrayValue.length <= minItems}
+                onClick={() =>
+                  removeArrayItem(targetPath, index, config, setConfig)
+                }
+              />
+            </Box>
           </Box>
         </Box>
       ))}
@@ -381,7 +389,7 @@ const ArrayField: React.FC<{
         onClick={() =>
           addArrayItem(targetPath, elementSchema, config, setConfig)
         }>
-        Add Item
+        Add item
       </Button>
     </FormControl>
   );
