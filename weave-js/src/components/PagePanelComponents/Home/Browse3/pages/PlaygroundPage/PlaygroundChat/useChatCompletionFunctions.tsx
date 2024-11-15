@@ -7,6 +7,7 @@ import {PlaygroundState} from '../types';
 import {getInputFromPlaygroundState} from '../usePlaygroundState';
 import {clearTraceCall} from './useChatFunctions';
 import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
+import {CompletionsCreateRes} from '../../wfReactInterface/traceServerClientTypes';
 
 export const useChatCompletionFunctions = (
   setPlaygroundStates: (states: PlaygroundState[]) => void,
@@ -50,16 +51,12 @@ export const useChatCompletionFunctions = (
   };
 
   const handleErrorsAndUpdate = async (
-    response: any,
+    response: Array<CompletionsCreateRes | null>,
     updatedStates: PlaygroundState[],
     callIndex?: number
   ) => {
     const hasMissingLLMApiKey = handleMissingLLMApiKey(response, entity);
-    const hasError = handleErrorResponse(
-      Array.isArray(response)
-        ? response.map(r => r.response)
-        : response.response
-    );
+    const hasError = handleErrorResponse(response.map(r => r?.response));
 
     if (hasMissingLLMApiKey || hasError) {
       return false;
@@ -67,10 +64,7 @@ export const useChatCompletionFunctions = (
 
     const finalStates = updatedStates.map((state, index) => {
       if (callIndex === undefined || index === callIndex) {
-        return handleUpdateCallWithResponse(
-          state,
-          Array.isArray(response) ? response[index] : response
-        );
+        return handleUpdateCallWithResponse(state, response[index]);
       }
       return state;
     });
@@ -104,36 +98,14 @@ export const useChatCompletionFunctions = (
 
   const handleAllSend = async (
     role: 'assistant' | 'user' | 'tool',
-    messageText?: string
-  ) => {
-    await withCompletionsLoading(async () => {
-      const newMessage = createMessage(role, messageText || chatText);
-      const updatedStates = playgroundStates.map(state => {
-        return updatePlaygroundStateWithMessage(state, newMessage);
-      });
-
-      setPlaygroundStates(updatedStates);
-      setChatText('');
-
-      const responses = await Promise.all(
-        updatedStates.map((_, index) =>
-          makeCompletionRequest(index, updatedStates)
-        )
-      );
-      await handleErrorsAndUpdate(responses, updatedStates);
-    });
-  };
-
-  const handleSend = async (
-    role: 'assistant' | 'user' | 'tool',
-    callIndex: number,
-    content: string,
+    callIndex?: number,
+    content?: string,
     toolCallId?: string
   ) => {
     await withCompletionsLoading(async () => {
-      const newMessage = createMessage(role, content, toolCallId);
+      const newMessage = createMessage(role, content || chatText, toolCallId);
       const updatedStates = playgroundStates.map((state, index) => {
-        if (callIndex !== index) {
+        if (callIndex === undefined || callIndex !== index) {
           return state;
         }
         return updatePlaygroundStateWithMessage(state, newMessage);
@@ -142,8 +114,15 @@ export const useChatCompletionFunctions = (
       setPlaygroundStates(updatedStates);
       setChatText('');
 
-      const response = await makeCompletionRequest(callIndex, updatedStates);
-      await handleErrorsAndUpdate(response, updatedStates, callIndex);
+      const responses = await Promise.all(
+        updatedStates.map((_, index) => {
+          if (callIndex === undefined || callIndex !== index) {
+            return Promise.resolve(null);
+          }
+          return makeCompletionRequest(index, updatedStates);
+        })
+      );
+      await handleErrorsAndUpdate(responses, updatedStates);
     });
   };
 
@@ -169,11 +148,15 @@ export const useChatCompletionFunctions = (
       });
 
       const response = await makeCompletionRequest(callIndex, updatedStates);
-      await handleErrorsAndUpdate(response, updatedStates, callIndex);
+      await handleErrorsAndUpdate(
+        updatedStates.map(() => response),
+        updatedStates,
+        callIndex
+      );
     });
   };
 
-  return {handleRetry, handleSend, handleAllSend};
+  return {handleRetry, handleAllSend};
 };
 
 const createMessage = (
@@ -208,20 +191,19 @@ const handleMissingLLMApiKey = (responses: any, entity: string) => {
   return false;
 };
 
-const handleErrorResponse = (responses: any): boolean => {
-  if (Array.isArray(responses)) {
-    return responses.some((response: any) => handleErrorResponse(response));
-  } else {
-    if (!responses) {
-      return true;
-    }
-    if (responses.error) {
-      toast(responses.error, {
-        type: 'error',
-      });
-      return true;
-    }
+const handleErrorResponse = (
+  responses: Array<CompletionsCreateRes | null>
+): boolean => {
+  if (!responses) {
+    return true;
   }
+  if (responses.some(r => r?.error)) {
+    toast(responses.find(r => r?.error)?.error, {
+      type: 'error',
+    });
+    return true;
+  }
+
   return false;
 };
 
