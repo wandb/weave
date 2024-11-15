@@ -104,7 +104,7 @@ OnOutputHandlerType = Callable[[Any, FinishCallbackType, dict], Any]
 OnFinishHandlerType = Callable[["Call", Any, Optional[BaseException]], None]
 
 
-def value_is_sentinel(param: Any) -> bool:
+def _value_is_sentinel(param: Any) -> bool:
     return (
         param.default is None
         or param.default is OPENAI_NOT_GIVEN
@@ -123,7 +123,7 @@ def _apply_fn_defaults_to_inputs(
     sig = inspect.signature(fn)
     for param_name, param in sig.parameters.items():
         if param_name not in inputs:
-            if param.default != inspect.Parameter.empty and not value_is_sentinel(
+            if param.default != inspect.Parameter.empty and not _value_is_sentinel(
                 param
             ):
                 inputs[param_name] = param.default
@@ -226,7 +226,7 @@ def _is_unbound_method(func: Callable) -> bool:
     return bool(is_method)
 
 
-def default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
+def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
     try:
         inputs = func.signature.bind(*args, **kwargs).arguments
     except TypeError as e:
@@ -250,7 +250,7 @@ def _create_call(
     if func._on_input_handler is not None:
         pargs = func._on_input_handler(func, args, kwargs)
     if not pargs:
-        pargs = default_on_input_handler(func, args, kwargs)
+        pargs = _default_on_input_handler(func, args, kwargs)
     inputs_with_defaults = pargs.inputs
 
     # This should probably be configurable, but for now we redact the api_key
@@ -274,9 +274,9 @@ def _create_call(
     )
 
 
-def _execute_call(
+def _execute_op(
     __op: Op,
-    call: Any,
+    __call: Call,
     *args: Any,
     __should_raise: bool = True,
     **kwargs: Any,
@@ -291,17 +291,17 @@ def _execute_call(
             raise ValueError("Should not call finish more than once")
 
         client.finish_call(
-            call,
+            __call,
             output,
             exception,
             op=__op,
         )
         if not call_context.get_current_call():
-            print_call_link(call)
+            print_call_link(__call)
 
     def on_output(output: Any) -> Any:
         if handler := getattr(__op, "_on_output_handler", None):
-            return handler(output, finish, call.inputs)
+            return handler(output, finish, __call.inputs)
         finish(output)
         return output
 
@@ -320,15 +320,15 @@ def _execute_call(
             # Is there a better place for this? We want to ensure that even
             # if the final output fails to be captured, we still pop the call
             # so we don't put future calls under the old call.
-            call_context.pop_call(call.id)
+            call_context.pop_call(__call.id)
 
-        return res, call
+        return res, __call
 
     def handle_exception(e: Exception) -> tuple[Any, Call]:
         finish(exception=e)
         if __should_raise:
             raise
-        return None, call
+        return None, __call
 
     if inspect.iscoroutinefunction(func):
 
@@ -349,7 +349,7 @@ def _execute_call(
     else:
         return process(res)
 
-    return None, call
+    return None, __call
 
 
 def call(
@@ -377,11 +377,19 @@ def call(
     """
     if inspect.iscoroutinefunction(op.resolve_fn):
         return _do_call_async(
-            op, *args, __weave=__weave, __should_raise=__should_raise, **kwargs
+            op,
+            *args,
+            __weave=__weave,
+            __should_raise=__should_raise,
+            **kwargs,
         )
     else:
         return _do_call(
-            op, *args, __weave=__weave, __should_raise=__should_raise, **kwargs
+            op,
+            *args,
+            __weave=__weave,
+            __should_raise=__should_raise,
+            **kwargs,
         )
 
 
@@ -412,7 +420,7 @@ def _do_call(
     if op._on_input_handler is not None:
         pargs = op._on_input_handler(op, args, kwargs)
     if not pargs:
-        pargs = default_on_input_handler(op, args, kwargs)
+        pargs = _default_on_input_handler(op, args, kwargs)
 
     if settings.should_disable_weave():
         res = func(*pargs.args, **pargs.kwargs)
@@ -436,7 +444,7 @@ def _do_call(
             )
             res = func(*pargs.args, **pargs.kwargs)
         else:
-            execute_result = _execute_call(
+            execute_result = _execute_op(
                 op, call, *pargs.args, __should_raise=__should_raise, **pargs.kwargs
             )
             if inspect.iscoroutine(execute_result):
@@ -479,7 +487,7 @@ async def _do_call_async(
             )
             res = await func(*args, **kwargs)
         else:
-            execute_result = _execute_call(
+            execute_result = _execute_op(
                 op, call, *args, __should_raise=__should_raise, **kwargs
             )
             if not inspect.iscoroutine(execute_result):
