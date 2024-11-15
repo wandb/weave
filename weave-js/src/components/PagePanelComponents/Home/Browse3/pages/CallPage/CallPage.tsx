@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Loading} from '@wandb/weave/components/Loading';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
@@ -58,6 +59,8 @@ export const CallPage: FC<{
 };
 
 const useCallTabs = (call: CallSchema) => {
+  const viewerInfo = useViewerInfo();
+  const showScores = viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
@@ -129,14 +132,18 @@ const useCallTabs = (call: CallSchema) => {
         </Tailwind>
       ),
     },
-    {
-      label: 'Scores',
-      content: (
-        <Tailwind>
-          <CallScoresViewer call={call} />
-        </Tailwind>
-      ),
-    },
+    ...(showScores
+      ? [
+          {
+            label: 'Scores (Internal Preview)',
+            content: (
+              <Tailwind>
+                <CallScoresViewer call={call} />
+              </Tailwind>
+            ),
+          },
+        ]
+      : []),
     {
       label: 'Use',
       content: (
