@@ -147,8 +147,6 @@ export const CallScoresViewer: React.FC<{
     return _.sortBy([...scoredRows, ...additionalRows], s => s.id);
   }, [actionSpecs, scoredRows]);
 
-  console.log('actionSpecs', actionSpecs);
-
   const columns: Array<GridColDef<(typeof rows)[number]>> = [
     {
       field: 'scorer',
