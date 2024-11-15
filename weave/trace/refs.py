@@ -1,6 +1,6 @@
-import dataclasses
 import urllib
 from concurrent.futures import Future
+from dataclasses import asdict, dataclass, fields
 from typing import Any, Optional, Union, cast
 
 from weave.trace_server import refs_internal
@@ -11,16 +11,26 @@ OBJECT_ATTR_EDGE_NAME = refs_internal.OBJECT_ATTR_EDGE_NAME
 TABLE_ROW_ID_EDGE_NAME = refs_internal.TABLE_ROW_ID_EDGE_NAME
 
 
-@dataclasses.dataclass(frozen=True)
+class WeaveDigestError(ValueError):
+    """Raised when a digest is invalid."""
+
+
+@dataclass(frozen=True)
 class Ref:
     def uri(self) -> str:
         raise NotImplementedError
 
     def as_param_dict(self) -> dict:
-        return dataclasses.asdict(self)
+        return asdict(self)
+
+    def __deepcopy__(self, memo: dict) -> "Ref":
+        d = {f.name: getattr(self, f.name) for f in fields(self)}
+        res = self.__class__(**d)
+        memo[id(self)] = res
+        return res
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class TableRef(Ref):
     entity: str
     project: str
@@ -42,7 +52,7 @@ class TableRef(Ref):
             self.__dict__["_digest"] = self._digest.result()
 
         if not isinstance(self._digest, str):
-            raise Exception(f"TableRef digest is not a string: {self._digest}")
+            raise WeaveDigestError(f"TableRef digest is not a string: {self._digest}")
 
         refs_internal.validate_no_slashes(self._digest, "digest")
         refs_internal.validate_no_colons(self._digest, "digest")
@@ -56,7 +66,9 @@ class TableRef(Ref):
             self.__dict__["_row_digests"] = self._row_digests.result()
 
         if not isinstance(self._row_digests, list):
-            raise Exception(f"TableRef row_digests is not a list: {self._row_digests}")
+            raise WeaveDigestError(
+                f"TableRef row_digests is not a list: {self._row_digests}"
+            )
 
         return self._row_digests
 
@@ -69,7 +81,7 @@ class TableRef(Ref):
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class RefWithExtra(Ref):
     def with_extra(self, extra: tuple[Union[str, Future[str]], ...]) -> "RefWithExtra":
         params = self.as_param_dict()
@@ -89,7 +101,7 @@ class RefWithExtra(Ref):
         return self.with_extra((TABLE_ROW_ID_EDGE_NAME, item_digest))
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class ObjectRef(RefWithExtra):
     entity: str
     project: str
@@ -123,7 +135,7 @@ class ObjectRef(RefWithExtra):
             self.__dict__["_digest"] = self._digest.result()
 
         if not isinstance(self._digest, str):
-            raise Exception(f"ObjectRef digest is not a string: {self._digest}")
+            raise WeaveDigestError(f"ObjectRef digest is not a string: {self._digest}")
 
         refs_internal.validate_no_slashes(self._digest, "digest")
         refs_internal.validate_no_colons(self._digest, "digest")
@@ -198,7 +210,7 @@ class ObjectRef(RefWithExtra):
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class OpRef(ObjectRef):
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/op/{self.name}:{self.digest}"
@@ -207,7 +219,7 @@ class OpRef(ObjectRef):
         return u
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class CallRef(RefWithExtra):
     entity: str
     project: str
@@ -273,5 +285,5 @@ def parse_uri(uri: str) -> AnyRef:
 
 def parse_op_uri(uri: str) -> OpRef:
     if not isinstance(parsed := parse_uri(uri), OpRef):
-        raise ValueError(f"URI is not for an Op: {uri}")
+        raise TypeError(f"URI is not for an Op: {uri}")
     return parsed

@@ -83,8 +83,9 @@ def object_method_app(
     if method_name is None:
         if len(op_attrs) > 1:
             raise ValueError(
-                "Multiple ops found on object (%s), must specify method_name argument"
-                % ", ".join(op_attrs)
+                "Multiple ops found on object ({}), must specify method_name argument".format(
+                    ", ".join(op_attrs)
+                )
             )
         method_name = next(iter(op_attrs))
 
@@ -101,7 +102,7 @@ def object_method_app(
             f"Type for model's method '{method_name}' could not be determined. Did you annotate it with Python types? {e}"
         )
     if not isinstance(args, op_args.OpNamedArgs):
-        raise ValueError("predict op must have named args")
+        raise TypeError("predict op must have named args")
 
     arg_types = args.weave_type().property_types
     del arg_types["self"]

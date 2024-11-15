@@ -33,6 +33,7 @@ import {Icon} from '@wandb/weave/components/Icon';
 import React, {
   FC,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -44,7 +45,11 @@ import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {TailwindContents} from '../../../../../Tailwind';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
-import {useWeaveflowCurrentRouteContext} from '../../context';
+import {TableRowSelectionContext} from '../../../Browse3';
+import {
+  useWeaveflowCurrentRouteContext,
+  WeaveflowPeekContext,
+} from '../../context';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
@@ -274,6 +279,11 @@ export const CallsTable: FC<{
       setCallsResult([]);
       setCallsTotal(0);
       callsEffectiveFilter.current = effectiveFilter;
+      // Refetch the calls IFF the filter has changed, this is a
+      // noop if the calls query is already loading, but if the filter
+      // has no effective impact (frozen vs. not frozen) we need to
+      // manually refetch
+      calls.refetch();
     } else if (!calls.loading) {
       setCallsResult(calls.result);
       setCallsTotal(calls.total);
@@ -485,6 +495,13 @@ export const CallsTable: FC<{
       }
     }
   }, [rowIds, peekId]);
+  const {setRowIds} = useContext(TableRowSelectionContext);
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  useEffect(() => {
+    if (!isPeeking && setRowIds) {
+      setRowIds(rowIds);
+    }
+  }, [rowIds, isPeeking, setRowIds]);
 
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {

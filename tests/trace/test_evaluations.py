@@ -10,7 +10,7 @@ import weave
 from tests.trace.util import AnyIntMatcher
 from weave import Evaluation, Model
 from weave.scorers import Scorer
-from weave.trace.feedback_types.score import SCORE_TYPE_NAME
+from weave.trace.refs import CallRef
 from weave.trace.weave_client import get_ref
 from weave.trace_server import trace_server_interface as tsi
 
@@ -935,6 +935,7 @@ async def test_evaluation_with_multiple_column_maps():
     ), "No matches should be found for AnotherDummyScorer"
 
 
+@pytest.mark.asyncio
 async def test_feedback_is_correctly_linked(client):
     @weave.op
     def predict(text: str) -> str:
@@ -961,7 +962,48 @@ async def test_feedback_is_correctly_linked(client):
     feedbacks = calls.calls[0].summary["weave"]["feedback"]
     assert len(feedbacks) == 1
     feedback = feedbacks[0]
-    assert feedback["feedback_type"] == SCORE_TYPE_NAME
-    assert feedback["payload"]["name"] == "score"
-    assert feedback["payload"]["op_ref"] == get_ref(score).uri()
-    assert feedback["payload"]["results"] == True
+    assert feedback["feedback_type"] == "wandb.runnable.score"
+    assert feedback["payload"] == {"output": True}
+    assert feedback["runnable_ref"] == get_ref(score).uri()
+    assert (
+        feedback["call_ref"]
+        == CallRef(
+            entity=client.entity,
+            project=client.project,
+            id=list(score.calls())[0].id,
+        ).uri()
+    )
+
+
+@pytest.mark.asyncio
+async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
+    @weave.op
+    def predict(text: str) -> str:
+        return text
+
+    class MyScorer(Scorer):
+        @weave.op
+        def score(self, text, output) -> bool:
+            return text == output
+
+    scorer = MyScorer()
+    eval = weave.Evaluation(
+        dataset=[{"text": "hello"}],
+        scorers=[scorer],
+    )
+    res = await eval.evaluate(predict)
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            include_feedback=True,
+            filter=tsi.CallsFilter(op_names=[get_ref(predict).uri()]),
+        )
+    )
+    assert len(calls.calls) == 1
+    assert calls.calls[0].summary["weave"]["feedback"]
+    feedbacks = calls.calls[0].summary["weave"]["feedback"]
+    assert len(feedbacks) == 1
+    feedback = feedbacks[0]
+    assert feedback["feedback_type"] == "wandb.runnable.MyScorer"
+    assert feedback["payload"] == {"output": True}
+    assert feedback["runnable_ref"] == get_ref(scorer).uri()

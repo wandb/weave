@@ -1,5 +1,5 @@
 import importlib
-from typing import Callable, List
+from typing import Callable
 
 import weave
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
@@ -14,7 +14,7 @@ def nd_wrapper(name: str) -> Callable[[Callable], Callable]:
     return wrapper
 
 
-def _patch_client_op(method_name: str) -> List[SymbolPatcher]:
+def _patch_client_op(method_name: str) -> list[SymbolPatcher]:
     return [
         SymbolPatcher(
             lambda: importlib.import_module("notdiamond"),

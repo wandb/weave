@@ -1,5 +1,5 @@
 import importlib
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
@@ -78,7 +78,7 @@ def litellm_on_finish_post_processor(value: Any) -> Any:
 
 
 # Unlike other integrations, streaming is based on input flag, not
-def should_use_accumulator(inputs: Dict) -> bool:
+def should_use_accumulator(inputs: dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
