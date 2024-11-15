@@ -58,6 +58,11 @@ export const extractValFromHumanAnnotationPayload = (
   if (payload.value == null) {
     return null;
   }
-  const val = Object.values(Object.values(payload.value)[0])[0];
-  return val;
+  try {
+    const val = Object.values(Object.values(payload.value)[0])[0];
+    return val;
+  } catch (e) {
+    console.error('Error extracting value from human annotation payload', e);
+    return null;
+  }
 };

@@ -35,9 +35,9 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
     value: HUMAN_ANNOTATION_VALUE,
     icon: IconNames.UsersTeam,
     Component: AnnotationScorerForm,
-    onSave: async (data: any) => {
+    onSave: async data => {
       // Implementation for saving annotation scorer
-      console.log('save annotation scorer', data);
+      console.log('TODO: save annotation scorer', data);
     },
   },
   LLM_JUDGE: {

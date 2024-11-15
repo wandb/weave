@@ -1,6 +1,6 @@
 import React from 'react';
 
-import {Pill, TagColorName} from '../../../../Tag';
+import { Pill, TagColorName } from '../../../../Tag';
 
 type FeedbackTypeChipProps = {
   feedbackType: string;
@@ -16,7 +16,7 @@ export const FeedbackTypeChip = ({feedbackType}: FeedbackTypeChipProps) => {
     color = 'gold';
     label = 'Note';
   } else if (feedbackType.startsWith('wandb.annotation.')) {
-    color = 'sienna';
+    color = 'magenta';
     label = 'Annotation';
   }
   return <Pill color={color} label={label} />;
