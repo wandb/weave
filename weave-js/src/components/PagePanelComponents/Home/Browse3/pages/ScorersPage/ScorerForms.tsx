@@ -1,20 +1,12 @@
-import {Box} from '@material-ui/core';
-import {MOON_200} from '@wandb/weave/common/css/color.styles';
-import {Link} from '@wandb/weave/common/util/links';
-import React, {FC} from 'react';
+import { Box } from '@material-ui/core';
+import { MOON_200 } from '@wandb/weave/common/css/color.styles';
+import { Link } from '@wandb/weave/common/util/links';
+import React, { FC } from 'react';
 
 export interface ScorerFormProps<T> {
   data?: T;
   onDataChange: (isValid: boolean, data?: T) => void;
 }
-
-export const AnnotationScorerForm: FC<ScorerFormProps<any>> = ({
-  data,
-  onDataChange,
-}) => {
-  // Implementation for annotation scorer form
-  return <div>Annotation Scorer Form</div>;
-};
 
 export const ProgrammaticScorerForm: FC<ScorerFormProps<any>> = ({
   data,

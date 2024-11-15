@@ -1,11 +1,11 @@
-import {Button} from '@wandb/weave/components/Button';
-import {IconNames} from '@wandb/weave/components/Icon';
-import React, {useState} from 'react';
+import { Button } from '@wandb/weave/components/Button';
+import { IconNames } from '@wandb/weave/components/Icon';
+import React, { useState } from 'react';
 
-import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
-import {AnnotationsTab} from './AnnotationsTab';
-import {ProgrammaticScorersTab} from './CoreScorersTab';
-import {LLMJudgesTab} from './LLMJudgesTab';
+import { SimplePageLayoutWithHeader } from '../common/SimplePageLayout';
+import { AnnotationsTab } from './AnnotationsTab';
+import { ProgrammaticScorersTab } from './CoreScorersTab';
+import { LLMJudgesTab } from './LLMJudgesTab';
 import {
   HUMAN_ANNOTATION_VALUE,
   NewScorerDrawer,

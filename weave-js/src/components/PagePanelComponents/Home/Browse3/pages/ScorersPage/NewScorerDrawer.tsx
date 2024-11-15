@@ -1,14 +1,14 @@
-import {Box, Drawer} from '@material-ui/core';
-import {Button} from '@wandb/weave/components/Button';
-import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
-import React, {FC, ReactNode, useCallback, useEffect, useState} from 'react';
+import { Box, Drawer } from '@material-ui/core';
+import { Button } from '@wandb/weave/components/Button';
+import { Icon, IconName, IconNames } from '@wandb/weave/components/Icon';
+import React, { FC, ReactNode, useCallback, useEffect, useState } from 'react';
 
-import {TraceServerClient} from '../wfReactInterface/traceServerClient';
-import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
-import {AutocompleteWithLabel} from './FormComponents';
+import { TraceServerClient } from '../wfReactInterface/traceServerClient';
+import { useGetTraceServerClientContext } from '../wfReactInterface/traceServerClientContext';
+import * as AnnotationScorerForm from './AnnotationScorerForm';
+import { AutocompleteWithLabel } from './FormComponents';
 import * as LLMJudgeScorerForm from './LLMJudgeScorerForm';
 import {
-  AnnotationScorerForm,
   ProgrammaticScorerForm,
   ScorerFormProps,
 } from './ScorerForms';
@@ -41,11 +41,8 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
     label: HUMAN_ANNOTATION_LABEL,
     value: HUMAN_ANNOTATION_VALUE,
     icon: IconNames.UsersTeam,
-    Component: AnnotationScorerForm,
-    onSave: async (entity, project, data, client) => {
-      // Implementation for saving annotation scorer
-      console.log('TODO: save annotation scorer', data);
-    },
+    Component: AnnotationScorerForm.AnnotationScorerForm,
+    onSave: AnnotationScorerForm.onAnnotationScorerSave,
   },
   LLM_JUDGE: {
     label: LLM_JUDGE_LABEL,
