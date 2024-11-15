@@ -260,6 +260,7 @@ class Call:
         return CallRef(entity, project, self.id)
 
     # These are the children if we're using Call at read-time
+    @property
     def children(self) -> CallsIter:
         client = weave_client_context.require_weave_client()
         if not self.id:
