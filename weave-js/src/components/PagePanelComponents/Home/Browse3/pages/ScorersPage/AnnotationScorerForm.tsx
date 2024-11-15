@@ -1,17 +1,17 @@
-import {Box} from '@material-ui/core';
-import React, {FC, useCallback, useState} from 'react';
-import {z} from 'zod';
+import { Box } from '@material-ui/core';
+import React, { FC, useCallback, useState } from 'react';
+import { z } from 'zod';
 
-import {createBaseObjectInstance} from '../wfReactInterface/baseObjectClassQuery';
-import {TraceServerClient} from '../wfReactInterface/traceServerClient';
-import {sanitizeObjectId} from '../wfReactInterface/traceServerDirectClient';
-import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
-import {ScorerFormProps} from './ScorerForms';
-import {ZSForm} from './ZodSchemaForm';
+import { createBaseObjectInstance } from '../wfReactInterface/baseObjectClassQuery';
+import { TraceServerClient } from '../wfReactInterface/traceServerClient';
+import { sanitizeObjectId } from '../wfReactInterface/traceServerDirectClient';
+import { projectIdFromParts } from '../wfReactInterface/tsDataModelHooks';
+import { ScorerFormProps } from './ScorerForms';
+import { ZSForm } from './ZodSchemaForm';
 
 const AnnotationScorerFormSchema = z.object({
-  Name: z.string().min(5),
-  Description: z.string().min(5),
+  Name: z.string().min(1),
+  Description: z.string().min(1),
   Type: z.discriminatedUnion('type', [
     z.object({
       type: z.literal('boolean'),
