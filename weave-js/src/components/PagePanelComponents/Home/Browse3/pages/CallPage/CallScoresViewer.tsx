@@ -11,7 +11,7 @@ import {CellValue} from '../../../Browse2/CellValue';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid'; // Import the StyledDataGrid component
-import {useBaseObjectInstances} from '../wfReactInterface/baseObjectClassQuery';
+import {TraceObjSchemaForBaseObjectClass, useBaseObjectInstances} from '../wfReactInterface/baseObjectClassQuery';
 import {WEAVE_REF_SCHEME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
@@ -21,6 +21,7 @@ import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 const RUNNABLE_REF_PREFIX = 'wandb.runnable';
+
 
 // New RunButton component
 const RunButton: React.FC<{
@@ -69,49 +70,32 @@ const RunButton: React.FC<{
   );
 };
 
-export const CallScoresViewer: React.FC<{
-  call: CallSchema;
-}> = props => {
-  const {useFeedback} = useWFHooks();
-  const weaveRef = makeRefCall(
-    props.call.entity,
-    props.call.project,
-    props.call.callId
-  );
-  const feedbackQuery = useFeedback({
-    entity: props.call.entity,
-    project: props.call.project,
-    weaveRef,
-  });
 
+const useLatestActionDefinitionsForCall = (call: CallSchema) => {
   const actionSpecs = (
     useBaseObjectInstances('ActionSpec', {
       project_id: projectIdFromParts({
-        entity: props.call.entity,
-        project: props.call.project,
+        entity: call.entity,
+        project: call.project,
       }),
       filter: {latest_only: true},
     }).result ?? []
   ).sort((a, b) => (a.val.name ?? '').localeCompare(b.val.name ?? ''));
+  return actionSpecs;
+};
 
-  const actionRunnableRefs = useMemo(() => {
-    return _.fromPairs(
-      actionSpecs.map(actionSpec => {
-        return [
-          RUNNABLE_REF_PREFIX + '.' + actionSpec.object_id,
-          objectVersionKeyToRefUri({
-            scheme: WEAVE_REF_SCHEME,
-            weaveKind: 'object',
-            entity: props.call.entity,
-            project: props.call.project,
-            objectId: actionSpec.object_id,
-            versionHash: actionSpec.digest,
-            path: '',
-          }),
-        ];
-      })
-    );
-  }, [actionSpecs, props.call.entity, props.call.project]);
+const useRunnableFeedbacksForCall = (call: CallSchema) => {
+  const {useFeedback} = useWFHooks();
+  const weaveRef = makeRefCall(
+    call.entity,
+    call.project,
+    call.callId
+  );
+  const feedbackQuery = useFeedback({
+    entity: call.entity,
+    project: call.project,
+    weaveRef,
+  });
 
   const runnableFeedbacks: Feedback[] = useMemo(() => {
     return (feedbackQuery.result ?? []).filter(
@@ -120,6 +104,41 @@ export const CallScoresViewer: React.FC<{
         f.runnable_ref !== null
     );
   }, [feedbackQuery.result]);
+
+  return {runnableFeedbacks, refetchFeedback: feedbackQuery.refetch};
+};
+
+const useRunnableFeedbackTypeToLatestActionRef = (call: CallSchema, actionSpecs:  Array<TraceObjSchemaForBaseObjectClass<'ActionSpec'>>): Record<string, string> => {
+  return useMemo(() => {
+    return _.fromPairs(
+      actionSpecs.map(actionSpec => {
+        return [
+          RUNNABLE_REF_PREFIX + '.' + actionSpec.object_id,
+          objectVersionKeyToRefUri({
+            scheme: WEAVE_REF_SCHEME,
+            weaveKind: 'object',
+            entity: call.entity,
+            project: call.project,
+            objectId: actionSpec.object_id,
+            versionHash: actionSpec.digest,
+            path: '',
+          }),
+        ];
+      })
+    );
+  }, [actionSpecs, call.entity, call.project]);
+}
+
+
+
+export const CallScoresViewer: React.FC<{
+  call: CallSchema;
+}> = props => {
+  const actionSpecs = useLatestActionDefinitionsForCall(props.call);
+  const {runnableFeedbacks, refetchFeedback} = useRunnableFeedbacksForCall(props.call);
+  const runnableFeedbackTypeToLatestActionRef = useRunnableFeedbackTypeToLatestActionRef(props.call, actionSpecs);
+
+  
 
   const scoredRows = useMemo(() => {
     return Object.entries(
@@ -230,14 +249,14 @@ export const CallScoresViewer: React.FC<{
       headerName: '',
       width: 70,
       renderCell: params => {
-        const actionRef = actionRunnableRefs[params.row.id];
+        const actionRef = runnableFeedbackTypeToLatestActionRef[params.row.id];
         return actionRef ? (
           <RunButton
             actionRef={actionRef}
             callId={props.call.callId}
             entity={props.call.entity}
             project={props.call.project}
-            refetchFeedback={feedbackQuery.refetch}
+            refetchFeedback={refetchFeedback}
           />
         ) : null;
       },
