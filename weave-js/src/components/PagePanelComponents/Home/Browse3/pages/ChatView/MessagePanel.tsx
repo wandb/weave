@@ -11,9 +11,7 @@ type MessagePanelProps = {
   index: number;
   message: Message;
   isStructuredOutput?: boolean;
-  isChoice?: boolean;
   isNested?: boolean;
-  pendingToolResponseId?: string;
 };
 
 export const MessagePanel = ({
@@ -46,7 +44,7 @@ export const MessagePanel = ({
       <div
         className={classNames('relative overflow-visible rounded-lg', {
           'border-t border-moon-250': isTool,
-          'bg-moon-50': isSystemPrompt,
+          'bg-moon-100': isSystemPrompt,
           'bg-cactus-300/[0.24]': isUser,
           'w-full': !isUser,
           'max-w-3xl': isUser,
@@ -64,7 +62,7 @@ export const MessagePanel = ({
           )}
 
           {isTool && (
-            <div className={classNames(isNested ? '' : 'px-16', 'pb-8')}>
+            <div className={classNames({'px-16': isNested}, 'pb-8')}>
               <div className="text-sm font-semibold text-moon-500">
                 Response
               </div>

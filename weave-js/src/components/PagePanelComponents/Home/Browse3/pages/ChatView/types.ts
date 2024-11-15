@@ -32,10 +32,6 @@ export type ToolCall = {
     // Validate the arguments in your code before calling your function.
     arguments: string;
   };
-};
-
-// Used to store the response of a tool call in the message history.
-export type ToolCallWithResponse = ToolCall & {
   response?: Message;
 };
 

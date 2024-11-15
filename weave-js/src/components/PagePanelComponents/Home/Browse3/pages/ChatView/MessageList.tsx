@@ -1,7 +1,7 @@
 import React, {useEffect, useRef} from 'react';
 
 import {MessagePanel} from './MessagePanel';
-import {Message, Messages, ToolCallWithResponse} from './types';
+import {Message, Messages, ToolCall} from './types';
 
 type MessageListProps = {
   messages: Messages;
@@ -35,7 +35,7 @@ export const MessageList = ({
 };
 
 // Associates tool calls with their responses
-const processToolCallMessages = (messages: Messages) => {
+const processToolCallMessages = (messages: Messages): Messages => {
   const processedMessages: Message[] = [];
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
@@ -45,7 +45,9 @@ const processToolCallMessages = (messages: Messages) => {
     if (!message.tool_calls) {
       processedMessages.push({
         ...message,
-        original_index: message.original_index ?? i,
+        // Store the original index of the message in the message object
+        // so that we can use it to sort the messages later.
+        original_index: i,
       });
       continue;
     }
@@ -61,13 +63,14 @@ const processToolCallMessages = (messages: Messages) => {
       i++;
     }
 
-    const toolCallsWithResponses: ToolCallWithResponse[] =
-      message.tool_calls.map(toolCall => ({
+    const toolCallsWithResponses: ToolCall[] = message.tool_calls.map(
+      toolCall => ({
         ...toolCall,
         response: toolMessages.find(
           toolMessage => toolMessage.tool_call_id === toolCall.id
         ),
-      }));
+      })
+    );
 
     processedMessages.push({
       ...message,
