@@ -148,7 +148,7 @@ export const useCallsForQuery = (
       },
       // TODO(gst): why does the $contains operator typing fail here...
     } as Query;
-  }, [feedbackTypeSubstr, callResults]);
+  }, [feedbackTypeSubstr, callRefs]);
   const feedbackQuery = useFeedbackQuery(entity, project, feedbackQueryQuery);
 
   // map of callId to the latest feedback of each feedback_type
@@ -162,11 +162,8 @@ export const useCallsForQuery = (
           }
           // Store feedback by feedback_type, newer entries will overwrite older ones
           if (curr.feedback_type) {
-            const feedbackName = curr.feedback_type.replace(
-              feedbackTypeSubstr,
-              ''
-            );
-            acc[callId][feedbackName] = getNestedValue(curr.payload);
+            const name = curr.feedback_type.replace(feedbackTypeSubstr, '');
+            acc[callId][name] = getNestedValue(curr.payload);
           }
           return acc;
         },

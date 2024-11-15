@@ -709,7 +709,7 @@ const useFeedbackQuery = (
     return () => {
       mounted = false;
     };
-  }, [getTsClient, doReload, sortBy, entity, project]);
+  }, [getTsClient, doReload, sortBy, entity, project, query]);
 
   return {...result, refetch};
 };

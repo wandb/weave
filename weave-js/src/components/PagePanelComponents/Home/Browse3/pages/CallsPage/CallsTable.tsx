@@ -541,14 +541,13 @@ export const CallsTable: FC<{
     const needsUpdate = annotationColumns.result.some(
       col => columnVisibilityModel[`feedback.${col.object_id}`] === undefined
     );
-
     if (!needsUpdate) {
       return;
     }
 
     const annotationColumnVisiblityFalse = annotationColumns.result.reduce(
       (acc, col) => {
-        // Only add columns that aren't already in the model
+        // Only add columns=false when not already in the model
         if (columnVisibilityModel[`feedback.${col.object_id}`] === undefined) {
           acc[`feedback.${col.object_id}`] = false;
         }
