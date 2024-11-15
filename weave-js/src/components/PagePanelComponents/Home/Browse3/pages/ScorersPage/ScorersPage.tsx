@@ -63,6 +63,8 @@ export const ScorersPage: React.FC<{
         }
       />
       <NewScorerDrawer
+        entity={entity}
+        project={project}
         open={isModalOpen}
         initialScorerType={selectedTab}
         onClose={() => setIsModalOpen(false)}
