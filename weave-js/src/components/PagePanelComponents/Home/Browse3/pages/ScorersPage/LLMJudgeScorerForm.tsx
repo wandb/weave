@@ -1,24 +1,29 @@
 import {Box} from '@material-ui/core';
-import {GOLD_300, GOLD_650} from '@wandb/weave/common/css/color.styles';
-import { Icon, IconNames } from '@wandb/weave/components/Icon';
+import {
+  GOLD_300,
+  GOLD_550,
+  GOLD_650,
+} from '@wandb/weave/common/css/color.styles';
+import {Button} from '@wandb/weave/components/Button';
+import {IconNames} from '@wandb/weave/components/Icon';
 import React, {FC, useCallback, useState} from 'react';
 import {z} from 'zod';
 
-import { AutocompleteWithLabel } from './FormComponents';
+import {AutocompleteWithLabel} from './FormComponents';
 import {ScorerFormProps} from './ScorerForms';
 import {ZSForm} from './ZodSchemaForm';
 
+const TEMPLATE_CTA = 'Start with a common LLM judge template!';
 const JSONTypeNames = z.enum(['Boolean', 'Number', 'String']);
 const ObjectJsonResponseFormat = z.object({
   Type: z.literal('Object'),
-  Properties: z.record(JSONTypeNames),
+  Properties: z.record(z.string().min(1), JSONTypeNames),
 });
 
 const LLMJudgeScorerFormSchema = z.object({
   Name: z.string().min(5),
-  Description: z.string().optional(),
   Model: z.enum(['gpt-4o-mini', 'gpt-4o']).default('gpt-4o-mini'),
-  Prompt: z.string(),
+  Prompt: z.string().min(5),
   'Response Schema': z.discriminatedUnion('Type', [
     z.object({Type: z.literal('Boolean')}),
     z.object({Type: z.literal('Number')}),
@@ -27,11 +32,55 @@ const LLMJudgeScorerFormSchema = z.object({
   ]),
 });
 
+const LLMJudgeScorerTemplates: Record<
+  string,
+  z.infer<typeof LLMJudgeScorerFormSchema>
+> = {
+  RelevancyJudge: {
+    Name: 'Relevancy Judge',
+    Model: 'gpt-4o-mini',
+    Prompt: 'Is the output relevant to the input?',
+    'Response Schema': {
+      Type: 'Object',
+      Properties: {
+        Relevance: 'Boolean',
+        Reason: 'String',
+      },
+    },
+  },
+  CorrectnessJudge: {
+    Name: 'Correctness Judge',
+    Model: 'gpt-4o-mini',
+    Prompt:
+      'Given the input and output, and your knowledge of the world, is the output correct?',
+    'Response Schema': {
+      Type: 'Object',
+      Properties: {
+        Correctness: 'Boolean',
+        Reason: 'String',
+      },
+    },
+  },
+};
+
+const LLMJudgeScorerOptions = Object.entries(LLMJudgeScorerTemplates).map(
+  ([name, template]) => ({
+    label: template.Name,
+    value: name,
+  })
+);
+
 export const LLMJudgeScorerForm: FC<
   ScorerFormProps<z.infer<typeof LLMJudgeScorerFormSchema>>
 > = ({data, onDataChange}) => {
   const [config, setConfigRaw] = useState(data);
   const [isValid, setIsValidRaw] = useState(false);
+  const [templateKey, setTemplateKey] = useState<string>(
+    Object.keys(LLMJudgeScorerTemplates)[0]
+  );
+  const selectedTemplate = templateKey
+    ? LLMJudgeScorerTemplates[templateKey]
+    : null;
 
   const setConfig = useCallback(
     (newConfig: any) => {
@@ -63,22 +112,31 @@ export const LLMJudgeScorerForm: FC<
           justifyContent: 'center',
           flexDirection: 'row',
           gap: '10px',
-          overflow: 'hidden',
-          flexWrap: 'wrap'
+          // overflow: 'hidden',
+          flexWrap: 'wrap',
         }}>
-        <Icon name={IconNames.MagicWandStar} style={{color: GOLD_650, flexShrink: 0}}/>
-          <Box style={{color: GOLD_650}}>Begin with a common LLM Judge template!</Box>
-          <Box style={{flex: 1}}><AutocompleteWithLabel style={{marginBottom: 0}} options={[
-            {
-              label: 'gpt-4o-mini',
-              value: 'gpt-4o-mini',
-            },
-            {
-              label: 'gpt-4o',
-              value: 'gpt-4o',
-            },
-          ]} /></Box>
+        <Box style={{color: GOLD_650}}>{TEMPLATE_CTA}</Box>
+        <Box style={{flex: 1}}>
+          <AutocompleteWithLabel
+            style={{marginBottom: 0}}
+            value={LLMJudgeScorerOptions.find(o => o.value === templateKey)}
+            onChange={v => setTemplateKey(v.value)}
+            options={LLMJudgeScorerOptions}
+          />
         </Box>
+        <Button
+          icon={IconNames.MagicWandStar}
+          style={{backgroundColor: GOLD_550, flexShrink: 0}}
+          disabled={!selectedTemplate}
+          onClick={() => {
+            if (selectedTemplate) {
+              setIsValidRaw(true);
+              setConfig(selectedTemplate);
+            }
+          }}>
+          Fill
+        </Button>
+      </Box>
       <ZSForm
         configSchema={LLMJudgeScorerFormSchema}
         config={config ?? {}}
@@ -270,3 +328,9 @@ export const LLMJudgeScorerForm: FC<
 //   )}
 // </Menu>
 // </Box>
+
+export const onLLMJudgeScorerSave = async (
+  data: z.infer<typeof LLMJudgeScorerFormSchema>
+) => {
+  console.log('TODO: save llm judge scorer', data);
+};

@@ -4,7 +4,7 @@ import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
 import React, {FC, ReactNode, useCallback, useEffect, useState} from 'react';
 
 import {AutocompleteWithLabel} from './FormComponents';
-import {LLMJudgeScorerForm} from './LLMJudgeScorerForm';
+import * as LLMJudgeScorerForm from './LLMJudgeScorerForm';
 import {
   AnnotationScorerForm,
   ProgrammaticScorerForm,
@@ -44,11 +44,8 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
     label: LLM_JUDGE_LABEL,
     value: LLM_JUDGE_VALUE,
     icon: IconNames.RobotServiceMember,
-    Component: LLMJudgeScorerForm,
-    onSave: async data => {
-      // Implementation for saving llm judge scorer
-      console.log('TODO: save llm judge scorer', data);
-    },
+    Component: LLMJudgeScorerForm.LLMJudgeScorerForm,
+    onSave: LLMJudgeScorerForm.onLLMJudgeScorerSave,
   },
   PROGRAMMATIC: {
     label: PROGRAMMATIC_LABEL,

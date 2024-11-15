@@ -552,7 +552,7 @@ const RecordField: React.FC<{
             height: '35px',
             marginBottom: '4px',
           }}>
-          <Box flexGrow={1}>
+          <Box style={{flex: '1 1 50%'}}>
             <TextFieldWithLabel
               style={{
                 marginBottom: '0px',
@@ -571,7 +571,7 @@ const RecordField: React.FC<{
               }}
             />
           </Box>
-          <Box flexGrow={1}>
+          <Box style={{flex: '1 1 50%'}}>
             {isZodType(valueSchema, s => s instanceof z.ZodEnum) ? (
               <EnumField
                 noMarginBottom
