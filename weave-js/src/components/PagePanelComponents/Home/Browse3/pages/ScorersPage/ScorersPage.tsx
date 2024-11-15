@@ -1,54 +1,74 @@
-import {Button} from '@wandb/weave/components/Button';
-import {Select} from '@wandb/weave/components/Form/Select';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useState} from 'react';
+import { Button } from '@wandb/weave/components/Button';
+import { IconNames } from '@wandb/weave/components/Icon';
+import React, { useState } from 'react';
 
-import {EditOrCreateAnnotationSpec} from '../../feedback/HumanFeedback/EditOrCreateAnnotationSpec';
-import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
-import {ActionSpecsTab} from './ActionSpecsTab';
-import {AnnotationsTab} from './AnnotationsTab';
-import {ProgrammaticScorersTab} from './CoreScorersTab';
+import { EditOrCreateAnnotationSpec } from '../../feedback/HumanFeedback/EditOrCreateAnnotationSpec';
+import { SimplePageLayoutWithHeader } from '../common/SimplePageLayout';
+import { AnnotationsTab } from './AnnotationsTab';
+import { ProgrammaticScorersTab } from './CoreScorersTab';
+import { LLMJudgesTab } from './LLMJudgesTab';
+import {
+  HUMAN_ANNOTATION_VALUE,
+  NewScorerDrawer,
+  ScorerType,
+  scorerTypeRecord,
+} from './NewScorerDrawer';
 
 export const ScorersPage: React.FC<{
   entity: string;
   project: string;
 }> = ({entity, project}) => {
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTab, setSelectedTab] = useState<ScorerType>(
+    scorerTypeRecord.ANNOTATION.value
+  );
+
   return (
-    <SimplePageLayoutWithHeader
-      title="Scorers"
-      tabs={[
-        {
-          label: 'Programmatic Scorers',
-          content: <ProgrammaticScorersTab entity={entity} project={project} />,
-        },
-        {
-          label: 'Human Annotations',
-          content: <AnnotationsTab entity={entity} project={project} />,
-        },
-        {
-          label: 'Configurable Scorers',
-          content: <ActionSpecsTab entity={entity} project={project} />,
-        },
-      ]}
-      headerContent={undefined}
-      headerExtra={
-        <Button
-          className="p-5 pr-8"
-          icon="add-new"
-          onClick={() => setIsDrawerOpen(true)}>
-          Create scorer
-        </Button>
-      }
-      isRightSidebarOpen={isDrawerOpen}
-      rightSidebarContent={
-        <CreateScorerDrawer
-          entityName={entity}
-          projectName={project}
-          onClose={() => setIsDrawerOpen(false)}
-        />
-      }
-    />
+    <>
+      <SimplePageLayoutWithHeader
+        title="Scorers"
+        tabs={[
+          {
+            label: scorerTypeRecord.ANNOTATION.label + 's',
+            icon: scorerTypeRecord.ANNOTATION.icon,
+            content: <AnnotationsTab entity={entity} project={project} />,
+          },
+          {
+            label: scorerTypeRecord.LLM_JUDGE.label + 's',
+            icon: scorerTypeRecord.LLM_JUDGE.icon,
+            content: <LLMJudgesTab entity={entity} project={project} />,
+          },
+          {
+            label: scorerTypeRecord.PROGRAMMATIC.label + 's',
+            icon: scorerTypeRecord.PROGRAMMATIC.icon,
+            content: (
+              <ProgrammaticScorersTab entity={entity} project={project} />
+            ),
+          },
+        ]}
+        headerExtra={
+          <Button
+            icon={IconNames.AddNew}
+            onClick={() => setIsModalOpen(true)}
+            variant="secondary">
+            Create scorer
+          </Button>
+        }
+        headerContent={undefined}
+        onTabSelectedCallback={tab =>
+          setSelectedTab(
+            // Hacky that we have to do the `"s"` thing, but it works
+            Object.values(scorerTypeRecord).find(t => t.label + 's' === tab)
+              ?.value ?? HUMAN_ANNOTATION_VALUE
+          )
+        }
+      />
+      <NewScorerDrawer
+        open={isModalOpen}
+        initialScorerType={selectedTab}
+        onClose={() => setIsModalOpen(false)}
+      />
+    </>
   );
 };
 

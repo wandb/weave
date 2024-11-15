@@ -3,9 +3,9 @@
  * to collapse the left panel.
  */
 
-import {hexToRGB, MOON_250} from '@wandb/weave/common/css/globals.styles';
-import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
-import {throttle} from 'lodash';
+import { hexToRGB, MOON_250 } from '@wandb/weave/common/css/globals.styles';
+import { useLocalStorage } from '@wandb/weave/util/useLocalStorage';
+import { throttle } from 'lodash';
 import React, {
   ReactNode,
   useCallback,
@@ -14,7 +14,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {AutoSizer} from 'react-virtualized';
+import { AutoSizer } from 'react-virtualized';
 import styled from 'styled-components';
 
 type SplitPanelProps = {
@@ -63,7 +63,7 @@ const getWidth = (value: number | string, total: number): number => {
   return parseFloat(value);
 };
 
-export const TraceTreeSplitPanel = ({
+export const SplitPanelLeft = ({
   main,
   drawer,
   isDrawerOpen,
