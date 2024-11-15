@@ -1,5 +1,6 @@
 from typing import Any, Literal, Optional, Union
 
+import jsonschema
 from pydantic import BaseModel, Field, field_validator
 
 from weave.trace_server.interface.base_object_classes import base_object_def
@@ -37,4 +38,14 @@ class ActionSpec(base_object_def.BaseObject):
     def name_must_be_set(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             raise ValueError("name must be set")
+        return v
+
+    @field_validator("json_schema")
+    def validate_json_schema(cls, v: dict) -> dict:
+        try:
+            jsonschema.validate(None, v)
+        except jsonschema.exceptions.SchemaError as e:
+            raise e
+        except jsonschema.exceptions.ValidationError:
+            pass  # we don't care that `None` does not conform
         return v
