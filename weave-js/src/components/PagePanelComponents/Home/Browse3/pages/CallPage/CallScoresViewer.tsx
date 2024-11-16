@@ -191,9 +191,7 @@ const useFlattenedRows = (rows: GroupedRowType[]): FlattenedRowType[] => {
       if (r.feedback == null) {
         return [r];
       }
-      const feedback = flattenObjectPreservingWeaveTypes(
-        r.feedback.payload.output
-      );
+      const feedback = flattenObjectPreservingWeaveTypes(r.feedback.payload);
       return Object.entries(feedback).map(([k, v]) => ({
         ...r,
         id: r.id + '::' + k,
@@ -279,7 +277,11 @@ export const CallScoresViewer: React.FC<{
       headerName: 'Key',
       width: 100,
       renderCell: params => {
-        const key = params.row.feedbackKey;
+        let key = params.row.feedbackKey;
+        // Handle cases where the output is a primitive value vs a nested object
+        if (key?.startsWith('.output')) {
+          key = key.slice(8);
+        }
         return key;
       },
     },
