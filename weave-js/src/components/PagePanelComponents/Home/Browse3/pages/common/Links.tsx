@@ -165,6 +165,7 @@ export const ObjectVersionLink: React.FC<{
   const text = props.hideVersionSuffix
     ? props.objectName
     : objectVersionText(props.objectName, props.versionIndex);
+  console.log('ObjectVersionLink: ');
   const to = peekingRouter.objectVersionUIUrl(
     props.entityName,
     props.projectName,

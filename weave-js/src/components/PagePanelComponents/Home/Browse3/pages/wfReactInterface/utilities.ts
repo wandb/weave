@@ -286,6 +286,39 @@ export const objectVersionNiceString = (ov: ObjectVersionSchema) => {
   return result;
 };
 
+export function parseObjectVersionUrlPathToRefUri(
+  urlPath: string | undefined
+): string | null {
+  if (!urlPath) {
+    return null;
+  }
+
+  // Remove leading and trailing slashes
+  const cleanPath = urlPath.replace(/^\/|\/$/g, '');
+  const segments = cleanPath.split('/');
+
+  // We need at least 6 segments to be a valid object version path
+  if (segments.length < 6) {
+    return null;
+  }
+  const entity = segments[0];
+  const project = segments[1];
+  const objectId = segments[3];
+  const versionHash = segments[5];
+
+  // Construct RefUri for object version
+  return objectVersionKeyToRefUri({
+    scheme: 'weave',
+    entity,
+    project,
+    objectId,
+    versionHash,
+    path: '', // empty because path is legacy
+    refExtra: '', // empty because refExtra is legacy
+    weaveKind: 'object',
+  });
+}
+
 /// Hooks ///
 
 export const useParentCall = (

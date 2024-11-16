@@ -23,7 +23,11 @@ import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
-import {useWeaveflowRouteContext} from '../context';
+import {
+  usePeekLocation,
+  useWeaveflowCurrentRouteContext,
+  useWeaveflowRouteContext,
+} from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
 import {Empty} from './common/Empty';
@@ -50,7 +54,7 @@ import {
   prepareFlattenedDataForTable,
 } from './common/tabularListViews/columnBuilder';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
-import {useControllableState, useURLSearchParamsDict} from './util';
+import {useControllableState} from './util';
 import {
   KNOWN_BASE_OBJECT_CLASSES,
   OBJECT_ATTR_EDGE_NAME,
@@ -216,6 +220,7 @@ export const ObjectVersionsTable: React.FC<{
 }> = props => {
   // `showPropsAsColumns` probably needs to be a bit more robust
   const showPropsAsColumns = !props.hidePropsAsColumns;
+  const router = useWeaveflowCurrentRouteContext();
   const rows: GridRowsProp = useMemo(() => {
     const vals = props.objectVersions.map(ov => ov.val);
     const flat = prepareFlattenedDataForTable(vals);
@@ -231,14 +236,20 @@ export const ObjectVersionsTable: React.FC<{
       // Show name, even though it can be = to object id, consider adding back
       // val = _.omit(val, 'name');
       return {
-        id: objectVersionKeyToRefUri(ov),
+        id: router.objectVersionUIUrl(
+          ov.entity,
+          ov.project,
+          ov.objectId,
+          ov.versionHash
+        ), // instead of using the ref uri, using the UI url to reduce parsing and conversion
+        // this somehow adds /weave after projectRoot()... why?
         obj: {
           ...ov,
           val,
         },
       };
     });
-  }, [props.objectVersions]);
+  }, [props.objectVersions, router]);
 
   // TODO: We should make this page very robust similar to the CallsTable page.
   // We will want to do nearly all the same things: URL state management,
@@ -382,12 +393,20 @@ export const ObjectVersionsTable: React.FC<{
   }, [props, showPropsAsColumns, rows]);
 
   // Highlight table row if it matches peek drawer.
-  const query = useURLSearchParamsDict();
-  const {peekPath} = query;
-  const peekId = peekPath ? peekPath.split('/').pop() : null;
+  // const query = useURLSearchParamsDict();
+  // const {peekPath} = query;
+
+  // const peekId = parseObjectVersionUrlPathToRefUri(peekPath);
+
+  // use peek location's path name, matching with ObjectVersionUIUrl
+  const peekLocation = usePeekLocation();
+  const peekId = peekLocation?.pathname ?? '';
+
   const rowIds = useMemo(() => {
     return rows.map(row => row.id);
   }, [rows]);
+  console.log({peekLocation, peekId, rowIds});
+
   const [rowSelectionModel, setRowSelectionModel] =
     useState<GridRowSelectionModel>([]);
   useEffect(() => {
