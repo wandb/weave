@@ -279,8 +279,8 @@ export const CallScoresViewer: React.FC<{
       renderCell: params => {
         let key = params.row.feedbackKey;
         // Handle cases where the output is a primitive value vs a nested object
-        if (key?.startsWith('.output')) {
-          key = key.slice(8);
+        if (key?.startsWith('output.')) {
+          key = key.slice(7);
         }
         return key;
       },
