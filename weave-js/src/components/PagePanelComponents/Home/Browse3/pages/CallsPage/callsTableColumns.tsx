@@ -11,12 +11,12 @@ import {
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
+import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {TEAL_600} from '../../../../../../common/css/color.styles';
 import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
-import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {Reactions} from '../../feedback/Reactions';
 import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
@@ -45,6 +45,7 @@ import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
 
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.weave'];
+const SHOWN_DYNAMIC_COLUMNS = ['summary.weave.feedback'];
 
 export const useCallsTableColumns = (
   entity: string,
@@ -57,7 +58,7 @@ export const useCallsTableColumns = (
   columnIsRefExpanded: (col: string) => boolean,
   allowedColumnPatterns?: string[],
   onAddFilter?: OnAddFilter,
-  costsLoading: boolean = false
+  extrasLoading: boolean = false
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -134,7 +135,7 @@ export const useCallsTableColumns = (
         userDefinedColumnWidths,
         allowedColumnPatterns,
         onAddFilter,
-        costsLoading
+        extrasLoading
       ),
     [
       entity,
@@ -151,7 +152,7 @@ export const useCallsTableColumns = (
       userDefinedColumnWidths,
       allowedColumnPatterns,
       onAddFilter,
-      costsLoading,
+      extrasLoading,
     ]
   );
 
@@ -177,7 +178,7 @@ function buildCallsTableColumns(
   userDefinedColumnWidths: Record<string, number>,
   allowedColumnPatterns?: string[],
   onAddFilter?: OnAddFilter,
-  costsLoading: boolean = false
+  extrasLoading: boolean = false
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -186,7 +187,9 @@ function buildCallsTableColumns(
   // Sort attributes after inputs and outputs.
   const filteredDynamicColumnNames = allDynamicColumnNames
     .filter(
-      c => !HIDDEN_DYNAMIC_COLUMN_PREFIXES.some(p => c.startsWith(p + '.'))
+      c =>
+        !HIDDEN_DYNAMIC_COLUMN_PREFIXES.some(p => c.startsWith(p + '.')) ||
+        SHOWN_DYNAMIC_COLUMNS.some(shown => c.startsWith(shown))
     )
     .sort((a, b) => {
       const prefixes = ['inputs.', 'output.', 'attributes.'];
@@ -419,7 +422,7 @@ function buildCallsTableColumns(
       return costNum;
     },
     renderCell: cellParams => {
-      if (costsLoading) {
+      if (extrasLoading) {
         return <LoadingDots />;
       }
       const {cost, costToolTipContent} = getCostsFromCellParams(cellParams.row);

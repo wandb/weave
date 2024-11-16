@@ -11,6 +11,7 @@ import {addCostsToCallResults} from '../CallPage/cost';
 import {operationConverter} from '../common/tabularListViews/operators';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
+import {Feedback} from '../wfReactInterface/traceServerClientTypes';
 import {
   CallFilter,
   CallSchema,
@@ -37,7 +38,7 @@ export const useCallsForQuery = (
   expandedColumns?: Set<string>,
   columns?: string[]
 ): {
-  costsLoading: boolean;
+  extrasLoading: boolean;
   result: CallSchema[];
   loading: boolean;
   total: number;
@@ -95,7 +96,7 @@ export const useCallsForQuery = (
     [calls.result]
   );
 
-  const costs = useCalls(
+  const extras = useCalls(
     entity,
     project,
     costFilter,
@@ -108,32 +109,69 @@ export const useCallsForQuery = (
     {
       skip: calls.loading,
       includeCosts: true,
+      includeFeedback: true,
     }
   );
 
-  const costResults = useMemo(() => {
-    return costs.result ?? [];
-  }, [costs]);
+  const extrasResults = useMemo(() => {
+    return extras.result ?? [];
+  }, [extras]);
   const refetch = useCallback(() => {
     calls.refetch();
-    costs.refetch();
+    extras.refetch();
     callsStats.refetch();
-  }, [calls, callsStats, costs]);
+  }, [calls, callsStats, extras]);
 
   return useMemo(() => {
     return {
-      costsLoading: costs.loading,
+      extrasLoading: extras.loading,
       loading: calls.loading,
       // Return faster calls query results until cost query finishes
       result: calls.loading
         ? []
-        : costResults.length > 0
-        ? addCostsToCallResults(callResults, costResults)
+        : extrasResults.length > 0
+        ? formatFeedbackInCalls(
+            addCostsToCallResults(callResults, extrasResults)
+          )
         : callResults,
       total,
       refetch,
     };
-  }, [callResults, calls.loading, total, costs.loading, costResults, refetch]);
+  }, [
+    callResults,
+    calls.loading,
+    total,
+    extras.loading,
+    extrasResults,
+    refetch,
+  ]);
+};
+
+const formatFeedback = (feedback: Feedback[]) => {
+  return feedback.reduce((acc, item) => {
+    acc[item.feedback_type] = item;
+    return acc;
+  }, {} as Record<string, Feedback>);
+};
+
+const formatFeedbackInCalls = (calls: CallSchema[]): CallSchema[] => {
+  return calls.map(call => {
+    const feedback = formatFeedback(
+      call.traceCall?.summary?.weave?.feedback ?? []
+    );
+    return {
+      ...call,
+      traceCall: {
+        ...call.traceCall,
+        summary: {
+          weave: {
+            ...call.traceCall?.summary?.weave,
+            feedback,
+          },
+        },
+      },
+    };
+  }) as CallSchema[];
 };
 
 export const useFilterSortby = (
