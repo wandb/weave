@@ -920,7 +920,7 @@ const useRootObjectVersions = (
   filter: ObjectVersionFilter,
   limit?: number,
   metadataOnly?: boolean,
-  opts?: {skip?: boolean}
+  opts?: {skip?: boolean; noAutoRefresh?: boolean}
 ): LoadableWithError<ObjectVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -983,8 +983,11 @@ const useRootObjectVersions = (
     if (opts?.skip) {
       return;
     }
+    if (opts?.noAutoRefresh) {
+      return;
+    }
     return getTsClient().registerOnObjectListener(doFetch);
-  }, [getTsClient, doFetch, opts?.skip]);
+  }, [getTsClient, doFetch, opts?.skip, opts?.noAutoRefresh]);
 
   return useMemo(() => {
     if (opts?.skip) {
