@@ -3,9 +3,10 @@ import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {Switch} from '@wandb/weave/components';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import {Tag} from '@wandb/weave/components/Tag';
-import React, {SetStateAction} from 'react';
+import React from 'react';
 
-import {PlaygroundState, PlaygroundStateKey} from '../types';
+import {SetPlaygroundStateFieldFunctionType} from '../PlaygroundChat/useChatFunctions';
+import {PlaygroundState} from '../types';
 import {FunctionEditor} from './FunctionEditor';
 import {PlaygroundSlider} from './PlaygroundSlider';
 import {ResponseFormatEditor} from './ResponseFormatEditor';
@@ -13,11 +14,7 @@ import {StopSequenceEditor} from './StopSequenceEditor';
 
 export type PlaygroundSettingsProps = {
   playgroundStates: PlaygroundState[];
-  setPlaygroundStateField: (
-    index: number,
-    field: PlaygroundStateKey,
-    value: SetStateAction<PlaygroundState[PlaygroundStateKey]>
-  ) => void;
+  setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
   settingsTab: number;
   setSettingsTab: (tab: number) => void;
 };
