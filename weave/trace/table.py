@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 from collections.abc import Iterator
-from typing import Any, Optional
+from typing import Any
 
 from weave.trace.refs import TableRef
 
 
 class Table:
-    ref: Optional[TableRef]
+    ref: TableRef | None
 
     def __init__(self, rows: list[dict]) -> None:
         if not isinstance(rows, list):
