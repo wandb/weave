@@ -37,6 +37,7 @@ export const PlaygroundChat = ({
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const chatPercentWidth = 100 / playgroundStates.length;
 
   const {handleRetry, handleSend} = useChatCompletionFunctions(
     setPlaygroundStates,
@@ -57,8 +58,6 @@ export const PlaygroundChat = ({
     }
     setChatText('');
   };
-
-  const chatPercentWidth = 100 / playgroundStates.length;
 
   return (
     <Box

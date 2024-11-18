@@ -12,7 +12,7 @@ type OneToolCallProps = {
 };
 
 const OneToolCall = ({toolCall}: OneToolCallProps) => {
-  const [isCopying, setIsCopying] = useState<boolean>(false);
+  const [isCopying, setIsCopying] = useState(false);
   const {isPlayground} = usePlaygroundContext();
 
   const handleCopyText = (text: string) => {
