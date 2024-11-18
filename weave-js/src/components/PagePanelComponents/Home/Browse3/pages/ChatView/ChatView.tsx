@@ -58,7 +58,7 @@ export const ChatView = ({chat}: ChatViewProps) => {
           </div>
         </>
       )}
-      {showEmptyStateCallout && <ChatEmptyStateCallout />}
+      {/* {showEmptyStateCallout && <ChatEmptyStateCallout />} */}
     </div>
   );
 };
