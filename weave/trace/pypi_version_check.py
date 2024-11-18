@@ -8,16 +8,12 @@ Copied here to avoid a dependency on the wandb library and allow more pointed co
 over the version checking logic.
 """
 
+from __future__ import annotations
+
 import queue
 import sys
 import threading
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Optional,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Callable
 
 import requests
 
@@ -27,7 +23,7 @@ if TYPE_CHECKING:
 
 def check_available(
     current_version: str, module_name: str
-) -> Optional[dict[str, Optional[str]]]:
+) -> dict[str, str | None] | None:
     """
     Check if there is a new version of the module available on PyPI.
 
@@ -36,7 +32,7 @@ def check_available(
         module_name (str): The name of the module to check for updates.
 
     Returns:
-        Optional[dict[str, Optional[str]]]: A dictionary containing the upgrade message, yank message, or delete message, or None if no update is available.
+        dict[str, str | None] | None: A dictionary containing the upgrade message, yank message, or delete message, or None if no update is available.
     """
     package_info = _find_available(current_version, module_name)
     if not package_info:
@@ -68,7 +64,7 @@ def check_available(
     }
 
 
-def _parse_version(version: str) -> "packaging.version.Version":
+def _parse_version(version: str) -> packaging.version.Version:
     """Parse a version string into a version object.
 
     This function is a wrapper around the `packaging.version.parse` function, which
@@ -83,9 +79,7 @@ def _parse_version(version: str) -> "packaging.version.Version":
     return parse_version(version)
 
 
-def _async_call(
-    target: Callable, timeout: Optional[Union[int, float]] = None
-) -> Callable:
+def _async_call(target: Callable, timeout: int | float | None = None) -> Callable:
     """Wrap a method to run in the background with an optional timeout.
 
     Returns a new method that will call the original with any args, waiting for upto
@@ -96,15 +90,13 @@ def _async_call(
     """
     q: queue.Queue = queue.Queue()
 
-    def wrapped_target(q: "queue.Queue", *args: Any, **kwargs: Any) -> Any:
+    def wrapped_target(q: queue.Queue, *args: Any, **kwargs: Any) -> Any:
         try:
             q.put(target(*args, **kwargs))
         except Exception as e:
             q.put(e)
 
-    def wrapper(
-        *args: Any, **kwargs: Any
-    ) -> Union[tuple[Exception, "threading.Thread"], tuple[None, "threading.Thread"]]:
+    def wrapper(*args: Any, **kwargs: Any) -> tuple[Exception | None, threading.Thread]:
         thread = threading.Thread(
             target=wrapped_target, args=(q,) + args, kwargs=kwargs
         )
@@ -124,7 +116,7 @@ def _async_call(
 
 def _find_available(
     current_version: str, module_name: str
-) -> Optional[tuple[str, bool, bool, bool, Optional[str]]]:
+) -> tuple[str, bool, bool, bool, str | None] | None:
     pypi_url = f"https://pypi.org/pypi/{module_name}/json"
     yanked_dict = {}
     try:

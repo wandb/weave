@@ -1,15 +1,23 @@
 /**
  * A vertically split panel with a draggable divider and the ability
- * to collapse the right panel.
+ * to collapse the left panel.
  */
 
 import {hexToRGB, MOON_250} from '@wandb/weave/common/css/globals.styles';
 import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
-import React, {ReactNode, useCallback, useRef, useState} from 'react';
+import {throttle} from 'lodash';
+import React, {
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {AutoSizer} from 'react-virtualized';
 import styled from 'styled-components';
 
-type SplitPanelProps = {
+type SplitPanelLeftProps = {
   drawer?: ReactNode;
   main: ReactNode;
   isDrawerOpen: boolean;
@@ -22,7 +30,7 @@ const DIVIDER_LINE_WIDTH = 1;
 const DIVIDER_BORDER_WIDTH = 4;
 const DIVIDER_WIDTH = 2 * DIVIDER_BORDER_WIDTH + DIVIDER_LINE_WIDTH;
 
-const Divider = styled.span<{right: number}>`
+const DividerLeft = styled.span<{left: number}>`
   background-color: ${MOON_250};
   border-left: ${DIVIDER_BORDER_WIDTH}px solid transparent;
   border-right: ${DIVIDER_BORDER_WIDTH}px solid transparent;
@@ -33,7 +41,7 @@ const Divider = styled.span<{right: number}>`
   position: absolute;
   top: 0;
   bottom: 0;
-  right: ${props => props.right}px;
+  left: ${props => props.left}px;
   transition: border 0.5s ease;
   transition-delay: 0.2s;
 
@@ -42,7 +50,7 @@ const Divider = styled.span<{right: number}>`
     border-right-color: ${hexToRGB(MOON_250, 0.5)};
   }
 `;
-Divider.displayName = 'S.DividerRight';
+DividerLeft.displayName = 'S.DividerLeft';
 
 // Handle percent or pixel specification.
 const getWidth = (value: number | string, total: number): number => {
@@ -55,51 +63,84 @@ const getWidth = (value: number | string, total: number): number => {
   return parseFloat(value);
 };
 
-export const SplitPanelRight = ({
+export const SplitPanelLeft = ({
   main,
   drawer,
   isDrawerOpen,
   minWidth,
   maxWidth,
   defaultWidth = '30%',
-}: SplitPanelProps) => {
+}: SplitPanelLeftProps) => {
   const ref = useRef<HTMLDivElement>(null);
-  //  We store the drawer width and height in local storage so that it persists
+  const dragStartXRef = useRef<number>(0);
+  const dragStartWidthRef = useRef<number>(0);
+
   const [width, setWidth] = useLocalStorage(
-    'weaveflow-rightpanel-width-number',
+    'weaveflow-tracetree-width-number',
     defaultWidth
   );
 
   const [isDragging, setIsDragging] = useState(false);
 
-  const onMouseDown = useCallback(() => {
-    setIsDragging(true);
-  }, [setIsDragging]);
+  // Throttle the width setting to 16ms (60fps)
+  const throttledSetWidth = useMemo(
+    () =>
+      throttle((newWidth: number) => {
+        setWidth(newWidth);
+      }, 16),
+    [setWidth]
+  );
+  useEffect(() => {
+    return () => {
+      throttledSetWidth.cancel();
+    };
+  }, [throttledSetWidth]);
+
+  const onMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      setIsDragging(true);
+      dragStartXRef.current = e.clientX;
+      dragStartWidthRef.current = typeof width === 'number' ? width : 0;
+      e.preventDefault();
+    },
+    [width]
+  );
   const onMouseUp = useCallback(() => {
     setIsDragging(false);
-  }, [setIsDragging]);
+  }, []);
   const onMouseLeave = useCallback(() => {
     setIsDragging(false);
-  }, [setIsDragging]);
-  const onMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) {
-      const panel = (e.target as HTMLElement).parentElement!;
-      const bounds = panel.getBoundingClientRect();
-      const x = bounds.right - e.clientX;
-      if (minWidth && x < getWidth(minWidth, bounds.width)) {
+  }, []);
+  const onMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isDragging) {
         return;
       }
-      if (maxWidth && x > getWidth(maxWidth, bounds.width)) {
-        return;
-      }
-      setWidth(x);
-    }
-  };
 
-  // TODO: Might be nice to change the cursor if user has gone beyond the min/max width
+      const deltaX = e.clientX - dragStartXRef.current;
+      const newWidth = dragStartWidthRef.current + deltaX;
+
+      const bounds = ref.current?.getBoundingClientRect();
+      if (!bounds) {
+        return;
+      }
+
+      const minW = minWidth ? getWidth(minWidth, bounds.width) : 0;
+      const maxW = maxWidth ? getWidth(maxWidth, bounds.width) : bounds.width;
+
+      if (newWidth < minW || newWidth > maxW) {
+        return;
+      }
+
+      throttledSetWidth(newWidth);
+    },
+    [isDragging, minWidth, maxWidth, throttledSetWidth]
+  );
+
   const cursor = isDragging ? 'col-resize' : undefined;
   const pointerEvents = isDragging ? 'none' : 'auto';
   const userSelect = isDragging ? 'none' : 'auto';
+
   return (
     <AutoSizer style={{width: '100%', height: '100%'}}>
       {panelDim => {
@@ -141,39 +182,38 @@ export const SplitPanelRight = ({
                 userSelect,
                 pointerEvents,
               }}>
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: isDrawerOpen ? numW + DIVIDER_WIDTH : 0,
-                  bottom: 0,
-                  overflow: 'hidden',
-                  willChange: isDragging ? 'right' : 'auto',
-                }}>
-                {main}
-              </div>
               {isDrawerOpen && (
                 <div
                   style={{
                     position: 'absolute',
                     top: 0,
-                    right: 0,
+                    left: 0,
                     bottom: 0,
-                    width: numW,
+                    width: numW + DIVIDER_WIDTH / 2,
                     overflow: 'hidden',
-                    transform: `translateX(0)`,
-                    willChange: isDragging ? 'transform' : 'auto',
+                    willChange: isDragging ? 'transform, width' : 'auto',
                   }}>
                   {drawer}
                 </div>
               )}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: isDrawerOpen ? numW + DIVIDER_WIDTH : 0,
+                  right: 0,
+                  bottom: 0,
+                  overflow: 'hidden',
+                  willChange: isDragging ? 'left' : 'auto',
+                }}>
+                {main}
+              </div>
             </div>
             {isDrawerOpen && (
-              <Divider
+              <DividerLeft
                 className="divider"
                 onMouseDown={onMouseDown}
-                right={numW}
+                left={numW}
               />
             )}
           </div>

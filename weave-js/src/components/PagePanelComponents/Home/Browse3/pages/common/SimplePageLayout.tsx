@@ -15,8 +15,8 @@ import React, {
 } from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
-import {SplitPanelLeft} from './SplitPanelLeft';
-import {SplitPanelRight} from './SplitPanelRight';
+import {SplitPanelLeft} from './SplitPanels/SplitPanelLeft';
+import {SplitPanelRight} from './SplitPanels/SplitPanelRight';
 import {isPrimitive} from './util';
 
 type SimplePageLayoutContextType = {
@@ -33,7 +33,7 @@ export const SimplePageLayout: FC<{
     label: string;
     content: ReactNode;
   }>;
-  leftSidebar?: ReactNode;
+  leftSidebarContent?: ReactNode;
   hideTabsIfSingle?: boolean;
   headerExtra?: ReactNode;
 }> = props => {
@@ -135,7 +135,7 @@ export const SimplePageLayout: FC<{
           flexDirection: 'row',
           flex: '1 1 auto',
         }}>
-        {props.leftSidebar && (
+        {props.leftSidebarContent && (
           <Box
             sx={{
               width: '35%',
@@ -145,7 +145,7 @@ export const SimplePageLayout: FC<{
               maxHeight: '100%',
               borderRight: `1px solid ${MOON_200}`,
             }}>
-            {props.leftSidebar}
+            {props.leftSidebarContent}
           </Box>
         )}
         <Box
@@ -171,12 +171,14 @@ export const SimplePageLayoutWithHeader: FC<{
   }>;
   headerExtra?: ReactNode;
   headerContent: ReactNode;
-  leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
+  onTabSelectedCallback?: (tab: string) => void;
+  // Left sidebar
   isLeftSidebarOpen?: boolean;
+  leftSidebarContent?: ReactNode;
+  // Right sidebar
   isRightSidebarOpen?: boolean;
   rightSidebarContent?: ReactNode;
-  onTabSelectedCallback?: (tab: string) => void;
 }> = props => {
   const {tabs} = props;
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
@@ -257,13 +259,13 @@ export const SimplePageLayoutWithHeader: FC<{
         {props.headerExtra}
         {simplePageLayoutContextValue.headerSuffix}
       </Box>
-      <div style={{flex: '1 1 auto', overflow: 'hidden', display: 'flex'}}>
+      <div style={{flex: '1 1 auto', overflow: 'hidden'}}>
         <SplitPanelLeft
           minWidth={150}
           defaultWidth={200}
           maxWidth="50%"
           isDrawerOpen={props.isLeftSidebarOpen ?? false}
-          drawer={props.leftSidebar}
+          drawer={props.leftSidebarContent}
           main={
             <SplitPanelRight
               minWidth={150}
@@ -272,7 +274,7 @@ export const SimplePageLayoutWithHeader: FC<{
               drawer={props.rightSidebarContent}
               isDrawerOpen={props.isRightSidebarOpen ?? false}
               main={
-                <SimpleTabContent
+                <SimpleTabView
                   headerContent={props.headerContent}
                   tabContent={tabContent}
                   tabs={props.tabs}
@@ -290,7 +292,7 @@ export const SimplePageLayoutWithHeader: FC<{
   );
 };
 
-const SimpleTabContent: FC<{
+const SimpleTabView: FC<{
   headerContent: ReactNode;
   tabs: Array<{
     label: string;

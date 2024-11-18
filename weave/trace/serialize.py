@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import logging
-import typing
 from collections.abc import Sequence
 from types import CoroutineType
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
@@ -18,12 +19,12 @@ from weave.trace_server.trace_server_interface import (
 )
 from weave.trace_server.trace_server_interface_util import bytes_digest
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
 
 
 def to_json(
-    obj: Any, project_id: str, client: "WeaveClient", use_dictify: bool = False
+    obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
 ) -> Any:
     if isinstance(obj, TableRef):
         return obj.uri()
@@ -63,7 +64,7 @@ def to_json(
 
 
 def _build_result_from_encoded(
-    encoded: dict, project_id: str, client: "WeaveClient"
+    encoded: dict, project_id: str, client: WeaveClient
 ) -> Any:
     file_digests = {}
     for name, val in encoded["files"].items():
@@ -121,7 +122,7 @@ def has_custom_repr(obj: Any) -> bool:
 
 
 def dictify(
-    obj: Any, maxdepth: int = 0, depth: int = 1, seen: Optional[set[int]] = None
+    obj: Any, maxdepth: int = 0, depth: int = 1, seen: set[int] | None = None
 ) -> Any:
     """Recursively compute a dictionary representation of an object."""
     if seen is None:
