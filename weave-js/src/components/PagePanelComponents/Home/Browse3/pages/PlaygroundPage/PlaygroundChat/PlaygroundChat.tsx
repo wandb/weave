@@ -38,7 +38,7 @@ export const PlaygroundChat = ({
   const [chatText, setChatText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const {handleRetry, handleAllSend} = useChatCompletionFunctions(
+  const {handleRetry, handleSend} = useChatCompletionFunctions(
     setPlaygroundStates,
     setIsLoading,
     chatText,
@@ -194,7 +194,7 @@ export const PlaygroundChat = ({
         chatText={chatText}
         setChatText={setChatText}
         isLoading={isLoading}
-        onSend={handleAllSend}
+        onSend={handleSend}
         onAdd={handleAddMessage}
       />
     </Box>

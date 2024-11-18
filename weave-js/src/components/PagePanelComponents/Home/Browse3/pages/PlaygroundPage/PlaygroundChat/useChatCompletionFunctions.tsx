@@ -20,23 +20,6 @@ export const useChatCompletionFunctions = (
 ) => {
   const getTsClient = useGetTraceServerClientContext();
 
-  // Helper functions
-  const appendChoicesToMessages = (state: PlaygroundState) => {
-    const updatedState = JSON.parse(JSON.stringify(state));
-    if (
-      updatedState.traceCall?.inputs?.messages &&
-      updatedState.traceCall.output?.choices
-    ) {
-      updatedState.traceCall.output.choices.forEach((choice: any) => {
-        if (choice.message) {
-          updatedState.traceCall.inputs.messages.push(choice.message);
-        }
-      });
-      updatedState.traceCall.output.choices = undefined;
-    }
-    return updatedState;
-  };
-
   const makeCompletionRequest = async (
     callIndex: number,
     updatedStates: PlaygroundState[]
@@ -73,42 +56,25 @@ export const useChatCompletionFunctions = (
     return true;
   };
 
-  const updatePlaygroundStateWithMessage = (
-    state: PlaygroundState,
-    message: Message | undefined
-  ) => {
-    const updatedState = appendChoicesToMessages(state);
-    if (updatedState.traceCall?.inputs?.messages) {
-      updatedState.traceCall.inputs.messages.push(message);
-    }
-
-    return updatedState;
-  };
-
-  const withCompletionsLoading = async (operation: () => Promise<void>) => {
-    setIsLoading(true);
-    try {
-      await operation();
-    } catch (error) {
-      console.error('Error processing completion:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleAllSend = async (
+  const handleSend = async (
     role: 'assistant' | 'user' | 'tool',
     callIndex?: number,
     content?: string,
     toolCallId?: string
   ) => {
-    await withCompletionsLoading(async () => {
+    try {
+      setIsLoading(true);
+
       const newMessage = createMessage(role, content || chatText, toolCallId);
       const updatedStates = playgroundStates.map((state, index) => {
         if (callIndex === undefined || callIndex !== index) {
           return state;
         }
-        return updatePlaygroundStateWithMessage(state, newMessage);
+        const updatedState = appendChoicesToMessages(state);
+        if (updatedState.traceCall?.inputs?.messages) {
+          updatedState.traceCall.inputs.messages.push(newMessage);
+        }
+        return updatedState;
       });
 
       setPlaygroundStates(updatedStates);
@@ -123,7 +89,11 @@ export const useChatCompletionFunctions = (
         })
       );
       await handleErrorsAndUpdate(responses, updatedStates);
-    });
+    } catch (error) {
+      console.error('Error processing completion:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleRetry = async (
@@ -131,7 +101,8 @@ export const useChatCompletionFunctions = (
     messageIndex: number,
     isChoice?: boolean
   ) => {
-    await withCompletionsLoading(async () => {
+    try {
+      setIsLoading(true);
       const updatedStates = playgroundStates.map((state, index) => {
         if (index === callIndex) {
           if (isChoice) {
@@ -153,12 +124,17 @@ export const useChatCompletionFunctions = (
         updatedStates,
         callIndex
       );
-    });
+    } catch (error) {
+      console.error('Error processing completion:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  return {handleRetry, handleAllSend};
+  return {handleRetry, handleSend};
 };
 
+// Helper functions
 const createMessage = (
   role: 'assistant' | 'user' | 'tool',
   content: string,
@@ -192,13 +168,16 @@ const handleMissingLLMApiKey = (responses: any, entity: string) => {
 };
 
 const handleErrorResponse = (
-  responses: Array<CompletionsCreateRes | null>
+  responses: Array<CompletionsCreateRes | null | {error: string}>
 ): boolean => {
   if (!responses) {
     return true;
   }
-  if (responses.some(r => r?.error)) {
-    toast(responses.find(r => r?.error)?.error, {
+  if (responses.some(r => r && 'error' in r)) {
+    const errorResponse = responses.find(r => r && 'error' in r) as {
+      error: string;
+    };
+    toast(errorResponse?.error, {
       type: 'error',
     });
     return true;
@@ -216,4 +195,20 @@ const handleUpdateCallWithResponse = (updatedCall: any, response: any) => {
       output: response.response,
     },
   };
+};
+
+const appendChoicesToMessages = (state: PlaygroundState) => {
+  const updatedState = JSON.parse(JSON.stringify(state));
+  if (
+    updatedState.traceCall?.inputs?.messages &&
+    updatedState.traceCall.output?.choices
+  ) {
+    updatedState.traceCall.output.choices.forEach((choice: any) => {
+      if (choice.message) {
+        updatedState.traceCall.inputs.messages.push(choice.message);
+      }
+    });
+    updatedState.traceCall.output.choices = undefined;
+  }
+  return updatedState;
 };

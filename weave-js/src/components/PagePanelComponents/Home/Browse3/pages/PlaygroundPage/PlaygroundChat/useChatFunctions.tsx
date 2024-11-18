@@ -1,7 +1,7 @@
 import {cloneDeep} from 'lodash';
 import {SetStateAction} from 'react';
 
-import {Choice, Message} from '../../ChatView/types';
+import {Message} from '../../ChatView/types';
 import {OptionalTraceCallSchema, PlaygroundState} from '../types';
 import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
 type TraceCallOutput = {
