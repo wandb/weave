@@ -50,6 +50,7 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
+import {convertFeedbackFieldToBackendFilter} from '../../feedback/HumanFeedback/tsHumanFeedback';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
@@ -100,7 +101,10 @@ import {ManageColumnsButton} from './ManageColumnsButton';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
-export const DEFAULT_HIDDEN_COLUMN_PREFIXES = ['attributes.weave', 'feedback'];
+export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
+  'attributes.weave',
+  'summary.weave.feedback',
+];
 
 export const ALWAYS_PIN_LEFT_CALLS = ['CustomCheckbox'];
 
@@ -688,6 +692,15 @@ export const CallsTable: FC<{
       // not have been determined yet. So skip setting the sort model in this case.
       if (!muiColumns.some(col => col.field.startsWith('output'))) {
         return;
+      }
+
+      // handle feedback conversion from weave summary to backend filter
+      for (const sort of newModel) {
+        if (sort.field.startsWith('summary.weave.feedback')) {
+          const stripped = sort.field.replace('summary.weave.', '');
+          const backendFilter = convertFeedbackFieldToBackendFilter(stripped);
+          sort.field = backendFilter;
+        }
       }
       setSortModel(newModel);
     },

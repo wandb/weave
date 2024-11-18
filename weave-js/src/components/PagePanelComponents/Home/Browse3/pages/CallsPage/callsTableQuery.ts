@@ -243,8 +243,16 @@ const getFeedbackMerged = (calls: CallSchema[]) => {
       },
       {}
     );
-    // TODO: how do I sneak this into the schema?
-    c.traceCall.feedback = feedback;
+    c.traceCall = {
+      ...c.traceCall,
+      summary: {
+        ...c.traceCall.summary,
+        weave: {
+          ...c.traceCall.summary.weave,
+          feedback,
+        },
+      },
+    };
     return c;
   });
 };

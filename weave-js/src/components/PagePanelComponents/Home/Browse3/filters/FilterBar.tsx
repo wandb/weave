@@ -10,6 +10,10 @@ import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
 import {IconFilterAlt} from '../../../../Icon';
 import {Tailwind} from '../../../../Tailwind';
+import {
+  convertFeedbackFieldToBackendFilter,
+  parseFeedbackType,
+} from '../feedback/HumanFeedback/tsHumanFeedback';
 import {ColumnInfo} from '../types';
 import {
   FIELD_DESCRIPTIONS,
@@ -104,6 +108,16 @@ export const FilterBar = ({
         value: col.field,
         label: (col.headerName ?? col.field).substring('attributes.'.length),
         description: FIELD_DESCRIPTIONS[col.field],
+      });
+    } else if (
+      col.field.startsWith('summary.weave.feedback.wandb.annotation')
+    ) {
+      const stripped = col.field.replace('summary.weave.', '');
+      const parsed = parseFeedbackType(stripped);
+      const backendFilter = convertFeedbackFieldToBackendFilter(stripped);
+      (options[0] as GroupedOption).options.push({
+        value: backendFilter,
+        label: parsed ? parsed.displayName : col.field,
       });
     } else {
       (options[0] as GroupedOption).options.push({

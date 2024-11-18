@@ -336,8 +336,10 @@ function buildCallsTableColumns(
   cols.push(...newCols);
 
   // Create special feedback columns with grouping model
-  const annotationColNames = allDynamicColumnNames.filter(c =>
-    c.startsWith('feedback.wandb.annotation')
+  const annotationColNames = allDynamicColumnNames.filter(
+    c =>
+      c.startsWith('summary.weave.feedback.wandb.annotation') &&
+      c.endsWith('payload.value')
   );
   if (annotationColNames.length > 0) {
     // Add feedback group to grouping model
@@ -352,7 +354,8 @@ function buildCallsTableColumns(
     // Add feedback columns
     const annotationColumns: Array<GridColDef<TraceCallSchema>> =
       annotationColNames.map(c => {
-        const parsed = parseFeedbackType(c);
+        const stripped = c.replace('summary.weave.', '');
+        const parsed = parseFeedbackType(stripped);
         return {
           field: convertFeedbackFieldToBackendFilter(c),
           headerName: parsed ? parsed.displayName : `${c}`,
