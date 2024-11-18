@@ -26,52 +26,7 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 const RUNNABLE_REF_PREFIX = 'wandb.runnable';
 
-// New RunButton component
-const RunButton: React.FC<{
-  actionRef: string;
-  callId: string;
-  entity: string;
-  project: string;
-  refetchFeedback: () => void;
-}> = ({actionRef, callId, entity, project, refetchFeedback}) => {
-  const getClient = useGetTraceServerClientContext();
 
-  const [isRunning, setIsRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleRunClick = async () => {
-    setIsRunning(true);
-    setError(null);
-    try {
-      await getClient().actionsExecuteBatch({
-        project_id: projectIdFromParts({entity, project}),
-        call_ids: [callId],
-        action_ref: actionRef,
-      });
-      refetchFeedback();
-    } catch (err) {
-      setError('An error occurred while running the action.');
-    } finally {
-      setIsRunning(false);
-    }
-  };
-
-  if (error) {
-    return (
-      <Button variant="destructive" onClick={handleRunClick} disabled>
-        Error
-      </Button>
-    );
-  }
-
-  return (
-    <div>
-      <Button variant="secondary" onClick={handleRunClick} disabled={isRunning}>
-        {isRunning ? 'Running...' : 'Run'}
-      </Button>
-    </div>
-  );
-};
 
 const useLatestActionDefinitionsForCall = (call: CallSchema) => {
   const actionSpecs = (
@@ -311,7 +266,7 @@ export const CallScoresViewer: React.FC<{
     {
       field: 'run',
       headerName: '',
-      width: 70,
+      width:75,
       rowSpanValueGetter: (value, row) => row.displayName,
       renderCell: params => {
         const actionRef = params.row.runnableActionRef;
@@ -365,5 +320,53 @@ export const CallScoresViewer: React.FC<{
         }}
       />
     </>
+  );
+};
+
+
+const RunButton: React.FC<{
+  actionRef: string;
+  callId: string;
+  entity: string;
+  project: string;
+  refetchFeedback: () => void;
+}> = ({actionRef, callId, entity, project, refetchFeedback}) => {
+  const getClient = useGetTraceServerClientContext();
+
+  const [isRunning, setIsRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleRunClick = async () => {
+    setIsRunning(true);
+    setError(null);
+    try {
+      await getClient().actionsExecuteBatch({
+        project_id: projectIdFromParts({entity, project}),
+        call_ids: [callId],
+        action_ref: actionRef,
+      });
+      refetchFeedback();
+    } catch (err) {
+      setError('An error occurred while running the action.');
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+
+  if (error) {
+    return (
+      <Button variant="destructive" onClick={handleRunClick} disabled style={{width: '55px'}}>
+        Error
+      </Button>
+    );
+  }
+
+  return (
+    <div>
+      <Button variant="secondary" onClick={handleRunClick} disabled={isRunning} style={{width: '55px'}}>
+        {isRunning ? '...' : 'Run'}
+      </Button>
+    </div>
   );
 };
