@@ -3,17 +3,15 @@ import Prism from 'prismjs';
 import React, {useEffect, useRef, useState} from 'react';
 
 import {Alert} from '../../../../../Alert';
-import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
 import {MessagePanel} from './MessagePanel';
-import {ToolCallWithResponse} from './types';
+import {ToolCall} from './types';
 
 type OneToolCallProps = {
-  toolCall: ToolCallWithResponse;
+  toolCall: ToolCall;
 };
 
 const OneToolCall = ({toolCall}: OneToolCallProps) => {
-  const [isCopying, setIsCopying] = useState<boolean>(false);
-  const {isPlayground} = usePlaygroundContext();
+  const [isCopying, setIsCopying] = useState(false);
 
   const handleCopyText = (text: string) => {
     try {
@@ -85,11 +83,10 @@ const OneToolCall = ({toolCall}: OneToolCallProps) => {
       </div>
 
       {/* The tool call response */}
-      {(toolCall.response || isPlayground) && (
+      {toolCall.response && (
         <div className="px-16">
           <MessagePanel
             isNested
-            pendingToolResponseId={toolCall.response ? undefined : toolCall.id}
             index={toolCall.response?.original_index ?? 0}
             key={toolCall.id}
             message={
@@ -106,7 +103,7 @@ const OneToolCall = ({toolCall}: OneToolCallProps) => {
 };
 
 type ToolCallsProps = {
-  toolCalls: ToolCallWithResponse[];
+  toolCalls: ToolCall[];
 };
 
 export const ToolCalls = ({toolCalls}: ToolCallsProps) => {

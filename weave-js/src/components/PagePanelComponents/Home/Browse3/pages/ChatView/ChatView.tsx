@@ -27,17 +27,25 @@ export const ChatView = ({chat}: ChatViewProps) => {
 
   return (
     <div className="flex flex-col pb-32">
+      <span className="mb-[-16px] text-sm font-semibold text-moon-800">
+        Messages
+      </span>
       <MessageList
         messages={chat.request?.messages || []}
         scrollLastMessage={scrollLastMessage}
       />
       {chatResult && chatResult.choices && (
-        <div ref={outputRef}>
-          <ChoicesView
-            isStructuredOutput={chat.isStructuredOutput}
-            choices={chatResult.choices}
-          />
-        </div>
+        <>
+          <span className="mt-16 text-sm font-semibold text-moon-800">
+            Response
+          </span>
+          <div ref={outputRef}>
+            <ChoicesView
+              isStructuredOutput={chat.isStructuredOutput}
+              choices={chatResult.choices}
+            />
+          </div>
+        </>
       )}
     </div>
   );

@@ -15,7 +15,6 @@ export const ChoiceView = ({choice, isStructuredOutput}: ChoiceViewProps) => {
       index={choice.index}
       message={message}
       isStructuredOutput={isStructuredOutput}
-      isChoice
     />
   );
 };
