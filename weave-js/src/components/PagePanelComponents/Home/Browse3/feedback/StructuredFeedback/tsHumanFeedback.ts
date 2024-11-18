@@ -7,12 +7,9 @@ import {
 } from '../../pages/wfReactInterface/traceServerClientTypes';
 import {projectIdFromParts} from '../../pages/wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '../../pages/wfReactInterface/utilities';
-import {
-  HumanAnnotationPayload,
-  tsHumanAnnotationSpec,
-} from './humanFeedbackTypes';
+import {tsHumanAnnotationSpec} from './humanAnnotationTypes';
 
-export const useHumanFeedbackSpecs = (
+export const useHumanAnnotationSpecs = (
   entity: string,
   project: string
 ): tsHumanAnnotationSpec[] => {
@@ -50,19 +47,4 @@ export const useHumanFeedbackSpecs = (
       }),
     }));
   }, [cols, entity, project]);
-};
-
-export const extractValFromHumanAnnotationPayload = (
-  payload: HumanAnnotationPayload
-) => {
-  if (payload.value == null) {
-    return null;
-  }
-  try {
-    const val = Object.values(Object.values(payload.value)[0])[0];
-    return val;
-  } catch (e) {
-    console.error('Error extracting value from human annotation payload', e);
-    return null;
-  }
 };

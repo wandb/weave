@@ -16,8 +16,8 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
-import {FeedbackSidebar} from '../../feedback/HumanFeedback/FeedbackSidebar';
-import {useHumanFeedbackSpecs} from '../../feedback/HumanFeedback/tsHumanFeedback';
+import {FeedbackSidebar} from '../../feedback/StructuredFeedback/FeedbackSidebar';
+import {useHumanAnnotationSpecs} from '../../feedback/StructuredFeedback/tsHumanFeedback';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
@@ -200,7 +200,10 @@ const CallPageInnerVertical: FC<{
       )
     );
   }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
-  const humanFeedbackSpecs = useHumanFeedbackSpecs(call.entity, call.project);
+  const humanAnnotationSpecs = useHumanAnnotationSpecs(
+    call.entity,
+    call.project
+  );
 
   const tree = useCallFlattenedTraceTree(call, path ?? null);
   const {rows, expandKeys, loading, costLoading, selectedCall} = tree;
@@ -249,18 +252,16 @@ const CallPageInnerVertical: FC<{
             <PaginationControls call={call} path={path} />
           )}
           <Box sx={{marginLeft: showPaginationContols ? 0 : 'auto'}}>
-            {humanFeedbackSpecs && (
-              <Button
-                icon="marker"
-                tooltip={`${
-                  showFeedbackExpand ? 'Hide' : 'Show'
-                } feedback sidebar`}
-                variant="ghost"
-                active={showFeedbackExpand ?? false}
-                onClick={onToggleFeedbackExpand}
-                className="mr-4"
-              />
-            )}
+            <Button
+              icon="marker"
+              tooltip={`${
+                showFeedbackExpand ? 'Hide' : 'Show'
+              } feedback sidebar`}
+              variant="ghost"
+              active={showFeedbackExpand ?? false}
+              onClick={onToggleFeedbackExpand}
+              className="mr-4"
+            />
             <Button
               icon="layout-tabs"
               tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
@@ -276,7 +277,7 @@ const CallPageInnerVertical: FC<{
         <Tailwind style={{display: 'contents'}}>
           <div className="flex h-full flex-col">
             <FeedbackSidebar
-              humanFeedbackSpecs={humanFeedbackSpecs}
+              humanAnnotationSpecs={humanAnnotationSpecs}
               callID={currentCall.callId}
               entity={currentCall.entity}
               project={currentCall.project}

@@ -18,16 +18,16 @@ import {
 } from '../../pages/wfReactInterface/traceServerClientTypes';
 import {
   FEEDBACK_TYPE_OPTIONS,
+  HumanAnnotation,
   HumanAnnotationPayload,
-  HumanFeedback,
   makeAnnotationFeedbackType,
   tsHumanAnnotationSpec,
-} from './humanFeedbackTypes';
+} from './humanAnnotationTypes';
 
 const DEBOUNCE_VAL = 200;
 
 // Interfaces
-type HumanFeedbackProps = {
+type HumanAnnotationProps = {
   entity: string;
   project: string;
   viewer: string | null;
@@ -40,11 +40,11 @@ type HumanFeedbackProps = {
   >;
 };
 
-export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
+export const HumanAnnotationCell: React.FC<HumanAnnotationProps> = props => {
   const getTsClient = useGetTraceServerClientContext();
   const tsClient = getTsClient();
   const {useFeedback} = useWFHooks();
-  const [foundFeedback, setFoundFeedback] = useState<HumanFeedback[]>([]);
+  const [foundFeedback, setFoundFeedback] = useState<HumanAnnotation[]>([]);
   const query = useFeedback({
     entity: props.entity,
     project: props.project,
@@ -64,7 +64,7 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
       query.refetch
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [props.callRef]);
 
   useEffect(() => {
     if (foundFeedbackCallRef && props.callRef !== foundFeedbackCallRef) {
@@ -86,28 +86,20 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
 
       // TODO(gst): use replace when feedback is updated within 10 seconds of the previous feedback
       const createRequest = generateFeedbackRequestPayload(requestProps);
-      const promise = tsClient
-        .feedbackCreate(createRequest)
-        .then(res => {
-          if ('detail' in res) {
-            const errorRes = res as FeedbackCreateError;
-            toast(`Feedback create failed: ${errorRes.detail}`, {
-              type: 'error',
-            });
-            return false;
-          }
-          const successRes = res as FeedbackCreateSuccess;
-          return !!successRes.id;
-        })
-        .catch(error => {
-          toast(`Error in onAddFeedback: ${error}`, {
+      const promise = tsClient.feedbackCreate(createRequest).then(res => {
+        if ('detail' in res) {
+          const errorRes = res as FeedbackCreateError;
+          toast(`Feedback create failed: ${errorRes.detail}`, {
             type: 'error',
           });
           return false;
-        });
+        }
+        const successRes = res as FeedbackCreateSuccess;
+        return !!successRes.id;
+      });
       return await promise;
     } catch (error) {
-      toast(`Error in onAddFeedback: ${error}`, {
+      toast(`Error adding feedback: ${error}`, {
         type: 'error',
       });
       return false;
@@ -119,10 +111,10 @@ export const HumanFeedbackCell: React.FC<HumanFeedbackProps> = props => {
       return;
     }
 
-    const feedbackRefMatches = (feedback: HumanFeedback) =>
+    const feedbackRefMatches = (feedback: HumanAnnotation) =>
       feedback.annotation_ref === feedbackSpecRef;
 
-    const currFeedback = query.result?.filter((feedback: HumanFeedback) =>
+    const currFeedback = query.result?.filter((feedback: HumanAnnotation) =>
       feedbackRefMatches(feedback)
     );
     if (!currFeedback || currFeedback.length === 0) {
@@ -223,10 +215,10 @@ const FeedbackComponentSelector: React.FC<{
             focused={focused}
           />
         );
-      case 'array':
+      case 'enum':
         return (
-          <CategoricalFeedbackColumn
-            options={jsonSchema.options}
+          <EnumFeedbackColumn
+            options={jsonSchema.enum}
             onAddFeedback={wrappedOnAddFeedback}
             defaultValue={foundValue as string | null}
             focused={focused}
@@ -259,7 +251,7 @@ type ExtractedFeedbackValues = {
 };
 
 const extractFeedbackValues = (
-  foundFeedback: HumanFeedback[],
+  foundFeedback: HumanAnnotation[],
   viewer: string | null,
   columnRef: string
 ): ExtractedFeedbackValues => {
@@ -321,11 +313,7 @@ const generateFeedbackRequestPayload = ({
 }: FeedbackRequestProps) => {
   const parsedRef = parseRef(feedbackSpecRef);
   const humanAnnotationPayload: HumanAnnotationPayload = {
-    value: {
-      [parsedRef.artifactName]: {
-        [parsedRef?.artifactVersion]: value,
-      },
-    },
+    value,
   };
   const feedbackType = makeAnnotationFeedbackType(parsedRef.artifactName);
   const baseRequest = {
@@ -341,12 +329,12 @@ const generateFeedbackRequestPayload = ({
 };
 
 const inferTypeFromJsonSchema = (jsonSchema: Record<string, any>) => {
+  if ('enum' in jsonSchema) {
+    return 'enum';
+  }
   if (FEEDBACK_TYPE_OPTIONS.includes(jsonSchema.type)) {
     return jsonSchema.type;
   }
-  toast(`Unknown feedback type from spec: ${JSON.stringify(jsonSchema)}`, {
-    type: 'warning',
-  });
   return null;
 };
 
@@ -447,7 +435,7 @@ type Option = {
   value: string;
 };
 
-export const CategoricalFeedbackColumn = ({
+export const EnumFeedbackColumn = ({
   options,
   onAddFeedback,
   defaultValue,

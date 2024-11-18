@@ -9,7 +9,6 @@ import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {FeedbackGridActions} from './FeedbackGridActions';
 import {FeedbackTypeChip} from './FeedbackTypeChip';
-import {extractValFromHumanAnnotationPayload} from './HumanFeedback/tsHumanFeedback';
 
 type FeedbackGridInnerProps = {
   feedback: Feedback[];
@@ -44,8 +43,11 @@ export const FeedbackGridInner = ({
           return params.row.payload.emoji;
         }
         if (params.row.feedback_type.startsWith('wandb.annotation.')) {
-          const val = extractValFromHumanAnnotationPayload(params.row.payload);
-          return <CellValueString value={JSON.stringify(val ?? null)} />;
+          return (
+            <CellValueString
+              value={JSON.stringify(params.row.payload.value ?? null)}
+            />
+          );
         }
         return <CellValueString value={JSON.stringify(params.row.payload)} />;
       },

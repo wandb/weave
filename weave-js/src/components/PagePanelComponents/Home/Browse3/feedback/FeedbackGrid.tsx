@@ -11,9 +11,9 @@ import {Empty} from '../pages/common/Empty';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
 import {FeedbackGridInner} from './FeedbackGridInner';
-import {HUMAN_FEEDBACK_BASE_TYPE} from './HumanFeedback/humanFeedbackTypes';
+import {HUMAN_ANNOTATION_BASE_TYPE} from './StructuredFeedback/humanAnnotationTypes';
 
-const ANNOTATION_PREFIX = `${HUMAN_FEEDBACK_BASE_TYPE}.`;
+const ANNOTATION_PREFIX = `${HUMAN_ANNOTATION_BASE_TYPE}.`;
 
 type FeedbackGridProps = {
   entity: string;

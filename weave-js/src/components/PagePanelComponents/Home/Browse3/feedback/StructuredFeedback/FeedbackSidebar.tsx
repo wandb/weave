@@ -5,18 +5,18 @@ import {Icon} from '@wandb/weave/components/Icon';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useState} from 'react';
 
-import {HumanFeedbackCell} from './HumanFeedback';
-import {tsHumanAnnotationSpec} from './humanFeedbackTypes';
+import {HumanAnnotationCell} from './HumanAnnotation';
+import {tsHumanAnnotationSpec} from './humanAnnotationTypes';
 
 type FeedbackSidebarProps = {
-  humanFeedbackSpecs: tsHumanAnnotationSpec[];
+  humanAnnotationSpecs: tsHumanAnnotationSpec[];
   callID: string;
   entity: string;
   project: string;
 };
 
 export const FeedbackSidebar = ({
-  humanFeedbackSpecs,
+  humanAnnotationSpecs,
   callID,
   entity,
   project,
@@ -58,69 +58,75 @@ export const FeedbackSidebar = ({
         <div className="text-lg font-semibold">Feedback</div>
         <div className="flex-grow" />
       </div>
-      <div className="mx-6 h-full flex-grow overflow-auto">
-        <HumanFeedbackSection
-          entity={entity}
-          project={project}
-          callID={callID}
-          humanFeedbackSpecs={humanFeedbackSpecs}
-          setUnsavedFeedbackChanges={setUnsavedFeedbackChanges}
-        />
-      </div>
-      <div className="flex w-full border-t border-moon-300 p-6 pr-10">
-        <Button
-          onClick={save}
-          variant="primary"
-          className="w-full"
-          disabled={
-            isSaving || Object.keys(unsavedFeedbackChanges).length === 0
-          }
-          size="large">
-          {isSaving ? 'Saving...' : 'Save'}
-        </Button>
-      </div>
+      {humanAnnotationSpecs.length > 0 ? (
+        <>
+          <div className="mx-6 h-full flex-grow overflow-auto">
+            <HumanAnnotationSection
+              entity={entity}
+              project={project}
+              callID={callID}
+              humanAnnotationSpecs={humanAnnotationSpecs}
+              setUnsavedFeedbackChanges={setUnsavedFeedbackChanges}
+            />
+          </div>
+          <div className="flex w-full border-t border-moon-300 p-6 pr-10">
+            <Button
+              onClick={save}
+              variant="primary"
+              className="w-full"
+              disabled={
+                isSaving || Object.keys(unsavedFeedbackChanges).length === 0
+              }
+              size="large">
+              {isSaving ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <div>Create an annotation spec to get started with human labeling</div>
+      )}
     </div>
   );
 };
 
-type HumanFeedbackSectionProps = {
+type HumanAnnotationSectionProps = {
   entity: string;
   project: string;
   callID: string;
-  humanFeedbackSpecs: tsHumanAnnotationSpec[];
+  humanAnnotationSpecs: tsHumanAnnotationSpec[];
   setUnsavedFeedbackChanges: React.Dispatch<
     React.SetStateAction<Record<string, () => Promise<boolean>>>
   >;
 };
 
-const HumanFeedbackSection = ({
+const HumanAnnotationSection = ({
   entity,
   project,
   callID,
-  humanFeedbackSpecs,
+  humanAnnotationSpecs,
   setUnsavedFeedbackChanges,
-}: HumanFeedbackSectionProps) => {
+}: HumanAnnotationSectionProps) => {
   const [isExpanded, setIsExpanded] = useState(true);
-  const sortedVisibleColumns = humanFeedbackSpecs.sort((a, b) =>
+  const sortedVisibleColumns = humanAnnotationSpecs.sort((a, b) =>
     (a.name ?? '').localeCompare(b.name ?? '')
   );
 
   return (
     <div>
-      <HumanFeedbackHeader
-        numHumanFeedbackSpecsVisible={sortedVisibleColumns.length}
-        numHumanFeedbackSpecsHidden={
-          humanFeedbackSpecs.length - sortedVisibleColumns.length
+      <HumanAnnotationHeader
+        numHumanAnnotationSpecsVisible={sortedVisibleColumns.length}
+        numHumanAnnotationSpecsHidden={
+          humanAnnotationSpecs.length - sortedVisibleColumns.length
         }
         isExpanded={isExpanded}
         setIsExpanded={setIsExpanded}
       />
       {isExpanded && (
-        <HumanFeedbackInputs
+        <HumanAnnotationInputs
           entity={entity}
           project={project}
           callID={callID}
-          humanFeedbackSpecs={sortedVisibleColumns}
+          humanAnnotationSpecs={sortedVisibleColumns}
           setUnsavedFeedbackChanges={setUnsavedFeedbackChanges}
         />
       )}
@@ -128,32 +134,32 @@ const HumanFeedbackSection = ({
   );
 };
 
-type HumanFeedbackHeaderProps = {
-  numHumanFeedbackSpecsVisible: number;
-  numHumanFeedbackSpecsHidden: number;
+type HumanAnnotationHeaderProps = {
+  numHumanAnnotationSpecsVisible: number;
+  numHumanAnnotationSpecsHidden: number;
   isExpanded: boolean;
   setIsExpanded: (isExpanded: boolean) => void;
 };
 
-const HumanFeedbackHeader = ({
-  numHumanFeedbackSpecsVisible,
-  numHumanFeedbackSpecsHidden,
+const HumanAnnotationHeader = ({
+  numHumanAnnotationSpecsVisible,
+  numHumanAnnotationSpecsHidden,
   isExpanded,
   setIsExpanded,
-}: HumanFeedbackHeaderProps) => {
+}: HumanAnnotationHeaderProps) => {
   return (
     <button
       className="text-md hover:bg-gray-100 flex w-full items-center justify-between px-6 py-8 font-semibold"
       onClick={() => setIsExpanded(!isExpanded)}>
       <div className="mb-8 flex w-full items-center">
-        <div className="text-lg">Human scores</div>
+        <div className="text-lg">Human annotations</div>
         <div className="ml-6 mt-1">
-          <DisplayNumericCounter count={numHumanFeedbackSpecsVisible} />
+          <DisplayNumericCounter count={numHumanAnnotationSpecsVisible} />
         </div>
         <div className="flex-grow" />
-        {numHumanFeedbackSpecsHidden > 0 && (
+        {numHumanAnnotationSpecsHidden > 0 && (
           <div className="mr-4 mt-2 rounded-full px-2 text-xs font-medium">
-            {numHumanFeedbackSpecsHidden} hidden
+            {numHumanAnnotationSpecsHidden} hidden
           </div>
         )}
       </div>
@@ -164,23 +170,23 @@ const HumanFeedbackHeader = ({
   );
 };
 
-type HumanFeedbackInputsProps = {
+type HumanAnnotationInputsProps = {
   entity: string;
   project: string;
   callID: string;
-  humanFeedbackSpecs: tsHumanAnnotationSpec[];
+  humanAnnotationSpecs: tsHumanAnnotationSpec[];
   setUnsavedFeedbackChanges: React.Dispatch<
     React.SetStateAction<Record<string, () => Promise<boolean>>>
   >;
 };
 
-const HumanFeedbackInputs = ({
+const HumanAnnotationInputs = ({
   entity,
   project,
   callID,
-  humanFeedbackSpecs,
+  humanAnnotationSpecs,
   setUnsavedFeedbackChanges,
-}: HumanFeedbackInputsProps) => {
+}: HumanAnnotationInputsProps) => {
   const callRef = makeRefCall(entity, project, callID);
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
 
@@ -191,7 +197,7 @@ const HumanFeedbackInputs = ({
 
   return (
     <div>
-      {humanFeedbackSpecs?.map((field, index) => (
+      {humanAnnotationSpecs?.map((field, index) => (
         <div key={field.ref} className="px-16">
           <div className="bg-gray-50 text-md font-semibold">{field.name}</div>
           {field.description && (
@@ -200,7 +206,7 @@ const HumanFeedbackInputs = ({
             </div>
           )}
           <div className="pb-8 pt-4">
-            <HumanFeedbackCell
+            <HumanAnnotationCell
               focused={index === 0}
               hfSpec={field}
               callRef={callRef}
