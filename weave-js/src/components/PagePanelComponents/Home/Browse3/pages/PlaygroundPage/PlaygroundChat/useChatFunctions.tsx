@@ -109,7 +109,7 @@ export const useChatFunctions = (
   const editChoice = (
     callIndex: number,
     choiceIndex: number,
-    newChoice: Choice
+    newChoice: Message
   ) => {
     setPlaygroundStateField(callIndex, 'traceCall', prevTraceCall => {
       const newTraceCall = clearTraceCall(
@@ -128,10 +128,7 @@ export const useChatFunctions = (
         // Add the new choice as a message
         newTraceCall.inputs = newTraceCall.inputs ?? {};
         newTraceCall.inputs.messages = newTraceCall.inputs.messages ?? [];
-        newTraceCall.inputs.messages.push({
-          role: 'assistant',
-          content: newChoice.message?.content,
-        });
+        newTraceCall.inputs.messages.push(newChoice);
       }
       return newTraceCall;
     });

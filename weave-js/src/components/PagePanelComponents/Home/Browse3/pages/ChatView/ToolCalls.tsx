@@ -8,7 +8,7 @@ import {MessagePanel} from './MessagePanel';
 import {ToolCall} from './types';
 
 type OneToolCallProps = {
-  toolCall: ToolCallWithResponse;
+  toolCall: ToolCall;
 };
 
 const OneToolCall = ({toolCall}: OneToolCallProps) => {

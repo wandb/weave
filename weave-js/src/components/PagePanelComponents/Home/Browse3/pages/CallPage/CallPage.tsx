@@ -105,7 +105,7 @@ const useCallTabs = (call: CallSchema) => {
                 </Button>
                 <ScrollableTabContent>
                   <Tailwind>
-                    <CallChat call={call.traceCall!} isPlayground={false} />
+                    <CallChat call={call.traceCall!} />
                   </Tailwind>
                 </ScrollableTabContent>
               </>

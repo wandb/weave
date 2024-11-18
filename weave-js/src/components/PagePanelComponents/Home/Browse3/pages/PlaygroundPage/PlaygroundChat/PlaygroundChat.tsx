@@ -38,9 +38,7 @@ export const PlaygroundChat = ({
   const [chatText, setChatText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const {deleteMessage, editMessage, deleteChoice, editChoice, addMessage} =
-    useChatFunctions(setPlaygroundStateField);
-  const {handleRetry, handleSend, handleAllSend} = useChatCompletionFunctions(
+  const {handleRetry, handleAllSend} = useChatCompletionFunctions(
     setPlaygroundStates,
     setIsLoading,
     chatText,
@@ -50,15 +48,6 @@ export const PlaygroundChat = ({
     setChatText
   );
 
-  const handleAddMessage = (role: 'assistant' | 'user', text: string) => {
-    for (let i = 0; i < playgroundStates.length; i++) {
-      addMessage(i, {role, content: text});
-    }
-    setChatText('');
-  };
-
-  const chatPercentWidth = 100 / playgroundStates.length;
-
   const {deleteMessage, editMessage, deleteChoice, editChoice, addMessage} =
     useChatFunctions(setPlaygroundStateField);
 
@@ -68,6 +57,8 @@ export const PlaygroundChat = ({
     }
     setChatText('');
   };
+
+  const chatPercentWidth = 100 / playgroundStates.length;
 
   return (
     <Box

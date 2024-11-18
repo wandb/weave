@@ -9,7 +9,7 @@ import {StyledTextArea} from '../PlaygroundPage/StyledTextarea';
 import {MessagePanelPart} from './MessagePanelPart';
 import {ShowMoreButton} from './ShowMoreButton';
 import {ToolCalls} from './ToolCalls';
-import {Message, ToolCallWithResponse} from './types';
+import {Message, ToolCall} from './types';
 
 type MessagePanelProps = {
   index: number;
@@ -56,7 +56,7 @@ export const MessagePanel = ({
   const responseIndexes: number[] | undefined = hasToolCalls
     ? message
         .tool_calls!.map(
-          (toolCall: ToolCallWithResponse) => toolCall.response?.original_index
+          (toolCall: ToolCall) => toolCall.response?.original_index
         )
         .filter((idx): idx is number => idx !== undefined)
     : undefined;
@@ -223,7 +223,8 @@ const PlaygroundMessagePanelEditor: React.FC<
   const handleSave = () => {
     if (isChoice) {
       editChoice?.(index, {
-        message: {content: editedContent},
+        content: editedContent,
+        role: message.role,
       });
     } else {
       editMessage?.(index, {
