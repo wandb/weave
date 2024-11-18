@@ -22,11 +22,7 @@ const DIVIDER_LINE_WIDTH = 1;
 const DIVIDER_BORDER_WIDTH = 4;
 const DIVIDER_WIDTH = 2 * DIVIDER_BORDER_WIDTH + DIVIDER_LINE_WIDTH;
 
-<<<<<<<< HEAD:weave-js/src/components/PagePanelComponents/Home/Browse3/pages/common/SplitPanelRight.tsx
-const Divider = styled.span<{right: number}>`
-========
 const DividerRight = styled.span<{right: number}>`
->>>>>>>> master:weave-js/src/components/PagePanelComponents/Home/Browse3/pages/common/SplitPanels/SplitPanelRight.tsx
   background-color: ${MOON_250};
   border-left: ${DIVIDER_BORDER_WIDTH}px solid transparent;
   border-right: ${DIVIDER_BORDER_WIDTH}px solid transparent;
@@ -46,11 +42,7 @@ const DividerRight = styled.span<{right: number}>`
     border-right-color: ${hexToRGB(MOON_250, 0.5)};
   }
 `;
-<<<<<<<< HEAD:weave-js/src/components/PagePanelComponents/Home/Browse3/pages/common/SplitPanelRight.tsx
-Divider.displayName = 'S.DividerRight';
-========
 DividerRight.displayName = 'S.DividerRight';
->>>>>>>> master:weave-js/src/components/PagePanelComponents/Home/Browse3/pages/common/SplitPanels/SplitPanelRight.tsx
 
 // Handle percent or pixel specification.
 const getWidth = (value: number | string, total: number): number => {
