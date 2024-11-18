@@ -1,13 +1,13 @@
 import re
 from typing import Any
 
-import torch
 from pydantic import PrivateAttr
 
 import weave
 from weave.scorers.base_scorer import Scorer
 
 try:
+    import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 except ImportError:
     raise ImportError(
