@@ -269,7 +269,8 @@ export type WFDataModelHooksInterface = {
     entity: string,
     project: string,
     query: Query,
-    sortBy?: traceServerClientTypes.SortBy[]
+    sortBy?: traceServerClientTypes.SortBy[],
+    opts?: {skip?: boolean}
   ) => LoadableWithError<any[] | null> & Refetchable;
   derived: {
     useChildCallsForCompare: (

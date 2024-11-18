@@ -19,6 +19,9 @@ import {
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 
+// TODO(gst): move this
+const ANNOTATION_FEEDBACK_TYPE_PREFIX = 'wandb.annotation';
+
 /**
  * This Hook is responsible for bridging the gap between the CallsTable
  * component and the underlying data hooks. In particular, it takes a high level
@@ -124,18 +127,17 @@ export const useCallsForQuery = (
 
   // query for annotation feeback
   const {useFeedbackQuery} = useWFHooks();
-  const feedbackTypeSubstr = 'wandb.annotation.';
-  const callRefs = callResults.map(call =>
-    makeRefCall(entity, project, call.callId)
-  );
   const feedbackQueryQuery = useMemo(() => {
+    const callRefs = callResults.map(call =>
+      makeRefCall(entity, project, call.callId)
+    );
     return {
       $expr: {
         $and: [
           {
             $contains: {
               input: {$getField: 'feedback_type'},
-              substr: {$literal: feedbackTypeSubstr},
+              substr: {$literal: `${ANNOTATION_FEEDBACK_TYPE_PREFIX}.`},
             },
           },
           {
@@ -148,8 +150,15 @@ export const useCallsForQuery = (
       },
       // TODO(gst): why does the $contains operator typing fail here...
     } as Query;
-  }, [feedbackTypeSubstr, callRefs]);
-  const feedbackQuery = useFeedbackQuery(entity, project, feedbackQueryQuery);
+  }, [entity, project, callResults]);
+  const opts = {skip: callResults.length === 0};
+  const feedbackQuery = useFeedbackQuery(
+    entity,
+    project,
+    feedbackQueryQuery,
+    undefined,
+    opts
+  );
 
   // map of callId to the latest feedback of each feedback_type
   const feedbackByType: Record<string, Record<string, any>> | undefined =
@@ -162,7 +171,10 @@ export const useCallsForQuery = (
           }
           // Store feedback by feedback_type, newer entries will overwrite older ones
           if (curr.feedback_type) {
-            const name = curr.feedback_type.replace(feedbackTypeSubstr, '');
+            const name = curr.feedback_type.replace(
+              `${ANNOTATION_FEEDBACK_TYPE_PREFIX}.`,
+              ''
+            );
             acc[callId][name] = getNestedValue(curr.payload);
           }
           return acc;

@@ -661,7 +661,8 @@ const useFeedbackQuery = (
   entity: string,
   project: string,
   query: Query,
-  sortBy?: traceServerTypes.SortBy[]
+  sortBy?: traceServerTypes.SortBy[],
+  opts?: {skip?: boolean}
 ) => {
   const getTsClient = useGetTraceServerClientContext();
 
@@ -678,6 +679,9 @@ const useFeedbackQuery = (
   }, [setDoReload]);
 
   useEffect(() => {
+    if (opts?.skip) {
+      return;
+    }
     let mounted = true;
     if (doReload) {
       setDoReload(false);
@@ -709,7 +713,7 @@ const useFeedbackQuery = (
     return () => {
       mounted = false;
     };
-  }, [getTsClient, doReload, sortBy, entity, project, query]);
+  }, [getTsClient, doReload, sortBy, entity, project, query, opts?.skip]);
 
   return {...result, refetch};
 };

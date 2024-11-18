@@ -544,7 +544,6 @@ export const CallsTable: FC<{
     if (!needsUpdate) {
       return;
     }
-
     const annotationColumnVisiblityFalse = annotationColumns.result.reduce(
       (acc, col) => {
         // Only add columns=false when not already in the model
