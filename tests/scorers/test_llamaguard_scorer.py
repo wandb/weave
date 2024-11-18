@@ -1,6 +1,4 @@
 import pytest
-from openai import OpenAI
-import torch
 from transformers import AutoTokenizer
 
 import weave
@@ -9,19 +7,22 @@ from weave.scorers import LlamaGuard
 _TINY_MODEL_NAME = "HuggingFaceM4/tiny-random-LlamaForCausalLM"
 _LLAMAGUARD_MODEL_NAME = "meta-llama/Llama-Guard-3-1B"
 
+
 @pytest.fixture
 def llamaguard_scorer(monkeypatch):
     scorer = LlamaGuard(
         model_name=_TINY_MODEL_NAME,
         device="cpu",
     )
-    scorer._tokenizer = AutoTokenizer.from_pretrained(_LLAMAGUARD_MODEL_NAME) 
+    scorer._tokenizer = AutoTokenizer.from_pretrained(_LLAMAGUARD_MODEL_NAME)
+
     # Mock the _generate method to return predictable outputs
     def mock_generate(*args, **kwargs):
         return "unsafe\nS10: Hate<|eot_id|>"
-    
+
     monkeypatch.setattr(scorer, "_generate", mock_generate)
     return scorer
+
 
 def test_llamaguard_postprocess(llamaguard_scorer):
     # Test safe content
@@ -64,6 +65,6 @@ async def test_llamaguard_evaluation(llamaguard_scorer):
         scorers=[llamaguard_scorer],
     )
     result = await evaluation.evaluate(model)
-    
+
     assert "LlamaGuard" in result
     assert "safe" in result["LlamaGuard"]

@@ -10,6 +10,7 @@ from weave.scorers.classification_scorer import (
 )
 from weave.scorers.hallucination_scorer import HallucinationFreeScorer
 from weave.scorers.json_scorer import ValidJSONScorer
+from weave.scorers.llamaguard_scorer import LlamaGuard
 from weave.scorers.llm_scorer import (
     InstructorLLMScorer,
     LLMScorer,
@@ -31,7 +32,6 @@ from weave.scorers.string_scorer import (
 )
 from weave.scorers.summarization_scorer import SummarizationScorer
 from weave.scorers.xml_scorer import ValidXMLScorer
-from weave.scorers.llamaguard_scorer import LlamaGuard
 
 __all__ = [
     "auto_summarize",

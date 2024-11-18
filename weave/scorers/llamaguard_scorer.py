@@ -1,14 +1,14 @@
 import re
+from typing import Any
+
 import torch
-import weave
-from typing import Any, List, Dict, Optional
 from pydantic import PrivateAttr
 
+import weave
 from weave.scorers.base_scorer import Scorer
-from weave.flow.util import warn_once
 
 try:
-    from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+    from transformers import AutoModelForCausalLM, AutoTokenizer
 except ImportError:
     raise ImportError(
         "The `transformers` package is required to use LlamaGuard, please run `pip install transformers`"
@@ -51,7 +51,7 @@ class LlamaGuard(Scorer):
         "S14": "Code Interpreter Abuse",
     }
 
-    def model_post_init(self, __context):
+    def model_post_init(self, __context: Any) -> None:
         if not torch.cuda.is_available() and "cuda" in self.device:
             raise ValueError("CUDA is not available")
         self._model = AutoModelForCausalLM.from_pretrained(
@@ -80,13 +80,11 @@ class LlamaGuard(Scorer):
     @weave.op
     async def score_messages(
         self,
-        messages: List[Dict[str, Any]],
-        categories: dict[str, str] = None,
+        messages: list[dict[str, Any]],
+        categories: dict[str, str] | None = None,
         excluded_category_keys: list[str] = [],
-    ):
-        """
-        Score the messages list. If you want to score conversations that contain multiple messages, use this method.
-        """
+    ) -> str:
+        "Score a list of messages in a conversation."
         if categories is not None:
             input_ids = self._tokenizer.apply_chat_template(
                 messages,
@@ -120,19 +118,14 @@ class LlamaGuard(Scorer):
         )
         return response
 
-    def default_format_messages(self, prompt: str) -> List[Dict[str, str]]:
-        """Override this method to format the prompt in a custom way. 
+    def default_format_messages(self, prompt: str) -> list[dict[str, Any]]:
+        """Override this method to format the prompt in a custom way.
         It should return a list of dictionaries with the following alternative keys: "role" and "content".
         """
         return [
             {
                 "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": prompt,
-                    }
-                ],
+                "content": prompt,
             }
         ]
 
@@ -140,9 +133,9 @@ class LlamaGuard(Scorer):
     async def score(
         self,
         output: str,
-        categories: dict[str, str] = None,
+        categories: dict[str, str] | None = None,
         excluded_category_keys: list[str] = [],
-    ):
+    ) -> dict[str, Any]:
         messages = self.default_format_messages(prompt=output)
         response = await self.score_messages(
             messages=messages,
