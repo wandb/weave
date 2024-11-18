@@ -4,6 +4,7 @@ import weave
 from typing import Any, List, Dict, Optional
 from pydantic import PrivateAttr
 
+from weave.scorers.base_scorer import Scorer
 from weave.flow.util import warn_once
 
 try:
@@ -18,7 +19,7 @@ except ImportError:
 # https://github.com/meta-llama/llama-recipes/blob/main/recipes/responsible_ai/llama_guard/llama_guard_text_and_vision_inference.ipynb
 
 
-class LlamaGuard(weave.Scorer):
+class LlamaGuard(Scorer):
     """
     Use Meta's LlamaGuard to check if the model output is safe.
 
@@ -59,7 +60,6 @@ class LlamaGuard(weave.Scorer):
             **self.automodel_kwargs,
         )
         self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        warn_once(f"LlamaGuard model and tokenizer loaded in {self.device}")
 
     def postprocess(self, output: str) -> dict[str, Any]:
         safe = True
@@ -71,7 +71,7 @@ class LlamaGuard(weave.Scorer):
             if match:
                 category_key = f"S{match.group(1)}"
                 category = f"{category_key}: {self._CATEGORY_TYPES.get(category_key)}"
-        return {"llama_guard": safe, "category": category}
+        return {"safe": safe, "category": category}
 
     @weave.op
     async def score_messages(
@@ -93,23 +93,25 @@ class LlamaGuard(weave.Scorer):
                 return_tensors="pt",
                 excluded_category_keys=excluded_category_keys,
             ).to(self.device)
-        input_prompt = self._tokenizer.decode(input_ids[0], skip_special_tokens=False)
+        return self._generate(input_ids)
 
+    def _generate(self, input_ids: torch.Tensor) -> str:
         prompt_len = input_ids.shape[1]
-        model_output = self._model.generate(
+        llamaguard_output = self._model.generate(
             input_ids=input_ids,
             max_new_tokens=20,
             output_scores=True,
             return_dict_in_generate=True,
             pad_token_id=0,
+            top_p=None,
             do_sample=False,
         )
-        generated_tokens = model_output.sequences[:, prompt_len:]
+        generated_tokens = llamaguard_output.sequences[:, prompt_len:]
 
         response = self._tokenizer.decode(
             generated_tokens[0], skip_special_tokens=False
         )
-        return input_prompt, response
+        return response
 
     def default_format_messages(self, prompt: str) -> List[Dict[str, str]]:
         """Override this method to format the prompt in a custom way."""
@@ -133,7 +135,7 @@ class LlamaGuard(weave.Scorer):
         excluded_category_keys: list[str] = [],
     ):
         messages = self.default_format_messages(prompt=output)
-        _, response = await self.score_messages(
+        response = await self.score_messages(
             messages=messages,
             categories=categories,
             excluded_category_keys=excluded_category_keys,
