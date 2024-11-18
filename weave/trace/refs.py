@@ -74,6 +74,10 @@ class TableRef(Ref):
 
         return self._row_digests
 
+    @property
+    def project_id(self) -> str:
+        return f"{self.entity}/{self.project}"
+
     def __post_init__(self) -> None:
         if isinstance(self._digest, str):
             refs_internal.validate_no_slashes(self._digest, "digest")
