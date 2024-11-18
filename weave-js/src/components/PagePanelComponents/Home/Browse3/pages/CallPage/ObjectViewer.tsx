@@ -18,9 +18,9 @@ import React, {
   useState,
 } from 'react';
 
+import {parseRefMaybe} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../filters/common';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
