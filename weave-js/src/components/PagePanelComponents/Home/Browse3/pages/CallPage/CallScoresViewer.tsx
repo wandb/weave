@@ -24,7 +24,7 @@ import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
-const RUNNABLE_REF_PREFIX = 'wandb.runnable';
+export const RUNNABLE_FEEDBACK_TYPE_PREFIX = 'wandb.runnable';
 
 const useLatestActionDefinitionsForCall = (call: CallSchema) => {
   const actionSpecs = (
@@ -51,7 +51,7 @@ const useRunnableFeedbacksForCall = (call: CallSchema) => {
   const runnableFeedbacks: Feedback[] = useMemo(() => {
     return (feedbackQuery.result ?? []).filter(
       f =>
-        f.feedback_type?.startsWith(RUNNABLE_REF_PREFIX) &&
+        f.feedback_type?.startsWith(RUNNABLE_FEEDBACK_TYPE_PREFIX) &&
         f.runnable_ref !== null
     );
   }, [feedbackQuery.result]);
@@ -67,7 +67,7 @@ const useRunnableFeedbackTypeToLatestActionRef = (
     return _.fromPairs(
       actionSpecs.map(actionSpec => {
         return [
-          RUNNABLE_REF_PREFIX + '.' + actionSpec.object_id,
+          RUNNABLE_FEEDBACK_TYPE_PREFIX + '.' + actionSpec.object_id,
           objectVersionKeyToRefUri({
             scheme: WEAVE_REF_SCHEME,
             weaveKind: 'object',
@@ -103,7 +103,9 @@ const useTableRowsForRunnableFeedbacks = (
       const val = _.reverse(_.sortBy(fs, 'created_at'))[0];
       return {
         id: feedbackType,
-        displayName: feedbackType.slice(RUNNABLE_REF_PREFIX.length + 1),
+        displayName: feedbackType.slice(
+          RUNNABLE_FEEDBACK_TYPE_PREFIX.length + 1
+        ),
         runnableActionRef:
           runnableFeedbackTypeToLatestActionRef[val.feedback_type],
         feedback: val,
@@ -112,7 +114,8 @@ const useTableRowsForRunnableFeedbacks = (
     });
     const additionalRows = actionSpecs
       .map(actionSpec => {
-        const feedbackType = RUNNABLE_REF_PREFIX + '.' + actionSpec.object_id;
+        const feedbackType =
+          RUNNABLE_FEEDBACK_TYPE_PREFIX + '.' + actionSpec.object_id;
         return {
           id: feedbackType,
           runnableActionRef:

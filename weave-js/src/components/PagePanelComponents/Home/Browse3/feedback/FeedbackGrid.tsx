@@ -1,12 +1,13 @@
 import {Box} from '@mui/material';
 import _ from 'lodash';
-import React, {useEffect} from 'react';
+import React, {useEffect, useMemo} from 'react';
 
 import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {TargetBlank} from '../../../../../common/util/links';
 import {Alert} from '../../../../Alert';
 import {Loading} from '../../../../Loading';
 import {Tailwind} from '../../../../Tailwind';
+import {RUNNABLE_FEEDBACK_TYPE_PREFIX} from '../pages/CallPage/CallScoresViewer';
 import {Empty} from '../pages/common/Empty';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
@@ -40,6 +41,23 @@ export const FeedbackGrid = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Exclude runnables as they are presented in a different tab
+  const withoutRunnables = useMemo(
+    () =>
+      (query.result ?? []).filter(
+        f => !f.feedback_type.startsWith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
+      ),
+    [query.result]
+  );
+
+  // Group by feedback on this object vs. descendent objects
+  const grouped = useMemo(
+    () =>
+      _.groupBy(withoutRunnables, f => f.weave_ref.substring(weaveRef.length)),
+    [withoutRunnables, weaveRef]
+  );
+  const paths = useMemo(() => Object.keys(grouped).sort(), [grouped]);
+
   if (query.loading || loadingUserInfo) {
     return (
       <Box
@@ -61,7 +79,7 @@ export const FeedbackGrid = ({
     );
   }
 
-  if (!query.result || !query.result.length) {
+  if (!withoutRunnables.length) {
     return (
       <Empty
         size="small"
@@ -80,12 +98,6 @@ export const FeedbackGrid = ({
       />
     );
   }
-
-  // Group by feedback on this object vs. descendent objects
-  const grouped = _.groupBy(query.result, f =>
-    f.weave_ref.substring(weaveRef.length)
-  );
-  const paths = Object.keys(grouped).sort();
 
   const currentViewerId = userInfo ? userInfo.id : null;
   return (

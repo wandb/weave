@@ -136,6 +136,9 @@ const useCallTabs = (call: CallSchema) => {
         </Tailwind>
       ),
     },
+    // For now, we are only showing this tab for W&B admins since the
+    // feature is in active development. We want to be able to get
+    // feedback without enabling for all users.
     ...(showScores
       ? [
           {

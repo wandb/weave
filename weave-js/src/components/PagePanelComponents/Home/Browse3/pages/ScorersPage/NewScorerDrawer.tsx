@@ -133,6 +133,10 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
 
   const ScorerFormComponent = scorerTypeRecord[selectedScorerType].Component;
   const showRunnableUI = useShowRunnableUI();
+
+  // Here, we hide the LLM judge option from non-admins since the
+  // feature is in active development. We want to be able to get
+  // feedback without enabling for all users.
   const options = useMemo(() => {
     return scorerTypeOptions.filter(
       opt => showRunnableUI || opt.value !== LLM_JUDGE_VALUE
