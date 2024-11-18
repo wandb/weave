@@ -1,11 +1,13 @@
 import {Box, SxProps, Theme} from '@mui/material';
 import {MOON_200} from '@wandb/weave/common/css/color.styles';
+import {IconName} from '@wandb/weave/components/Icon';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import _ from 'lodash';
 import React, {
   createContext,
   FC,
   ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -13,7 +15,8 @@ import React, {
 } from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
-import {SplitPanel} from './SplitPanel';
+import {SplitPanelLeft} from './SplitPanels/SplitPanelLeft';
+import {SplitPanelRight} from './SplitPanels/SplitPanelRight';
 import {isPrimitive} from './util';
 
 type SimplePageLayoutContextType = {
@@ -30,7 +33,7 @@ export const SimplePageLayout: FC<{
     label: string;
     content: ReactNode;
   }>;
-  leftSidebar?: ReactNode;
+  leftSidebarContent?: ReactNode;
   hideTabsIfSingle?: boolean;
   headerExtra?: ReactNode;
 }> = props => {
@@ -132,7 +135,7 @@ export const SimplePageLayout: FC<{
           flexDirection: 'row',
           flex: '1 1 auto',
         }}>
-        {props.leftSidebar && (
+        {props.leftSidebarContent && (
           <Box
             sx={{
               width: '35%',
@@ -142,7 +145,7 @@ export const SimplePageLayout: FC<{
               maxHeight: '100%',
               borderRight: `1px solid ${MOON_200}`,
             }}>
-            {props.leftSidebar}
+            {props.leftSidebarContent}
           </Box>
         )}
         <Box
@@ -163,13 +166,19 @@ export const SimplePageLayoutWithHeader: FC<{
   title?: ReactNode;
   tabs: Array<{
     label: string;
+    icon?: IconName;
     content: ReactNode;
   }>;
   headerExtra?: ReactNode;
   headerContent: ReactNode;
-  leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
-  isSidebarOpen?: boolean;
+  onTabSelectedCallback?: (tab: string) => void;
+  // Left sidebar
+  isLeftSidebarOpen?: boolean;
+  leftSidebarContent?: ReactNode;
+  // Right sidebar
+  isRightSidebarOpen?: boolean;
+  rightSidebarContent?: ReactNode;
 }> = props => {
   const {tabs} = props;
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
@@ -177,6 +186,13 @@ export const SimplePageLayoutWithHeader: FC<{
   // We try to preserve the selected tab even if the set of tabs changes,
   // falling back to the first tab.
   const [tabId, setTabId] = useState(tabs[0].label);
+  const setAndNotifyTab = useCallback(
+    (newValue: string) => {
+      setTabId(newValue);
+      props.onTabSelectedCallback?.(newValue);
+    },
+    [props]
+  );
   // If the user has manually selected a tab, always keep that tab selected
   // otherwise, always default to the leftmost tab. Some calls have chat
   // tabs, others do not, so unless the user has explicitly selected a different
@@ -185,20 +201,20 @@ export const SimplePageLayoutWithHeader: FC<{
   const idxSelected = tabs.findIndex(t => t.label === tabId);
   const tabValue = idxSelected !== -1 ? idxSelected : 0;
   const handleTabChange = (newValue: string) => {
-    setTabId(newValue);
+    setAndNotifyTab(newValue);
     setUserSelectedTab(true);
   };
   useEffect(() => {
     if (idxSelected === -1) {
-      setTabId(tabs[0].label);
+      setAndNotifyTab(tabs[0].label);
       setUserSelectedTab(false);
     } else if (!userSelectedTab && idxSelected === 1) {
       // User has not selected a tab, but the current tab is not the leftmost tab.
       // Default to the leftmost.
       // Example: view call w/o chat [tab='call'] -> view call w/ chat [tab='call']
-      setTabId(tabs[0].label);
+      setAndNotifyTab(tabs[0].label);
     }
-  }, [tabs, idxSelected, userSelectedTab]);
+  }, [tabs, idxSelected, userSelectedTab, setAndNotifyTab]);
   const tabContent = useMemo(() => tabs[tabValue].content, [tabs, tabValue]);
 
   return (
@@ -244,63 +260,97 @@ export const SimplePageLayoutWithHeader: FC<{
         {simplePageLayoutContextValue.headerSuffix}
       </Box>
       <div style={{flex: '1 1 auto', overflow: 'hidden'}}>
-        <SplitPanel
+        <SplitPanelLeft
           minWidth={150}
           defaultWidth={200}
           maxWidth="50%"
-          isDrawerOpen={props.isSidebarOpen ?? false}
-          drawer={props.leftSidebar}
+          isDrawerOpen={props.isLeftSidebarOpen ?? false}
+          drawer={props.leftSidebarContent}
           main={
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                flexGrow: 1,
-                height: '100%',
-                overflow: 'hidden',
-              }}>
-              <Box
-                sx={{
-                  maxHeight: '50%',
-                  flex: '0 0 auto',
-                  width: '100%',
-                  overflow: 'auto',
-                  pt: 1,
-                  px: 2,
-                  alignContent: 'center',
-                }}>
-                {props.headerContent}
-              </Box>
-              {(!props.hideTabsIfSingle || tabs.length > 1) && (
-                <Tabs.Root
-                  style={{margin: '12px 16px 0 16px'}}
-                  value={tabs[tabValue].label}
-                  onValueChange={handleTabChange}>
-                  <Tabs.List>
-                    {tabs.map(tab => (
-                      <Tabs.Trigger
-                        key={tab.label}
-                        value={tab.label}
-                        className="h-[30px] text-sm">
-                        {tab.label}
-                      </Tabs.Trigger>
-                    ))}
-                  </Tabs.List>
-                </Tabs.Root>
-              )}
-              <Box
-                sx={{
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  flex: '1 1 auto',
-                }}>
-                <ErrorBoundary key={tabId}>{tabContent}</ErrorBoundary>
-              </Box>
-            </Box>
+            <SplitPanelRight
+              minWidth={150}
+              defaultWidth={200}
+              maxWidth="50%"
+              drawer={props.rightSidebarContent}
+              isDrawerOpen={props.isRightSidebarOpen ?? false}
+              main={
+                <SimpleTabView
+                  headerContent={props.headerContent}
+                  tabContent={tabContent}
+                  tabs={props.tabs}
+                  tabId={tabId}
+                  tabValue={tabValue}
+                  hideTabsIfSingle={props.hideTabsIfSingle}
+                  handleTabChange={handleTabChange}
+                />
+              }
+            />
           }
         />
       </div>
+    </Box>
+  );
+};
+
+const SimpleTabView: FC<{
+  headerContent: ReactNode;
+  tabs: Array<{
+    label: string;
+    content: ReactNode;
+  }>;
+  tabContent: ReactNode;
+  tabId: string;
+  tabValue: number;
+  hideTabsIfSingle?: boolean;
+  handleTabChange: (newValue: string) => void;
+}> = props => {
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        flexGrow: 1,
+        height: '100%',
+        overflow: 'hidden',
+      }}>
+      <Box
+        sx={{
+          maxHeight: '50%',
+          flex: '0 0 auto',
+          width: '100%',
+          overflow: 'auto',
+          pt: 1,
+          px: 2,
+          alignContent: 'center',
+        }}>
+        {props.headerContent}
+      </Box>
+      {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
+        <Tabs.Root
+          style={{margin: '12px 16px 0 16px'}}
+          value={props.tabs[props.tabValue].label}
+          onValueChange={props.handleTabChange}>
+          <Tabs.List>
+            {props.tabs.map(tab => (
+              <Tabs.Trigger
+                key={tab.label}
+                value={tab.label}
+                className="h-[30px] text-sm">
+                {tab.label}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        </Tabs.Root>
+      )}
+      <Box
+        sx={{
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          flex: '1 1 auto',
+        }}>
+        <ErrorBoundary key={props.tabId}>{props.tabContent}</ErrorBoundary>
+      </Box>
     </Box>
   );
 };

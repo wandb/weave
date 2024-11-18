@@ -1,21 +1,23 @@
 """Utility methods for converting exceptions to JSON."""
 
+from __future__ import annotations
+
 import json
 import traceback
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 
 class StackFrameDict(TypedDict):
     filename: str
-    line_number: Optional[int]
+    line_number: int | None
     function_name: str
-    text: Optional[str]
+    text: str | None
 
 
 class ExceptionDict(TypedDict, total=False):
     type: str
     message: str
-    traceback: Optional[list[StackFrameDict]]
+    traceback: list[StackFrameDict] | None
 
 
 def frame_summary_to_dict(frame: traceback.FrameSummary) -> StackFrameDict:

@@ -113,7 +113,6 @@ export const MessagePanel = ({
               </div>
             )}
           </div>
-
           {isOverflowing && (
             <ShowMoreButton
               isUser={isUser}
