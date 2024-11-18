@@ -1,27 +1,26 @@
 import {Box, CircularProgress, Divider} from '@mui/material';
 import {MOON_200} from '@wandb/weave/common/css/color.styles';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {SetStateAction, useState} from 'react';
+import React, {useState} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
-import {PlaygroundState, PlaygroundStateKey} from '../types';
+import {PlaygroundState} from '../types';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
-import {useChatFunctions} from './useChatFunctions';
+import {
+  SetPlaygroundStateFieldFunctionType,
+  useChatFunctions,
+} from './useChatFunctions';
 
 export type PlaygroundChatProps = {
   entity: string;
   project: string;
   setPlaygroundStates: (states: PlaygroundState[]) => void;
   playgroundStates: PlaygroundState[];
-  setPlaygroundStateField: (
-    index: number,
-    field: PlaygroundStateKey,
-    value: SetStateAction<PlaygroundState[PlaygroundStateKey]>
-  ) => void;
+  setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
   setSettingsTab: (callIndex: number | null) => void;
   settingsTab: number | null;
 };

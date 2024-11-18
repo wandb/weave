@@ -1,12 +1,16 @@
 import {createContext, useContext} from 'react';
 
+import {Choice, Message} from '../ChatView/types';
+
 export type PlaygroundContextType = {
   isPlayground: boolean;
+  addMessage: (newMessage: Message) => void;
+  editMessage: (messageIndex: number, newMessage: Message) => void;
   deleteMessage: (messageIndex: number, responseIndexes?: number[]) => void;
-  editMessage: (messageIndex: number, newMessage: any) => void;
+
+  editChoice: (choiceIndex: number, newChoice: Choice) => void;
   deleteChoice: (choiceIndex: number) => void;
-  editChoice: (choiceIndex: number, newChoice: any) => void;
-  addMessage: (newMessage: any) => void;
+
   retry: (messageIndex: number, isChoice?: boolean) => void;
   sendMessage: (
     role: 'assistant' | 'user' | 'tool',
@@ -17,11 +21,13 @@ export type PlaygroundContextType = {
 
 const DEFAULT_CONTEXT: PlaygroundContextType = {
   isPlayground: false,
-  deleteMessage: () => {},
-  editMessage: () => {},
-  deleteChoice: () => {},
-  editChoice: () => {},
   addMessage: () => {},
+  editMessage: () => {},
+  deleteMessage: () => {},
+
+  editChoice: () => {},
+  deleteChoice: () => {},
+
   retry: () => {},
   sendMessage: () => {},
 };

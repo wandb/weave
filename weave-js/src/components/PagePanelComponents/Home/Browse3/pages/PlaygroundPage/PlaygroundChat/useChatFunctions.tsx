@@ -1,3 +1,4 @@
+import {cloneDeep} from 'lodash';
 import {SetStateAction} from 'react';
 
 import {Choice, Message} from '../../ChatView/types';
@@ -7,14 +8,15 @@ type TraceCallOutput = {
   choices?: any[];
 };
 
+export type SetPlaygroundStateFieldFunctionType = (
+  index: number,
+  field: keyof PlaygroundState,
+  // The value here is a function that returns a PlaygroundState field
+  value: SetStateAction<PlaygroundState[keyof PlaygroundState]>
+) => void;
+
 export const useChatFunctions = (
-  setPlaygroundStateField: (
-    index: number,
-    field: keyof PlaygroundState,
-    value:
-      | PlaygroundState[keyof PlaygroundState]
-      | SetStateAction<PlaygroundState[keyof PlaygroundState]>
-  ) => void
+  setPlaygroundStateField: SetPlaygroundStateFieldFunctionType
 ) => {
   const deleteMessage = (
     callIndex: number,
@@ -23,7 +25,7 @@ export const useChatFunctions = (
   ) => {
     setPlaygroundStateField(callIndex, 'traceCall', prevTraceCall => {
       const newTraceCall = clearTraceCall(
-        JSON.parse(JSON.stringify(prevTraceCall))
+        cloneDeep(prevTraceCall as OptionalTraceCallSchema)
       );
       if (newTraceCall && newTraceCall.inputs?.messages) {
         // Remove the message and all responses to it
@@ -48,7 +50,7 @@ export const useChatFunctions = (
   ) => {
     setPlaygroundStateField(callIndex, 'traceCall', prevTraceCall => {
       const newTraceCall = clearTraceCall(
-        JSON.parse(JSON.stringify(prevTraceCall))
+        cloneDeep(prevTraceCall as OptionalTraceCallSchema)
       );
       if (newTraceCall && newTraceCall.inputs?.messages) {
         // Replace the message
@@ -61,7 +63,7 @@ export const useChatFunctions = (
   const addMessage = (callIndex: number, newMessage: Message) => {
     setPlaygroundStateField(callIndex, 'traceCall', prevTraceCall => {
       const newTraceCall = clearTraceCall(
-        JSON.parse(JSON.stringify(prevTraceCall))
+        cloneDeep(prevTraceCall as OptionalTraceCallSchema)
       );
       if (newTraceCall && newTraceCall.inputs?.messages) {
         if (
@@ -90,14 +92,12 @@ export const useChatFunctions = (
   const deleteChoice = (callIndex: number, choiceIndex: number) => {
     setPlaygroundStateField(callIndex, 'traceCall', prevTraceCall => {
       const newTraceCall = clearTraceCall(
-        JSON.parse(JSON.stringify(prevTraceCall))
+        cloneDeep(prevTraceCall as OptionalTraceCallSchema)
       );
       const output = newTraceCall?.output as TraceCallOutput;
       if (output && Array.isArray(output.choices)) {
         // Remove the choice
-        output.choices = output.choices.filter(
-          (_, index: number) => index !== choiceIndex
-        );
+        output.choices.splice(choiceIndex, 1);
         if (newTraceCall) {
           newTraceCall.output = output;
         }
@@ -113,16 +113,17 @@ export const useChatFunctions = (
   ) => {
     setPlaygroundStateField(callIndex, 'traceCall', prevTraceCall => {
       const newTraceCall = clearTraceCall(
-        JSON.parse(JSON.stringify(prevTraceCall))
+        cloneDeep(prevTraceCall as OptionalTraceCallSchema)
       );
       if (
         newTraceCall?.output &&
         Array.isArray((newTraceCall.output as TraceCallOutput).choices)
       ) {
         // Delete the old choice
-        (newTraceCall.output as TraceCallOutput).choices = (
-          newTraceCall.output as TraceCallOutput
-        ).choices!.filter((_, index) => index !== choiceIndex);
+        (newTraceCall.output as TraceCallOutput).choices!.splice(
+          choiceIndex,
+          1
+        );
 
         // Add the new choice as a message
         newTraceCall.inputs = newTraceCall.inputs ?? {};
