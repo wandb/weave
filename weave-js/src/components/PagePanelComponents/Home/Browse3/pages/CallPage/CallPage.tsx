@@ -58,9 +58,13 @@ export const CallPage: FC<{
   return <CallPageInnerVertical {...props} call={call.result} />;
 };
 
-const useCallTabs = (call: CallSchema) => {
+export const useShowRunnableUI = () => {
   const viewerInfo = useViewerInfo();
-  const showScores = viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
+  return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
+};
+
+const useCallTabs = (call: CallSchema) => {
+  const showScores = useShowRunnableUI();
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);

@@ -26,8 +26,6 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 const RUNNABLE_REF_PREFIX = 'wandb.runnable';
 
-
-
 const useLatestActionDefinitionsForCall = (call: CallSchema) => {
   const actionSpecs = (
     useBaseObjectInstances('ActionSpec', {
@@ -266,7 +264,7 @@ export const CallScoresViewer: React.FC<{
     {
       field: 'run',
       headerName: '',
-      width:75,
+      width: 75,
       rowSpanValueGetter: (value, row) => row.displayName,
       renderCell: params => {
         const actionRef = params.row.runnableActionRef;
@@ -323,7 +321,6 @@ export const CallScoresViewer: React.FC<{
   );
 };
 
-
 const RunButton: React.FC<{
   actionRef: string;
   callId: string;
@@ -353,10 +350,13 @@ const RunButton: React.FC<{
     }
   };
 
-
   if (error) {
     return (
-      <Button variant="destructive" onClick={handleRunClick} disabled style={{width: '55px'}}>
+      <Button
+        variant="destructive"
+        onClick={handleRunClick}
+        disabled
+        style={{width: '55px'}}>
         Error
       </Button>
     );
@@ -364,7 +364,11 @@ const RunButton: React.FC<{
 
   return (
     <div>
-      <Button variant="secondary" onClick={handleRunClick} disabled={isRunning} style={{width: '55px'}}>
+      <Button
+        variant="secondary"
+        onClick={handleRunClick}
+        disabled={isRunning}
+        style={{width: '55px'}}>
         {isRunning ? '...' : 'Run'}
       </Button>
     </div>
