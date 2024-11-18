@@ -1,5 +1,5 @@
 import re
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import PrivateAttr
 
@@ -14,6 +14,9 @@ except ImportError:
     print(
         "The `transformers` package is required to use LlamaGuard, please run `pip install transformers`"
     )
+
+if TYPE_CHECKING:
+    from torch import Tensor
 
 
 # https://github.com/meta-llama/llama-recipes/blob/main/src/llama_recipes/inference/prompt_format_utils.py
@@ -101,7 +104,7 @@ class LlamaGuard(Scorer):
             ).to(self.device)
         return self._generate(input_ids)
 
-    def _generate(self, input_ids: torch.Tensor) -> str:
+    def _generate(self, input_ids: "Tensor") -> str:
         prompt_len = input_ids.shape[1]
         llamaguard_output = self._model.generate(
             input_ids=input_ids,
