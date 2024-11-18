@@ -18,6 +18,10 @@ import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
+import {
+  convertFeedbackFieldToBackendFilter,
+  parseFeedbackType,
+} from '../../feedback/HumanFeedback/tsHumanFeedback';
 import {Reactions} from '../../feedback/Reactions';
 import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../filters/common';
@@ -336,40 +340,23 @@ function buildCallsTableColumns(
     c.startsWith('feedback.')
   );
   if (feedbackCols.length > 0) {
-    const convertFeedbackFieldToBackendFilter = (field: string) => {
-      // feedback.wandb.annotation.Text-field-2.value.Text-field-2.ZQUEOy2FtgkRWahm8ucKgGHQGQYhoroXSug6SY6SSZQ
-      // -> feedback.[wandb.annotation.Text-field-2].value.Text-field-2.ZQUEOy2FtgkRWahm8ucKgGHQGQYhoroXSug6SY6SSZQ
-      const regex = /feedback\.wandb\.([^.]+\.[^.]+)\.value\./;
-      const feedbackType = regex.exec(field)?.[1] ?? field; // annotation.my-type
-      const afterType = field.split(feedbackType).pop();
-      return `feedback.[wandb.${feedbackType}]${afterType}`;
-    };
-
     // Add feedback group to grouping model
     groupingModel.push({
       groupId: 'feedback',
-      headerName: 'feedback',
+      headerName: 'Annotations',
       children: feedbackCols.map(col => ({
         field: convertFeedbackFieldToBackendFilter(col),
       })),
     });
 
-    const getFeedbackHeaderFromField = (field: string) => {
-      // feedback.wandb.annotation.Text-field-2.value.Text-field-2.ZQUEOy2FtgkRWahm8ucKgGHQGQYhoroXSug6SY6SSZQ
-      // -> Text-field-2
-      const regex = /feedback\.wandb\.[^.]+\.([^.]+)\.value\./;
-      const match = regex.exec(field);
-      return match?.[1] ?? field;
-    };
-
     // Add feedback columns
     const feedbackColumns: Array<GridColDef<TraceCallSchema>> =
       feedbackCols.map(c => ({
         field: convertFeedbackFieldToBackendFilter(c),
-        headerName: `Feedback.${getFeedbackHeaderFromField(c)}`,
+        headerName: `Annotation.${parseFeedbackType(c).userDefinedType}`,
         width: 150,
         renderHeader: () => {
-          return <div>{getFeedbackHeaderFromField(c)}</div>;
+          return <div>{parseFeedbackType(c).userDefinedType}</div>;
         },
         valueGetter: (unused: any, row: any) => {
           return row[c];

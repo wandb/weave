@@ -11,6 +11,7 @@ import {
 import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
 
+import {parseFeedbackType} from '../feedback/HumanFeedback/tsHumanFeedback';
 import {WEAVE_REF_PREFIX} from '../pages/wfReactInterface/constants';
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
@@ -41,9 +42,7 @@ export const FIELD_LABELS: Record<string, string> = {
 
 export const getFieldLabel = (field: string): string => {
   if (field.startsWith('feedback.')) {
-    // feedback.[wandb.annotation.foo].payload.value.foo --> feedback.foo
-    const bracketed = field.split('[')[1].split(']')[0];
-    return `Feedback.${bracketed.split('.').pop()}`;
+    return `Feedback.${parseFeedbackType(field).userDefinedType}`;
   }
   return FIELD_LABELS[field] ?? field;
 };
