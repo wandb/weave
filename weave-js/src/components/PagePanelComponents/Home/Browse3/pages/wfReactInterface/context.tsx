@@ -54,6 +54,7 @@ export const useProjectHasTraceServerData = (
     true,
     {
       skip: !hasTraceServer,
+      noAutoRefresh: true,
     }
   );
   const columns = useMemo(() => ['id'], []);

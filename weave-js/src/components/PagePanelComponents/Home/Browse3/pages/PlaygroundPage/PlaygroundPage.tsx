@@ -37,10 +37,9 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
     setPlaygroundStateFromTraceCall,
   } = usePlaygroundState();
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [settingsTab, setSettingsTab] = useState<number | null>(0);
+  const {useCall, useCalls} = useWFHooks();
+  const [settingsTab, setSettingsTab] = useState<number | null>(null);
 
-  const {useCall} = useWFHooks();
   const call = useCall(
     useMemo(() => {
       return props.callId
@@ -52,6 +51,10 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
         : null;
     }, [props.entity, props.project, props.callId])
   );
+
+  const {result: calls} = useCalls(props.entity, props.project, {
+    callIds: playgroundStates.map(state => state.traceCall.id || ''),
+  });
 
   useEffect(() => {
     if (!call.loading && call.result) {
@@ -71,7 +74,22 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
     }
     // Only set the call the first time the page loads, and we get the call
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.callId]);
+  }, [call.loading]);
+
+  useEffect(() => {
+    setPlaygroundStates(prev => {
+      const newStates = [...prev];
+      for (const [idx, state] of newStates.entries()) {
+        for (const c of calls || []) {
+          if (state.traceCall.id === c.callId) {
+            newStates[idx] = {...state, traceCall: c.traceCall || {}};
+            break;
+          }
+        }
+      }
+      return newStates;
+    });
+  }, [calls, setPlaygroundStates]);
 
   return (
     <Box

@@ -100,7 +100,7 @@ export const useCreateBaseObjectInstance = <
     createBaseObjectInstance(client, baseObjectClassName, req);
 };
 
-const createBaseObjectInstance = async <
+export const createBaseObjectInstance = async <
   C extends BaseObjectClassRegistryKeys,
   T = BaseObjectClassType<C>
 >(

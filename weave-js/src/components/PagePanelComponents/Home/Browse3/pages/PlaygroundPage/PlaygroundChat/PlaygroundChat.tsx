@@ -1,8 +1,12 @@
 import {Box, CircularProgress, Divider} from '@mui/material';
 import {MOON_200} from '@wandb/weave/common/css/color.styles';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {SetStateAction, useState} from 'react';
 
+import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundState, PlaygroundStateKey} from '../types';
+import {PlaygroundCallStats} from './PlaygroundCallStats';
+import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
 
 export type PlaygroundChatProps = {
@@ -28,6 +32,7 @@ export const PlaygroundChat = ({
   setSettingsTab,
   settingsTab,
 }: PlaygroundChatProps) => {
+  const [chatText, setChatText] = useState('');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLoading, setIsLoading] = useState(false);
   const chatPercentWidth = 100 / playgroundStates.length;
@@ -104,10 +109,46 @@ export const PlaygroundChat = ({
                   project={project}
                 />
               </Box>
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  overflow: 'scroll',
+                  paddingTop: '48px', // Height of the top bar
+                  paddingX: '16px',
+                }}>
+                <Tailwind>
+                  <div className="mx-auto h-full min-w-[400px] max-w-[800px] pb-8">
+                    Chat
+                  </div>
+                </Tailwind>
+              </Box>
+              <Box
+                sx={{
+                  width: '100%',
+                  maxWidth: '800px',
+                  padding: '8px',
+                  paddingLeft: '12px',
+                  marginX: 'auto',
+                  marginBottom: '16px',
+                }}>
+                {state.traceCall.summary && (
+                  <PlaygroundCallStats
+                    call={state.traceCall as TraceCallSchema}
+                  />
+                )}
+              </Box>
             </Box>
           </React.Fragment>
         ))}
       </Box>
+      <PlaygroundChatInput
+        chatText={chatText}
+        setChatText={setChatText}
+        isLoading={isLoading}
+        onSend={() => {}}
+        onAdd={() => {}}
+      />
     </Box>
   );
 };

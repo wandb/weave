@@ -44,7 +44,7 @@ export const CustomGridTreeDataGroupingCell: FC<
 > = props => {
   const {id, field, rowNode, row} = props;
   const {isParentRow} = row;
-  const call = row.call as CallSchema;
+  const call = row.call as CallSchema | undefined;
   const apiRef = useGridApiContext();
   const handleClick: ButtonProps['onClick'] = event => {
     if (rowNode.type !== 'group') {
@@ -89,6 +89,10 @@ export const CustomGridTreeDataGroupingCell: FC<
   ) : null;
 
   const isHiddenCount = id === 'HIDDEN_SIBLING_COUNT';
+
+  if (call == null) {
+    return <div />;
+  }
 
   const box = (
     <CursorBox
@@ -203,7 +207,7 @@ export const CustomGridTreeDataGroupingCell: FC<
                 {call.displayName ?? opNiceName(call.spanName)}
               </Box>
             </Box>
-            {call?.traceCall?.summary && (
+            {call.traceCall?.summary && (
               <TraceCostStats
                 usageData={call.traceCall.summary.usage}
                 costData={call.traceCall.summary.weave?.costs}

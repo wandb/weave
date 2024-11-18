@@ -6,6 +6,10 @@ import {Tag} from '@wandb/weave/components/Tag';
 import React, {SetStateAction} from 'react';
 
 import {PlaygroundState, PlaygroundStateKey} from '../types';
+import {FunctionEditor} from './FunctionEditor';
+import {PlaygroundSlider} from './PlaygroundSlider';
+import {ResponseFormatEditor} from './ResponseFormatEditor';
+import {StopSequenceEditor} from './StopSequenceEditor';
 
 export type PlaygroundSettingsProps = {
   playgroundStates: PlaygroundState[];
@@ -58,6 +62,84 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 gap: '4px',
                 mt: 2,
               }}>
+              <FunctionEditor
+                playgroundState={playgroundState}
+                functions={playgroundState.functions}
+                setFunctions={value =>
+                  setPlaygroundStateField(
+                    idx,
+                    'functions',
+                    value as Array<{name: string; [key: string]: any}>
+                  )
+                }
+              />
+
+              <ResponseFormatEditor
+                responseFormat={playgroundState.responseFormat}
+                setResponseFormat={value =>
+                  setPlaygroundStateField(idx, 'responseFormat', value)
+                }
+              />
+
+              <PlaygroundSlider
+                min={0}
+                max={2}
+                step={0.01}
+                setValue={value =>
+                  setPlaygroundStateField(idx, 'temperature', value)
+                }
+                label="Temperature"
+                value={playgroundState.temperature}
+              />
+
+              <PlaygroundSlider
+                min={0}
+                max={playgroundState.maxTokensLimit || 100}
+                step={1}
+                setValue={value =>
+                  setPlaygroundStateField(idx, 'maxTokens', value)
+                }
+                label="Maximum tokens"
+                value={playgroundState.maxTokens}
+              />
+
+              <StopSequenceEditor
+                stopSequences={playgroundState.stopSequences}
+                setStopSequences={value =>
+                  setPlaygroundStateField(idx, 'stopSequences', value)
+                }
+              />
+
+              <PlaygroundSlider
+                min={0}
+                max={1}
+                step={0.01}
+                setValue={value => setPlaygroundStateField(idx, 'topP', value)}
+                label="Top P"
+                value={playgroundState.topP}
+              />
+
+              <PlaygroundSlider
+                min={0}
+                max={1}
+                step={0.01}
+                setValue={value =>
+                  setPlaygroundStateField(idx, 'frequencyPenalty', value)
+                }
+                label="Frequency penalty"
+                value={playgroundState.frequencyPenalty}
+              />
+
+              <PlaygroundSlider
+                min={0}
+                max={1}
+                step={0.01}
+                setValue={value =>
+                  setPlaygroundStateField(idx, 'presencePenalty', value)
+                }
+                label="Presence penalty"
+                value={playgroundState.presencePenalty}
+              />
               <Box
                 sx={{
                   width: '100%',
