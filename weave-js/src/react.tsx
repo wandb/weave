@@ -551,6 +551,14 @@ const RE_WEAVE_CALL_REF_PATHNAME = new RegExp(
   ].join('')
 );
 
+export const parseRefMaybe = (s: string): ObjectRef | null => {
+  try {
+    return parseRef(s);
+  } catch (e) {
+    return null;
+  }
+};
+
 export const parseRef = (ref: string): ObjectRef => {
   const url = new URL(ref);
   let splitLimit: number;
