@@ -29,8 +29,8 @@ const AnnotationScorerFormSchema = z.object({
         .describe('Optional maximum length of the string'),
     }),
     z.object({
-      type: z.literal('array'),
-      options: z.array(z.string()).describe('List of options to choose from'),
+      type: z.literal('enum'),
+      enum: z.array(z.string()).describe('List of options to choose from'),
     }),
   ]),
 });
@@ -75,6 +75,10 @@ export const onAnnotationScorerSave = async (
   data: z.infer<typeof AnnotationScorerFormSchema>,
   client: TraceServerClient
 ) => {
+  let type = data.Type.type;
+  if (type === 'enum') {
+    type = 'string';
+  }
   return createBaseObjectInstance(client, 'AnnotationSpec', {
     obj: {
       project_id: projectIdFromParts({entity, project}),
@@ -82,7 +86,10 @@ export const onAnnotationScorerSave = async (
       val: {
         name: data.Name,
         description: data.Description,
-        json_schema: data.Type,
+        json_schema: {
+          ...data.Type,
+          type,
+        },
       },
     },
   });
