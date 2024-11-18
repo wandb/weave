@@ -62,6 +62,10 @@ class LlamaGuard(Scorer):
         self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
 
     def postprocess(self, output: str) -> dict[str, Any]:
+        """
+        Postprocess the output of the LlamaGuard model. The output is in the following format:
+        "unsafe" if the output is unsafe, otherwise "safe". If unsafe, the category is also returned.
+        """
         safe = True
         category = None
         if "unsafe" in output.lower():
@@ -80,6 +84,9 @@ class LlamaGuard(Scorer):
         categories: dict[str, str] = None,
         excluded_category_keys: list[str] = [],
     ):
+        """
+        Score the messages list. If you want to score conversations that contain multiple messages, use this method.
+        """
         if categories is not None:
             input_ids = self._tokenizer.apply_chat_template(
                 messages,
@@ -114,7 +121,9 @@ class LlamaGuard(Scorer):
         return response
 
     def default_format_messages(self, prompt: str) -> List[Dict[str, str]]:
-        """Override this method to format the prompt in a custom way."""
+        """Override this method to format the prompt in a custom way. 
+        It should return a list of dictionaries with the following alternative keys: "role" and "content".
+        """
         return [
             {
                 "role": "user",
