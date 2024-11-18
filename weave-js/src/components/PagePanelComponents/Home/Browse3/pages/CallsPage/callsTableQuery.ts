@@ -171,11 +171,7 @@ export const useCallsForQuery = (
           }
           // Store feedback by feedback_type, newer entries will overwrite older ones
           if (curr.feedback_type) {
-            const name = curr.feedback_type.replace(
-              `${ANNOTATION_FEEDBACK_TYPE_PREFIX}.`,
-              ''
-            );
-            acc[callId][name] = getNestedValue(curr.payload);
+            acc[callId][curr.feedback_type] = getNestedValue(curr.payload);
           }
           return acc;
         },

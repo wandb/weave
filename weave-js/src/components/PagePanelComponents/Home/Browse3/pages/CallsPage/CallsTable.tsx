@@ -537,9 +537,12 @@ export const CallsTable: FC<{
     if (!setColumnVisibilityModel || !columnVisibilityModel) {
       return;
     }
+    // TODO(gst): move to ts
+    const specToQueryName = (objectId: string) =>
+      `feedback.[wandb.annotation.${objectId}]`;
     // Check if we need to update - only update if any annotation columns are missing from the model
     const needsUpdate = annotationColumns.result.some(
-      col => columnVisibilityModel[`feedback.${col.object_id}`] === undefined
+      col => columnVisibilityModel[specToQueryName(col.object_id)] === undefined
     );
     if (!needsUpdate) {
       return;
@@ -547,8 +550,10 @@ export const CallsTable: FC<{
     const annotationColumnVisiblityFalse = annotationColumns.result.reduce(
       (acc, col) => {
         // Only add columns=false when not already in the model
-        if (columnVisibilityModel[`feedback.${col.object_id}`] === undefined) {
-          acc[`feedback.${col.object_id}`] = false;
+        if (
+          columnVisibilityModel[specToQueryName(col.object_id)] === undefined
+        ) {
+          acc[specToQueryName(col.object_id)] = false;
         }
         return acc;
       },
