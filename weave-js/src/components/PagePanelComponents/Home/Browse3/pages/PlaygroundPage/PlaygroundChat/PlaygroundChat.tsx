@@ -3,7 +3,9 @@ import {MOON_200} from '@wandb/weave/common/css/color.styles';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {SetStateAction, useState} from 'react';
 
+import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundState, PlaygroundStateKey} from '../types';
+import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
 
@@ -120,6 +122,21 @@ export const PlaygroundChat = ({
                     Chat
                   </div>
                 </Tailwind>
+              </Box>
+              <Box
+                sx={{
+                  width: '100%',
+                  maxWidth: '800px',
+                  padding: '8px',
+                  paddingLeft: '12px',
+                  marginX: 'auto',
+                  marginBottom: '16px',
+                }}>
+                {state.traceCall.summary && (
+                  <PlaygroundCallStats
+                    call={state.traceCall as TraceCallSchema}
+                  />
+                )}
               </Box>
             </Box>
           </React.Fragment>

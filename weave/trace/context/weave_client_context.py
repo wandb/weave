@@ -1,16 +1,18 @@
+from __future__ import annotations
+
 import threading
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from weave.trace.errors import WeaveInitError
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
 
-_global_weave_client: Optional["WeaveClient"] = None
+_global_weave_client: WeaveClient | None = None
 lock = threading.Lock()
 
 
-def set_weave_client_global(client: Optional["WeaveClient"]) -> None:
+def set_weave_client_global(client: WeaveClient | None) -> None:
     global _global_weave_client
 
     # These outer guards are to avoid expensive lock acquisition
@@ -30,13 +32,13 @@ def set_weave_client_global(client: Optional["WeaveClient"]) -> None:
 #     context_state._graph_client.set(client)
 
 
-def get_weave_client() -> Optional["WeaveClient"]:
+def get_weave_client() -> WeaveClient | None:
     # if (context_client := context_state._graph_client.get()) is not None:
     #     return context_client
     return _global_weave_client
 
 
-def require_weave_client() -> "WeaveClient":
+def require_weave_client() -> WeaveClient:
     if (client := get_weave_client()) is None:
         raise WeaveInitError("You must call `weave.init(<project_name>)` first")
     return client
