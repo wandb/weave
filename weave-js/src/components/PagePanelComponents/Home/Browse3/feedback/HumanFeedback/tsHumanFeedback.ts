@@ -2,6 +2,7 @@ export type FeedbackTypeParts = {
   fullType: string;
   userDefinedType: string;
   feedbackType: string;
+  displayName: string;
 };
 
 export const parseFeedbackType = (field: string): FeedbackTypeParts | null => {
@@ -9,6 +10,7 @@ export const parseFeedbackType = (field: string): FeedbackTypeParts | null => {
   // fullType: feedback.wandb.annotation.Numerical-field-2
   // userDefinedType: Numerical-field-2
   // type: annotation
+  // displayName: Annotation.Numerical-field-2
   const deBracketed = field.replace(/\[.*\]/g, '');
   const split = deBracketed.split('.');
   if (split.length !== 6) {
@@ -32,6 +34,9 @@ export const parseFeedbackType = (field: string): FeedbackTypeParts | null => {
     fullType: [f, w, type, userDefinedType].join('.'),
     feedbackType: type,
     userDefinedType,
+    displayName: `${
+      type.charAt(0).toUpperCase() + type.slice(1)
+    }.${userDefinedType}`,
   };
 };
 

@@ -355,7 +355,7 @@ function buildCallsTableColumns(
         const parsed = parseFeedbackType(c);
         return {
           field: convertFeedbackFieldToBackendFilter(c),
-          headerName: parsed ? `Annotation.${parsed.userDefinedType}` : `${c}`,
+          headerName: parsed ? parsed.displayName : `${c}`,
           width: 150,
           renderHeader: () => {
             return <div>{parsed ? parsed.userDefinedType : c}</div>;

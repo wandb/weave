@@ -46,7 +46,7 @@ export const getFieldLabel = (field: string): string => {
     if (parsed === null) {
       return field;
     }
-    return `Annotation.${parsed.userDefinedType}`;
+    return parsed.displayName;
   }
   return FIELD_LABELS[field] ?? field;
 };

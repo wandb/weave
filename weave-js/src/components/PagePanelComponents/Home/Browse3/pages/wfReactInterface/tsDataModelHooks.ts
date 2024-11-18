@@ -669,67 +669,6 @@ const useFeedback = (
   return {...result, refetch};
 };
 
-const useFeedbackQuery = (
-  entity: string,
-  project: string,
-  query: Query,
-  sortBy?: traceServerTypes.SortBy[],
-  opts?: {skip?: boolean}
-) => {
-  const getTsClient = useGetTraceServerClientContext();
-
-  const [result, setResult] = useState<
-    LoadableWithError<traceServerTypes.Feedback[]>
-  >({
-    loading: false,
-    result: null,
-    error: null,
-  });
-  const [doReload, setDoReload] = useState(false);
-  const refetch = useCallback(() => {
-    setDoReload(true);
-  }, [setDoReload]);
-
-  useEffect(() => {
-    if (opts?.skip) {
-      return;
-    }
-    let mounted = true;
-    if (doReload) {
-      setDoReload(false);
-    }
-    setResult({loading: true, result: null, error: null});
-    getTsClient()
-      .feedbackQuery({
-        project_id: projectIdFromParts({
-          entity,
-          project,
-        }),
-        query,
-        sort_by: sortBy ?? [{field: 'created_at', direction: 'desc'}],
-      })
-      .then(res => {
-        if (!mounted) {
-          return;
-        }
-        if ('result' in res) {
-          setResult({loading: false, result: res.result, error: null});
-        }
-      })
-      .catch(err => {
-        if (!mounted) {
-          return;
-        }
-        setResult({loading: false, result: null, error: err});
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [getTsClient, doReload, sortBy, entity, project, query, opts?.skip]);
-
-  return {...result, refetch};
-};
-
 const useOpVersion = (
   // Null value skips
   key: OpVersionKey | null
@@ -1796,7 +1735,6 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useRefsData,
   useApplyMutationsToRef,
   useFeedback,
-  useFeedbackQuery,
   useFileContent,
   useTableRowsQuery,
   useTableQueryStats,

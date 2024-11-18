@@ -6,7 +6,6 @@ import {CallSchema} from '../../wfReactInterface/wfDataModelHooksInterface';
 import {DEFAULT_COST_DATA, isCostDataKey, isUsageDataKey} from './costTypes';
 
 const COST_PARAM_PREFIX = 'summary.weave.costs.';
-const USAGE_PARAM_PREFIX = 'summary.usage.';
 
 export const getCostFromCellParams = (params: {[key: string]: any}) => {
   const costData: {[key: string]: LLMCostSchema} = {};
@@ -30,8 +29,8 @@ export const getCostFromCellParams = (params: {[key: string]: any}) => {
 export const getUsageFromCellParams = (params: {[key: string]: any}) => {
   const usage: {[key: string]: LLMUsageSchema} = {};
   for (const key in params) {
-    if (key.startsWith(USAGE_PARAM_PREFIX)) {
-      const usageKeys = key.replace(`${USAGE_PARAM_PREFIX}.`, '').split('.');
+    if (key.startsWith('summary.usage')) {
+      const usageKeys = key.replace('summary.usage.', '').split('.');
       const usageKey = usageKeys.pop() || '';
       if (isUsageDataKey(usageKey)) {
         const model = usageKeys.join('.');
@@ -93,38 +92,17 @@ export const formatTokenCost = (cost: number): string => {
 export const addCostsToCallResults = (
   callResults: CallSchema[],
   costResults: CallSchema[]
-): CallSchema[] => {
-  const costDict = costResults.reduce((acc, costResult) => {
-    if (costResult.callId) {
-      acc[costResult.callId] = {
-        costs: costResult.traceCall?.summary?.weave?.costs,
-        usage: costResult.traceCall?.summary?.usage,
-      };
+) => {
+  const costDict = costResults.reduce((acc, cost) => {
+    if (cost.callId) {
+      acc[cost.callId] = cost;
     }
     return acc;
-  }, {} as Record<string, any>);
+  }, {} as Record<string, CallSchema>);
 
   return callResults.map(call => {
     if (call.callId && costDict[call.callId]) {
-      if (!call.traceCall) {
-        return call;
-      }
-      // Merge cost fields into existing call data
-      const merged = {
-        ...call,
-        traceCall: {
-          ...call.traceCall,
-          summary: {
-            ...call.traceCall?.summary,
-            weave: {
-              ...call.traceCall?.summary?.weave,
-              costs: costDict[call.callId].costs,
-            },
-          },
-          usage: costDict[call.callId].usage,
-        },
-      };
-      return merged;
+      return {...call, ...costDict[call.callId]};
     }
     return call;
   });
