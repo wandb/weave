@@ -238,6 +238,10 @@ const getFeedbackMerged = (calls: CallSchema[]) => {
     }
     const feedback = c.traceCall?.summary?.weave?.feedback?.reduce(
       (acc: Record<string, any>, curr: Record<string, any>) => {
+        // keep most recent feedback of each type
+        if (acc[curr.feedback_type]?.created_at > curr.created_at) {
+          return acc;
+        }
         acc[curr.feedback_type] = curr;
         return acc;
       },
