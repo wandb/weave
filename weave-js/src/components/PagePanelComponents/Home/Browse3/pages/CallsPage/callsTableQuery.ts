@@ -3,8 +3,6 @@ import {
   GridPaginationModel,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
-import {parseRef} from '@wandb/weave/react';
-import {makeRefCall} from '@wandb/weave/util/refs';
 import {useCallback, useMemo} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
@@ -18,9 +16,6 @@ import {
   CallSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
-
-// TODO(gst): move this
-const ANNOTATION_FEEDBACK_TYPE_PREFIX = 'wandb.annotation';
 
 /**
  * This Hook is responsible for bridging the gap between the CallsTable
@@ -69,6 +64,7 @@ export const useCallsForQuery = (
     expandedColumns,
     {
       refetchOnDelete: true,
+      includeFeedback: true,
     }
   );
 
@@ -77,7 +73,7 @@ export const useCallsForQuery = (
   });
 
   const callResults = useMemo(() => {
-    return calls.result ?? [];
+    return getFeedbackMerged(calls.result ?? []);
   }, [calls]);
 
   const total = useMemo(() => {
@@ -113,71 +109,18 @@ export const useCallsForQuery = (
     {
       skip: calls.loading,
       includeCosts: true,
+      includeFeedback: true,
     }
   );
 
   const costResults = useMemo(() => {
-    return costs.result ?? [];
+    return getFeedbackMerged(costs.result ?? []);
   }, [costs]);
   const refetch = useCallback(() => {
     calls.refetch();
     costs.refetch();
     callsStats.refetch();
   }, [calls, callsStats, costs]);
-
-  // query for annotation feeback
-  const {useFeedbackQuery} = useWFHooks();
-  const feedbackQueryQuery = useMemo(() => {
-    const callRefs = callResults.map(call =>
-      makeRefCall(entity, project, call.callId)
-    );
-    return {
-      $expr: {
-        $and: [
-          {
-            $contains: {
-              input: {$getField: 'feedback_type'},
-              substr: {$literal: `${ANNOTATION_FEEDBACK_TYPE_PREFIX}.`},
-            },
-          },
-          {
-            $in: [
-              {$getField: 'weave_ref'},
-              callRefs.map(ref => ({$literal: ref})),
-            ],
-          },
-        ],
-      },
-      // TODO(gst): why does the $contains operator typing fail here...
-    } as Query;
-  }, [entity, project, callResults]);
-  const opts = {skip: callResults.length === 0};
-  const feedbackQuery = useFeedbackQuery(
-    entity,
-    project,
-    feedbackQueryQuery,
-    undefined,
-    opts
-  );
-
-  // map of callId to the latest feedback of each feedback_type
-  const feedbackByType: Record<string, Record<string, any>> | undefined =
-    useMemo(() => {
-      return feedbackQuery.result?.reduce(
-        (acc: Record<string, Record<string, any>>, curr) => {
-          const callId = parseRef(curr.weave_ref).artifactName;
-          if (!acc[callId]) {
-            acc[callId] = {};
-          }
-          // Store feedback by feedback_type, newer entries will overwrite older ones
-          if (curr.feedback_type) {
-            acc[callId][curr.feedback_type] = curr.payload;
-          }
-          return acc;
-        },
-        {}
-      );
-    }, [feedbackQuery.result]);
 
   return useMemo(() => {
     if (calls.loading) {
@@ -193,19 +136,16 @@ export const useCallsForQuery = (
     return {
       costsLoading: costs.loading,
       loading: calls.loading,
-      result: mergeCallData(callResults, costResults, feedbackByType),
+      // Return faster calls query results until cost query finishes
+      result: calls.loading
+        ? []
+        : costResults.length > 0
+        ? addCostsToCallResults(callResults, costResults)
+        : callResults,
       total,
       refetch,
     };
-  }, [
-    callResults,
-    calls.loading,
-    total,
-    costs.loading,
-    costResults,
-    refetch,
-    feedbackByType,
-  ]);
+  }, [callResults, calls.loading, total, costs.loading, costResults, refetch]);
 };
 
 export const useFilterSortby = (
@@ -290,30 +230,21 @@ const convertHighLevelFilterToLowLevelFilter = (
   };
 };
 
-const mergeCallData = (
-  baseCallResults: CallSchema[],
-  costResults: CallSchema[],
-  feedbackByType?: Record<string, Record<string, any>>
-): CallSchema[] => {
-  let result = baseCallResults;
-
-  // Add feedback if available
-  if (feedbackByType) {
-    result = result.map(call => ({
-      ...call,
-      traceCall: call.traceCall
-        ? {
-            ...call.traceCall,
-            feedback: feedbackByType[call.callId],
-          }
-        : undefined,
-    }));
-  }
-
-  // Add costs if available
-  if (costResults.length > 0) {
-    result = addCostsToCallResults(result, costResults);
-  }
-
-  return result;
+const getFeedbackMerged = (calls: CallSchema[]) => {
+  // for each call, reduce all feedback to the latest feedback of each type
+  return calls.map(c => {
+    if (!c.traceCall?.summary?.weave?.feedback) {
+      return c;
+    }
+    const feedback = c.traceCall?.summary?.weave?.feedback?.reduce(
+      (acc: Record<string, any>, curr: Record<string, any>) => {
+        acc[curr.feedback_type] = curr.payload;
+        return acc;
+      },
+      {}
+    );
+    // TODO: how do I sneak this into the schema?
+    c.traceCall.feedback = feedback;
+    return c;
+  });
 };

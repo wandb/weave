@@ -336,22 +336,22 @@ function buildCallsTableColumns(
   cols.push(...newCols);
 
   // Create special feedback columns with grouping model
-  const feedbackCols = allDynamicColumnNames.filter(c =>
-    c.startsWith('feedback.')
+  const annotationColNames = allDynamicColumnNames.filter(c =>
+    c.startsWith('feedback.wandb.annotation')
   );
-  if (feedbackCols.length > 0) {
+  if (annotationColNames.length > 0) {
     // Add feedback group to grouping model
     groupingModel.push({
       groupId: 'feedback',
       headerName: 'Annotations',
-      children: feedbackCols.map(col => ({
+      children: annotationColNames.map(col => ({
         field: convertFeedbackFieldToBackendFilter(col),
       })),
     });
 
     // Add feedback columns
-    const feedbackColumns: Array<GridColDef<TraceCallSchema>> =
-      feedbackCols.map(c => ({
+    const annotationColumns: Array<GridColDef<TraceCallSchema>> =
+      annotationColNames.map(c => ({
         field: convertFeedbackFieldToBackendFilter(c),
         headerName: `Annotation.${parseFeedbackType(c).userDefinedType}`,
         width: 150,
@@ -365,7 +365,7 @@ function buildCallsTableColumns(
           return <div>{params.value}</div>;
         },
       }));
-    cols.push(...feedbackColumns);
+    cols.push(...annotationColumns);
   }
 
   cols.push({

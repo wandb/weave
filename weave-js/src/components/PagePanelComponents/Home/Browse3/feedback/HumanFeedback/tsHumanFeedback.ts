@@ -14,10 +14,10 @@ export const parseFeedbackType = (field: string): FeedbackTypeParts => {
   const [f, w, type, userDefinedType, v, u2, hash] = deBracketed.split('.');
 
   if (f !== 'feedback') {
-    throw new Error(`Expected 'feedback' prefix, got ${f}`);
+    throw new Error(`Expected 'feedback' prefix, got '${f}'`);
   }
   if (v !== 'value') {
-    throw new Error(`Expected 'value' prefix, got ${v}`);
+    throw new Error(`Expected 'value' prefix, got '${v}'`);
   }
   if (w !== 'wandb') {
     // don't try to parse non-wandb feedback
