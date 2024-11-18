@@ -31,6 +31,7 @@ from weave.scorers.string_scorer import (
 )
 from weave.scorers.summarization_scorer import SummarizationScorer
 from weave.scorers.xml_scorer import ValidXMLScorer
+from weave.scorers.llamaguard_scorer import LlamaGuard
 
 __all__ = [
     "auto_summarize",
@@ -54,4 +55,5 @@ __all__ = [
     "SummarizationScorer",
     "transpose",
     "ValidXMLScorer",
+    "LlamaGuard",
 ]
