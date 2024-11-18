@@ -27,13 +27,15 @@ to manage asynchronous tasks:
     result_future = executor.then([future], process_result)
 """
 
+from __future__ import annotations
+
 import atexit
 import concurrent.futures
 import logging
 from concurrent.futures import Future, wait
 from contextvars import ContextVar
 from threading import Lock
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, TypeVar
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.util import ContextAwareThreadPoolExecutor
@@ -63,11 +65,11 @@ class FutureExecutor:
 
     def __init__(
         self,
-        max_workers: Optional[int] = None,
+        max_workers: int | None = None,
         thread_name_prefix: str = THREAD_NAME_PREFIX,
     ):
         self._max_workers = max_workers
-        self._executor: Optional[ContextAwareThreadPoolExecutor] = None
+        self._executor: ContextAwareThreadPoolExecutor | None = None
         if max_workers != 0:
             self._executor = ContextAwareThreadPoolExecutor(
                 max_workers=max_workers, thread_name_prefix=thread_name_prefix
@@ -138,7 +140,7 @@ class FutureExecutor:
 
         return result_future
 
-    def flush(self, timeout: Optional[float] = None) -> bool:
+    def flush(self, timeout: float | None = None) -> bool:
         """
         Block until all currently submitted items are complete or timeout is reached.
 

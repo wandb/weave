@@ -1,10 +1,10 @@
 import _ from 'lodash';
-import React, {useMemo} from 'react';
+import React from 'react';
 
-import {BytesStoredInfoIcon} from '../../../../../BytesStoredInfoIcon';
+import {parseRefMaybe} from '../../../../../../react';
 import {Timestamp} from '../../../../../Timestamp';
 import {UserLink} from '../../../../../UserLink';
-import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
+import {SmallRef} from '../../../Browse2/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CostTable} from './cost';
@@ -34,22 +34,6 @@ export const CallSummary: React.FC<{
     )
   );
   const costData = call.traceCall?.summary?.weave?.costs;
-
-  const inputBytes = useMemo(
-    () =>
-      call.traceCall?.inputs
-        ? JSON.stringify(call.traceCall?.inputs).length
-        : 0,
-    [call.traceCall?.inputs]
-  );
-  const outputBytes = useMemo(
-    () =>
-      call.traceCall?.output
-        ? JSON.stringify(call.traceCall?.output).length
-        : 0,
-    [call.traceCall?.output]
-  );
-  const totalBytesStored = inputBytes + outputBytes;
 
   return (
     <div className="overflow-auto px-16 pt-12">
@@ -92,12 +76,6 @@ export const CallSummary: React.FC<{
                 Latency: span.summary.latency_s.toFixed(3) + 's',
               }
             : {}),
-          'Bytes stored': (
-            <BytesStoredInfoIcon
-              bytesStored={totalBytesStored}
-              weaveKind="trace"
-            />
-          ),
           ...(Object.keys(attributes).length > 0
             ? {Attributes: attributes}
             : {}),

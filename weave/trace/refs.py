@@ -1,7 +1,9 @@
-import dataclasses
+from __future__ import annotations
+
 import urllib
 from concurrent.futures import Future
-from typing import Any, Optional, Union, cast
+from dataclasses import asdict, dataclass, fields
+from typing import Any, Union, cast
 
 from weave.trace_server import refs_internal
 
@@ -15,21 +17,27 @@ class WeaveDigestError(ValueError):
     """Raised when a digest is invalid."""
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class Ref:
     def uri(self) -> str:
         raise NotImplementedError
 
     def as_param_dict(self) -> dict:
-        return dataclasses.asdict(self)
+        return asdict(self)
+
+    def __deepcopy__(self, memo: dict) -> Ref:
+        d = {f.name: getattr(self, f.name) for f in fields(self)}
+        res = self.__class__(**d)
+        memo[id(self)] = res
+        return res
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class TableRef(Ref):
     entity: str
     project: str
-    _digest: Union[str, Future[str]]
-    _row_digests: Optional[Union[list[str], Future[list[str]]]] = None
+    _digest: str | Future[str]
+    _row_digests: list[str] | Future[list[str]] | None = None
 
     def as_param_dict(self) -> dict:
         return {
@@ -66,6 +74,10 @@ class TableRef(Ref):
 
         return self._row_digests
 
+    @property
+    def project_id(self) -> str:
+        return f"{self.entity}/{self.project}"
+
     def __post_init__(self) -> None:
         if isinstance(self._digest, str):
             refs_internal.validate_no_slashes(self._digest, "digest")
@@ -75,33 +87,33 @@ class TableRef(Ref):
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class RefWithExtra(Ref):
-    def with_extra(self, extra: tuple[Union[str, Future[str]], ...]) -> "RefWithExtra":
+    def with_extra(self, extra: tuple[str | Future[str], ...]) -> RefWithExtra:
         params = self.as_param_dict()
         params["_extra"] = self._extra + tuple(extra)  # type: ignore
         return self.__class__(**params)
 
-    def with_key(self, key: str) -> "RefWithExtra":
+    def with_key(self, key: str) -> RefWithExtra:
         return self.with_extra((DICT_KEY_EDGE_NAME, key))
 
-    def with_attr(self, attr: str) -> "RefWithExtra":
+    def with_attr(self, attr: str) -> RefWithExtra:
         return self.with_extra((OBJECT_ATTR_EDGE_NAME, attr))
 
-    def with_index(self, index: int) -> "RefWithExtra":
+    def with_index(self, index: int) -> RefWithExtra:
         return self.with_extra((LIST_INDEX_EDGE_NAME, str(index)))
 
-    def with_item(self, item_digest: Union[str, Future[str]]) -> "RefWithExtra":
+    def with_item(self, item_digest: str | Future[str]) -> RefWithExtra:
         return self.with_extra((TABLE_ROW_ID_EDGE_NAME, item_digest))
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class ObjectRef(RefWithExtra):
     entity: str
     project: str
     name: str
-    _digest: Union[str, Future[str]]
-    _extra: tuple[Union[str, Future[str]], ...] = ()
+    _digest: str | Future[str]
+    _extra: tuple[str | Future[str], ...] = ()
 
     def as_param_dict(self) -> dict:
         return {
@@ -187,7 +199,7 @@ class ObjectRef(RefWithExtra):
             init_client.reset()
         return self.objectify(res)
 
-    def is_descended_from(self, potential_ancestor: "ObjectRef") -> bool:
+    def is_descended_from(self, potential_ancestor: ObjectRef) -> bool:
         if self.entity != potential_ancestor.entity:
             return False
         if self.project != potential_ancestor.project:
@@ -204,7 +216,7 @@ class ObjectRef(RefWithExtra):
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class OpRef(ObjectRef):
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/op/{self.name}:{self.digest}"
@@ -213,12 +225,12 @@ class OpRef(ObjectRef):
         return u
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class CallRef(RefWithExtra):
     entity: str
     project: str
     id: str
-    _extra: tuple[Union[str, Future[str]], ...] = ()
+    _extra: tuple[str | Future[str], ...] = ()
 
     def as_param_dict(self) -> dict:
         return {
