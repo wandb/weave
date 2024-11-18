@@ -271,7 +271,6 @@ const CallPageInnerVertical: FC<{
           </Box>
         </Box>
       }
-      isLeftSidebarOpen={showTraceTree}
       isRightSidebarOpen={showFeedbackExpand}
       rightSidebarContent={
         <Tailwind style={{display: 'contents'}}>

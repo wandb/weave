@@ -18,9 +18,9 @@ import {
 } from '../../pages/wfReactInterface/traceServerClientTypes';
 import {
   FEEDBACK_TYPE_OPTIONS,
-  HUMAN_FEEDBACK_BASE_TYPE,
   HumanAnnotationPayload,
   HumanFeedback,
+  makeAnnotationFeedbackType,
   tsHumanAnnotationSpec,
 } from './humanFeedbackTypes';
 
@@ -327,7 +327,7 @@ const generateFeedbackRequestPayload = ({
       },
     },
   };
-  const feedbackType = `${HUMAN_FEEDBACK_BASE_TYPE}.${parsedRef.artifactName}`;
+  const feedbackType = makeAnnotationFeedbackType(parsedRef.artifactName);
   const baseRequest = {
     project_id: `${entity}/${project}`,
     weave_ref: callRef,
