@@ -105,15 +105,15 @@ OnFinishHandlerType = Callable[["Call", Any, Optional[BaseException]], None]
 
 
 def value_is_sentinel(param: Any) -> bool:
-    return (
-        param.default is None
-        or param.default is OPENAI_NOT_GIVEN
-        or param.default is COHERE_NOT_GIVEN
-        or param.default is ANTHROPIC_NOT_GIVEN
-        or param.default is MISTRAL_NOT_GIVEN
-        or param.default is CEREBRAS_NOT_GIVEN
-        or param.default is Ellipsis
-    )
+    return param.default in {
+        None,
+        OPENAI_NOT_GIVEN,
+        COHERE_NOT_GIVEN,
+        ANTHROPIC_NOT_GIVEN,
+        MISTRAL_NOT_GIVEN,
+        CEREBRAS_NOT_GIVEN,
+        Ellipsis,
+    }
 
 
 def _apply_fn_defaults_to_inputs(
