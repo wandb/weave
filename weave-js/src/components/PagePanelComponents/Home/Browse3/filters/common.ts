@@ -42,7 +42,11 @@ export const FIELD_LABELS: Record<string, string> = {
 
 export const getFieldLabel = (field: string): string => {
   if (field.startsWith('feedback.')) {
-    return `Feedback.${parseFeedbackType(field).userDefinedType}`;
+    const parsed = parseFeedbackType(field);
+    if (parsed === null) {
+      return field;
+    }
+    return `Annotation.${parsed.userDefinedType}`;
   }
   return FIELD_LABELS[field] ?? field;
 };

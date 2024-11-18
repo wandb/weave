@@ -238,7 +238,7 @@ const getFeedbackMerged = (calls: CallSchema[]) => {
     }
     const feedback = c.traceCall?.summary?.weave?.feedback?.reduce(
       (acc: Record<string, any>, curr: Record<string, any>) => {
-        acc[curr.feedback_type] = curr.payload;
+        acc[curr.feedback_type] = curr;
         return acc;
       },
       {}

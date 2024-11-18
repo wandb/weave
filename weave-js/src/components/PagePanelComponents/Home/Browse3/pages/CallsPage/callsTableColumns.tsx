@@ -351,20 +351,23 @@ function buildCallsTableColumns(
 
     // Add feedback columns
     const annotationColumns: Array<GridColDef<TraceCallSchema>> =
-      annotationColNames.map(c => ({
-        field: convertFeedbackFieldToBackendFilter(c),
-        headerName: `Annotation.${parseFeedbackType(c).userDefinedType}`,
-        width: 150,
-        renderHeader: () => {
-          return <div>{parseFeedbackType(c).userDefinedType}</div>;
-        },
-        valueGetter: (unused: any, row: any) => {
-          return row[c];
-        },
-        renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
-          return <div>{params.value}</div>;
-        },
-      }));
+      annotationColNames.map(c => {
+        const parsed = parseFeedbackType(c);
+        return {
+          field: convertFeedbackFieldToBackendFilter(c),
+          headerName: parsed ? `Annotation.${parsed.userDefinedType}` : `${c}`,
+          width: 150,
+          renderHeader: () => {
+            return <div>{parsed ? parsed.userDefinedType : c}</div>;
+          },
+          valueGetter: (unused: any, row: any) => {
+            return row[c];
+          },
+          renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+            return <div>{params.value}</div>;
+          },
+        };
+      });
     cols.push(...annotationColumns);
   }
 

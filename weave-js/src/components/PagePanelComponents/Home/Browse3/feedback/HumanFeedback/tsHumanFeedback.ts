@@ -1,17 +1,20 @@
 export type FeedbackTypeParts = {
-  value: any;
   fullType: string;
   userDefinedType: string;
   feedbackType: string;
 };
 
-export const parseFeedbackType = (field: string): FeedbackTypeParts => {
-  // feedback.wandb.annotation.Text-field-2.value.Text-field-2.ZQUEOy2FtgkRWahm8ucKgGHQGQYhoroXSug6SY6SSZQ
-  // userDefinedType: Text-field-2
+export const parseFeedbackType = (field: string): FeedbackTypeParts | null => {
+  // feedback.wandb.annotation.Numerical-field-2.payload.value
+  // fullType: feedback.wandb.annotation.Numerical-field-2
+  // userDefinedType: Numerical-field-2
   // type: annotation
-  // value: Text-field-2.ZQUEOy2FtgkRWahm8ucKgGHQGQYhoroXSug6SY6SSZQ
   const deBracketed = field.replace(/\[.*\]/g, '');
-  const [f, w, type, userDefinedType, v, u2, hash] = deBracketed.split('.');
+  const split = deBracketed.split('.');
+  if (split.length !== 6) {
+    return null;
+  }
+  const [f, w, type, userDefinedType, p, v] = split;
 
   if (f !== 'feedback') {
     throw new Error(`Expected 'feedback' prefix, got '${f}'`);
@@ -19,30 +22,24 @@ export const parseFeedbackType = (field: string): FeedbackTypeParts => {
   if (v !== 'value') {
     throw new Error(`Expected 'value' prefix, got '${v}'`);
   }
+  if (p !== 'payload') {
+    throw new Error(`Expected 'payload' prefix, got '${p}'`);
+  }
   if (w !== 'wandb') {
-    // don't try to parse non-wandb feedback
-    return {
-      value: field,
-      fullType: field,
-      feedbackType: field,
-      userDefinedType: field,
-    };
+    return null;
   }
-  if (userDefinedType !== u2) {
-    throw new Error(
-      `Malformed feedback field: userDefinedType ${userDefinedType} does not match payload type: ${u2} (${field})`
-    );
-  }
-  const value = `${userDefinedType}.${hash}`;
   return {
-    value,
-    fullType: field,
+    fullType: [f, w, type, userDefinedType].join('.'),
     feedbackType: type,
     userDefinedType,
   };
 };
 
 export const convertFeedbackFieldToBackendFilter = (field: string): string => {
-  const {feedbackType, userDefinedType, value} = parseFeedbackType(field);
-  return `feedback.[wandb.${feedbackType}.${userDefinedType}].value.${value}`;
+  const parsed = parseFeedbackType(field);
+  if (parsed === null) {
+    return field;
+  }
+  const {feedbackType, userDefinedType} = parsed;
+  return `feedback.[wandb.${feedbackType}.${userDefinedType}].payload.value`;
 };
