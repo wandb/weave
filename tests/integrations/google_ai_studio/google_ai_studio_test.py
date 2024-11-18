@@ -47,6 +47,9 @@ def assert_correct_summary(summary: dict, trace_name: str):
     assert summary["weave"]["latency_ms"] > 0
 
 
+@pytest.mark.skip(
+    reason="This test depends on a non-deterministic external service provider"
+)
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 def test_content_generation(client):
@@ -69,6 +72,9 @@ def test_content_generation(client):
     assert_correct_summary(call.summary, trace_name)
 
 
+@pytest.mark.skip(
+    reason="This test depends on a non-deterministic external service provider"
+)
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 def test_content_generation_stream(client):
@@ -95,6 +101,9 @@ def test_content_generation_stream(client):
     assert_correct_summary(call.summary, trace_name)
 
 
+@pytest.mark.skip(
+    reason="This test depends on a non-deterministic external service provider"
+)
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client

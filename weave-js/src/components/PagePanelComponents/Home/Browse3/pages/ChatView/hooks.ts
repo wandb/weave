@@ -60,6 +60,8 @@ export const isToolCall = (toolCall: any): boolean => {
 
 export const isToolCalls = (toolCalls: any): boolean => {
   if (toolCalls === null) {
+    // Some llms return null for tool calls
+    // before the chat view was hidden for those calls
     return true;
   }
 

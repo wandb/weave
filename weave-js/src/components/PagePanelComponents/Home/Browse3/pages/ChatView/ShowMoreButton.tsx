@@ -15,12 +15,12 @@ export const ShowMoreButton = ({
   return (
     <div
       className={classNames(
-        'absolute bottom-0 left-0 flex w-full items-center justify-center pb-4 pt-20',
-        !isShowingMore
-          ? `from-34% bg-gradient-to-t ${
-              isUser ? 'from-cactus-300/[0.24]' : 'from-moon-50'
-            } to-transparent`
-          : ''
+        'absolute bottom-0 left-0 flex w-full items-center justify-center pb-4 pt-32',
+        {
+          [`from-34% rounded-b-xl bg-gradient-to-t ${
+            isUser ? 'from-cactus-300/[0.24]' : 'from-moon-100'
+          } to-transparent`]: !isShowingMore,
+        }
       )}>
       <Button
         className="z-10"

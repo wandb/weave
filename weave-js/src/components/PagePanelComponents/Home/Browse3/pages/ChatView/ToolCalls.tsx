@@ -5,7 +5,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {Alert} from '../../../../../Alert';
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
 import {MessagePanel} from './MessagePanel';
-import {ToolCallWithResponse} from './types';
+import {ToolCall} from './types';
 
 type OneToolCallProps = {
   toolCall: ToolCallWithResponse;
@@ -106,7 +106,7 @@ const OneToolCall = ({toolCall}: OneToolCallProps) => {
 };
 
 type ToolCallsProps = {
-  toolCalls: ToolCallWithResponse[];
+  toolCalls: ToolCall[];
 };
 
 export const ToolCalls = ({toolCalls}: ToolCallsProps) => {

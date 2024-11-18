@@ -3,11 +3,11 @@ import React from 'react';
 import {Link} from 'react-router-dom';
 
 import {Message} from '../../ChatView/types';
+import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
+import {CompletionsCreateRes} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundState} from '../types';
 import {getInputFromPlaygroundState} from '../usePlaygroundState';
 import {clearTraceCall} from './useChatFunctions';
-import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
-import {CompletionsCreateRes} from '../../wfReactInterface/traceServerClientTypes';
 
 export const useChatCompletionFunctions = (
   setPlaygroundStates: (states: PlaygroundState[]) => void,

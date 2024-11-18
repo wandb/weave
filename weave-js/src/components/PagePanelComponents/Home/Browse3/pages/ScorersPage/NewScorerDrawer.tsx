@@ -1,64 +1,65 @@
-import {Box, Drawer, InputLabel} from '@material-ui/core';
+import {Box, Drawer} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button';
-import {Select} from '@wandb/weave/components/Form/Select';
 import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
 import React, {FC, ReactNode, useCallback, useEffect, useState} from 'react';
 
+import {TraceServerClient} from '../wfReactInterface/traceServerClient';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import {AutocompleteWithLabel} from './FormComponents';
+import * as LLMJudgeScorerForm from './LLMJudgeScorerForm';
 import {
-  ActionScorerForm,
   AnnotationScorerForm,
   ProgrammaticScorerForm,
+  ScorerFormProps,
 } from './ScorerForms';
 
-const HUMAN_ANNOTATION_LABEL = 'Human annotations';
+const HUMAN_ANNOTATION_LABEL = 'Human annotation';
 export const HUMAN_ANNOTATION_VALUE = 'ANNOTATION';
-const ACTION_LABEL = 'LLM judges';
-const ACTION_VALUE = 'ACTION';
-const PROGRAMMATIC_LABEL = 'Functional scorers';
+const LLM_JUDGE_LABEL = 'LLM judge';
+const LLM_JUDGE_VALUE = 'LLM_JUDGE';
+const PROGRAMMATIC_LABEL = 'Programmatic scorer';
 const PROGRAMMATIC_VALUE = 'PROGRAMMATIC';
 
 export type ScorerType =
   | typeof HUMAN_ANNOTATION_VALUE
-  | typeof ACTION_VALUE
+  | typeof LLM_JUDGE_VALUE
   | typeof PROGRAMMATIC_VALUE;
 type OptionType = {label: string; value: ScorerType; icon: IconName};
 
-interface ScorerTypeConfig extends OptionType {
-  Component: FC<ScorerFormProps>;
-  onSave: (formData: any) => Promise<void>;
+interface ScorerTypeConfig<T> extends OptionType {
+  Component: FC<ScorerFormProps<T>>;
+  onSave: (
+    entity: string,
+    project: string,
+    formData: T,
+    client: TraceServerClient
+  ) => Promise<any>;
 }
 
-export interface ScorerFormProps {
-  onDataChange: (isValid: boolean, data: any) => void;
-}
-
-export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig> = {
+export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
   ANNOTATION: {
     label: HUMAN_ANNOTATION_LABEL,
     value: HUMAN_ANNOTATION_VALUE,
     icon: IconNames.UsersTeam,
     Component: AnnotationScorerForm,
-    onSave: async data => {
+    onSave: async (entity, project, data, client) => {
       // Implementation for saving annotation scorer
       console.log('TODO: save annotation scorer', data);
     },
   },
-  ACTION: {
-    label: ACTION_LABEL,
-    value: ACTION_VALUE,
+  LLM_JUDGE: {
+    label: LLM_JUDGE_LABEL,
+    value: LLM_JUDGE_VALUE,
     icon: IconNames.RobotServiceMember,
-    Component: ActionScorerForm,
-    onSave: async data => {
-      // Implementation for saving action scorer
-      console.log('TODO: save action scorer', data);
-    },
+    Component: LLMJudgeScorerForm.LLMJudgeScorerForm,
+    onSave: LLMJudgeScorerForm.onLLMJudgeScorerSave,
   },
   PROGRAMMATIC: {
     label: PROGRAMMATIC_LABEL,
     value: PROGRAMMATIC_VALUE,
     icon: IconNames.CodeAlt,
     Component: ProgrammaticScorerForm,
-    onSave: async data => {
+    onSave: async (entity, project, data, client) => {
       // Implementation for saving programmatic scorer
       console.log('TODO: save programmatic scorer', data);
     },
@@ -70,12 +71,16 @@ const scorerTypeOptions: OptionType[] = Object.values(scorerTypeRecord).map(
 );
 
 interface NewScorerDrawerProps {
+  entity: string;
+  project: string;
   open: boolean;
   onClose: () => void;
   initialScorerType?: ScorerType;
 }
 
 export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
+  entity,
+  project,
   open,
   onClose,
   initialScorerType,
@@ -101,15 +106,22 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
     setFormData(data);
   }, []);
 
+  const getClient = useGetTraceServerClientContext();
+
   const onSave = useCallback(async () => {
     try {
-      await scorerTypeRecord[selectedScorerType].onSave(formData);
+      await scorerTypeRecord[selectedScorerType].onSave(
+        entity,
+        project,
+        formData,
+        getClient()
+      );
       onClose();
     } catch (error) {
       console.error('Failed to create scorer:', error);
       // Handle error appropriately
     }
-  }, [selectedScorerType, formData, onClose]);
+  }, [selectedScorerType, entity, project, formData, getClient, onClose]);
 
   const ScorerFormComponent = scorerTypeRecord[selectedScorerType].Component;
 
@@ -134,28 +146,13 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
           value && setScorerTypeAndResetForm(value.value as ScorerType)
         }
       />
-      <ScorerFormComponent onDataChange={handleFormDataChange} />
+      <ScorerFormComponent
+        data={formData}
+        onDataChange={handleFormDataChange}
+      />
     </SaveableDrawer>
   );
 };
-
-type AutocompleteWithLabelType<Option = any> = (
-  props: {
-    label: string;
-  } & React.ComponentProps<typeof Select<Option>>
-) => React.ReactElement;
-
-const AutocompleteWithLabel: AutocompleteWithLabelType = ({
-  label,
-  ...props
-}) => (
-  <Box style={{marginBottom: '10px', padding: '0px 2px'}}>
-    <InputLabel style={{marginBottom: '10px', fontSize: '14px'}}>
-      {label}
-    </InputLabel>
-    <Select {...props} />
-  </Box>
-);
 
 interface SaveableDrawerProps {
   open: boolean;

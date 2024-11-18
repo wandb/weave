@@ -44,7 +44,7 @@ export const MessagePanel = ({
     if (contentRef.current) {
       setIsOverflowing(contentRef.current.scrollHeight > 400);
     }
-  }, [message.content]);
+  }, [message.content, contentRef?.current?.scrollHeight]);
 
   const isUser = message.role === 'user';
   const isSystemPrompt = message.role === 'system';
@@ -63,7 +63,7 @@ export const MessagePanel = ({
 
   return (
     <div className={classNames('flex gap-8', {'mt-24': !isTool})}>
-      {!isNested && (
+      {!isNested && !isSystemPrompt && (
         <div className="w-32">
           {!isUser && !isTool && (
             <Callout
@@ -77,19 +77,12 @@ export const MessagePanel = ({
       )}
 
       <div
-        className={classNames('relative overflow-visible', {
+        className={classNames('relative overflow-visible rounded-lg', {
           'pb-40': isOverflowing && isShowingMore,
           'border-t border-moon-250': isTool,
-          'rounded-lg border border-moon-250': isSystemPrompt,
+          'bg-moon-100': isSystemPrompt,
           'bg-cactus-300/[0.24]': isUser,
-          'w-3/4': isTool || hasToolCalls || isStructuredOutput || editorHeight,
-          'w-full':
-            isSystemPrompt ||
-            isNested ||
-            isTool ||
-            hasToolCalls ||
-            isStructuredOutput ||
-            editorHeight,
+          'w-full': !isUser,
           'max-w-3xl': isUser,
           'ml-auto': isUser,
           'mr-auto': !isUser,
@@ -100,14 +93,14 @@ export const MessagePanel = ({
         <div>
           {isSystemPrompt && (
             <div className="flex justify-between px-16">
-              <div className="text-base font-semibold">
+              <div className="text-sm text-moon-500">
                 {message.role.charAt(0).toUpperCase() + message.role.slice(1)}
               </div>
             </div>
           )}
 
           {isTool && (
-            <div className={classNames(isNested ? '' : 'px-16', 'pb-8')}>
+            <div className={classNames({'px-16': isNested}, 'pb-8')}>
               <div className="text-sm font-semibold text-moon-500">
                 Response
               </div>

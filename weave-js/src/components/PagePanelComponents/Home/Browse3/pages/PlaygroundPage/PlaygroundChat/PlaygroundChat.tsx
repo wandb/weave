@@ -10,8 +10,8 @@ import {PlaygroundState, PlaygroundStateKey} from '../types';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
-import {useChatFunctions} from './useChatFunctions';
 import {useChatCompletionFunctions} from './useChatCompletionFunctions';
+import {useChatFunctions} from './useChatFunctions';
 
 export type PlaygroundChatProps = {
   entity: string;
