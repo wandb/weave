@@ -189,8 +189,6 @@ const ObjectVersionPageInner: React.FC<{
     return viewerData;
   }, [viewerData]);
 
-  const isAnnotationSpec =
-    baseObjectClass === 'AnnotationSpec' && refExtra == null;
   const isDataset = baseObjectClass === 'Dataset' && refExtra == null;
   const isEvaluation = baseObjectClass === 'Evaluation' && refExtra == null;
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
