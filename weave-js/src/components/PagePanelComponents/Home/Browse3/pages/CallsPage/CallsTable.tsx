@@ -70,13 +70,9 @@ import {
   useControllableState,
   useURLSearchParamsDict,
 } from '../util';
-import {useBaseObjectInstances} from '../wfReactInterface/baseObjectClassQuery';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
-import {
-  projectIdFromParts,
-  traceCallToUICallSchema,
-} from '../wfReactInterface/tsDataModelHooks';
+import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -104,14 +100,7 @@ import {ManageColumnsButton} from './ManageColumnsButton';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
-export const DEFAULT_COLUMN_VISIBILITY_CALLS = {
-  'attributes.weave.client_version': false,
-  'attributes.weave.source': false,
-  'attributes.weave.os_name': false,
-  'attributes.weave.os_version': false,
-  'attributes.weave.os_release': false,
-  'attributes.weave.sys_version': false,
-};
+export const DEFAULT_HIDDEN_COLUMN_PREFIXES = ['attributes.weave', 'feedback'];
 
 export const ALWAYS_PIN_LEFT_CALLS = ['CustomCheckbox'];
 
@@ -523,52 +512,38 @@ export const CallsTable: FC<{
     project
   );
 
-  // Fetch annotation columns and make them hidden by default
-  const annotationColumns = useBaseObjectInstances('AnnotationSpec', {
-    project_id: projectIdFromParts({entity, project}),
-    filter: {
-      latest_only: true,
-    },
-  });
+  // Set default hidden columns to be hidden
   useEffect(() => {
-    if (!annotationColumns.result || annotationColumns.result.length === 0) {
-      return;
-    }
     if (!setColumnVisibilityModel || !columnVisibilityModel) {
       return;
     }
-    // TODO(gst): move to ts
-    const specToQueryName = (objectId: string) =>
-      `feedback.[wandb.annotation.${objectId}]`;
+    const hiddenColumns: string[] = [];
+    for (const hiddenColPrefix of DEFAULT_HIDDEN_COLUMN_PREFIXES) {
+      const cols = columns.cols.filter(col =>
+        col.field.startsWith(hiddenColPrefix)
+      );
+      hiddenColumns.push(...cols.map(col => col.field));
+    }
     // Check if we need to update - only update if any annotation columns are missing from the model
-    const needsUpdate = annotationColumns.result.some(
-      col => columnVisibilityModel[specToQueryName(col.object_id)] === undefined
+    const needsUpdate = hiddenColumns.some(
+      col => columnVisibilityModel[col] === undefined
     );
     if (!needsUpdate) {
       return;
     }
-    const annotationColumnVisiblityFalse = annotationColumns.result.reduce(
-      (acc, col) => {
-        // Only add columns=false when not already in the model
-        if (
-          columnVisibilityModel[specToQueryName(col.object_id)] === undefined
-        ) {
-          acc[specToQueryName(col.object_id)] = false;
-        }
-        return acc;
-      },
-      {} as Record<string, boolean>
-    );
+    const hiddenColumnVisiblityFalse = hiddenColumns.reduce((acc, col) => {
+      // Only add columns=false when not already in the model
+      if (columnVisibilityModel[col] === undefined) {
+        acc[col] = false;
+      }
+      return acc;
+    }, {} as Record<string, boolean>);
 
     setColumnVisibilityModel({
       ...columnVisibilityModel,
-      ...annotationColumnVisiblityFalse,
+      ...hiddenColumnVisiblityFalse,
     });
-  }, [
-    annotationColumns.result,
-    columnVisibilityModel,
-    setColumnVisibilityModel,
-  ]);
+  }, [columns.cols, columnVisibilityModel, setColumnVisibilityModel]);
 
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);

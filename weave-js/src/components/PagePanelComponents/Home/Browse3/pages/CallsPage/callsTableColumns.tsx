@@ -44,7 +44,11 @@ import {
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
 
-const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.weave'];
+const HIDDEN_DYNAMIC_COLUMN_PREFIXES = [
+  'summary.usage',
+  'summary.weave',
+  'feedback',
+];
 
 export const useCallsTableColumns = (
   entity: string,
@@ -326,6 +330,56 @@ function buildCallsTableColumns(
     }
   );
   cols.push(...newCols);
+
+  // Create special feedback columns with grouping model
+  const feedbackCols = allDynamicColumnNames.filter(c =>
+    c.startsWith('feedback.')
+  );
+  if (feedbackCols.length > 0) {
+    const convertFeedbackFieldToBackendFilter = (field: string) => {
+      // feedback.wandb.annotation.Text-field-2.value.Text-field-2.ZQUEOy2FtgkRWahm8ucKgGHQGQYhoroXSug6SY6SSZQ
+      // -> feedback.[wandb.annotation.Text-field-2].value.Text-field-2.ZQUEOy2FtgkRWahm8ucKgGHQGQYhoroXSug6SY6SSZQ
+      const regex = /feedback\.wandb\.([^.]+\.[^.]+)\.value\./;
+      const feedbackType = regex.exec(field)?.[1] ?? field; // annotation.my-type
+      const afterType = field.split(feedbackType).pop();
+      return `feedback.[wandb.${feedbackType}]${afterType}`;
+    };
+
+    // Add feedback group to grouping model
+    groupingModel.push({
+      groupId: 'feedback',
+      headerName: 'feedback',
+      children: feedbackCols.map(col => ({
+        field: convertFeedbackFieldToBackendFilter(col),
+      })),
+    });
+
+    const getFeedbackHeaderFromField = (field: string) => {
+      // feedback.wandb.annotation.Text-field-2.value.Text-field-2.ZQUEOy2FtgkRWahm8ucKgGHQGQYhoroXSug6SY6SSZQ
+      // -> Text-field-2
+      const regex = /feedback\.wandb\.[^.]+\.([^.]+)\.value\./;
+      const match = regex.exec(field);
+      return match?.[1] ?? field;
+    };
+
+    // Add feedback columns
+    const feedbackColumns: Array<GridColDef<TraceCallSchema>> =
+      feedbackCols.map(c => ({
+        field: convertFeedbackFieldToBackendFilter(c),
+        headerName: `Feedback.${getFeedbackHeaderFromField(c)}`,
+        width: 150,
+        renderHeader: () => {
+          return <div>{getFeedbackHeaderFromField(c)}</div>;
+        },
+        valueGetter: (unused: any, row: any) => {
+          return row[c];
+        },
+        renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+          return <div>{params.value}</div>;
+        },
+      }));
+    cols.push(...feedbackColumns);
+  }
 
   cols.push({
     field: 'wb_user_id',

@@ -171,7 +171,7 @@ export const useCallsForQuery = (
           }
           // Store feedback by feedback_type, newer entries will overwrite older ones
           if (curr.feedback_type) {
-            acc[callId][curr.feedback_type] = getNestedValue(curr.payload);
+            acc[callId][curr.feedback_type] = curr.payload;
           }
           return acc;
         },
@@ -316,16 +316,4 @@ const mergeCallData = (
   }
 
   return result;
-};
-
-const getNestedValue = <T>(obj: any, depth: number = 3): T | undefined => {
-  try {
-    let result = obj;
-    for (let i = 0; i < depth; i++) {
-      result = Object.values(result)[0];
-    }
-    return result as T;
-  } catch {
-    return undefined;
-  }
 };

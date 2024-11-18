@@ -40,6 +40,11 @@ export const FIELD_LABELS: Record<string, string> = {
 };
 
 export const getFieldLabel = (field: string): string => {
+  if (field.startsWith('feedback.')) {
+    // feedback.[wandb.annotation.foo].payload.value.foo --> feedback.foo
+    const bracketed = field.split('[')[1].split(']')[0];
+    return `Feedback.${bracketed.split('.').pop()}`;
+  }
   return FIELD_LABELS[field] ?? field;
 };
 
