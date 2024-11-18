@@ -104,8 +104,8 @@ OnOutputHandlerType = Callable[[Any, FinishCallbackType, dict], Any]
 OnFinishHandlerType = Callable[["Call", Any, Optional[BaseException]], None]
 
 
-def value_is_sentinel(param: Any) -> bool:
-    return param.default in {
+def _is_sentinel(v: Any) -> bool:
+    return v in {
         None,
         OPENAI_NOT_GIVEN,
         COHERE_NOT_GIVEN,
@@ -123,8 +123,8 @@ def _apply_fn_defaults_to_inputs(
     sig = inspect.signature(fn)
     for param_name, param in sig.parameters.items():
         if param_name not in inputs:
-            if param.default != inspect.Parameter.empty and not value_is_sentinel(
-                param
+            if param.default != inspect.Parameter.empty and not _is_sentinel(
+                param.default
             ):
                 inputs[param_name] = param.default
             if param.kind == inspect.Parameter.VAR_POSITIONAL:
