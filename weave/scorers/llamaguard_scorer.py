@@ -1,5 +1,5 @@
 import re
-from typing import Any
+from typing import Any, Dict, List, Union
 
 from pydantic import PrivateAttr
 
@@ -10,7 +10,8 @@ try:
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 except ImportError:
-    raise ImportError(
+    import_failed = True
+    print(
         "The `transformers` package is required to use LlamaGuard, please run `pip install transformers`"
     )
 
@@ -31,10 +32,10 @@ class LlamaGuard(Scorer):
 
     device: str = "cpu"
     model_name: str = "meta-llama/Llama-Guard-3-1B"
-    automodel_kwargs: dict[str, Any] = {}
+    automodel_kwargs: Dict[str, Any] = {}
     _model: Any = PrivateAttr()
     _tokenizer: Any = PrivateAttr()
-    _CATEGORY_TYPES: dict[str, str] = {
+    _CATEGORY_TYPES: Dict[str, str] = {
         "S1": "Violent Crimes",
         "S2": "Non-Violent Crimes",
         "S3": "Sex Crimes",
@@ -80,9 +81,9 @@ class LlamaGuard(Scorer):
     @weave.op
     async def score_messages(
         self,
-        messages: list[dict[str, Any]],
-        categories: dict[str, str] | None = None,
-        excluded_category_keys: list[str] = [],
+        messages: List[Dict[str, Any]],
+        categories: Union[Dict[str, str], None] = None,
+        excluded_category_keys: List[str] = [],
     ) -> str:
         "Score a list of messages in a conversation."
         if categories is not None:
@@ -118,7 +119,7 @@ class LlamaGuard(Scorer):
         )
         return response
 
-    def default_format_messages(self, prompt: str) -> list[dict[str, Any]]:
+    def default_format_messages(self, prompt: str) -> List[Dict[str, Any]]:
         """Override this method to format the prompt in a custom way.
         It should return a list of dictionaries with the following alternative keys: "role" and "content".
         """
@@ -133,9 +134,9 @@ class LlamaGuard(Scorer):
     async def score(
         self,
         output: str,
-        categories: dict[str, str] | None = None,
-        excluded_category_keys: list[str] = [],
-    ) -> dict[str, Any]:
+        categories: Union[Dict[str, str], None] = None,
+        excluded_category_keys: List[str] = [],
+    ) -> Dict[str, Any]:
         messages = self.default_format_messages(prompt=output)
         response = await self.score_messages(
             messages=messages,
