@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Union
+from typing import Any, Optional
 
 from pydantic import PrivateAttr
 
@@ -32,10 +32,10 @@ class LlamaGuard(Scorer):
 
     device: str = "cpu"
     model_name: str = "meta-llama/Llama-Guard-3-1B"
-    automodel_kwargs: Dict[str, Any] = {}
+    automodel_kwargs: dict[str, Any] = {}
     _model: Any = PrivateAttr()
     _tokenizer: Any = PrivateAttr()
-    _CATEGORY_TYPES: Dict[str, str] = {
+    _CATEGORY_TYPES: dict[str, str] = {
         "S1": "Violent Crimes",
         "S2": "Non-Violent Crimes",
         "S3": "Sex Crimes",
@@ -81,9 +81,9 @@ class LlamaGuard(Scorer):
     @weave.op
     async def score_messages(
         self,
-        messages: List[Dict[str, Any]],
-        categories: Union[Dict[str, str], None] = None,
-        excluded_category_keys: List[str] = [],
+        messages: list[dict[str, Any]],
+        categories: Optional[dict[str, str]] = None,
+        excluded_category_keys: Optional[list[str]] = None,
     ) -> str:
         "Score a list of messages in a conversation."
         if categories is not None:
@@ -119,7 +119,7 @@ class LlamaGuard(Scorer):
         )
         return response
 
-    def default_format_messages(self, prompt: str) -> List[Dict[str, Any]]:
+    def default_format_messages(self, prompt: str) -> list[dict[str, Any]]:
         """Override this method to format the prompt in a custom way.
         It should return a list of dictionaries with the following alternative keys: "role" and "content".
         """
@@ -134,9 +134,9 @@ class LlamaGuard(Scorer):
     async def score(
         self,
         output: str,
-        categories: Union[Dict[str, str], None] = None,
-        excluded_category_keys: List[str] = [],
-    ) -> Dict[str, Any]:
+        categories: Optional[dict[str, str]] = None,
+        excluded_category_keys: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
         messages = self.default_format_messages(prompt=output)
         response = await self.score_messages(
             messages=messages,
