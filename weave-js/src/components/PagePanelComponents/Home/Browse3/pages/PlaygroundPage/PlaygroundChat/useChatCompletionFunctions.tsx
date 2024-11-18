@@ -23,7 +23,7 @@ export const useChatCompletionFunctions = (
   const makeCompletionRequest = async (
     callIndex: number,
     updatedStates: PlaygroundState[]
-  ) => {
+  ): Promise<CompletionsCreateRes | null> => {
     const inputs = getInputFromPlaygroundState(updatedStates[callIndex]);
 
     return getTsClient().completionsCreate({
@@ -37,7 +37,7 @@ export const useChatCompletionFunctions = (
     response: Array<CompletionsCreateRes | null>,
     updatedStates: PlaygroundState[],
     callIndex?: number
-  ) => {
+  ): Promise<boolean> => {
     const hasMissingLLMApiKey = handleMissingLLMApiKey(response, entity);
     const hasError = handleErrorResponse(response.map(r => r?.response));
 
@@ -64,10 +64,9 @@ export const useChatCompletionFunctions = (
   ) => {
     try {
       setIsLoading(true);
-
       const newMessage = createMessage(role, content || chatText, toolCallId);
       const updatedStates = playgroundStates.map((state, index) => {
-        if (callIndex === undefined || callIndex !== index) {
+        if (callIndex !== undefined && callIndex !== index) {
           return state;
         }
         const updatedState = appendChoicesToMessages(state);
@@ -81,11 +80,11 @@ export const useChatCompletionFunctions = (
       setChatText('');
 
       const responses = await Promise.all(
-        updatedStates.map((_, index) => {
-          if (callIndex === undefined || callIndex !== index) {
+        updatedStates.map(async (_, index) => {
+          if (callIndex !== undefined && callIndex !== index) {
             return Promise.resolve(null);
           }
-          return makeCompletionRequest(index, updatedStates);
+          return await makeCompletionRequest(index, updatedStates);
         })
       );
       await handleErrorsAndUpdate(responses, updatedStates);
@@ -143,13 +142,13 @@ const createMessage = (
   return content.trim() ? {role, content, tool_call_id: toolCallId} : undefined;
 };
 
-const handleMissingLLMApiKey = (responses: any, entity: string) => {
+const handleMissingLLMApiKey = (responses: any, entity: string): boolean => {
   if (Array.isArray(responses)) {
     responses.forEach((response: any) => {
       handleMissingLLMApiKey(response, entity);
     });
   } else {
-    if (responses.api_key && responses.reason) {
+    if (responses && responses.api_key && responses.reason) {
       toast(
         <div>
           <div>{responses.reason}</div>
@@ -186,7 +185,13 @@ const handleErrorResponse = (
   return false;
 };
 
-const handleUpdateCallWithResponse = (updatedCall: any, response: any) => {
+const handleUpdateCallWithResponse = (
+  updatedCall: PlaygroundState,
+  response: any
+): PlaygroundState => {
+  if (!response) {
+    return updatedCall;
+  }
   return {
     ...updatedCall,
     traceCall: {
@@ -197,7 +202,7 @@ const handleUpdateCallWithResponse = (updatedCall: any, response: any) => {
   };
 };
 
-const appendChoicesToMessages = (state: PlaygroundState) => {
+const appendChoicesToMessages = (state: PlaygroundState): PlaygroundState => {
   const updatedState = JSON.parse(JSON.stringify(state));
   if (
     updatedState.traceCall?.inputs?.messages &&
