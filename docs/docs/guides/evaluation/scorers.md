@@ -793,3 +793,9 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
     ```
   </TabItem>
 </Tabs>
+
+### Human scorers
+
+Human scoring is supported in the weave UI after configuration of a Human Annotation scorer, which can be accessed via the `Scorers` page in the navigation sidebar. Once configured, scoring inputs can be used when inspecting individual calls in the main Call or Evaluation table, by selecting the "Marker" icon in the call header (seen below).
+
+![Marker icon in call header](./imgs/marker-icon.png)
