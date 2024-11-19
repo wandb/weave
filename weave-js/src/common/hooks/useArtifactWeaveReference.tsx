@@ -66,7 +66,10 @@ export const useArtifactWeaveReference = ({
           console.log("ARTIFACT WEAVE REF QUERY result: ", result);
           const organization = result?.data?.entity?.organization?.name;
           const artifactType = result?.data?.entity?.project?.artifact?.artifactType?.name;
-          if (!artifactType || !organization && isArtifactRegistryProject(projectName)) {
+          if (artifactType == null) {
+              return undefined;
+          } 
+          if (organization == null && isArtifactRegistryProject(projectName)) {
             return undefined;
           }
           const info: ArtifactWeaveReferenceInfo = {
