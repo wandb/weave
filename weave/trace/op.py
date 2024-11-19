@@ -138,6 +138,50 @@ class WeaveKwargs(TypedDict):
     display_name: str | None
 
 
+class Callback(Protocol):
+    def before_call(self, call: Call) -> None: ...
+    def before_yield(self, call: Call, value: Any) -> Any: ...
+    def after_yield(self, call: Call, value: Any) -> Any: ...
+    def after_call(self, call: Call) -> None: ...
+    def after_error(self, call: Call, exc: Exception) -> None: ...
+
+
+class LifecycleHandler:
+    def __init__(self, callbacks: list[Callback] | None = None):
+        self.callbacks = callbacks or []
+        self.intermediate_results: list[Any] = []
+
+    def add_callback(self, callback: Callback):
+        self.callbacks.append(callback)
+
+    def run_before_call(self, call: Call) -> None:
+        for callback in self.callbacks:
+            if hasattr(callback, "before_call"):
+                callback.before_call(call)
+
+    def run_before_yield(self, call: Call, value: Any) -> Any:
+        for callback in self.callbacks:
+            if hasattr(callback, "before_yield"):
+                value = callback.before_yield(call, value)
+        return value
+
+    def run_after_yield(self, call: Call, value: Any) -> Any:
+        for callback in self.callbacks:
+            if hasattr(callback, "after_yield"):
+                value = callback.after_yield(call, value)
+        return value
+
+    def run_after_call(self, call: Call) -> None:
+        for callback in self.callbacks:
+            if hasattr(callback, "after_call"):
+                callback.after_call(call)
+
+    def run_after_error(self, call: Call, exc: Exception) -> None:
+        for callback in self.callbacks:
+            if hasattr(callback, "after_error"):
+                callback.after_error(call, exc)
+
+
 @runtime_checkable
 class Op(Protocol):
     """
@@ -168,6 +212,8 @@ class Op(Protocol):
 
     call: Callable[..., Any]
     calls: Callable[..., CallsIter]
+
+    lifecycle_handler: LifecycleHandler
 
     _set_on_input_handler: Callable[[OnInputHandlerType], None]
     _on_input_handler: OnInputHandlerType | None
@@ -312,7 +358,7 @@ def _execute_call(
             # break the user process if we trip up on processing
             # the output
             res = on_output(res)
-        except Exception as e:
+        except Exception:
             if get_raise_on_captured_errors():
                 raise
             log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
@@ -527,6 +573,7 @@ def op(
     call_display_name: str | CallDisplayNameFunc | None = None,
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
+    callbacks: list[Callback] | None = None,
 ) -> Op: ...
 
 
@@ -537,6 +584,7 @@ def op(
     call_display_name: str | CallDisplayNameFunc | None = None,
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
+    callbacks: list[Callback] | None = None,
 ) -> Callable[[Callable], Op]: ...
 
 
@@ -547,6 +595,7 @@ def op(
     call_display_name: str | CallDisplayNameFunc | None = None,
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
+    callbacks: list[Callback] | None = None,
 ) -> Callable[[Callable], Op] | Op:
     """
     A decorator to weave op-ify a function or method.  Works for both sync and async.
@@ -636,6 +685,8 @@ def op(
             wrapper.name = name or inferred_name  # type: ignore
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
+
+            wrapper.lifecycle_handler = LifecycleHandler(callbacks)
 
             wrapper.postprocess_inputs = postprocess_inputs  # type: ignore
             wrapper.postprocess_output = postprocess_output  # type: ignore
