@@ -1,4 +1,5 @@
 import {Box} from '@mui/material';
+import {useArtifactWeaveReference} from '@wandb/weave/common/hooks/useArtifactWeaveReference';
 import {getTypeName, Type} from '@wandb/weave/core';
 import {
   isWandbArtifactRef,
@@ -20,8 +21,7 @@ import {
   ObjectVersionKey,
   OpVersionKey,
 } from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
-import { useArtifactWeaveReference } from '@wandb/weave/common/hooks/useArtifactWeaveReference';
-import { fetchArtifactRefPageUrl } from './url';
+import {fetchArtifactRefPageUrl} from './url';
 
 const getRootType = (t: Type): Type => {
   if (
@@ -123,21 +123,23 @@ export const SmallArtifactRef: FC<{
   const {loading, artInfo} = useArtifactWeaveReference({
     entityName: objRef.entityName,
     projectName: objRef.projectName,
-    artifactName: objRef.artifactName + ":" + objRef.artifactVersion,
+    artifactName: objRef.artifactName + ':' + objRef.artifactVersion,
   });
   if (loading) {
     return <SmallRefBox iconName={IconNames.Loading} text="Loading..." />;
   }
 
-  const artifactUrl = artInfo ? fetchArtifactRefPageUrl({
-    entityName: objRef.entityName,
-    projectName: objRef.projectName,
-    artifactName: objRef.artifactName,
-    artifactVersion: objRef.artifactVersion,
-    artifactType: artInfo?.artifactType,
-      orgName: artInfo?.orgName,
-    }) : null;
-    
+  const artifactUrl = artInfo
+    ? fetchArtifactRefPageUrl({
+        entityName: objRef.entityName,
+        projectName: objRef.projectName,
+        artifactName: objRef.artifactName,
+        artifactVersion: objRef.artifactVersion,
+        artifactType: artInfo?.artifactType,
+        orgName: artInfo?.orgName,
+      })
+    : null;
+
   const Content = (
     <Box
       sx={{
@@ -148,8 +150,12 @@ export const SmallArtifactRef: FC<{
         alignItems: 'center',
         cursor: artifactUrl ? 'pointer' : 'not-allowed',
       }}
-      title={artifactUrl ? objRef.artifactPath : "No link detected for this wandb artifact reference: " + objRef.artifactPath}
-    >
+      title={
+        artifactUrl
+          ? objRef.artifactPath
+          : 'No link detected for this wandb artifact reference: ' +
+            objRef.artifactPath
+      }>
       <SmallRefBox
         iconName={IconNames.Registries}
         text={`${objRef.artifactName}:${objRef.artifactVersion}`}
@@ -158,7 +164,9 @@ export const SmallArtifactRef: FC<{
         <Box sx={{display: 'flex', alignItems: 'center'}}>
           <Icon name={IconNames.OpenNewTab} width={14} height={14} />
         </Box>
-      ) : <></>}
+      ) : (
+        <></>
+      )}
     </Box>
   );
 
@@ -170,7 +178,9 @@ export const SmallArtifactRef: FC<{
       href={artifactUrl}>
       {Content}
     </Link>
-  ) : Content;
+  ) : (
+    Content
+  );
 };
 
 export const SmallWeaveRef: FC<{

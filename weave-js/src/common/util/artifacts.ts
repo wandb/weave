@@ -104,7 +104,6 @@ export function getDescriptionSummary(artifactDescription: string) {
   return artifactDescription.split('\n')[0];
 }
 
-
 const REGISTRY_PROJECT_PREFIX = 'wandb-registry-';
 
 export function isArtifactRegistryProject(projectName: string) {
@@ -115,5 +114,5 @@ export function fetchRegistryName(projectName: string) {
   if (isArtifactRegistryProject(projectName)) {
     return projectName.substring(REGISTRY_PROJECT_PREFIX.length);
   }
-  return "";
+  return '';
 }

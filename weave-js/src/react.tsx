@@ -573,7 +573,7 @@ export const parseRef = (ref: string): ObjectRef => {
   const decodedUri = decodeURIComponent(url.pathname);
   const splitUri = decodedUri.replace(/^\/+/, '').split('/', maxSplitsToMake);
 
-  if (maxSplitsToMake != splitUri.length) {
+  if (maxSplitsToMake !== splitUri.length) {
     throw new Error(`Invalid Artifact URI: ${url}`);
   }
 
