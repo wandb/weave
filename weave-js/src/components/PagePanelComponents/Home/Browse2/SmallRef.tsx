@@ -1,4 +1,5 @@
 import {Box} from '@mui/material';
+import * as Tooltip from '@radix-ui/react-tooltip';
 import {useArtifactWeaveReference} from '@wandb/weave/common/hooks/useArtifactWeaveReference';
 import {getTypeName, Type} from '@wandb/weave/core';
 import {
@@ -125,7 +126,18 @@ export const SmallArtifactRef: FC<{
     artifactName: objRef.artifactName + ':' + objRef.artifactVersion,
   });
   if (loading) {
-    return <SmallRefBox iconName={IconNames.Loading} text="Loading..." />;
+    return (
+      <Box
+        sx={{
+          width: '100%',
+          height: '100%',
+          minHeight: '38px',
+          display: 'flex',
+          alignItems: 'center',
+        }}>
+        <SmallRefBox iconName={IconNames.Loading} text="Loading..." />
+      </Box>
+    );
   }
 
   const artifactUrl = artInfo
@@ -140,33 +152,55 @@ export const SmallArtifactRef: FC<{
     : null;
 
   const Content = (
-    <Box
-      sx={{
-        width: '100%',
-        height: '100%',
-        minHeight: '38px',
-        display: 'flex',
-        alignItems: 'center',
-        cursor: artifactUrl ? 'pointer' : 'not-allowed',
-      }}
-      title={
-        artifactUrl
-          ? objRef.artifactPath
-          : 'No link detected for this wandb artifact reference: ' +
-            objRef.artifactPath
-      }>
-      <SmallRefBox
-        iconName={IconNames.Registries}
-        text={`${objRef.artifactName}:${objRef.artifactVersion}`}
-      />
-      {artifactUrl ? (
-        <Box sx={{display: 'flex', alignItems: 'center'}}>
-          <Icon name={IconNames.OpenNewTab} width={14} height={14} />
+    <Tooltip.Provider delayDuration={100} skipDelayDuration={50}>
+      <Tooltip.Root>
+        <Box
+          sx={{
+            width: '100%',
+            height: '100%',
+            minHeight: '38px',
+            display: 'flex',
+            alignItems: 'center',
+            cursor: artifactUrl ? 'pointer' : 'not-allowed',
+          }}>
+          <Tooltip.Trigger asChild>
+            <Box sx={{display: 'flex', alignItems: 'center'}}>
+              <SmallRefBox
+                iconName={IconNames.Registries}
+                text={`${objRef.artifactName}:${objRef.artifactVersion}`}
+              />
+              {artifactUrl ? (
+                <Box sx={{display: 'flex', alignItems: 'center'}}>
+                  <Icon name={IconNames.OpenNewTab} width={14} height={14} />
+                </Box>
+              ) : (
+                <></>
+              )}
+            </Box>
+          </Tooltip.Trigger>
         </Box>
-      ) : (
-        <></>
-      )}
-    </Box>
+        <Tooltip.Portal>
+          <Tooltip.Content
+            side="top"
+            sideOffset={8}
+            className="rounded bg-moon-900 px-3 py-2 text-sm text-moon-200"
+            style={{
+              zIndex: 9999,
+              position: 'relative',
+              backgroundColor: '#1a1a1a',
+              color: '#e0e0e0',
+              padding: '8px 12px',
+              borderRadius: '4px',
+            }}>
+            {artifactUrl
+              ? objRef.artifactPath
+              : 'No link detected for this wandb artifact reference: ' +
+                objRef.artifactPath}
+            <Tooltip.Arrow style={{fill: '#1a1a1a'}} />
+          </Tooltip.Content>
+        </Tooltip.Portal>
+      </Tooltip.Root>
+    </Tooltip.Provider>
   );
 
   return artifactUrl ? (
