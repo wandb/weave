@@ -69,7 +69,7 @@ This directory contains various integrations for Weave. As of this writing, ther
    4. Add any assertions to validate correct logging. The base case to validate that a call was logged would be:
 
    ```
-   calls = list(client.calls())
+   calls = list(client.get_calls())
    assert len(calls) == 1
    ```
 

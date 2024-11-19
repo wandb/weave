@@ -73,7 +73,7 @@ def test_llamaindex_quickstart(
     query_engine = index.as_query_engine()
     response = query_engine.query("What did the author do growing up?")
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert_calls_correct_for_quickstart(flattened_calls)
     call, _ = flattened_calls[-2]
@@ -99,7 +99,7 @@ async def test_llamaindex_quickstart_async(
     query_engine = index.as_query_engine()
     response = await query_engine.aquery("What did the author do growing up?")
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert_calls_correct_for_quickstart(flattened_calls)
     call, _ = flattened_calls[-2]
