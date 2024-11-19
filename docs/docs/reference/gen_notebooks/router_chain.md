@@ -56,6 +56,7 @@ from langchain_core.runnables import RunnableMap, RunnablePassthrough, RunnableL
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 
 nltk.download('punkt', quiet=True);
+nltk.download('punkt_tab')
 ```
 
 Setting Up the OpenAI API Key & W&B Weave Project
@@ -264,25 +265,25 @@ We define a few scoring functions to evaluate the performance of a prompt router
 ```python
 # Define the scorer
 @weave.op()
-def evaluate_response(expected: str, model_output: dict) -> dict:
-    response_text = model_output['response']
+def evaluate_response(expected: str, output: dict) -> dict:
+    response_text = output['response']
     is_correct = expected.strip().lower() in response_text.strip().lower()
     return {'is_correct': is_correct}
 
 # Define the BLEU scorer
 @weave.op()
-def evaluate_bleu(expected: str, model_output: dict) -> dict:
+def evaluate_bleu(expected: str, output: dict) -> dict:
     reference = [nltk.word_tokenize(expected.strip().lower())]
-    candidate = nltk.word_tokenize(model_output['response'].strip().lower())
+    candidate = nltk.word_tokenize(output['response'].strip().lower())
     smoothing = SmoothingFunction().method1
     score = sentence_bleu(reference, candidate, smoothing_function=smoothing)
     return {'bleu_score': score}
 
 # Define the ROUGE scorer
 @weave.op()
-def evaluate_rouge(expected: str, model_output: dict) -> dict:
+def evaluate_rouge(expected: str, output: dict) -> dict:
     scorer = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
-    scores = scorer.score(expected.strip().lower(), model_output['response'].strip().lower())
+    scores = scorer.score(expected.strip().lower(), output['response'].strip().lower())
     rouge_l_fmeasure = scores['rougeL'].fmeasure
     return {'rougeL_fmeasure': rouge_l_fmeasure}
 ```
@@ -332,8 +333,8 @@ def preprocess_model_input(example: dict) -> dict:
 
 # Define scoring function for Weave Evaluation
 @weave.op()
-def match_score(expected_category: str, model_output: dict) -> dict:
-    category = model_output.get("category")
+def match_score(expected_category: str, output: dict) -> dict:
+    category = output.get("category")
     if category is None:
         return {'match': False}
 
