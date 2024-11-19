@@ -156,52 +156,50 @@ CREATE TABLE object_versions (
     refs Array(String),
     val_dump String,
     digest String,
-    created_at DateTime64(3) DEFAULT now64(3),
-    deleted_at Nullable(DateTime64(3)) DEFAULT NULL
+    created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, kind, object_id, digest);
 
-CREATE VIEW object_versions_deduped as
-    SELECT project_id,
-        object_id,
-        created_at,
-        deleted_at,  -- **** Add deleted_at to the view ****
+CREATE VIEW object_versions_deduped AS
+SELECT project_id,
+    object_id,
+    created_at,
+    kind,
+    base_object_class,
+    refs,
+    val_dump,
+    digest,
+    if (kind = 'op', 1, 0) AS is_op,
+    row_number() OVER (
+        PARTITION BY project_id,
         kind,
-        base_object_class,
-        refs,
-        val_dump,
-        digest,
-        if (kind = 'op', 1, 0) AS is_op,
-        row_number() OVER (
-            PARTITION BY project_id,
-            kind,
-            object_id
-            ORDER BY created_at ASC
-        ) AS _version_index_plus_1,
-        _version_index_plus_1 - 1 AS version_index,
-        count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-        if(_version_index_plus_1 = version_count, 1, 0) AS is_latest
-    FROM (
-            SELECT *,
-                row_number() OVER (
-                    PARTITION BY project_id,
-                    kind,
-                    object_id,
-                    digest
-                    ORDER BY created_at ASC
-                ) AS rn
-            FROM object_versions
-        )
-    WHERE rn = 1 WINDOW w AS (
-            PARTITION BY project_id,
-            kind,
-            object_id
-            ORDER BY created_at ASC
-        )
-    ORDER BY project_id,
+        object_id
+        ORDER BY created_at ASC
+    ) AS _version_index_plus_1,
+    _version_index_plus_1 - 1 AS version_index,
+    count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
+    if(_version_index_plus_1 = version_count, 1, 0) AS is_latest
+FROM (
+        SELECT *,
+            row_number() OVER (
+                PARTITION BY project_id,
+                kind,
+                object_id,
+                digest
+                ORDER BY created_at ASC
+            ) AS rn
+        FROM object_versions
+    )
+WHERE rn = 1 WINDOW w AS (
+        PARTITION BY project_id,
         kind,
-        object_id,
-        created_at;
+        object_id
+        ORDER BY created_at ASC
+    )
+ORDER BY project_id,
+    kind,
+    object_id,
+    created_at;
 
 CREATE TABLE table_rows (
     project_id String,
