@@ -1380,8 +1380,11 @@ class WeaveClient:
             [res_future], lambda res: res[0].digest
         )
 
-        ref_cls = OpRef if is_op(orig_val) else ObjectRef
-        ref = ref_cls(self.entity, self.project, name, digest_future)
+        ref: Ref
+        if is_op(orig_val):
+            ref = OpRef(self.entity, self.project, name, digest_future)
+        else:
+            ref = ObjectRef(self.entity, self.project, name, digest_future)
 
         # Attach the ref to the object
         try:
