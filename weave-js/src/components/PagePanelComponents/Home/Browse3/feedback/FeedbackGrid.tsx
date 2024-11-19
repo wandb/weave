@@ -44,18 +44,17 @@ export const FeedbackGrid = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
   // Group by feedback on this object vs. descendent objects
-  const grouped = useMemo(
-    () =>
-    {
-  // Exclude runnables as they are presented in a different tab
-      const withoutRunnables = (query.result ?? []).filter(
-        f => !f.feedback_type.startsWith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
-      )
-          // Combine annotation feedback on (feedback_type, creator)
+  const grouped = useMemo(() => {
+    // Exclude runnables as they are presented in a different tab
+    const withoutRunnables = (query.result ?? []).filter(
+      f => !f.feedback_type.startsWith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
+    );
+    // Combine annotation feedback on (feedback_type, creator)
     const combined = _.groupBy(
-      withoutRunnables.filter(f => f.feedback_type.startsWith(ANNOTATION_PREFIX)),
+      withoutRunnables.filter(f =>
+        f.feedback_type.startsWith(ANNOTATION_PREFIX)
+      ),
       f => `${f.feedback_type}-${f.creator}`
     );
     // only keep the most recent feedback for each (feedback_type, creator)
@@ -64,18 +63,16 @@ export const FeedbackGrid = ({
     );
     // add the non-annotation feedback to the combined object
     combinedFiltered.push(
-      ...withoutRunnables.filter(f => !f.feedback_type.startsWith(ANNOTATION_PREFIX))
+      ...withoutRunnables.filter(
+        f => !f.feedback_type.startsWith(ANNOTATION_PREFIX)
+      )
     );
-  
+
     // Group by feedback on this object vs. descendent objects
     return _.groupBy(combinedFiltered, f =>
-        f.weave_ref.substring(weaveRef.length)
-      );
-    },
-    [query.result, weaveRef]
-  );
-
-
+      f.weave_ref.substring(weaveRef.length)
+    );
+  }, [query.result, weaveRef]);
 
   const paths = useMemo(() => Object.keys(grouped).sort(), [grouped]);
 
@@ -100,7 +97,7 @@ export const FeedbackGrid = ({
     );
   }
 
-  if (!withoutRunnables.length) {
+  if (!paths.length) {
     return (
       <Empty
         size="small"
@@ -119,7 +116,6 @@ export const FeedbackGrid = ({
       />
     );
   }
-
 
   const currentViewerId = userInfo ? userInfo.id : null;
   return (
