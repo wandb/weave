@@ -39,7 +39,7 @@ def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> Non
 6. Époisses: Known for its pungent smell, Époisses is a soft, washed-rind cheese with a rich and creamy flavor."""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -91,7 +91,7 @@ async def test_mistral_quickstart_async(
 Ultimately, the best French cheese is a matter of personal taste. I would recommend trying a variety of cheeses and seeing which ones you enjoy the most."""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -149,7 +149,7 @@ def test_mistral_quickstart_with_stream(
 6. Époisses: This is a pungent soft cheese with a distinctive orange rind. It's known for its strong flavor and creamy texture."""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -206,7 +206,7 @@ async def test_mistral_quickstart_with_stream_async(
 5. Chèvre: This is a general term for goat cheese in French. It can come in many forms and flavors, from fresh and mild to aged and tangy."""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 

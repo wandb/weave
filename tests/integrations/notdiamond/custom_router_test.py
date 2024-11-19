@@ -69,8 +69,8 @@ def test_train_router(
         preference_id=preference_id,
     )
 
-    assert len(list(client.calls())) > 0
-    nd_calls = [call for call in client.calls() if "train_router" in call.op_name]
+    assert len(list(client.get_calls())) > 0
+    nd_calls = [call for call in client.get_calls() if "train_router" in call.op_name]
     assert len(nd_calls) == 1
 
     # confirm router was trained
@@ -91,6 +91,8 @@ def test_evaluate_router(
         api_key=api_key,
     )
 
-    assert len(list(client.calls())) > 0
-    nd_calls = [call for call in client.calls() if "evaluate_router" in call.op_name]
+    assert len(list(client.get_calls())) > 0
+    nd_calls = [
+        call for call in client.get_calls() if "evaluate_router" in call.op_name
+    ]
     assert len(nd_calls) == 1

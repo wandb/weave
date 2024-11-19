@@ -26,7 +26,7 @@ def test_openai_quickstart(client: weave.trace.weave_client.WeaveClient) -> None
         max_tokens=64,
         top_p=1,
     )
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -74,7 +74,7 @@ async def test_openai_async_quickstart(
         max_tokens=64,
         top_p=1,
     )
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -126,7 +126,7 @@ def test_openai_stream_quickstart(client: weave.trace.weave_client.WeaveClient) 
         if chunk.choices[0].delta.content:
             all_content += chunk.choices[0].delta.content
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -183,7 +183,7 @@ async def test_openai_async_stream_quickstart(
         if chunk.choices[0].delta.content:
             all_content += chunk.choices[0].delta.content
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -237,7 +237,7 @@ def test_openai_stream_usage_quickstart(
 
     for chunk in response:
         pass
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -303,7 +303,7 @@ def test_openai_function_call(client: weave.trace.weave_client.WeaveClient) -> N
         top_p=1,
     )
     print(response)
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -389,7 +389,7 @@ async def test_openai_function_call_async(
         max_tokens=64,
         top_p=1,
     )
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -480,7 +480,7 @@ async def test_openai_function_call_async_stream(
     async for chunk in response:
         pass
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -565,7 +565,7 @@ def test_openai_tool_call(client: weave.trace.weave_client.WeaveClient) -> None:
     )
     print(response)
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -652,7 +652,7 @@ async def test_openai_tool_call_async(
         max_tokens=64,
         top_p=1,
     )
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -747,7 +747,7 @@ async def test_openai_tool_call_async_stream(
     async for chunk in response:
         pass
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -809,7 +809,7 @@ def test_openai_as_context_manager(
             if chunk.choices[0].delta.content:
                 all_content += chunk.choices[0].delta.content
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -864,7 +864,7 @@ async def test_openai_as_context_manager_async(
             if chunk.choices[0].delta.content:
                 all_content += chunk.choices[0].delta.content
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
