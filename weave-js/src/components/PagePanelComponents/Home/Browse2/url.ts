@@ -1,6 +1,4 @@
-import {
-  checkRegistryProject
-} from '@wandb/weave/common/util/artifacts';
+import {checkRegistryProject} from '@wandb/weave/common/util/artifacts';
 import {isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 
 import {useWeaveflowRouteContext} from '../Browse3/context';
@@ -34,11 +32,13 @@ export type ArtifactRefURLInfo = {
   orgName: string;
 };
 
-// Keep somewhat in sync with 
-//https://github.com/wandb/core/blob/master/frontends/app/src/util/urls/paths.ts
+// Keep somewhat in sync with
+// https://github.com/wandb/core/blob/master/frontends/app/src/util/urls/paths.ts
 export function fetchArtifactRefPageUrl(ref: ArtifactRefURLInfo): string {
   // Handle registry artifact
-  const {isRegistryProject, registryName} = checkRegistryProject(ref.projectName);
+  const {isRegistryProject, registryName} = checkRegistryProject(
+    ref.projectName
+  );
   if (isRegistryProject && registryName) {
     return buildRegistryArtifactUrl(ref, registryName);
   }
@@ -53,36 +53,44 @@ export function fetchArtifactRefPageUrl(ref: ArtifactRefURLInfo): string {
 }
 
 function isModelRegistryArtifact(ref: ArtifactRefURLInfo): boolean {
-  return ref.artifactType.toLowerCase().includes('model') && 
-         ref.projectName === 'model-registry';
+  return (
+    ref.artifactType.toLowerCase().includes('model') &&
+    ref.projectName === 'model-registry'
+  );
 }
 
 function buildRegistryArtifactUrl(
-  ref: ArtifactRefURLInfo, 
+  ref: ArtifactRefURLInfo,
   registryName: string
 ): string {
   const path = `orgs/${ref.orgName}/registry/${registryName}`;
   const params = new URLSearchParams({
-    selectionPath: `${ref.entityName}/${ref.projectName}/${encodeURIComponent(ref.artifactName)}`,
+    selectionPath: `${ref.entityName}/${ref.projectName}/${encodeURIComponent(
+      ref.artifactName
+    )}`,
     view: 'membership',
-    version: ref.artifactVersion
+    version: ref.artifactVersion,
   });
 
   return `${window.location.origin}/${path}?${params.toString()}`;
 }
 
 function buildRegularArtifactUrl(ref: ArtifactRefURLInfo): string {
-  return `${window.location.origin}/${ref.entityName}/${ref.projectName}/artifacts/${encodeURIComponent(
-    ref.artifactType
-  )}/${encodeURIComponent(ref.artifactName)}/${ref.artifactVersion}`;
+  return `${window.location.origin}/${ref.entityName}/${
+    ref.projectName
+  }/artifacts/${encodeURIComponent(ref.artifactType)}/${encodeURIComponent(
+    ref.artifactName
+  )}/${ref.artifactVersion}`;
 }
 
 function buildTeamModelRegistryUrl(ref: ArtifactRefURLInfo): string {
   const path = `${ref.entityName}/registry/model`;
   const params = new URLSearchParams({
-    selectionPath: `${ref.entityName}/model-registry/${encodeURIComponent(ref.artifactName)}`,
+    selectionPath: `${ref.entityName}/model-registry/${encodeURIComponent(
+      ref.artifactName
+    )}`,
     view: 'membership',
-    version: ref.artifactVersion
+    version: ref.artifactVersion,
   });
 
   return `${window.location.origin}/${path}?${params.toString()}`;

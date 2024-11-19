@@ -8,15 +8,18 @@ import {
   GridFilterItem,
   GridFilterModel,
 } from '@mui/x-data-grid-pro';
-import {isWandbArtifactRef, isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
+import {
+  isWandbArtifactRef,
+  isWeaveObjectRef,
+  parseRefMaybe,
+} from '@wandb/weave/react';
 import _ from 'lodash';
 
-import {parseRefMaybe} from '../../Browse2/SmallRef';
+import {parseFeedbackType} from '../feedback/HumanFeedback/tsHumanFeedback';
 import {
   WANDB_ARTIFACT_REF_PREFIX,
   WEAVE_REF_PREFIX,
 } from '../pages/wfReactInterface/constants';
-
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
 export type FilterId = number | string | undefined;

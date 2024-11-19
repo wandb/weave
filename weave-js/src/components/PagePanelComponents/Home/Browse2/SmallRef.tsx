@@ -262,7 +262,6 @@ export const SmallWeaveRef: FC<{
   );
 };
 
-
 export const SmallRef: FC<{
   objRef: ObjectRef;
   wfTable?: WFDBTableType;
