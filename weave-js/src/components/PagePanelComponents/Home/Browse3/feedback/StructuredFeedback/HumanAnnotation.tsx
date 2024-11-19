@@ -167,7 +167,7 @@ const FeedbackComponentSelector: React.FC<{
   jsonSchema: Record<string, any>;
   focused: boolean;
   onAddFeedback: (value: any) => Promise<boolean>;
-  foundValue: string | number | null;
+  foundValue: string | number | boolean | null;
   feedbackSpecRef: string;
   setUnsavedFeedbackChanges: React.Dispatch<
     React.SetStateAction<Record<string, () => Promise<boolean>>>
@@ -194,12 +194,23 @@ const FeedbackComponentSelector: React.FC<{
     );
 
     switch (type) {
+      case 'integer':
+        return (
+          <NumericalFeedbackColumn
+            min={jsonSchema.minimum}
+            max={jsonSchema.maximum}
+            isInteger={true}
+            onAddFeedback={wrappedOnAddFeedback}
+            defaultValue={foundValue as number | null}
+            focused={focused}
+          />
+        );
       case 'number':
         return (
           <NumericalFeedbackColumn
-            min={jsonSchema.min}
-            max={jsonSchema.max}
-            isInteger={jsonSchema.is_integer}
+            min={jsonSchema.minimum}
+            max={jsonSchema.maximum}
+            isInteger={false}
             onAddFeedback={wrappedOnAddFeedback}
             defaultValue={foundValue as number | null}
             focused={focused}
@@ -226,7 +237,7 @@ const FeedbackComponentSelector: React.FC<{
         return (
           <BinaryFeedbackColumn
             onAddFeedback={wrappedOnAddFeedback}
-            defaultValue={foundValue as string | null}
+            defaultValue={foundValue as boolean | null}
             focused={focused}
           />
         );
@@ -513,35 +524,35 @@ export const BinaryFeedbackColumn = ({
   defaultValue,
   focused,
 }: {
-  onAddFeedback?: (value: string) => Promise<boolean>;
-  defaultValue: string | null;
+  onAddFeedback?: (value: any) => Promise<boolean>;
+  defaultValue: boolean | null;
   focused?: boolean;
 }) => {
-  const [value, setValue] = useState<string | null>(defaultValue);
+  const [value, setValue] = useState<boolean | null>(defaultValue);
 
   useEffect(() => {
     setValue(defaultValue);
   }, [defaultValue]);
 
-  const handleClick = (newValue: string) => {
+  const handleClick = (newValue: boolean) => {
     // If clicking the same value, deselect it
     const valueToSet = value === newValue ? null : newValue;
     setValue(valueToSet);
-    onAddFeedback?.(valueToSet ?? '');
+    onAddFeedback?.(valueToSet);
   };
 
   return (
     <Tailwind>
       <div className="flex w-full justify-center gap-10">
         <Button
-          variant={value === 'true' ? 'primary' : 'outline'}
-          onClick={() => handleClick('true')}
+          variant={value === true ? 'primary' : 'outline'}
+          onClick={() => handleClick(true)}
           autoFocus={focused}>
           True
         </Button>
         <Button
-          variant={value === 'false' ? 'primary' : 'outline'}
-          onClick={() => handleClick('false')}>
+          variant={value === false ? 'primary' : 'outline'}
+          onClick={() => handleClick(false)}>
           False
         </Button>
       </div>

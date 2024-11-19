@@ -4,8 +4,11 @@ import React, {FC, useCallback, useContext, useEffect} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {TableRowSelectionContext} from '../../../Browse3';
-import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
-import {isEvaluateOp} from '../common/heuristics';
+import {
+  FEEDBACK_EXPAND_PARAM,
+  TRACETREE_PARAM,
+  useWeaveflowCurrentRouteContext,
+} from '../../context';
 import {useURLSearchParamsDict} from '../util';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
@@ -21,9 +24,11 @@ export const PaginationControls: FC<{
   const currentRouter = useWeaveflowCurrentRouteContext();
   const query = useURLSearchParamsDict();
   const showTraceTree =
-    TRACETREE_PARAM in query
-      ? query[TRACETREE_PARAM] === '1'
-      : !isEvaluateOp(call.spanName);
+    TRACETREE_PARAM in query ? query[TRACETREE_PARAM] === '1' : false;
+  const showFeedbackExpand =
+    FEEDBACK_EXPAND_PARAM in query
+      ? query[FEEDBACK_EXPAND_PARAM] === '1'
+      : false;
 
   const onNextCall = useCallback(() => {
     const nextCallId = getNextRowId?.(call.callId);
@@ -35,11 +40,20 @@ export const PaginationControls: FC<{
           call.traceId,
           nextCallId,
           path,
-          showTraceTree
+          showTraceTree,
+          showFeedbackExpand
         )
       );
     }
-  }, [call, currentRouter, history, path, showTraceTree, getNextRowId]);
+  }, [
+    call,
+    currentRouter,
+    history,
+    path,
+    showTraceTree,
+    getNextRowId,
+    showFeedbackExpand,
+  ]);
   const onPreviousCall = useCallback(() => {
     const previousRowId = getPreviousRowId?.(call.callId);
     if (previousRowId) {
@@ -50,11 +64,20 @@ export const PaginationControls: FC<{
           call.traceId,
           previousRowId,
           path,
-          showTraceTree
+          showTraceTree,
+          showFeedbackExpand
         )
       );
     }
-  }, [call, currentRouter, history, path, showTraceTree, getPreviousRowId]);
+  }, [
+    call,
+    currentRouter,
+    history,
+    path,
+    showTraceTree,
+    getPreviousRowId,
+    showFeedbackExpand,
+  ]);
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (event.key === 'ArrowDown' && event.shiftKey) {
