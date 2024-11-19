@@ -244,8 +244,8 @@ type ExtractedFeedbackValues = {
   // The most recent feedback value from ANY viewer
   mostRecentVal: string | number | null;
   // The combined feedback from all viewers
-  // userId -> objectId -> objectHash : value
-  combinedFeedback: Record<string, Record<string, Record<string, string>>>;
+  // userId : value
+  combinedFeedback: Record<string, string>;
 };
 
 const extractFeedbackValues = (
@@ -253,38 +253,22 @@ const extractFeedbackValues = (
   viewer: string | null,
   columnRef: string
 ): ExtractedFeedbackValues => {
-  const combinedFeedback = foundFeedback.reduce((acc, feedback) => {
-    return {
-      [feedback.creator ?? '']: feedback.payload.value,
-      ...acc,
-    };
-  }, {}) as Record<string, Record<string, Record<string, string>>>;
+  // filter out feedback for previous columns, then combine by creator
+  const combinedFeedback = foundFeedback
+    .filter(feedback => feedback.annotation_ref === columnRef)
+    .reduce((acc, feedback) => {
+      return {
+        [feedback.creator ?? '']: feedback.payload.value,
+        ...acc,
+      };
+    }, {}) as Record<string, string>;
 
-  const parsedRef = parseRef(columnRef);
-  const rawValues = Object.values(combinedFeedback)
-    .map(payload => {
-      const pRecord = payload as Record<
-        string,
-        Record<string, string | number>
-      >;
-      return pRecord[parsedRef.artifactName]?.[parsedRef.artifactVersion];
-    })
-    .filter(Boolean);
-
-  const viewerFeedbackVal =
-    combinedFeedback[viewer ?? '']?.[parsedRef.artifactName]?.[
-      parsedRef.artifactVersion
-    ];
-
-  // Get most recent value from the first feedback (since they're sorted by created_at desc)
-  const mostRecentVal =
-    foundFeedback[0]?.payload.value?.[parsedRef.artifactName]?.[
-      parsedRef.artifactVersion
-    ] ?? null;
+  const rawValues = Object.values(combinedFeedback).filter(Boolean);
+  const viewerFeedbackVal = combinedFeedback[viewer ?? ''] ?? null;
+  const mostRecentVal = foundFeedback[0]?.payload.value ?? null;
 
   return {
     rawValues,
-    // Currently unused, but likely useful in the future
     viewerFeedbackVal,
     mostRecentVal,
     combinedFeedback,
