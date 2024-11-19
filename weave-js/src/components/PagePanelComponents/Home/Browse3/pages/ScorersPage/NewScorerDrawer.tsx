@@ -1,8 +1,16 @@
 import {Box, Drawer} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
-import React, {FC, ReactNode, useCallback, useEffect, useState} from 'react';
+import React, {
+  FC,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
+import {useShowRunnableUI} from '../CallPage/CallPage';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import * as AnnotationScorerForm from './AnnotationScorerForm';
@@ -13,7 +21,7 @@ import {ProgrammaticScorerForm, ScorerFormProps} from './ScorerForms';
 const HUMAN_ANNOTATION_LABEL = 'Human annotation';
 export const HUMAN_ANNOTATION_VALUE = 'ANNOTATION';
 const LLM_JUDGE_LABEL = 'LLM judge';
-const LLM_JUDGE_VALUE = 'LLM_JUDGE';
+export const LLM_JUDGE_VALUE = 'LLM_JUDGE';
 const PROGRAMMATIC_LABEL = 'Programmatic scorer';
 const PROGRAMMATIC_VALUE = 'PROGRAMMATIC';
 
@@ -42,7 +50,7 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
     onSave: AnnotationScorerForm.onAnnotationScorerSave,
   },
   LLM_JUDGE: {
-    label: LLM_JUDGE_LABEL,
+    label: LLM_JUDGE_LABEL + ' (W&B Admin Preview)',
     value: LLM_JUDGE_VALUE,
     icon: IconNames.RobotServiceMember,
     Component: LLMJudgeScorerForm.LLMJudgeScorerForm,
@@ -118,6 +126,16 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
   }, [selectedScorerType, entity, project, formData, getClient, onClose]);
 
   const ScorerFormComponent = scorerTypeRecord[selectedScorerType].Component;
+  const showRunnableUI = useShowRunnableUI();
+
+  // Here, we hide the LLM judge option from non-admins since the
+  // feature is in active development. We want to be able to get
+  // feedback without enabling for all users.
+  const options = useMemo(() => {
+    return scorerTypeOptions.filter(
+      opt => showRunnableUI || opt.value !== LLM_JUDGE_VALUE
+    );
+  }, [showRunnableUI]);
 
   return (
     <SaveableDrawer
@@ -128,8 +146,8 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
       saveDisabled={!isFormValid}>
       <AutocompleteWithLabel
         label="Scorer type"
-        options={scorerTypeOptions}
-        value={scorerTypeOptions.find(opt => opt.value === selectedScorerType)}
+        options={options}
+        value={options.find(opt => opt.value === selectedScorerType)}
         formatOptionLabel={option => (
           <Box display="flex" alignItems="center" style={{gap: '4px'}}>
             <Icon name={option.icon} />

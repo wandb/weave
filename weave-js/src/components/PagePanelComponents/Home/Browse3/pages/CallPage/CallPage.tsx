@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Loading} from '@wandb/weave/components/Loading';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
@@ -34,6 +35,7 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
+import {CallScoresViewer} from './CallScoresViewer';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
 import {PaginationControls} from './PaginationControls';
@@ -59,7 +61,13 @@ export const CallPage: FC<{
   return <CallPageInnerVertical {...props} call={call.result} />;
 };
 
+export const useShowRunnableUI = () => {
+  const viewerInfo = useViewerInfo();
+  return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
+};
+
 const useCallTabs = (call: CallSchema) => {
+  const showScores = useShowRunnableUI();
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
@@ -131,6 +139,21 @@ const useCallTabs = (call: CallSchema) => {
         </Tailwind>
       ),
     },
+    // For now, we are only showing this tab for W&B admins since the
+    // feature is in active development. We want to be able to get
+    // feedback without enabling for all users.
+    ...(showScores
+      ? [
+          {
+            label: 'Scores (W&B Admin Preview)',
+            content: (
+              <Tailwind>
+                <CallScoresViewer call={call} />
+              </Tailwind>
+            ),
+          },
+        ]
+      : []),
     {
       label: 'Use',
       content: (
