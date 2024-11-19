@@ -45,7 +45,15 @@ export const PaginationControls: FC<{
         )
       );
     }
-  }, [call, currentRouter, history, path, showTraceTree, getNextRowId]);
+  }, [
+    call,
+    currentRouter,
+    history,
+    path,
+    showTraceTree,
+    getNextRowId,
+    showFeedbackExpand,
+  ]);
   const onPreviousCall = useCallback(() => {
     const previousRowId = getPreviousRowId?.(call.callId);
     if (previousRowId) {
@@ -61,7 +69,15 @@ export const PaginationControls: FC<{
         )
       );
     }
-  }, [call, currentRouter, history, path, showTraceTree, getPreviousRowId]);
+  }, [
+    call,
+    currentRouter,
+    history,
+    path,
+    showTraceTree,
+    getPreviousRowId,
+    showFeedbackExpand,
+  ]);
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (event.key === 'ArrowDown' && event.shiftKey) {
