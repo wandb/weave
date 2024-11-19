@@ -54,7 +54,6 @@ export const MessagePanel = ({
 
       <div
         className={classNames('relative overflow-visible rounded-lg', {
-          'pb-40': isOverflowing && isShowingMore,
           'border-t border-moon-250': isTool,
           'bg-moon-100': isSystemPrompt,
           'bg-cactus-300/[0.24]': isUser,
