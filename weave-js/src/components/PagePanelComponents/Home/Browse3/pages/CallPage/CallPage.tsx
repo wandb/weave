@@ -284,9 +284,7 @@ const CallPageInnerVertical: FC<{
             />
             <Button
               icon="marker"
-              tooltip={`${
-                showFeedbackExpand ? 'Hide' : 'Show'
-              } feedback sidebar`}
+              tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback`}
               variant="ghost"
               active={showFeedbackExpand ?? false}
               onClick={onToggleFeedbackExpand}
