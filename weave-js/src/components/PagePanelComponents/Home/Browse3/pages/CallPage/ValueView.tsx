@@ -2,7 +2,7 @@ import React, {useMemo} from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
-import {isWeaveRef, isArtifactRef} from '../../filters/common';
+import {isArtifactRef, isWeaveRef} from '../../filters/common';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {
