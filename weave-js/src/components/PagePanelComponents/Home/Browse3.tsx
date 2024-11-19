@@ -73,7 +73,6 @@ import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {
   ALWAYS_PIN_LEFT_CALLS,
-  DEFAULT_COLUMN_VISIBILITY_CALLS,
   DEFAULT_FILTER_CALLS,
   DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
@@ -736,7 +735,7 @@ const CallsPageBinding = () => {
     try {
       return JSON.parse(query.cols);
     } catch (e) {
-      return DEFAULT_COLUMN_VISIBILITY_CALLS;
+      return {};
     }
   }, [query.cols]);
   const setColumnVisibilityModel = (newModel: GridColumnVisibilityModel) => {
@@ -1143,11 +1142,13 @@ const Browse3Breadcrumbs: FC = props => {
 
 export const TableRowSelectionContext = React.createContext<{
   rowIdsConfigured: boolean;
+  rowIdInTable: (id: string) => boolean;
   setRowIds?: (rowIds: string[]) => void;
   getNextRowId?: (currentId: string) => string | null;
   getPreviousRowId?: (currentId: string) => string | null;
 }>({
   rowIdsConfigured: false,
+  rowIdInTable: (id: string) => false,
   setRowIds: () => {},
   getNextRowId: () => null,
   getPreviousRowId: () => null,
@@ -1158,6 +1159,10 @@ const TableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
 }) => {
   const [rowIds, setRowIds] = useState<string[]>([]);
   const rowIdsConfigured = useMemo(() => rowIds.length > 0, [rowIds]);
+  const rowIdInTable = useCallback(
+    (currentId: string) => rowIds.includes(currentId),
+    [rowIds]
+  );
 
   const getNextRowId = useCallback(
     (currentId: string) => {
@@ -1183,7 +1188,13 @@ const TableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
 
   return (
     <TableRowSelectionContext.Provider
-      value={{rowIdsConfigured, setRowIds, getNextRowId, getPreviousRowId}}>
+      value={{
+        rowIdsConfigured,
+        rowIdInTable,
+        setRowIds,
+        getNextRowId,
+        getPreviousRowId,
+      }}>
       {children}
     </TableRowSelectionContext.Provider>
   );

@@ -2,18 +2,19 @@ import {Box} from '@mui/material';
 import {Select} from '@wandb/weave/components/Form/Select';
 import React from 'react';
 
-import {LLM_MAX_TOKENS} from '../llmMaxTokens';
+import {LLM_MAX_TOKENS, LLMMaxTokensKey} from '../llmMaxTokens';
 
 interface LLMDropdownProps {
-  value: string;
-  onChange: (value: string, maxTokens: number) => void;
+  value: LLMMaxTokensKey;
+  onChange: (value: LLMMaxTokensKey, maxTokens: number) => void;
 }
 
 export const LLMDropdown: React.FC<LLMDropdownProps> = ({value, onChange}) => {
-  const options = Object.keys(LLM_MAX_TOKENS).map(llm => ({
-    value: llm,
-    label: llm,
-  }));
+  const options: Array<{value: LLMMaxTokensKey; label: LLMMaxTokensKey}> =
+    Object.keys(LLM_MAX_TOKENS).map(llm => ({
+      value: llm as LLMMaxTokensKey,
+      label: llm as LLMMaxTokensKey,
+    }));
 
   return (
     <Box
@@ -35,7 +36,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({value, onChange}) => {
               LLM_MAX_TOKENS[
                 (option as {value: string}).value as keyof typeof LLM_MAX_TOKENS
               ]?.max_tokens || 0;
-            onChange((option as {value: string}).value, maxTokens);
+            onChange((option as {value: LLMMaxTokensKey}).value, maxTokens);
           }
         }}
         options={options}

@@ -169,6 +169,7 @@ type User implements Node {
   photoUrl: String
   deletedAt: DateTime
   teams(before: String, after: String, first: Int, last: Int): EntityConnection
+  admin: Boolean
 }
 
 type UserConnection {

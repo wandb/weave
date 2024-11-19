@@ -1,6 +1,8 @@
 import _ from 'lodash';
 
 import {
+  CompletionsCreateReq,
+  CompletionsCreateRes,
   FeedbackCreateReq,
   FeedbackCreateRes,
   FeedbackPurgeReq,
@@ -136,6 +138,12 @@ export class TraceServerClient extends DirectTraceServerClient {
 
   public readBatch(req: TraceRefsReadBatchReq): Promise<TraceRefsReadBatchRes> {
     return this.requestReadBatch(req);
+  }
+
+  public completionsCreate(
+    req: CompletionsCreateReq
+  ): Promise<CompletionsCreateRes> {
+    return super.completionsCreate(req);
   }
 
   private requestReadBatch(

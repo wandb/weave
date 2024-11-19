@@ -5,7 +5,6 @@ import {
   isWandbArtifactRef,
   isWeaveObjectRef,
   ObjectRef,
-  parseRef,
   refUri,
   WandbArtifactRef,
   WeaveObjectRef,
@@ -263,6 +262,7 @@ export const SmallWeaveRef: FC<{
   );
 };
 
+
 export const SmallRef: FC<{
   objRef: ObjectRef;
   wfTable?: WFDBTableType;
@@ -281,12 +281,4 @@ export const SmallRef: FC<{
   return (
     <SmallWeaveRef objRef={objRef} wfTable={wfTable} iconOnly={iconOnly} />
   );
-};
-
-export const parseRefMaybe = (s: string): ObjectRef | null => {
-  try {
-    return parseRef(s);
-  } catch (e) {
-    return null;
-  }
 };

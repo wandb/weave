@@ -18,7 +18,7 @@ class AnnotationSpec(base_object_def.BaseObject):
             # Boolean feedback
             {"type": "boolean"},
             # Categorical feedback
-            {"type": "categorical", "options": ["option1", "option2"]},
+            {"type": "string", "enum": ["option1", "option2"]},
         ],
     )
 
