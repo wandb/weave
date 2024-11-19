@@ -17,9 +17,14 @@ const AnnotationScorerFormSchema = z.object({
       type: z.literal('boolean'),
     }),
     z.object({
+      type: z.literal('integer'),
+      minimum: z.number().optional().describe('Optional minimum value'),
+      maximum: z.number().optional().describe('Optional maximum value'),
+    }),
+    z.object({
       type: z.literal('number'),
-      min: z.number().optional().describe('Optional minimum value'),
-      max: z.number().optional().describe('Optional maximum value'),
+      minimum: z.number().optional().describe('Optional minimum value'),
+      maximum: z.number().optional().describe('Optional maximum value'),
     }),
     z.object({
       type: z.literal('string'),

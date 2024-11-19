@@ -2,7 +2,13 @@ import {AnnotationSpec} from '../../pages/wfReactInterface/generatedBaseObjectCl
 import {Feedback} from '../../pages/wfReactInterface/traceServerClientTypes';
 
 export const HUMAN_ANNOTATION_BASE_TYPE = 'wandb.annotation';
-export const FEEDBACK_TYPE_OPTIONS = ['string', 'number', 'boolean', 'enum'];
+export const FEEDBACK_TYPE_OPTIONS = [
+  'string',
+  'number',
+  'boolean',
+  'enum',
+  'integer',
+];
 export type FeedbackSchemaType = (typeof FEEDBACK_TYPE_OPTIONS)[number];
 
 export const makeAnnotationFeedbackType = (type: string) =>

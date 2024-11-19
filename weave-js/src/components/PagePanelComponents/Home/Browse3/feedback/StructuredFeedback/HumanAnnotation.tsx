@@ -194,12 +194,23 @@ const FeedbackComponentSelector: React.FC<{
     );
 
     switch (type) {
+      case 'integer':
+        return (
+          <NumericalFeedbackColumn
+            min={jsonSchema.minimum}
+            max={jsonSchema.maximum}
+            isInteger={true}
+            onAddFeedback={wrappedOnAddFeedback}
+            defaultValue={foundValue as number | null}
+            focused={focused}
+          />
+        );
       case 'number':
         return (
           <NumericalFeedbackColumn
-            min={jsonSchema.min}
-            max={jsonSchema.max}
-            isInteger={jsonSchema.is_integer}
+            min={jsonSchema.minimum}
+            max={jsonSchema.maximum}
+            isInteger={false}
             onAddFeedback={wrappedOnAddFeedback}
             defaultValue={foundValue as number | null}
             focused={focused}
