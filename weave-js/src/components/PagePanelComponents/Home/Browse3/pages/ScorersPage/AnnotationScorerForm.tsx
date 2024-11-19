@@ -11,7 +11,7 @@ import {ZSForm} from './ZodSchemaForm';
 
 const AnnotationScorerFormSchema = z.object({
   Name: z.string().min(1),
-  Description: z.string().min(1),
+  Description: z.string().optional(),
   Type: z.discriminatedUnion('type', [
     z.object({
       type: z.literal('boolean'),
@@ -40,10 +40,14 @@ const AnnotationScorerFormSchema = z.object({
   ]),
 });
 
+const DEFAULT_STATE = {
+  Type: {type: 'boolean'},
+} as z.infer<typeof AnnotationScorerFormSchema>;
+
 export const AnnotationScorerForm: FC<
   ScorerFormProps<z.infer<typeof AnnotationScorerFormSchema>>
 > = ({data, onDataChange}) => {
-  const [config, setConfig] = useState(data);
+  const [config, setConfig] = useState(data ?? DEFAULT_STATE);
   const [isValid, setIsValid] = useState(false);
 
   const handleConfigChange = useCallback(
