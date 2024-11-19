@@ -90,14 +90,6 @@ class OpNameError(ValueError):
     """Raised when an op name is invalid."""
 
 
-def dataclasses_asdict_one_level(obj: Any) -> dict[str, Any]:
-    # dataclasses.asdict is recursive. We don't want that when json encoding
-    return {f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}
-
-
-# TODO: unused
-
-
 def get_obj_name(val: Any) -> str:
     name = getattr(val, "name", None)
     if name is None:
@@ -233,23 +225,25 @@ class Call:
     def feedback(self) -> RefFeedbackQuery:
         if not self.id:
             raise ValueError("Can't get feedback for call without ID")
+
         if self._feedback is None:
-            project_parts = self.project_id.split("/")
-            if len(project_parts) != 2:
+            try:
+                entity, project = self.project_id.split("/")
+            except ValueError:
                 raise ValueError(f"Invalid project_id: {self.project_id}")
-            entity, project = project_parts
             weave_ref = CallRef(entity, project, self.id)
             self._feedback = RefFeedbackQuery(weave_ref.uri())
         return self._feedback
 
     @property
     def ui_url(self) -> str:
-        project_parts = self.project_id.split("/")
-        if len(project_parts) != 2:
-            raise ValueError(f"Invalid project_id: {self.project_id}")
-        entity, project = project_parts
         if not self.id:
             raise ValueError("Can't get URL for call without ID")
+
+        try:
+            entity, project = self.project_id.split("/")
+        except ValueError:
+            raise ValueError(f"Invalid project_id: {self.project_id}")
         return urls.redirect_call(entity, project, self.id)
 
     @property
@@ -257,6 +251,7 @@ class Call:
         entity, project = self.project_id.split("/")
         if not self.id:
             raise ValueError("Can't get ref for call without ID")
+
         return CallRef(entity, project, self.id)
 
     # These are the children if we're using Call at read-time
@@ -264,6 +259,8 @@ class Call:
         client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError("Can't get children of call without ID")
+
+        client = weave_client_context.require_weave_client()
         return CallsIter(
             client.server,
             self.project_id,
@@ -419,15 +416,17 @@ class CallsIter:
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
 ) -> WeaveObject:
-    output = server_call.output
+    if (call_id := server_call.id) is None:
+        raise ValueError("Call ID is None")
+
     call = Call(
         _op_name=server_call.op_name,
         project_id=server_call.project_id,
         trace_id=server_call.trace_id,
         parent_id=server_call.parent_id,
-        id=server_call.id,
+        id=call_id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
-        output=from_json(output, server_call.project_id, server),
+        output=from_json(server_call.output, server_call.project_id, server),
         summary=dict(server_call.summary) if server_call.summary is not None else None,
         display_name=server_call.display_name,
         attributes=server_call.attributes,
@@ -435,9 +434,8 @@ def make_client_call(
         ended_at=server_call.ended_at,
         deleted_at=server_call.deleted_at,
     )
-    if call.id is None:
-        raise ValueError("Call ID is None")
-    return WeaveObject(call, CallRef(entity, project, call.id), server, None)
+    ref = CallRef(entity, project, call_id)
+    return WeaveObject(call, ref, server, None)
 
 
 def sum_dict_leaves(dicts: list[dict]) -> dict:
@@ -588,8 +586,6 @@ class WeaveClient:
         # here, we just directly assign the digest.
         ref = dataclasses.replace(ref, _digest=read_res.obj.digest)
 
-        data = read_res.obj.val
-
         # If there is a ref-extra, we should resolve it. Rather than walking
         # the object, it is more efficient to directly query for the data and
         # let the server resolve it.
@@ -605,6 +601,8 @@ class WeaveClient:
             if not ref_read_res.vals:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
             data = ref_read_res.vals[0]
+        else:
+            data = read_res.obj.val
 
         val = from_json(data, project_id, self.server)
 
