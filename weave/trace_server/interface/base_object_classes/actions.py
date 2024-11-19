@@ -1,5 +1,6 @@
 from typing import Any, Literal, Optional, Union
 
+import jsonschema
 from pydantic import BaseModel, Field, field_validator
 
 from weave.trace_server.interface.base_object_classes import base_object_def
@@ -13,6 +14,16 @@ class LlmJudgeActionConfig(BaseModel):
     prompt: str
     # Expected to be valid JSON Schema
     response_schema: dict[str, Any]
+
+    @field_validator("response_schema")
+    def validate_response_schema(cls, v: dict) -> dict:
+        try:
+            jsonschema.validate(None, v)
+        except jsonschema.exceptions.SchemaError as e:
+            raise e
+        except jsonschema.exceptions.ValidationError:
+            pass  # we don't care that `None` does not conform
+        return v
 
 
 class ContainsWordsActionConfig(BaseModel):

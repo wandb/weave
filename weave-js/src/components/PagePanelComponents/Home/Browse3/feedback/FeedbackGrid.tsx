@@ -12,6 +12,9 @@ import {Empty} from '../pages/common/Empty';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
 import {FeedbackGridInner} from './FeedbackGridInner';
+import {HUMAN_ANNOTATION_BASE_TYPE} from './StructuredFeedback/humanAnnotationTypes';
+
+const ANNOTATION_PREFIX = `${HUMAN_ANNOTATION_BASE_TYPE}.`;
 
 type FeedbackGridProps = {
   entity: string;
@@ -41,21 +44,39 @@ export const FeedbackGrid = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Exclude runnables as they are presented in a different tab
-  const withoutRunnables = useMemo(
-    () =>
-      (query.result ?? []).filter(
-        f => !f.feedback_type.startsWith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
-      ),
-    [query.result]
-  );
 
   // Group by feedback on this object vs. descendent objects
   const grouped = useMemo(
     () =>
-      _.groupBy(withoutRunnables, f => f.weave_ref.substring(weaveRef.length)),
-    [withoutRunnables, weaveRef]
+    {
+  // Exclude runnables as they are presented in a different tab
+      const withoutRunnables = (query.result ?? []).filter(
+        f => !f.feedback_type.startsWith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
+      )
+          // Combine annotation feedback on (feedback_type, creator)
+    const combined = _.groupBy(
+      withoutRunnables.filter(f => f.feedback_type.startsWith(ANNOTATION_PREFIX)),
+      f => `${f.feedback_type}-${f.creator}`
+    );
+    // only keep the most recent feedback for each (feedback_type, creator)
+    const combinedFiltered = Object.values(combined).map(
+      fs => fs.sort((a, b) => b.created_at - a.created_at)[0]
+    );
+    // add the non-annotation feedback to the combined object
+    combinedFiltered.push(
+      ...withoutRunnables.filter(f => !f.feedback_type.startsWith(ANNOTATION_PREFIX))
+    );
+  
+    // Group by feedback on this object vs. descendent objects
+    return _.groupBy(combinedFiltered, f =>
+        f.weave_ref.substring(weaveRef.length)
+      );
+    },
+    [query.result, weaveRef]
   );
+
+
+
   const paths = useMemo(() => Object.keys(grouped).sort(), [grouped]);
 
   if (query.loading || loadingUserInfo) {
@@ -98,6 +119,7 @@ export const FeedbackGrid = ({
       />
     );
   }
+
 
   const currentViewerId = userInfo ? userInfo.id : null;
   return (

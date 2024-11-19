@@ -11,11 +11,14 @@ import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TableRowSelectionContext} from '../../../Browse3';
 import {
+  FEEDBACK_EXPAND_PARAM,
   TRACETREE_PARAM,
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
+import {FeedbackSidebar} from '../../feedback/StructuredFeedback/FeedbackSidebar';
+import {useHumanAnnotationSpecs} from '../../feedback/StructuredFeedback/tsHumanFeedback';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
@@ -179,6 +182,10 @@ const CallPageInnerVertical: FC<{
     TRACETREE_PARAM in query
       ? query[TRACETREE_PARAM] === '1'
       : !isEvaluateOp(call.spanName);
+  const showFeedbackExpand =
+    FEEDBACK_EXPAND_PARAM in query
+      ? query[FEEDBACK_EXPAND_PARAM] === '1'
+      : false;
 
   const onToggleTraceTree = useCallback(() => {
     history.replace(
@@ -188,7 +195,8 @@ const CallPageInnerVertical: FC<{
         call.traceId,
         call.callId,
         path,
-        !showTraceTree
+        !showTraceTree,
+        showFeedbackExpand
       )
     );
   }, [
@@ -200,7 +208,25 @@ const CallPageInnerVertical: FC<{
     history,
     path,
     showTraceTree,
+    showFeedbackExpand,
   ]);
+  const onToggleFeedbackExpand = useCallback(() => {
+    history.replace(
+      currentRouter.callUIUrl(
+        call.entity,
+        call.project,
+        call.traceId,
+        call.callId,
+        path,
+        showTraceTree,
+        !showFeedbackExpand
+      )
+    );
+  }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
+  const humanAnnotationSpecs = useHumanAnnotationSpecs(
+    call.entity,
+    call.project
+  );
 
   const tree = useCallFlattenedTraceTree(call, path ?? null);
   const {rows, expandKeys, loading, costLoading, selectedCall} = tree;
@@ -250,6 +276,16 @@ const CallPageInnerVertical: FC<{
           )}
           <Box sx={{marginLeft: showPaginationContols ? 0 : 'auto'}}>
             <Button
+              icon="marker"
+              tooltip={`${
+                showFeedbackExpand ? 'Hide' : 'Show'
+              } feedback sidebar`}
+              variant="ghost"
+              active={showFeedbackExpand ?? false}
+              onClick={onToggleFeedbackExpand}
+              className="mr-4"
+            />
+            <Button
               icon="layout-tabs"
               tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
               variant="ghost"
@@ -258,6 +294,19 @@ const CallPageInnerVertical: FC<{
             />
           </Box>
         </Box>
+      }
+      isRightSidebarOpen={showFeedbackExpand}
+      rightSidebarContent={
+        <Tailwind style={{display: 'contents'}}>
+          <div className="flex h-full flex-col">
+            <FeedbackSidebar
+              humanAnnotationSpecs={humanAnnotationSpecs}
+              callID={currentCall.callId}
+              entity={currentCall.entity}
+              project={currentCall.project}
+            />
+          </div>
+        </Tailwind>
       }
       headerContent={<CallOverview call={currentCall} />}
       isLeftSidebarOpen={showTraceTree}
