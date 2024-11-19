@@ -112,9 +112,11 @@ export const FilterBar = ({
     } else if (
       col.field.startsWith('summary.weave.feedback.wandb.annotation')
     ) {
-      const stripped = col.field.replace('summary.weave.', '');
-      const parsed = parseFeedbackType(stripped);
-      const backendFilter = convertFeedbackFieldToBackendFilter(stripped);
+      const parsed = parseFeedbackType(col.field);
+      if (!parsed) {
+        continue;
+      }
+      const backendFilter = convertFeedbackFieldToBackendFilter(parsed.field);
       (options[0] as GroupedOption).options.push({
         value: backendFilter,
         label: parsed ? parsed.displayName : col.field,

@@ -42,6 +42,8 @@ export const FIELD_LABELS: Record<string, string> = {
 
 export const getFieldLabel = (field: string): string => {
   if (field.startsWith('feedback.')) {
+    // Here the field is coming from convertFeedbackFieldToBackendFilter
+    // so the field should start with 'feedback.' if feedback
     const parsed = parseFeedbackType(field);
     if (parsed === null) {
       return field;
