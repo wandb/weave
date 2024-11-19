@@ -1,9 +1,9 @@
-import os
-import warnings
 import hashlib
+import os
 import tempfile
+import warnings
 from enum import Enum
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import weave
 from weave.scorers.base_scorer import Scorer
@@ -19,58 +19,6 @@ except ImportError:
     )
 
 
-class TextReplaceBuilder:
-    """Creates new text according to users request."""
-
-    def __init__(self, original_text: str):
-        self.output_text = original_text
-        self.original_text = original_text
-        self.text_len = len(original_text)
-        self.last_replacement_index = self.text_len
-
-    def get_text_in_position(self, start: int, end: int) -> str:
-        """
-        Get part of the text inside the original text.
-
-        :param start: start position of inner text
-        :param end: end position of inner text
-        :return: str - part of the original text
-        """
-        self.__validate_position_in_text(start, end)
-        return self.original_text[start:end]
-
-    def replace_text_get_insertion_index(
-        self, replacement_text: str, start: int, end: int
-    ) -> int:
-        """
-        Replace text in a specific position with the text.
-
-        :param replacement_text: new text to replace the old text according to indices
-        :param start: the startpoint to replace the text
-        :param end: the endpoint to replace the text
-        :return: The index of inserted text
-        """
-        end_of_text_index = min(end, self.last_replacement_index)
-        self.last_replacement_index = start
-
-        before_text = self.output_text[:start]
-        after_text = self.output_text[end_of_text_index:]
-        self.output_text = before_text + replacement_text + after_text
-
-        # The replace algorithm is replacing the text from end to start.
-        # calculate and return the start point from the end.
-        return len(after_text) + len(replacement_text)
-
-    def __validate_position_in_text(self, start: int, end: int):
-        """Validate the start and end position match the text length."""
-        if self.text_len < start or end > self.text_len:
-            err_msg = (
-                f"Invalid analyzer result, start: {start} and end: "
-                f"{end}, while text length is only {self.text_len}."
-            )
-            raise ValueError(err_msg)
-
-
 class REDACTION(str, Enum):
     REDACT_PARTIAL = "REDACT_PARTIAL"
     REDACT_ALL = "REDACT_ALL"
@@ -80,7 +28,7 @@ class REDACTION(str, Enum):
 class SecretsScorer(Scorer):
     """Validate whether a string contains a secret."""
 
-    _detect_secrets_config: Dict[str, Any] = ALL_PLUGINS
+    _detect_secrets_config: dict[str, Any] = ALL_PLUGINS
     redact_mode: REDACTION = REDACTION.REDACT_ALL
 
     @staticmethod
@@ -96,7 +44,7 @@ class SecretsScorer(Scorer):
 
         return redacted_value
 
-    def get_unique_secrets(self, value: str) -> Tuple[Dict[str, Any], List[str]]:
+    def get_unique_secrets(self, value: str) -> tuple[dict[str, Any], list[str]]:
         """Get unique secrets from the value."""
         secrets = SecretsCollection()
         temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -125,7 +73,7 @@ class SecretsScorer(Scorer):
         return unique_secrets, lines
 
     def get_modified_value(
-        self, unique_secrets: Dict[str, Any], lines: List[str]
+        self, unique_secrets: dict[str, Any], lines: list[str]
     ) -> str:
         """Replace the secrets on the lines with asterisks."""
         for secret, line_numbers in unique_secrets.items():
@@ -137,7 +85,7 @@ class SecretsScorer(Scorer):
         modified_value = "\n".join(lines)
         return modified_value
 
-    def scan(self, prompt: str) -> Tuple[str, bool, float]:
+    def scan(self, prompt: str) -> tuple[str, bool, float]:
         if prompt.strip() == "":
             return prompt, True, -1.0
 
@@ -151,8 +99,8 @@ class SecretsScorer(Scorer):
     @weave.op
     async def score(self, input: str, output: str) -> dict:
         result = {
-            "input_secrets": None,
-            "output_secrets": None,
+            "input_secrets": {},
+            "output_secrets": {},
             "total_secrets": 0,
             "input_has_secrets": False,
             "output_has_secrets": False,
@@ -171,7 +119,13 @@ class SecretsScorer(Scorer):
                     "detected_secrets": ["detected"],
                     "modified_value": redacted_text,
                 }
-                result["total_secrets"] += 1
+                if result["total_secrets"] is None:
+                    result["total_secrets"] = 1
+                else:
+                    if isinstance(result["total_secrets"], int):
+                        result["total_secrets"] += 1
+                    else:
+                        result["total_secrets"] = 1
                 if key == "input_secrets":
                     result["input_has_secrets"] = True
                 else:

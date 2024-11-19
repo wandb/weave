@@ -1,6 +1,7 @@
 import pytest
+
 import weave
-from weave.scorers.secrets_scorer import SecretsScorer, REDACTION
+from weave.scorers.secrets_scorer import REDACTION, SecretsScorer
 
 
 @pytest.fixture
