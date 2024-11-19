@@ -29,7 +29,7 @@ const AnnotationScorerFormSchema = z.object({
         .describe('Optional maximum length of the string'),
     }),
     z.object({
-      type: z.literal('enum'),
+      type: z.literal('options'),
       enum: z.array(z.string()).describe('List of options to choose from'),
     }),
   ]),
@@ -76,7 +76,7 @@ export const onAnnotationScorerSave = async (
   client: TraceServerClient
 ) => {
   let type = data.Type.type;
-  if (type === 'enum') {
+  if (type === 'options') {
     type = 'string';
   }
   return createBaseObjectInstance(client, 'AnnotationSpec', {
