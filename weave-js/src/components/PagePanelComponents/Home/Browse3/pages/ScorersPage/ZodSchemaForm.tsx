@@ -131,7 +131,6 @@ const DiscriminatedUnionField: React.FC<{
           label: currentType,
         }}
         onChange={v => {
-          console.log(v);
           handleTypeChange(v.value as string);
         }}
       />
@@ -162,8 +161,6 @@ const NestedForm: React.FC<{
   const currentValue = getNestedValue(config, currentPath);
 
   const unwrappedSchema = unwrapSchema(fieldSchema);
-
-  console.log(typeof fieldSchema, fieldSchema);
 
   if (unwrappedSchema instanceof z.ZodDiscriminatedUnion) {
     return (
