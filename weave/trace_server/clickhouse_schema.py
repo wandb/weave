@@ -13,6 +13,7 @@ class CallStartCHInsertable(BaseModel):
     parent_id: Optional[str] = None
     op_name: str
     started_at: datetime.datetime
+    started_at_micros: Optional[datetime.datetime] = None
     attributes_dump: str
     inputs_dump: str
     input_refs: list[str]
@@ -38,6 +39,7 @@ class CallEndCHInsertable(BaseModel):
     project_id: str
     id: str
     ended_at: datetime.datetime
+    ended_at_micros: Optional[datetime.datetime] = None
     exception: Optional[str] = None
     summary_dump: str
     output_dump: str
@@ -102,7 +104,9 @@ class SelectableCHCallSchema(BaseModel):
     parent_id: Optional[str] = None
 
     started_at: datetime.datetime
+    started_at_micros: Optional[datetime.datetime] = None
     ended_at: Optional[datetime.datetime] = None
+    ended_at_micros: Optional[datetime.datetime] = None
     exception: Optional[str] = None
 
     # attributes and inputs are required on call schema, but can be

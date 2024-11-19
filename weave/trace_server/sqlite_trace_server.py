@@ -91,7 +91,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 parent_id TEXT,
                 op_name TEXT,
                 started_at TEXT,
+                started_at_micros TEXT,
                 ended_at TEXT,
+                ended_at_micros TEXT,
                 exception TEXT,
                 attributes TEXT,
                 inputs TEXT,
@@ -174,12 +176,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     op_name,
                     display_name,
                     started_at,
+                    started_at_micros,
                     attributes,
                     inputs,
                     input_refs,
                     wb_user_id,
                     wb_run_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req.start.project_id,
                     req.start.id,
@@ -188,6 +191,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.start.op_name,
                     req.start.display_name,
                     req.start.started_at.isoformat(),
+                    req.start.started_at_micros.isoformat()
+                    if req.start.started_at_micros
+                    else None,
                     json.dumps(req.start.attributes),
                     json.dumps(req.start.inputs),
                     json.dumps(
@@ -215,6 +221,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             cursor.execute(
                 """UPDATE calls SET
                     ended_at = ?,
+                    ended_at_micros = ?,
                     exception = ?,
                     output = ?,
                     output_refs = ?,
@@ -222,6 +229,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 WHERE id = ?""",
                 (
                     req.end.ended_at.isoformat(),
+                    req.end.ended_at_micros.isoformat()
+                    if req.end.ended_at_micros
+                    else None,
                     req.end.exception,
                     json.dumps(req.end.output),
                     json.dumps(

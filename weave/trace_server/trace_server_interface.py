@@ -94,6 +94,7 @@ class CallSchema(BaseModel):
 
     # Start time is required
     started_at: datetime.datetime
+    started_at_micros: Optional[datetime.datetime] = None
     # Attributes: properties of the call
     attributes: dict[str, Any]
 
@@ -102,6 +103,7 @@ class CallSchema(BaseModel):
 
     # End time is required if finished
     ended_at: Optional[datetime.datetime] = None
+    ended_at_micros: Optional[datetime.datetime] = None
 
     # Exception is present if the call failed
     exception: Optional[str] = None
@@ -142,6 +144,7 @@ class StartedCallSchemaForInsert(BaseModel):
 
     # Start time is required
     started_at: datetime.datetime
+    started_at_micros: Optional[datetime.datetime] = None
     # Attributes: properties of the call
     attributes: dict[str, Any]
 
@@ -159,6 +162,7 @@ class EndedCallSchemaForInsert(BaseModel):
 
     # End time is required
     ended_at: datetime.datetime
+    ended_at_micros: Optional[datetime.datetime] = None
 
     # Exception is present if the call failed
     exception: Optional[str] = None

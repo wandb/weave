@@ -330,7 +330,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for sort_by in req.sort_by:
                 cq.add_order(sort_by.field, sort_by.direction)
         else:
-            cq.add_order("started_at", "asc")
+            cq.add_order("started_at_micros", "asc")
         if req.limit is not None:
             cq.set_limit(req.limit)
         if req.offset is not None:
@@ -2029,6 +2029,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         parent_id=start_call.parent_id,
         op_name=start_call.op_name,
         started_at=start_call.started_at,
+        started_at_micros=start_call.started_at,
         attributes_dump=_dict_value_to_dump(start_call.attributes),
         inputs_dump=_dict_value_to_dump(start_call.inputs),
         input_refs=extract_refs_from_values(start_call.inputs),
@@ -2048,6 +2049,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         id=end_call.id,
         exception=end_call.exception,
         ended_at=end_call.ended_at,
+        ended_at_micros=end_call.ended_at,
         summary_dump=_dict_value_to_dump(dict(end_call.summary)),
         output_dump=_any_value_to_dump(end_call.output),
         output_refs=extract_refs_from_values(end_call.output),
