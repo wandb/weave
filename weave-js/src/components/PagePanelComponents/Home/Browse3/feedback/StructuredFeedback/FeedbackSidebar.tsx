@@ -77,10 +77,19 @@ export const FeedbackSidebar = ({
         organizationName: orgName,
         entityName: entity,
         projectName: project,
-        numHumanAnnotationSpecs: humanAnnotationSpecs.length,
+        numAnnotationSpecs: humanAnnotationSpecs.length,
       });
     }
-  }, [viewerLoading, orgNameLoading, userInfo, orgName, entity, project]);
+  }, [
+    viewerLoading,
+    orgNameLoading,
+    userInfo,
+    orgName,
+    entity,
+    project,
+    humanAnnotationSpecs.length,
+    callID,
+  ]);
 
   return (
     <div className="flex h-full flex-col bg-white">
