@@ -8,7 +8,10 @@ export type FeedbackTypeParts = {
 export const parseFeedbackType = (
   inputField: string
 ): FeedbackTypeParts | null => {
-  // summary.weave.feedback.wandb.annotation.Numerical-field-2.payload.value
+  // input: summary.weave.feedback.wandb.annotation.Numerical-field-2.payload.value
+  // or input: wandb.annotation.Numerical-field-2.payload.value
+  //
+  // output:
   // field: wandb.annotation.Numerical-field-2
   // userDefinedType: Numerical-field-2
   // type: annotation
