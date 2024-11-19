@@ -10,11 +10,8 @@ import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
 import {IconFilterAlt} from '../../../../Icon';
 import {Tailwind} from '../../../../Tailwind';
-import {
-  convertFeedbackFieldToBackendFilter,
-  parseFeedbackType,
-} from '../feedback/HumanFeedback/tsHumanFeedback';
-import {ColumnInfo} from '../types';
+import {parseFeedbackType} from '../feedback/HumanFeedback/tsHumanFeedback';
+import {ColumnInfo, convertFeedbackFieldToBackendFilter} from '../types';
 import {
   FIELD_DESCRIPTIONS,
   FilterId,

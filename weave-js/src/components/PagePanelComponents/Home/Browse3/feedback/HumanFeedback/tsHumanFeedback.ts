@@ -10,6 +10,7 @@ export const parseFeedbackType = (
 ): FeedbackTypeParts | null => {
   // input: summary.weave.feedback.wandb.annotation.Numerical-field-2.payload.value
   // or input: wandb.annotation.Numerical-field-2.payload.value
+  // or input: feedback.[wandb.annotation.Numerical-field-2].payload.value
   //
   // output:
   // field: wandb.annotation.Numerical-field-2
