@@ -276,6 +276,13 @@ const CallPageInnerVertical: FC<{
           )}
           <Box sx={{marginLeft: showPaginationContols ? 0 : 'auto'}}>
             <Button
+              icon="layout-tabs"
+              tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
+              variant="ghost"
+              active={showTraceTree ?? false}
+              onClick={onToggleTraceTree}
+            />
+            <Button
               icon="marker"
               tooltip={`${
                 showFeedbackExpand ? 'Hide' : 'Show'
@@ -283,14 +290,7 @@ const CallPageInnerVertical: FC<{
               variant="ghost"
               active={showFeedbackExpand ?? false}
               onClick={onToggleFeedbackExpand}
-              className="mr-4"
-            />
-            <Button
-              icon="layout-tabs"
-              tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
-              variant="ghost"
-              active={showTraceTree ?? false}
-              onClick={onToggleTraceTree}
+              className="ml-4"
             />
           </Box>
         </Box>
