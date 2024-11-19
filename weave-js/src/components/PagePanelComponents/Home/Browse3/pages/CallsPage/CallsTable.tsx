@@ -50,7 +50,10 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
-import {convertFeedbackFieldToBackendFilter} from '../../feedback/HumanFeedback/tsHumanFeedback';
+import {
+  convertFeedbackFieldToBackendFilter,
+  parseFeedbackType,
+} from '../../feedback/HumanFeedback/tsHumanFeedback';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
@@ -697,9 +700,13 @@ export const CallsTable: FC<{
       // handle feedback conversion from weave summary to backend filter
       for (const sort of newModel) {
         if (sort.field.startsWith('summary.weave.feedback')) {
-          const stripped = sort.field.replace('summary.weave.', '');
-          const backendFilter = convertFeedbackFieldToBackendFilter(stripped);
-          sort.field = backendFilter;
+          const parsed = parseFeedbackType(sort.field);
+          if (parsed) {
+            const backendFilter = convertFeedbackFieldToBackendFilter(
+              parsed.field
+            );
+            sort.field = backendFilter;
+          }
         }
       }
       setSortModel(newModel);

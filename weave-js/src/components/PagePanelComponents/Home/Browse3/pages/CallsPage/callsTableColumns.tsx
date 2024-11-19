@@ -354,8 +354,7 @@ function buildCallsTableColumns(
     // Add feedback columns
     const annotationColumns: Array<GridColDef<TraceCallSchema>> =
       annotationColNames.map(c => {
-        const stripped = c.replace('summary.weave.', '');
-        const parsed = parseFeedbackType(stripped);
+        const parsed = parseFeedbackType(c);
         return {
           field: convertFeedbackFieldToBackendFilter(c),
           headerName: parsed ? parsed.displayName : `${c}`,
