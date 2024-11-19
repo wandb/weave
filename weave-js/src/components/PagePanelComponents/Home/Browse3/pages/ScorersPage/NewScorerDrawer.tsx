@@ -5,13 +5,10 @@ import React, {FC, ReactNode, useCallback, useEffect, useState} from 'react';
 
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import * as AnnotationScorerForm from './AnnotationScorerForm';
 import {AutocompleteWithLabel} from './FormComponents';
 import * as LLMJudgeScorerForm from './LLMJudgeScorerForm';
-import {
-  AnnotationScorerForm,
-  ProgrammaticScorerForm,
-  ScorerFormProps,
-} from './ScorerForms';
+import {ProgrammaticScorerForm, ScorerFormProps} from './ScorerForms';
 
 const HUMAN_ANNOTATION_LABEL = 'Human annotation';
 export const HUMAN_ANNOTATION_VALUE = 'ANNOTATION';
@@ -41,11 +38,8 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
     label: HUMAN_ANNOTATION_LABEL,
     value: HUMAN_ANNOTATION_VALUE,
     icon: IconNames.UsersTeam,
-    Component: AnnotationScorerForm,
-    onSave: async (entity, project, data, client) => {
-      // Implementation for saving annotation scorer
-      console.log('TODO: save annotation scorer', data);
-    },
+    Component: AnnotationScorerForm.AnnotationScorerForm,
+    onSave: AnnotationScorerForm.onAnnotationScorerSave,
   },
   LLM_JUDGE: {
     label: LLM_JUDGE_LABEL,
