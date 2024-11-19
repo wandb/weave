@@ -73,7 +73,6 @@ import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {
   ALWAYS_PIN_LEFT_CALLS,
-  DEFAULT_COLUMN_VISIBILITY_CALLS,
   DEFAULT_FILTER_CALLS,
   DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
@@ -736,7 +735,7 @@ const CallsPageBinding = () => {
     try {
       return JSON.parse(query.cols);
     } catch (e) {
-      return DEFAULT_COLUMN_VISIBILITY_CALLS;
+      return {};
     }
   }, [query.cols]);
   const setColumnVisibilityModel = (newModel: GridColumnVisibilityModel) => {
