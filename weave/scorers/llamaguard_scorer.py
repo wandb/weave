@@ -65,10 +65,11 @@ class LlamaGuard(Scorer):
         )
         self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
 
-    def postprocess(self, output: str) -> dict[str, Any]:
+    def postprocess(self, output: str, unsafe_score: float) -> dict[str, Any]:
         """
         Postprocess the output of the LlamaGuard model. The output is in the following format:
         "unsafe" if the output is unsafe, otherwise "safe". If unsafe, the category is also returned.
+        Also includes the probability score for "unsafe".
         """
         safe = True
         category = None
@@ -79,7 +80,7 @@ class LlamaGuard(Scorer):
             if match:
                 category_key = f"S{match.group(1)}"
                 category = f"{category_key}: {self._CATEGORY_TYPES.get(category_key)}"
-        return {"safe": safe, "category": category}
+        return {"safe": safe, "category": category, "unsafe_score": unsafe_score}
 
     @weave.op
     async def score_messages(
@@ -87,8 +88,9 @@ class LlamaGuard(Scorer):
         messages: list[dict[str, Any]],
         categories: Optional[dict[str, str]] = None,
         excluded_category_keys: Optional[list[str]] = None,
-    ) -> str:
+    ) -> tuple[str, float]:
         "Score a list of messages in a conversation."
+        excluded_category_keys = excluded_category_keys or []
         if categories is not None:
             input_ids = self._tokenizer.apply_chat_template(
                 messages,
@@ -104,7 +106,7 @@ class LlamaGuard(Scorer):
             ).to(self.device)
         return self._generate(input_ids)
 
-    def _generate(self, input_ids: "Tensor") -> str:
+    def _generate(self, input_ids: "Tensor") -> tuple[str, float]:
         prompt_len = input_ids.shape[1]
         llamaguard_output = self._model.generate(
             input_ids=input_ids,
@@ -114,13 +116,19 @@ class LlamaGuard(Scorer):
             pad_token_id=0,
             top_p=None,
             do_sample=False,
+            output_logits=True,
         )
         generated_tokens = llamaguard_output.sequences[:, prompt_len:]
+
+        first_token_logits = llamaguard_output.logits[0]
+        first_token_probs = torch.softmax(first_token_logits, dim=-1)
+        unsafe_token_id = self._tokenizer.convert_tokens_to_ids("unsafe")
+        unsafe_score = first_token_probs[0, unsafe_token_id].item()
 
         response = self._tokenizer.decode(
             generated_tokens[0], skip_special_tokens=False
         )
-        return response
+        return response, unsafe_score
 
     def default_format_messages(self, prompt: str) -> list[dict[str, Any]]:
         """Override this method to format the prompt in a custom way.
@@ -140,10 +148,11 @@ class LlamaGuard(Scorer):
         categories: Optional[dict[str, str]] = None,
         excluded_category_keys: Optional[list[str]] = None,
     ) -> dict[str, Any]:
+        excluded_category_keys = excluded_category_keys or []
         messages = self.default_format_messages(prompt=output)
-        response = await self.score_messages(
+        response, unsafe_score = await self.score_messages(
             messages=messages,
             categories=categories,
             excluded_category_keys=excluded_category_keys,
         )
-        return self.postprocess(response)
+        return self.postprocess(response, unsafe_score)
