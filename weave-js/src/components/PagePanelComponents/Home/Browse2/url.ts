@@ -1,6 +1,5 @@
 import {
-  fetchRegistryName,
-  isArtifactRegistryProject,
+  checkRegistryProject
 } from '@wandb/weave/common/util/artifacts';
 import {isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 
@@ -35,44 +34,56 @@ export type ArtifactRefURLInfo = {
   orgName: string;
 };
 
+// Keep somewhat in sync with 
+//https://github.com/wandb/core/blob/master/frontends/app/src/util/urls/paths.ts
 export function fetchArtifactRefPageUrl(ref: ArtifactRefURLInfo): string {
-  // Registry artifact
-  if (isArtifactRegistryProject(ref.projectName)) {
-    let res = `orgs/${ref.orgName}/registry/${fetchRegistryName(
-      ref.projectName
-    )}`;
-    const urlParams = new URLSearchParams();
-    urlParams.set(
-      'selectionPath',
-      `${ref.entityName}/${ref.projectName}/${ref.artifactName}`
-    );
-    urlParams.set('view', 'membership');
-    urlParams.set('version', ref.artifactVersion);
-    if (Array.from(urlParams.keys()).length > 0) {
-      res += `?${urlParams.toString()}`;
-    }
-    return `${window.location.origin}/${res}`;
+  // Handle registry artifact
+  const {isRegistryProject, registryName} = checkRegistryProject(ref.projectName);
+  if (isRegistryProject && registryName) {
+    return buildRegistryArtifactUrl(ref, registryName);
   }
 
-  // Old model registry artifact
-  if (
-    ref.artifactType.toLowerCase().includes('model') &&
-    ref.projectName === 'model-registry'
-  ) {
-    let res = `${ref.entityName}/registry/model`;
-    const urlParams = new URLSearchParams();
-    urlParams.set(
-      'selectionPath',
-      `${ref.entityName}/model-registry/${ref.artifactName}`
-    );
-    urlParams.set('view', 'membership');
-    urlParams.set('version', ref.artifactVersion);
-    if (Array.from(urlParams.keys()).length > 0) {
-      res += `?${urlParams.toString()}`;
-    }
-    return `${window.location.origin}/${res}`;
+  // Handle old team level model registry artifact
+  if (isModelRegistryArtifact(ref)) {
+    return buildTeamModelRegistryUrl(ref);
   }
 
-  // Regular artifact
-  return `${window.location.origin}/${ref.entityName}/${ref.projectName}/artifacts/${ref.artifactType}/${ref.artifactName}/${ref.artifactVersion}`;
+  // Handle regular artifact
+  return buildRegularArtifactUrl(ref);
+}
+
+function isModelRegistryArtifact(ref: ArtifactRefURLInfo): boolean {
+  return ref.artifactType.toLowerCase().includes('model') && 
+         ref.projectName === 'model-registry';
+}
+
+function buildRegistryArtifactUrl(
+  ref: ArtifactRefURLInfo, 
+  registryName: string
+): string {
+  const path = `orgs/${ref.orgName}/registry/${registryName}`;
+  const params = new URLSearchParams({
+    selectionPath: `${ref.entityName}/${ref.projectName}/${encodeURIComponent(ref.artifactName)}`,
+    view: 'membership',
+    version: ref.artifactVersion
+  });
+
+  return `${window.location.origin}/${path}?${params.toString()}`;
+}
+
+function buildRegularArtifactUrl(ref: ArtifactRefURLInfo): string {
+  return `${window.location.origin}/${ref.entityName}/${ref.projectName}/artifacts/${encodeURIComponent(
+    ref.artifactType
+  )}/${encodeURIComponent(ref.artifactName)}/${ref.artifactVersion}`;
+}
+
+function buildTeamModelRegistryUrl(ref: ArtifactRefURLInfo): string {
+  const path = `${ref.entityName}/registry/model`;
+  const params = new URLSearchParams({
+    selectionPath: `${ref.entityName}/model-registry/${encodeURIComponent(ref.artifactName)}`,
+    view: 'membership',
+    version: ref.artifactVersion
+  });
+
+  return `${window.location.origin}/${path}?${params.toString()}`;
 }

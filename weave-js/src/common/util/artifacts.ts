@@ -104,15 +104,30 @@ export function getDescriptionSummary(artifactDescription: string) {
   return artifactDescription.split('\n')[0];
 }
 
-const REGISTRY_PROJECT_PREFIX = 'wandb-registry-';
+// Maintain same as https://github.com/wandb/core/blob/master/frontends/app/src/components/Registries/common/utils.ts
+export const REGISTRY_PROJECT_PREFIX = 'wandb-registry-';
 
-export function isArtifactRegistryProject(projectName: string) {
-  return projectName.startsWith(REGISTRY_PROJECT_PREFIX);
-}
+export type registryProject = {
+  isRegistryProject: boolean;
+  registryName?: string;
+};
 
-export function fetchRegistryName(projectName: string) {
-  if (isArtifactRegistryProject(projectName)) {
-    return projectName.substring(REGISTRY_PROJECT_PREFIX.length);
+export const isOrgRegistryProjectName = (projectName: string) => {
+  const {isRegistryProject} = checkRegistryProject(projectName);
+  return isRegistryProject;
+};
+
+export const checkRegistryProject = (
+  projectName: string | undefined
+): registryProject => {
+  if (!projectName) {
+    return {isRegistryProject: false, registryName: undefined};
   }
-  return '';
-}
+  // Function to check if project is a registry project
+  const isRegistryProject = projectName.startsWith(REGISTRY_PROJECT_PREFIX);
+  const index = REGISTRY_PROJECT_PREFIX.length;
+  const registryName = isRegistryProject
+    ? projectName.substring(index)
+    : undefined;
+  return {isRegistryProject, registryName};
+};

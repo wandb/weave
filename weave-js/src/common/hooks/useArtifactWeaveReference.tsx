@@ -1,7 +1,7 @@
 import {gql, useApolloClient} from '@apollo/client';
 import {useEffect, useState} from 'react';
 
-import {isArtifactRegistryProject} from '../util/artifacts';
+import {isOrgRegistryProjectName} from '../util/artifacts';
 import {useIsMounted} from './useIsMounted';
 
 export const ARTIFACT_WEAVE_REF_QUERY = gql`
@@ -74,7 +74,7 @@ export const useArtifactWeaveReference = ({
         if (artifactType == null) {
           return undefined;
         }
-        if (organization == null && isArtifactRegistryProject(projectName)) {
+        if (organization == null && isOrgRegistryProjectName(projectName)) {
           return undefined;
         }
         const info: ArtifactWeaveReferenceInfo = {
