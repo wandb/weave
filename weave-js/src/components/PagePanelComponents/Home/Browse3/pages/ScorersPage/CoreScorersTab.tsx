@@ -10,6 +10,7 @@ export const ProgrammaticScorersTab: React.FC<{
     <FilterableObjectVersionsTable
       entity={entity}
       project={project}
+      objectTitle="Scorer"
       initialFilter={{
         baseObjectClass: 'Scorer',
       }}

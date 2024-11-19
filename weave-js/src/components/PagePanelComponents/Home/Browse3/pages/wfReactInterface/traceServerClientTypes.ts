@@ -295,6 +295,35 @@ export type TraceFileContentReadRes = {
   content: ArrayBuffer;
 };
 
+export type CompletionsCreateInputs = {
+  model: string;
+  messages: any[];
+  temperature: number;
+  max_tokens: number;
+
+  // These are optional, depending on the LLM provider some accept these some dont
+  stop?: string[];
+  top_p?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+  n?: number;
+  response_format?: {
+    type: string;
+  };
+  tools?: any[];
+};
+
+export type CompletionsCreateReq = {
+  project_id: string;
+  inputs: CompletionsCreateInputs;
+  track_llm_call?: boolean;
+};
+
+export type CompletionsCreateRes = {
+  response: any;
+  weave_call_id?: string;
+};
+
 export enum ContentType {
   csv = 'text/csv',
   tsv = 'text/tab-separated-values',
