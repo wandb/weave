@@ -1335,13 +1335,13 @@ class WeaveClient:
         """Directly saves an object to the weave server and attach
         the ref to the object. This is the lowest level object saving logic.
         """
+        orig_val = val
+
         # The WeaveTable case is special because object saving happens inside
         # _save_object_nested and it has a special table_ref -- skip it here.
         if getattr(val, "_is_dirty", False) and not isinstance(val, WeaveTable):
             val.ref = None
 
-        is_opdef = is_op(val)
-        orig_val = val
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
             if ALLOW_MIXED_PROJECT_REFS:
@@ -1351,9 +1351,6 @@ class WeaveClient:
             if val.project == self.project:
                 return val
             val = orig_val
-
-        # `to_json` is mostly fast, except for CustomWeaveTypes
-        # which incur network costs to serialize the payload
 
         if name is None:
             serializer = get_serializer_for_obj(val)
@@ -1366,6 +1363,8 @@ class WeaveClient:
         name = sanitize_object_name(name)
 
         def send_obj_create() -> ObjCreateRes:
+            # `to_json` is mostly fast, except for CustomWeaveTypes
+            # which incur network costs to serialize the payload
             json_val = to_json(val, self._project_id(), self)
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
@@ -1377,21 +1376,17 @@ class WeaveClient:
             return self.server.obj_create(req)
 
         res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
-
         digest_future: Future[str] = self.future_executor.then(
             [res_future], lambda res: res[0].digest
         )
 
-        ref: Ref
-        if is_opdef:
-            ref = OpRef(self.entity, self.project, name, digest_future)
-        else:
-            ref = ObjectRef(self.entity, self.project, name, digest_future)
+        ref_cls = OpRef if is_op(orig_val) else ObjectRef
+        ref = ref_cls(self.entity, self.project, name, digest_future)
 
         # Attach the ref to the object
         try:
             set_ref(orig_val, ref)
-        except:
+        except Exception:
             # Don't worry if we can't set the ref.
             # This can happen for primitive types that don't have __dict__
             pass
