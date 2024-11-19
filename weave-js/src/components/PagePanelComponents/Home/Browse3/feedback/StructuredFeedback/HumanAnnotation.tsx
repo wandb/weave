@@ -83,8 +83,6 @@ export const HumanAnnotationCell: React.FC<HumanAnnotationProps> = props => {
         feedbackSpecRef,
         value,
       };
-
-      // TODO(gst): use replace when feedback is updated within 10 seconds of the previous feedback
       const createRequest = generateFeedbackRequestPayload(requestProps);
       const promise = tsClient.feedbackCreate(createRequest).then(res => {
         if ('detail' in res) {

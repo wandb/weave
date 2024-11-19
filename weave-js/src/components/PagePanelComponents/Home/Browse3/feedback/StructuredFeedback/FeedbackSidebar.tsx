@@ -4,7 +4,11 @@ import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
+import {useWeaveflowRouteContext} from '../../context';
+import {Empty} from '../../pages/common/Empty';
+import {EMPTY_PROPS_ANNOTATIONS} from '../../pages/common/EmptyContent';
 import {HumanAnnotationCell} from './HumanAnnotation';
 import {tsHumanAnnotationSpec} from './humanAnnotationTypes';
 
@@ -21,6 +25,8 @@ export const FeedbackSidebar = ({
   entity,
   project,
 }: FeedbackSidebarProps) => {
+  const history = useHistory();
+  const router = useWeaveflowRouteContext().baseRouter;
   const [isSaving, setIsSaving] = useState(false);
   const [unsavedFeedbackChanges, setUnsavedFeedbackChanges] = useState<
     Record<string, () => Promise<boolean>>
@@ -83,7 +89,17 @@ export const FeedbackSidebar = ({
           </div>
         </>
       ) : (
-        <div>Create an annotation spec to get started with human labeling</div>
+        <div className="mt-12 w-full items-center justify-center">
+          <Empty {...EMPTY_PROPS_ANNOTATIONS} />
+          <div className="mt-4 flex w-full justify-center">
+            <Button
+              onClick={() =>
+                history.push(router.scorersUIUrl(entity, project))
+              }>
+              View scorers
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );
