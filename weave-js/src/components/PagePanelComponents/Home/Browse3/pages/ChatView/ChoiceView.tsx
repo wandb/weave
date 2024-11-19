@@ -11,6 +11,10 @@ type ChoiceViewProps = {
 export const ChoiceView = ({choice, isStructuredOutput}: ChoiceViewProps) => {
   const {message} = choice;
   return (
-    <MessagePanel message={message} isStructuredOutput={isStructuredOutput} />
+    <MessagePanel
+      index={choice.index}
+      message={message}
+      isStructuredOutput={isStructuredOutput}
+    />
   );
 };

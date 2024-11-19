@@ -363,28 +363,26 @@ class WeaveTable(Traceable):
                 yield from self._remote_iter()
                 return
 
-        for ndx, row in enumerate(self._prefetched_rows):
+        for i, _ in enumerate(self._prefetched_rows):
             next_id_future = wc.future_executor.defer(
-                lambda ndx_closure=ndx: cached_table_ref.row_digests[ndx_closure]
+                lambda closure=i: cached_table_ref.row_digests[closure]
             )
             new_ref = self.ref.with_item(next_id_future)
-            val = self._prefetched_rows[ndx]
-            res = from_json(
-                val, self.table_ref.entity + "/" + self.table_ref.project, self.server
-            )
+            val = self._prefetched_rows[i]
+            res = from_json(val, self.table_ref.project_id, self.server)
             res = make_trace_obj(res, new_ref, self.server, self.root)
             yield res
 
     def _remote_iter(self) -> Generator[dict, None, None]:
+        if self.table_ref is None:
+            return
+
         page_index = 0
         page_size = 100
         while True:
-            if self.table_ref is None:
-                break
-
             response = self.server.table_query(
                 TableQueryReq(
-                    project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
+                    project_id=self.table_ref.project_id,
                     digest=self.table_ref.digest,
                     offset=page_index * page_size,
                     limit=page_size,
@@ -402,7 +400,7 @@ class WeaveTable(Traceable):
                 )
                 self._prefetched_rows = None
 
-            for ndx, item in enumerate(response.rows):
+            for i, item in enumerate(response.rows):
                 new_ref = self.ref.with_item(item.digest) if self.ref else None
                 # Here, we use the raw rows if they exist, otherwise we use the
                 # rows from the server. This is a temporary trick to ensure
@@ -413,13 +411,9 @@ class WeaveTable(Traceable):
                 val = (
                     item.val
                     if self._prefetched_rows is None
-                    else self._prefetched_rows[ndx]
+                    else self._prefetched_rows[i]
                 )
-                res = from_json(
-                    val,
-                    self.table_ref.entity + "/" + self.table_ref.project,
-                    self.server,
-                )
+                res = from_json(val, self.table_ref.project_id, self.server)
                 res = make_trace_obj(res, new_ref, self.server, self.root)
                 yield res
 
