@@ -223,7 +223,7 @@ const CallPageInnerVertical: FC<{
       )
     );
   }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
-  const humanAnnotationSpecs = useHumanAnnotationSpecs(
+  const {humanAnnotationSpecs, specsLoading} = useHumanAnnotationSpecs(
     call.entity,
     call.project
   );
@@ -301,6 +301,7 @@ const CallPageInnerVertical: FC<{
           <div className="flex h-full flex-col">
             <FeedbackSidebar
               humanAnnotationSpecs={humanAnnotationSpecs}
+              specsLoading={specsLoading}
               callID={currentCall.callId}
               entity={currentCall.entity}
               project={currentCall.project}

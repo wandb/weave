@@ -2,6 +2,7 @@ import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
+import {Loading} from '@wandb/weave/components/Loading';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -14,6 +15,7 @@ import {tsHumanAnnotationSpec} from './humanAnnotationTypes';
 
 type FeedbackSidebarProps = {
   humanAnnotationSpecs: tsHumanAnnotationSpec[];
+  specsLoading: boolean;
   callID: string;
   entity: string;
   project: string;
@@ -21,6 +23,7 @@ type FeedbackSidebarProps = {
 
 export const FeedbackSidebar = ({
   humanAnnotationSpecs,
+  specsLoading,
   callID,
   entity,
   project,
@@ -88,6 +91,10 @@ export const FeedbackSidebar = ({
             </Button>
           </div>
         </>
+      ) : specsLoading ? (
+        <div className="mt-12 w-full items-center justify-center">
+          <Loading centered />
+        </div>
       ) : (
         <div className="mt-12 w-full items-center justify-center">
           <Empty {...EMPTY_PROPS_ANNOTATIONS} />
