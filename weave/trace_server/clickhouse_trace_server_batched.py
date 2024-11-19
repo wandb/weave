@@ -144,7 +144,14 @@ all_call_insert_columns = list(
 
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
 all_call_json_columns = ("inputs", "output", "attributes", "summary")
-required_call_columns = ["id", "project_id", "trace_id", "op_name", "started_at"]
+required_call_stream_columns = [
+    "id",
+    "project_id",
+    "trace_id",
+    "op_name",
+    "started_at",
+    "started_at_micros",
+]
 
 
 # Columns in the calls_merged table with special aggregation functions:
@@ -303,7 +310,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # Set columns to user-requested columns, w/ required columns
             # These are all formatted by the CallsQuery, which prevents injection
             # and other attack vectors.
-            columns = list(set(required_call_columns + req.columns))
+            columns = list(set(required_call_stream_columns + req.columns))
             # TODO: add support for json extract fields
             # Split out any nested column requests
             columns = [col.split(".")[0] for col in columns]
@@ -330,7 +337,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for sort_by in req.sort_by:
                 cq.add_order(sort_by.field, sort_by.direction)
         else:
-            cq.add_order("started_at", "asc")
+            cq.add_order("started_at_micros", "asc")
         if req.limit is not None:
             cq.set_limit(req.limit)
         if req.offset is not None:
@@ -1973,7 +1980,9 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     summary = _nullable_any_dump_to_any(ch_call_dict.get("summary_dump"))
     started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
+    started_at_micros = _ensure_datetimes_have_tz(ch_call_dict.get("started_at_micros"))
     ended_at = _ensure_datetimes_have_tz(ch_call_dict.get("ended_at"))
+    ended_at_micros = _ensure_datetimes_have_tz(ch_call_dict.get("ended_at_micros"))
     display_name = empty_str_to_none(ch_call_dict.get("display_name"))
     return {
         "project_id": ch_call_dict.get("project_id"),
@@ -1982,7 +1991,9 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "parent_id": ch_call_dict.get("parent_id"),
         "op_name": ch_call_dict.get("op_name"),
         "started_at": started_at,
+        "started_at_micros": started_at_micros or started_at,
         "ended_at": ended_at,
+        "ended_at_micros": ended_at_micros,
         "attributes": _dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}")),
         "inputs": _dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
         "output": _nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
@@ -2029,6 +2040,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         parent_id=start_call.parent_id,
         op_name=start_call.op_name,
         started_at=start_call.started_at,
+        started_at_micros=start_call.started_at,
         attributes_dump=_dict_value_to_dump(start_call.attributes),
         inputs_dump=_dict_value_to_dump(start_call.inputs),
         input_refs=extract_refs_from_values(start_call.inputs),
@@ -2048,6 +2060,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         id=end_call.id,
         exception=end_call.exception,
         ended_at=end_call.ended_at,
+        ended_at_micros=end_call.ended_at,
         summary_dump=_dict_value_to_dump(dict(end_call.summary)),
         output_dump=_any_value_to_dump(end_call.output),
         output_refs=extract_refs_from_values(end_call.output),
