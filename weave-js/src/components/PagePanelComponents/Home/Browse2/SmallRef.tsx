@@ -137,34 +137,37 @@ export const SmallArtifactRef: FC<{
     artifactType: artInfo?.artifactType,
       orgName: artInfo?.orgName,
     }) : null;
-  console.log("ARTIFACT URL", artifactUrl);
-
+    
   const Content = (
     <Box
       sx={{
         width: '100%',
+        height: '100%',
         minHeight: '38px',
         display: 'flex',
         alignItems: 'center',
         cursor: artifactUrl ? 'pointer' : 'not-allowed',
       }}
-      title={artifactUrl ? undefined : "No link detected for this wandb artifact reference"}
+      title={artifactUrl ? objRef.artifactPath : "No link detected for this wandb artifact reference: " + objRef.artifactPath}
     >
       <SmallRefBox
-        iconName={artifactUrl ? IconNames.OpenNewTab : IconNames.Warning}
+        iconName={IconNames.Registries}
         text={`${objRef.artifactName}:${objRef.artifactVersion}`}
       />
+      {artifactUrl ? (
+        <Box sx={{display: 'flex', alignItems: 'center'}}>
+          <Icon name={IconNames.OpenNewTab} width={14} height={14} />
+        </Box>
+      ) : <></>}
     </Box>
   );
 
   return artifactUrl ? (
     <Link
       $variant="secondary"
-      style={{width: '100%'}}
+      style={{width: '100%', height: '100%'}}
       as="a"
-      href={artifactUrl}
-      target="_blank"
-      rel="noopener noreferrer">
+      href={artifactUrl}>
       {Content}
     </Link>
   ) : Content;

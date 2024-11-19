@@ -554,17 +554,14 @@ const RE_WEAVE_CALL_REF_PATHNAME = new RegExp(
 export const parseRef = (ref: string): ObjectRef => {
   const url = new URL(ref);
   let maxSplitsToMake: number;
-  let allowableNumSeparations: number[];
 
   const isWandbArtifact = url.protocol.startsWith('wandb-artifact');
   const isLocalArtifact = url.protocol.startsWith('local-artifact');
   const isWeaveRef = url.protocol.startsWith('weave');
   if (isWandbArtifact) {
-    maxSplitsToMake = 4;
-    allowableNumSeparations = [3, 4];
+    maxSplitsToMake = 3;
   } else if (isLocalArtifact) {
     maxSplitsToMake = 2;
-    allowableNumSeparations = [2];
   } else if (isWeaveRef) {
     return parseWeaveRef(ref);
   } else {
@@ -576,20 +573,20 @@ export const parseRef = (ref: string): ObjectRef => {
   const decodedUri = decodeURIComponent(url.pathname);
   const splitUri = decodedUri.replace(/^\/+/, '').split('/', maxSplitsToMake);
 
-  if (!allowableNumSeparations.includes(splitUri.length)) {
+  if (maxSplitsToMake != splitUri.length) {
     throw new Error(`Invalid Artifact URI: ${url}`);
   }
 
   if (isWandbArtifact) {
-    const [entityName, projectName, artifactId, artifactPathPart] = splitUri;
-    const [artifactNamePart, artifactVersion] = artifactId.split(':', 2);
+    const [entityName, projectName, artifactName] = splitUri;
+    const [artifactCollection, artifactVersion] = artifactName.split(':', 2);
     return {
       scheme: 'wandb-artifact',
       entityName,
       projectName,
-      artifactName: artifactNamePart,
+      artifactName: artifactCollection,
       artifactVersion,
-      artifactPath: artifactPathPart,
+      artifactPath: ref,
       artifactRefExtra: url.hash ? url.hash.slice(1) : undefined,
     };
   }
