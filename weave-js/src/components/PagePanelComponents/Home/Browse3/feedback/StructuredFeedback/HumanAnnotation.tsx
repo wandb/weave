@@ -205,7 +205,7 @@ const FeedbackComponentSelector: React.FC<{
             focused={focused}
           />
         );
-      case 'text':
+      case 'string':
         return (
           <TextFeedbackColumn
             onAddFeedback={wrappedOnAddFeedback}
