@@ -1,9 +1,13 @@
 import {toast} from '@wandb/weave/common/components/elements/Toast';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
+import {Loading} from '@wandb/weave/components/Loading';
+import {annotationsViewed} from '@wandb/weave/integrations/analytics/viewEvents';
 import {makeRefCall} from '@wandb/weave/util/refs';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../../context';
@@ -14,6 +18,7 @@ import {tsHumanAnnotationSpec} from './humanAnnotationTypes';
 
 type FeedbackSidebarProps = {
   humanAnnotationSpecs: tsHumanAnnotationSpec[];
+  specsLoading: boolean;
   callID: string;
   entity: string;
   project: string;
@@ -21,6 +26,7 @@ type FeedbackSidebarProps = {
 
 export const FeedbackSidebar = ({
   humanAnnotationSpecs,
+  specsLoading,
   callID,
   entity,
   project,
@@ -31,6 +37,11 @@ export const FeedbackSidebar = ({
   const [unsavedFeedbackChanges, setUnsavedFeedbackChanges] = useState<
     Record<string, () => Promise<boolean>>
   >({});
+
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const {loading: orgNameLoading, orgName} = useOrgName({
+    entityName: entity,
+  });
 
   const save = async () => {
     setIsSaving(true);
@@ -58,6 +69,28 @@ export const FeedbackSidebar = ({
     }
   };
 
+  useEffect(() => {
+    if (!viewerLoading && !orgNameLoading) {
+      annotationsViewed({
+        traceId: callID,
+        userId: userInfo.id,
+        organizationName: orgName,
+        entityName: entity,
+        projectName: project,
+        numAnnotationSpecs: humanAnnotationSpecs.length,
+      });
+    }
+  }, [
+    viewerLoading,
+    orgNameLoading,
+    userInfo,
+    orgName,
+    entity,
+    project,
+    humanAnnotationSpecs.length,
+    callID,
+  ]);
+
   return (
     <div className="flex h-full flex-col bg-white">
       <div className="justify-left flex w-full border-b border-moon-300 p-12">
@@ -75,7 +108,7 @@ export const FeedbackSidebar = ({
               setUnsavedFeedbackChanges={setUnsavedFeedbackChanges}
             />
           </div>
-          <div className="flex w-full border-t border-moon-300 p-6 pr-10">
+          <div className="flex w-full border-t border-moon-300 p-12 pr-18">
             <Button
               onClick={save}
               variant="primary"
@@ -88,6 +121,10 @@ export const FeedbackSidebar = ({
             </Button>
           </div>
         </>
+      ) : specsLoading ? (
+        <div className="mt-12 w-full items-center justify-center">
+          <Loading centered />
+        </div>
       ) : (
         <div className="mt-12 w-full items-center justify-center">
           <Empty {...EMPTY_PROPS_ANNOTATIONS} />

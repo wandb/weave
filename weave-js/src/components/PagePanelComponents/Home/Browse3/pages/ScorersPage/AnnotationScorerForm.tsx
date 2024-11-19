@@ -11,15 +11,20 @@ import {ZSForm} from './ZodSchemaForm';
 
 const AnnotationScorerFormSchema = z.object({
   Name: z.string().min(1),
-  Description: z.string().min(1),
+  Description: z.string().optional(),
   Type: z.discriminatedUnion('type', [
     z.object({
       type: z.literal('boolean'),
     }),
     z.object({
+      type: z.literal('integer'),
+      minimum: z.number().optional().describe('Optional minimum value'),
+      maximum: z.number().optional().describe('Optional maximum value'),
+    }),
+    z.object({
       type: z.literal('number'),
-      min: z.number().optional().describe('Optional minimum value'),
-      max: z.number().optional().describe('Optional maximum value'),
+      minimum: z.number().optional().describe('Optional minimum value'),
+      maximum: z.number().optional().describe('Optional maximum value'),
     }),
     z.object({
       type: z.literal('string'),
@@ -29,16 +34,20 @@ const AnnotationScorerFormSchema = z.object({
         .describe('Optional maximum length of the string'),
     }),
     z.object({
-      type: z.literal('enum'),
+      type: z.literal('options'),
       enum: z.array(z.string()).describe('List of options to choose from'),
     }),
   ]),
 });
 
+const DEFAULT_STATE = {
+  Type: {type: 'boolean'},
+} as z.infer<typeof AnnotationScorerFormSchema>;
+
 export const AnnotationScorerForm: FC<
   ScorerFormProps<z.infer<typeof AnnotationScorerFormSchema>>
 > = ({data, onDataChange}) => {
-  const [config, setConfig] = useState(data);
+  const [config, setConfig] = useState(data ?? DEFAULT_STATE);
   const [isValid, setIsValid] = useState(false);
 
   const handleConfigChange = useCallback(
@@ -76,7 +85,7 @@ export const onAnnotationScorerSave = async (
   client: TraceServerClient
 ) => {
   let type = data.Type.type;
-  if (type === 'enum') {
+  if (type === 'options') {
     type = 'string';
   }
   return createBaseObjectInstance(client, 'AnnotationSpec', {
