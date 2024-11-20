@@ -10,6 +10,7 @@ import {PlaygroundState} from '../types';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
+import {useChatCompletionFunctions} from './useChatCompletionFunctions';
 import {
   SetPlaygroundStateFieldFunctionType,
   useChatFunctions,
@@ -35,9 +36,18 @@ export const PlaygroundChat = ({
   settingsTab,
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLoading, setIsLoading] = useState(false);
   const chatPercentWidth = 100 / playgroundStates.length;
+
+  const {handleRetry, handleSend} = useChatCompletionFunctions(
+    setPlaygroundStates,
+    setIsLoading,
+    chatText,
+    playgroundStates,
+    entity,
+    project,
+    setChatText
+  );
 
   const {deleteMessage, editMessage, deleteChoice, editChoice, addMessage} =
     useChatFunctions(setPlaygroundStateField);
@@ -145,18 +155,14 @@ export const PlaygroundChat = ({
                           editChoice: (choiceIndex, newChoice) =>
                             editChoice(idx, choiceIndex, newChoice),
                           retry: (messageIndex: number, isChoice?: boolean) =>
-                            console.log('retry', messageIndex, isChoice),
+                            handleRetry(idx, messageIndex, isChoice),
                           sendMessage: (
                             role: 'assistant' | 'user' | 'tool',
                             content: string,
                             toolCallId?: string
-                          ) =>
-                            console.log(
-                              'sendMessage',
-                              role,
-                              content,
-                              toolCallId
-                            ),
+                          ) => {
+                            handleSend(role, idx, content, toolCallId);
+                          },
                         }}>
                         <CallChat call={state.traceCall as TraceCallSchema} />
                       </PlaygroundContext.Provider>
@@ -187,7 +193,7 @@ export const PlaygroundChat = ({
         chatText={chatText}
         setChatText={setChatText}
         isLoading={isLoading}
-        onSend={() => {}}
+        onSend={handleSend}
         onAdd={handleAddMessage}
       />
     </Box>
