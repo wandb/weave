@@ -32,7 +32,7 @@ export const ToggleButtonGroup = React.forwardRef<
   return (
     <Tailwind>
       <ToggleGroup.Root
-        type="single"
+        type="single" // supports single selection only
         value={value}
         onValueChange={handleValueChange}
         className="flex gap-px"
@@ -41,7 +41,6 @@ export const ToggleButtonGroup = React.forwardRef<
           <ToggleGroup.Item
             key={option}
             value={option}
-            active={value === option}
             disabled={isDisabled}>
             <Button
               icon={icons?.[index]}
