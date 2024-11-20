@@ -37,7 +37,6 @@ export const PlaygroundChat = ({
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const chatPercentWidth = 100 / playgroundStates.length;
 
   const {handleRetry, handleSend} = useChatCompletionFunctions(
     setPlaygroundStates,
@@ -111,13 +110,15 @@ export const PlaygroundChat = ({
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
+                position: 'relative',
               }}>
               <Box
                 sx={{
                   position: 'absolute',
                   top: '8px',
-                  left: `calc(${idx * chatPercentWidth}% + 8px)`,
-                  width: `calc(${chatPercentWidth}% - 16px)`,
+                  width: 'calc(100% - 16px)',
+                  left: '8px',
+                  right: '8px',
                   zIndex: 10,
                 }}>
                 <PlaygroundChatTopBar
@@ -140,7 +141,7 @@ export const PlaygroundChat = ({
                   paddingX: '16px',
                 }}>
                 <Tailwind>
-                  <div className="mx-auto h-full min-w-[400px] max-w-[800px] pb-8">
+                  <div className=" mx-auto h-full min-w-[400px] max-w-[800px] pb-8">
                     {state.traceCall && (
                       <PlaygroundContext.Provider
                         value={{
