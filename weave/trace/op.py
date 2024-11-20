@@ -80,9 +80,6 @@ ON_OUTPUT_MSG = "Error capturing call output:\n{}"
 class DisplayNameFuncError(ValueError): ...
 
 
-class OpExecutionError(Exception): ...
-
-
 def print_call_link(call: Call) -> None:
     if settings.should_print_call_link():
         print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
@@ -578,7 +575,7 @@ def _execute_op(
                 __op.lifecycle_handler.run_after_yield_all(call)
             finally:
                 if __op.lifecycle_handler.has_finished:
-                    raise OpExecutionError("Should not call finish more than once")
+                    raise OpCallError("Should not call finish more than once")
                 boxed_output = box.box(call.output)
                 client.finish_call(call, boxed_output, exception=exception, op=__op)
                 if not call_context.get_current_call():
@@ -598,7 +595,7 @@ def _execute_op(
                 raise
         finally:
             if __op.lifecycle_handler.has_finished:
-                raise OpExecutionError("Should not call finish more than once")
+                raise OpCallError("Should not call finish more than once")
             boxed_output = box.box(res)
             client.finish_call(call, boxed_output, exception=exception, op=__op)
             if not call_context.get_current_call():
