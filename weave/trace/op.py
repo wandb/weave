@@ -14,9 +14,11 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Generic,
     Optional,
     Protocol,
     TypedDict,
+    TypeVar,
     cast,
     overload,
     runtime_checkable,
@@ -151,6 +153,34 @@ class Callback(Protocol):
     def after_yield_all(self, call: Call) -> None: ...
     def after_call(self, call: Call) -> None: ...
     def after_error(self, call: Call, exc: Exception) -> None: ...
+
+
+T = TypeVar("T")
+Acc = TypeVar("Acc")
+
+
+class ReducerFunc(Protocol, Generic[T, Acc]):
+    """Any function that implements this can be automatically converted into a reducer callback."""
+
+    def __call__(self, val: T, acc: Acc) -> Acc: ...
+
+
+@dataclass
+class Reducer(Generic[T, Acc]):
+    func: ReducerFunc[T, Acc]
+    initial_acc: Acc
+
+
+class ReducerCallback(Generic[T, Acc]):
+    def __init__(self, reducer: Reducer[T, Acc]):
+        self.func = reducer.func
+        self.acc = reducer.initial_acc
+
+    def after_yield(self, call, val):
+        self.acc = self.func(val, self.acc)
+
+    def after_yield_all(self, call):
+        call.output = self.acc
 
 
 class LifecycleHandler:
@@ -615,6 +645,7 @@ def op(
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
     callbacks: list[Callback] | None = None,
+    reducers: list[Reducer] | None = None,
 ) -> Op: ...
 
 
@@ -626,6 +657,7 @@ def op(
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
     callbacks: list[Callback] | None = None,
+    reducers: list[Reducer] | None = None,
 ) -> Callable[[Callable], Op]: ...
 
 
@@ -637,6 +669,7 @@ def op(
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
     callbacks: list[Callback] | None = None,
+    reducers: list[Reducer] | None = None,
 ) -> Callable[[Callable], Op] | Op:
     """
     A decorator to weave op-ify a function or method.  Works for both sync and async.
@@ -691,6 +724,7 @@ def op(
 
     def op_deco(func: Callable) -> Op:
         # Check function type
+
         sig = inspect.signature(func)
         is_method = _is_unbound_method(func)
         is_async = inspect.iscoroutinefunction(func)
@@ -787,6 +821,11 @@ def op(
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
 
+            nonlocal reducers
+            nonlocal callbacks
+            reducers = reducers or []
+            callbacks = callbacks or []
+            callbacks += [ReducerCallback(reducer) for reducer in reducers]
             wrapper.lifecycle_handler = LifecycleHandler(callbacks)
 
             wrapper.postprocess_inputs = postprocess_inputs  # type: ignore
