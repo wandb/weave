@@ -43,6 +43,7 @@ dependencies = [
   "numpy>1.21.0",            # Used in box.py and scorer.py (should be made optional)
   "rich",                    # Used for special formatting of tables (should be made optional)
   "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
+  "jsonschema>=4.23.0",      # Used by scorers for field validation
 ]
 
 [project.optional-dependencies]
@@ -90,7 +91,6 @@ test = [
   "clickhouse_connect==0.7.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
-  "jsonschema>=4.23.0",
 
   # Integration Tests
   "pytest-recording>=0.13.2",
