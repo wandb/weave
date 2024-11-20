@@ -213,6 +213,13 @@ export const useProjectSidebar = (
             iconName: IconNames.CubeContainer,
           },
           {
+            type: 'button' as const,
+            name: 'Playground',
+            slug: 'weave/playground',
+            isShown: isWeaveOnly,
+            iconName: IconNames.RobotServiceMember,
+          },
+          {
             type: 'menuPlaceholder' as const,
             // name: 'More',
             // slug: 'moreWeave',
@@ -224,6 +231,7 @@ export const useProjectSidebar = (
               // 'weave/scorers', // Hiding until we want to release
               'weave/operations',
               'weave/objects',
+              'weave/playground',
             ],
           },
         ];

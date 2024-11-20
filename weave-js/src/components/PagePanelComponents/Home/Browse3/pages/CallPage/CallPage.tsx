@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Loading} from '@wandb/weave/components/Loading';
+import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -71,6 +72,14 @@ const useCallTabs = (call: CallSchema) => {
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
+
+  const handleOpenInPlayground = () => {
+    window.open(
+      urlPrefixed(`/${entity}/${project}/weave/playground/${callId}`),
+      '_blank'
+    );
+  };
+
   return [
     // Disabling Evaluation tab until it's better for single evaluation
     ...(false && isEvaluateOp(call.spanName)
@@ -97,11 +106,20 @@ const useCallTabs = (call: CallSchema) => {
           {
             label: 'Chat',
             content: (
-              <ScrollableTabContent>
-                <Tailwind>
-                  <CallChat call={call.traceCall!} />
-                </Tailwind>
-              </ScrollableTabContent>
+              <>
+                <Button
+                  variant="secondary"
+                  startIcon="sandbox-playground"
+                  className="m-16 mb-8"
+                  onClick={handleOpenInPlayground}>
+                  Open chat in playground
+                </Button>
+                <ScrollableTabContent>
+                  <Tailwind>
+                    <CallChat call={call.traceCall!} />
+                  </Tailwind>
+                </ScrollableTabContent>
+              </>
             ),
           },
         ]
