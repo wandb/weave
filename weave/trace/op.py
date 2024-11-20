@@ -527,6 +527,7 @@ def _execute_op(
     *args: Any,
     __weave: WeaveKwargs | None = None,
     __should_raise: bool = True,
+    __should_accumulate: bool = True,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = __op.resolve_fn
@@ -560,7 +561,7 @@ def _execute_op(
     )
     __op.lifecycle_handler.run_before_call({}, None, None, "")
 
-    if is_generator:
+    if is_generator and __should_accumulate:
 
         def _wrapped_sync_generator():
             try:
