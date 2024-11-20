@@ -1,7 +1,6 @@
-export const ToggleButtonGroupSizes = {
-  Small: 'small',
-  Medium: 'medium',
-  Large: 'large',
-} as const;
-export type ToggleButtonGroupSize =
-  (typeof ToggleButtonGroupSizes)[keyof typeof ToggleButtonGroupSizes];
+export enum ToggleButtonGroupSizes {
+  small = 'small',
+  medium = 'medium',
+  large = 'large',
+}
+export type ToggleButtonGroupSize = keyof typeof ToggleButtonGroupSizes;
