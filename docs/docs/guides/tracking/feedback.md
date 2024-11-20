@@ -197,7 +197,7 @@ This scorer will automatically show up in the "Feedback" sidebar with the option
 
 ![Human Annotation scorer feedback sidebar](./imgs/full-feedback-sidebar.png)
 
-Once labeled, the feedback can also be viewed in the calls table (refreshing the table may required). The column can be ordered and filtered.
+Once labeled, the feedback can also be viewed in the calls table (refreshing the table may be required). The column can be ordered and filtered.
 
 ![Human Annotation scorer feedback in calls table](./imgs/feedback-in-the-table.png)
 
