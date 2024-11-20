@@ -6,6 +6,7 @@ import React, {FC} from 'react';
 
 import {parseRefMaybe} from '../../../../react';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
+import {SmallRef} from '../Browse3/SmallRef';
 import {Call} from './callTree';
 import {DisplayControlChars} from './CommonLib';
 import {
@@ -14,7 +15,6 @@ import {
   OpenAIChatInputView,
   OpenAIChatOutputView,
 } from './openai';
-import {SmallRef} from './SmallRef';
 
 const ObjectView: FC<{obj: any}> = ({obj}) => {
   if (_.isPlainObject(obj)) {

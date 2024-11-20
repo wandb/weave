@@ -10,7 +10,7 @@ import React, {useMemo, useState} from 'react';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {CellValue} from '../../../Browse2/CellValue';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
-import {SmallRef} from '../../../Browse2/SmallRef';
+import {SmallRef} from '../../SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid'; // Import the StyledDataGrid component
 import {
   TraceObjSchemaForBaseObjectClass,

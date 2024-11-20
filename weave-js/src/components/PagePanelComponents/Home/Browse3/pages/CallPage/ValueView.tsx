@@ -5,7 +5,7 @@ import {
   parseRef,
   parseRefMaybe,
 } from '../../../../../../react';
-import {SmallRef} from '../../../Browse2/SmallRef';
+import {SmallRef} from '../../../Browse3/SmallRef';
 import {isWeaveRef} from '../../filters/common';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
