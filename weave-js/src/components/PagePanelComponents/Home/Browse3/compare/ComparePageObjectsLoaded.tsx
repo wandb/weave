@@ -23,7 +23,7 @@ import {
   queryToggleBoolean,
 } from '../urlQueryUtil';
 import {computeDiff, mergeObjects} from './compare';
-import {CompareGrid} from './CompareGrid';
+import {CompareGrid, MAX_OBJECT_COLS} from './CompareGrid';
 import {isSequentialVersions, parseSpecifier} from './hooks';
 import {getExpandableRefs, RefValues, RESOLVED_REF_KEY} from './refUtil';
 import {ShoppingCart} from './ShoppingCart';
@@ -262,6 +262,8 @@ export const ComparePageObjectsLoaded = ({
     });
   };
 
+  const tooManyCols = objectIds.length > MAX_OBJECT_COLS && !selected;
+
   return (
     <SimplePageLayout
       title={title}
@@ -279,7 +281,7 @@ export const ComparePageObjectsLoaded = ({
                     icon="back"
                     variant="ghost"
                     onClick={onPrev}
-                    tooltip="View previous versions"
+                    tooltip="Decrement the selected versions of this object to view earlier changes"
                   />
                 )}
                 <ShoppingCart
@@ -297,7 +299,7 @@ export const ComparePageObjectsLoaded = ({
                     icon="forward-next"
                     variant="ghost"
                     onClick={onNext}
-                    tooltip="View subsequent versions"
+                    tooltip="Increment the selected versions of this object to view later changes"
                   />
                 )}
               </div>
@@ -338,43 +340,48 @@ export const ComparePageObjectsLoaded = ({
                     </Button>
                   </div>
                 )}
+                {tooManyCols && (
+                  <div>Viewing first {MAX_OBJECT_COLS} columns only</div>
+                )}
                 <div className="flex-grow" />
-                <DropdownMenu.Root open={isOpen} onOpenChange={setIsOpen}>
-                  <DropdownMenu.Trigger>
-                    <div className="cursor-pointer">
-                      <div className="flex items-center gap-10">
-                        {baselineEnabled
-                          ? 'Compare with baseline'
-                          : 'Compare with previous'}{' '}
-                        <Icon name="chevron-down" />
+                {objectIds.length > 2 && (
+                  <DropdownMenu.Root open={isOpen} onOpenChange={setIsOpen}>
+                    <DropdownMenu.Trigger>
+                      <div className="cursor-pointer">
+                        <div className="flex items-center gap-10">
+                          {baselineEnabled
+                            ? 'Compare with baseline'
+                            : 'Compare with previous'}{' '}
+                          <Icon name="chevron-down" />
+                        </div>
                       </div>
-                    </div>
-                  </DropdownMenu.Trigger>
-                  <DropdownMenu.Portal>
-                    <DropdownMenu.Content align="start">
-                      <DropdownMenu.Item
-                        className="select-none"
-                        onClick={() => onSetBaseline(false)}>
-                        {!baselineEnabled ? (
-                          <Icon name="checkmark" />
-                        ) : (
-                          <IconPlaceholder />
-                        )}{' '}
-                        Compare with previous
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item
-                        className="select-none"
-                        onClick={() => onSetBaseline(true)}>
-                        {baselineEnabled ? (
-                          <Icon name="checkmark" />
-                        ) : (
-                          <IconPlaceholder />
-                        )}{' '}
-                        Compare with baseline
-                      </DropdownMenu.Item>
-                    </DropdownMenu.Content>
-                  </DropdownMenu.Portal>
-                </DropdownMenu.Root>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.Content align="start">
+                        <DropdownMenu.Item
+                          className="select-none"
+                          onClick={() => onSetBaseline(false)}>
+                          {!baselineEnabled ? (
+                            <Icon name="checkmark" />
+                          ) : (
+                            <IconPlaceholder />
+                          )}{' '}
+                          Compare with previous
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                          className="select-none"
+                          onClick={() => onSetBaseline(true)}>
+                          {baselineEnabled ? (
+                            <Icon name="checkmark" />
+                          ) : (
+                            <IconPlaceholder />
+                          )}{' '}
+                          Compare with baseline
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Root>
+                )}
               </div>
               <div className="overflow-auto px-16">
                 <CompareGrid

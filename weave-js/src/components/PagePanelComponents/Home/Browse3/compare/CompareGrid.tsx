@@ -32,12 +32,13 @@ type CompareGridProps = {
   mode: Mode;
   baselineEnabled: boolean;
   onlyChanged: boolean;
-  isExpanded?: boolean;
 
   expandedIds: GridRowId[];
   setExpandedIds: React.Dispatch<React.SetStateAction<GridRowId[]>>;
   addExpandedRefs: (path: string, refs: string[]) => void;
 };
+
+export const MAX_OBJECT_COLS = 6;
 
 const objectVersionSchemaToRef = (
   objVersion: ObjectVersionSchema
@@ -60,7 +61,6 @@ export const CompareGrid = ({
   mode,
   baselineEnabled,
   onlyChanged,
-  isExpanded,
   expandedIds,
   setExpandedIds,
   addExpandedRefs,
@@ -112,53 +112,55 @@ export const CompareGrid = ({
       },
     });
   } else {
-    const versionCols: GridColDef[] = objectIds.map(objId => ({
-      field: objId,
-      headerName: objId,
-      flex: 1,
-      display: 'flex',
-      width: 500,
-      sortable: false,
-      valueGetter: (unused: any, row: any) => {
-        return row.values[objId];
-      },
-      renderHeader: (params: any) => {
-        if (objectType === 'call') {
-          // TODO: Make this a peek drawer link
-          return objId;
-        }
-        const idx = objectIds.indexOf(objId);
-        const objVersion = objects[idx];
-        const objRef = objectVersionSchemaToRef(
-          objVersion as ObjectVersionSchema
-        );
-        return <SmallRef objRef={objRef} />;
-      },
-      renderCell: (cellParams: any) => {
-        const compareIdx = baselineEnabled
-          ? 0
-          : Math.max(0, objectIds.indexOf(objId) - 1);
-        const compareId = objectIds[compareIdx];
-        const compareValue = cellParams.row.values[compareId];
-        const compareValueType = cellParams.row.types[compareId];
-        const value = cellParams.row.values[objId];
-        const valueType = cellParams.row.types[objId];
-        const rowChangeType = cellParams.row.changeType;
-        return (
-          <div className="w-full p-8">
-            <CompareGridCell
-              path={cellParams.row.path}
-              displayType="diff"
-              value={value}
-              valueType={valueType}
-              compareValue={compareValue}
-              compareValueType={compareValueType}
-              rowChangeType={rowChangeType}
-            />
-          </div>
-        );
-      },
-    }));
+    const versionCols: GridColDef[] = objectIds
+      .slice(0, MAX_OBJECT_COLS)
+      .map(objId => ({
+        field: objId,
+        headerName: objId,
+        flex: 1,
+        display: 'flex',
+        width: 500,
+        sortable: false,
+        valueGetter: (unused: any, row: any) => {
+          return row.values[objId];
+        },
+        renderHeader: (params: any) => {
+          if (objectType === 'call') {
+            // TODO: Make this a peek drawer link
+            return objId;
+          }
+          const idx = objectIds.indexOf(objId);
+          const objVersion = objects[idx];
+          const objRef = objectVersionSchemaToRef(
+            objVersion as ObjectVersionSchema
+          );
+          return <SmallRef objRef={objRef} />;
+        },
+        renderCell: (cellParams: any) => {
+          const compareIdx = baselineEnabled
+            ? 0
+            : Math.max(0, objectIds.indexOf(objId) - 1);
+          const compareId = objectIds[compareIdx];
+          const compareValue = cellParams.row.values[compareId];
+          const compareValueType = cellParams.row.types[compareId];
+          const value = cellParams.row.values[objId];
+          const valueType = cellParams.row.types[objId];
+          const rowChangeType = cellParams.row.changeType;
+          return (
+            <div className="w-full p-8">
+              <CompareGridCell
+                path={cellParams.row.path}
+                displayType="diff"
+                value={value}
+                valueType={valueType}
+                compareValue={compareValue}
+                compareValueType={compareValueType}
+                rowChangeType={rowChangeType}
+              />
+            </div>
+          );
+        },
+      }));
     columns.push(...versionCols);
   }
 
