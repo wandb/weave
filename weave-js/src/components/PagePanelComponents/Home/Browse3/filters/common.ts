@@ -8,11 +8,18 @@ import {
   GridFilterItem,
   GridFilterModel,
 } from '@mui/x-data-grid-pro';
-import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
+import {
+  isWandbArtifactRef,
+  isWeaveObjectRef,
+  parseRefMaybe,
+} from '@wandb/weave/react';
 import _ from 'lodash';
 
 import {parseFeedbackType} from '../feedback/HumanFeedback/tsHumanFeedback';
-import {WEAVE_REF_PREFIX} from '../pages/wfReactInterface/constants';
+import {
+  WANDB_ARTIFACT_REF_PREFIX,
+  WEAVE_REF_PREFIX,
+} from '../pages/wfReactInterface/constants';
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
 export type FilterId = number | string | undefined;
@@ -237,15 +244,18 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = {
 
 // Create a unique symbol for RefString
 const WeaveRefStringSymbol = Symbol('WeaveRefString');
-
+const ArtifactRefStringSymbol = Symbol('ArtifactRefString');
 // Define RefString type using the unique symbol
 export type WeaveRefString = string & {[WeaveRefStringSymbol]: never};
-
+export type ArtifactRefString = string & {[ArtifactRefStringSymbol]: never};
 const isRefPrefixedString = (value: any): boolean => {
   if (typeof value !== 'string') {
     return false;
   }
-  if (value.startsWith(WEAVE_REF_PREFIX)) {
+  if (
+    value.startsWith(WEAVE_REF_PREFIX) ||
+    value.startsWith(WANDB_ARTIFACT_REF_PREFIX)
+  ) {
     return true;
   }
   return false;
@@ -264,6 +274,14 @@ export const isWeaveRef = (value: any): value is WeaveRefString => {
   }
   const parsed = parseRefMaybe(value);
   return parsed ? isWeaveObjectRef(parsed) : false;
+};
+
+export const isArtifactRef = (value: any): value is ArtifactRefString => {
+  if (!isRefPrefixedString(value)) {
+    return false;
+  }
+  const parsed = parseRefMaybe(value);
+  return parsed ? isWandbArtifactRef(parsed) : false;
 };
 
 export const getStringList = (value: any): string[] => {
