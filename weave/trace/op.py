@@ -155,13 +155,9 @@ class Callback(Protocol):
 
 class DebugCallback:
     def before_call(
-        self,
-        inputs: dict,
-        parent: Call | None,
-        attributes: dict | None,
-        display_name: str | Callable[[Call], str],
+        self, inputs: dict, parent: Call | None, attributes: dict | None
     ) -> None:
-        print(f"before_call: {inputs} {parent} {attributes} {display_name}")
+        print(f"before_call: {inputs} {parent} {attributes}")
 
     def before_yield(self, call: Call, value: Any) -> None:
         print(f"before_yield: {call} {value}")
@@ -221,15 +217,11 @@ class LifecycleHandler:
         self.callbacks.append(callback)
 
     def run_before_call(
-        self,
-        inputs: dict,
-        parent: Call | None,
-        attributes: dict | None,
-        display_name: str | Callable[[Call], str],
+        self, inputs: dict, parent: Call | None, attributes: dict | None
     ) -> None:
         for callback in self.callbacks:
             if hasattr(callback, "before_call"):
-                callback.before_call(inputs, parent, attributes, display_name)
+                callback.before_call(inputs, parent, attributes)
 
     def run_before_yield(self, call: Call, value: Any) -> Any:
         for callback in self.callbacks:
@@ -468,6 +460,8 @@ async def _execute_op_async(
     # Create the call
     call_time_display_name = __weave.get("display_name") if __weave else None
     inputs = inspect.signature(func).bind(*args, **kwargs).arguments
+    __op.lifecycle_handler.run_before_call(inputs, parent_call, attributes)
+
     call = client.create_call(
         __op,
         inputs,
@@ -475,8 +469,9 @@ async def _execute_op_async(
         display_name=call_time_display_name or __op.call_display_name,
         attributes=attributes,
     )
-    __op.lifecycle_handler.run_before_call({}, None, None, "")
-    if is_async_generator or __should_accumulate:
+
+    should_accumulate = __should_accumulate and __should_accumulate(call)
+    if is_async_generator or should_accumulate:
 
         @wraps(func)
         async def _wrapped_async_generator():
@@ -524,6 +519,13 @@ async def _execute_op_async(
     return res, call
 
 
+def _is_context_manager(obj: Any) -> bool:
+    __enter__ = getattr(obj, "__enter__", None)
+    __exit__ = getattr(obj, "__exit__", None)
+
+    return callable(__enter__) and callable(__exit__)
+
+
 def _execute_op(
     __op: Op,
     *args: Any,
@@ -563,7 +565,8 @@ def _execute_op(
     )
     __op.lifecycle_handler.run_before_call({}, None, None, "")
 
-    if is_generator or __should_accumulate:
+    should_accumulate = __should_accumulate and __should_accumulate(call)
+    if is_generator or should_accumulate:
 
         @wraps(func)
         def _wrapped_sync_generator():
@@ -651,7 +654,8 @@ def op(
     postprocess_output: PostprocessOutputFunc | None = None,
     callbacks: list[Callback] | None = None,
     reducers: list[Reducer] | None = None,
-    __should_accumulate: bool = False,
+    __should_accumulate: Callable[[Call], bool]
+    | None = None,  # escape hatch for integrations
 ) -> Op: ...
 
 
@@ -664,7 +668,8 @@ def op(
     postprocess_output: PostprocessOutputFunc | None = None,
     callbacks: list[Callback] | None = None,
     reducers: list[Reducer] | None = None,
-    __should_accumulate: bool = False,
+    __should_accumulate: Callable[[Call], bool]
+    | None = None,  # escape hatch for integrations
 ) -> Callable[[Callable], Op]: ...
 
 
@@ -677,7 +682,8 @@ def op(
     postprocess_output: PostprocessOutputFunc | None = None,
     callbacks: list[Callback] | None = None,
     reducers: list[Reducer] | None = None,
-    __should_accumulate: bool = False,
+    __should_accumulate: Callable[[Call], bool]
+    | None = None,  # escape hatch for integrations
 ) -> Callable[[Callable], Op] | Op:
     """
     A decorator to weave op-ify a function or method.  Works for both sync and async.
