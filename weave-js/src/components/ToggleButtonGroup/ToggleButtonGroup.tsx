@@ -38,10 +38,7 @@ export const ToggleButtonGroup = React.forwardRef<
         className="flex gap-px"
         ref={ref}>
         {options.map((option, index) => (
-          <ToggleGroup.Item
-            key={option}
-            value={option}
-            disabled={isDisabled}>
+          <ToggleGroup.Item key={option} value={option} disabled={isDisabled}>
             <Button
               icon={icons?.[index]}
               size={size}
