@@ -523,12 +523,17 @@ def call(
     result, call = add.call(1, 2)
     ```
     """
-    if inspect.iscoroutinefunction(op.resolve_fn):
-        return _do_call_async(
+    func = op.resolve_fn
+    is_async = inspect.iscoroutinefunction(func)
+    is_async_generator = inspect.isasyncgenfunction(func)
+
+    if is_async or is_async_generator:
+        # TODO: This might not be right for async generators
+        return _execute_op_async(
             op, *args, __weave=__weave, __should_raise=__should_raise, **kwargs
         )
     else:
-        return _do_call(
+        return _execute_op(
             op, *args, __weave=__weave, __should_raise=__should_raise, **kwargs
         )
 
@@ -688,6 +693,9 @@ def _execute_op(
                     raise OpCallError("Should not call finish more than once")
                 boxed_output = box.box(call.output)
                 client.finish_call(call, boxed_output, exception=exception, op=__op)
+                # TODO: We choose to print the call link at the end, but for streaming cases it might be helpful to:
+                # 1. Print the link at the beginning of the stream
+                # 2. (maybe?): Update the call object periodically with the latest output
                 if not call_context.get_current_call():
                     print_call_link(call)
                 call_context.pop_call(call.id)
