@@ -152,7 +152,7 @@ export const SmallArtifactRef: FC<{
     : null;
 
   const Content = (
-    <Tooltip.Provider delayDuration={100} skipDelayDuration={50}>
+    <Tooltip.Provider delayDuration={150} skipDelayDuration={50}>
       <Tooltip.Root>
         <Box
           sx={{
@@ -169,13 +169,6 @@ export const SmallArtifactRef: FC<{
                 iconName={IconNames.Registries}
                 text={`${objRef.artifactName}:${objRef.artifactVersion}`}
               />
-              {artifactUrl ? (
-                <Box sx={{display: 'flex', alignItems: 'center'}}>
-                  <Icon name={IconNames.OpenNewTab} width={14} height={14} />
-                </Box>
-              ) : (
-                <></>
-              )}
             </Box>
           </Tooltip.Trigger>
         </Box>
