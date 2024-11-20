@@ -14,19 +14,23 @@ class AnnotationSpec(base_object_def.BaseObject):
             # String feedback
             {"type": "string", "max_length": 100},
             # Number feedback
-            {"type": "number", "min": 0, "max": 100},
+            {"type": "number", "minimum": 0, "maximum": 100},
+            # Integer feedback
+            {"type": "integer", "minimum": 0, "maximum": 100},
             # Boolean feedback
             {"type": "boolean"},
             # Categorical feedback
-            {"type": "categorical", "options": ["option1", "option2"]},
+            {"type": "string", "enum": ["option1", "option2"]},
         ],
     )
 
+    # TODO
     # If true, all unique creators will have their
     # own value for this feedback type. Otherwise,
     # by default, the value is shared and can be edited.
     unique_among_creators: bool = False
 
+    # TODO
     # If provided, this feedback type will only be shown
     # when a call is generated from the given op ref
     op_scope: Optional[list[str]] = Field(
