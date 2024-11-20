@@ -139,9 +139,16 @@ class WeaveKwargs(TypedDict):
 
 
 class Callback(Protocol):
-    def before_call(self, call: Call) -> None: ...
-    def before_yield(self, call: Call, value: Any) -> Any: ...
-    def after_yield(self, call: Call, value: Any) -> Any: ...
+    def before_call(
+        self,
+        inputs: dict,
+        parent: Call | None,
+        attributes: dict | None,
+        display_name: str | Callable[[Call], str],
+    ) -> None: ...
+    def before_yield(self, call: Call, value: Any) -> None: ...
+    def after_yield(self, call: Call, value: Any) -> None: ...
+    def after_yield_all(self, call: Call) -> None: ...
     def after_call(self, call: Call) -> None: ...
     def after_error(self, call: Call, exc: Exception) -> None: ...
 
@@ -151,35 +158,69 @@ class LifecycleHandler:
         self.callbacks = callbacks or []
         self.intermediate_results: list[Any] = []
 
-    def add_callback(self, callback: Callback):
+    def add_callback(self, callback: Callback) -> None:
         self.callbacks.append(callback)
 
-    def run_before_call(self, call: Call) -> None:
+    def run_before_call(
+        self,
+        inputs: dict,
+        parent: Call | None,
+        attributes: dict | None,
+        display_name: str | Callable[[Call], str],
+    ) -> None:
         for callback in self.callbacks:
             if hasattr(callback, "before_call"):
-                callback.before_call(call)
+                callback.before_call(inputs, parent, attributes, display_name)
 
     def run_before_yield(self, call: Call, value: Any) -> Any:
         for callback in self.callbacks:
             if hasattr(callback, "before_yield"):
-                value = callback.before_yield(call, value)
-        return value
+                try:
+                    callback.before_yield(call, value)
+                except Exception:
+                    logger.exception(
+                        f"Error in before_yield callback:\n{traceback.format_exc()}"
+                    )
 
     def run_after_yield(self, call: Call, value: Any) -> Any:
         for callback in self.callbacks:
             if hasattr(callback, "after_yield"):
-                value = callback.after_yield(call, value)
-        return value
+                try:
+                    callback.after_yield(call, value)
+                except Exception:
+                    logger.exception(
+                        f"Error in after_yield callback:\n{traceback.format_exc()}"
+                    )
+
+    def run_after_yield_all(self, call: Call) -> None:
+        for callback in self.callbacks:
+            if hasattr(callback, "after_yield_all"):
+                try:
+                    callback.after_yield_all(call)
+                except Exception:
+                    logger.exception(
+                        f"Error in after_yield_all callback:\n{traceback.format_exc()}"
+                    )
 
     def run_after_call(self, call: Call) -> None:
         for callback in self.callbacks:
             if hasattr(callback, "after_call"):
-                callback.after_call(call)
+                try:
+                    callback.after_call(call)
+                except Exception:
+                    logger.exception(
+                        f"Error in after_call callback:\n{traceback.format_exc()}"
+                    )
 
     def run_after_error(self, call: Call, exc: Exception) -> None:
         for callback in self.callbacks:
             if hasattr(callback, "after_error"):
-                callback.after_error(call, exc)
+                try:
+                    callback.after_error(call, exc)
+                except Exception:
+                    logger.exception(
+                        f"Error in after_error callback:\n{traceback.format_exc()}"
+                    )
 
 
 @runtime_checkable
@@ -653,6 +694,8 @@ def op(
         sig = inspect.signature(func)
         is_method = _is_unbound_method(func)
         is_async = inspect.iscoroutinefunction(func)
+        is_generator = inspect.isgeneratorfunction(func)
+        is_async_generator = inspect.isasyncgenfunction(func)
 
         def create_wrapper(func: Callable) -> Op:
             if is_async:
@@ -667,9 +710,67 @@ def op(
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    res, _ = _do_call(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
-                    )
+                    def _wrapper(__op: Op) -> Any:
+                        # This exists only so we can cast the wrapper to an Op
+                        client = weave_client_context.require_weave_client()
+                        parent_call = call_context.get_current_call()
+                        attributes = call_attributes.get()
+
+                        # Instead of creating a call inside here, it should be a dummy
+                        # first before optionally getting passed in
+                        call = client.create_call(
+                            __op,
+                            {"testing": "dict"},
+                            parent_call,
+                            display_name="testing",
+                            attributes=attributes,
+                        )
+                        __op.lifecycle_handler.run_before_call({}, None, None, "")
+                        if is_generator:
+
+                            def _wrapper_generator():
+                                for val in func(*args, **kwargs):
+                                    __op.lifecycle_handler.run_before_yield(call, val)
+                                    yield val
+                                    __op.lifecycle_handler.run_after_yield(call, val)
+                                __op.lifecycle_handler.run_after_yield_all(call)
+                                # box the result (but how do you do it here?)
+                                # call on_output
+                                # call the on_output_handler (but this is just after_call?)
+                                # call finish
+                                client.finish_call(
+                                    call,
+                                    box.box(call.output),
+                                    None,
+                                    op=__op,
+                                )
+                                if not call_context.get_current_call():
+                                    print_call_link(call)
+
+                                call_context.pop_call(call.id)
+
+                            res = _wrapper_generator()
+                            __op.lifecycle_handler.run_after_call(call)
+                        else:
+                            res = func(*args, **kwargs)
+                            __op.lifecycle_handler.run_after_call(call)
+
+                            client.finish_call(
+                                call,
+                                box.box(res),
+                                None,
+                                op=__op,
+                            )
+                            if not call_context.get_current_call():
+                                print_call_link(call)
+                            # box the result
+                            # call on_output
+                            # call the on_output_handler
+                            # call finish
+                            call_context.pop_call(call.id)
+                        return res, call
+
+                    res, _ = _wrapper(cast(Op, wrapper))
                     return res
 
             # Tack these helpers on to our wrapper
