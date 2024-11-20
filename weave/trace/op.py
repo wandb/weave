@@ -80,6 +80,9 @@ ON_OUTPUT_MSG = "Error capturing call output:\n{}"
 class DisplayNameFuncError(ValueError): ...
 
 
+class OpExecutionError(Exception): ...
+
+
 def print_call_link(call: Call) -> None:
     if settings.should_print_call_link():
         print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
@@ -286,8 +289,8 @@ class Op(Protocol):
     postprocess_inputs: Callable[[dict[str, Any]], dict[str, Any]] | None
     postprocess_output: Callable[..., Any] | None
 
-    call: Callable[..., Any]
-    calls: Callable[..., CallsIter]
+    call: Callable[..., Any] | Coroutine[Any, Any, Any]
+    calls: Callable[..., CallsIter] | Coroutine[Any, Any, CallsIter]
 
     lifecycle_handler: LifecycleHandler
 
@@ -520,6 +523,92 @@ def _placeholder_call() -> Call:
     )
 
 
+def _execute_op(
+    __op: Op,
+    *args: Any,
+    __weave: WeaveKwargs | None = None,
+    __should_raise: bool = True,
+    **kwargs: Any,
+) -> tuple[Any, Call]:
+    func = __op.resolve_fn
+    is_generator = inspect.isgeneratorfunction(func)
+    call = _placeholder_call()
+
+    # TODO: Add back on_input_handler (maybe part of callback?)
+
+    # Early returns for disabled cases -- no call is created
+    if settings.should_disable_weave():
+        return func(*args, **kwargs), call
+    elif weave_client_context.get_weave_client() is None:
+        return func(*args, **kwargs), call
+    elif not __op._tracing_enabled:
+        return func(*args, **kwargs), call
+
+    # Setup call context
+    client = weave_client_context.require_weave_client()
+    parent_call = call_context.get_current_call()
+    attributes = call_attributes.get()
+
+    # Create the call
+    call_time_display_name = __weave.get("display_name") if __weave else None
+    inputs = inspect.signature(func).bind(*args, **kwargs).arguments
+    call = client.create_call(
+        __op,
+        inputs,
+        parent_call,
+        display_name=call_time_display_name or __op.call_display_name,
+        attributes=attributes,
+    )
+    __op.lifecycle_handler.run_before_call({}, None, None, "")
+
+    if is_generator:
+
+        def _wrapped_sync_generator():
+            try:
+                for val in func(*args, **kwargs):
+                    __op.lifecycle_handler.run_before_yield(call, val)
+                    yield val
+                    __op.lifecycle_handler.run_after_yield(call, val)
+            except Exception as e:
+                exception = e
+                if __should_raise:
+                    raise
+            else:
+                exception = None
+                __op.lifecycle_handler.run_after_yield_all(call)
+            finally:
+                if __op.lifecycle_handler.has_finished:
+                    raise OpExecutionError("Should not call finish more than once")
+                boxed_output = box.box(call.output)
+                client.finish_call(call, boxed_output, exception=exception, op=__op)
+                if not call_context.get_current_call():
+                    print_call_link(call)
+                call_context.pop_call(call.id)
+
+        res = _wrapped_sync_generator()
+    else:
+        # Regular sync function
+        try:
+            res = func(*args, **kwargs)
+            exception = None
+        except Exception as e:
+            res = None
+            exception = e
+            if __should_raise:
+                raise
+        finally:
+            if __op.lifecycle_handler.has_finished:
+                raise OpExecutionError("Should not call finish more than once")
+            boxed_output = box.box(res)
+            client.finish_call(call, boxed_output, exception=exception, op=__op)
+            if not call_context.get_current_call():
+                print_call_link(call)
+            call_context.pop_call(call.id)
+
+    __op.lifecycle_handler.run_after_call(call)
+    return res, call
+
+
 def _do_call(
     op: Op,
     *args: Any,
@@ -749,100 +838,9 @@ def op(
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    def _wrapper(__op: Op) -> Any:
-                        # This exists only so we can cast the wrapper to an Op
-                        client = weave_client_context.require_weave_client()
-                        parent_call = call_context.get_current_call()
-                        attributes = call_attributes.get()
-
-                        __weave = None
-                        call_time_display_name = (
-                            __weave.get("display_name") if __weave else None
-                        )
-                        inputs = inspect.signature(func).bind(*args, **kwargs).arguments
-
-                        # Instead of creating a call inside here, it should be a dummy
-                        # first before optionally getting passed in
-                        call = client.create_call(
-                            __op,
-                            inputs,
-                            parent_call,
-                            display_name=call_time_display_name
-                            or __op.call_display_name,
-                            attributes=attributes,
-                        )
-                        __op.lifecycle_handler.run_before_call({}, None, None, "")
-                        if is_generator:
-
-                            def _generator():
-                                try:
-                                    for val in func(*args, **kwargs):
-                                        __op.lifecycle_handler.run_before_yield(
-                                            call, val
-                                        )
-                                        yield val
-                                        __op.lifecycle_handler.run_after_yield(
-                                            call, val
-                                        )
-                                except Exception as e:
-                                    exception = e
-                                    if __op.lifecycle_handler.has_finished:
-                                        raise ValueError(
-                                            "Should not call finish more than once"
-                                        )
-                                    __should_raise = True
-                                    if __should_raise:
-                                        raise
-                                else:
-                                    exception = None
-                                    __op.lifecycle_handler.run_after_yield_all(call)
-                                finally:
-                                    # box the result (but how do you do it here?)
-                                    # call the on_output_handler (but this is just after_call, or in the generator case after_yield_all?)
-                                    # call finish
-                                    client.finish_call(
-                                        call,
-                                        box.box(call.output),
-                                        exception=exception,
-                                        op=__op,
-                                    )
-                                    if not call_context.get_current_call():
-                                        print_call_link(call)
-                                    call_context.pop_call(call.id)
-
-                            # TODO: may need to wrap this too?
-                            res = _generator()
-                            __op.lifecycle_handler.run_after_call(call)
-                            return res, call
-                        else:
-                            try:
-                                res = func(*args, **kwargs)
-                            except Exception as e:
-                                exception = e
-                                res = None
-                                if __op.lifecycle_handler.has_finished:
-                                    raise ValueError(
-                                        "Should not call finish more than once"
-                                    )
-                                __should_raise = True
-                                if __should_raise:
-                                    raise
-                            else:
-                                exception = None
-                                __op.lifecycle_handler.run_after_call(call)
-                            finally:
-                                client.finish_call(
-                                    call,
-                                    output=box.box(res),
-                                    exception=exception,
-                                    op=__op,
-                                )
-                                if not call_context.get_current_call():
-                                    print_call_link(call)
-                                call_context.pop_call(call.id)
-                                return res, call
-
-                    res, _ = _wrapper(as_op(wrapper))
+                    res, _ = _execute_op(
+                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                    )
                     return res
 
             # Tack these helpers on to our wrapper
