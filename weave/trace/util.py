@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import warnings
 from collections.abc import Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 from contextvars import Context, copy_context
 from functools import partial, wraps
 from threading import Thread as _Thread
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 
 class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
@@ -47,7 +49,7 @@ class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
         self,
         fn: Callable,
         *iterables: Iterable[Iterable],
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
         chunksize: int = 1,
     ) -> Iterator:
         contexts = [copy_context() for _ in range(len(list(iterables[0])))]
