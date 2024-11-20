@@ -103,3 +103,46 @@ export const evaluationViewed = makeTrackEvent<
     };
   }
 >('Weave evaluation viewed');
+
+export const annotationsViewed = makeTrackEvent<
+  {
+    traceId: string;
+    userId: string;
+    organizationName: string;
+    entityName: string;
+    projectName: string;
+    numAnnotationSpecs: number;
+  },
+  {
+    _description: `User viewed the annotations of a trace`;
+    _location: '/calls/:itemName';
+    _motivation: 'Used for annotations views';
+    traceId: {
+      description: 'ID of trace viewed';
+      exampleValues: [
+        'bb5621fd-91bc-42af-b017-1a34e3250330',
+        'b2136295-edc5-4778-9304-0fa36c9541a4'
+      ];
+    };
+    userId: {
+      description: 'ID of user viewing annotations';
+      exampleValues: ['VXNlcjo0NTM4MTM='];
+    };
+    organizationName: {
+      description: 'Name of organization';
+      exampleValues: ['my-org'];
+    };
+    entityName: {
+      description: 'Name of entity';
+      exampleValues: ['my-entity'];
+    };
+    projectName: {
+      description: 'Name of project';
+      exampleValues: ['my-project'];
+    };
+    numAnnotationSpecs: {
+      description: 'Number of human annotation specs';
+      exampleValues: [1, 2, 3];
+    };
+  }
+>('Weave annotations viewed');
