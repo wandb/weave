@@ -140,11 +140,7 @@ class WeaveKwargs(TypedDict):
 
 class Callback(Protocol):
     def before_call(
-        self,
-        inputs: dict,
-        parent: Call | None,
-        attributes: dict | None,
-        display_name: str | Callable[[Call], str],
+        self, inputs: dict, parent: Call | None, attributes: dict | None
     ) -> None: ...
     def before_yield(self, call: Call, value: Any) -> None: ...
     def after_yield(self, call: Call, value: Any) -> None: ...
