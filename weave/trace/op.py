@@ -443,6 +443,7 @@ async def _execute_op_async(
     *args: Any,
     __weave: WeaveKwargs | None = None,
     __should_raise: bool = True,
+    __should_accumulate: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = __op.resolve_fn
@@ -475,8 +476,9 @@ async def _execute_op_async(
         attributes=attributes,
     )
     __op.lifecycle_handler.run_before_call({}, None, None, "")
-    if is_async_generator:
+    if is_async_generator or __should_accumulate:
 
+        @wraps(func)
         async def _wrapped_async_generator():
             try:
                 async for val in func(*args, **kwargs):
@@ -527,7 +529,7 @@ def _execute_op(
     *args: Any,
     __weave: WeaveKwargs | None = None,
     __should_raise: bool = True,
-    __should_accumulate: bool = True,
+    __should_accumulate: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = __op.resolve_fn
@@ -561,8 +563,9 @@ def _execute_op(
     )
     __op.lifecycle_handler.run_before_call({}, None, None, "")
 
-    if is_generator and __should_accumulate:
+    if is_generator or __should_accumulate:
 
+        @wraps(func)
         def _wrapped_sync_generator():
             try:
                 for val in func(*args, **kwargs):
@@ -648,6 +651,7 @@ def op(
     postprocess_output: PostprocessOutputFunc | None = None,
     callbacks: list[Callback] | None = None,
     reducers: list[Reducer] | None = None,
+    __should_accumulate: bool = False,
 ) -> Op: ...
 
 
@@ -660,6 +664,7 @@ def op(
     postprocess_output: PostprocessOutputFunc | None = None,
     callbacks: list[Callback] | None = None,
     reducers: list[Reducer] | None = None,
+    __should_accumulate: bool = False,
 ) -> Callable[[Callable], Op]: ...
 
 
@@ -672,6 +677,7 @@ def op(
     postprocess_output: PostprocessOutputFunc | None = None,
     callbacks: list[Callback] | None = None,
     reducers: list[Reducer] | None = None,
+    __should_accumulate: bool = False,
 ) -> Callable[[Callable], Op] | Op:
     """
     A decorator to weave op-ify a function or method.  Works for both sync and async.
@@ -756,7 +762,11 @@ def op(
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
                     res, _ = _execute_op(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op, wrapper),
+                        *args,
+                        __should_raise=True,
+                        __should_accumulate=__should_accumulate,
+                        **kwargs,
                     )
                     return res
 
