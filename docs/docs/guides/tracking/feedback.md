@@ -201,7 +201,7 @@ Once labeled, the feedback can also be viewed in the calls table (refreshing the
 
 ![Human Annotation scorer feedback in calls table](./imgs/feedback-in-the-table.png)
 
-## Through the API
+### Through the API
 
 Human annotation scorers can also be configured through the API. Each scorer is its own object, which is created and updated independently. The following example creates two scorers, one for the temperature of the llm call, and one for the tone of the response. Simply import the `AnnotationSpec` class from `weave.flow.annotation_spec` and use the `save` method on the weave client to create the scorer.
 
