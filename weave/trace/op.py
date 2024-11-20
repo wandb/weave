@@ -159,22 +159,26 @@ T = TypeVar("T")
 Acc = TypeVar("Acc")
 
 
-class ReducerFunc(Protocol, Generic[T, Acc]):
-    """Any function that implements this can be automatically converted into a reducer callback."""
+class Reducer(Protocol, Generic[T, Acc]):
+    """Any function that implements this can be automatically converted into a reducer callback.
+
+    Note that `acc` must have a default value to serve as the initializer!"""
 
     def __call__(self, val: T, acc: Acc) -> Acc: ...
 
 
-@dataclass
-class Reducer(Generic[T, Acc]):
-    func: ReducerFunc[T, Acc]
-    initial_acc: Acc
-
-
 class ReducerCallback(Generic[T, Acc]):
     def __init__(self, reducer: Reducer[T, Acc]):
-        self.func = reducer.func
-        self.acc = reducer.initial_acc
+        self.func = reducer
+        sig = inspect.signature(reducer)
+        if not (acc := sig.parameters.get("acc")):
+            raise ValueError("Reducer must have an 'acc' parameter")
+        if acc.default is inspect.Parameter.empty:
+            raise ValueError(
+                "Reducer 'acc' parameter must have a default value (the initial value)"
+            )
+
+        self.acc = acc.default
 
     def after_yield(self, call, val):
         self.acc = self.func(val, self.acc)
@@ -751,19 +755,26 @@ def op(
                         parent_call = call_context.get_current_call()
                         attributes = call_attributes.get()
 
+                        __weave = None
+                        call_time_display_name = (
+                            __weave.get("display_name") if __weave else None
+                        )
+                        inputs = inspect.signature(func).bind(*args, **kwargs).arguments
+
                         # Instead of creating a call inside here, it should be a dummy
                         # first before optionally getting passed in
                         call = client.create_call(
                             __op,
-                            {"testing": "dict"},
+                            inputs,
                             parent_call,
-                            display_name="testing",
+                            display_name=call_time_display_name
+                            or __op.call_display_name,
                             attributes=attributes,
                         )
                         __op.lifecycle_handler.run_before_call({}, None, None, "")
                         if is_generator:
 
-                            def _wrapper_generator():
+                            def _generator():
                                 try:
                                     for val in func(*args, **kwargs):
                                         __op.lifecycle_handler.run_before_yield(
@@ -787,8 +798,7 @@ def op(
                                     __op.lifecycle_handler.run_after_yield_all(call)
                                 finally:
                                     # box the result (but how do you do it here?)
-                                    # call on_output
-                                    # call the on_output_handler (but this is just after_call?)
+                                    # call the on_output_handler (but this is just after_call, or in the generator case after_yield_all?)
                                     # call finish
                                     client.finish_call(
                                         call,
@@ -801,7 +811,7 @@ def op(
                                     call_context.pop_call(call.id)
 
                             # TODO: may need to wrap this too?
-                            res = _wrapper_generator()
+                            res = _generator()
                             __op.lifecycle_handler.run_after_call(call)
                             return res, call
                         else:
