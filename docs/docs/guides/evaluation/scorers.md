@@ -793,23 +793,3 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
     ```
   </TabItem>
 </Tabs>
-
-## Human annotation
-
-Human annotations are supported in the weave UI after configuration of a Human Annotation scorer, which can be accessed via the `Scorers` page in the navigation sidebar. Once configured, annotations can be used when inspecting individual calls in the main Call or Evaluation table, by selecting the marker icon in the call header (seen below).
-
-![Marker icon in call header](./imgs/marker-icon.png)
-
-### Creating a Human Annotation scorer
-
-To create a scorer, click "create scorer" in the "Scorers" page (accessed via the navigation sidebar). Select the type of scorer, in this case: "Human annotation". Then fill out the subsequent form to configure the scorer, paying special attention to the `Type`, which will be used to determine the type of feedback that will be collected. Here is an example scorer configuration where a human labeler is asked to choose which type of document the llm used:
-
-![Human Annotation scorer form](./imgs/human-annotation-scorer-form.png)
-
-This scorer will automatically show up in the "Feedback" sidebar with the options provided.
-
-![Human Annotation scorer feedback sidebar](./imgs/full-feedback-sidebar.png)
-
-Once labeled, the feedback can also be viewed in the calls table (refreshing the table may required). The column can be ordered and filtered.
-
-![Human Annotation scorer feedback in calls table](./imgs/feedback-in-the-table.png)
