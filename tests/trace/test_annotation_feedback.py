@@ -10,8 +10,8 @@ def test_human_feedback_basic(client):
         description="A numerical field with a range of -1 to 1",
         json_schema={
             "type": "number",
-            "min": -1,
-            "max": 1,
+            "minimum": -1,
+            "maximum": 1,
         },
         unique_among_creators=True,
         op_scope=None,
@@ -49,8 +49,8 @@ def test_human_feedback_basic(client):
     assert objects.objs[1].val["op_scope"] == ["weave:///entity/project/op/name:digest"]
     assert objects.objs[0].val["json_schema"] == {
         "type": "number",
-        "min": -1,
-        "max": 1,
+        "minimum": -1,
+        "maximum": 1,
     }
     assert objects.objs[1].val["json_schema"] == {
         "type": "string",

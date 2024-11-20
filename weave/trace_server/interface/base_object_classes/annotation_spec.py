@@ -14,7 +14,7 @@ class AnnotationSpec(base_object_def.BaseObject):
             # String feedback
             {"type": "string", "max_length": 100},
             # Number feedback
-            {"type": "number", "min": 0, "max": 100},
+            {"type": "number", "minimum": 0, "maximum": 100},
             # Boolean feedback
             {"type": "boolean"},
             # Categorical feedback
