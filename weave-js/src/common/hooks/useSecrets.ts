@@ -5,7 +5,7 @@
 
 import {
   gql,
-  MutationResult,
+  TypedDocumentNode,
   useApolloClient,
   useMutation,
 } from '@apollo/client';
@@ -40,7 +40,7 @@ const SECRETS_MUTATION = gql`
       success
     }
   }
-`;
+` as TypedDocumentNode<InsertSecretResponse, InsertSecretVariables>;
 
 type SecretResponseLoading = {
   loading: true;
@@ -99,6 +99,12 @@ export const useSecrets = ({
   return response;
 };
 
+interface InsertSecretResponse {
+  insertSecret: {
+    success: boolean;
+  };
+}
+
 type InsertSecretVariables = {
   entityName: string;
   secretName: string;
@@ -106,9 +112,10 @@ type InsertSecretVariables = {
 };
 
 export const useInsertSecret = () => {
-  const [insertSecret] = useMutation<MutationResult, InsertSecretVariables>(
-    SECRETS_MUTATION
-  );
+  const [insertSecret] = useMutation<
+    InsertSecretResponse,
+    InsertSecretVariables
+  >(SECRETS_MUTATION);
 
   return insertSecret;
 };
