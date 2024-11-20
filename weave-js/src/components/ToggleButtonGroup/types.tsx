@@ -3,4 +3,5 @@ export const ToggleButtonGroupSizes = {
   Medium: 'medium',
   Large: 'large',
 } as const;
-export type ToggleButtonGroupSize = (typeof ToggleButtonGroupSizes)[keyof typeof ToggleButtonGroupSizes];
+export type ToggleButtonGroupSize =
+  (typeof ToggleButtonGroupSizes)[keyof typeof ToggleButtonGroupSizes];
