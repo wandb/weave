@@ -187,6 +187,7 @@ class LifecycleHandler:
     def __init__(self, callbacks: list[Callback] | None = None):
         self.callbacks = callbacks or []
         self.intermediate_results: list[Any] = []
+        self.has_finished = False
 
     def add_callback(self, callback: Callback) -> None:
         self.callbacks.append(callback)
@@ -763,48 +764,75 @@ def op(
                         if is_generator:
 
                             def _wrapper_generator():
-                                for val in func(*args, **kwargs):
-                                    __op.lifecycle_handler.run_before_yield(call, val)
-                                    yield val
-                                    __op.lifecycle_handler.run_after_yield(call, val)
-                                __op.lifecycle_handler.run_after_yield_all(call)
-                                # box the result (but how do you do it here?)
-                                # call on_output
-                                # call the on_output_handler (but this is just after_call?)
-                                # call finish
+                                try:
+                                    for val in func(*args, **kwargs):
+                                        __op.lifecycle_handler.run_before_yield(
+                                            call, val
+                                        )
+                                        yield val
+                                        __op.lifecycle_handler.run_after_yield(
+                                            call, val
+                                        )
+                                except Exception as e:
+                                    exception = e
+                                    if __op.lifecycle_handler.has_finished:
+                                        raise ValueError(
+                                            "Should not call finish more than once"
+                                        )
+                                    __should_raise = True
+                                    if __should_raise:
+                                        raise
+                                else:
+                                    exception = None
+                                    __op.lifecycle_handler.run_after_yield_all(call)
+                                finally:
+                                    # box the result (but how do you do it here?)
+                                    # call on_output
+                                    # call the on_output_handler (but this is just after_call?)
+                                    # call finish
+                                    client.finish_call(
+                                        call,
+                                        box.box(call.output),
+                                        exception=exception,
+                                        op=__op,
+                                    )
+                                    if not call_context.get_current_call():
+                                        print_call_link(call)
+                                    call_context.pop_call(call.id)
+
+                            # TODO: may need to wrap this too?
+                            res = _wrapper_generator()
+                            __op.lifecycle_handler.run_after_call(call)
+                            return res, call
+                        else:
+                            try:
+                                res = func(*args, **kwargs)
+                            except Exception as e:
+                                exception = e
+                                res = None
+                                if __op.lifecycle_handler.has_finished:
+                                    raise ValueError(
+                                        "Should not call finish more than once"
+                                    )
+                                __should_raise = True
+                                if __should_raise:
+                                    raise
+                            else:
+                                exception = None
+                                __op.lifecycle_handler.run_after_call(call)
+                            finally:
                                 client.finish_call(
                                     call,
-                                    box.box(call.output),
-                                    None,
+                                    output=box.box(res),
+                                    exception=exception,
                                     op=__op,
                                 )
                                 if not call_context.get_current_call():
                                     print_call_link(call)
-
                                 call_context.pop_call(call.id)
+                                return res, call
 
-                            res = _wrapper_generator()
-                            __op.lifecycle_handler.run_after_call(call)
-                        else:
-                            res = func(*args, **kwargs)
-                            __op.lifecycle_handler.run_after_call(call)
-
-                            client.finish_call(
-                                call,
-                                box.box(res),
-                                None,
-                                op=__op,
-                            )
-                            if not call_context.get_current_call():
-                                print_call_link(call)
-                            # box the result
-                            # call on_output
-                            # call the on_output_handler
-                            # call finish
-                            call_context.pop_call(call.id)
-                        return res, call
-
-                    res, _ = _wrapper(cast(Op, wrapper))
+                    res, _ = _wrapper(as_op(wrapper))
                     return res
 
             # Tack these helpers on to our wrapper
