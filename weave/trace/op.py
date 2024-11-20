@@ -155,6 +155,32 @@ class Callback(Protocol):
     def after_error(self, call: Call, exc: Exception) -> None: ...
 
 
+class DebugCallback:
+    def before_call(
+        self,
+        inputs: dict,
+        parent: Call | None,
+        attributes: dict | None,
+        display_name: str | Callable[[Call], str],
+    ) -> None:
+        print(f"before_call: {inputs} {parent} {attributes} {display_name}")
+
+    def before_yield(self, call: Call, value: Any) -> None:
+        print(f"before_yield: {call} {value}")
+
+    def after_yield(self, call: Call, value: Any) -> None:
+        print(f"after_yield: {call} {value}")
+
+    def after_yield_all(self, call: Call) -> None:
+        print(f"after_yield_all: {call}")
+
+    def after_call(self, call: Call) -> None:
+        print(f"after_call: {call}")
+
+    def after_error(self, call: Call, exc: Exception) -> None:
+        print(f"after_error: {call} {exc}")
+
+
 T = TypeVar("T")
 Acc = TypeVar("Acc")
 
@@ -520,6 +546,90 @@ def _placeholder_call() -> Call:
     )
 
 
+async def _execute_op_async(
+    __op: Op,
+    *args: Any,
+    __weave: WeaveKwargs | None = None,
+    __should_raise: bool = True,
+    **kwargs: Any,
+) -> tuple[Any, Call]:
+    func = __op.resolve_fn
+    is_async_generator = inspect.isasyncgenfunction(func)
+    call = _placeholder_call()
+
+    # TODO: Add back on_input_handler (maybe part of callback?)
+
+    # Early returns for disabled cases -- no call is created
+    if settings.should_disable_weave():
+        return await func(*args, **kwargs), call
+    elif weave_client_context.get_weave_client() is None:
+        return await func(*args, **kwargs), call
+    elif not __op._tracing_enabled:
+        return await func(*args, **kwargs), call
+
+    # Setup call context
+    client = weave_client_context.require_weave_client()
+    parent_call = call_context.get_current_call()
+    attributes = call_attributes.get()
+
+    # Create the call
+    call_time_display_name = __weave.get("display_name") if __weave else None
+    inputs = inspect.signature(func).bind(*args, **kwargs).arguments
+    call = client.create_call(
+        __op,
+        inputs,
+        parent_call,
+        display_name=call_time_display_name or __op.call_display_name,
+        attributes=attributes,
+    )
+    __op.lifecycle_handler.run_before_call({}, None, None, "")
+    if is_async_generator:
+
+        async def _wrapped_async_generator():
+            try:
+                async for val in func(*args, **kwargs):
+                    __op.lifecycle_handler.run_before_yield(call, val)
+                    yield val
+                    __op.lifecycle_handler.run_after_yield(call, val)
+            except Exception as e:
+                exception = e
+                if __should_raise:
+                    raise
+            else:
+                exception = None
+                __op.lifecycle_handler.run_after_yield_all(call)
+            finally:
+                if __op.lifecycle_handler.has_finished:
+                    raise OpCallError("Should not call finish more than once")
+                boxed_output = box.box(call.output)
+                client.finish_call(call, boxed_output, exception=exception, op=__op)
+                if not call_context.get_current_call():
+                    print_call_link(call)
+                call_context.pop_call(call.id)
+
+        res = _wrapped_async_generator()
+    else:
+        try:
+            res = await func(*args, **kwargs)
+            exception = None
+        except Exception as e:
+            res = None
+            exception = e
+            if __should_raise:
+                raise
+        finally:
+            if __op.lifecycle_handler.has_finished:
+                raise OpCallError("Should not call finish more than once")
+            boxed_output = box.box(res)
+            client.finish_call(call, boxed_output, exception=exception, op=__op)
+            if not call_context.get_current_call():
+                print_call_link(call)
+            call_context.pop_call(call.id)
+
+    __op.lifecycle_handler.run_after_call(call)
+    return res, call
+
+
 def _execute_op(
     __op: Op,
     *args: Any,
@@ -819,18 +929,27 @@ def op(
         sig = inspect.signature(func)
         is_method = _is_unbound_method(func)
         is_async = inspect.iscoroutinefunction(func)
-        is_generator = inspect.isgeneratorfunction(func)
         is_async_generator = inspect.isasyncgenfunction(func)
 
+        # TODO: Maybe split out the 4 execute op methods (sync/async, gen/not-gen)
         def create_wrapper(func: Callable) -> Op:
             if is_async:
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportRedeclaration]
-                    res, _ = await _do_call_async(
+                    res, _ = await _execute_op_async(
                         cast(Op, wrapper), *args, __should_raise=True, **kwargs
                     )
                     return res
+            elif is_async_generator:
+
+                @wraps(func)
+                async def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportRedeclaration]
+                    res, _ = await _execute_op_async(
+                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                    )
+                    async for v in res:
+                        yield v
             else:
 
                 @wraps(func)
