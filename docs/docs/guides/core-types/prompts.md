@@ -164,5 +164,3 @@ response = client.chat.completions.create(
   messages=prompt.format(scene="A dog is lying on a dock next to a fisherman."),
 )
 ```
-
-## Retrieving Prompts
