@@ -21,7 +21,7 @@ class RobustnessScorer(Scorer):
     """
 
     @weave.op
-    async def score(self, output: List[str]) -> dict:
+    def score(self, output: List[str]) -> dict:
         """
         Calculates Cohen's h for text outputs by comparing string similarity
         of perturbed generations with the original generation.
