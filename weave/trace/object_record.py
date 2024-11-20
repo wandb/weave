@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import types
 from inspect import getmro, isclass
@@ -33,7 +35,7 @@ class ObjectRecord:
                 return False
         return True
 
-    def map_values(self, fn: Callable) -> "ObjectRecord":
+    def map_values(self, fn: Callable) -> ObjectRecord:
         return ObjectRecord({k: fn(v) for k, v in self.__dict__.items()})
 
 
@@ -46,7 +48,7 @@ def pydantic_model_fields(obj: PydanticBaseModelGeneral) -> list[str]:
     elif isinstance(obj, pydantic.v1.BaseModel):
         return obj.__fields__
     else:
-        raise ValueError(f"{obj} is not a pydantic model")
+        raise TypeError(f"{obj} is not a pydantic model")
 
 
 def pydantic_asdict_one_level(obj: PydanticBaseModelGeneral) -> dict[str, Any]:

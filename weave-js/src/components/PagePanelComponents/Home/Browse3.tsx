@@ -1,5 +1,5 @@
-import {ApolloProvider} from '@apollo/client';
-import {Home} from '@mui/icons-material';
+import { ApolloProvider } from '@apollo/client';
+import { Home } from '@mui/icons-material';
 import {
   AppBar,
   Box,
@@ -17,10 +17,10 @@ import {
   GridPinnedColumnFields,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
-import {LicenseInfo} from '@mui/x-license';
-import {makeGorillaApolloClient} from '@wandb/weave/apollo';
-import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
-import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
+import { LicenseInfo } from '@mui/x-license';
+import { makeGorillaApolloClient } from '@wandb/weave/apollo';
+import { EVALUATE_OP_NAME_POST_PYDANTIC } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
+import { opVersionKeyToRefUri } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
 import _ from 'lodash';
 import React, {
   ComponentProps,
@@ -33,20 +33,20 @@ import React, {
 } from 'react';
 import useMousetrap from 'react-hook-mousetrap';
 import {
-  Link as RouterLink,
   Redirect,
   Route,
+  Link as RouterLink,
   Switch,
   useHistory,
   useLocation,
   useParams,
 } from 'react-router-dom';
 
-import {URL_BROWSE3} from '../../../urls';
-import {Button} from '../../Button';
-import {ErrorBoundary} from '../../ErrorBoundary';
-import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
-import {Browse2HomePage} from './Browse2/Browse2HomePage';
+import { URL_BROWSE3 } from '../../../urls';
+import { Button } from '../../Button';
+import { ErrorBoundary } from '../../ErrorBoundary';
+import { Browse2EntityPage } from './Browse2/Browse2EntityPage';
+import { Browse2HomePage } from './Browse2/Browse2HomePage';
 import {
   baseContext,
   browse2Context,
@@ -59,51 +59,52 @@ import {
   useWeaveflowRouteContext,
   WeaveflowPeekContext,
 } from './Browse3/context';
-import {FullPageButton} from './Browse3/FullPageButton';
-import {getValidFilterModel} from './Browse3/grid/filters';
+import { FullPageButton } from './Browse3/FullPageButton';
+import { getValidFilterModel } from './Browse3/grid/filters';
 import {
   DEFAULT_PAGE_SIZE,
   getValidPaginationModel,
 } from './Browse3/grid/pagination';
-import {getValidPinModel, removeAlwaysLeft} from './Browse3/grid/pin';
-import {getValidSortModel} from './Browse3/grid/sort';
-import {BoardPage} from './Browse3/pages/BoardPage';
-import {BoardsPage} from './Browse3/pages/BoardsPage';
-import {CallPage} from './Browse3/pages/CallPage/CallPage';
-import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
+import { getValidPinModel, removeAlwaysLeft } from './Browse3/grid/pin';
+import { getValidSortModel } from './Browse3/grid/sort';
+import { BoardPage } from './Browse3/pages/BoardPage';
+import { BoardsPage } from './Browse3/pages/BoardsPage';
+import { CallPage } from './Browse3/pages/CallPage/CallPage';
+import { CallsPage } from './Browse3/pages/CallsPage/CallsPage';
 import {
   ALWAYS_PIN_LEFT_CALLS,
-  DEFAULT_COLUMN_VISIBILITY_CALLS,
   DEFAULT_FILTER_CALLS,
   DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
 } from './Browse3/pages/CallsPage/CallsTable';
-import {Empty} from './Browse3/pages/common/Empty';
-import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
-import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
-import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
-import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
-import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
-import {ModsPage} from './Browse3/pages/ModsPage';
-import {ObjectPage} from './Browse3/pages/ObjectPage';
-import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
+import { Empty } from './Browse3/pages/common/Empty';
+import { EMPTY_NO_TRACE_SERVER } from './Browse3/pages/common/EmptyContent';
+import { SimplePageLayoutContext } from './Browse3/pages/common/SimplePageLayout';
+import { CompareEvaluationsPage } from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
+import { LeaderboardListingPage } from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
+import { LeaderboardPage } from './Browse3/pages/LeaderboardPage/LeaderboardPage';
+import { ModsPage } from './Browse3/pages/ModsPage';
+import { ObjectPage } from './Browse3/pages/ObjectPage';
+import { ObjectVersionPage } from './Browse3/pages/ObjectVersionPage';
 import {
   ObjectVersionsPage,
   WFHighLevelObjectVersionFilter,
 } from './Browse3/pages/ObjectVersionsPage';
-import {OpPage} from './Browse3/pages/OpPage';
-import {OpsPage} from './Browse3/pages/OpsPage';
-import {OpVersionPage} from './Browse3/pages/OpVersionPage';
-import {OpVersionsPage} from './Browse3/pages/OpVersionsPage';
-import {TablePage} from './Browse3/pages/TablePage';
-import {TablesPage} from './Browse3/pages/TablesPage';
-import {useURLSearchParamsDict} from './Browse3/pages/util';
+import { OpPage } from './Browse3/pages/OpPage';
+import { OpsPage } from './Browse3/pages/OpsPage';
+import { OpVersionPage } from './Browse3/pages/OpVersionPage';
+import { OpVersionsPage } from './Browse3/pages/OpVersionsPage';
+import { PlaygroundPage } from './Browse3/pages/PlaygroundPage/PlaygroundPage';
+import { ScorersPage } from './Browse3/pages/ScorersPage/ScorersPage';
+import { TablePage } from './Browse3/pages/TablePage';
+import { TablesPage } from './Browse3/pages/TablesPage';
+import { useURLSearchParamsDict } from './Browse3/pages/util';
 import {
   useWFHooks,
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
-import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
-import {useDrawerResize} from './useDrawerResize';
+import { useHasTraceServerClientContext } from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import { useDrawerResize } from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
   'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
@@ -158,6 +159,7 @@ const tabOptions = [
   'boards',
   'tables',
   'mods',
+  'scorers',
 ];
 const tabs = tabOptions.join('|');
 const browse3Paths = (projectRoot: string) => [
@@ -499,6 +501,9 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
         </Route>
+        <Route path={`${projectRoot}/:tab(scorers)`}>
+          <ScorersPageBinding />
+        </Route>
         <Route
           path={[
             `${projectRoot}/leaderboards/:itemName`,
@@ -529,6 +534,14 @@ const Browse3ProjectRoot: FC<{
         <Route
           path={[`${projectRoot}/mods/:itemName`, `${projectRoot}/:tab(mods)`]}>
           <ModsPageBinding />
+        </Route>
+        {/* PLAYGROUND */}
+        <Route
+          path={[
+            `${projectRoot}/playground/:itemName`,
+            `${projectRoot}/playground`,
+          ]}>
+          <PlaygroundPageBinding />
         </Route>
       </Switch>
     </Box>
@@ -729,7 +742,7 @@ const CallsPageBinding = () => {
     try {
       return JSON.parse(query.cols);
     } catch (e) {
-      return DEFAULT_COLUMN_VISIBILITY_CALLS;
+      return {};
     }
   }, [query.cols]);
   const setColumnVisibilityModel = (newModel: GridColumnVisibilityModel) => {
@@ -992,6 +1005,11 @@ const CompareEvaluationsBinding = () => {
   );
 };
 
+const ScorersPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  return <ScorersPage entity={entity} project={project} />;
+};
+
 const LeaderboardPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
   const {entity, project, itemName: leaderboardName} = params;
@@ -1052,6 +1070,17 @@ const AppBarLink = (props: ComponentProps<typeof RouterLink>) => (
     component={RouterLink}
   />
 );
+
+const PlaygroundPageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+  return (
+    <PlaygroundPage
+      entity={params.entity}
+      project={params.project}
+      callId={params.itemName}
+    />
+  );
+};
 
 const Browse3Breadcrumbs: FC = props => {
   const params = useParamsDecoded<Browse3Params>();
@@ -1131,11 +1160,13 @@ const Browse3Breadcrumbs: FC = props => {
 
 export const TableRowSelectionContext = React.createContext<{
   rowIdsConfigured: boolean;
+  rowIdInTable: (id: string) => boolean;
   setRowIds?: (rowIds: string[]) => void;
   getNextRowId?: (currentId: string) => string | null;
   getPreviousRowId?: (currentId: string) => string | null;
 }>({
   rowIdsConfigured: false,
+  rowIdInTable: (id: string) => false,
   setRowIds: () => {},
   getNextRowId: () => null,
   getPreviousRowId: () => null,
@@ -1146,6 +1177,10 @@ const TableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
 }) => {
   const [rowIds, setRowIds] = useState<string[]>([]);
   const rowIdsConfigured = useMemo(() => rowIds.length > 0, [rowIds]);
+  const rowIdInTable = useCallback(
+    (currentId: string) => rowIds.includes(currentId),
+    [rowIds]
+  );
 
   const getNextRowId = useCallback(
     (currentId: string) => {
@@ -1171,7 +1206,13 @@ const TableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
 
   return (
     <TableRowSelectionContext.Provider
-      value={{rowIdsConfigured, setRowIds, getNextRowId, getPreviousRowId}}>
+      value={{
+        rowIdsConfigured,
+        rowIdInTable,
+        setRowIds,
+        getNextRowId,
+        getPreviousRowId,
+      }}>
       {children}
     </TableRowSelectionContext.Provider>
   );

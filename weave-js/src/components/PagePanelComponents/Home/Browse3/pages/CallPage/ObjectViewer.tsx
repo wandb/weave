@@ -18,9 +18,9 @@ import React, {
   useState,
 } from 'react';
 
+import {parseRefMaybe} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../filters/common';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
@@ -647,7 +647,7 @@ const ShowMoreButtons = ({
       sx={{
         display: 'flex',
         width: '100%',
-        justifyContent: 'flex-end',
+        justifyContent: 'flex-start',
         gap: 1,
       }}>
       {truncatedCount > ARRAY_TRUNCATION_LENGTH && (

@@ -231,6 +231,40 @@ def get_ranked_prices(
     select_query = (
         llm_usage_table.select()
         .fields(["*", *ltp_fields, row_number_clause])
+        .where(
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$or": [
+                            {
+                                "$eq": [
+                                    {
+                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
+                                    },
+                                    {"$literal": project_id},
+                                ]
+                            },
+                            {
+                                "$eq": [
+                                    {
+                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
+                                    },
+                                    {"$literal": DEFAULT_PRICING_LEVEL_ID},
+                                ]
+                            },
+                            {
+                                "$eq": [
+                                    {
+                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
+                                    },
+                                    {"$literal": ""},
+                                ]
+                            },
+                        ]
+                    }
+                }
+            )
+        )
         .join(
             LLM_TOKEN_PRICES_TABLE,
             tsi.Query(

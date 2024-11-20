@@ -18,13 +18,14 @@ import {
 } from './constants';
 import {useWFHooks} from './context';
 import {
+  CallSchema,
   KnownBaseObjectClassType,
+  Loadable,
   ObjectVersionKey,
   ObjectVersionSchema,
   OpCategory,
   OpVersionKey,
 } from './wfDataModelHooksInterface';
-import {CallSchema, Loadable} from './wfDataModelHooksInterface';
 
 type RefUri = string;
 

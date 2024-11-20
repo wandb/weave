@@ -14,9 +14,7 @@ import emoji
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.base_object_class_util import (
-    process_incoming_object,
-)
+from weave.trace_server.base_object_class_util import process_incoming_object
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.feedback import (
@@ -339,7 +337,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         rhs_part = f"LOWER({rhs_part})"
                     cond = f"instr({lhs_part}, {rhs_part})"
                 else:
-                    raise ValueError(f"Unknown operation type: {operation}")
+                    raise TypeError(f"Unknown operation type: {operation}")
 
                 return cond
 
@@ -380,7 +378,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 ):
                     return process_operation(operand)
                 else:
-                    raise ValueError(f"Unknown operand type: {operand}")
+                    raise TypeError(f"Unknown operand type: {operand}")
 
             filter_cond = process_operation(req.query.expr_)
 
@@ -722,7 +720,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         insert_rows = []
         for r in req.table.rows:
             if not isinstance(r, dict):
-                raise ValueError("All rows must be dictionaries")
+                raise TypeError("All rows must be dictionaries")
             row_json = json.dumps(r)
             row_digest = str_digest(row_json)
             insert_rows.append((req.table.project_id, row_digest, row_json))
@@ -770,7 +768,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         def add_new_row_needed_to_insert(row_data: Any) -> str:
             if not isinstance(row_data, dict):
-                raise ValueError("All rows must be dictionaries")
+                raise TypeError("All rows must be dictionaries")
             row_json = json.dumps(row_data)
             row_digest = str_digest(row_json)
             if row_digest not in known_digests:
@@ -799,7 +797,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 final_row_digests.insert(update.insert.index, new_digest)
                 updated_digests.append(new_digest)
             else:
-                raise ValueError("Unrecognized update", update)
+                raise TypeError("Unrecognized update", update)
 
         # Perform the actual DB inserts
         with self.lock:
@@ -1053,6 +1051,36 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             cursor.execute(prepared.sql, prepared.parameters)
             conn.commit()
         return tsi.FeedbackPurgeRes()
+
+    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+        purge_request = tsi.FeedbackPurgeReq(
+            project_id=req.project_id,
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "id"},
+                        {"$literal": req.feedback_id},
+                    ],
+                }
+            },
+        )
+        self.feedback_purge(purge_request)
+        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
+        create_result = self.feedback_create(create_req)
+
+        return tsi.FeedbackReplaceRes(
+            id=create_result.id,
+            created_at=create_result.created_at,
+            wb_user_id=create_result.wb_user_id,
+            payload=create_result.payload,
+        )
+
+    def actions_execute_batch(
+        self, req: tsi.ActionsExecuteBatchReq
+    ) -> tsi.ActionsExecuteBatchRes:
+        raise NotImplementedError(
+            "actions_execute_batch is not implemented for SQLite trace server"
+        )
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)

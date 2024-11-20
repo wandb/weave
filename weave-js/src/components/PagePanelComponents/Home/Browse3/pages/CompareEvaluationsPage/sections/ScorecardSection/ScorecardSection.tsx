@@ -9,29 +9,32 @@ import {
   MOON_300,
   MOON_600,
 } from '../../../../../../../../common/css/color.styles';
-import {WeaveObjectRef} from '../../../../../../../../react';
+import {parseRefMaybe, WeaveObjectRef} from '../../../../../../../../react';
 import {Checkbox} from '../../../../../../..';
 import {Pill, TagColorName} from '../../../../../../../Tag';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {CellValueBoolean} from '../../../../../Browse2/CellValueBoolean';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
-import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
+import {SmallRef} from '../../../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {
+  buildCompositeMetricsMap,
   CompositeScoreMetrics,
   DERIVED_SCORER_REF_PLACEHOLDER,
   evalCallIdToScorerRefs,
   resolveDimension,
 } from '../../compositeMetricsUtil';
-import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
 import {
   BOX_RADIUS,
+  SIGNIFICANT_DIGITS,
   STANDARD_BORDER,
   STANDARD_PADDING,
 } from '../../ecpConstants';
-import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
-import {getOrderedCallIds, getOrderedModelRefs} from '../../ecpState';
-import {EvaluationComparisonState} from '../../ecpState';
+import {
+  EvaluationComparisonState,
+  getOrderedCallIds,
+  getOrderedModelRefs,
+} from '../../ecpState';
 import {resolveSummaryMetricResultForEvaluateCall} from '../../ecpUtil';
 import {usePeekCall} from '../../hooks';
 import {HorizontalBox} from '../../Layout';

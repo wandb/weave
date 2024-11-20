@@ -193,6 +193,10 @@ export const browse2Context = {
   ) => {
     throw new Error('Not implemented');
   },
+
+  scorersUIUrl: (entityName: string, projectName: string) => {
+    throw new Error('Not implemented');
+  },
   leaderboardsUIUrl: (
     entityName: string,
     projectName: string,
@@ -332,7 +336,8 @@ export const browse3ContextGen = (
       traceId: string,
       callId: string,
       path?: string | null,
-      tracetree?: boolean
+      tracetree?: boolean,
+      feedbackExpand?: boolean
     ) => {
       let url = `${projectRoot(entityName, projectName)}/calls/${callId}`;
       const params = new URLSearchParams();
@@ -341,6 +346,9 @@ export const browse3ContextGen = (
       }
       if (tracetree !== undefined) {
         params.set(TRACETREE_PARAM, tracetree ? '1' : '0');
+      }
+      if (feedbackExpand !== undefined) {
+        params.set(FEEDBACK_EXPAND_PARAM, feedbackExpand ? '1' : '0');
       }
       if (params.toString()) {
         url += '?' + params.toString();
@@ -430,6 +438,11 @@ export const browse3ContextGen = (
         JSON.stringify(evaluationCallIds)
       )}${metricsPart}`;
     },
+
+    scorersUIUrl: (entityName: string, projectName: string) => {
+      return `${projectRoot(entityName, projectName)}/scorers`;
+    },
+
     leaderboardsUIUrl: (
       entityName: string,
       projectName: string,
@@ -488,7 +501,8 @@ type RouteType = {
     traceId: string,
     callId: string,
     path?: string | null,
-    tracetree?: boolean
+    tracetree?: boolean,
+    feedbackExpand?: boolean
   ) => string;
   tracesUIUrl: (entityName: string, projectName: string) => string;
   callsUIUrl: (
@@ -524,6 +538,9 @@ type RouteType = {
     evaluationCallIds: string[],
     metrics: Record<string, boolean> | null
   ) => string;
+
+  scorersUIUrl: (entityName: string, projectName: string) => string;
+
   leaderboardsUIUrl: (
     entityName: string,
     projectName: string,
@@ -552,6 +569,7 @@ const useSetSearchParam = () => {
 
 export const PEEK_PARAM = 'peekPath';
 export const TRACETREE_PARAM = 'tracetree';
+export const FEEDBACK_EXPAND_PARAM = 'feedbackExpand';
 export const PATH_PARAM = 'path';
 
 export const baseContext = browse3ContextGen(
@@ -642,6 +660,9 @@ const useMakePeekingRouter = (): RouteType => {
         PEEK_PARAM,
         baseContext.compareEvaluationsUri(...args)
       );
+    },
+    scorersUIUrl: (...args: Parameters<typeof baseContext.scorersUIUrl>) => {
+      return setSearchParam(PEEK_PARAM, baseContext.scorersUIUrl(...args));
     },
     leaderboardsUIUrl: (
       ...args: Parameters<typeof baseContext.leaderboardsUIUrl>

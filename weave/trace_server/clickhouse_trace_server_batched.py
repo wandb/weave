@@ -31,12 +31,7 @@ import threading
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-from typing import (
-    Any,
-    Optional,
-    Union,
-    cast,
-)
+from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -49,9 +44,8 @@ from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.base_object_class_util import (
-    process_incoming_object,
-)
+from weave.trace_server.actions_worker.dispatcher import execute_batch
+from weave.trace_server.base_object_class_util import process_incoming_object
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -173,7 +167,7 @@ CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
-    "max_memory_usage": 10 * 1024 * 1024 * 1024,  # 10 GiB
+    "max_memory_usage": 16 * 1024 * 1024 * 1024,  # 16 GiB
 }
 
 
@@ -313,6 +307,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # TODO: add support for json extract fields
             # Split out any nested column requests
             columns = [col.split(".")[0] for col in columns]
+
+        # sort the columns such that similar queries are grouped together
+        columns = sorted(columns)
 
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
@@ -668,7 +665,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         insert_rows = []
         for r in req.table.rows:
             if not isinstance(r, dict):
-                raise ValueError(
+                raise TypeError(
                     f"""Validation Error: Encountered a non-dictionary row when creating a table. Please ensure that all rows are dictionaries. Violating row:\n{r}."""
                 )
             row_json = json.dumps(r)
@@ -732,7 +729,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         def add_new_row_needed_to_insert(row_data: Any) -> str:
             if not isinstance(row_data, dict):
-                raise ValueError("All rows must be dictionaries")
+                raise TypeError("All rows must be dictionaries")
             row_json = json.dumps(row_data)
             row_digest = str_digest(row_json)
             if row_digest not in known_digests:
@@ -768,7 +765,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 final_row_digests.insert(update.insert.index, new_digest)
                 updated_digests.append(new_digest)
             else:
-                raise ValueError("Unrecognized update", update)
+                raise TypeError("Unrecognized update", update)
 
         if new_rows_needed_to_insert:
             self._insert(
@@ -1406,6 +1403,49 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
 
+    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+        # To replace, first purge, then if successful, create.
+        query = tsi.Query(
+            **{
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "id"},
+                        {"$literal": req.feedback_id},
+                    ],
+                }
+            }
+        )
+        purge_request = tsi.FeedbackPurgeReq(
+            project_id=req.project_id,
+            query=query,
+        )
+        self.feedback_purge(purge_request)
+        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
+        create_result = self.feedback_create(create_req)
+        return tsi.FeedbackReplaceRes(
+            id=create_result.id,
+            created_at=create_result.created_at,
+            wb_user_id=create_result.wb_user_id,
+            payload=create_result.payload,
+        )
+
+    def actions_execute_batch(
+        self, req: tsi.ActionsExecuteBatchReq
+    ) -> tsi.ActionsExecuteBatchRes:
+        if len(req.call_ids) == 0:
+            return tsi.ActionsExecuteBatchRes()
+        if len(req.call_ids) > 1:
+            # This is temporary until we setup our batching infrastructure
+            raise NotImplementedError("Batching actions is not yet supported")
+
+        # For now, we just execute in-process if it is a single action
+        execute_batch(
+            batch_req=req,
+            trace_server=self,
+        )
+
+        return tsi.ActionsExecuteBatchRes()
+
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
@@ -1840,7 +1880,7 @@ def _dict_value_to_dump(
     value: dict,
 ) -> str:
     if not isinstance(value, dict):
-        raise ValueError(f"Value is not a dict: {value}")
+        raise TypeError(f"Value is not a dict: {value}")
     return json.dumps(value)
 
 
@@ -1853,7 +1893,7 @@ def _any_value_to_dump(
 def _dict_dump_to_dict(val: str) -> dict[str, Any]:
     res = json.loads(val)
     if not isinstance(res, dict):
-        raise ValueError(f"Value is not a dict: {val}")
+        raise TypeError(f"Value is not a dict: {val}")
     return res
 
 
