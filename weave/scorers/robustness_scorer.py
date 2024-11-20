@@ -41,6 +41,7 @@ class RobustnessScorer(Scorer):
         perturbed_outputs = output[1:]
 
         # Compute similarity scores for each perturbed output
+        # TODO: The scores should be provided by the caller especially for reference evaluations.
         binary_scores = [1 if perturbed == original else 0 for perturbed in perturbed_outputs]
 
         # Original score is perfect similarity (1.0) with itself

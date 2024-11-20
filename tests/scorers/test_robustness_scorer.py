@@ -55,3 +55,31 @@ def test_robustness_scorer_insufficient_outputs():
         AssertionError, match="There must be output of at least one perturbed question"
     ):
         robustness_scorer.score(output=output)
+
+
+@pytest.mark.asyncio
+async def test_robustness_scorer_eval():
+    from typing import List
+
+    dataset = [
+        {
+            "questions": ["What is the capital of France?", "what the capital of france?", "Wht is the Capital of France?"],
+        },
+        {
+            "questions": ["Who is the owner of X.com?", "who is the owner of x.com?", "Who owns X.com?"],
+        },
+    ]
+
+    @weave.op
+    def model(questions: List[str]):
+        perturbed_outputs = [False, True]
+        return ["True"] + perturbed_outputs
+
+    robustness_scorer = RobustnessScorer()
+
+    evaluation = weave.Evaluation(
+        dataset=dataset,
+        scorers=[robustness_scorer],
+    )
+    result = await evaluation.evaluate(model)
+    assert result["RobustnessScorer"]["cohen_h"]["mean"] == 1.0
