@@ -3,11 +3,8 @@ import {
   Checkbox,
   FormControl,
   FormControlLabel,
-  IconButton,
   InputLabel,
-  Tooltip,
 } from '@material-ui/core';
-import {Help} from '@mui/icons-material';
 import {Button} from '@wandb/weave/components/Button';
 import React, {useEffect, useMemo, useState} from 'react';
 import {z} from 'zod';
@@ -131,7 +128,6 @@ const DiscriminatedUnionField: React.FC<{
           label: currentType,
         }}
         onChange={v => {
-          console.log(v);
           handleTypeChange(v.value as string);
         }}
       />
@@ -162,8 +158,6 @@ const NestedForm: React.FC<{
   const currentValue = getNestedValue(config, currentPath);
 
   const unwrappedSchema = unwrapSchema(fieldSchema);
-
-  console.log(typeof fieldSchema, fieldSchema);
 
   if (unwrappedSchema instanceof z.ZodDiscriminatedUnion) {
     return (
@@ -721,7 +715,10 @@ const NumberField: React.FC<{
         }}
       />
       {fieldDescription && (
-        <Box display="flex" alignItems="center" sx={{marginTop: '14px'}}>
+        <Box
+          display="flex"
+          alignItems="center"
+          sx={{marginTop: '14px', marginLeft: '2px'}}>
           <DescriptionTooltip description={fieldDescription} />
         </Box>
       )}
@@ -820,11 +817,12 @@ const DescriptionTooltip: React.FC<{description?: string}> = ({
     return null;
   }
   return (
-    <Tooltip title={description}>
-      <IconButton size="small">
-        <Help fontSize="small" />
-      </IconButton>
-    </Tooltip>
+    <Button
+      size="small"
+      variant="ghost"
+      icon="help-alt"
+      tooltip={description}
+    />
   );
 };
 
