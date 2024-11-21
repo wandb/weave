@@ -177,11 +177,7 @@ class Evaluation(Object):
             else model_predict.__name__
         )
 
-        if is_op(model_predict):
-            model_predict = as_op(model_predict)
-            predict_signature = model_predict.signature
-        else:
-            predict_signature = inspect.signature(model_predict)
+        predict_signature = inspect.signature(model_predict)
         model_predict_arg_names = list(predict_signature.parameters.keys())
 
         if isinstance(model_input, dict):
@@ -250,11 +246,7 @@ class Evaluation(Object):
             if weave_isinstance(scorer, Scorer):
                 scorer_self = scorer
             scorer_name, score_fn, _ = get_scorer_attributes(scorer)
-            if is_op(score_fn):
-                score_fn = as_op(score_fn)
-                score_signature = score_fn.signature
-            else:
-                score_signature = inspect.signature(score_fn)
+            score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
 
             # the actual kwarg name depends on the scorer
