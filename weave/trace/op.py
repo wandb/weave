@@ -29,8 +29,8 @@ from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import call_attributes
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.errors import OpCallError
-from weave.trace.op_extensions.log_once import log_once
 from weave.trace.refs import ObjectRef
+from weave.trace.util import log_once
 
 logger = logging.getLogger(__name__)
 
