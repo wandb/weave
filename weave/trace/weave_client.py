@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import logging
 import platform
 import re
 import sys
@@ -41,9 +42,9 @@ from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.settings import client_parallelism
 from weave.trace.table import Table
-from weave.trace.util import deprecated
+from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
-from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
+from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
 from weave.trace_server.trace_server_interface import (
@@ -85,6 +86,8 @@ from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTrace
 # If False, object refs with with mismatching projects will be recreated.
 # If True, use existing ref to object in other project.
 ALLOW_MIXED_PROJECT_REFS = False
+
+logger = logging.getLogger(__name__)
 
 
 class OpNameError(ValueError):
@@ -198,6 +201,14 @@ class Call:
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
     _feedback: RefFeedbackQuery | None = None
+
+    def __post_init__(self) -> None:
+        if len(self.display_name) > MAX_DISPLAY_NAME_LENGTH:
+            log_once(
+                logger.warning,
+                f"Display name {self.display_name} is longer than {MAX_DISPLAY_NAME_LENGTH} characters.  It will be truncated!",
+            )
+        self.display_name = elide_display_name(self.display_name)
 
     @property
     def op_name(self) -> str:
@@ -1488,7 +1499,7 @@ class WeaveClient:
             CallUpdateReq(
                 project_id=self._project_id(),
                 call_id=call.id,
-                display_name=display_name,
+                display_name=elide_display_name(display_name),
             )
         )
 
@@ -1608,6 +1619,13 @@ def sanitize_object_name(name: str) -> str:
     if len(res) > MAX_OBJECT_NAME_LENGTH:
         res = res[:MAX_OBJECT_NAME_LENGTH]
     return res
+
+
+def elide_display_name(name: str) -> str:
+    if len(name) > MAX_DISPLAY_NAME_LENGTH:
+        warn_once
+        return name[: MAX_DISPLAY_NAME_LENGTH - 3] + "..."
+    return name
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]
