@@ -5,19 +5,17 @@ import React from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {CopyableId} from '../../common/Id';
+import {LLMMaxTokensKey} from '../llmMaxTokens';
 import {OptionalTraceCallSchema, PlaygroundState} from '../types';
 import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
 import {LLMDropdown} from './LLMDropdown';
+import {SetPlaygroundStateFieldFunctionType} from './useChatFunctions';
 
 type PlaygroundChatTopBarProps = {
   idx: number;
   settingsTab: number | null;
   setSettingsTab: (tab: number | null) => void;
-  setPlaygroundStateField: (
-    index: number,
-    field: keyof PlaygroundState,
-    value: any
-  ) => void;
+  setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
   entity: string;
   project: string;
   playgroundStates: PlaygroundState[];
@@ -60,7 +58,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
 
   const handleModelChange = (
     index: number,
-    model: string,
+    model: LLMMaxTokensKey,
     maxTokens: number
   ) => {
     setPlaygroundStateField(index, 'model', model);
@@ -81,7 +79,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           display: 'flex',
           gap: '8px',
           alignItems: 'center',
-          backgroundColor: 'white',
+          backgroundColor: 'transparent',
         }}>
         {!onlyOneChat && <Tag label={`${idx + 1}`} />}
         <LLMDropdown
@@ -99,7 +97,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           display: 'flex',
           alignItems: 'center',
           gap: '4px',
-          backgroundColor: 'white',
+          backgroundColor: 'transparent',
         }}>
         <Button
           tooltip={'Clear chat'}

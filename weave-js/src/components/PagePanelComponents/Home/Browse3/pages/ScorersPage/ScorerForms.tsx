@@ -8,14 +8,6 @@ export interface ScorerFormProps<T> {
   onDataChange: (isValid: boolean, data?: T) => void;
 }
 
-export const AnnotationScorerForm: FC<ScorerFormProps<any>> = ({
-  data,
-  onDataChange,
-}) => {
-  // Implementation for annotation scorer form
-  return <div>Annotation Scorer Form</div>;
-};
-
 export const ProgrammaticScorerForm: FC<ScorerFormProps<any>> = ({
   data,
   onDataChange,
