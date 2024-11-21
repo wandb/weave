@@ -1270,7 +1270,7 @@ export const useExpandedNode = (
     if (error != null) {
       // rethrow in render thread
       console.error('useExpanded error', error);
-      throw new Error(error);
+      throw error;
     }
     return {
       loading: node.nodeType !== 'output' ? false : node !== result.node,
