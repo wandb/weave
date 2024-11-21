@@ -1,8 +1,7 @@
-from typing import Optional, List
 import math
 
 import weave
-from weave.scorers.base_scorer import Scorer, auto_summarize
+from weave.scorers.base_scorer import Scorer
 
 
 class RobustnessScorer(Scorer):
@@ -21,7 +20,7 @@ class RobustnessScorer(Scorer):
     """
 
     @weave.op
-    def score(self, output: List[str]) -> dict:
+    def score(self, output: list[str]) -> dict:
         """
         Calculates Cohen's h for text outputs by comparing string similarity
         of perturbed generations with the original generation.
@@ -34,7 +33,9 @@ class RobustnessScorer(Scorer):
             dict: A dictionary containing the original score (1.0), the average similarity
                   score for perturbed outputs, and the Cohen's h value.
         """
-        assert len(output) > 1, "There must be output of at least one perturbed question"
+        assert (
+            len(output) > 1
+        ), "There must be output of at least one perturbed question"
 
         # Original generation (reference output) and perturbed generations
         original = output[0]
@@ -42,7 +43,9 @@ class RobustnessScorer(Scorer):
 
         # Compute similarity scores for each perturbed output
         # TODO: The scores should be provided by the caller especially for reference evaluations.
-        binary_scores = [1 if perturbed == original else 0 for perturbed in perturbed_outputs]
+        binary_scores = [
+            1 if perturbed == original else 0 for perturbed in perturbed_outputs
+        ]
 
         # Original score is perfect similarity (1.0) with itself
         score_o = 1.0

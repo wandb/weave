@@ -1,15 +1,14 @@
-import pytest
 import math
+
+import pytest
 
 import weave
 from weave.scorers.robustness_scorer import RobustnessScorer
 
 
 def truncate(number, decimals=0):
-    """
-    Truncates a number to the specified number of decimal places without rounding.
-    """
-    factor = 10.0 ** decimals
+    """Truncates a number to the specified number of decimal places without rounding."""
+    factor = 10.0**decimals
     return math.trunc(number * factor) / factor
 
 
@@ -59,19 +58,25 @@ def test_robustness_scorer_insufficient_outputs():
 
 @pytest.mark.asyncio
 async def test_robustness_scorer_eval():
-    from typing import List
-
     dataset = [
         {
-            "questions": ["What is the capital of France?", "what the capital of france?", "Wht is the Capital of France?"],
+            "questions": [
+                "What is the capital of France?",
+                "what the capital of france?",
+                "Wht is the Capital of France?",
+            ],
         },
         {
-            "questions": ["Who is the owner of X.com?", "who is the owner of x.com?", "Who owns X.com?"],
+            "questions": [
+                "Who is the owner of X.com?",
+                "who is the owner of x.com?",
+                "Who owns X.com?",
+            ],
         },
     ]
 
     @weave.op
-    def model(questions: List[str]):
+    def model(questions: list[str]):
         perturbed_outputs = [False, True]
         return ["True"] + perturbed_outputs
 

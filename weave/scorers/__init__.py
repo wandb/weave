@@ -24,6 +24,7 @@ from weave.scorers.ragas_scorer import (
     ContextEntityRecallScorer,
     ContextRelevancyScorer,
 )
+from weave.scorers.robustness_scorer import RobustnessScorer
 from weave.scorers.similarity_scorer import EmbeddingSimilarityScorer
 from weave.scorers.string_scorer import (
     LevenshteinScorer,
@@ -31,7 +32,6 @@ from weave.scorers.string_scorer import (
 )
 from weave.scorers.summarization_scorer import SummarizationScorer
 from weave.scorers.xml_scorer import ValidXMLScorer
-from weave.scorers.robustness_scorer import RobustnessScorer
 
 __all__ = [
     "auto_summarize",
