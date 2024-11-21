@@ -19,6 +19,7 @@ from weave.flow.obj import Object
 from weave.scorers import (
     Scorer,
     _has_oldstyle_scorers,
+    _validate_scorer_signature,
     auto_summarize,
     get_scorer_attributes,
     transpose,
@@ -137,11 +138,7 @@ class Evaluation(Object):
             # Having both `output` and `model_output` in the scorer signature
             # causes issues with scoring because it's ambigious as to which
             # one is the canonical "output", and which is just a regular kwarg.
-            params = inspect.signature(scorer.resolve_fn).parameters
-            if "output" in params and "model_output" in params:
-                raise ValueError(
-                    "Both 'output' and 'model_output' cannot be in the scorer signature; prefer just using `output`."
-                )
+            _validate_scorer_signature(scorer)
 
             scorers.append(scorer)
 
