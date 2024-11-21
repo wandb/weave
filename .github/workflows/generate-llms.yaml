@@ -56,7 +56,7 @@ jobs:
       - name: Generate llms.txt
         run: |
           source .venv/bin/activate
-          python $GITHUB_WORKSPACE/docs/scripts/generate-llmstxt.py
+          python $GITHUB_WORKSPACE/docs/scripts/generate_llmstxt.py
 
       - name: Check if llms.txt exists
         run: |
