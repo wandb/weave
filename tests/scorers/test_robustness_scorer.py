@@ -81,7 +81,12 @@ def test_robustness_scorer_with_ground_truths_as_strings():
 
 def test_robustness_scorer_with_ground_truths_as_booleans():
     output = ["True", "True", "False", "True"]
-    ground_truths = [False, False, False, False]  # Booleans will be converted to strings
+    ground_truths = [
+        False,
+        False,
+        False,
+        False,
+    ]  # Booleans will be converted to strings
     robustness_scorer = RobustnessScorer()
     result = robustness_scorer.score(output=output, ground_truths=ground_truths)
     assert truncate(result["cohen_h"], 5) == 0.39182
@@ -159,7 +164,11 @@ async def test_robustness_scorer_eval_with_ground_truths():
                 "who owns x.com?",
                 "Who is the current owner of X.com?",
             ],
-            "ground_truths": ["Elon Musk", "Elon Musk", "Elon Musk"],  # Ground truths as strings
+            "ground_truths": [
+                "Elon Musk",
+                "Elon Musk",
+                "Elon Musk",
+            ],  # Ground truths as strings
         },
     ]
 
