@@ -8,6 +8,7 @@ import {SmallRef} from '../../../Browse2/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CostTable} from './cost';
+import {ObjectViewerSection} from './ObjectViewerSection';
 
 const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = [
   'latency_s',
@@ -20,21 +21,12 @@ export const CallSummary: React.FC<{
 }> = ({call}) => {
   const span = call.rawSpan;
   
-  // Process all non-null attributes, flattening nested objects
+  // Process attributes, only filtering out null values and keys starting with '_'
   const weaveAttributes = _.reduce(
     span.attributes ?? {},
     (result, value, key) => {
       if (!key.startsWith('_') && value != null) {
-        if (_.isPlainObject(value)) {
-          // Flatten nested objects
-          Object.entries(value).forEach(([nestedKey, nestedValue]) => {
-            if (nestedValue != null) {
-              result[`${key}.${nestedKey}`] = nestedValue;
-            }
-          });
-        } else {
-          result[key] = value;
-        }
+        result[key] = value;
       }
       return result;
     },
@@ -65,20 +57,6 @@ export const CallSummary: React.FC<{
             Usage
           </p>
           <CostTable costs={costData} />
-        </div>
-      )}
-      {Object.keys(weaveAttributes).length > 0 && (
-        <div className="mb-16">
-          <p
-            className="mb-10"
-            style={{
-              fontWeight: 600,
-              marginRight: 10,
-              paddingRight: 10,
-            }}>
-            Attributes
-          </p>
-          <SimpleKeyValueTable keyColumnWidth={164} data={weaveAttributes} />
         </div>
       )}
       <div className="mb-16">
@@ -114,6 +92,15 @@ export const CallSummary: React.FC<{
           }}
         />
       </div>
+      {Object.keys(weaveAttributes).length > 0 && (
+        <div className="mb-16">
+          <ObjectViewerSection
+            title="Attributes"
+            data={weaveAttributes}
+            isExpanded={true}
+          />
+        </div>
+      )}
     </div>
   );
 };
