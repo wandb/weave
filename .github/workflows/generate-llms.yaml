@@ -3,7 +3,7 @@ name: Generate llms.txt
 on:
   push:
     branches:
-      - pr-3045-gh-action  # Adjust if your default branch has a different name
+      - pr-3045-gh-action  
 
 jobs:
   generate-llms:
@@ -15,7 +15,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.x'  # Specify the required Python version
+          python-version: '3.x'  
 
       - name: Create virtual environment
         run: |
@@ -27,9 +27,8 @@ jobs:
       - name: Generate llms.txt
         run: |
           source .venv/bin/activate
-          python docs/scripts/generate-llmstxt.py
+          python $GITHUB_WORKSPACE/docs/scripts/generate-llmstxt.py
 
-      # Step 6: Verify generated file 
       - name: Check if llms.txt exists
         run: |
           if [ ! -f weave/docs/static/llms.txt ]; then
