@@ -341,7 +341,11 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       col.renderHeader = () => {
         return <></>;
       };
-    } else if (columnIsExpanded && onCollapse && columnIsExpanded(originalKey)) {
+    } else if (
+      columnIsExpanded &&
+      onCollapse &&
+      columnIsExpanded(originalKey)
+    ) {
       col.renderHeader = () => {
         return (
           <CollapseHeader
@@ -351,7 +355,11 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
           />
         );
       };
-    } else if (columnCanBeExpanded && onExpand && columnCanBeExpanded(originalKey)) {
+    } else if (
+      columnCanBeExpanded &&
+      onExpand &&
+      columnCanBeExpanded(originalKey)
+    ) {
       col.renderHeader = () => {
         return (
           <ExpandHeader
@@ -372,7 +380,9 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
 // Collapse middle area
 const collapseMiddlePath = (path: string): string => {
   const parts = path.split('.');
-  if (parts.length <= 3) return path;
+  if (parts.length <= 3) {
+    return path;
+  }
 
   const first = parts[0];
   const last = parts[parts.length - 1];
