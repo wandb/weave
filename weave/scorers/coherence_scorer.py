@@ -27,6 +27,7 @@ class CoherenceScorer(Scorer):
     device: str = "cpu"
     model_name: str = "wandb/coherence_scorer"
     _classifier: Any = PrivateAttr()
+    _label2id: dict[str, int] = PrivateAttr()
 
     def model_post_init(self, __context: Any) -> None:
         if not torch.cuda.is_available() and "cuda" in self.device:
@@ -34,6 +35,13 @@ class CoherenceScorer(Scorer):
         self._classifier = pipeline(
             task="sentiment-analysis", model=self.model_name, device=self.device
         )
+        self._label2id = {
+            "Completely Incoherent": 0,
+            "Mostly Incoherent": 1,
+            "A Little Incoherent": 2,
+            "Mostly Coherent": 3,
+            "Perfectly Coherent": 4,
+        }
 
     @weave.op
     def score_messages(self, prompt: str, output: str) -> dict[str, Any]:
@@ -48,7 +56,8 @@ class CoherenceScorer(Scorer):
         return {
             "coherent": coherent,
             "coherence": coherence_output["label"],
-            "coherence_score": coherence_output["score"],
+            "coherence_score": self._label2id[coherence_output["label"]],
+            "confidence": coherence_output["score"],
         }
 
     def _format_chat_history(self, chat_history: list[dict[str, str]]) -> str:
