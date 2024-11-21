@@ -192,7 +192,7 @@ class Call:
     output: Any = None
     exception: str | None = None
     summary: dict | None = None
-    display_name: str | Callable[[Call], str] | None = None
+    _display_name: str | Callable[[Call], str] | None = None
     attributes: dict | None = None
     started_at: datetime.datetime | None = None
     ended_at: datetime.datetime | None = None
@@ -202,13 +202,15 @@ class Call:
     _children: list[Call] = dataclasses.field(default_factory=list)
     _feedback: RefFeedbackQuery | None = None
 
-    def __post_init__(self) -> None:
-        if len(self.display_name) > MAX_DISPLAY_NAME_LENGTH:
-            log_once(
-                logger.warning,
-                f"Display name {self.display_name} is longer than {MAX_DISPLAY_NAME_LENGTH} characters.  It will be truncated!",
-            )
-        self.display_name = elide_display_name(self.display_name)
+    @property
+    def display_name(self) -> str | Callable[[Call], str] | None:
+        return self._display_name
+
+    @display_name.setter
+    def display_name(self, name: str | Callable[[Call], str] | None) -> None:
+        if isinstance(name, str):
+            name = elide_display_name(name)
+        self._display_name = name
 
     @property
     def op_name(self) -> str:
@@ -303,11 +305,11 @@ class Call:
             raise ValueError(
                 "Display name cannot be empty. To remove the display_name, set name=None or use remove_display_name."
             )
-        if name == self.display_name:
+        if name == self._display_name:
             return
         client = weave_client_context.require_weave_client()
         client._set_call_display_name(call=self, display_name=name)
-        self.display_name = name
+        self._display_name = name
 
     def remove_display_name(self) -> None:
         self.set_display_name(None)
@@ -440,7 +442,7 @@ def make_client_call(
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=from_json(server_call.output, server_call.project_id, server),
         summary=dict(server_call.summary) if server_call.summary is not None else None,
-        display_name=server_call.display_name,
+        _display_name=server_call.display_name,
         attributes=server_call.attributes,
         started_at=server_call.started_at,
         ended_at=server_call.ended_at,
@@ -747,7 +749,7 @@ class WeaveClient:
         # because the func needs to be resolved for schema insert below
         if callable(name_func := display_name):
             display_name = name_func(call)
-        call.display_name = display_name
+        call._display_name = display_name
 
         if parent is not None:
             parent._children.append(call)
@@ -1623,7 +1625,10 @@ def sanitize_object_name(name: str) -> str:
 
 def elide_display_name(name: str) -> str:
     if len(name) > MAX_DISPLAY_NAME_LENGTH:
-        warn_once
+        log_once(
+            logger.warning,
+            f"Display name {name} is longer than {MAX_DISPLAY_NAME_LENGTH} characters.  It will be truncated!",
+        )
         return name[: MAX_DISPLAY_NAME_LENGTH - 3] + "..."
     return name
 
