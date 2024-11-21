@@ -749,7 +749,7 @@ class WeaveClient:
         # because the func needs to be resolved for schema insert below
         if callable(name_func := display_name):
             display_name = name_func(call)
-        call._display_name = display_name
+        call.display_name = display_name
 
         if parent is not None:
             parent._children.append(call)
@@ -768,7 +768,7 @@ class WeaveClient:
                         project_id=project_id,
                         id=call_id,
                         op_name=op_def_ref.uri(),
-                        display_name=display_name,
+                        display_name=call.display_name,
                         trace_id=trace_id,
                         started_at=started_at,
                         parent_id=parent_id,
