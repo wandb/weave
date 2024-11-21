@@ -333,7 +333,7 @@ export const ObjectVersionsTable: React.FC<{
     if (!props.hideCategoryColumn) {
       cols.push(
         basicField('baseObjectClass', 'Category', {
-          width: 100,
+          width: 120,
           display: 'flex',
           valueGetter: (unused: any, row: any) => {
             return row.obj.baseObjectClass;
