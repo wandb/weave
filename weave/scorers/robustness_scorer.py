@@ -17,9 +17,7 @@ class RobustnessScorer(Scorer):
 
     def model_post_init(self, __context: Any) -> None:
         # Load an embedding model
-        if self.binary:
-            self.embedding_model = None
-        else:
+        if not self.binary:
             self.embedding_model = SentenceTransformer(self.embedding_model_name)
 
     @weave.op
@@ -28,20 +26,6 @@ class RobustnessScorer(Scorer):
         output: list[Union[str, bool]],
         ground_truths: Optional[list[Union[str, bool]]] = None,
     ) -> dict:
-        """
-        Calculates Cohen's h for text outputs by comparing predictions with ground truths.
-
-        Args:
-            output (List[Union[str, bool]]): Predictions from the system, which can be strings
-                                             or booleans.
-            ground_truths (List[Union[str, bool]], optional): A list of ground truths.
-                - If strings: Compare predicted outputs directly to the ground truth values.
-                - If booleans: Convert `True` to `"True"` and `False` to `"False"` for comparison.
-
-        Returns:
-            dict: A dictionary containing the original score (1.0), the average similarity
-                  score for perturbed outputs, and the Cohen's h value.
-        """
         assert (
             len(output) > 1
         ), "There must be output of at least one perturbed question."
@@ -78,11 +62,15 @@ class RobustnessScorer(Scorer):
                     1.0 if output[i] == ground_truths[i] else 0.0
                     for i in range(len(output))
                 ]
+                score_o = similarities[0]
+                perturbed_similarities = similarities[1:]
             else:
                 similarities = [
                     1.0 if perturbed == original else 0.0
                     for perturbed in perturbed_outputs
                 ]
+                score_o = 1.0
+                perturbed_similarities = similarities
         else:
             # Semantic similarity scoring
             if ground_truths:
@@ -90,29 +78,23 @@ class RobustnessScorer(Scorer):
                     self.compute_similarity(output[i], ground_truths[i])
                     for i in range(len(output))
                 ]
+                score_o = similarities[0]
+                perturbed_similarities = similarities[1:]
             else:
                 similarities = [
                     self.compute_similarity(original, perturbed)
                     for perturbed in perturbed_outputs
                 ]
-
-        # Original score
-        score_o = (
-            similarities[0]
-            if ground_truths
-            else (1.0 if self.binary else similarities[0])
-        )
-
-        # Perturbed scores
-        perturbed_similarities = similarities[1:] if ground_truths else similarities
-
+                score_o = 1.0
+                perturbed_similarities = similarities
+    
         if not self.binary:
             # compute cohens d
             d = self.compute_cohens_d(score_o, perturbed_similarities)
             return {
                 "cohen_d": d,
                 "score(original)": score_o,
-                "score(perturbed)": np.mean(perturbed_similarities),
+                "score(perturbed)": np.mean(perturbed_similarities).item(),
             }
         else:
             # compute cohens h
@@ -120,7 +102,7 @@ class RobustnessScorer(Scorer):
             return {
                 "cohen_h": h,
                 "score(original)": score_o,
-                "score(perturbed)": np.mean(perturbed_similarities),
+                "score(perturbed)": np.mean(perturbed_similarities).item(),
             }
 
     def compute_cohens_h(
@@ -148,7 +130,7 @@ class RobustnessScorer(Scorer):
         if std_diff == 0:
             return 0.0  # No variability in differences
         else:
-            return mean_diff / std_diff
+            return (mean_diff / std_diff).item()
 
     def compute_similarity(self, text1: str, text2: str) -> float:
         """
@@ -165,22 +147,6 @@ class RobustnessScorer(Scorer):
             # Compute cosine similarity between sentence embeddings
             embeddings = self.embedding_model.encode([text1, text2])
             sim = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
-            return sim
-        elif self.similarity_metric == "bleu":
-            # Compute BLEU score
-            from nltk.translate.bleu_score import sentence_bleu
-
-            reference = [text1.split()]
-            candidate = text2.split()
-            score = sentence_bleu(reference, candidate)
-            return score
-        elif self.similarity_metric == "rouge":
-            # Compute ROUGE score
-            from rouge import Rouge
-
-            rouge = Rouge()
-            scores = rouge.get_scores(text1, text2)
-            # You can choose which ROUGE metric to use; here we use ROUGE-L F1 score
-            return scores[0]["rouge-l"]["f"]
+            return sim.item()
         else:
             raise ValueError(f"Unsupported similarity metric: {self.similarity_metric}")
