@@ -29,7 +29,7 @@ def test_cohere(
 
     exp = response.text
     assert exp.strip() != ""
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -84,7 +84,7 @@ def test_cohere_stream(
         pass
 
     response = event.response  # the NonStreamedChatResponse
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -141,7 +141,7 @@ async def test_cohere_async(
 
     exp = response.text
     assert exp.strip() != ""
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -196,7 +196,7 @@ async def test_cohere_async_stream(
         pass
 
     response = event.response  # the NonStreamedChatResponse
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -249,7 +249,7 @@ def test_cohere_v2(
         messages=[{"role": "user", "content": "count to three"}],
         max_tokens=1024,
     )
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -296,7 +296,7 @@ async def test_cohere_async_v2(
         messages=[{"role": "user", "content": "count to three"}],
         max_tokens=1024,
     )
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -354,7 +354,7 @@ def test_cohere_stream_v2(
             if event.type == "message-end":
                 finish_reason = event.delta.finish_reason
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -404,7 +404,7 @@ async def test_cohere_async_stream_v2(
             if event.type == "message-end":
                 finish_reason = event.delta.finish_reason
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 

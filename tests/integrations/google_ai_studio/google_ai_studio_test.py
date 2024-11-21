@@ -59,7 +59,7 @@ def test_content_generation(client):
     model = genai.GenerativeModel("gemini-1.5-flash")
     model.generate_content("Explain how AI works in simple terms")
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -88,7 +88,7 @@ def test_content_generation_stream(client):
     chunks = [chunk.text for chunk in response]
     assert len(chunks) > 1
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -115,7 +115,7 @@ async def test_content_generation_async(client):
 
     _ = await model.generate_content_async("Explain how AI works in simple terms")
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]

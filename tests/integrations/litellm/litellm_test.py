@@ -61,7 +61,7 @@ def test_litellm_quickstart(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you. How can I assist you today?"""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
     call = calls[0]
     assert call.exception is None and call.ended_at is not None
@@ -102,7 +102,7 @@ async def test_litellm_quickstart_async(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you with whatever you need. How can I assist you today?"""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
     call = calls[0]
     assert call.exception is None and call.ended_at is not None
@@ -148,7 +148,7 @@ def test_litellm_quickstart_stream(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you. How can I assist you today?"""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
     call = calls[0]
     assert call.exception is None and call.ended_at is not None
@@ -196,7 +196,7 @@ async def test_litellm_quickstart_stream_async(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here and ready to assist you with any questions or tasks you may have. How can I help you today?"""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
     call = calls[0]
     assert call.exception is None and call.ended_at is not None

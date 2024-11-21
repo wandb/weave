@@ -138,13 +138,11 @@ async def test_evaluation_performance(client: WeaveClient):
         }
     )
 
-    calls = client.calls()
-    objects = client._objects()
+    calls = list(client.get_calls())
+    objects = list(client._objects())
 
-    assert (
-        len(list(calls)) == 14
-    )  # eval, summary, 4 predict_and_score, 4 predicts, 4 scores
-    assert len(list(objects)) == 3  # model, dataset, evaluation
+    assert len(calls) == 14  # eval, summary, 4 predict_and_score, 4 predicts, 4 scores
+    assert len(objects) == 3  # model, dataset, evaluation
 
 
 @pytest.mark.asyncio

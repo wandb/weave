@@ -289,7 +289,7 @@ def test_postprocessing_funcs(client):
     res = func(1, "should_be_hidden", "also_hidden")
     assert res == {"b": 2, "also_hide_me": "12345"}
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     call = calls[0]
 
     assert call.inputs == {"a": 1}
@@ -303,7 +303,7 @@ def test_op_call_display_name_str(client):
 
     func()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     call = calls[0]
 
     assert call.display_name == "example"
@@ -324,7 +324,7 @@ def test_op_call_display_name_callable_lambda(client):
 
     func()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     call = calls[0]
 
     assert call.display_name == "shawn/test-project-123"
@@ -342,7 +342,7 @@ def test_op_call_display_name_callable_func(client):
 
     func()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     call = calls[0]
 
     assert call.display_name == "wow-1844-tcejorp-tset/nwahs"
@@ -378,7 +378,7 @@ def test_op_call_display_name_callable_other_attributes(client):
     ):
         func()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert calls[0].display_name == "finetuned-llama-3.1-8b__v0.1.2__2024-08-01"
     assert calls[1].display_name == "finetuned-gpt-4o__v0.1.3__2024-08-02"
 
@@ -402,7 +402,7 @@ def test_op_call_display_name_modified_dynamically(client):
     func.call_display_name = custom_display_name2
     func()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert calls[0].display_name == "string"
     assert calls[1].display_name == "wow"
     assert calls[2].display_name == "amazing"
@@ -415,7 +415,7 @@ def test_op_name(client):
 
     func()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     call = calls[0]
 
     parsed = parse_uri(call.op_name)
