@@ -36,6 +36,7 @@ export const CallSummary: React.FC<{
   const summary = _.fromPairs(
     Object.entries(span.summary ?? {}).filter(
       ([k, a]) =>
+        // Display all summary fields, but remove usage and latencys stats because we have a separate representations
         !k.startsWith('_') &&
         a != null &&
         !SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER.includes(k)
@@ -47,6 +48,7 @@ export const CallSummary: React.FC<{
     <div className="overflow-auto px-16 pt-12">
       {costData && (
         <div className="mb-16">
+          {/* This styling is similar to what is is SimpleKeyValueTable */}
           <p
             className="mb-10"
             style={{
