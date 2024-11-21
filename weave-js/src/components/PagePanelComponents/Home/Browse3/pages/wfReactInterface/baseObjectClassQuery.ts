@@ -19,12 +19,16 @@ type BaseObjectClassType<C extends BaseObjectClassRegistryKeys> = z.infer<
   BaseObjectClassRegistry[C]
 >;
 
+export type TraceObjSchemaForBaseObjectClass<
+  C extends BaseObjectClassRegistryKeys
+> = TraceObjSchema<BaseObjectClassType<C>, C>;
+
 export const useBaseObjectInstances = <C extends BaseObjectClassRegistryKeys>(
   baseObjectClassName: C,
   req: TraceObjQueryReq
-): Loadable<Array<TraceObjSchema<BaseObjectClassType<C>, C>>> => {
+): Loadable<Array<TraceObjSchemaForBaseObjectClass<C>>> => {
   const [objects, setObjects] = useState<
-    Array<TraceObjSchema<BaseObjectClassType<C>, C>>
+    Array<TraceObjSchemaForBaseObjectClass<C>>
   >([]);
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();

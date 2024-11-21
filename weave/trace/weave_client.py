@@ -90,14 +90,6 @@ class OpNameError(ValueError):
     """Raised when an op name is invalid."""
 
 
-def dataclasses_asdict_one_level(obj: Any) -> dict[str, Any]:
-    # dataclasses.asdict is recursive. We don't want that when json encoding
-    return {f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}
-
-
-# TODO: unused
-
-
 def get_obj_name(val: Any) -> str:
     name = getattr(val, "name", None)
     if name is None:
@@ -233,23 +225,25 @@ class Call:
     def feedback(self) -> RefFeedbackQuery:
         if not self.id:
             raise ValueError("Can't get feedback for call without ID")
+
         if self._feedback is None:
-            project_parts = self.project_id.split("/")
-            if len(project_parts) != 2:
+            try:
+                entity, project = self.project_id.split("/")
+            except ValueError:
                 raise ValueError(f"Invalid project_id: {self.project_id}")
-            entity, project = project_parts
             weave_ref = CallRef(entity, project, self.id)
             self._feedback = RefFeedbackQuery(weave_ref.uri())
         return self._feedback
 
     @property
     def ui_url(self) -> str:
-        project_parts = self.project_id.split("/")
-        if len(project_parts) != 2:
-            raise ValueError(f"Invalid project_id: {self.project_id}")
-        entity, project = project_parts
         if not self.id:
             raise ValueError("Can't get URL for call without ID")
+
+        try:
+            entity, project = self.project_id.split("/")
+        except ValueError:
+            raise ValueError(f"Invalid project_id: {self.project_id}")
         return urls.redirect_call(entity, project, self.id)
 
     @property
@@ -257,6 +251,7 @@ class Call:
         entity, project = self.project_id.split("/")
         if not self.id:
             raise ValueError("Can't get ref for call without ID")
+
         return CallRef(entity, project, self.id)
 
     # These are the children if we're using Call at read-time
@@ -264,6 +259,8 @@ class Call:
         client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError("Can't get children of call without ID")
+
+        client = weave_client_context.require_weave_client()
         return CallsIter(
             client.server,
             self.project_id,
@@ -419,15 +416,17 @@ class CallsIter:
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
 ) -> WeaveObject:
-    output = server_call.output
+    if (call_id := server_call.id) is None:
+        raise ValueError("Call ID is None")
+
     call = Call(
         _op_name=server_call.op_name,
         project_id=server_call.project_id,
         trace_id=server_call.trace_id,
         parent_id=server_call.parent_id,
-        id=server_call.id,
+        id=call_id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
-        output=from_json(output, server_call.project_id, server),
+        output=from_json(server_call.output, server_call.project_id, server),
         summary=dict(server_call.summary) if server_call.summary is not None else None,
         display_name=server_call.display_name,
         attributes=server_call.attributes,
@@ -435,9 +434,8 @@ def make_client_call(
         ended_at=server_call.ended_at,
         deleted_at=server_call.deleted_at,
     )
-    if call.id is None:
-        raise ValueError("Call ID is None")
-    return WeaveObject(call, CallRef(entity, project, call.id), server, None)
+    ref = CallRef(entity, project, call_id)
+    return WeaveObject(call, ref, server, None)
 
 
 def sum_dict_leaves(dicts: list[dict]) -> dict:
@@ -588,8 +586,6 @@ class WeaveClient:
         # here, we just directly assign the digest.
         ref = dataclasses.replace(ref, _digest=read_res.obj.digest)
 
-        data = read_res.obj.val
-
         # If there is a ref-extra, we should resolve it. Rather than walking
         # the object, it is more efficient to directly query for the data and
         # let the server resolve it.
@@ -605,6 +601,8 @@ class WeaveClient:
             if not ref_read_res.vals:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
             data = ref_read_res.vals[0]
+        else:
+            data = read_res.obj.val
 
         val = from_json(data, project_id, self.server)
 
@@ -616,7 +614,7 @@ class WeaveClient:
     def get_calls(
         self,
         filter: CallsFilter | None = None,
-        include_costs: bool | None = False,
+        include_costs: bool = False,
     ) -> CallsIter:
         if filter is None:
             filter = CallsFilter()
@@ -629,12 +627,16 @@ class WeaveClient:
     def calls(
         self,
         filter: CallsFilter | None = None,
-        include_costs: bool | None = False,
+        include_costs: bool = False,
     ) -> CallsIter:
         return self.get_calls(filter=filter, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
-    def get_call(self, call_id: str, include_costs: bool | None = False) -> WeaveObject:
+    def get_call(
+        self,
+        call_id: str,
+        include_costs: bool = False,
+    ) -> WeaveObject:
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
@@ -648,7 +650,11 @@ class WeaveClient:
         return make_client_call(self.entity, self.project, response_call, self.server)
 
     @deprecated(new_name="get_call")
-    def call(self, call_id: str, include_costs: bool | None = False) -> WeaveObject:
+    def call(
+        self,
+        call_id: str,
+        include_costs: bool = False,
+    ) -> WeaveObject:
         return self.get_call(call_id=call_id, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -691,7 +697,6 @@ class WeaveClient:
 
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
-        call_id = generate_id()
 
         if parent is None and use_stack:
             parent = call_context.get_current_call()
@@ -716,6 +721,7 @@ class WeaveClient:
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
+        call_id = generate_id()
         call = Call(
             _op_name=op_name_future,
             project_id=self._project_id(),
@@ -730,6 +736,7 @@ class WeaveClient:
         if callable(name_func := display_name):
             display_name = name_func(call)
         call.display_name = display_name
+
         if parent is not None:
             parent._children.append(call)
 
