@@ -305,11 +305,11 @@ class Call:
             raise ValueError(
                 "Display name cannot be empty. To remove the display_name, set name=None or use remove_display_name."
             )
-        if name == self._display_name:
+        if name == self.display_name:
             return
         client = weave_client_context.require_weave_client()
         client._set_call_display_name(call=self, display_name=name)
-        self._display_name = name
+        self.display_name = name
 
     def remove_display_name(self) -> None:
         self.set_display_name(None)

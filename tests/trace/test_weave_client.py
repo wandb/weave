@@ -1534,4 +1534,13 @@ def test_long_display_names_are_elided(client):
 
     # The display name is correct server side
     calls = list(func.calls())
-    assert len(calls[0].display_name) <= MAX_DISPLAY_NAME_LENGTH
+    call = calls[0]
+    assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
+
+    # Calling set_display_name is correct
+    call.set_display_name("b" * 2048)
+    assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
+
+    calls = list(func.calls())
+    call = calls[0]
+    assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
