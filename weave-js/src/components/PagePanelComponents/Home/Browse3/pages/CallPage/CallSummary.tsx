@@ -19,15 +19,22 @@ export const CallSummary: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
   const span = call.rawSpan;
-  const attributes = _.fromPairs(
-    Object.entries(span.attributes ?? {}).filter(
-      ([k, a]) => !k.startsWith('_') && a != null
-    )
+  
+  // Process all non-null attributes
+  const weaveAttributes = _.reduce(
+    span.attributes ?? {},
+    (result, value, key) => {
+      if (value != null) {
+        result[key] = value;
+      }
+      return result;
+    },
+    {} as Record<string, any>
   );
+
   const summary = _.fromPairs(
     Object.entries(span.summary ?? {}).filter(
       ([k, a]) =>
-        // Display all summary fields, but remove usage and latencys stats because we have a separate representations
         !k.startsWith('_') &&
         a != null &&
         !SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER.includes(k)
@@ -39,7 +46,6 @@ export const CallSummary: React.FC<{
     <div className="overflow-auto px-16 pt-12">
       {costData && (
         <div className="mb-16">
-          {/* This styling is similar to what is is SimpleKeyValueTable */}
           <p
             className="mb-10"
             style={{
@@ -52,36 +58,53 @@ export const CallSummary: React.FC<{
           <CostTable costs={costData} />
         </div>
       )}
-      <SimpleKeyValueTable
-        data={{
-          Operation:
-            parseRefMaybe(span.name) != null ? (
-              <SmallRef
-                objRef={parseRefMaybe(span.name)!}
-                wfTable="OpVersion"
-              />
-            ) : (
-              span.name
+      {Object.keys(weaveAttributes).length > 0 && (
+        <div className="mb-16">
+          <p
+            className="mb-10"
+            style={{
+              fontWeight: 600,
+              marginRight: 10,
+              paddingRight: 10,
+            }}>
+            Attributes
+          </p>
+          <SimpleKeyValueTable keyColumnWidth={164} data={weaveAttributes} />
+        </div>
+      )}
+      <div className="mb-16">
+        <p
+          className="mb-10"
+          style={{
+            fontWeight: 600,
+            marginRight: 10,
+            paddingRight: 10,
+          }}>
+          Details
+        </p>
+        <SimpleKeyValueTable
+          keyColumnWidth={164}
+          data={{
+            Operation:
+              parseRefMaybe(span.name) != null ? (
+                <SmallRef objRef={parseRefMaybe(span.name)!} wfTable="OpVersion" />
+              ) : (
+                span.name
+              ),
+            User: (
+              <UserLink userId={call.userId} placement="bottom-start" includeName />
             ),
-          User: (
-            <UserLink
-              userId={call.userId}
-              placement="bottom-start"
-              includeName
-            />
-          ),
-          Called: <Timestamp value={span.timestamp / 1000} format="relative" />,
-          ...(span.summary.latency_s != null && span.status_code !== 'UNSET'
-            ? {
-                Latency: span.summary.latency_s.toFixed(3) + 's',
-              }
-            : {}),
-          ...(Object.keys(attributes).length > 0
-            ? {Attributes: attributes}
-            : {}),
-          ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
-        }}
-      />
+            Called: <Timestamp value={span.timestamp / 1000} format="relative" />,
+            ...(span.summary.latency_s != null && span.status_code !== 'UNSET'
+              ? {
+                  Latency: span.summary.latency_s.toFixed(3) + 's',
+                }
+              : {}),
+            Model: span.attributes?.model,
+            ...(Object.keys(summary).length > 0 ? summary : {}),
+          }}
+        />
+      </div>
     </div>
   );
 };

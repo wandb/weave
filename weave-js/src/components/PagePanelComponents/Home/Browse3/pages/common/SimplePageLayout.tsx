@@ -375,47 +375,41 @@ export const ScrollableTabContent: FC<{
 
 export const SimpleKeyValueTable: FC<{
   data: {[key: string]: ReactNode};
+  keyColumnWidth?: string | number;
 }> = props => {
   return (
-    <table
-      style={{
-        borderCollapse: 'collapse',
-      }}>
-      <tbody>
-        {Object.entries(props.data).map(([key, val]) => {
-          return (
-            <tr key={key}>
-              <td
-                style={{
-                  fontWeight: 600,
-                  marginRight: 10,
-                  paddingRight: 10,
-
-                  // align text to the top
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'flex-start',
-                  width: 100,
-                }}>
-                {key}
-              </td>
-              <td>
-                {isPrimitive(val) ? (
-                  val
-                ) : _.isArray(val) ? (
-                  <SimpleKeyValueTable
-                    data={_.fromPairs(val.map((v, i) => [i, v]))}
-                  />
-                ) : (
-                  <SimpleKeyValueTable
-                    data={_.fromPairs(Object.entries(val as any))}
-                  />
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className="border border-[#E0E0E0] rounded overflow-hidden w-full">
+      <table className="text-[14px] w-full">
+        <tbody className="divide-y divide-[#E0E0E0]">
+          {Object.entries(props.data).map(([key, val]) => {
+            return (
+              <tr key={key}>
+                <td 
+                  className="align-top bg-moon-50 border-r border-[#E0E0E0] text-moon-500 p-[8px]"
+                  style={props.keyColumnWidth ? {width: props.keyColumnWidth} : undefined}
+                >
+                  {key}
+                </td>
+                <td className="align-top p-[8px]">
+                  {isPrimitive(val) ? (
+                    val
+                  ) : _.isArray(val) ? (
+                    <SimpleKeyValueTable
+                      data={_.fromPairs(val.map((v, i) => [i, v]))}
+                      keyColumnWidth={props.keyColumnWidth}
+                    />
+                  ) : (
+                    <SimpleKeyValueTable
+                      data={_.fromPairs(Object.entries(val as any))}
+                      keyColumnWidth={props.keyColumnWidth}
+                    />
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 };
