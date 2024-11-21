@@ -3,4 +3,3 @@ export enum ToggleButtonGroupSizes {
   medium = 'medium',
   large = 'large',
 }
-export type ToggleButtonGroupSize = keyof typeof ToggleButtonGroupSizes;

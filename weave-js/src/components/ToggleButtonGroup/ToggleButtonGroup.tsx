@@ -5,7 +5,7 @@ import {twMerge} from 'tailwind-merge';
 import {Button} from '../Button';
 import {IconName} from '../Icon';
 import {Tailwind} from '../Tailwind';
-import {ToggleButtonGroupSize} from './types';
+import {ToggleButtonGroupSizes} from './types';
 
 export type ToggleOption = {
   label: string;
@@ -15,7 +15,7 @@ export type ToggleOption = {
 export type ToggleButtonGroupProps = {
   options: ToggleOption[];
   value: string;
-  size: ToggleButtonGroupSize;
+  size: ToggleButtonGroupSizes;
   isDisabled?: boolean;
   onValueChange: (value: string) => void;
 };
