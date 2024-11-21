@@ -21,15 +21,20 @@ jobs:
       - name: Install Hatch
         run: pip install hatch
 
+      # Step 3.1: Verify Hatch
+      - name: List Hatch environments
+        run: hatch env show
+
       # Step 4: Install dependencies for docs
       - name: Install documentation dependencies
         run: hatch env create llmspy
 
       # Step 5: Run the script
       - name: Generate llms.txt
-        run: hatch run llmspy python weave/docs/scripts/generate-llmstxt.py
+        run: |
+          hatch shell llmspy -c "python weave/docs/scripts/generate-llmstxt.py"
 
-      # Step 6: Verify generated file (optional)
+      # Step 6: Verify generated file 
       - name: Check if llms.txt exists
         run: |
           if [ ! -f weave/docs/static/llms.txt ]; then
