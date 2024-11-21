@@ -43,6 +43,7 @@ from weave.trace.settings import client_parallelism
 from weave.trace.table import Table
 from weave.trace.util import deprecated
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
 from weave.trace_server.trace_server_interface import (
@@ -1604,8 +1605,8 @@ def sanitize_object_name(name: str) -> str:
     res = re.sub(r"([._-]{2,})+", "-", re.sub(r"[^\w._]+", "-", name)).strip("-_")
     if not res:
         raise ValueError(f"Invalid object name: {name}")
-    if len(res) > 128:
-        res = res[:128]
+    if len(res) > MAX_OBJECT_NAME_LENGTH:
+        res = res[:MAX_OBJECT_NAME_LENGTH]
     return res
 
 
