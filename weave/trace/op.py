@@ -152,14 +152,12 @@ class Op(Protocol):
     Some of the attributes are carry-overs from when Op was a class.  We should
     consider removing the unnecessary ones where possible.
     - resolve_fn (I think you can just use the func itself?)
-    - signature (just inspect the func)
     - _set_on_output_handler (does this have to be on the op?)
     - _on_output_handler (does this have to be on the op?)
     """
 
     name: str
     call_display_name: str | Callable[[Call], str]
-    signature: inspect.Signature
     ref: ObjectRef | None
     resolve_fn: Callable
 
@@ -228,7 +226,8 @@ def _is_unbound_method(func: Callable) -> bool:
 
 def default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
     try:
-        inputs = func.signature.bind(*args, **kwargs).arguments
+        sig = inspect.signature(func)
+        inputs = sig.bind(*args, **kwargs).arguments
     except TypeError as e:
         raise OpCallError(f"Error calling {func.name}: {e}")
     inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
@@ -601,7 +600,6 @@ def op(
 
     def op_deco(func: Callable) -> Op:
         # Check function type
-        sig = inspect.signature(func)
         is_method = _is_unbound_method(func)
         is_async = inspect.iscoroutinefunction(func)
 
@@ -634,7 +632,6 @@ def op(
             inferred_name = inferred_name.split(".<locals>.")[-1]
 
             wrapper.name = name or inferred_name  # type: ignore
-            wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
 
             wrapper.postprocess_inputs = postprocess_inputs  # type: ignore

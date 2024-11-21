@@ -144,11 +144,7 @@ def _has_oldstyle_scorers(scorers: list[Union[Callable, Op, Scorer]]) -> bool:
     """Check if any scorers use the deprecated 'model_output' parameter."""
     for scorer in scorers:
         _, score_fn, _ = get_scorer_attributes(scorer)
-        if is_op(score_fn):
-            score_fn = as_op(score_fn)
-            score_signature = score_fn.signature
-        else:
-            score_signature = inspect.signature(score_fn)
+        score_signature = inspect.signature(score_fn)
         if "model_output" in score_signature.parameters:
             return True
     return False

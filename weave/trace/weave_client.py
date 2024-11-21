@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import inspect
 import platform
 import re
 import sys
@@ -316,7 +317,7 @@ class Call:
         - no context yet (ie. ground truth)
         """
         client = weave_client_context.require_weave_client()
-        scorer_signature = scorer_op.signature
+        scorer_signature = inspect.signature(scorer_op)
         scorer_arg_names = list(scorer_signature.parameters.keys())
         score_args = {k: v for k, v in self.inputs.items() if k in scorer_arg_names}
         if "output" in scorer_arg_names:
