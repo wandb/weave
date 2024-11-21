@@ -24,6 +24,23 @@ jobs:
       - name: List directory contents
         run: ls -R
 
+      - name: Debug script path
+        run: |
+          ls -l $GITHUB_WORKSPACE/docs/scripts/generate-llmstxt.py
+
+      - name: Debug Python version
+        run: |
+          source .venv/bin/activate
+          python --version
+
+      - name: Check active Python environment
+        run: |
+          source .venv/bin/activate
+          which python
+
+      - name: Fix script permissions
+        run: chmod +rx $GITHUB_WORKSPACE/docs/scripts/generate-llmstxt.py
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
