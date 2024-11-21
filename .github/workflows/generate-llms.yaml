@@ -32,7 +32,7 @@ jobs:
       # Step 5: Run the script
       - name: Generate llms.txt
         run: |
-          hatch shell llmspy -c "python weave/docs/scripts/generate-llmstxt.py"
+          hatch shell llmspy "python weave/docs/scripts/generate-llmstxt.py"
 
       # Step 6: Verify generated file 
       - name: Check if llms.txt exists
