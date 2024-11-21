@@ -155,7 +155,7 @@ export class ObjectPath {
   }
 }
 
-type ValueType =
+export type ValueType =
   | 'null'
   | 'undefined'
   | 'boolean'
