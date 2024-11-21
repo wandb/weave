@@ -20,7 +20,12 @@ from weave.scorers.llm_utils import (
     create,
     embed,
 )
-from weave.scorers.moderation_scorer import OpenAIModerationScorer
+from weave.scorers.moderation_scorer import (
+    OpenAIModerationScorer,
+    RollingWindowScorer,
+    ToxicScorer,
+    GenderRaceBiasScorer,
+)
 from weave.scorers.pydantic_scorer import PydanticScorer
 from weave.scorers.ragas_scorer import (
     ContextEntityRecallScorer,
@@ -50,6 +55,9 @@ __all__ = [
     "LLMScorer",
     "MultiTaskBinaryClassificationF1",
     "OpenAIModerationScorer",
+    "RollingWindowScorer",
+    "ToxicScorer",
+    "GenderRaceBiasScorer",
     "PydanticScorer",
     "Scorer",
     "StringMatchScorer",
