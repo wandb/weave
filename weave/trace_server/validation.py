@@ -2,6 +2,11 @@ import re
 from typing import Any, Literal, Optional
 
 from weave.trace_server import refs_internal, validation_util
+from weave.trace_server.constants import (
+    MAX_DISPLAY_NAME_LENGTH,
+    MAX_OBJECT_NAME_LENGTH,
+    MAX_OP_NAME_LENGTH,
+)
 from weave.trace_server.errors import InvalidRequest
 
 # Temporary flag to disable database-side validation of object ids.
@@ -39,14 +44,14 @@ def parent_id_validator(s: Optional[str]) -> Optional[str]:
 def display_name_validator(s: Optional[str]) -> Optional[str]:
     if s is None:
         return None
-    return validation_util.require_max_str_len(s, 128)
+    return validation_util.require_max_str_len(s, MAX_DISPLAY_NAME_LENGTH)
 
 
 def op_name_validator(s: str) -> str:
     if refs_internal.string_will_be_interpreted_as_ref(s):
         validation_util.require_internal_ref_uri(s, refs_internal.InternalOpRef)
     else:
-        validation_util.require_max_str_len(s, 128)
+        validation_util.require_max_str_len(s, MAX_OP_NAME_LENGTH)
 
     return s
 
@@ -86,7 +91,7 @@ def _validate_object_name_charset(name: str) -> None:
 def object_id_validator(s: str) -> str:
     if SHOULD_ENFORCE_OBJ_ID_CHARSET:
         _validate_object_name_charset(s)
-    return validation_util.require_max_str_len(s, 128)
+    return validation_util.require_max_str_len(s, MAX_OBJECT_NAME_LENGTH)
 
 
 def refs_list_validator(s: list[str]) -> list[str]:
