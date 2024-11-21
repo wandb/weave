@@ -1,5 +1,4 @@
-import re
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
 from pydantic import PrivateAttr
 
@@ -72,8 +71,8 @@ class CoherenceScorer(Scorer):
     ) -> dict[str, Any]:
         prompt = input
         if chat_history is not None:
-            chat_history = self._format_chat_history(chat_history)
-            prompt = f"{chat_history}{input}"
+            history = self._format_chat_history(chat_history)
+            prompt = f"{history}{input}"
         if context is not None:
             prompt = f"{input}\n\n{context}"
         return self.score_messages(prompt, output)
