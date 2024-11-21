@@ -378,19 +378,22 @@ export const SimpleKeyValueTable: FC<{
   keyColumnWidth?: string | number;
 }> = props => {
   return (
-    <div className="border border-[#E0E0E0] rounded overflow-hidden w-full">
-      <table className="text-[14px] w-full">
+    <div className="w-full overflow-hidden rounded border border-[#E0E0E0]">
+      <table className="w-full text-[14px]">
         <tbody className="divide-y divide-[#E0E0E0]">
           {Object.entries(props.data).map(([key, val]) => {
             return (
               <tr key={key}>
-                <td 
-                  className="align-top bg-moon-50 border-r border-[#E0E0E0] text-moon-500 p-[8px]"
-                  style={props.keyColumnWidth ? {width: props.keyColumnWidth} : undefined}
-                >
+                <td
+                  className="border-r border-[#E0E0E0] bg-moon-50 p-[8px] align-top text-moon-500"
+                  style={
+                    props.keyColumnWidth
+                      ? {width: props.keyColumnWidth}
+                      : undefined
+                  }>
                   {key}
                 </td>
-                <td className="align-top p-[8px]">
+                <td className="p-[8px] align-top">
                   {isPrimitive(val) ? (
                     val
                   ) : _.isArray(val) ? (

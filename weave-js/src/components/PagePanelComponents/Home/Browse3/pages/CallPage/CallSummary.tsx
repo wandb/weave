@@ -20,7 +20,7 @@ export const CallSummary: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
   const span = call.rawSpan;
-  
+
   // Process attributes, only filtering out null values and keys starting with '_'
   const weaveAttributes = _.reduce(
     span.attributes ?? {},
@@ -76,14 +76,23 @@ export const CallSummary: React.FC<{
           data={{
             Operation:
               parseRefMaybe(span.name) != null ? (
-                <SmallRef objRef={parseRefMaybe(span.name)!} wfTable="OpVersion" />
+                <SmallRef
+                  objRef={parseRefMaybe(span.name)!}
+                  wfTable="OpVersion"
+                />
               ) : (
                 span.name
               ),
             User: (
-              <UserLink userId={call.userId} placement="bottom-start" includeName />
+              <UserLink
+                userId={call.userId}
+                placement="bottom-start"
+                includeName
+              />
             ),
-            Called: <Timestamp value={span.timestamp / 1000} format="relative" />,
+            Called: (
+              <Timestamp value={span.timestamp / 1000} format="relative" />
+            ),
             ...(span.summary.latency_s != null && span.status_code !== 'UNSET'
               ? {
                   Latency: span.summary.latency_s.toFixed(3) + 's',
