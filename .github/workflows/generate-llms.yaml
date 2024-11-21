@@ -11,35 +11,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-      
-      - name: Debug path issues 
-        run: |
-          echo "Current directory: $(pwd)"
-          echo "GitHub workspace: $GITHUB_WORKSPACE"
-          if [ "$(pwd)" != "$GITHUB_WORKSPACE" ]; then
-            echo "Error: Current directory does not match \$GITHUB_WORKSPACE"
-            exit 1
-          fi
-
-      - name: List directory contents
-        run: ls -R
-
-      - name: Debug script path
-        run: |
-          ls -l $GITHUB_WORKSPACE/docs/scripts/generate-llmstxt.py
-
-      - name: Debug Python version
-        run: |
-          source .venv/bin/activate
-          python --version
-
-      - name: Check active Python environment
-        run: |
-          source .venv/bin/activate
-          which python
-
-      - name: Fix script permissions
-        run: chmod +rx $GITHUB_WORKSPACE/docs/scripts/generate-llmstxt.py
 
       - name: Set up Python
         uses: actions/setup-python@v4
