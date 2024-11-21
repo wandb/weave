@@ -11,6 +11,7 @@ from weave.scorers.classification_scorer import (
 from weave.scorers.hallucination_scorer import HallucinationFreeScorer
 from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.llamaguard_scorer import LlamaGuard
+from weave.scorers.coherence_scorer import CoherenceScorer
 from weave.scorers.llm_scorer import (
     InstructorLLMScorer,
     LLMScorer,
@@ -56,4 +57,5 @@ __all__ = [
     "transpose",
     "ValidXMLScorer",
     "LlamaGuard",
+    "CoherenceScorer",
 ]
