@@ -174,6 +174,10 @@ async def test_async_anthropic_stream(
 
     assert call.exception is None and call.ended_at is not None
     output = call.output
+
+    print(f"{output=}")
+    print(f"{message=}")
+
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "end_turn"
