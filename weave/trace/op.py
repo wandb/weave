@@ -7,7 +7,6 @@ import logging
 import sys
 import traceback
 from collections.abc import Coroutine, Mapping
-from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial, wraps
 from types import MethodType
@@ -139,17 +138,6 @@ class WeaveKwargs(TypedDict):
     display_name: str | None
 
 
-class Callback(Protocol):
-    def before_call(
-        self, inputs: dict, parent: Call | None, attributes: dict | None
-    ) -> None: ...
-    def before_yield(self, call: Call, value: Any) -> None: ...
-    def after_yield(self, call: Call, value: Any) -> None: ...
-    def after_yield_all(self, call: Call) -> None: ...
-    def after_call(self, call: Call) -> None: ...
-    def after_error(self, call: Call, exc: Exception) -> None: ...
-
-
 class DebugCallback:
     def before_call(
         self, inputs: dict, parent: Call | None, attributes: dict | None
@@ -176,6 +164,17 @@ T = TypeVar("T")
 Acc = TypeVar("Acc")
 
 
+class Callback(Protocol):
+    def before_call(
+        self, inputs: dict, parent: Call | None, attributes: dict | None
+    ) -> None: ...
+    def before_yield(self, call: Call, value: Any) -> None: ...
+    def after_yield(self, call: Call, value: Any) -> None: ...
+    def after_yield_all(self, call: Call) -> None: ...
+    def after_call(self, call: Call) -> None: ...
+    def after_error(self, call: Call, exc: Exception) -> None: ...
+
+
 class Reducer(Protocol, Generic[T, Acc]):
     """Any function that implements this can be automatically converted into a reducer callback.
 
@@ -197,10 +196,10 @@ class ReducerCallback(Generic[T, Acc]):
 
         self.acc = acc.default
 
-    def after_yield(self, call, val):
+    def after_yield(self, call: Call, val: T) -> None:
         self.acc = self.func(val, self.acc)
 
-    def after_yield_all(self, call):
+    def after_yield_all(self, call: Call) -> None:
         call.output = self.acc
 
 
@@ -432,7 +431,8 @@ async def _execute_op_async(
     *args: Any,
     __weave: WeaveKwargs | None = None,
     __should_raise: bool = True,
-    __should_accumulate: bool = False,
+    __should_accumulate: Callable[[Call], bool] | None = None,
+    __should_use_contextmanager: Callable[[Callable], bool] | None = None,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = __op.resolve_fn
@@ -468,32 +468,125 @@ async def _execute_op_async(
     )
 
     should_accumulate = __should_accumulate and __should_accumulate(call)
+    should_use_contextmanager = (
+        __should_use_contextmanager and __should_use_contextmanager(func)
+    )
     if is_async_generator or should_accumulate:
+        if should_use_contextmanager:
 
-        @wraps(func)
-        async def _wrapped_async_generator():
-            try:
-                async for val in func(*args, **kwargs):
-                    __op.lifecycle_handler.run_before_yield(call, val)
-                    yield val
-                    __op.lifecycle_handler.run_after_yield(call, val)
-            except Exception as e:
-                exception = e
-                if __should_raise:
-                    raise
-            else:
-                exception = None
-                __op.lifecycle_handler.run_after_yield_all(call)
-            finally:
-                if __op.lifecycle_handler.has_finished:
-                    raise OpCallError("Should not call finish more than once")
-                boxed_output = box.box(call.output)
-                client.finish_call(call, boxed_output, exception=exception, op=__op)
-                if not call_context.get_current_call():
-                    print_call_link(call)
-                call_context.pop_call(call.id)
+            class AsyncGeneratorContextManager:
+                def __init__(self, func, args, kwargs, op, call, should_raise):
+                    self.func = func
+                    self.args = args
+                    self.kwargs = kwargs
+                    self.op = op
+                    self.call = call
+                    self.should_raise = should_raise
+                    self.exception = None
 
-        res = _wrapped_async_generator()
+                async def __aenter__(self):
+                    self.orig_gen = await func(*self.args, **self.kwargs).__aenter__()
+                    return self._wrapped_async_generator()
+
+                async def __aexit__(self, exc_type, exc_val, exc_tb):
+                    if self.op.lifecycle_handler.has_finished:
+                        raise OpCallError("Should not call finish more than once")
+
+                    boxed_output = box.box(self.call.output)
+                    client = weave_client_context.require_weave_client()
+                    client.finish_call(
+                        self.call, boxed_output, exception=self.exception, op=self.op
+                    )
+
+                    if not call_context.get_current_call():
+                        print_call_link(self.call)
+                    call_context.pop_call(self.call.id)
+
+                    return self.orig_gen.__aexit__(exc_type, exc_val, exc_tb)
+
+                async def _wrapped_async_generator(self):
+                    try:
+                        async for val in self.orig_gen:
+                            __op.lifecycle_handler.run_before_yield(call, val)
+                            yield val
+                            __op.lifecycle_handler.run_after_yield(call, val)
+                    except Exception as e:
+                        self.exception = e
+                        if self.should_raise:
+                            raise
+                    else:
+                        __op.lifecycle_handler.run_after_yield_all(call)
+
+                def __getattr__(self, name):
+                    # Forward unknown attrs to the original generator
+                    if name not in {
+                        "__aenter__",
+                        "__aexit__",
+                        "_wrapped_async_generator",
+                    }:
+                        return getattr(self.orig_gen, name)
+
+            res = AsyncGeneratorContextManager(
+                func, args, kwargs, __op, call, __should_raise
+            )
+
+            # @asynccontextmanager
+            # @wraps(func)
+            # async def _wrapped_context_manager_yields_async_generator():
+            #     exception = None
+            #     original_gen = await func(*args, **kwargs)
+
+            #     async def _wrapped_async_generator():
+            #         nonlocal exception
+            #         try:
+            #             async for val in original_gen:
+            #                 __op.lifecycle_handler.run_before_yield(call, val)
+            #                 yield val
+            #                 __op.lifecycle_handler.run_after_yield(call, val)
+            #         except Exception as e:
+            #             exception = e
+            #             if __should_raise:
+            #                 raise
+            #         else:
+            #             __op.lifecycle_handler.run_after_yield_all(call)
+
+            #     yield _wrapped_async_generator()
+
+            #     if __op.lifecycle_handler.has_finished:
+            #         raise OpCallError("Should not call finish more than once")
+            #     boxed_output = box.box(call.output)
+            #     client.finish_call(call, boxed_output, exception=exception, op=__op)
+            #     if not call_context.get_current_call():
+            #         print_call_link(call)
+            #     call_context.pop_call(call.id)
+
+            # res = _wrapped_context_manager_yields_async_generator()
+        else:
+
+            @wraps(func)
+            async def _wrapped_async_generator():
+                try:
+                    async for val in await func(*args, **kwargs):
+                        __op.lifecycle_handler.run_before_yield(call, val)
+                        yield val
+                        __op.lifecycle_handler.run_after_yield(call, val)
+                except Exception as e:
+                    exception = e
+                    if __should_raise:
+                        raise
+                else:
+                    exception = None
+                    __op.lifecycle_handler.run_after_yield_all(call)
+                finally:
+                    if __op.lifecycle_handler.has_finished:
+                        raise OpCallError("Should not call finish more than once")
+                    boxed_output = box.box(call.output)
+                    client.finish_call(call, boxed_output, exception=exception, op=__op)
+                    if not call_context.get_current_call():
+                        print_call_link(call)
+                    call_context.pop_call(call.id)
+
+            res = _wrapped_async_generator()
     else:
         try:
             res = await func(*args, **kwargs)
@@ -514,15 +607,6 @@ async def _execute_op_async(
 
     __op.lifecycle_handler.run_after_call(call)
     return res, call
-
-
-def _is_context_manager(obj: Any) -> bool:
-    __enter__ = getattr(obj, "__enter__", None)
-    __exit__ = getattr(obj, "__exit__", None)
-
-    print(__enter__, __exit__)
-
-    return callable(__enter__) and callable(__exit__)
 
 
 def _execute_op(
@@ -574,38 +658,140 @@ def _execute_op(
         # TODO: Not sure if this is the right pattern.  This hack is only
         # used to support the Anthropic streaming context streaming case atm...
         if should_use_contextmanager:
+            # class SyncGeneratorContextManager:
+            #     def __init__(self, func, args, kwargs, op, call, should_raise):
+            #         self.func = func
+            #         self.args = args
+            #         self.kwargs = kwargs
+            #         self.op = op
+            #         self.call = call
+            #         self.should_raise = should_raise
+            #         self.exception = None
 
-            @contextmanager
-            @wraps(func)
-            def _wrapped_context_manager_yields_sync_generator():
-                exception = None
-                with func(*args, **kwargs) as original_gen:
+            #     async def __aenter__(self):
+            #         print("Entering aenter")
+            #         self.orig_context = func(*self.args, **self.kwargs)
+            #         self.orig_gen = await self.orig_context.__aenter__()
+            #         self.gen = self._wrapped_async_generator()
+            #         return self.gen
 
-                    def _wrapped_sync_generator():
-                        nonlocal exception
-                        try:
-                            for val in original_gen:
-                                __op.lifecycle_handler.run_before_yield(call, val)
-                                yield val
-                                __op.lifecycle_handler.run_after_yield(call, val)
-                        except Exception as e:
-                            exception = e
-                            if __should_raise:
-                                raise
-                        else:
-                            __op.lifecycle_handler.run_after_yield_all(call)
+            #     async def __aexit__(self, exc_type, exc_val, exc_tb):
+            #         print("Entering aexit")
+            #         if self.op.lifecycle_handler.has_finished:
+            #             raise OpCallError("Should not call finish more than once")
 
-                    yield _wrapped_sync_generator()
+            #         boxed_output = box.box(self.call.output)
+            #         client = weave_client_context.require_weave_client()
+            #         client.finish_call(
+            #             self.call, boxed_output, exception=self.exception, op=self.op
+            #         )
 
-                if __op.lifecycle_handler.has_finished:
-                    raise OpCallError("Should not call finish more than once")
-                boxed_output = box.box(call.output)
-                client.finish_call(call, boxed_output, exception=exception, op=__op)
-                if not call_context.get_current_call():
-                    print_call_link(call)
-                call_context.pop_call(call.id)
+            #         if not call_context.get_current_call():
+            #             print_call_link(self.call)
+            #         call_context.pop_call(self.call.id)
 
-            res = _wrapped_context_manager_yields_sync_generator()
+            #         return await self.orig_context.__aexit__(exc_type, exc_val, exc_tb)
+
+            #     async def _wrapped_async_generator(self):
+            #         print("Entering wrapped async generator")
+            #         try:
+            #             async for val in self.orig_gen:
+            #                 self.op.lifecycle_handler.run_before_yield(call, val)
+            #                 yield val
+            #                 self.op.lifecycle_handler.run_after_yield(call, val)
+            #         except Exception as e:
+            #             self.exception = e
+            #             if self.should_raise:
+            #                 raise
+            #         else:
+            #             self.op.lifecycle_handler.run_after_yield_all(call)
+
+            #     def __enter__(self):
+            #         print("Entering enter")
+            #         self.orig_gen = func(*self.args, **self.kwargs).__enter__()
+            #         return self._wrapped_sync_generator()
+
+            #     def __exit__(self, exc_type, exc_val, exc_tb):
+            #         print("Entering exit")
+            #         if self.op.lifecycle_handler.has_finished:
+            #             raise OpCallError("Should not call finish more than once")
+
+            #         boxed_output = box.box(self.call.output)
+            #         client = weave_client_context.require_weave_client()
+            #         client.finish_call(
+            #             self.call, boxed_output, exception=self.exception, op=self.op
+            #         )
+
+            #         if not call_context.get_current_call():
+            #             print_call_link(self.call)
+            #         call_context.pop_call(self.call.id)
+
+            #         return self.orig_gen.__exit__(exc_type, exc_val, exc_tb)
+
+            #     def _wrapped_sync_generator(self):
+            #         print("Entering wrapped sync generator")
+            #         try:
+            #             for val in self.orig_gen:
+            #                 self.op.lifecycle_handler.run_before_yield(self.call, val)
+            #                 yield val
+            #                 self.op.lifecycle_handler.run_after_yield(self.call, val)
+            #         except Exception as e:
+            #             self.exception = e
+            #             if self.should_raise:
+            #                 raise
+            #         else:
+            #             self.op.lifecycle_handler.run_after_yield_all(self.call)
+
+            #     def __getattr__(self, name):
+            #         print(f"Getting {name}")
+            #         # Forward unknown attrs to the original generator
+            #         if name not in {
+            #             "__enter__",
+            #             "__aenter__",
+            #             "__exit__",
+            #             "__aexit__",
+            #             "_wrapped_sync_generator",
+            #             "_wrapped_async_generator",
+            #         }:
+            #             print(f"Forwarding {name} to original context")
+            #             return getattr(self.orig_context, name)
+            #         return getattr(self, name)
+
+            res = SyncGeneratorContextManager(
+                func, args, kwargs, __op, call, __should_raise
+            )
+
+            # @contextmanager
+            # @wraps(func)
+            # def _wrapped_context_manager_yields_sync_generator():
+            #     exception = None
+            #     with func(*args, **kwargs) as original_gen:
+
+            #         def _wrapped_sync_generator():
+            #             nonlocal exception
+            #             try:
+            #                 for val in original_gen:
+            #                     __op.lifecycle_handler.run_before_yield(call, val)
+            #                     yield val
+            #                     __op.lifecycle_handler.run_after_yield(call, val)
+            #             except Exception as e:
+            #                 exception = e
+            #                 if __should_raise:
+            #                     raise
+            #             else:
+            #                 __op.lifecycle_handler.run_after_yield_all(call)
+
+            #         yield _wrapped_sync_generator()
+
+            #     if __op.lifecycle_handler.has_finished:
+            #         raise OpCallError("Should not call finish more than once")
+            #     boxed_output = box.box(call.output)
+            #     client.finish_call(call, boxed_output, exception=exception, op=__op)
+            #     if not call_context.get_current_call():
+            #         print_call_link(call)
+            #     call_context.pop_call(call.id)
+
+            # res = _wrapped_context_manager_yields_sync_generator()
 
         else:
 
@@ -789,7 +975,12 @@ def op(
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportRedeclaration]
                     res, _ = await _execute_op_async(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op, wrapper),
+                        *args,
+                        __should_raise=True,
+                        __should_accumulate=__should_accumulate,
+                        __should_use_contextmanager=__should_use_contextmanager,
+                        **kwargs,
                     )
                     return res
             elif is_async_generator:
@@ -797,7 +988,12 @@ def op(
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportRedeclaration]
                     res, _ = await _execute_op_async(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op, wrapper),
+                        *args,
+                        __should_raise=True,
+                        __should_accumulate=__should_accumulate,
+                        __should_use_contextmanager=__should_use_contextmanager,
+                        **kwargs,
                     )
                     async for v in res:
                         yield v
@@ -926,6 +1122,106 @@ def as_op(fn: Callable) -> Op:
         raise ValueError("fn must be a weave.op() decorated function")
 
     return cast(Op, fn)
+
+
+class SyncGeneratorContextManager:
+    def __init__(self, func, args, kwargs, op, call, should_raise):
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+        self.op = op
+        self.call = call
+        self.should_raise = should_raise
+        self.exception = None
+
+    async def __aenter__(self):
+        print("Entering aenter")
+        self.orig_context = self.func(*self.args, **self.kwargs)
+        self.orig_gen = await self.orig_context.__aenter__()
+        self.gen = self._wrapped_async_generator()
+        return self.gen
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        print("Entering aexit")
+        if self.op.lifecycle_handler.has_finished:
+            raise OpCallError("Should not call finish more than once")
+
+        boxed_output = box.box(self.call.output)
+        client = weave_client_context.require_weave_client()
+        client.finish_call(
+            self.call, boxed_output, exception=self.exception, op=self.op
+        )
+
+        if not call_context.get_current_call():
+            print_call_link(self.call)
+        call_context.pop_call(self.call.id)
+
+        return await self.orig_context.__aexit__(exc_type, exc_val, exc_tb)
+
+    async def _wrapped_async_generator(self):
+        print("Entering wrapped async generator")
+        try:
+            async for val in self.orig_gen:
+                self.op.lifecycle_handler.run_before_yield(call, val)
+                yield val
+                self.op.lifecycle_handler.run_after_yield(call, val)
+        except Exception as e:
+            self.exception = e
+            if self.should_raise:
+                raise
+        else:
+            self.op.lifecycle_handler.run_after_yield_all(call)
+
+    def __enter__(self):
+        print("Entering enter")
+        self.orig_gen = self.func(*self.args, **self.kwargs).__enter__()
+        return self._wrapped_sync_generator()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        print("Entering exit")
+        if self.op.lifecycle_handler.has_finished:
+            raise OpCallError("Should not call finish more than once")
+
+        boxed_output = box.box(self.call.output)
+        client = weave_client_context.require_weave_client()
+        client.finish_call(
+            self.call, boxed_output, exception=self.exception, op=self.op
+        )
+
+        if not call_context.get_current_call():
+            print_call_link(self.call)
+        call_context.pop_call(self.call.id)
+
+        return self.orig_gen.__exit__(exc_type, exc_val, exc_tb)
+
+    def _wrapped_sync_generator(self):
+        print("Entering wrapped sync generator")
+        try:
+            for val in self.orig_gen:
+                self.op.lifecycle_handler.run_before_yield(self.call, val)
+                yield val
+                self.op.lifecycle_handler.run_after_yield(self.call, val)
+        except Exception as e:
+            self.exception = e
+            if self.should_raise:
+                raise
+        else:
+            self.op.lifecycle_handler.run_after_yield_all(self.call)
+
+    def __getattr__(self, name):
+        print(f"Getting {name}")
+        # Forward unknown attrs to the original generator
+        if name not in {
+            "__enter__",
+            "__aenter__",
+            "__exit__",
+            "__aexit__",
+            "_wrapped_sync_generator",
+            "_wrapped_async_generator",
+        }:
+            print(f"Forwarding {name} to original context")
+            return getattr(self.orig_context, name)
+        return getattr(self, name)
 
 
 __docspec__ = [call, calls]
