@@ -219,6 +219,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
   });
 
   // Build tree with collapsed paths
+  // Note: buildTree uses dot notation when building levels
   const tree = buildTree([...collapsedPaths]);
   let groupingModel: GridColumnGroupingModel = tree.children.filter(
     c => 'groupId' in c
@@ -377,7 +378,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
   return {cols, groupingModel};
 };
 
-// Collapse middle area
+// Collapse middle keys
 const collapseMiddlePath = (path: string): string => {
   const parts = path.split('.');
   if (parts.length <= 3) {
