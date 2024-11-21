@@ -210,7 +210,16 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
 ) => {
   const cols: Array<GridColDef<T>> = [];
 
-  const tree = buildTree([...filteredDynamicColumnNames]);
+  // Create a mapping between original and collapsed paths
+  const pathMapping = new Map<string, string>();
+  const collapsedPaths = filteredDynamicColumnNames.map(path => {
+    const collapsed = collapseMiddlePath(path);
+    pathMapping.set(collapsed, path); // Store mapping for value lookup
+    return collapsed;
+  });
+
+  // Build tree with collapsed paths
+  const tree = buildTree([...collapsedPaths]);
   let groupingModel: GridColumnGroupingModel = tree.children.filter(
     c => 'groupId' in c
   ) as GridColumnGroup[];
@@ -258,19 +267,20 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
     return node;
   }) as GridColumnGroupingModel;
 
-  for (const key of filteredDynamicColumnNames) {
+  for (const collapsedKey of collapsedPaths) {
+    const originalKey = pathMapping.get(collapsedKey) ?? collapsedKey;
     const col: GridColDef<T> = {
       flex: 1,
       minWidth: 150,
-      field: key,
-      sortable: columnIsSortable && columnIsSortable(key),
-      headerName: key,
+      field: collapsedKey,
+      sortable: columnIsSortable && columnIsSortable(originalKey),
+      headerName: collapsedKey,
       display: 'flex',
       renderHeader: () => {
-        return <div>{key.split('.').slice(-1)[0]}</div>;
+        return <div>{collapsedKey.split('.').slice(-1)[0]}</div>;
       },
       valueGetter: (unused: any, row: any) => {
-        const val = valueForKey(row, key);
+        const val = valueForKey(row, originalKey);
         if (Array.isArray(val) || typeof val === 'object') {
           try {
             return JSON.stringify(val);
@@ -283,12 +293,12 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       renderCell: cellParams => {
         const {entity, project} = entityProjectFromRow(cellParams.row);
 
-        const val = valueForKey(cellParams.row, key);
+        const val = valueForKey(cellParams.row, originalKey);
         if (val === undefined) {
           return (
             <CellFilterWrapper
               onAddFilter={onAddFilter}
-              field={key}
+              field={originalKey}
               rowId={cellParams.id.toString()}
               operation={'(any): isEmpty'}
               value={undefined}>
@@ -300,7 +310,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
           <ErrorBoundary>
             <CellFilterWrapper
               onAddFilter={onAddFilter}
-              field={key}
+              field={originalKey}
               rowId={cellParams.id.toString()}
               operation={null}
               value={val}
@@ -327,26 +337,26 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       },
     };
 
-    if (groupIds.has(key)) {
+    if (groupIds.has(originalKey)) {
       col.renderHeader = () => {
         return <></>;
       };
-    } else if (columnIsExpanded && onCollapse && columnIsExpanded(key)) {
+    } else if (columnIsExpanded && onCollapse && columnIsExpanded(originalKey)) {
       col.renderHeader = () => {
         return (
           <CollapseHeader
-            headerName={key.split('.').slice(-1)[0]}
-            field={key}
+            headerName={originalKey.split('.').slice(-1)[0]}
+            field={originalKey}
             onCollapse={onCollapse}
           />
         );
       };
-    } else if (columnCanBeExpanded && onExpand && columnCanBeExpanded(key)) {
+    } else if (columnCanBeExpanded && onExpand && columnCanBeExpanded(originalKey)) {
       col.renderHeader = () => {
         return (
           <ExpandHeader
-            headerName={key.split('.').slice(-1)[0]}
-            field={key}
+            headerName={originalKey.split('.').slice(-1)[0]}
+            field={originalKey}
             hasExpand
             onExpand={onExpand}
           />
@@ -357,4 +367,17 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
   }
 
   return {cols, groupingModel};
+};
+
+// Collapse middle area
+const collapseMiddlePath = (path: string): string => {
+  const parts = path.split('.');
+  if (parts.length <= 3) return path;
+
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  // Use unicode character - `buildTree` splits on dot notation and'll undo this
+  const middle = parts.slice(1, -1).join('\u2024');
+
+  return `${first}.${middle}.${last}`;
 };
