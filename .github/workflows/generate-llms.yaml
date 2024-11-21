@@ -1,0 +1,47 @@
+name: Generate llms.txt
+
+on:
+  push:
+    branches:
+      - pr-3045-gh-action  # Adjust if your default branch has a different name
+
+jobs:
+  generate-llms:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'  # Specify the required Python version
+
+      # Step 3: Install Hatch
+      - name: Install Hatch
+        run: pip install hatch
+
+      # Step 4: Install dependencies for docs
+      - name: Install documentation dependencies
+        run: hatch env create llmspy
+
+      # Step 5: Run the script
+      - name: Generate llms.txt
+        run: hatch run llmspy python weave/docs/scripts/generate-llmstxt.py
+
+      # Step 6: Verify generated file (optional)
+      - name: Check if llms.txt exists
+        run: |
+          if [ ! -f weave/docs/static/llms.txt ]; then
+            echo "Error: llms.txt was not generated."
+            exit 1
+          fi
+      - name: Commit and push changes
+        run: |
+          git config user.name "llms.py GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add weave/docs/static/llms.txt
+          git diff-index --quiet HEAD || git commit -m "Auto-generate llms.txt"
+          git push origin test-llmspy-action
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
