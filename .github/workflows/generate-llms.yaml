@@ -27,8 +27,8 @@ jobs:
       - name: Generate llms.txt
         run: |
           source .venv/bin/activate
-          python weave/docs/scripts/generate-llmstxt.py
-          
+          python docs/scripts/generate-llmstxt.py
+
       # Step 6: Verify generated file 
       - name: Check if llms.txt exists
         run: |
