@@ -20,12 +20,21 @@ export const CallSummary: React.FC<{
 }> = ({call}) => {
   const span = call.rawSpan;
   
-  // Process all non-null attributes
+  // Process all non-null attributes, flattening nested objects
   const weaveAttributes = _.reduce(
     span.attributes ?? {},
     (result, value, key) => {
-      if (value != null) {
-        result[key] = value;
+      if (!key.startsWith('_') && value != null) {
+        if (_.isPlainObject(value)) {
+          // Flatten nested objects
+          Object.entries(value).forEach(([nestedKey, nestedValue]) => {
+            if (nestedValue != null) {
+              result[`${key}.${nestedKey}`] = nestedValue;
+            }
+          });
+        } else {
+          result[key] = value;
+        }
       }
       return result;
     },
