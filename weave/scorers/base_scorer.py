@@ -19,6 +19,10 @@ class Scorer(Object):
         description="A mapping from column names in the dataset to the names expected by the scorer",
     )
 
+    def model_post_init(self, __context: Any) -> None:
+        super().model_post_init(__context)
+        _validate_scorer_signature(self)
+
     @weave.op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
@@ -26,6 +30,24 @@ class Scorer(Object):
     @weave.op()
     def summarize(self, score_rows: list) -> Optional[dict]:
         return auto_summarize(score_rows)
+
+
+def _validate_scorer_signature(scorer: Union[Callable, Op, Scorer]) -> bool:
+    """Validate that the scorer signature does not have both `output` and `model_output`.
+
+    Having both `output` and `model_output` in the scorer signature causes
+    issues with scoring because it's ambigious as to which one is the
+    canonical "output", and which is just a regular kwarg.
+    """
+    if isinstance(scorer, Scorer):
+        params = inspect.signature(scorer.score).parameters
+    else:
+        params = inspect.signature(scorer).parameters
+    if "output" in params and "model_output" in params:
+        raise ValueError(
+            "Both 'output' and 'model_output' cannot be in the scorer signature; prefer just using `output`."
+        )
+    return True
 
 
 def stderr(data: Sequence[Union[int, float]]) -> float:

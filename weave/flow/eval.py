@@ -19,6 +19,7 @@ from weave.flow.obj import Object
 from weave.scorers import (
     Scorer,
     _has_oldstyle_scorers,
+    _validate_scorer_signature,
     auto_summarize,
     get_scorer_attributes,
     transpose,
@@ -133,6 +134,9 @@ class Evaluation(Object):
                 pass
             else:
                 raise ValueError(f"Invalid scorer: {scorer}")
+
+            _validate_scorer_signature(scorer)
+
             scorers.append(scorer)
 
         # Determine output key based on scorer types
