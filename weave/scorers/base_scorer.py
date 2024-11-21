@@ -33,6 +33,12 @@ class Scorer(Object):
 
 
 def _validate_scorer_signature(scorer: Union[Callable, Op, Scorer]) -> bool:
+    """Validate that the scorer signature does not have both `output` and `model_output`.
+
+    Having both `output` and `model_output` in the scorer signature causes
+    issues with scoring because it's ambigious as to which one is the
+    canonical "output", and which is just a regular kwarg.
+    """
     if isinstance(scorer, Scorer):
         params = inspect.signature(scorer.score).parameters
     else:

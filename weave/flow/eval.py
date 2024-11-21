@@ -135,9 +135,6 @@ class Evaluation(Object):
             else:
                 raise ValueError(f"Invalid scorer: {scorer}")
 
-            # Having both `output` and `model_output` in the scorer signature
-            # causes issues with scoring because it's ambigious as to which
-            # one is the canonical "output", and which is just a regular kwarg.
             _validate_scorer_signature(scorer)
 
             scorers.append(scorer)
