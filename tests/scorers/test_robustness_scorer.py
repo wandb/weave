@@ -87,4 +87,4 @@ async def test_robustness_scorer_eval():
         scorers=[robustness_scorer],
     )
     result = await evaluation.evaluate(model)
-    assert result["RobustnessScorer"]["cohen_h"]["mean"] == 1.0
+    assert truncate(result["RobustnessScorer"]["cohen_h"]["mean"], 5) == 0.49999

@@ -69,7 +69,10 @@ class RobustnessScorer(Scorer):
         score_o = 1.0 if not ground_truths else binary_scores[0]
 
         # Average perturbed similarity score
-        score_p = sum(binary_scores[1:]) / len(binary_scores[1:])
+        # When ground truths are present, start from index 1
+        # When no ground truths, use all perturbed outputs (already in binary_scores)
+        perturbed_binary_scores = binary_scores[1:] if ground_truths else binary_scores
+        score_p = sum(perturbed_binary_scores) / len(perturbed_binary_scores)
 
         def psi(score: float) -> float:
             return 2 * math.asin(math.sqrt(score))
