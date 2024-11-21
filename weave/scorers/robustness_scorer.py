@@ -1,33 +1,26 @@
 import math
+from typing import Optional, Union
 
 import weave
 from weave.scorers.base_scorer import Scorer
 
 
 class RobustnessScorer(Scorer):
-    """
-    A scorer that evaluates the robustness of an LLM system. The system can be the LLM itself or something more complex like a pipeline.
-
-    # TODO: better detailing
-    The robustness scorer checks for the following:
-    - Robustness to permuted inputs: This robustness metric measures insensitivity of the system's answers to meaning-preserving variants of their input. The permutations are categorized as superficial, paraphrasing and distractions. For more details, refer to the [A Novel Metric for Measuring the Robustness of Large Language Models in Non-adversarial Scenarios](https://arxiv.org/abs/2408.01963v1).
-
-    We use the `cohen's h` to quatify the robustness of the system. Unlike the Performance Drop Rate (PDR), which has certain limitations:
-    - Asymmetry: PDR overweights performance improvements compared to equivalent performance drops, leading to biased results.
-    - Undefined for Zero Scores: PDR is undefined when the original score is zero, causing biased averages by ignoring such cases.
-
-    `cohen's h` is symmetric and well-defined for zero scores, making it a more appropriate metric for measuring robustness.
-    """
-
     @weave.op
-    def score(self, output: list[str]) -> dict:
+    def score(
+        self,
+        output: list[Union[str, bool]],
+        ground_truths: Optional[list[Union[str, bool]]] = None,
+    ) -> dict:
         """
-        Calculates Cohen's h for text outputs by comparing string similarity
-        of perturbed generations with the original generation.
+        Calculates Cohen's h for text outputs by comparing predictions with ground truths.
 
         Args:
-            output (List[str]): A list of strings where the first element is the original
-                                generation and the rest are the perturbed generations.
+            output (List[Union[str, bool]]): Predictions from the system, which can be strings
+                                             or booleans.
+            ground_truths (List[Union[str, bool]], optional): A list of ground truths.
+                - If strings: Compare predicted outputs directly to the ground truth values.
+                - If booleans: Convert `True` to `"True"` and `False` to `"False"` for comparison.
 
         Returns:
             dict: A dictionary containing the original score (1.0), the average similarity
@@ -35,23 +28,48 @@ class RobustnessScorer(Scorer):
         """
         assert (
             len(output) > 1
-        ), "There must be output of at least one perturbed question"
+        ), "There must be output of at least one perturbed question."
 
-        # Original generation (reference output) and perturbed generations
+        if ground_truths:
+            assert len(ground_truths) == len(output), (
+                "Length of ground_truths must match the length of output. "
+                f"Got {len(ground_truths)} ground_truths and {len(output)} outputs."
+            )
+
+        # Normalize `output` and `ground_truths` to strings if necessary
+        output = [str(o) if isinstance(o, bool) else o for o in output]
+        if ground_truths:
+            ground_truths = [
+                str(gt) if isinstance(gt, bool) else gt for gt in ground_truths
+            ]
+
+        # Ensure all elements are strings
+        assert all(isinstance(o, str) for o in output), "All outputs must be strings."
+        if ground_truths:
+            assert all(
+                isinstance(gt, str) for gt in ground_truths
+            ), "All ground_truths must be strings."
+
+        # Original prediction (reference output) and perturbed predictions
         original = output[0]
         perturbed_outputs = output[1:]
 
-        # Compute similarity scores for each perturbed output
-        # TODO: The scores should be provided by the caller especially for reference evaluations.
-        binary_scores = [
-            1 if perturbed == original else 0 for perturbed in perturbed_outputs
-        ]
+        # Determine binary scores
+        if ground_truths:
+            binary_scores = [
+                1 if output[i] == ground_truths[i] else 0 for i in range(len(output))
+            ]
+        else:
+            # Default: Compare perturbed outputs to the original prediction
+            binary_scores = [
+                1 if perturbed == original else 0 for perturbed in perturbed_outputs
+            ]
 
-        # Original score is perfect similarity (1.0) with itself
-        score_o = 1.0
+        # Original score is perfect similarity (1.0) with itself or the ground truth
+        score_o = 1.0 if not ground_truths else binary_scores[0]
 
         # Average perturbed similarity score
-        score_p = sum(binary_scores) / len(binary_scores)
+        score_p = sum(binary_scores[1:]) / len(binary_scores[1:])
 
         def psi(score: float) -> float:
             return 2 * math.asin(math.sqrt(score))
@@ -59,4 +77,4 @@ class RobustnessScorer(Scorer):
         # Normalize Cohen's h by dividing by pi and take absolute value
         h = abs((psi(score_p) - psi(score_o)) / math.pi)
 
-        return {"cohen_h": h}
+        return {"cohen_h": h, "score(original)": score_o, "score(perturbed)": score_p}
