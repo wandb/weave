@@ -387,7 +387,7 @@ const collapseMiddlePath = (path: string): string => {
 
   const first = parts[0];
   const last = parts[parts.length - 1];
-  // Use unicode character - `buildTree` splits on dot notation and'll undo this
+  // Using unicode character - `buildTree` splits on `.` and creates new headers
   const middle = parts.slice(1, -1).join('\u2024');
 
   return `${first}.${middle}.${last}`;
