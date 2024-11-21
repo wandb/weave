@@ -17,22 +17,18 @@ jobs:
         with:
           python-version: '3.x'  # Specify the required Python version
 
-      # Step 3: Install Hatch
-      - name: Install Hatch
-        run: pip install hatch
+      - name: Create virtual environment
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install PyYAML  # Add other dependencies here if needed
 
-      # Step 3.1: Verify Hatch
-      - name: List Hatch environments
-        run: hatch env show
-
-      # Step 4: Install dependencies for docs
-      - name: Install documentation dependencies
-        run: hatch env create llmspy
-
-      # Step 5: Run the script
       - name: Generate llms.txt
-        run: hatch run llmspy python weave/docs/scripts/generate-llmstxt.py
-      
+        run: |
+          source .venv/bin/activate
+          python weave/docs/scripts/generate-llmstxt.py
+          
       # Step 6: Verify generated file 
       - name: Check if llms.txt exists
         run: |
