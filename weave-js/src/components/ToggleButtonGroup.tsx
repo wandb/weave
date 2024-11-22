@@ -53,7 +53,12 @@ export const ToggleButtonGroup = React.forwardRef<
           <ToggleGroup.Item
             key={optionValue}
             value={optionValue}
-            disabled={isDisabled || value === optionValue}>
+            disabled={isDisabled || value === optionValue}
+            className={twMerge(
+              'first:rounded-l-sm', // First button rounded left
+              'last:rounded-r-sm', // Last button rounded right
+              'overflow-hidden'
+            )}>
             <Button
               icon={icon}
               size={size}
@@ -70,8 +75,7 @@ export const ToggleButtonGroup = React.forwardRef<
                 value === optionValue
                   ? 'bg-teal-300/[0.48] text-teal-600 hover:bg-teal-300/[0.48]'
                   : 'hover:bg-oblivion/7 bg-oblivion/5 text-moon-600 hover:text-moon-800',
-                'first:rounded-l-sm', // First button rounded left
-                'last:rounded-r-sm' // Last button rounded right
+                'rounded-none'
               )}>
               {optionValue}
             </Button>
