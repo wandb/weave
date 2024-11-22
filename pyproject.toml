@@ -134,7 +134,6 @@ exclude = [
   "weave/clear_cache.py",
 ]
 
-
 [tool.pytest.ini_options]
 filterwarnings = [
   # treat warnings as errors
