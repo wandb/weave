@@ -156,6 +156,9 @@ async def test_content_generation_async(client):
     assert_correct_summary(call.summary, trace_name)
 
 
+@pytest.mark.skip(
+    reason="This test depends on a non-deterministic external service provider"
+)
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 def test_send_message(client):
@@ -191,6 +194,9 @@ def test_send_message(client):
     assert_code_execution(output)
 
 
+@pytest.mark.skip(
+    reason="This test depends on a non-deterministic external service provider"
+)
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 def test_send_message_stream(client):
@@ -231,6 +237,9 @@ def test_send_message_stream(client):
     assert_code_execution(output)
 
 
+@pytest.mark.skip(
+    reason="This test depends on a non-deterministic external service provider"
+)
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
