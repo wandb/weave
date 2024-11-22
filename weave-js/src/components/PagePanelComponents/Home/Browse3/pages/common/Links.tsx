@@ -451,6 +451,7 @@ export const OpVersionsLink: React.FC<{
   filter?: WFHighLevelOpVersionFilter;
   neverPeek?: boolean;
   variant?: LinkVariant;
+  children?: React.ReactNode;
 }> = props => {
   const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
   const router = props.neverPeek ? baseRouter : peekingRouter;
@@ -458,9 +459,13 @@ export const OpVersionsLink: React.FC<{
     <Link
       $variant={props.variant}
       to={router.opVersionsUIUrl(props.entity, props.project, props.filter)}>
-      {props.versionCount}
-      {props.countIsLimited ? '+' : ''} version
-      {props.versionCount !== 1 ? 's' : ''}
+      {props.children ?? (
+        <>
+          {props.versionCount}
+          {props.countIsLimited ? '+' : ''} version
+          {props.versionCount !== 1 ? 's' : ''}
+        </>
+      )}
     </Link>
   );
 };

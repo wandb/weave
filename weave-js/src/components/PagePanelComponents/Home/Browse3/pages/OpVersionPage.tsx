@@ -20,6 +20,7 @@ import {TabUseOp} from './TabUseOp';
 import {useWFHooks} from './wfReactInterface/context';
 import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
 import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
+import {Icon} from '../../../../Icon';
 
 export const OpVersionPage: React.FC<{
   entity: string;
@@ -75,34 +76,45 @@ const OpVersionPageInner: React.FC<{
     <SimplePageLayoutWithHeader
       title={opVersionText(opId, versionIndex)}
       headerContent={
-        <SimpleKeyValueTable
-          data={{
-            Name: (
-              <>
-                {opId}{' '}
-                {opVersions.loading ? (
-                  <LoadingDots />
-                ) : (
-                  <>
-                    [
-                    <OpVersionsLink
-                      entity={entity}
-                      project={project}
-                      filter={{
-                        opName: opId,
-                      }}
-                      versionCount={opVersionCount}
-                      neverPeek
-                      variant="secondary"
+        <Tailwind>
+          <div className="grid grid-cols-3 gap-[8px] text-[14px] w-full">
+            <div className="block">
+              <p className="text-moon-500">Name:</p>
+              <div className="flex items-center">
+                <OpVersionsLink
+                  entity={entity}
+                  project={project}
+                  filter={{
+                    opName: opId,
+                  }}
+                  versionCount={opVersionCount}
+                  neverPeek
+                  variant="secondary"
+                >
+                  <div className="flex font-semibold items-center group">
+                    <span>{opId}</span>
+                    {opVersions.loading ? (
+                      <LoadingDots />
+                    ) : (
+                      <span className="ml-[4px]">({opVersionCount} version{opVersionCount !== 1 ? 's' : ''})</span>
+                    )}
+                    <Icon 
+                      name="forward-next" 
+                      width={16} 
+                      height={16}
+                      className="ml-[2px] opacity-0 group-hover:opacity-100"
                     />
-                    ]
-                  </>
-                )}
-              </>
-            ),
-            Version: <>{versionIndex}</>,
-            Calls:
-              !callsStats.loading || opVersionCallCount > 0 ? (
+                  </div>
+                </OpVersionsLink>
+              </div>
+            </div>
+            <div className="block">
+              <p className="text-moon-500">Version:</p>
+              <p>{versionIndex}</p>
+            </div>
+            <div className="block">
+              <p className="text-moon-500">Calls:</p>
+              {!callsStats.loading || opVersionCallCount > 0 ? (
                 <CallsLink
                   entity={entity}
                   project={project}
@@ -114,10 +126,11 @@ const OpVersionPageInner: React.FC<{
                   variant="secondary"
                 />
               ) : (
-                <></>
-              ),
-          }}
-        />
+                <p>-</p>
+              )}
+            </div>
+          </div>
+        </Tailwind>
       }
       tabs={[
         {
