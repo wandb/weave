@@ -81,7 +81,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
             }}>
             Add as
             <Button
-              className="ml-4"
+              className="ml-4 rounded-r-none"
               variant="secondary"
               size="medium"
               active={addMessageRole === 'assistant'}
@@ -89,6 +89,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
               Assistant
             </Button>
             <Button
+              className="rounded-l-none"
               variant="secondary"
               size="medium"
               active={addMessageRole === 'user'}
