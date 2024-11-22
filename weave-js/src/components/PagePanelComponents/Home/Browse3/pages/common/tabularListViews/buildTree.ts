@@ -70,15 +70,18 @@ function addToTree(
   // Combine middle layers into a single group name
   const isFirstLevel = depth === 0;
   const isLastLevel = fields.length === 2;
-  
+
   let groupName: string;
   let remainingFields: string[];
   let groupId: string;
-  
+
   if (isFirstLevel || isLastLevel) {
     groupName = fields[0];
     remainingFields = fields.slice(1);
-    groupId = fullPath.split('.').slice(0, depth + 1).join('.');
+    groupId = fullPath
+      .split('.')
+      .slice(0, depth + 1)
+      .join('.');
   } else {
     // Combine all middle fields with + separator
     groupName = fields.slice(0, -1).join('.');
