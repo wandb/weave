@@ -137,6 +137,20 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 label="Presence penalty"
                 value={playgroundState.presencePenalty}
               />
+
+              {/* TODO: Add this back in, N times to run is not supported for all models */}
+              {/* Shawn said to run multiple requests if its not supported */}
+              {/* <PlaygroundSlider
+                min={1}
+                max={100}
+                step={1}
+                setValue={value =>
+                  setPlaygroundStateField(idx, 'nTimes', value)
+                }
+                label="n times to run"
+                value={playgroundState.nTimes}
+              /> */}
+
               <Box
                 sx={{
                   width: '100%',

@@ -48,6 +48,16 @@ export const PlaygroundChat = ({
     setChatText
   );
 
+  const {handleRetry, handleSend} = useChatCompletionFunctions(
+    setPlaygroundStates,
+    setIsLoading,
+    chatText,
+    playgroundStates,
+    entity,
+    project,
+    setChatText
+  );
+
   const {deleteMessage, editMessage, deleteChoice, editChoice, addMessage} =
     useChatFunctions(setPlaygroundStateField);
 
