@@ -75,6 +75,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
           <Box
             sx={{
               display: 'flex',
+              alignItems: 'center',
               color: MOON_500,
               fontSize: '12px',
             }}>
