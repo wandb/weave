@@ -148,7 +148,7 @@ const handleMissingLLMApiKey = (responses: any, entity: string): boolean => {
       handleMissingLLMApiKey(response, entity);
     });
   } else {
-    if (responses && responses.api_key && responses.reason) {
+    if (responses?.api_key && responses.reason) {
       toast(
         <div>
           <div>{responses.reason}</div>

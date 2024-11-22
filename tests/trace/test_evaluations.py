@@ -1007,3 +1007,25 @@ async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
     assert feedback["feedback_type"] == "wandb.runnable.MyScorer"
     assert feedback["payload"] == {"output": True}
     assert feedback["runnable_ref"] == get_ref(scorer).uri()
+
+
+def test_scorers_with_output_and_model_output_raise_error():
+    class MyScorer(Scorer):
+        @weave.op
+        def score(self, text, output, model_output):
+            return text == output == model_output
+
+    @weave.op
+    def my_second_scorer(text, output, model_output):
+        return text == output == model_output
+
+    ds = [{"text": "hello"}]
+
+    with pytest.raises(ValueError, match="Both 'output' and 'model_output'"):
+        scorer = MyScorer()
+
+    with pytest.raises(ValueError, match="Both 'output' and 'model_output'"):
+        evaluation = weave.Evaluation(dataset=ds, scorers=[MyScorer()])
+
+    with pytest.raises(ValueError, match="Both 'output' and 'model_output'"):
+        evaluation = weave.Evaluation(dataset=ds, scorers=[my_second_scorer])

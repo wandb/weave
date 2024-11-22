@@ -42,6 +42,13 @@ export const FeedbackGridInner = ({
         if (params.row.feedback_type === 'wandb.reaction.1') {
           return params.row.payload.emoji;
         }
+        if (params.row.feedback_type.startsWith('wandb.annotation.')) {
+          return (
+            <CellValueString
+              value={JSON.stringify(params.row.payload.value ?? null)}
+            />
+          );
+        }
         return <CellValueString value={JSON.stringify(params.row.payload)} />;
       },
     },

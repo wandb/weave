@@ -3,10 +3,10 @@ import classNames from 'classnames';
 import _ from 'lodash';
 import React, {useEffect, useRef, useState} from 'react';
 
-import {PlaygroundMessagePanelEditor} from './PlaygroundMessagePanelEditor';
-import {PlaygroundMessagePanelButtons} from './PlaygroundMessagePanellButtons';
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
 import {MessagePanelPart} from './MessagePanelPart';
+import {PlaygroundMessagePanelButtons} from './PlaygroundMessagePanelButtons';
+import {PlaygroundMessagePanelEditor} from './PlaygroundMessagePanelEditor';
 import {ShowMoreButton} from './ShowMoreButton';
 import {ToolCalls} from './ToolCalls';
 import {Message, ToolCall} from './types';
@@ -64,7 +64,7 @@ export const MessagePanel = ({
   return (
     <div className={classNames('flex gap-8', {'mt-24': !isTool})}>
       {!isNested && !isSystemPrompt && (
-        <div className="w-32">
+        <div className="w-32 flex-shrink-0">
           {!isUser && !isTool && (
             <Callout
               size="small"
@@ -77,13 +77,13 @@ export const MessagePanel = ({
       )}
 
       <div
-        className={classNames('relative overflow-visible rounded-lg', {
-          'pb-40': isOverflowing && isShowingMore,
+        className={classNames('relative w-full overflow-visible', {
+          'rounded-lg': !isNested,
           'border-t border-moon-250': isTool,
-          'bg-moon-100': isSystemPrompt,
+          'bg-moon-100': isSystemPrompt || hasToolCalls,
           'bg-cactus-300/[0.24]': isUser,
-          'w-full': !isUser,
-          'max-w-3xl': isUser,
+          'max-w-full': !isUser,
+          'max-w-[768px]': isUser,
           'ml-auto': isUser,
           'mr-auto': !isUser,
           'py-8': hasContent,
@@ -100,7 +100,7 @@ export const MessagePanel = ({
           )}
 
           {isTool && (
-            <div className={classNames({'px-16': isNested}, 'pb-8')}>
+            <div className={classNames('pb-8')}>
               <div className="text-sm font-semibold text-moon-500">
                 Response
               </div>
@@ -166,16 +166,21 @@ export const MessagePanel = ({
 
           {/* Playground buttons (retry, edit, delete) */}
           {isPlayground && isHovering && !editorHeight && (
-            <PlaygroundMessagePanelButtons
-              index={index}
-              isChoice={isChoice ?? false}
-              isTool={isTool}
-              hasContent={hasContent}
-              isNested={isNested ?? false}
-              contentRef={contentRef}
-              setEditorHeight={setEditorHeight}
-              responseIndexes={responseIndexes}
-            />
+            <div
+              className={classNames(
+                'absolute flex w-full items-center justify-start pt-20',
+                isNested ? 'bottom-0' : 'bottom-[-32px]'
+              )}>
+              <PlaygroundMessagePanelButtons
+                index={message.original_index ?? index}
+                isChoice={isChoice ?? false}
+                isTool={isTool}
+                hasContent={hasContent}
+                contentRef={contentRef}
+                setEditorHeight={setEditorHeight}
+                responseIndexes={responseIndexes}
+              />
+            </div>
           )}
         </div>
       </div>

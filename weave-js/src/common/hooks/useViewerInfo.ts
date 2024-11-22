@@ -11,6 +11,7 @@ const VIEWER_QUERY = gql`
     viewer {
       id
       username
+      admin
       teams {
         edges {
           node {
@@ -28,6 +29,7 @@ type UserInfo = {
   id: string;
   username: string;
   teams: string[];
+  admin: boolean;
 };
 type UserInfoResponseLoading = {
   loading: true;
@@ -71,6 +73,7 @@ export const useViewerInfo = (): UserInfoResponse => {
           id,
           username,
           teams,
+          admin: userInfo.admin,
         },
       });
     });
