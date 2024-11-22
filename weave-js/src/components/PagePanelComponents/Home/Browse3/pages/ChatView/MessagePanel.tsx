@@ -67,7 +67,7 @@ export const MessagePanel = ({
         <div className="w-32 flex-shrink-0">
           {!isUser && !isTool && (
             <Callout
-              size="small"
+              size="x-small"
               icon="robot-service-member"
               color="moon"
               className="h-32 w-32"
@@ -84,8 +84,8 @@ export const MessagePanel = ({
           'bg-cactus-300/[0.24]': isUser,
           'max-w-full': !isUser,
           'max-w-[768px]': isUser,
-          'ml-auto': isUser,
-          'mr-auto': !isUser,
+          'ml-auto py-8': isUser,
+          'mr-auto pt-4 pb-8': !isUser,
           'py-8': hasContent,
         })}
         onMouseEnter={() => setIsHovering(true)}
@@ -93,7 +93,7 @@ export const MessagePanel = ({
         <div>
           {isSystemPrompt && (
             <div className="flex justify-between px-16">
-              <div className="text-sm text-moon-500">
+              <div className="text-moon-500">
                 {message.role.charAt(0).toUpperCase() + message.role.slice(1)}
               </div>
             </div>
@@ -101,7 +101,7 @@ export const MessagePanel = ({
 
           {isTool && (
             <div className={classNames('pb-8')}>
-              <div className="text-sm font-semibold text-moon-500">
+              <div className="text-[14px] font-semibold text-moon-500">
                 Response
               </div>
             </div>
@@ -129,7 +129,6 @@ export const MessagePanel = ({
                   <div
                     className={classNames(
                       hasToolCalls ? 'pb-8' : '',
-                      ' text-sm',
                       {'px-16': isSystemPrompt || isUser}
                     )}>
                     {_.isString(message.content) ? (
