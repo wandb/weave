@@ -1,10 +1,12 @@
+import jsonschema
+import pytest
+from pydantic import BaseModel, Field
+
+import weave
 from weave.flow.annotation_spec import AnnotationSpec
 from weave.trace_server.clickhouse_trace_server_batched import InvalidRequest
 from weave.trace_server.trace_server_interface import FeedbackCreateReq, ObjQueryReq
-from pydantic import BaseModel, Field
-import pytest
-import jsonschema
-import weave
+
 
 def test_human_feedback_basic(client):
     # create a human feedback spec
@@ -62,22 +64,30 @@ def test_human_feedback_basic(client):
     }
 
     # Attempt to add valid and invalid payloads
-    client.server.feedback_create(FeedbackCreateReq.model_validate({
-        "project_id": client._project_id(),
-        "weave_ref": "weave:///entity/project/call/name:digest",
-        "feedback_type": "wandb.annotation." + ref1.name,
-        "annotation_ref": ref1.uri(),
-        "payload": {"value": 0},
-    }))
+    client.server.feedback_create(
+        FeedbackCreateReq.model_validate(
+            {
+                "project_id": client._project_id(),
+                "weave_ref": "weave:///entity/project/call/name:digest",
+                "feedback_type": "wandb.annotation." + ref1.name,
+                "annotation_ref": ref1.uri(),
+                "payload": {"value": 0},
+            }
+        )
+    )
 
     with pytest.raises(InvalidRequest):
-        client.server.feedback_create(FeedbackCreateReq.model_validate({
-            "project_id": client._project_id(),
-            "weave_ref": "weave:///entity/project/call/name:digest",
-            "feedback_type": "wandb.annotation." + ref1.name,
-            "annotation_ref": ref1.uri(),
-            "payload": {"value": 42},
-        }))
+        client.server.feedback_create(
+            FeedbackCreateReq.model_validate(
+                {
+                    "project_id": client._project_id(),
+                    "weave_ref": "weave:///entity/project/call/name:digest",
+                    "feedback_type": "wandb.annotation." + ref1.name,
+                    "annotation_ref": ref1.uri(),
+                    "payload": {"value": 42},
+                }
+            )
+        )
 
 
 def test_field_schema_with_pydantic_model(client):
@@ -106,13 +116,19 @@ def test_field_schema_with_pydantic_model(client):
     )
 
     # Find our new spec
-    pydantic_spec = next(obj for obj in objects.objs if obj.val["name"] == "Pydantic Model Feedback")
-    
+    pydantic_spec = next(
+        obj for obj in objects.objs if obj.val["name"] == "Pydantic Model Feedback"
+    )
+
     # Verify the schema was properly converted
     assert pydantic_spec.val["field_schema"]["type"] == "object"
     assert "properties" in pydantic_spec.val["field_schema"]
-    assert set(pydantic_spec.val["field_schema"]["properties"].keys()) == {"rating", "comment", "category"}
-    
+    assert set(pydantic_spec.val["field_schema"]["properties"].keys()) == {
+        "rating",
+        "comment",
+        "category",
+    }
+
     # Verify specific field constraints were preserved
     rating_schema = pydantic_spec.val["field_schema"]["properties"]["rating"]
     assert rating_schema["type"] == "integer"
@@ -127,44 +143,63 @@ def test_field_schema_with_pydantic_model(client):
     assert category_schema["type"] == "string"
     assert set(category_schema["enum"]) == {"good", "bad", "neutral"}
 
-        # Attempt to add valid and invalid payloads
-    client.server.feedback_create(FeedbackCreateReq.model_validate({
-        "project_id": client._project_id(),
-        "weave_ref": "weave:///entity/project/call/name:digest",
-        "feedback_type": "wandb.annotation." + ref.name,
-        "annotation_ref": ref.uri(),
-        "payload": {"value": {
-            "rating": 1,
-            "comment": "Good work!",
-            "category": "good",
-        }},
-    }))
+    # Attempt to add valid and invalid payloads
+    client.server.feedback_create(
+        FeedbackCreateReq.model_validate(
+            {
+                "project_id": client._project_id(),
+                "weave_ref": "weave:///entity/project/call/name:digest",
+                "feedback_type": "wandb.annotation." + ref.name,
+                "annotation_ref": ref.uri(),
+                "payload": {
+                    "value": {
+                        "rating": 1,
+                        "comment": "Good work!",
+                        "category": "good",
+                    }
+                },
+            }
+        )
+    )
 
     with pytest.raises(InvalidRequest):
-        client.server.feedback_create(FeedbackCreateReq.model_validate({
-            "project_id": client._project_id(),
-            "weave_ref": "weave:///entity/project/call/name:digest",
-            "feedback_type": "wandb.annotation." + ref.name,
-            "annotation_ref": ref.uri(),
-            "payload": {"value": {
-                "rating": 'not a number',
-                "comment": "Good work!",
-                "category": "good",
-            }},
-        }))
+        client.server.feedback_create(
+            FeedbackCreateReq.model_validate(
+                {
+                    "project_id": client._project_id(),
+                    "weave_ref": "weave:///entity/project/call/name:digest",
+                    "feedback_type": "wandb.annotation." + ref.name,
+                    "annotation_ref": ref.uri(),
+                    "payload": {
+                        "value": {
+                            "rating": "not a number",
+                            "comment": "Good work!",
+                            "category": "good",
+                        }
+                    },
+                }
+            )
+        )
 
 
 def test_field_schema_with_pydantic_field(client):
     # Test various field types
     rating_field = Field(ge=1, le=5, description="Rating from 1 to 5")
-    text_field = Field(min_length=10, max_length=100, pattern="^[A-Za-z ]+$", description="Text feedback")
-    enum_field = Field(enum=["excellent", "good", "fair", "poor"], description="Category selection")
-    
+    text_field = Field(
+        min_length=10,
+        max_length=100,
+        pattern="^[A-Za-z ]+$",
+        description="Text feedback",
+    )
+    enum_field = Field(
+        enum=["excellent", "good", "fair", "poor"], description="Category selection"
+    )
+
     # Test rating field
     col1 = AnnotationSpec(
         name="Rating Field",
         description="A rating field using Pydantic Field",
-        field_schema=rating_field
+        field_schema=rating_field,
     )
     ref1 = weave.publish(col1, "rating field spec")
     assert ref1
@@ -173,7 +208,7 @@ def test_field_schema_with_pydantic_field(client):
     col2 = AnnotationSpec(
         name="Text Field",
         description="A text field using Pydantic Field",
-        field_schema=text_field
+        field_schema=text_field,
     )
     ref2 = weave.publish(col2, "text field spec")
     assert ref2
@@ -182,7 +217,7 @@ def test_field_schema_with_pydantic_field(client):
     col3 = AnnotationSpec(
         name="Enum Field",
         description="An enum field using Pydantic Field",
-        field_schema=enum_field
+        field_schema=enum_field,
     )
     ref3 = weave.publish(col3, "enum field spec")
     assert ref3
@@ -201,7 +236,7 @@ def test_field_schema_with_pydantic_field(client):
     rating_spec = next(obj for obj in objects.objs if obj.val["name"] == "Rating Field")
     text_spec = next(obj for obj in objects.objs if obj.val["name"] == "Text Field")
     enum_spec = next(obj for obj in objects.objs if obj.val["name"] == "Enum Field")
-    
+
     # Verify rating field schema
     assert rating_spec.val["field_schema"]["minimum"] == 1
     assert rating_spec.val["field_schema"]["maximum"] == 5
@@ -215,7 +250,12 @@ def test_field_schema_with_pydantic_field(client):
 
     # Verify enum field schema
     assert text_spec.val["field_schema"]["type"] == "string"
-    assert set(enum_spec.val["field_schema"]["enum"]) == {"excellent", "good", "fair", "poor"}
+    assert set(enum_spec.val["field_schema"]["enum"]) == {
+        "excellent",
+        "good",
+        "fair",
+        "poor",
+    }
     assert enum_spec.val["field_schema"]["description"] == "Category selection"
 
 
@@ -227,14 +267,14 @@ def test_annotation_spec_validation():
             "type": "number",
             "minimum": 1,
             "maximum": 5,
-        }
+        },
     )
-    
+
     # Valid cases
     number_spec.validate(3)
     number_spec.validate(1)
     number_spec.validate(5)
-    
+
     # Invalid cases
     with pytest.raises(jsonschema.exceptions.ValidationError):
         number_spec.validate(0)  # too low
@@ -242,120 +282,119 @@ def test_annotation_spec_validation():
         number_spec.validate(6)  # too high
     with pytest.raises(jsonschema.exceptions.ValidationError):
         number_spec.validate("3")  # wrong type
-    
+
     # Test validation with Pydantic model schema
     class FeedbackModel(BaseModel):
         rating: int = Field(ge=1, le=5)
         comment: str = Field(max_length=100)
         tags: list[str] = Field(min_length=1, max_length=3)
 
-    model_spec = AnnotationSpec(
-        name="Complex Feedback",
-        field_schema=FeedbackModel
-    )
-    
+    model_spec = AnnotationSpec(name="Complex Feedback", field_schema=FeedbackModel)
+
     # Valid cases
-    model_spec.validate({
-        "rating": 4,
-        "comment": "Good work!",
-        "tags": ["positive", "helpful"]
-    })
-    
+    model_spec.validate(
+        {"rating": 4, "comment": "Good work!", "tags": ["positive", "helpful"]}
+    )
+
     # Invalid cases
     with pytest.raises(jsonschema.exceptions.ValidationError):
-        model_spec.validate({
-            "rating": 4,
-            "comment": "Good work!"
-            # missing tags
-        })
-    
+        model_spec.validate(
+            {
+                "rating": 4,
+                "comment": "Good work!",
+                # missing tags
+            }
+        )
+
     with pytest.raises(jsonschema.exceptions.ValidationError):
-        model_spec.validate({
-            "rating": 6,  # invalid rating
-            "comment": "Good work!",
-            "tags": ["positive"]
-        })
-    
+        model_spec.validate(
+            {
+                "rating": 6,  # invalid rating
+                "comment": "Good work!",
+                "tags": ["positive"],
+            }
+        )
+
     with pytest.raises(jsonschema.exceptions.ValidationError):
-        model_spec.validate({
-            "rating": 4,
-            "comment": "Good work!",
-            "tags": []  # empty tags list
-        })
-    
+        model_spec.validate(
+            {
+                "rating": 4,
+                "comment": "Good work!",
+                "tags": [],  # empty tags list
+            }
+        )
+
     # Test validation with Pydantic Field schema
     enum_field = Field(enum=["excellent", "good", "fair", "poor"])
-    enum_spec = AnnotationSpec(
-        name="Simple Enum",
-        field_schema=enum_field
-    )
-    
+    enum_spec = AnnotationSpec(name="Simple Enum", field_schema=enum_field)
+
     # Valid cases
     enum_spec.validate("good")
     enum_spec.validate("excellent")
-    
+
     # Invalid cases
     with pytest.raises(jsonschema.exceptions.ValidationError):
         enum_spec.validate("invalid_choice")
     with pytest.raises(jsonschema.exceptions.ValidationError):
         enum_spec.validate(123)
 
+
 def test_annotation_spec_validation_with_complex_types():
     # Test nested object validation
     class Address(BaseModel):
         street: str
         city: str
-        zip_code: str = Field(pattern=r'^\d{5}$')
+        zip_code: str = Field(pattern=r"^\d{5}$")
 
     class PersonFeedback(BaseModel):
         name: str
         age: int = Field(ge=0, le=120)
         addresses: list[Address] = Field(min_length=1, max_length=3)
 
-    person_spec = AnnotationSpec(
-        name="Person Feedback",
-        field_schema=PersonFeedback
-    )
-    
+    person_spec = AnnotationSpec(name="Person Feedback", field_schema=PersonFeedback)
+
     # Valid case
-    person_spec.validate({
-        "name": "John Doe",
-        "age": 30,
-        "addresses": [
-            {
-                "street": "123 Main St",
-                "city": "Springfield",
-                "zip_code": "12345"
-            }
-        ]
-    })
-    
-    # Invalid cases
-    with pytest.raises(jsonschema.exceptions.ValidationError):
-        person_spec.validate({
+    person_spec.validate(
+        {
             "name": "John Doe",
             "age": 30,
             "addresses": [
-                {
-                    "street": "123 Main St",
-                    "city": "Springfield",
-                    "zip_code": "123"  # invalid zip code
-                }
-            ]
-        })
-    
+                {"street": "123 Main St", "city": "Springfield", "zip_code": "12345"}
+            ],
+        }
+    )
+
+    # Invalid cases
     with pytest.raises(jsonschema.exceptions.ValidationError):
-        person_spec.validate({
-            "name": "John Doe",
-            "age": 150,  # invalid age
-            "addresses": [
-                {
-                    "street": "123 Main St",
-                    "city": "Springfield",
-                    "zip_code": "12345"
-                }
-            ]
-        })
+        person_spec.validate(
+            {
+                "name": "John Doe",
+                "age": 30,
+                "addresses": [
+                    {
+                        "street": "123 Main St",
+                        "city": "Springfield",
+                        "zip_code": "123",  # invalid zip code
+                    }
+                ],
+            }
+        )
+
+    with pytest.raises(jsonschema.exceptions.ValidationError):
+        person_spec.validate(
+            {
+                "name": "John Doe",
+                "age": 150,  # invalid age
+                "addresses": [
+                    {
+                        "street": "123 Main St",
+                        "city": "Springfield",
+                        "zip_code": "12345",
+                    }
+                ],
+            }
+        )
+
 
 def test_annotation_spec_validate_return_value():
     # Test with a simple numeric schema
@@ -365,66 +404,79 @@ def test_annotation_spec_validate_return_value():
             "type": "number",
             "minimum": 1,
             "maximum": 5,
-        }
+        },
     )
-    
+
     # Valid cases should return True
     assert number_spec.validate(3) is True
     assert number_spec.validate(1) is True
     assert number_spec.validate(5) is True
-    
+
     # Invalid cases should return False
     assert number_spec.validate(0) is False  # too low
     assert number_spec.validate(6) is False  # too high
     assert number_spec.validate("3") is False  # wrong type
-    
+
     # Test with a Pydantic model schema
     class FeedbackModel(BaseModel):
         rating: int = Field(ge=1, le=5)
         comment: str = Field(max_length=100)
         tags: list[str] = Field(min_length=1, max_length=3)
 
-    model_spec = AnnotationSpec(
-        name="Complex Feedback",
-        field_schema=FeedbackModel
-    )
-    
+    model_spec = AnnotationSpec(name="Complex Feedback", field_schema=FeedbackModel)
+
     # Valid case should return True
-    assert model_spec.validate({
-        "rating": 4,
-        "comment": "Good work!",
-        "tags": ["positive", "helpful"]
-    }) is True
-    
+    assert (
+        model_spec.validate(
+            {"rating": 4, "comment": "Good work!", "tags": ["positive", "helpful"]}
+        )
+        is True
+    )
+
     # Invalid cases should return False
-    assert model_spec.validate({
-        "rating": 4,
-        "comment": "Good work!"
-        # missing tags
-    }) is False
-    
-    assert model_spec.validate({
-        "rating": 6,  # invalid rating
-        "comment": "Good work!",
-        "tags": ["positive"]
-    }) is False
-    
-    assert model_spec.validate({
-        "rating": 4,
-        "comment": "Good work!",
-        "tags": []  # empty tags list
-    }) is False
-    
+    assert (
+        model_spec.validate(
+            {
+                "rating": 4,
+                "comment": "Good work!",
+                # missing tags
+            }
+        )
+        is False
+    )
+
+    assert (
+        model_spec.validate(
+            {
+                "rating": 6,  # invalid rating
+                "comment": "Good work!",
+                "tags": ["positive"],
+            }
+        )
+        is False
+    )
+
+    assert (
+        model_spec.validate(
+            {
+                "rating": 4,
+                "comment": "Good work!",
+                "tags": [],  # empty tags list
+            }
+        )
+        is False
+    )
+
     # Test with a Pydantic Field schema
     enum_spec = AnnotationSpec(
         name="Simple Enum",
-        field_schema=Field(enum=["excellent", "good", "fair", "poor"])
+        field_schema=Field(enum=["excellent", "good", "fair", "poor"]),
     )
-    
+
     # Valid cases should return True
     assert enum_spec.validate("good") is True
     assert enum_spec.validate("excellent") is True
-    
+
     # Invalid cases should return False
     assert enum_spec.validate("invalid_choice") is False
     assert enum_spec.validate(123) is False

@@ -1338,10 +1338,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             data = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[req.annotation_ref]))
             if len(data.vals) == 0:
                 raise InvalidRequest(f"Annotation ref {req.annotation_ref} not found")
-            is_valid = AnnotationSpec.model_validate(data.vals[0]).validate(req.payload['value'])
+            is_valid = AnnotationSpec.model_validate(data.vals[0]).validate(
+                req.payload["value"]
+            )
             if not is_valid:
-                raise InvalidRequest(f"Feedback payload does not match annotation spec")
-            
+                raise InvalidRequest("Feedback payload does not match annotation spec")
 
         # Augment emoji with alias.
         res_payload = {}

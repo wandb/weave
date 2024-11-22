@@ -1,14 +1,14 @@
-from typing import Optional, Union, Type, Dict, Any
+from typing import Any, Optional
 
 import jsonschema
-from pydantic import BaseModel, field_validator, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.fields import FieldInfo
 
 from weave.trace_server.interface.base_object_classes import base_object_def
 
 
 class AnnotationSpec(base_object_def.BaseObject):
-    field_schema: Dict[str, Any] = Field(
+    field_schema: dict[str, Any] = Field(
         default={},
         description="Expected to be valid JSON Schema. Can be provided as a dict, a Pydantic model class, or a Pydantic Field",
         examples=[
@@ -42,19 +42,28 @@ class AnnotationSpec(base_object_def.BaseObject):
         ],
     )
 
-    @field_validator("field_schema")
-    def validate_field_schema(cls, v: Union[Dict[str, Any], Type[BaseModel], FieldInfo]) -> Dict[str, Any]:
+    @model_validator(mode="before")
+    @classmethod
+    def preprocess_field_schema(cls, data: dict[str, Any]) -> dict[str, Any]:
+        if "field_schema" not in data:
+            return data
+
+        field_schema = data["field_schema"]
+
         # Handle Pydantic Field
-        if isinstance(v, FieldInfo):
-            return v.json_schema()
-        
+        if isinstance(field_schema, FieldInfo):
+            data["field_schema"] = field_schema.json_schema()
+            return data
+
         # Handle Pydantic model
-        if isinstance(v, type) and issubclass(v, BaseModel):
-            return v.model_json_schema()
-            
-        # Handle direct schema dict
-        schema = v
-            
+        if isinstance(field_schema, type) and issubclass(field_schema, BaseModel):
+            data["field_schema"] = field_schema.model_json_schema()  # type: ignore
+            return data
+
+        return data
+
+    @field_validator("field_schema")
+    def validate_field_schema(cls, schema: dict[str, Any]) -> dict[str, Any]:
         # Validate the schema
         try:
             jsonschema.validate(None, schema)
@@ -67,10 +76,10 @@ class AnnotationSpec(base_object_def.BaseObject):
     def validate(self, payload: Any) -> bool:
         """
         Validates a payload against this annotation spec's schema.
-        
+
         Args:
             payload: The data to validate against the schema
-            
+
         Returns:
             bool: True if validation succeeds, False otherwise
         """
