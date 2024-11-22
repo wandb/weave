@@ -22,6 +22,7 @@ from weave.scorers.llm_utils import (
     embed,
 )
 from weave.scorers.moderation_scorer import (
+    CustomGenderRaceBiasScorer,
     GenderRaceBiasScorer,
     OpenAIModerationScorer,
     RollingWindowScorer,
@@ -74,4 +75,5 @@ __all__ = [
     "create_perturbed_dataset",
     "LlamaGuard",
     "CoherenceScorer",
+    "CustomGenderRaceBiasScorer",
 ]

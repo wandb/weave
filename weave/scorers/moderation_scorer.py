@@ -7,15 +7,6 @@ from weave.scorers.base_scorer import Scorer
 from weave.scorers.llm_scorer import LLMScorer
 from weave.scorers.llm_utils import _LLM_CLIENTS, OPENAI_DEFAULT_MODERATION_MODEL
 
-try:
-    import torch
-    from transformers import AutoModelForSequenceClassification, AutoTokenizer
-except ImportError:
-    import_failed = True
-    print(
-        "The `transformers` package is required to use LlamaGuard, please run `pip install transformers`"
-    )
-
 if TYPE_CHECKING:
     from torch import Tensor
 
@@ -238,6 +229,13 @@ class ToxicScorer(RollingWindowScorer):
     ]
 
     def model_post_init(self, __context: Any) -> None:
+        try:
+            import torch
+            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+        except ImportError:
+            print(
+                "The `transformers` package is required to use ToxicScorer, please run `pip install transformers`"
+            )
         """Initialize the toxicity model and tokenizer."""
         if not torch.cuda.is_available() and self.device == "cuda":
             raise ValueError("CUDA is not available")
@@ -287,10 +285,6 @@ class GenderRaceBiasScorer(ToxicScorer):
     overlap: int = 50
     categories: list[str] = ["racial_bias", "gender_bias"]
 
-    def model_post_init(self, __context: Any) -> None:
-        """Initialize the toxicity model and tokenizer."""
-        super().model_post_init(__context)
-
     def predict(self, prompt: str) -> list[float]:
         """
         Extract predictions for Race/Origin and Gender/Sex categories.
@@ -336,9 +330,6 @@ class GenderRaceBiasScorer(ToxicScorer):
         }
 
 
-from transformers import pipeline
-
-
 class PipelineScorer(Scorer):
     task: str
     model_name: str
@@ -347,6 +338,12 @@ class PipelineScorer(Scorer):
     _pipeline: Any = PrivateAttr()
 
     def model_post_init(self, __context: Any) -> None:
+        try:
+            from transformers import pipeline
+        except ImportError:
+            print(
+                "The `transformers` package is required to use PipelineScorer, please run `pip install transformers`"
+            )
         self._pipeline = pipeline(
             self.task, model=self.model_name, device=self.device, **self.pipeline_kwargs
         )
