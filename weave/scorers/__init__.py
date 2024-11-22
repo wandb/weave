@@ -1,6 +1,7 @@
 from weave.scorers.base_scorer import (
     Scorer,
     _has_oldstyle_scorers,
+    _validate_scorer_signature,
     auto_summarize,
     get_scorer_attributes,
 )
@@ -31,6 +32,10 @@ from weave.scorers.ragas_scorer import (
     ContextEntityRecallScorer,
     ContextRelevancyScorer,
 )
+from weave.scorers.robustness_scorer import (
+    RobustnessScorer,
+    create_perturbed_dataset,
+)
 from weave.scorers.similarity_scorer import EmbeddingSimilarityScorer
 from weave.scorers.string_scorer import (
     LevenshteinScorer,
@@ -55,6 +60,7 @@ __all__ = [
     "LLMScorer",
     "MultiTaskBinaryClassificationF1",
     "OpenAIModerationScorer",
+    "RobustnessScorer",
     "RollingWindowScorer",
     "ToxicScorer",
     "GenderRaceBiasScorer",
@@ -64,6 +70,8 @@ __all__ = [
     "SummarizationScorer",
     "transpose",
     "ValidXMLScorer",
+    "_validate_scorer_signature",
+    "create_perturbed_dataset",
     "LlamaGuard",
     "CoherenceScorer",
 ]

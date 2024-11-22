@@ -30,37 +30,6 @@ export const TabUsePrompt = ({
   const isParentObject = !ref.artifactRefExtra;
   const label = isParentObject ? 'prompt version' : 'prompt';
 
-  // TODO: Simplify if no params.
-  const longExample = `import weave
-from openai import OpenAI
-
-weave.init("${projectName}")
-
-${pythonName} = weave.ref("${uri}").get()
-
-class MyModel(weave.Model):
-  model_name: str
-  prompt: weave.Prompt
-
-  @weave.op
-  def predict(self, params: dict) -> dict:
-      client = OpenAI()
-      response = client.chat.completions.create(
-          model=self.model_name,
-          messages=self.prompt.bind(params),
-      )
-      result = response.choices[0].message.content
-      if result is None:
-          raise ValueError("No response from model")
-      return result
-
-mymodel = MyModel(model_name="gpt-3.5-turbo", prompt=${pythonName})
-
-# Replace with desired parameter values
-params = ${JSON.stringify({}, null, 2)}
-print(mymodel.predict(params))
-`;
-
   return (
     <Box className="text-sm">
       <Alert icon="lightbulb-info">
@@ -82,15 +51,6 @@ print(mymodel.predict(params))
         <CopyableText
           text={`${pythonName} = weave.ref("${abbreviateRef(uri)}").get()`}
           copyText={`${pythonName} = weave.ref("${uri}").get()`}
-          tooltipText="Click to copy unabridged string"
-        />
-      </Box>
-
-      <Box mt={2}>A more complete example:</Box>
-      <Box mt={2}>
-        <CopyableText
-          text={longExample}
-          copyText={longExample}
           tooltipText="Click to copy unabridged string"
         />
       </Box>
