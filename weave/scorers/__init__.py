@@ -9,10 +9,10 @@ from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
     transpose,
 )
+from weave.scorers.coherence_scorer import CoherenceScorer
 from weave.scorers.hallucination_scorer import HallucinationFreeScorer
 from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.llamaguard_scorer import LlamaGuard
-from weave.scorers.coherence_scorer import CoherenceScorer
 from weave.scorers.llm_scorer import (
     InstructorLLMScorer,
     LLMScorer,
@@ -22,10 +22,10 @@ from weave.scorers.llm_utils import (
     embed,
 )
 from weave.scorers.moderation_scorer import (
+    GenderRaceBiasScorer,
     OpenAIModerationScorer,
     RollingWindowScorer,
     ToxicScorer,
-    GenderRaceBiasScorer,
 )
 from weave.scorers.pydantic_scorer import PydanticScorer
 from weave.scorers.ragas_scorer import (

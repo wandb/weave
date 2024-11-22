@@ -1,5 +1,4 @@
 import math
-import random
 import string
 
 import pytest
@@ -7,16 +6,16 @@ import pytest
 import weave
 from weave.scorers import RobustnessScorer
 from weave.scorers.robustness_scorer import (
-    create_perturbed_dataset,
-    butterfingers,
     add_whitespace,
-    swap_chars,
-    remove_punctuation,
-    random_case_change,
-    random_capitalization,
-    text_noise,
-    split_merge_words,
+    butterfingers,
+    create_perturbed_dataset,
     emphasize_words,
+    random_capitalization,
+    random_case_change,
+    remove_punctuation,
+    split_merge_words,
+    swap_chars,
+    text_noise,
 )
 
 

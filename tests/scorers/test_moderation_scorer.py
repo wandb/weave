@@ -1,9 +1,12 @@
-import pytest
+from typing import Any
 from unittest.mock import MagicMock, patch
-from weave.scorers.moderation_scorer import RollingWindowScorer
+
+import pytest
 import torch
 from torch import Tensor
-from typing import Any
+
+from weave.scorers.moderation_scorer import RollingWindowScorer
+
 
 # Define a concrete subclass for testing since RollingWindowScorer is abstract
 class TestRollingWindowScorer(RollingWindowScorer):
@@ -16,11 +19,13 @@ class TestRollingWindowScorer(RollingWindowScorer):
         """Mock score method for testing."""
         return {}
 
+
 @pytest.fixture
 def scorer():
     scorer_instance = TestRollingWindowScorer()
     scorer_instance.model_post_init(None)
     return scorer_instance
+
 
 @pytest.mark.asyncio
 async def test_tokenize_input(scorer):
@@ -37,29 +42,24 @@ async def test_tokenize_input(scorer):
     # Assert the tokenized input is as expected
     assert torch.equal(result, expected_tensor.to(scorer.device))
 
+
 @pytest.mark.asyncio
 async def test_aggregate_predictions_max(scorer):
     scorer.aggregation_method = "max"
-    all_predictions = [
-        [1, 2, 3],
-        [4, 5, 6],
-        [7, 8, 9]
-    ]
+    all_predictions = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
     expected = [7, 8, 9]
     result = scorer.aggregate_predictions(all_predictions)
     assert result == expected
 
+
 @pytest.mark.asyncio
 async def test_aggregate_predictions_average(scorer):
     scorer.aggregation_method = "average"
-    all_predictions = [
-        [1, 2, 3],
-        [4, 5, 6],
-        [7, 8, 9]
-    ]
+    all_predictions = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
     expected = [4.0, 5.0, 6.0]
     result = scorer.aggregate_predictions(all_predictions)
     assert result == expected
+
 
 @pytest.mark.asyncio
 async def test_aggregate_predictions_invalid_method(scorer):
@@ -69,17 +69,21 @@ async def test_aggregate_predictions_invalid_method(scorer):
         scorer.aggregate_predictions(all_predictions)
     assert "Unsupported aggregation method" in str(exc_info.value)
 
+
 @pytest.mark.asyncio
 async def test_predict_long_within_limit(scorer):
     prompt = "Short input."
     input_ids = Tensor([[1, 2, 3]])
     scorer.predict_chunk = MagicMock(return_value=[0, 1])
 
-    with patch.object(scorer, 'tokenize_input', return_value=input_ids):
-        with patch.object(scorer, 'predict_long', return_value=[0, 1]) as mock_predict_long:
+    with patch.object(scorer, "tokenize_input", return_value=input_ids):
+        with patch.object(
+            scorer, "predict_long", return_value=[0, 1]
+        ) as mock_predict_long:
             predictions = scorer.predict(prompt)
             mock_predict_long.assert_called_with(input_ids)
             assert predictions == [0, 1]
+
 
 @pytest.mark.asyncio
 async def test_tokenize_input_without_truncation(scorer):
