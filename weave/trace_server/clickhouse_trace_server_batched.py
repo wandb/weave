@@ -40,7 +40,6 @@ from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 
-from weave.flow.annotation_spec import AnnotationSpec
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
@@ -1331,18 +1330,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
-        validate_feedback_create_req(req)
-
-        if req.annotation_ref is not None:
-            # TODO: Make this more robust
-            data = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[req.annotation_ref]))
-            if len(data.vals) == 0:
-                raise InvalidRequest(f"Annotation ref {req.annotation_ref} not found")
-            is_valid = AnnotationSpec.model_validate(data.vals[0]).validate(
-                req.payload["value"]
-            )
-            if not is_valid:
-                raise InvalidRequest("Feedback payload does not match annotation spec")
+        validate_feedback_create_req(req, self)
 
         # Augment emoji with alias.
         res_payload = {}
