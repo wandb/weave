@@ -116,9 +116,9 @@ export const PlaygroundChat = ({
                 sx={{
                   position: 'absolute',
                   top: '8px',
-                  width: 'calc(100% - 32px)',
-                  left: '16px',
-                  right: '16px',
+                  width: 'calc(100% - 16px)',
+                  left: '8px',
+                  right: '8px',
                   zIndex: 10,
                 }}>
                 <PlaygroundChatTopBar
@@ -196,6 +196,7 @@ export const PlaygroundChat = ({
         isLoading={isLoading}
         onSend={handleSend}
         onAdd={handleAddMessage}
+        settingsTab={settingsTab}
       />
     </Box>
   );

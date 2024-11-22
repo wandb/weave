@@ -15,6 +15,7 @@ type PlaygroundChatInputProps = {
   isLoading: boolean;
   onSend: (role: 'assistant' | 'user') => void;
   onAdd: (role: 'assistant' | 'user', text: string) => void;
+  settingsTab: number | null;
 };
 
 export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
@@ -23,6 +24,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   isLoading,
   onSend,
   onAdd,
+  settingsTab,
 }) => {
   const [addMessageRole, setAddMessageRole] = useState<'assistant' | 'user'>(
     'user'
@@ -38,35 +40,34 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   return (
     <Box
       sx={{
-        width: 'calc(100% - 32px)',
-        maxHeight: '500px',
-        minWidth: '500px',
-        maxWidth: '800px',
-        marginX: '16px',
-        marginBottom: '16px',
-        borderRadius: '4px',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        gap: '8px',
-        position: 'relative',
+        position: 'fixed',
+        bottom: '0',
+        left: '58px',
+        paddingBottom: '16px',
+        paddingTop: '8px',
+        backgroundColor: 'white',
+        width: settingsTab !== null ? 'calc(100% - 58px - 320px)' : 'calc(100% - 58px)',
       }}>
       <Box
         sx={{
-          position: 'absolute',
-          top: '-30px',
-          right: '0',
-          fontSize: '12px',
-          color: MOON_500,
+          maxWidth: '800px',
+          marginX: 'auto',
         }}>
-        Press CMD + Enter to send
-      </Box>
-      <StyledTextArea
-        onChange={e => setChatText(e.target.value)}
-        value={chatText}
-        onKeyDown={handleKeyDown}
-      />
-      <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
+        <Box
+          sx={{
+            marginBottom: '4px',
+            textAlign: 'right',
+            fontSize: '12px',
+            color: MOON_500,
+          }}>
+          Press CMD + Enter to send
+        </Box>
+        <StyledTextArea
+          onChange={e => setChatText(e.target.value)}
+          value={chatText}
+          onKeyDown={handleKeyDown}
+        />
+        <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
         <Box sx={{display: 'flex', gap: '8px'}}>
           {/* TODO: Add image upload */}
           {/* <Button variant="secondary" size="small" startIcon="photo" /> */}
@@ -112,6 +113,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
             startIcon={isLoading ? 'loading' : undefined}>
             {isLoading ? 'Sending...' : 'Send'}
           </Button>
+          </Box>
         </Box>
       </Box>
     </Box>
