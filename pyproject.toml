@@ -77,6 +77,9 @@ scorers_tests = [
   "anthropic>=0.30.0",
   "sentence-transformers>=3.3.1",
   "scikit-learn>=1.5.2",
+  "transformers>=4.35.0",
+  "accelerate>=1.0.0",
+  "torch>=2.2.0",
 ]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]

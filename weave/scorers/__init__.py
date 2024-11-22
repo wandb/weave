@@ -11,6 +11,8 @@ from weave.scorers.classification_scorer import (
 )
 from weave.scorers.hallucination_scorer import HallucinationFreeScorer
 from weave.scorers.json_scorer import ValidJSONScorer
+from weave.scorers.llamaguard_scorer import LlamaGuard
+from weave.scorers.coherence_scorer import CoherenceScorer
 from weave.scorers.llm_scorer import (
     InstructorLLMScorer,
     LLMScorer,
@@ -19,7 +21,12 @@ from weave.scorers.llm_utils import (
     create,
     embed,
 )
-from weave.scorers.moderation_scorer import OpenAIModerationScorer
+from weave.scorers.moderation_scorer import (
+    OpenAIModerationScorer,
+    RollingWindowScorer,
+    ToxicScorer,
+    GenderRaceBiasScorer,
+)
 from weave.scorers.pydantic_scorer import PydanticScorer
 from weave.scorers.ragas_scorer import (
     ContextEntityRecallScorer,
@@ -54,6 +61,9 @@ __all__ = [
     "MultiTaskBinaryClassificationF1",
     "OpenAIModerationScorer",
     "RobustnessScorer",
+    "RollingWindowScorer",
+    "ToxicScorer",
+    "GenderRaceBiasScorer",
     "PydanticScorer",
     "Scorer",
     "StringMatchScorer",
@@ -62,4 +72,6 @@ __all__ = [
     "ValidXMLScorer",
     "_validate_scorer_signature",
     "create_perturbed_dataset",
+    "LlamaGuard",
+    "CoherenceScorer",
 ]
