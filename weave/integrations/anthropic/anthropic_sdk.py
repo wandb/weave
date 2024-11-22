@@ -65,14 +65,34 @@ class AnthropicCallback:
 
 
 class AnthropicStreamingCallback:
+    # def before_iteration(self, call: Call) -> None:
+    #     call.output = ""
+
+    def before_call_start(
+        self, inputs: dict, parent: Call | None, attributes: dict | None
+    ) -> None:
+        print(
+            f">>> AnthropicStreamingCallback.before_call_start: {inputs=} {parent=} {attributes=}"
+        )
+
     def before_iteration(self, call: Call) -> None:
-        call.output = ""
+        print(f">>> AnthropicStreamingCallback.before_iteration: {call=}")
+
+    def before_yield(self, call: Call, value: Any) -> None:
+        print(f">>> AnthropicStreamingCallback.before_yield: {call=} {value=}")
 
     def after_yield(self, call: Call, value: Any) -> None:
+        print(f">>> AnthropicStreamingCallback.after_yield: {call=} {value=}")
         from anthropic.lib.streaming._types import MessageStopEvent
+
+        if call.output is None:
+            call.output = ""
 
         if isinstance(value, MessageStopEvent):
             call.output = value.message
+
+    def before_call_finish(self, call: Call) -> None:
+        print(f">>> AnthropicStreamingCallback.before_call_finish: {call=}")
 
 
 def create_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
