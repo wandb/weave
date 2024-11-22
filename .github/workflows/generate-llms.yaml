@@ -29,17 +29,11 @@ jobs:
           source .venv/bin/activate
           python $GITHUB_WORKSPACE/docs/scripts/generate_llmstxt.py
 
-      - name: Check if llms.txt exists
-        run: |
-          if [ ! -f weave/docs/static/llms.txt ]; then
-            echo "Error: llms.txt was not generated."
-            exit 1
-          fi
       - name: Commit and push changes
         run: |
           git config user.name "llms.py GitHub Actions Bot"
           git config user.email "actions@github.com"
-          git add weave/docs/static/llms.txt
+          git add docs/static/llms.txt
           git diff-index --quiet HEAD || git commit -m "Auto-generate llms.txt"
           git push origin test-llmspy-action
         env:
