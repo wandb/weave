@@ -1,11 +1,13 @@
 {
   "name": "weave",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "AI development toolkit",
   "types": "dist/src/index.d.ts",
   "main": "dist/src/index.js",
   "type": "commonjs",
   "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
     "test": "jest --silent",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch",
@@ -14,6 +16,10 @@
     "generate-api": "swagger-typescript-api -p ./weave.openapi.json -o ./src/generated -n traceServerApi.ts",
     "dev": "nodemon"
   },
+  "files": [
+    "dist",
+    "src"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/wandb/weave/js"
