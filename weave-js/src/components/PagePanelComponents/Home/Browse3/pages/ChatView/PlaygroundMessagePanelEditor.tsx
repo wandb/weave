@@ -78,12 +78,12 @@ export const PlaygroundMessagePanelEditor: React.FC<
         }}
       />
       <div className="z-100 mt-8 flex justify-end gap-8">
-        <Button variant="quiet" size="small" onClick={handleCancel}>
+        <Button variant="quiet" size="medium" onClick={handleCancel}>
           Cancel
         </Button>
         <Button
           variant="primary"
-          size="small"
+          size="medium"
           onClick={
             pendingToolResponseId
               ? () =>
