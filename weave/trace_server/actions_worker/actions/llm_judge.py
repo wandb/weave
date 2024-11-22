@@ -2,7 +2,7 @@ import json
 from typing import Any
 
 from weave.trace_server.interface.base_object_classes.actions import (
-    LlmJudgeActionSpec,
+    LlmJudgeActionConfig,
 )
 from weave.trace_server.trace_server_interface import (
     CallSchema,
@@ -13,7 +13,7 @@ from weave.trace_server.trace_server_interface import (
 
 def do_llm_judge_action(
     project_id: str,
-    config: LlmJudgeActionSpec,
+    config: LlmJudgeActionConfig,
     call: CallSchema,
     trace_server: TraceServerInterface,
 ) -> Any:

@@ -47,6 +47,7 @@ import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
+import {ComparePage} from './Browse3/compare/ComparePage';
 import {
   baseContext,
   browse2Context,
@@ -73,7 +74,6 @@ import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {
   ALWAYS_PIN_LEFT_CALLS,
-  DEFAULT_COLUMN_VISIBILITY_CALLS,
   DEFAULT_FILTER_CALLS,
   DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
@@ -95,6 +95,7 @@ import {OpsPage} from './Browse3/pages/OpsPage';
 import {OpVersionPage} from './Browse3/pages/OpVersionPage';
 import {OpVersionsPage} from './Browse3/pages/OpVersionsPage';
 import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
+import {ScorersPage} from './Browse3/pages/ScorersPage/ScorersPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
@@ -157,6 +158,7 @@ const tabOptions = [
   'leaderboards',
   'boards',
   'tables',
+  'scorers',
 ];
 const tabs = tabOptions.join('|');
 const browse3Paths = (projectRoot: string) => [
@@ -498,6 +500,9 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
         </Route>
+        <Route path={`${projectRoot}/:tab(scorers)`}>
+          <ScorersPageBinding />
+        </Route>
         <Route
           path={[
             `${projectRoot}/leaderboards/:itemName`,
@@ -531,6 +536,9 @@ const Browse3ProjectRoot: FC<{
             `${projectRoot}/playground`,
           ]}>
           <PlaygroundPageBinding />
+        </Route>
+        <Route path={`${projectRoot}/compare`}>
+          <ComparePageBinding />
         </Route>
       </Switch>
     </Box>
@@ -731,7 +739,7 @@ const CallsPageBinding = () => {
     try {
       return JSON.parse(query.cols);
     } catch (e) {
-      return DEFAULT_COLUMN_VISIBILITY_CALLS;
+      return {};
     }
   }, [query.cols]);
   const setColumnVisibilityModel = (newModel: GridColumnVisibilityModel) => {
@@ -994,6 +1002,11 @@ const CompareEvaluationsBinding = () => {
   );
 };
 
+const ScorersPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  return <ScorersPage entity={entity} project={project} />;
+};
+
 const LeaderboardPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
   const {entity, project, itemName: leaderboardName} = params;
@@ -1028,6 +1041,12 @@ const TablesPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
 
   return <TablesPage entity={params.entity} project={params.project} />;
+};
+
+const ComparePageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+
+  return <ComparePage entity={params.entity} project={params.project} />;
 };
 
 const AppBarLink = (props: ComponentProps<typeof RouterLink>) => (
@@ -1133,11 +1152,13 @@ const Browse3Breadcrumbs: FC = props => {
 
 export const TableRowSelectionContext = React.createContext<{
   rowIdsConfigured: boolean;
+  rowIdInTable: (id: string) => boolean;
   setRowIds?: (rowIds: string[]) => void;
   getNextRowId?: (currentId: string) => string | null;
   getPreviousRowId?: (currentId: string) => string | null;
 }>({
   rowIdsConfigured: false,
+  rowIdInTable: (id: string) => false,
   setRowIds: () => {},
   getNextRowId: () => null,
   getPreviousRowId: () => null,
@@ -1148,6 +1169,10 @@ const TableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
 }) => {
   const [rowIds, setRowIds] = useState<string[]>([]);
   const rowIdsConfigured = useMemo(() => rowIds.length > 0, [rowIds]);
+  const rowIdInTable = useCallback(
+    (currentId: string) => rowIds.includes(currentId),
+    [rowIds]
+  );
 
   const getNextRowId = useCallback(
     (currentId: string) => {
@@ -1173,7 +1198,13 @@ const TableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
 
   return (
     <TableRowSelectionContext.Provider
-      value={{rowIdsConfigured, setRowIds, getNextRowId, getPreviousRowId}}>
+      value={{
+        rowIdsConfigured,
+        rowIdInTable,
+        setRowIds,
+        getNextRowId,
+        getPreviousRowId,
+      }}>
       {children}
     </TableRowSelectionContext.Provider>
   );

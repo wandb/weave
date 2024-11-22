@@ -7,6 +7,11 @@ from tests.trace.util import client_is_sqlite
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.trace_server_interface import (
+    FeedbackCreateReq,
+    FeedbackQueryReq,
+    FeedbackReplaceReq,
+)
 
 
 def test_client_feedback(client) -> None:
@@ -173,9 +178,11 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         "wb_user_id": "shawn",
         "creator": None,
         # Sad - seems like sqlite and clickhouse remote different types here
-        "created_at": create_res.created_at.isoformat().replace("T", " ")
-        if client_is_sqlite(client)
-        else MatchAnyDatetime(),
+        "created_at": (
+            create_res.created_at.isoformat().replace("T", " ")
+            if client_is_sqlite(client)
+            else MatchAnyDatetime()
+        ),
         "feedback_type": feedback_type,
         "payload": payload,
         "annotation_ref": annotation_ref,
@@ -321,9 +328,11 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "wb_user_id": "shawn",
         "creator": None,
         # Sad - seems like sqlite and clickhouse remote different types here
-        "created_at": create_res.created_at.isoformat().replace("T", " ")
-        if client_is_sqlite(client)
-        else MatchAnyDatetime(),
+        "created_at": (
+            create_res.created_at.isoformat().replace("T", " ")
+            if client_is_sqlite(client)
+            else MatchAnyDatetime()
+        ),
         "feedback_type": feedback_type,
         "payload": payload,
         "annotation_ref": None,
@@ -535,3 +544,80 @@ def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
     calls = list(calls)
     assert len(calls) == 2
     assert [c.id for c in calls] == [ids[2], ids[0]]
+
+
+def test_feedback_replace(client) -> None:
+    # Create initial feedback
+    create_req = FeedbackCreateReq(
+        project_id="test/project",
+        weave_ref="weave:///test/project/obj/123:abc",
+        feedback_type="reaction",
+        payload={"emoji": "👍"},
+        wb_user_id="test_user",
+    )
+    initial_feedback = client.server.feedback_create(create_req)
+
+    # Create another feedback with different type
+    note_feedback = client.server.feedback_create(
+        FeedbackCreateReq(
+            project_id="test/project",
+            weave_ref="weave:///test/project/obj/456:def",
+            feedback_type="note",
+            payload={"note": "This is a test note"},
+            wb_user_id="test_user",
+        )
+    )
+
+    # Replace the first feedback with new content
+    replace_req = FeedbackReplaceReq(
+        project_id="test/project",
+        weave_ref="weave:///test/project/obj/123:abc",
+        feedback_type="note",
+        payload={"note": "Updated feedback"},
+        feedback_id=initial_feedback.id,
+        wb_user_id="test_user",
+    )
+    replaced_feedback = client.server.feedback_replace(replace_req)
+
+    # Verify the replacement
+    assert note_feedback.id != replaced_feedback.id
+
+    # Verify the other feedback remains unchanged
+    query_res = client.server.feedback_query(
+        FeedbackQueryReq(
+            project_id="test/project", fields=["id", "feedback_type", "payload"]
+        )
+    )
+
+    feedbacks = query_res.result
+    assert len(feedbacks) == 2
+
+    # Find the non-replaced feedback and verify it's unchanged
+    other_feedback = next(f for f in feedbacks if f["id"] == note_feedback.id)
+    assert other_feedback["feedback_type"] == "note"
+    assert other_feedback["payload"] == {"note": "This is a test note"}
+
+    # now replace the replaced feedback with the original content
+    replace_req = FeedbackReplaceReq(
+        project_id="test/project",
+        weave_ref="weave:///test/project/obj/123:abc",
+        feedback_type="reaction",
+        payload={"emoji": "👍"},
+        feedback_id=replaced_feedback.id,
+        wb_user_id="test_user",
+    )
+    replaced_feedback = client.server.feedback_replace(replace_req)
+
+    assert replaced_feedback.id != initial_feedback.id
+
+    # Verify the latest feedback payload
+    query_res = client.server.feedback_query(
+        FeedbackQueryReq(
+            project_id="test/project", fields=["id", "feedback_type", "payload"]
+        )
+    )
+    feedbacks = query_res.result
+    assert len(feedbacks) == 2
+    new_feedback = next(f for f in feedbacks if f["id"] == replaced_feedback.id)
+    assert new_feedback["feedback_type"] == "reaction"
+    assert new_feedback["payload"] == {"emoji": "👍"}

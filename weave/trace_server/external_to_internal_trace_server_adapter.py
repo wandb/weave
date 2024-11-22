@@ -327,6 +327,18 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.feedback_purge, req)
 
+    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        original_user_id = req.wb_user_id
+        if original_user_id is None:
+            raise ValueError("wb_user_id cannot be None")
+        req.wb_user_id = self._idc.ext_to_int_user_id(original_user_id)
+        res = self._ref_apply(self._internal_trace_server.feedback_replace, req)
+        if res.wb_user_id != req.wb_user_id:
+            raise ValueError("Internal Error - User Mismatch")
+        res.wb_user_id = original_user_id
+        return res
+
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.cost_create, req)

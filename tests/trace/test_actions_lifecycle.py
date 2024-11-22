@@ -4,7 +4,7 @@ import weave
 from tests.trace.util import client_is_sqlite
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.interface.base_object_classes.actions import (
-    ActionDefinition,
+    ActionSpec,
 )
 from weave.trace_server.trace_server_interface import (
     ActionsExecuteBatchReq,
@@ -22,9 +22,9 @@ def test_action_lifecycle_word_count(client: WeaveClient):
     action_name = "my_contains_words_action"
 
     published_ref = weave.publish(
-        ActionDefinition(
+        ActionSpec(
             name=action_name,
-            spec={
+            config={
                 "action_type": "contains_words",
                 "target_words": ["mindful", "demure"],
             },

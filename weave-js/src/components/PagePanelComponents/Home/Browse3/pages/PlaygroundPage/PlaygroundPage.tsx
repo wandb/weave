@@ -4,6 +4,8 @@ import React, {useEffect, useMemo, useState} from 'react';
 
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
+import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
+import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
 import {DEFAULT_SYSTEM_MESSAGE, usePlaygroundState} from './usePlaygroundState';
 
 export type PlaygroundPageProps = {
@@ -15,7 +17,7 @@ export type PlaygroundPageProps = {
 export const PlaygroundPage = (props: PlaygroundPageProps) => {
   return (
     <SimplePageLayout
-      title={'Playground (dev)'}
+      title={'Playground (preview)'}
       hideTabsIfSingle
       tabs={[
         {
@@ -29,15 +31,15 @@ export const PlaygroundPage = (props: PlaygroundPageProps) => {
 
 export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
   const {
-    setPlaygroundStateFromTraceCall,
+    setPlaygroundStates,
     playgroundStates,
     setPlaygroundStateField,
+    setPlaygroundStateFromTraceCall,
   } = usePlaygroundState();
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const {useCall, useCalls} = useWFHooks();
   const [settingsTab, setSettingsTab] = useState<number | null>(null);
 
-  const {useCall} = useWFHooks();
   const call = useCall(
     useMemo(() => {
       return props.callId
@@ -49,6 +51,10 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
         : null;
     }, [props.entity, props.project, props.callId])
   );
+
+  const {result: calls} = useCalls(props.entity, props.project, {
+    callIds: playgroundStates.map(state => state.traceCall.id || ''),
+  });
 
   useEffect(() => {
     if (!call.loading && call.result) {
@@ -68,7 +74,22 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
     }
     // Only set the call the first time the page loads, and we get the call
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.callId]);
+  }, [call.loading]);
+
+  useEffect(() => {
+    setPlaygroundStates(prev => {
+      const newStates = [...prev];
+      for (const [idx, state] of newStates.entries()) {
+        for (const c of calls || []) {
+          if (state.traceCall.id === c.callId) {
+            newStates[idx] = {...state, traceCall: c.traceCall || {}};
+            break;
+          }
+        }
+      }
+      return newStates;
+    });
+  }, [calls, setPlaygroundStates]);
 
   return (
     <Box
@@ -87,9 +108,24 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           <WeaveLoader />
         </Box>
       ) : (
-        <div>Playground</div>
+        <PlaygroundChat
+          playgroundStates={playgroundStates}
+          setPlaygroundStates={setPlaygroundStates}
+          setPlaygroundStateField={setPlaygroundStateField}
+          entity={props.entity}
+          project={props.project}
+          setSettingsTab={setSettingsTab}
+          settingsTab={settingsTab}
+        />
       )}
-      {settingsTab !== null && <div>Settings</div>}
+      {settingsTab !== null && (
+        <PlaygroundSettings
+          playgroundStates={playgroundStates}
+          setPlaygroundStateField={setPlaygroundStateField}
+          settingsTab={settingsTab}
+          setSettingsTab={setSettingsTab}
+        />
+      )}
     </Box>
   );
 };
