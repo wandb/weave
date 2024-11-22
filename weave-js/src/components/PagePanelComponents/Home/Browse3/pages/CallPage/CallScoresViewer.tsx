@@ -259,7 +259,7 @@ export const CallScoresViewer: React.FC<{
               lineHeight: '20px',
               alignItems: 'center',
             }}>
-            <CellValue value={value} isExpanded={false} />
+            <CellValue value={value} />
           </Box>
         );
       },
