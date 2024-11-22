@@ -42,9 +42,6 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
         maxHeight: '500px',
         minWidth: '500px',
         maxWidth: '800px',
-        border: `2px solid ${TEAL_500}`,
-        padding: '8px',
-        paddingLeft: '12px',
         marginX: '16px',
         marginBottom: '16px',
         borderRadius: '4px',
@@ -85,14 +82,14 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
             <Button
               className="ml-4"
               variant="secondary"
-              size="small"
+              size="medium"
               active={addMessageRole === 'assistant'}
               onClick={() => setAddMessageRole('assistant')}>
               Assistant
             </Button>
             <Button
               variant="secondary"
-              size="small"
+              size="medium"
               active={addMessageRole === 'user'}
               onClick={() => setAddMessageRole('user')}>
               User
@@ -100,14 +97,14 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
           </Box>
           <Button
             variant="secondary"
-            size="small"
+            size="medium"
             startIcon="add-new"
             onClick={() => onAdd(addMessageRole, chatText)}>
             Add
           </Button>
           <Divider orientation="vertical" flexItem sx={{bgcolor: MOON_250}} />
           <Button
-            size="small"
+            size="medium"
             onClick={() => onSend(addMessageRole)}
             disabled={isLoading || chatText.trim() === ''}
             startIcon={isLoading ? 'loading' : undefined}>
