@@ -1,15 +1,16 @@
-from typing import Optional
+from typing import Optional, Union, Type, Dict, Any
 
 import jsonschema
-from pydantic import Field, field_validator
+from pydantic import BaseModel, field_validator, Field
+from pydantic.fields import FieldInfo
 
 from weave.trace_server.interface.base_object_classes import base_object_def
 
 
 class AnnotationSpec(base_object_def.BaseObject):
-    json_schema: dict = Field(
+    field_schema: Dict[str, Any] = Field(
         default={},
-        description="Expected to be valid JSON Schema",
+        description="Expected to be valid JSON Schema. Can be provided as a dict, a Pydantic model class, or a Pydantic Field",
         examples=[
             # String feedback
             {"type": "string", "max_length": 100},
@@ -41,12 +42,40 @@ class AnnotationSpec(base_object_def.BaseObject):
         ],
     )
 
-    @field_validator("json_schema")
-    def validate_json_schema(cls, v: dict) -> dict:
+    @field_validator("field_schema")
+    def validate_field_schema(cls, v: Union[Dict[str, Any], Type[BaseModel], FieldInfo]) -> Dict[str, Any]:
+        # Handle Pydantic Field
+        if isinstance(v, FieldInfo):
+            return v.json_schema()
+        
+        # Handle Pydantic model
+        if isinstance(v, type) and issubclass(v, BaseModel):
+            return v.model_json_schema()
+            
+        # Handle direct schema dict
+        schema = v
+            
+        # Validate the schema
         try:
-            jsonschema.validate(None, v)
+            jsonschema.validate(None, schema)
         except jsonschema.exceptions.SchemaError as e:
             raise e
         except jsonschema.exceptions.ValidationError:
             pass  # we don't care that `None` does not conform
-        return v
+        return schema
+
+    def validate(self, payload: Any) -> bool:
+        """
+        Validates a payload against this annotation spec's schema.
+        
+        Args:
+            payload: The data to validate against the schema
+            
+        Returns:
+            bool: True if validation succeeds, False otherwise
+        """
+        try:
+            jsonschema.validate(payload, self.field_schema)
+        except jsonschema.exceptions.ValidationError:
+            return False
+        return True

@@ -95,7 +95,7 @@ export const onAnnotationScorerSave = async (
       val: {
         name: data.Name,
         description: data.Description,
-        json_schema: {
+        field_schema: {
           ...data.Type,
           type,
         },
