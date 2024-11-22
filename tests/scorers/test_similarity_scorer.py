@@ -9,7 +9,7 @@ from weave.scorers.similarity_scorer import EmbeddingSimilarityScorer
 # mock the create function
 @pytest.fixture
 def mock_embed(monkeypatch):
-    def _mock_embed(*args, **kwargs):
+    async def _mock_embed(*args, **kwargs):
         import random
 
         return [[random.random() for _ in range(1024)] for _ in range(2)]
@@ -26,20 +26,22 @@ def similarity_scorer(mock_embed):
     )
 
 
-def test_similarity_scorer_score(similarity_scorer):
+@pytest.mark.asyncio
+async def test_similarity_scorer_score(similarity_scorer):
     output = "John's favorite cheese is cheddar."
     target = "John likes various types of cheese."
     similarity_scorer.threshold = 0.0
-    result = similarity_scorer.score(output=output, target=target)
+    result = await similarity_scorer.score(output=output, target=target)
     assert result["similarity_score"] > 0.0
     assert result["is_similar"] is True
 
 
-def test_similarity_scorer_not_similar(similarity_scorer):
+@pytest.mark.asyncio
+async def test_similarity_scorer_not_similar(similarity_scorer):
     output = "John's favorite cheese is cheddar."
     target = "John likes various types of cheese."
     similarity_scorer.threshold = 0.99
-    result = similarity_scorer.score(output=output, target=target)
+    result = await similarity_scorer.score(output=output, target=target)
     assert result["similarity_score"] < 0.99
     assert result["is_similar"] is False
 

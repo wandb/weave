@@ -131,9 +131,9 @@ class SummarizationScorer(InstructorLLMScorer):
     max_tokens: int = 1024
 
     @weave.op
-    def extract_entities(self, text: str) -> list[str]:
+    async def extract_entities(self, text: str) -> list[str]:
         """Use an LLM to extract entities"""
-        response = create(
+        response = await create(
             self.client,
             messages=[
                 {"role": "system", "content": self.extraction_system_prompt},
@@ -148,11 +148,11 @@ class SummarizationScorer(InstructorLLMScorer):
         return entities
 
     @weave.op
-    def evaluate_summary(
+    async def evaluate_summary(
         self, input: str, summary: str
     ) -> SummarizationEvaluationResponse:
         """Evaluate the quality of a summary using an LLM"""
-        return create(
+        return await create(
             self.client,
             messages=[
                 {
@@ -178,10 +178,8 @@ class SummarizationScorer(InstructorLLMScorer):
 
     @weave.op
     async def score(self, input: str, output: str) -> dict:
-        extract_task = asyncio.to_thread(self.extract_entities, text=str(output))
-        evaluate_task = asyncio.to_thread(
-            self.evaluate_summary, input=str(input), summary=str(output)
-        )
+        extract_task = self.extract_entities(text=str(output))
+        evaluate_task = self.evaluate_summary(input=str(input), summary=str(output))
         summary_entities, llm_eval = await asyncio.gather(extract_task, evaluate_task)
 
         # LLM evaluation

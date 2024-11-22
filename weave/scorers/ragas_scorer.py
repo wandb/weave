@@ -1,5 +1,6 @@
 # implementing metrics from ragas: https://github.com/explodinggradients/ragas
 
+import asyncio
 from textwrap import dedent
 
 from pydantic import BaseModel, Field
@@ -51,10 +52,10 @@ class ContextEntityRecallScorer(InstructorLLMScorer):
     temperature: float = 0.7
     max_tokens: int = 4096
 
-    def extract_entities(self, text: str) -> list[str]:
+    async def extract_entities(self, text: str) -> list[str]:
         # Use LLM to extract entities
         prompt = self.extraction_prompt.format(text=text)
-        response = create(
+        response = await create(
             self.client,
             messages=[{"role": "user", "content": prompt}],
             response_model=EntityExtractionResponse,
@@ -65,9 +66,10 @@ class ContextEntityRecallScorer(InstructorLLMScorer):
         return entities
 
     @weave.op
-    def score(self, output: str, context: str) -> dict:
-        expected_entities = self.extract_entities(output)
-        context_entities = self.extract_entities(context)
+    async def score(self, output: str, context: str) -> dict:
+        expected_entities, context_entities = await asyncio.gather(
+            self.extract_entities(output), self.extract_entities(context)
+        )
         # Calculate recall
         if not expected_entities:
             return {"recall": 0.0}
@@ -124,9 +126,9 @@ class ContextRelevancyScorer(InstructorLLMScorer):
     max_tokens: int = 4096
 
     @weave.op
-    def score(self, output: str, context: str) -> dict:
+    async def score(self, output: str, context: str) -> dict:
         prompt = self.relevancy_prompt.format(question=output, context=context)
-        response = create(
+        response = await create(
             self.client,
             messages=[{"role": "user", "content": prompt}],
             response_model=RelevancyResponse,

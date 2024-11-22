@@ -21,17 +21,19 @@ class EmbeddingSimilarityScorer(LLMScorer):
     model_id: str = OPENAI_DEFAULT_EMBEDDING_MODEL
 
     @weave.op
-    def score(self, output: str, target: str) -> Any:
+    async def score(self, output: str, target: str) -> Any:
         assert (
             self.threshold >= -1 and self.threshold <= 1
         ), "`threshold` should be between -1 and 1"
-        model_embedding, target_embedding = self._compute_embeddings(output, target)
+        model_embedding, target_embedding = await self._compute_embeddings(
+            output, target
+        )
         return self.cosine_similarity(model_embedding, target_embedding)
 
-    def _compute_embeddings(
+    async def _compute_embeddings(
         self, output: str, target: str
     ) -> tuple[list[float], list[float]]:
-        embeddings = embed(self.client, self.model_id, [output, target])
+        embeddings = await embed(self.client, self.model_id, [output, target])
         return embeddings[0], embeddings[1]
 
     def cosine_similarity(self, vec1: list[float], vec2: list[float]) -> dict:

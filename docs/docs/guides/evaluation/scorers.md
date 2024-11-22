@@ -85,7 +85,7 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
     from openai import OpenAI
     from weave import Scorer
 
-    llm_client = OpenAI()
+    llm_client = AsyncOpenAI()
 
     #highlight-next-line
     class SummarizationScorer(Scorer):
@@ -98,8 +98,8 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
             return processed_text
 
         @weave.op
-        def call_llm(self, summary: str, processed_text: str) -> dict:
-            res = llm_client.chat.completions.create(
+        async def call_llm(self, summary: str, processed_text: str) -> dict:
+            res = await llm_client.chat.completions.create(
                 messages=[
                     {"role": "system", "content": self.system_prompt},
                     {"role": "user", "content": (
@@ -109,7 +109,7 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
             return {"summary_quality": res}
 
         @weave.op
-        def score(self, output: str, text: str) -> dict:
+        async def score(self, output: str, text: str) -> dict:
             """Score the summary quality.
 
             Args:
@@ -117,7 +117,7 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
                 text: The original text being summarized
             """
             processed_text = self.some_complicated_preprocessing(text)
-            eval_result = self.call_llm(summary=output, processed_text=processed_text)
+            eval_result = await self.call_llm(summary=output, processed_text=processed_text)
             return {"summary_quality": eval_result}
 
     evaluation = weave.Evaluation(
@@ -179,7 +179,7 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
     class SummarizationScorer(Scorer):
 
         @weave.op
-        def score(output, text) -> dict:
+        async def score(output, text) -> dict:
             """
                 output: output summary from a LLM summarization system
                 text: the text being summarised
@@ -203,9 +203,9 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
     class MySummarizationScorer(SummarizationScorer):
 
         @weave.op
-        def score(self, output: str, news_article: str) -> dict:  # Added type hints
+        async def score(self, output: str, news_article: str) -> dict:  # Added type hints
             # overload the score method and map columns manually
-            return super().score(output=output, text=news_article)
+            return await super().score(output=output, text=news_article)
     ```
 
   </TabItem>
