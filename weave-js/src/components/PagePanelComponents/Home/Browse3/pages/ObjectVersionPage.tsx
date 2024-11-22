@@ -216,23 +216,29 @@ const ObjectVersionPageInner: React.FC<{
             <div className="block">
               <p className="text-moon-500">Name:</p>
               <div className="flex items-center">
-                <p className="font-medium">{objectName}</p>
-                {objectVersions.loading ? (
-                  <LoadingDots />
-                ) : (
-                  <span className="ml-[4px]">
-                    (
-                    <ObjectVersionsLink
-                      entity={entityName}
-                      project={projectName}
-                      filter={{objectName}}
-                      versionCount={objectVersionCount}
-                      neverPeek
-                      variant="secondary"
+                <ObjectVersionsLink
+                  entity={entityName}
+                  project={projectName}
+                  filter={{objectName}}
+                  versionCount={objectVersionCount}
+                  neverPeek
+                  variant="secondary"
+                >
+                  <div className="flex font-semibold items-center group">
+                    <span>{objectName}</span>
+                    {objectVersions.loading ? (
+                      <LoadingDots />
+                    ) : (
+                      <span className="ml-[4px]">({objectVersionCount} version{objectVersionCount !== 1 ? 's' : ''})</span>
+                    )}
+                    <Icon 
+                      name="forward-next" 
+                      width={16} 
+                      height={16}
+                      className="ml-[2px] opacity-0 group-hover:opacity-100"
                     />
-                    )
-                  </span>
-                )}
+                  </div>
+                </ObjectVersionsLink>
               </div>
             </div>
             <div className="block">
