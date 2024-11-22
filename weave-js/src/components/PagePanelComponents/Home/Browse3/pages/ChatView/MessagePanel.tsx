@@ -167,7 +167,7 @@ export const MessagePanel = ({
           {isPlayground && isHovering && !editorHeight && (
             <div
               className={classNames(
-                'absolute flex w-full items-center justify-start pt-20',
+                'absolute flex w-full items-center justify-start -bottom-[24px] right-[4px]',
                 isNested ? 'bottom-0' : 'bottom-[-32px]'
               )}>
               <PlaygroundMessagePanelButtons
