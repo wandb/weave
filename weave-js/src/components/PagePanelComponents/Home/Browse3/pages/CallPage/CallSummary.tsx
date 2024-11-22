@@ -20,19 +20,12 @@ export const CallSummary: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
   const span = call.rawSpan;
-
   // Process attributes, only filtering out null values and keys starting with '_'
-  const weaveAttributes = _.reduce(
-    span.attributes ?? {},
-    (result, value, key) => {
-      if (!key.startsWith('_') && value != null) {
-        result[key] = value;
-      }
-      return result;
-    },
-    {} as Record<string, any>
+  const attributes = _.fromPairs(
+    Object.entries(span.attributes ?? {}).filter(
+      ([k, a]) => !k.startsWith('_') && a != null
+    )
   );
-
   const summary = _.fromPairs(
     Object.entries(span.summary ?? {}).filter(
       ([k, a]) =>
@@ -98,16 +91,15 @@ export const CallSummary: React.FC<{
                   Latency: span.summary.latency_s.toFixed(3) + 's',
                 }
               : {}),
-            Model: span.attributes?.model,
             ...(Object.keys(summary).length > 0 ? summary : {}),
           }}
         />
       </div>
-      {Object.keys(weaveAttributes).length > 0 && (
+      {Object.keys(attributes).length > 0 && (
         <div className="mb-16">
           <ObjectViewerSection
             title="Attributes"
-            data={weaveAttributes}
+            data={attributes}
             isExpanded={true}
           />
         </div>
