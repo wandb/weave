@@ -1,4 +1,6 @@
 import math
+import random
+import string
 from typing import Any, Optional, Union
 
 import numpy as np
@@ -292,3 +294,173 @@ class RobustnessScorer(Scorer):
             return sim.item()
         else:
             raise ValueError(f"Unsupported similarity metric: {self.similarity_metric}")
+
+
+def get_keyboard_adjacent(char: str) -> list[str]:
+    """Get adjacent keys on QWERTY keyboard for a given character."""
+    keyboard = {
+        "a": ["q", "w", "s", "z"],
+        "b": ["v", "g", "h", "n"],
+        "c": ["x", "d", "f", "v"],
+        "d": ["s", "e", "r", "f", "c", "x"],
+        "e": ["w", "s", "d", "r"],
+        "f": ["d", "r", "t", "g", "v", "c"],
+        "g": ["f", "t", "y", "h", "b", "v"],
+        "h": ["g", "y", "u", "j", "n", "b"],
+        "i": ["u", "j", "k", "o"],
+        "j": ["h", "u", "i", "k", "m", "n"],
+        "k": ["j", "i", "o", "l", "m"],
+        "l": ["k", "o", "p"],
+        "m": ["n", "j", "k"],
+        "n": ["b", "h", "j", "m"],
+        "o": ["i", "k", "l", "p"],
+        "p": ["o", "l"],
+        "q": ["w", "a"],
+        "r": ["e", "d", "f", "t"],
+        "s": ["a", "w", "e", "d", "x", "z"],
+        "t": ["r", "f", "g", "y"],
+        "u": ["y", "h", "j", "i"],
+        "v": ["c", "f", "g", "b"],
+        "w": ["q", "a", "s", "e"],
+        "x": ["z", "s", "d", "c"],
+        "y": ["t", "g", "h", "u"],
+        "z": ["a", "s", "x"],
+    }
+    return keyboard.get(char.lower(), [])
+
+
+def butterfingers(text: str) -> str:
+    """Introduce a typo by replacing a random letter with an adjacent key."""
+    chars = list(text)
+    # Get positions of letters only
+    letter_positions = [i for i, c in enumerate(chars) if c.isalpha()]
+
+    if not letter_positions:
+        return text
+
+    # Choose random letter position to modify
+    pos = random.choice(letter_positions)
+    adjacent_keys = get_keyboard_adjacent(chars[pos])
+
+    if adjacent_keys:
+        chars[pos] = random.choice(adjacent_keys)
+
+    return "".join(chars)
+
+
+def add_whitespace(text: str) -> str:
+    """Add random extra whitespace."""
+    words = text.split()
+    return " " + "  ".join(words) + " "
+
+
+def swap_chars(text: str) -> str:
+    """Swap two adjacent characters in the text."""
+    if len(text) < 2:
+        return text
+
+    chars = list(text)
+    pos = random.randint(0, len(chars) - 2)
+    chars[pos], chars[pos + 1] = chars[pos + 1], chars[pos]
+    return "".join(chars)
+
+
+def remove_punctuation(text: str) -> str:
+    """Remove all punctuation from the text."""
+    return text.translate(str.maketrans("", "", string.punctuation))
+
+
+def random_case_change(text: str) -> str:
+    """Randomly change case of the text."""
+    options = [str.lower, str.upper, str.title]
+    return random.choice(options)(text)
+
+
+def random_capitalization(text: str) -> str:
+    """Randomly capitalize letters."""
+    return "".join(
+        char.upper() if random.random() > 0.5 else char.lower() for char in text
+    )
+
+
+def text_noise(text: str) -> str:
+    """Add random noise (characters or digits)."""
+    pos = random.randint(0, len(text))
+    noise = random.choice(string.ascii_letters + string.digits + "!@#$%^&*")
+    return text[:pos] + noise + text[pos:]
+
+
+def split_merge_words(text: str) -> str:
+    """Split or merge words randomly."""
+    words = text.split()
+    if random.random() > 0.5 and len(words) > 1:  # Merge words
+        idx = random.randint(0, len(words) - 2)
+        words[idx] = words[idx] + words[idx + 1]
+        del words[idx + 1]
+    elif len(words) > 0:  # Split a word
+        idx = random.randint(0, len(words) - 1)
+        pos = random.randint(1, len(words[idx]) - 1)
+        words[idx] = words[idx][:pos] + " " + words[idx][pos:]
+    return " ".join(words)
+
+
+def emphasize_words(text: str) -> str:
+    """Add emphasis using capitalization or repeated characters."""
+    words = text.split()
+    idx = random.randint(0, len(words) - 1)
+    words[idx] = words[idx].upper()
+    return " ".join(words)
+
+
+def create_perturbed_dataset(
+    dataset: list[str], num_perturbations: int = 7
+) -> list[dict]:
+    """
+    Create a dataset for robustness testing by generating perturbed versions of each input text.
+
+    Args:
+        dataset: List of original text strings to perturb
+        num_perturbations: Number of perturbed versions to generate for each text
+
+    Returns:
+        List of dictionaries, where each dict contains original + perturbed versions of a text
+    """
+
+    def perturb_text(text: str, num_perturbations: int = 1) -> list[str]:
+        """Apply random perturbations to input text."""
+        perturbation_functions = [
+            random_case_change,
+            remove_punctuation,
+            butterfingers,
+            add_whitespace,
+            swap_chars,
+            emphasize_words,
+            split_merge_words,
+            text_noise,
+            random_capitalization,
+        ]
+
+        perturbed_text = []
+        weights = [1.0] * len(perturbation_functions)
+
+        for _ in range(num_perturbations):
+            # Normalize weights to probabilities
+            total = sum(weights)
+            probs = [w / total for w in weights]
+
+            # Select function based on weights
+            idx = random.choices(range(len(perturbation_functions)), weights=probs)[0]
+            func = perturbation_functions[idx]
+            perturbed = func(text)
+            perturbed_text.append(perturbed)
+
+            # Reduce weight of selected function
+            weights[idx] *= 0.8  # 20% reduction each time used
+
+        return perturbed_text
+
+    robustness_dataset = []
+    for text in dataset:
+        perturbed_versions = perturb_text(text, num_perturbations)
+        robustness_dataset.append({"questions": [text] + perturbed_versions})
+    return robustness_dataset

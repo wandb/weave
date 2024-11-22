@@ -25,7 +25,10 @@ from weave.scorers.ragas_scorer import (
     ContextEntityRecallScorer,
     ContextRelevancyScorer,
 )
-from weave.scorers.robustness_scorer import RobustnessScorer
+from weave.scorers.robustness_scorer import (
+    RobustnessScorer,
+    create_perturbed_dataset,
+)
 from weave.scorers.similarity_scorer import EmbeddingSimilarityScorer
 from weave.scorers.string_scorer import (
     LevenshteinScorer,
@@ -58,4 +61,5 @@ __all__ = [
     "transpose",
     "ValidXMLScorer",
     "_validate_scorer_signature",
+    "create_perturbed_dataset",
 ]
