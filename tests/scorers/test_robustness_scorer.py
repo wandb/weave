@@ -1,9 +1,23 @@
 import math
+import random
+import string
 
 import pytest
 
 import weave
-from weave.scorers.robustness_scorer import RobustnessScorer
+from weave.scorers import RobustnessScorer
+from weave.scorers.robustness_scorer import (
+    create_perturbed_dataset,
+    butterfingers,
+    add_whitespace,
+    swap_chars,
+    remove_punctuation,
+    random_case_change,
+    random_capitalization,
+    text_noise,
+    split_merge_words,
+    emphasize_words,
+)
 
 
 def truncate(number, decimals=0):
@@ -439,3 +453,180 @@ async def test_robustness_scorer_non_binary_evaluation():
     assert (
         0 <= abs(cohen_d_mean) <= 3
     ), f"Cohen's d mean is out of expected range: {cohen_d_mean}"
+
+
+@pytest.mark.parametrize(
+    "input_text",
+    [
+        "The quick brown fox jumps over the lazy dog.",
+        "Hello, world!",
+        "123 Testing...",
+        "",
+    ],
+)
+def test_butterfingers(input_text):
+    perturbed = butterfingers(input_text)
+    assert isinstance(perturbed, str)
+    assert len(perturbed) == len(input_text)
+
+
+@pytest.mark.parametrize(
+    "input_text",
+    [
+        "The quick brown fox jumps over the lazy dog.",
+        "Hello, world!",
+        "123 Testing...",
+        "",
+    ],
+)
+def test_add_whitespace(input_text):
+    perturbed = add_whitespace(input_text)
+    assert isinstance(perturbed, str)
+    assert len(perturbed) >= len(input_text)
+
+
+@pytest.mark.parametrize(
+    "input_text",
+    [
+        "The quick brown fox jumps over the lazy dog.",
+        "Hello, world!",
+        "123 Testing...",
+        "",
+    ],
+)
+def test_swap_chars(input_text):
+    perturbed = swap_chars(input_text)
+    assert isinstance(perturbed, str)
+    assert len(perturbed) == len(input_text)
+
+
+@pytest.mark.parametrize(
+    "input_text",
+    [
+        "The quick brown fox jumps over the lazy dog.",
+        "Hello, world!",
+        "123 Testing...",
+        "",
+    ],
+)
+def test_remove_punctuation(input_text):
+    perturbed = remove_punctuation(input_text)
+    assert isinstance(perturbed, str)
+    assert all(c not in string.punctuation for c in perturbed)
+
+
+@pytest.mark.parametrize(
+    "input_text",
+    [
+        "The quick brown fox jumps over the lazy dog.",
+        "Hello, world!",
+        "123 Testing...",
+        "",
+    ],
+)
+def test_random_case_change(input_text):
+    perturbed = random_case_change(input_text)
+    assert isinstance(perturbed, str)
+
+
+@pytest.mark.parametrize(
+    "input_text",
+    [
+        "The quick brown fox jumps over the lazy dog.",
+        "Hello, world!",
+        "123 Testing...",
+        "",
+    ],
+)
+def test_random_capitalization(input_text):
+    perturbed = random_capitalization(input_text)
+    assert isinstance(perturbed, str)
+
+
+@pytest.mark.parametrize(
+    "input_text",
+    [
+        "The quick brown fox jumps over the lazy dog.",
+        "Hello, world!",
+        "123 Testing...",
+        "",
+    ],
+)
+def test_text_noise(input_text):
+    perturbed = text_noise(input_text)
+    assert isinstance(perturbed, str)
+    assert len(perturbed) == len(input_text) + 1  # Noise adds a single character
+
+
+@pytest.mark.parametrize(
+    "input_text",
+    [
+        "The quick brown fox jumps over the lazy dog.",
+        "Hello, world!",
+        "123 Testing...",
+        "",
+    ],
+)
+def test_split_merge_words(input_text):
+    perturbed = split_merge_words(input_text)
+    assert isinstance(perturbed, str)
+
+
+@pytest.mark.parametrize(
+    "input_text",
+    [
+        "The quick brown fox jumps over the lazy dog.",
+        "Hello, world!",
+        "123 Testing...",
+        "",
+    ],
+)
+def test_emphasize_words(input_text):
+    perturbed = emphasize_words(input_text)
+    assert isinstance(perturbed, str)
+
+
+def test_create_perturbed_dataset():
+    dataset = [
+        "What is the capital of France?",
+        "Who is the CEO of Tesla?",
+    ]
+    num_perturbations = 5
+    perturbed_dataset = create_perturbed_dataset(dataset, num_perturbations)
+
+    assert len(perturbed_dataset) == len(dataset)
+    for original, perturbed in zip(dataset, perturbed_dataset):
+        assert "questions" in perturbed
+        questions = perturbed["questions"]
+        assert len(questions) == num_perturbations + 1  # Original + perturbations
+        assert questions[0] == original  # First question is the original text
+        assert all(isinstance(q, str) for q in questions)
+
+
+def test_create_perturbed_dataset_empty():
+    dataset = []
+    perturbed_dataset = create_perturbed_dataset(dataset, 5)
+    assert perturbed_dataset == []
+
+
+def test_create_perturbed_dataset_single_item():
+    dataset = ["What is the capital of Germany?"]
+    num_perturbations = 3
+    perturbed_dataset = create_perturbed_dataset(dataset, num_perturbations)
+
+    assert len(perturbed_dataset) == 1
+    assert "questions" in perturbed_dataset[0]
+    questions = perturbed_dataset[0]["questions"]
+    assert len(questions) == num_perturbations + 1  # Original + perturbations
+    assert questions[0] == dataset[0]  # Original text
+
+
+def test_create_perturbed_dataset_randomness():
+    dataset = ["What is the capital of Germany?"]
+    num_perturbations = 3
+
+    # Generate two datasets and check they are not identical
+    perturbed_dataset_1 = create_perturbed_dataset(dataset, num_perturbations)
+    perturbed_dataset_2 = create_perturbed_dataset(dataset, num_perturbations)
+
+    assert perturbed_dataset_1 != perturbed_dataset_2  # Due to randomness

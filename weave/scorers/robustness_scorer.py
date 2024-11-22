@@ -407,6 +407,8 @@ def split_merge_words(text: str) -> str:
 def emphasize_words(text: str) -> str:
     """Add emphasis using capitalization or repeated characters."""
     words = text.split()
+    if not words:
+        return text
     idx = random.randint(0, len(words) - 1)
     words[idx] = words[idx].upper()
     return " ".join(words)
