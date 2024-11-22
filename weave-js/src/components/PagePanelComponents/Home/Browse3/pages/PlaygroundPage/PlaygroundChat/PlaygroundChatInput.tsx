@@ -15,6 +15,7 @@ type PlaygroundChatInputProps = {
   isLoading: boolean;
   onSend: (role: 'assistant' | 'user') => void;
   onAdd: (role: 'assistant' | 'user', text: string) => void;
+  isRespondingToToolCall: number | null;
 };
 
 export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
@@ -23,6 +24,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   isLoading,
   onSend,
   onAdd,
+  isRespondingToToolCall,
 }) => {
   const [addMessageRole, setAddMessageRole] = useState<'assistant' | 'user'>(
     'user'
@@ -80,6 +82,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
               display: 'flex',
               color: MOON_500,
               fontSize: '12px',
+              gap: '4px',
             }}>
             Add as
             <Button
@@ -109,7 +112,14 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
           <Button
             size="small"
             onClick={() => onSend(addMessageRole)}
-            disabled={isLoading || chatText.trim() === ''}
+            tooltip={
+              isRespondingToToolCall !== null
+                ? 'Waiting for tool call response(s)'
+                : undefined
+            }
+            disabled={
+              isLoading || chatText.trim() === '' || !!isRespondingToToolCall
+            }
             startIcon={isLoading ? 'loading' : undefined}>
             {isLoading ? 'Sending...' : 'Send'}
           </Button>

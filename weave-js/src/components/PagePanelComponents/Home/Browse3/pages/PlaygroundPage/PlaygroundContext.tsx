@@ -4,6 +4,9 @@ import {Message} from '../ChatView/types';
 
 export type PlaygroundContextType = {
   isPlayground: boolean;
+  setIsRespondingToToolCall: (toolCallIndex: string | null) => void;
+  isRespondingToToolCall: string | null;
+
   addMessage: (newMessage: Message) => void;
   editMessage: (messageIndex: number, newMessage: Message) => void;
   deleteMessage: (messageIndex: number, responseIndexes?: number[]) => void;
@@ -21,6 +24,9 @@ export type PlaygroundContextType = {
 
 const DEFAULT_CONTEXT: PlaygroundContextType = {
   isPlayground: false,
+  setIsRespondingToToolCall: () => {},
+  isRespondingToToolCall: null,
+
   addMessage: () => {},
   editMessage: () => {},
   deleteMessage: () => {},

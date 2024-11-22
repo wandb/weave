@@ -12,6 +12,7 @@ import {LLMDropdown} from './LLMDropdown';
 import {SetPlaygroundStateFieldFunctionType} from './useChatFunctions';
 
 type PlaygroundChatTopBarProps = {
+  originalCall?: OptionalTraceCallSchema;
   idx: number;
   settingsTab: number | null;
   setSettingsTab: (tab: number | null) => void;
@@ -31,6 +32,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   project,
   playgroundStates,
   setPlaygroundStates,
+  originalCall,
 }) => {
   const history = useHistory();
   const isLastChat = idx === playgroundStates.length - 1;
@@ -45,6 +47,10 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
         messages: [DEFAULT_SYSTEM_MESSAGE],
       },
     } as OptionalTraceCallSchema);
+  };
+
+  const resetToOriginalCall = () => {
+    setPlaygroundStateField(idx, 'traceCall', originalCall ?? {});
   };
 
   const handleCompare = () => {
@@ -99,6 +105,15 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           gap: '4px',
           backgroundColor: 'transparent',
         }}>
+        {originalCall && (
+          <Button
+            tooltip={'Reset to original call'}
+            icon="undo"
+            size="medium"
+            variant="ghost"
+            onClick={resetToOriginalCall}
+          />
+        )}
         <Button
           tooltip={'Clear chat'}
           icon="sweeps-broom"

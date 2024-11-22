@@ -1,12 +1,12 @@
 import {Box, CircularProgress, Divider} from '@mui/material';
 import {MOON_200} from '@wandb/weave/common/css/color.styles';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useState} from 'react';
+import React, {useRef, useState} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
-import {PlaygroundState} from '../types';
+import {OptionalTraceCallSchema, PlaygroundState} from '../types';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
@@ -17,6 +17,7 @@ import {
 } from './useChatFunctions';
 
 export type PlaygroundChatProps = {
+  originalCall?: OptionalTraceCallSchema;
   entity: string;
   project: string;
   setPlaygroundStates: (states: PlaygroundState[]) => void;
@@ -27,6 +28,7 @@ export type PlaygroundChatProps = {
 };
 
 export const PlaygroundChat = ({
+  originalCall,
   entity,
   project,
   setPlaygroundStates,
@@ -37,6 +39,9 @@ export const PlaygroundChat = ({
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRespondingToToolCall, setIsRespondingToToolCall] = useState<
+    string | null
+  >(null);
 
   const {handleRetry, handleSend} = useChatCompletionFunctions(
     setPlaygroundStates,
@@ -57,6 +62,13 @@ export const PlaygroundChat = ({
     }
     setChatText('');
   };
+
+  // Used to shift top bar over for scrollbar
+  const chatRef = useRef<HTMLDivElement>(null);
+  const isChatOverflowing =
+    chatRef?.current?.scrollHeight &&
+    chatRef.current.clientHeight &&
+    chatRef.current.scrollHeight > chatRef.current.clientHeight;
 
   return (
     <Box
@@ -116,13 +128,13 @@ export const PlaygroundChat = ({
                 sx={{
                   position: 'absolute',
                   top: '8px',
-                  width: 'calc(100% - 16px)',
                   left: '8px',
-                  right: '8px',
+                  right: isChatOverflowing ? '16px' : '8px',
                   zIndex: 10,
                 }}>
                 <PlaygroundChatTopBar
                   idx={idx}
+                  originalCall={originalCall}
                   settingsTab={settingsTab}
                   setSettingsTab={setSettingsTab}
                   setPlaygroundStateField={setPlaygroundStateField}
@@ -136,16 +148,19 @@ export const PlaygroundChat = ({
                 sx={{
                   width: '100%',
                   height: '100%',
-                  overflow: 'scroll',
+                  overflowY: 'auto',
                   paddingTop: '48px', // Height of the top bar
                   paddingX: '16px',
-                }}>
+                }}
+                ref={chatRef}>
                 <Tailwind>
                   <div className=" mx-auto h-full min-w-[400px] max-w-[800px] pb-8">
                     {state.traceCall && (
                       <PlaygroundContext.Provider
                         value={{
                           isPlayground: true,
+                          setIsRespondingToToolCall,
+                          isRespondingToToolCall,
                           deleteMessage: (messageIndex, responseIndexes) =>
                             deleteMessage(idx, messageIndex, responseIndexes),
                           editMessage: (messageIndex, newMessage) =>

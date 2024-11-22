@@ -31,15 +31,18 @@ export const MessagePanel = ({
   // and on save the tool call response will be updated and sent to the LLM
   pendingToolResponseId,
 }: MessagePanelProps) => {
-  const [isShowingMore, setIsShowingMore] = useState(false);
+  const [isShowingMore, setIsShowingMore] = useState(!!pendingToolResponseId);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
+  const [hasPendingToolResponse, setHasPendingToolResponse] = useState(false);
   const [editorHeight, setEditorHeight] = useState<number | null>(
     pendingToolResponseId ? 100 : null
   );
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const {isPlayground} = usePlaygroundContext();
+  const {isPlayground, setIsRespondingToToolCall, isRespondingToToolCall} =
+    usePlaygroundContext();
+
   useEffect(() => {
     if (contentRef.current) {
       setIsOverflowing(contentRef.current.scrollHeight > 400);
@@ -60,6 +63,19 @@ export const MessagePanel = ({
         )
         .filter((idx): idx is number => idx !== undefined)
     : undefined;
+
+  if (isRespondingToToolCall === null && pendingToolResponseId) {
+    setIsRespondingToToolCall(pendingToolResponseId);
+  }
+
+  if (!isShowingMore && isRespondingToToolCall) {
+    message.tool_calls?.forEach(toolCall => {
+      if (toolCall.id === isRespondingToToolCall) {
+        setIsShowingMore(true);
+        setHasPendingToolResponse(true);
+      }
+    });
+  }
 
   return (
     <div className={classNames('flex gap-8', {'mt-24': !isTool})}>
@@ -130,7 +146,7 @@ export const MessagePanel = ({
                     className={classNames(
                       hasToolCalls ? 'pb-8' : '',
                       ' text-sm',
-                      {'px-16': isSystemPrompt || isUser}
+                      {'px-16': isSystemPrompt || isUser || hasToolCalls}
                     )}>
                     {_.isString(message.content) ? (
                       <MessagePanelPart
@@ -179,6 +195,7 @@ export const MessagePanel = ({
                 contentRef={contentRef}
                 setEditorHeight={setEditorHeight}
                 responseIndexes={responseIndexes}
+                hasPendingToolResponse={hasPendingToolResponse}
               />
             </div>
           )}

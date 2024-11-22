@@ -109,6 +109,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
         </Box>
       ) : (
         <PlaygroundChat
+          originalCall={call.result?.traceCall}
           playgroundStates={playgroundStates}
           setPlaygroundStates={setPlaygroundStates}
           setPlaygroundStateField={setPlaygroundStateField}

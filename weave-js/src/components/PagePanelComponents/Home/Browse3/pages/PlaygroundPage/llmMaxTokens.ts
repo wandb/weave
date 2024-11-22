@@ -1,8 +1,12 @@
 // This is a mapping of LLM names to their max token limits.
 // Directly from the pycache model_providers.json in trace_server.
 // Some were removed because they are not supported when Josiah tried on Oct 30, 2024.
+// Others were removed because we want users to use models with the dates
 export const LLM_MAX_TOKENS = {
-  'gpt-4o-mini': {max_tokens: 16384, supports_function_calling: true},
+  'gpt-4o-mini-2024-07-18': {
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
   'claude-3-5-sonnet-20240620': {
     max_tokens: 8192,
     supports_function_calling: true,
@@ -44,10 +48,6 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 8192,
     supports_function_calling: true,
   },
-  'gemini/gemini-1.5-flash': {
-    max_tokens: 8192,
-    supports_function_calling: true,
-  },
   'gemini/gemini-1.5-pro-001': {
     max_tokens: 8192,
     supports_function_calling: true,
@@ -73,23 +73,13 @@ export const LLM_MAX_TOKENS = {
   'gpt-3.5-turbo-0125': {max_tokens: 4096, supports_function_calling: true},
   'gpt-3.5-turbo-1106': {max_tokens: 4096, supports_function_calling: true},
   'gpt-3.5-turbo-16k': {max_tokens: 4096, supports_function_calling: false},
-  'gpt-3.5-turbo': {max_tokens: 4096, supports_function_calling: true},
-  'gpt-4-0125-preview': {max_tokens: 4096, supports_function_calling: true},
   'gpt-4-0314': {max_tokens: 4096, supports_function_calling: false},
   'gpt-4-0613': {max_tokens: 4096, supports_function_calling: true},
-  'gpt-4-1106-preview': {max_tokens: 4096, supports_function_calling: true},
   'gpt-4-32k-0314': {max_tokens: 4096, supports_function_calling: false},
   'gpt-4-turbo-2024-04-09': {max_tokens: 4096, supports_function_calling: true},
-  'gpt-4-turbo-preview': {max_tokens: 4096, supports_function_calling: true},
-  'gpt-4-turbo': {max_tokens: 4096, supports_function_calling: true},
-  'gpt-4': {max_tokens: 4096, supports_function_calling: true},
   'gpt-4o-2024-05-13': {max_tokens: 4096, supports_function_calling: true},
   'gpt-4o-2024-08-06': {max_tokens: 16384, supports_function_calling: true},
-  'gpt-4o-mini-2024-07-18': {
-    max_tokens: 16384,
-    supports_function_calling: true,
-  },
-  'gpt-4o': {max_tokens: 4096, supports_function_calling: true},
+
   'groq/gemma-7b-it': {max_tokens: 8192, supports_function_calling: true},
   'groq/gemma2-9b-it': {max_tokens: 8192, supports_function_calling: true},
   'groq/llama-3.1-70b-versatile': {
@@ -115,9 +105,68 @@ export const LLM_MAX_TOKENS = {
     supports_function_calling: true,
   },
   'o1-mini-2024-09-12': {max_tokens: 65536, supports_function_calling: true},
-  'o1-mini': {max_tokens: 65536, supports_function_calling: true},
   'o1-preview-2024-09-12': {max_tokens: 32768, supports_function_calling: true},
-  'o1-preview': {max_tokens: 32768, supports_function_calling: true},
 };
 
 export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;
+
+// Helper function to calculate string similarity using Levenshtein distance
+const getLevenshteinDistance = (str1: string, str2: string): number => {
+  const track = Array(str2.length + 1)
+    .fill(null)
+    .map(() => Array(str1.length + 1).fill(null));
+
+  for (let i = 0; i <= str1.length; i++) {
+    track[0][i] = i;
+  }
+  for (let j = 0; j <= str2.length; j++) {
+    track[j][0] = j;
+  }
+
+  for (let j = 1; j <= str2.length; j++) {
+    for (let i = 1; i <= str1.length; i++) {
+      const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      track[j][i] = Math.min(
+        track[j][i - 1] + 1, // deletion
+        track[j - 1][i] + 1, // insertion
+        track[j - 1][i - 1] + indicator // substitution
+      );
+    }
+  }
+  return track[str2.length][str1.length];
+};
+
+// Main function to find most similar LLM name
+export const findMostSimilarLLMName = (
+  input: string,
+  llmList: LLMMaxTokensKey[]
+): string => {
+  const normalizedInput = input.toLowerCase().trim();
+
+  // If exact match exists, return it
+  if (llmList.includes(normalizedInput as LLMMaxTokensKey)) {
+    return normalizedInput;
+  }
+
+  let closestMatch = llmList[0];
+  let smallestDistance = Infinity;
+
+  llmList.forEach(llmName => {
+    const distance = getLevenshteinDistance(
+      normalizedInput,
+      llmName.toLowerCase()
+    );
+
+    if (distance < smallestDistance) {
+      smallestDistance = distance;
+      closestMatch = llmName;
+    }
+
+    if (llmName.includes(normalizedInput)) {
+      closestMatch = llmName;
+      smallestDistance = 0;
+    }
+  });
+
+  return closestMatch;
+};
