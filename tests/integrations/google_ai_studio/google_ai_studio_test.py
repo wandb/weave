@@ -53,7 +53,6 @@ def assert_correct_summary(summary: dict, trace_name: str):
     assert summary["weave"]["latency_ms"] > 0
 
 
-
 def is_part_presence_in_content_parts(parts: list[dict], part_type: str) -> bool:
     for part in parts:
         if part_type in part:
