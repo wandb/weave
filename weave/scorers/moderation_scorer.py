@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from pydantic import PrivateAttr, field_validator
+from pydantic import PrivateAttr, field_validator, Field
 
 import weave
 from weave.scorers.base_scorer import Scorer
@@ -9,8 +9,7 @@ from weave.scorers.llm_utils import _LLM_CLIENTS, OPENAI_DEFAULT_MODERATION_MODE
 
 try:
     import torch
-    import torch.nn as nn
-    from transformers import AutoTokenizer, DebertaV2Model, DebertaV2PreTrainedModel
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification
 except ImportError:
     import_failed = True
     print(
@@ -68,31 +67,6 @@ class OpenAIModerationScorer(LLMScorer):
         categories = {k: v for k, v in response.categories if v and ('/' not in k and '-' not in k)}
         return {"flagged": response.flagged, "categories": categories}
     
-class MultiHeadDebertaForSequenceClassification(DebertaV2PreTrainedModel):
-    def __init__(self, config, num_heads=5):  # type: ignore
-        super().__init__(config)
-        self.num_heads = num_heads
-        self.deberta = DebertaV2Model(config)
-        self.heads = nn.ModuleList(
-            [nn.Linear(config.hidden_size, 4) for _ in range(num_heads)]
-        )
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.post_init()
-
-    def forward(
-        self,
-        input_ids: Optional["Tensor"] = None,
-        attention_mask: Optional["Tensor"] = None,
-    ) -> "Tensor":
-        outputs = self.deberta(input_ids=input_ids, attention_mask=attention_mask)
-        sequence_output = outputs[0]
-        logits_list = [
-            head(self.dropout(sequence_output[:, 0, :])) for head in self.heads
-        ]
-        logits = torch.stack(logits_list, dim=1)
-        return logits
-
-
 class RollingWindowScorer(Scorer):
     """
     Base Scorer class that handles rolling window processing for long inputs.
@@ -246,24 +220,24 @@ class ToxicScorer(RollingWindowScorer):
         overlap: Number of overlapping tokens between windows. Defaults to `50`.
     """
 
-    model_name: str = "PleIAs/celadon"
+    model_name: str = "tcapelle/celadon"
     total_threshold: int = 5
     category_threshold: int = 2
     max_tokens: int = 512
     overlap: int = 50
-    categories: dict[str, str] = {
-        "LABEL_0": "Race/Origin",
-        "LABEL_1": "Gender/Sex",
-        "LABEL_2": "Religion",
-        "LABEL_3": "Ability",
-        "LABEL_4": "Violence",
-    }
+      categories: list[str] = [
+        "Race/Origin",
+        "Gender/Sex",
+        "Religion",
+        "Ability",
+        "Violence",
+    ]
 
     def model_post_init(self, __context: Any) -> None:
         """Initialize the toxicity model and tokenizer."""
         if not torch.cuda.is_available() and self.device == "cuda":
             raise ValueError("CUDA is not available")
-        self._model = MultiHeadDebertaForSequenceClassification.from_pretrained(
+        self._model = AutoModelForSequenceClassification.from_pretrained(
             self.model_name, device_map=self.device
         )
         self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
@@ -281,7 +255,7 @@ class ToxicScorer(RollingWindowScorer):
             flagged = True
 
         return {
-            "categories": dict(zip(self.categories.values(), predictions)),
+            "categories": dict(zip(self.categories, predictions)),
             "flagged": flagged,
         }
 
@@ -301,15 +275,12 @@ class GenderRaceBiasScorer(ToxicScorer):
     """
 
     # Retain the same model configuration as ToxicScorer
-    model_name: str = "PleIAs/celadon"
+    model_name: str = "tcapelle/celadon"
     total_threshold: int = 5  # Not used in this subclass
     category_threshold: int = 2
     max_tokens: int = 512
     overlap: int = 50
-    categories: dict[str, str] = {
-        "Race/Origin": "Race/Origin",
-        "Gender/Sex": "Gender/Sex",
-    }
+    categories: list[str] = ["racial_bias", "gender_bias"]
 
     def model_post_init(self, __context: Any) -> None:
         """Initialize the toxicity model and tokenizer."""
@@ -351,9 +322,49 @@ class GenderRaceBiasScorer(ToxicScorer):
             flagged = True
 
         return {
-            "categories": {
-                "Race/Origin": predictions[0],
-                "Gender/Sex": predictions[1],
-            },
+            self.categories[0]: predictions[0],
+            self.categories[1]: predictions[1],
             "flagged": flagged,
         }
+    
+
+from transformers import pipeline
+class PipelineScorer(Scorer):
+    task: str
+    model_name: str
+    device: str = "cpu"
+    pipeline_kwargs: dict[str, Any] = Field(default_factory=dict)
+    _pipeline: Any = PrivateAttr()
+
+    def model_post_init(self, __context: Any) -> None:
+        self._pipeline = pipeline(
+            self.task, 
+            model=self.model_name, 
+            device=self.device,
+            **self.pipeline_kwargs
+            )
+        
+    def pipe(self, prompt: str) -> list[dict[str, Any]]:
+        return self._pipeline(prompt)[0]
+
+class CustomGenderRaceBiasScorer(PipelineScorer):
+    """
+    Moderation Scorer that assesses gender and race/origin bias by focusing on specific categories.
+
+    This model is trained from scratch on a custom dataset of 260k samples. 
+    """
+    model_name: str = "tcapelle/bias-scorer-3-fp32"
+    task: str = "text-classification"
+    device: str = "cpu"
+    threshold: float = 0.5
+    categories: list[str] = [
+        "gender_bias",
+        "racial_bias",
+    ]
+    pipeline_kwargs: dict[str, Any] = {"top_k": 2}
+
+    @weave.op
+    def score(self, output: str) -> dict[str, Any]:
+        output = self.pipe(output)[0]
+        output = {cat: o["score"]>self.threshold for cat, o in zip(self.categories, output)}
+        return output
