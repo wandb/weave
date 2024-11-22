@@ -118,7 +118,7 @@ def test_robustness_scorer_non_binary():
         "The quick brown fox jumps over the lazy dog.",
         "A fast dark fox leaps over a sleepy canine.",
         "The quick brown fox hops over the lazy dog.",
-        "An agile red fox jumps over the lazy hound."
+        "An agile red fox jumps over the lazy hound.",
     ]
 
     # Instantiate the scorer with binary=False
@@ -130,11 +130,13 @@ def test_robustness_scorer_non_binary():
     print(result)
 
     # Assert that the result contains 'cohen_d' and is a float
-    assert 'cohen_d' in result
-    assert isinstance(result['cohen_d'], float)
+    assert "cohen_d" in result
+    assert isinstance(result["cohen_d"], float)
 
     # Check that the effect size is within a reasonable range
-    assert 0 <= abs(result['cohen_d']) <= 3, f"Cohen's d is out of expected range: {result['cohen_d']}"
+    assert (
+        0 <= abs(result["cohen_d"]) <= 3
+    ), f"Cohen's d is out of expected range: {result['cohen_d']}"
 
 
 def test_robustness_scorer_non_binary_with_ground_truths():
@@ -143,16 +145,11 @@ def test_robustness_scorer_non_binary_with_ground_truths():
         "The capital of France is Paris.",
         "Paris is the capital city of France.",
         "France's capital is Paris.",
-        "The capital city of France is Paris."
+        "The capital city of France is Paris.",
     ]
 
     # Ground truths corresponding to each output
-    ground_truths = [
-        "Paris",
-        "Paris",
-        "Paris",
-        "Paris"
-    ]
+    ground_truths = ["Paris", "Paris", "Paris", "Paris"]
 
     # Instantiate the scorer with binary=False
     robustness_scorer = RobustnessScorer(binary=False)
@@ -163,18 +160,24 @@ def test_robustness_scorer_non_binary_with_ground_truths():
     print(result)
 
     # Assert that the result contains 'cohen_d' and is a float
-    assert 'cohen_d' in result
-    assert isinstance(result['cohen_d'], float)
+    assert "cohen_d" in result
+    assert isinstance(result["cohen_d"], float)
 
     # Check that the effect size is within a reasonable range
-    assert 0 <= abs(result['cohen_d']) <= 3, f"Cohen's d is out of expected range: {result['cohen_d']}"
+    assert (
+        0 <= abs(result["cohen_d"]) <= 3
+    ), f"Cohen's d is out of expected range: {result['cohen_d']}"
 
 
 def test_robustness_scorer_invalid_similarity_metric():
     output = ["Text A", "Text B"]
-    robustness_scorer = RobustnessScorer(binary=False, similarity_metric="invalid_metric")
+    robustness_scorer = RobustnessScorer(
+        binary=False, similarity_metric="invalid_metric"
+    )
 
-    with pytest.raises(ValueError, match="Unsupported similarity metric: invalid_metric"):
+    with pytest.raises(
+        ValueError, match="Unsupported similarity metric: invalid_metric"
+    ):
         robustness_scorer.score(output=output)
 
 
@@ -183,14 +186,14 @@ def test_robustness_scorer_zero_variance():
         "The quick brown fox jumps over the lazy dog.",
         "The quick brown fox jumps over the lazy dog.",
         "The quick brown fox jumps over the lazy dog.",
-        "The quick brown fox jumps over the lazy dog."
+        "The quick brown fox jumps over the lazy dog.",
     ]
 
     robustness_scorer = RobustnessScorer(binary=False)
     result = robustness_scorer.score(output=output)
 
     # Since all outputs are identical, differences are zero, and std_dev is zero
-    assert result['cohen_d'] == 0.0
+    assert result["cohen_d"] == 0.0
 
 
 def test_robustness_scorer_long_texts():
@@ -202,15 +205,15 @@ def test_robustness_scorer_long_texts():
         "one of those gentlemen who always have a lance and ancient shield on a shelf, "
         "a skinny nag, and a greyhound for hunting.",
         "In a certain village in La Mancha, which I shall not name, there lived recently a gentleman "
-        "who kept a spear in his rack, an old shield, a thin horse, and a hunting greyhound."
+        "who kept a spear in his rack, an old shield, a thin horse, and a hunting greyhound.",
     ]
 
     robustness_scorer = RobustnessScorer(binary=False)
     result = robustness_scorer.score(output=output)
 
     # Assert that the scorer returns a valid effect size
-    assert 'cohen_d' in result
-    assert isinstance(result['cohen_d'], float)
+    assert "cohen_d" in result
+    assert isinstance(result["cohen_d"], float)
 
 
 def test_robustness_scorer_unicode_texts():
@@ -218,15 +221,15 @@ def test_robustness_scorer_unicode_texts():
         "C'est la vie 😊",  # Original output with emoji
         "C'est la vie 😊",  # Identical perturbed output
         "C'est la vie 😢",  # Perturbed output with different emoji
-        "C'est la vie"      # Perturbed output without emoji
+        "C'est la vie",  # Perturbed output without emoji
     ]
 
     robustness_scorer = RobustnessScorer(binary=False)
     result = robustness_scorer.score(output=output)
 
     # Assert that the scorer computes a valid effect size
-    assert 'cohen_d' in result
-    assert isinstance(result['cohen_d'], float)
+    assert "cohen_d" in result
+    assert isinstance(result["cohen_d"], float)
 
 
 def test_robustness_scorer_unicode_texts():
@@ -234,15 +237,15 @@ def test_robustness_scorer_unicode_texts():
         "C'est la vie 😊",  # Original output with emoji
         "C'est la vie 😊",  # Identical perturbed output
         "C'est la vie 😢",  # Perturbed output with different emoji
-        "C'est la vie"      # Perturbed output without emoji
+        "C'est la vie",  # Perturbed output without emoji
     ]
 
     robustness_scorer = RobustnessScorer(binary=False)
     result = robustness_scorer.score(output=output)
 
     # Assert that the scorer computes a valid effect size
-    assert 'cohen_d' in result
-    assert isinstance(result['cohen_d'], float)
+    assert "cohen_d" in result
+    assert isinstance(result["cohen_d"], float)
 
 
 def test_robustness_scorer_compute_similarity_exception():
@@ -268,23 +271,23 @@ def test_robustness_scorer_mixed_data_types():
     result = robustness_scorer.score(output=output)
 
     # Assert that the scorer computes a valid effect size
-    assert 'cohen_h' in result
-    assert isinstance(result['cohen_h'], float)
+    assert "cohen_h" in result
+    assert isinstance(result["cohen_h"], float)
 
 
 def test_robustness_scorer_multilingual_texts():
     output = [
-        "Hello, how are you?",          # English
-        "Hola, ¿cómo estás?",           # Spanish
-        "Bonjour, comment ça va?",      # French
-        "こんにちは、お元気ですか？",    # Japanese
+        "Hello, how are you?",  # English
+        "Hola, ¿cómo estás?",  # Spanish
+        "Bonjour, comment ça va?",  # French
+        "こんにちは、お元気ですか？",  # Japanese
     ]
 
     robustness_scorer = RobustnessScorer(binary=False)
     result = robustness_scorer.score(output=output)
 
     # Since texts are in different languages, expect low similarities
-    assert result['score(perturbed)'] < 0.5
+    assert result["score(perturbed)"] < 0.5
 
 
 @pytest.mark.asyncio
@@ -374,8 +377,10 @@ async def test_robustness_scorer_eval_with_ground_truths():
 
 
 import pytest
+
 import weave
 from weave.scorers.robustness_scorer import RobustnessScorer
+
 
 @pytest.mark.asyncio
 async def test_robustness_scorer_non_binary_evaluation():
@@ -383,16 +388,16 @@ async def test_robustness_scorer_non_binary_evaluation():
     dataset = [
         {
             "questions": [
-                "What is the capital of France?",     # Original question
-                "What's the capital of France?",      # Perturbed question 1
-                "What is France's capital city?",     # Perturbed question 2
+                "What is the capital of France?",  # Original question
+                "What's the capital of France?",  # Perturbed question 1
+                "What is France's capital city?",  # Perturbed question 2
             ],
         },
         {
             "questions": [
-                "Who is the CEO of Apple?",           # Original question
-                "Who leads Apple Inc.?",              # Perturbed question 1
-                "Name the chief executive of Apple.", # Perturbed question 2
+                "Who is the CEO of Apple?",  # Original question
+                "Who leads Apple Inc.?",  # Perturbed question 1
+                "Name the chief executive of Apple.",  # Perturbed question 2
             ],
         },
     ]
@@ -431,4 +436,6 @@ async def test_robustness_scorer_non_binary_evaluation():
 
     # Optionally, you can check that the effect size is within a reasonable range
     cohen_d_mean = result["RobustnessScorer"]["cohen_d"]["mean"]
-    assert 0 <= abs(cohen_d_mean) <= 3, f"Cohen's d mean is out of expected range: {cohen_d_mean}"
+    assert (
+        0 <= abs(cohen_d_mean) <= 3
+    ), f"Cohen's d mean is out of expected range: {cohen_d_mean}"

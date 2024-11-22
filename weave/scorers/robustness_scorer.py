@@ -138,14 +138,14 @@ class RobustnessScorer(Scorer):
             # Semantic similarity scoring
             if ground_truths:
                 similarities = [
-                    self.compute_similarity(output[i], ground_truths[i])
+                    self.compute_similarity(output[i], ground_truths[i])  # type: ignore
                     for i in range(len(output))
                 ]
                 score_o = similarities[0]
                 perturbed_similarities = similarities[1:]
             else:
                 similarities = [
-                    self.compute_similarity(original, perturbed)
+                    self.compute_similarity(original, perturbed)  # type: ignore
                     for perturbed in perturbed_outputs
                 ]
                 score_o = 1.0  # Similarity of original output with itself
@@ -196,6 +196,7 @@ class RobustnessScorer(Scorer):
         Note that the interpretation is a rule of thumb and may not be appropriate for small sample sizes. Feel free to interpret the results according to your use case.
 
         """
+
         def psi(score: float) -> float:
             """Arcsine transformation used in Cohen's h calculation."""
             return 2 * math.asin(math.sqrt(score))
