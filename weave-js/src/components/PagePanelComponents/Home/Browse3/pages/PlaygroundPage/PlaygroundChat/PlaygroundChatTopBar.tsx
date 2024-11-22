@@ -79,7 +79,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           display: 'flex',
           gap: '8px',
           alignItems: 'center',
-          backgroundColor: 'white',
+          backgroundColor: 'transparent',
         }}>
         {!onlyOneChat && <Tag label={`${idx + 1}`} />}
         <LLMDropdown
@@ -97,7 +97,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           display: 'flex',
           alignItems: 'center',
           gap: '4px',
-          backgroundColor: 'white',
+          backgroundColor: 'transparent',
         }}>
         <Button
           tooltip={'Clear chat'}
