@@ -1,0 +1,29 @@
+Metadata-Version: 2.1
+Name: types-Jinja2
+Version: 2.11.9
+Summary: Typing stubs for Jinja2
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0 license
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Typing :: Typed
+Description-Content-Type: text/markdown
+Requires-Dist: types-MarkupSafe
+
+## Typing stubs for Jinja2
+
+This is a PEP 561 type stub package for the `Jinja2` package.
+It can be used by type-checking tools like mypy, PyCharm, pytype etc. to check code
+that uses `Jinja2`. The source for this package can be found at
+https://github.com/python/typeshed/tree/master/stubs/Jinja2. All fixes for
+types and metadata should be contributed there.
+
+*Note:* The `Jinja2` package includes type annotations or type stubs
+since version 3.0. Please uninstall the `types-Jinja2`
+package if you use this or a newer version.
+
+
+See https://github.com/python/typeshed/blob/master/README.md for more details.
+This package was generated from typeshed commit `a5bc1e037fa9fb541d81de92ad27fa8543c65be4`.
+
+

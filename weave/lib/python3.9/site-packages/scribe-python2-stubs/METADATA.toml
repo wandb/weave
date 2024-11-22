@@ -1,0 +1,3 @@
+version = "2.0"
+python2 = true
+requires = ["types-fb303"]

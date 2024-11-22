@@ -1,0 +1,33 @@
+Metadata-Version: 2.1
+Name: types-frozendict
+Version: 2.0.9
+Summary: Typing stubs for frozendict
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0 license
+Project-URL: GitHub, https://github.com/python/typeshed
+Project-URL: Changes, https://github.com/typeshed-internal/stub_uploader/blob/main/data/changelogs/frozendict.md
+Project-URL: Issue tracker, https://github.com/python/typeshed/issues
+Project-URL: Chat, https://gitter.im/python/typing
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3
+Classifier: Typing :: Stubs Only
+Description-Content-Type: text/markdown
+
+## Typing stubs for frozendict
+
+This is a PEP 561 type stub package for the `frozendict` package.
+It can be used by type-checking tools like mypy, PyCharm, pytype etc. to check code
+that uses `frozendict`. The source for this package can be found at
+https://github.com/python/typeshed/tree/master/stubs/frozendict. All fixes for
+types and metadata should be contributed there.
+
+*Note:* The `frozendict` package includes type annotations or type stubs
+since version 2.2.0. Please uninstall the `types-frozendict`
+package if you use this or a newer version.
+
+
+See https://github.com/python/typeshed/blob/master/README.md for more details.
+This package was generated from typeshed commit `81fd55a885e678559471710f249c7e27d02ec212`.
+
+

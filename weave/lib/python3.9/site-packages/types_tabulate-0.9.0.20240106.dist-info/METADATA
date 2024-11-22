@@ -1,0 +1,37 @@
+Metadata-Version: 2.1
+Name: types-tabulate
+Version: 0.9.0.20240106
+Summary: Typing stubs for tabulate
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0 license
+Project-URL: GitHub, https://github.com/python/typeshed
+Project-URL: Changes, https://github.com/typeshed-internal/stub_uploader/blob/main/data/changelogs/tabulate.md
+Project-URL: Issue tracker, https://github.com/python/typeshed/issues
+Project-URL: Chat, https://gitter.im/python/typing
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3
+Classifier: Typing :: Stubs Only
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+
+## Typing stubs for tabulate
+
+This is a [PEP 561](https://peps.python.org/pep-0561/)
+type stub package for the [`tabulate`](https://github.com/astanin/python-tabulate) package.
+It can be used by type-checking tools like
+[mypy](https://github.com/python/mypy/),
+[pyright](https://github.com/microsoft/pyright),
+[pytype](https://github.com/google/pytype/),
+PyCharm, etc. to check code that uses
+`tabulate`.
+
+This version of `types-tabulate` aims to provide accurate annotations
+for `tabulate==0.9.*`.
+The source for this package can be found at
+https://github.com/python/typeshed/tree/main/stubs/tabulate. All fixes for
+types and metadata should be contributed there.
+
+See https://github.com/python/typeshed/blob/main/README.md for more details.
+This package was generated from typeshed commit `1de5830a2703936a96a126248227d5c7db883674` and was tested
+with mypy 1.8.0, pyright 1.1.342, and
+pytype 2023.12.18.

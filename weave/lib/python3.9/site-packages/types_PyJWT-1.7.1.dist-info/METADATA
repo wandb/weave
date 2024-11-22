@@ -1,0 +1,29 @@
+Metadata-Version: 2.1
+Name: types-PyJWT
+Version: 1.7.1
+Summary: Typing stubs for PyJWT
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0 license
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Typing :: Typed
+Description-Content-Type: text/markdown
+Requires-Dist: types-cryptography
+
+## Typing stubs for PyJWT
+
+This is an auto-generated PEP 561 type stub package for `PyJWT` package.
+It can be used by type-checking tools like mypy, PyCharm, pytype etc. to check code
+that uses `PyJWT`. The source for this package can be found at
+https://github.com/python/typeshed/tree/master/stubs/PyJWT. All fixes for
+types and metadata should be contributed there.
+
+*Note:* The `PyJWT` package includes type annotations or type stubs
+since version 2.0.0. Please uninstall the `types-PyJWT`
+package if you use this or a newer version.
+
+
+See https://github.com/python/typeshed/blob/master/README.md for more details.
+This package was generated from typeshed commit `64f463172b27d7321461890dd3edf416a103ace7`.
+
+

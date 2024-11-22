@@ -1,0 +1,138 @@
+Metadata-Version: 2.1
+Name: types-all
+Version: 1.0.0
+Summary: A shim for the typeshed changes in mypy 0.900
+Home-page: https://github.com/asottile/types-all
+Author: Anthony Sottile
+Author-email: asottile@umich.edu
+License: MIT
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Requires-Python: >=3.6.1
+Description-Content-Type: text/markdown
+Requires-Dist: types-DateTimeRange
+Requires-Dist: types-Deprecated
+Requires-Dist: types-Flask
+Requires-Dist: types-JACK-Client
+Requires-Dist: types-Jinja2
+Requires-Dist: types-Markdown
+Requires-Dist: types-MarkupSafe
+Requires-Dist: types-Pillow
+Requires-Dist: types-PyJWT
+Requires-Dist: types-PyMySQL
+Requires-Dist: types-PyYAML
+Requires-Dist: types-Routes
+Requires-Dist: types-Werkzeug
+Requires-Dist: types-aiofiles
+Requires-Dist: types-annoy
+Requires-Dist: types-atomicwrites
+Requires-Dist: types-backports
+Requires-Dist: types-backports-abc
+Requires-Dist: types-bleach
+Requires-Dist: types-boto
+Requires-Dist: types-cachetools
+Requires-Dist: types-certifi
+Requires-Dist: types-characteristic
+Requires-Dist: types-chardet
+Requires-Dist: types-click
+Requires-Dist: types-click-spinner
+Requires-Dist: types-colorama
+Requires-Dist: types-contextvars
+Requires-Dist: types-croniter
+Requires-Dist: types-cryptography
+Requires-Dist: types-dataclasses
+Requires-Dist: types-dateparser
+Requires-Dist: types-decorator
+Requires-Dist: types-docopt
+Requires-Dist: types-docutils
+Requires-Dist: types-emoji
+Requires-Dist: types-enum34
+Requires-Dist: types-fb303
+Requires-Dist: types-filelock
+Requires-Dist: types-first
+Requires-Dist: types-freezegun
+Requires-Dist: types-frozendict
+Requires-Dist: types-futures
+Requires-Dist: types-geoip2
+Requires-Dist: types-ipaddress
+Requires-Dist: types-itsdangerous
+Requires-Dist: types-kazoo
+Requires-Dist: types-maxminddb
+Requires-Dist: types-mock
+Requires-Dist: types-mypy-extensions
+Requires-Dist: types-nmap
+Requires-Dist: types-openssl-python
+Requires-Dist: types-orjson
+Requires-Dist: types-paramiko
+Requires-Dist: types-pathlib2
+Requires-Dist: types-pkg-resources
+Requires-Dist: types-polib
+Requires-Dist: types-protobuf
+Requires-Dist: types-pyRFC3339
+Requires-Dist: types-pyaudio
+Requires-Dist: types-pycurl
+Requires-Dist: types-pyfarmhash
+Requires-Dist: types-pymssql
+Requires-Dist: types-pysftp
+Requires-Dist: types-python-dateutil
+Requires-Dist: types-python-gflags
+Requires-Dist: types-python-slugify
+Requires-Dist: types-pytz
+Requires-Dist: types-pyvmomi
+Requires-Dist: types-redis
+Requires-Dist: types-requests
+Requires-Dist: types-retry
+Requires-Dist: types-scribe
+Requires-Dist: types-simplejson
+Requires-Dist: types-singledispatch
+Requires-Dist: types-six
+Requires-Dist: types-tabulate
+Requires-Dist: types-termcolor
+Requires-Dist: types-toml
+Requires-Dist: types-tornado
+Requires-Dist: types-typed-ast
+Requires-Dist: types-tzlocal
+Requires-Dist: types-ujson
+Requires-Dist: types-waitress
+Requires-Dist: types-xxhash
+
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/asottile/types-all/master.svg)](https://results.pre-commit.ci/latest/github/asottile/types-all/master)
+
+types-all
+=========
+
+A shim for the typeshed changes in mypy 0.900
+
+## installation
+
+`pip install types-all`
+
+## why
+
+`--install-types` is annoying, this installs all the things in [typeshed]
+
+```
+error: Library stubs not installed for "toml" (or incompatible with Python 3.8)
+```
+
+(for pre-commit, use something like this)
+
+```yaml
+-   repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v0.902
+    hooks:
+    -   id: mypy
+        additional_dependencies: [types-all]
+```
+
+[typeshed]: https://github.com/python/typeshed
+
+

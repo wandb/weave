@@ -1,0 +1,3 @@
+[console_scripts]
+lazydocs = lazydocs._cli:app
+

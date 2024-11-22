@@ -1,0 +1,1 @@
+scribe-python2-stubs

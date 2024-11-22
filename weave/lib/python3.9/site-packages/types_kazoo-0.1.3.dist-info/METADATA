@@ -1,0 +1,23 @@
+Metadata-Version: 2.1
+Name: types-kazoo
+Version: 0.1.3
+Summary: Typing stubs for kazoo
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0 license
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Typing :: Typed
+Description-Content-Type: text/markdown
+
+## Typing stubs for kazoo
+
+This is an auto-generated PEP 561 type stub package for `kazoo` package.
+It can be used by type-checking tools like mypy, PyCharm, pytype etc. to check code
+that uses `kazoo`. The source for this package can be found at
+https://github.com/python/typeshed/tree/master/stubs/kazoo. All fixes for
+types and metadata should be contributed there.
+
+See https://github.com/python/typeshed/blob/master/README.md for more details.
+This package was generated from typeshed commit `bda76bb7d8bcf97e67f50e3650ae5e9fb8d896aa`.
+
+

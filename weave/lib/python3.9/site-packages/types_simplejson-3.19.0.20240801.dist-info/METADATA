@@ -1,0 +1,38 @@
+Metadata-Version: 2.1
+Name: types-simplejson
+Version: 3.19.0.20240801
+Summary: Typing stubs for simplejson
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0 license
+Project-URL: GitHub, https://github.com/python/typeshed
+Project-URL: Changes, https://github.com/typeshed-internal/stub_uploader/blob/main/data/changelogs/simplejson.md
+Project-URL: Issue tracker, https://github.com/python/typeshed/issues
+Project-URL: Chat, https://gitter.im/python/typing
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3
+Classifier: Typing :: Stubs Only
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+
+## Typing stubs for simplejson
+
+This is a [PEP 561](https://peps.python.org/pep-0561/)
+type stub package for the [`simplejson`](https://github.com/simplejson/simplejson) package.
+It can be used by type-checking tools like
+[mypy](https://github.com/python/mypy/),
+[pyright](https://github.com/microsoft/pyright),
+[pytype](https://github.com/google/pytype/),
+PyCharm, etc. to check code that uses
+`simplejson`.
+
+This version of `types-simplejson` aims to provide accurate annotations
+for `simplejson==3.19.*`.
+The source for this package can be found at
+https://github.com/python/typeshed/tree/main/stubs/simplejson. All fixes for
+types and metadata should be contributed there.
+
+See https://github.com/python/typeshed/blob/main/README.md for more details.
+This package was generated from typeshed commit
+[`df29ce93ac284c6fcba5601339c814677f3aa1eb`](https://github.com/python/typeshed/commit/df29ce93ac284c6fcba5601339c814677f3aa1eb) and was tested
+with mypy 1.10.1, pyright 1.1.374, and
+pytype 2024.4.11.

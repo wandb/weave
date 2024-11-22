@@ -1,0 +1,28 @@
+Metadata-Version: 2.1
+Name: types-MarkupSafe
+Version: 1.1.10
+Summary: Typing stubs for MarkupSafe
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0 license
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Typing :: Typed
+Description-Content-Type: text/markdown
+
+## Typing stubs for MarkupSafe
+
+This is a PEP 561 type stub package for the `MarkupSafe` package.
+It can be used by type-checking tools like mypy, PyCharm, pytype etc. to check code
+that uses `MarkupSafe`. The source for this package can be found at
+https://github.com/python/typeshed/tree/master/stubs/MarkupSafe. All fixes for
+types and metadata should be contributed there.
+
+*Note:* The `MarkupSafe` package includes type annotations or type stubs
+since version 2.0. Please uninstall the `types-MarkupSafe`
+package if you use this or a newer version.
+
+
+See https://github.com/python/typeshed/blob/master/README.md for more details.
+This package was generated from typeshed commit `98af7d667fa668dec9dc640f0f2669c6e3453e86`.
+
+

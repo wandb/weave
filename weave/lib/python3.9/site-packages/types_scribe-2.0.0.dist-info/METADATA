@@ -1,0 +1,24 @@
+Metadata-Version: 2.1
+Name: types-scribe
+Version: 2.0.0
+Summary: Typing stubs for scribe
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0 license
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Typing :: Typed
+Description-Content-Type: text/markdown
+Requires-Dist: types-fb303
+
+## Typing stubs for scribe
+
+This is a PEP 561 type stub package for the `scribe` package.
+It can be used by type-checking tools like mypy, PyCharm, pytype etc. to check code
+that uses `scribe`. The source for this package can be found at
+https://github.com/python/typeshed/tree/master/stubs/scribe. All fixes for
+types and metadata should be contributed there.
+
+See https://github.com/python/typeshed/blob/master/README.md for more details.
+This package was generated from typeshed commit `b50ebafa7913cf572ed1d4a87926b49f34fd2dc0`.
+
+

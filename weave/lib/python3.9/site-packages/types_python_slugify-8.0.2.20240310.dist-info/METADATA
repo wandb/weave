@@ -1,0 +1,42 @@
+Metadata-Version: 2.1
+Name: types-python-slugify
+Version: 8.0.2.20240310
+Summary: Typing stubs for python-slugify
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0 license
+Project-URL: GitHub, https://github.com/python/typeshed
+Project-URL: Changes, https://github.com/typeshed-internal/stub_uploader/blob/main/data/changelogs/python-slugify.md
+Project-URL: Issue tracker, https://github.com/python/typeshed/issues
+Project-URL: Chat, https://gitter.im/python/typing
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3
+Classifier: Typing :: Stubs Only
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+
+## Typing stubs for python-slugify
+
+This is a [PEP 561](https://peps.python.org/pep-0561/)
+type stub package for the [`python-slugify`](https://github.com/un33k/python-slugify) package.
+It can be used by type-checking tools like
+[mypy](https://github.com/python/mypy/),
+[pyright](https://github.com/microsoft/pyright),
+[pytype](https://github.com/google/pytype/),
+PyCharm, etc. to check code that uses
+`python-slugify`.
+
+This version of `types-python-slugify` aims to provide accurate annotations
+for `python-slugify==8.0.2`.
+The source for this package can be found at
+https://github.com/python/typeshed/tree/main/stubs/python-slugify. All fixes for
+types and metadata should be contributed there.
+
+*Note:* The `python-slugify` package includes type annotations or type stubs
+since version 8.0.2. Please uninstall the `types-python-slugify`
+package if you use this or a newer version.
+
+
+See https://github.com/python/typeshed/blob/main/README.md for more details.
+This package was generated from typeshed commit `f94bbfbcc4c3b2b289425ea793beda0822e702f8` and was tested
+with mypy 1.9.0, pyright 1.1.350, and
+pytype 2024.2.27.

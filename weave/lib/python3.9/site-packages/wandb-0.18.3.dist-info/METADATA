@@ -1,0 +1,213 @@
+Metadata-Version: 2.3
+Name: wandb
+Version: 0.18.3
+Summary: A CLI and library for interacting with the Weights & Biases API.
+Project-URL: Source, https://github.com/wandb/wandb
+Project-URL: Bug Reports, https://github.com/wandb/wandb/issues
+Project-URL: Documentation, https://docs.wandb.ai/
+Author-email: Weights & Biases <support@wandb.com>
+License: MIT License
+        
+        Copyright (c) 2021 Weights and Biases, Inc.
+        
+        Permission is hereby granted, free of charge, to any person obtaining a copy
+        of this software and associated documentation files (the "Software"), to deal
+        in the Software without restriction, including without limitation the rights
+        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+        copies of the Software, and to permit persons to whom the Software is
+        furnished to do so, subject to the following conditions:
+        
+        The above copyright notice and this permission notice shall be included in all
+        copies or substantial portions of the Software.
+        
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+        SOFTWARE.
+License-File: LICENSE
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Natural Language :: English
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: System :: Logging
+Classifier: Topic :: System :: Monitoring
+Requires-Python: >=3.7
+Requires-Dist: click!=8.0.0,>=7.1
+Requires-Dist: docker-pycreds>=0.4.0
+Requires-Dist: gitpython!=3.1.29,>=1.0.0
+Requires-Dist: platformdirs
+Requires-Dist: protobuf!=4.21.0,!=5.28.0,<6,>=3.12.0; python_version < '3.9' and sys_platform == 'linux'
+Requires-Dist: protobuf!=4.21.0,!=5.28.0,<6,>=3.15.0; python_version == '3.9' and sys_platform == 'linux'
+Requires-Dist: protobuf!=4.21.0,!=5.28.0,<6,>=3.19.0; python_version > '3.9' and sys_platform == 'linux'
+Requires-Dist: protobuf!=4.21.0,!=5.28.0,<6,>=3.19.0; sys_platform != 'linux'
+Requires-Dist: psutil>=5.0.0
+Requires-Dist: pyyaml
+Requires-Dist: requests<3,>=2.0.0
+Requires-Dist: sentry-sdk>=1.0.0
+Requires-Dist: setproctitle
+Requires-Dist: setuptools
+Requires-Dist: typing-extensions; python_version < '3.10'
+Provides-Extra: aws
+Requires-Dist: boto3; extra == 'aws'
+Provides-Extra: azure
+Requires-Dist: azure-identity; extra == 'azure'
+Requires-Dist: azure-storage-blob; extra == 'azure'
+Provides-Extra: gcp
+Requires-Dist: google-cloud-storage; extra == 'gcp'
+Provides-Extra: importers
+Requires-Dist: filelock; extra == 'importers'
+Requires-Dist: mlflow; extra == 'importers'
+Requires-Dist: polars<=1.2.1; extra == 'importers'
+Requires-Dist: rich; extra == 'importers'
+Requires-Dist: tenacity; extra == 'importers'
+Provides-Extra: kubeflow
+Requires-Dist: google-cloud-storage; extra == 'kubeflow'
+Requires-Dist: kubernetes; extra == 'kubeflow'
+Requires-Dist: minio; extra == 'kubeflow'
+Requires-Dist: sh; extra == 'kubeflow'
+Provides-Extra: launch
+Requires-Dist: awscli; extra == 'launch'
+Requires-Dist: azure-containerregistry; extra == 'launch'
+Requires-Dist: azure-identity; extra == 'launch'
+Requires-Dist: azure-storage-blob; extra == 'launch'
+Requires-Dist: boto3; extra == 'launch'
+Requires-Dist: botocore; extra == 'launch'
+Requires-Dist: chardet; extra == 'launch'
+Requires-Dist: google-auth; extra == 'launch'
+Requires-Dist: google-cloud-aiplatform; extra == 'launch'
+Requires-Dist: google-cloud-artifact-registry; extra == 'launch'
+Requires-Dist: google-cloud-compute; extra == 'launch'
+Requires-Dist: google-cloud-storage; extra == 'launch'
+Requires-Dist: iso8601; extra == 'launch'
+Requires-Dist: jsonschema; extra == 'launch'
+Requires-Dist: kubernetes; extra == 'launch'
+Requires-Dist: kubernetes-asyncio; extra == 'launch'
+Requires-Dist: nbconvert; extra == 'launch'
+Requires-Dist: nbformat; extra == 'launch'
+Requires-Dist: optuna; extra == 'launch'
+Requires-Dist: pydantic; extra == 'launch'
+Requires-Dist: pyyaml>=6.0.0; extra == 'launch'
+Requires-Dist: tomli; extra == 'launch'
+Requires-Dist: typing-extensions; extra == 'launch'
+Provides-Extra: media
+Requires-Dist: bokeh; extra == 'media'
+Requires-Dist: imageio; extra == 'media'
+Requires-Dist: moviepy; extra == 'media'
+Requires-Dist: numpy; extra == 'media'
+Requires-Dist: pillow; extra == 'media'
+Requires-Dist: plotly>=5.18.0; extra == 'media'
+Requires-Dist: rdkit; extra == 'media'
+Requires-Dist: soundfile; extra == 'media'
+Provides-Extra: models
+Requires-Dist: cloudpickle; extra == 'models'
+Provides-Extra: perf
+Requires-Dist: orjson; extra == 'perf'
+Provides-Extra: sweeps
+Requires-Dist: sweeps>=0.2.0; extra == 'sweeps'
+Provides-Extra: workspaces
+Requires-Dist: wandb-workspaces; extra == 'workspaces'
+Description-Content-Type: text/markdown
+
+<div align="center">
+  <img src="https://i.imgur.com/RUtiVzH.png" width="600" /><br><br>
+</div>
+
+# Weights and Biases [![PyPI](https://img.shields.io/pypi/v/wandb)](https://pypi.python.org/pypi/wandb) [![Conda (channel only)](https://img.shields.io/conda/vn/conda-forge/wandb)](https://anaconda.org/conda-forge/wandb) [![CircleCI](https://img.shields.io/circleci/build/github/wandb/wandb/main)](https://circleci.com/gh/wandb/wandb) [![Codecov](https://img.shields.io/codecov/c/gh/wandb/wandb)](https://codecov.io/gh/wandb/wandb)
+
+Use W&B to build better models faster. Track and visualize all the pieces of your machine learning pipeline, from datasets to production machine learning models. Get started with W&B today, [sign up for an account!](https://wandb.com?utm_source=github&utm_medium=code&utm_campaign=wandb&utm_content=readme)
+
+
+
+See the [W&B Developer Guide](https://docs.wandb.ai/?utm_source=github&utm_medium=code&utm_campaign=wandb&utm_content=documentation) and [API Reference Guide](https://docs.wandb.ai/ref?utm_source=github&utm_medium=code&utm_campaign=wandb&utm_content=documentation) for a full technical description of the W&B platform.
+
+&nbsp;
+
+# Quickstart
+
+Get started with W&B in four steps:
+
+1. First, sign up for a [W&B account](https://wandb.ai/login?utm_source=github&utm_medium=code&utm_campaign=wandb&utm_content=quickstart).
+
+2. Second, install the W&B SDK with [pip](https://pip.pypa.io/en/stable/). Navigate to your terminal and type the following command:
+
+```shell
+pip install wandb
+```
+
+3. Third, log into W&B:
+
+```python
+wandb.login()
+```
+
+4. Use the example code snippet below as a template to integrate W&B to your Python script:
+
+```python
+import wandb
+
+# Start a W&B Run with wandb.init
+run = wandb.init(project="my_first_project")
+
+# Save model inputs and hyperparameters in a wandb.config object
+config = run.config
+config.learning_rate = 0.01
+
+# Model training code here ...
+
+# Log metrics over time to visualize performance with wandb.log
+for i in range(10):
+    run.log({"loss": ...})
+
+# Mark the run as finished, and finish uploading all data
+run.finish()
+```
+
+For example, if the preceding code was stored in a script called train.py:
+
+```shell
+python train.py
+```
+
+You will see a URL in your terminal logs when your script starts and finishes. Data is staged locally in a directory named _wandb_ relative to your script. Navigate to the W&B App to view a dashboard of your first W&B Experiment. Use the W&B App to compare multiple experiments in a unified place, dive into the results of a single run, and much more!
+
+&nbsp;
+
+# Integrations
+
+Use your favorite framework with W&B. W&B integrations make it fast and easy to set up experiment tracking and data versioning inside existing projects. For more information on how to integrate W&B with the framework of your choice, see [W&B Integrations](https://docs.wandb.ai/guides/integrations) in the W&B Developer Guide.
+
+&nbsp;
+
+# Contribution guidelines
+Weights & Biases ❤️ open source, and we welcome contributions from the community! See the [Contribution guide](https://github.com/wandb/wandb/blob/main/CONTRIBUTING.md) for more information on the development workflow and the internals of the wandb library. For wandb bugs and feature requests, visit [GitHub Issues](https://github.com/wandb/wandb/issues) or contact support@wandb.com.
+
+&nbsp;
+
+# Academic Researchers
+Reach out to W&B Support at support@wandb.com to get a [free academic license](https://www.wandb.com/academic) for you and your research group.
+
+&nbsp;
+
+# W&B Community
+
+Be a part of the growing W&B Community and interact with the W&B team in our [Discord](https://wandb.me/discord). Stay connected with the latest ML updates and tutorials with [W&B Fully Connected](https://wandb.ai/fully-connected).
+
+&nbsp;
+
+# License
+
+[MIT License](https://github.com/wandb/wandb/blob/main/LICENSE)

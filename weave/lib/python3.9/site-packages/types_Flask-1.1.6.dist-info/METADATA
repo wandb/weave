@@ -1,0 +1,31 @@
+Metadata-Version: 2.1
+Name: types-Flask
+Version: 1.1.6
+Summary: Typing stubs for Flask
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0 license
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Typing :: Typed
+Description-Content-Type: text/markdown
+Requires-Dist: types-Jinja2
+Requires-Dist: types-Werkzeug
+Requires-Dist: types-click
+
+## Typing stubs for Flask
+
+This is a PEP 561 type stub package for the `Flask` package.
+It can be used by type-checking tools like mypy, PyCharm, pytype etc. to check code
+that uses `Flask`. The source for this package can be found at
+https://github.com/python/typeshed/tree/master/stubs/Flask. All fixes for
+types and metadata should be contributed there.
+
+*Note:* The `Flask` package includes type annotations or type stubs
+since version 2.0. Please uninstall the `types-Flask`
+package if you use this or a newer version.
+
+
+See https://github.com/python/typeshed/blob/master/README.md for more details.
+This package was generated from typeshed commit `a5bc1e037fa9fb541d81de92ad27fa8543c65be4`.
+
+

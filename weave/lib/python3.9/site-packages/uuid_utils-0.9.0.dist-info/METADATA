@@ -1,0 +1,132 @@
+Metadata-Version: 2.3
+Name: uuid_utils
+Version: 0.9.0
+Classifier: Development Status :: 3 - Alpha
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Rust
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Operating System :: OS Independent
+License-File: LICENSE.md
+Summary: Drop-in replacement for Python UUID in Rust
+Keywords: rust,uuid
+Author-email: Amin Alaee <me@aminalaee.dev>
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown; charset=UTF-8; variant=GFM
+Project-URL: Documentation, https://github.com/aminalaee/uuid-utils
+Project-URL: Issues, https://github.com/aminalaee/uuid-utils/issues
+Project-URL: Source, https://github.com/aminalaee/uuid-utils
+
+# Python UUID Utils
+
+<p align="center">
+<a href="https://pypi.org/project/uuid-utils/">
+    <img src="https://badge.fury.io/py/uuid-utils.svg" alt="Package version">
+</a>
+<a href="https://pypi.org/project/uuid-utils" target="_blank">
+    <img src="https://img.shields.io/pypi/pyversions/uuid-utils.svg?color=%2334D058" alt="Supported Python versions">
+</a>
+</p>
+
+---
+
+Python UUID implementation using Rust's UUID library.
+This will make `uuid4` function around 10x faster.
+
+This package can be a drop-in replacement to the standard library UUID
+which implements existing UUID versions like v4 in Rust
+and also adds draft UUID versions like v6.
+
+Avaialble UUID versions:
+
+- `uuid1` - Version 1 UUIDs using a timestamp and monotonic counter.
+- `uuid3` - Version 3 UUIDs based on the MD5 hash of some data.
+- `uuid4` - Version 4 UUIDs with random data.
+- `uuid5` - Version 5 UUIDs based on the SHA1 hash of some data.
+- `uuid6` - Version 6 UUIDs using a timestamp and monotonic counter.
+- `uuid7` - Version 7 UUIDs using a Unix timestamp ordered by time.
+- `uuid8` - Version 8 UUIDs using user-defined data.
+
+<sup>Please note that UUID versions 6, 7 and 8 are still in draft RFC.</sup><br>
+
+## Installation
+Using `pip`:
+```shell
+$ pip install uuid-utils
+```
+or, using `conda`:
+
+```shell
+$ conda install -c conda-forge uuid-utils
+```
+
+## Example
+
+```shell
+>>> import uuid_utils as uuid
+
+>>> # make a random UUID
+>>> uuid.uuid4()
+UUID('ffe95fcc-b818-4aca-a350-e0a35b9de6ec')
+
+>>> # make a random UUID using a Unix timestamp which is time-ordered.
+>>> uuid.uuid7()
+UUID('018afa4a-0d21-7e6c-b857-012bc678552b')
+
+>>> # make a UUID using a SHA-1 hash of a namespace UUID and a name
+>>> uuid.uuid5(uuid.NAMESPACE_DNS, 'python.org')
+UUID('886313e1-3b8a-5372-9b90-0c9aee199e5d')
+
+>>> # make a UUID using an MD5 hash of a namespace UUID and a name
+>>> uuid.uuid3(uuid.NAMESPACE_DNS, 'python.org')
+UUID('6fa459ea-ee8a-3ca4-894e-db77e160355e')
+```
+
+## Compatibility
+
+In some cases, for example if you are using `Django`, you might need `UUID` instances to be returned
+from the standrad-library `uuid`, not a custom `UUID` class.
+In that case you can use the `uuid_utils.compat` which comes with a performance penalty
+in comparison with the `uuid_utils` default behaviour, but is still faster than the standard-library.
+
+```py
+>>> import uuid_utils.compat as uuid
+
+>>> # make a random UUID
+>>> uuid.uuid4()
+UUID('ffe95fcc-b818-4aca-a350-e0a35b9de6ec')
+```
+
+## Benchmarks
+
+| Benchmark        | Min   | Max   | Mean  | Min (+)       | Max (+)       | Mean (+)      |
+| ---------------- | ----- | ----- | ----- | ------------- | ------------- | ------------- |
+| UUID v1          | 0.058 | 0.059 | 0.058 | 0.005 (12.0x) | 0.005 (11.9x) | 0.005 (12.0x) |
+| UUID v3          | 0.063 | 0.064 | 0.063 | 0.008 (7.9x)  | 0.008 (8.1x)  | 0.008 (8.0x)  |
+| UUID v4          | 0.041 | 0.041 | 0.041 | 0.004 (11.1x) | 0.004 (10.8x) | 0.004 (10.9x) |
+| UUID v5          | 0.064 | 0.066 | 0.065 | 0.008 (8.1x)  | 0.008 (8.1x)  | 0.008 (8.1x)  |
+| UUID from hex    | 0.024 | 0.025 | 0.024 | 0.004 (6.7x)  | 0.004 (6.6x)  | 0.004 (6.6x)  |
+| UUID from bytes  | 0.024 | 0.025 | 0.024 | 0.004 (6.7x)  | 0.004 (6.6x)  | 0.004 (6.7x)  |
+| UUID from int    | 0.024 | 0.025 | 0.024 | 0.004 (6.6x)  | 0.004 (6.7x)  | 0.004 (6.6x)  |
+| UUID from fields | 0.028 | 0.028 | 0.028 | 0.009 (3.1x)  | 0.009 (3.1x)  | 0.009 (3.1x)  |
+
+## How to develop locally
+
+```shell
+$ make build
+$ make test
+```
+
+Or:
+
+```shell
+$ RUSTFLAGS="--cfg uuid_unstable" maturin develop --release
+```
+

@@ -1,0 +1,28 @@
+Metadata-Version: 2.1
+Name: types-Werkzeug
+Version: 1.0.9
+Summary: Typing stubs for Werkzeug
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0 license
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Typing :: Typed
+Description-Content-Type: text/markdown
+
+## Typing stubs for Werkzeug
+
+This is a PEP 561 type stub package for the `Werkzeug` package.
+It can be used by type-checking tools like mypy, PyCharm, pytype etc. to check code
+that uses `Werkzeug`. The source for this package can be found at
+https://github.com/python/typeshed/tree/master/stubs/Werkzeug. All fixes for
+types and metadata should be contributed there.
+
+*Note:* The `Werkzeug` package includes type annotations or type stubs
+since version 2.0. Please uninstall the `types-Werkzeug`
+package if you use this or a newer version.
+
+
+See https://github.com/python/typeshed/blob/master/README.md for more details.
+This package was generated from typeshed commit `a5bc1e037fa9fb541d81de92ad27fa8543c65be4`.
+
+

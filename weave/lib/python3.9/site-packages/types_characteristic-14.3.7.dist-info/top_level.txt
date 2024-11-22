@@ -1,0 +1,1 @@
+characteristic-stubs

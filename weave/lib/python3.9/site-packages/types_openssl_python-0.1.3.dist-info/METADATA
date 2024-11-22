@@ -1,0 +1,24 @@
+Metadata-Version: 2.1
+Name: types-openssl-python
+Version: 0.1.3
+Summary: Typing stubs for openssl-python
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0 license
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Typing :: Typed
+Description-Content-Type: text/markdown
+Requires-Dist: types-cryptography
+
+## Typing stubs for openssl-python
+
+This is an auto-generated PEP 561 type stub package for `openssl-python` package.
+It can be used by type-checking tools like mypy, PyCharm, pytype etc. to check code
+that uses `openssl-python`. The source for this package can be found at
+https://github.com/python/typeshed/tree/master/stubs/openssl-python. All fixes for
+types and metadata should be contributed there.
+
+See https://github.com/python/typeshed/blob/master/README.md for more details.
+This package was generated from typeshed commit `ff7579353123d3fd1a3f2a9c9953289906ef4e48`.
+
+

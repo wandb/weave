@@ -1,0 +1,49 @@
+Metadata-Version: 2.1
+Name: types-redis
+Version: 4.6.0.20241004
+Summary: Typing stubs for redis
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0
+Project-URL: GitHub, https://github.com/python/typeshed
+Project-URL: Changes, https://github.com/typeshed-internal/stub_uploader/blob/main/data/changelogs/redis.md
+Project-URL: Issue tracker, https://github.com/python/typeshed/issues
+Project-URL: Chat, https://gitter.im/python/typing
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3
+Classifier: Typing :: Stubs Only
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: types-pyOpenSSL
+Requires-Dist: cryptography>=35.0.0
+
+## Typing stubs for redis
+
+This is a [PEP 561](https://peps.python.org/pep-0561/)
+type stub package for the [`redis`](https://github.com/redis/redis-py) package.
+It can be used by type-checking tools like
+[mypy](https://github.com/python/mypy/),
+[pyright](https://github.com/microsoft/pyright),
+[pytype](https://github.com/google/pytype/),
+PyCharm, etc. to check code that uses
+`redis`.
+
+This version of `types-redis` aims to provide accurate annotations
+for `redis==4.6.0`.
+The source for this package can be found at
+https://github.com/python/typeshed/tree/main/stubs/redis. All fixes for
+types and metadata should be contributed there.
+
+*Note:* The `redis` package includes type annotations or type stubs
+since version 5.0.0. Please uninstall the `types-redis`
+package if you use this or a newer version.
+
+
+This stub package is marked as [partial](https://peps.python.org/pep-0561/#partial-stub-packages).
+If you find that annotations are missing, feel free to contribute and help complete them.
+
+
+See https://github.com/python/typeshed/blob/main/README.md for more details.
+This package was generated from typeshed commit
+[`d16fe74e1f7a56ae05dfaa2fad595d5184c574d6`](https://github.com/python/typeshed/commit/d16fe74e1f7a56ae05dfaa2fad595d5184c574d6) and was tested
+with mypy 1.11.2, pyright 1.1.383, and
+pytype 2024.9.13.

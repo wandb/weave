@@ -1,0 +1,43 @@
+Metadata-Version: 2.1
+Name: types-paramiko
+Version: 3.5.0.20240928
+Summary: Typing stubs for paramiko
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0
+Project-URL: GitHub, https://github.com/python/typeshed
+Project-URL: Changes, https://github.com/typeshed-internal/stub_uploader/blob/main/data/changelogs/paramiko.md
+Project-URL: Issue tracker, https://github.com/python/typeshed/issues
+Project-URL: Chat, https://gitter.im/python/typing
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3
+Classifier: Typing :: Stubs Only
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: cryptography>=37.0.0
+
+## Typing stubs for paramiko
+
+This is a [PEP 561](https://peps.python.org/pep-0561/)
+type stub package for the [`paramiko`](https://github.com/paramiko/paramiko) package.
+It can be used by type-checking tools like
+[mypy](https://github.com/python/mypy/),
+[pyright](https://github.com/microsoft/pyright),
+[pytype](https://github.com/google/pytype/),
+PyCharm, etc. to check code that uses
+`paramiko`.
+
+This version of `types-paramiko` aims to provide accurate annotations
+for `paramiko==3.5.*`.
+The source for this package can be found at
+https://github.com/python/typeshed/tree/main/stubs/paramiko. All fixes for
+types and metadata should be contributed there.
+
+This stub package is marked as [partial](https://peps.python.org/pep-0561/#partial-stub-packages).
+If you find that annotations are missing, feel free to contribute and help complete them.
+
+
+See https://github.com/python/typeshed/blob/main/README.md for more details.
+This package was generated from typeshed commit
+[`119cd09655dcb4ed7fb2021654ba809b8d88846f`](https://github.com/python/typeshed/commit/119cd09655dcb4ed7fb2021654ba809b8d88846f) and was tested
+with mypy 1.11.1, pyright 1.1.382.post1, and
+pytype 2024.9.13.

@@ -1,0 +1,42 @@
+Metadata-Version: 2.1
+Name: types-docutils
+Version: 0.21.0.20241005
+Summary: Typing stubs for docutils
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0
+Project-URL: GitHub, https://github.com/python/typeshed
+Project-URL: Changes, https://github.com/typeshed-internal/stub_uploader/blob/main/data/changelogs/docutils.md
+Project-URL: Issue tracker, https://github.com/python/typeshed/issues
+Project-URL: Chat, https://gitter.im/python/typing
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3
+Classifier: Typing :: Stubs Only
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+
+## Typing stubs for docutils
+
+This is a [PEP 561](https://peps.python.org/pep-0561/)
+type stub package for the [`docutils`](https://sourceforge.net/p/docutils/code) package.
+It can be used by type-checking tools like
+[mypy](https://github.com/python/mypy/),
+[pyright](https://github.com/microsoft/pyright),
+[pytype](https://github.com/google/pytype/),
+PyCharm, etc. to check code that uses
+`docutils`.
+
+This version of `types-docutils` aims to provide accurate annotations
+for `docutils==0.21.*`.
+The source for this package can be found at
+https://github.com/python/typeshed/tree/main/stubs/docutils. All fixes for
+types and metadata should be contributed there.
+
+This stub package is marked as [partial](https://peps.python.org/pep-0561/#partial-stub-packages).
+If you find that annotations are missing, feel free to contribute and help complete them.
+
+
+See https://github.com/python/typeshed/blob/main/README.md for more details.
+This package was generated from typeshed commit
+[`77510ae6a48571256bf7b43960ff4fcb02052d77`](https://github.com/python/typeshed/commit/77510ae6a48571256bf7b43960ff4fcb02052d77) and was tested
+with mypy 1.11.2, pyright 1.1.383, and
+pytype 2024.9.13.

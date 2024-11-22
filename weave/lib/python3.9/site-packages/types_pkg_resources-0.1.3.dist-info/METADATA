@@ -1,0 +1,23 @@
+Metadata-Version: 2.1
+Name: types-pkg-resources
+Version: 0.1.3
+Summary: Typing stubs for pkg_resources
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0 license
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Typing :: Typed
+Description-Content-Type: text/markdown
+
+## Typing stubs for pkg_resources
+
+This is an auto-generated PEP 561 type stub package for `pkg_resources` package.
+It can be used by type-checking tools like mypy, PyCharm, pytype etc. to check code
+that uses `pkg_resources`. The source for this package can be found at
+https://github.com/python/typeshed/tree/master/stubs/pkg_resources. All fixes for
+types and metadata should be contributed there.
+
+See https://github.com/python/typeshed/blob/master/README.md for more details.
+This package was generated from typeshed commit `64f463172b27d7321461890dd3edf416a103ace7`.
+
+

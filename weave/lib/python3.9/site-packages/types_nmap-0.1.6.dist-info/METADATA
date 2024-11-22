@@ -1,0 +1,23 @@
+Metadata-Version: 2.1
+Name: types-nmap
+Version: 0.1.6
+Summary: Typing stubs for nmap
+Home-page: https://github.com/python/typeshed
+License: Apache-2.0 license
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Typing :: Typed
+Description-Content-Type: text/markdown
+
+## Typing stubs for nmap
+
+This is a PEP 561 type stub package for the `nmap` package.
+It can be used by type-checking tools like mypy, PyCharm, pytype etc. to check code
+that uses `nmap`. The source for this package can be found at
+https://github.com/python/typeshed/tree/master/stubs/nmap. All fixes for
+types and metadata should be contributed there.
+
+See https://github.com/python/typeshed/blob/master/README.md for more details.
+This package was generated from typeshed commit `8b9d771b67acf13a35905c7d4996382394f23181`.
+
+
