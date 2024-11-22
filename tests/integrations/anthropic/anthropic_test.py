@@ -67,6 +67,7 @@ def test_anthropic_stream(
         messages=[{"role": "user", "content": "Hello, Claude"}],
     )
     all_content = ""
+    print(f">>> {type(stream)=}, {stream=}")
     for event in stream:
         if event.type == "message_start":
             message = event.message
@@ -273,6 +274,7 @@ def test_anthropic_messages_stream_ctx_manager(
         model=model,
     ) as stream:
         for event in stream:
+            print(f">>> {event=}")
             if event.type == "text":
                 all_content += event.text
 
@@ -284,6 +286,7 @@ def test_anthropic_messages_stream_ctx_manager(
 
     assert call.exception is None and call.ended_at is not None
     output = call.output
+    print(f">>> {output=}")
     assert output.model == model
     assert output.stop_reason == "end_turn"
     assert output.stop_sequence is None
