@@ -115,16 +115,24 @@ const OpVersionPageInner: React.FC<{
             <div className="block">
               <p className="text-moon-500">Calls:</p>
               {!callsStats.loading || opVersionCallCount > 0 ? (
-                <CallsLink
-                  entity={entity}
-                  project={project}
-                  callCount={opVersionCallCount}
-                  filter={{
-                    opVersionRefs: [uri],
-                  }}
-                  neverPeek
-                  variant="secondary"
-                />
+                <div className="flex items-center group w-max">
+                  <CallsLink
+                    entity={entity}
+                    project={project}
+                    callCount={opVersionCallCount}
+                    filter={{
+                      opVersionRefs: [uri],
+                    }}
+                    neverPeek
+                    variant="secondary"
+                  />
+                  <Icon 
+                    name="forward-next" 
+                    width={16} 
+                    height={16}
+                    className="ml-[2px] text-teal-500 opacity-0 group-hover:opacity-100 hover:hidden"
+                  />
+                </div>
               ) : (
                 <p>-</p>
               )}
