@@ -13,7 +13,7 @@ class AnnotationSpec(base_object_def.BaseObject):
         description="Expected to be valid JSON Schema. Can be provided as a dict, a Pydantic model class, or a Pydantic Field",
         examples=[
             # String feedback
-            {"type": "string", "max_length": 100},
+            {"type": "string", "maxLength": 100},
             # Number feedback
             {"type": "number", "minimum": 0, "maximum": 100},
             # Integer feedback

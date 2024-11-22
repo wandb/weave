@@ -222,6 +222,7 @@ const FeedbackComponentSelector: React.FC<{
             onAddFeedback={wrappedOnAddFeedback}
             defaultValue={foundValue as string | null}
             focused={focused}
+            maxLength={jsonSchema.maxLength ?? undefined}
           />
         );
       case 'enum':

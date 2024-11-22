@@ -107,20 +107,7 @@ def validate_feedback_create_req(
 
     # Validate the ref formats (we could even query the DB to ensure they exist and are valid)
     if req.annotation_ref:
-        ensure_ref_is_valid(req.annotation_ref, (ri.InternalObjectRef,))
-    if req.runnable_ref:
-        ensure_ref_is_valid(req.runnable_ref, (ri.InternalOpRef, ri.InternalObjectRef))
-    if req.call_ref:
-        ensure_ref_is_valid(req.call_ref, (ri.InternalCallRef,))
-    if req.trigger_ref:
-        ensure_ref_is_valid(req.trigger_ref, (ri.InternalObjectRef,))
-
-    # Validate the annotation ref
-    if req.annotation_ref is not None:
-        # 1. Validate project id matches
-        parsed = ri.parse_internal_uri(req.annotation_ref)
-        if not isinstance(parsed, ri.InternalObjectRef):
-            raise InvalidRequest(f"Invalid annotation ref {req.annotation_ref}")
+        parsed = ensure_ref_is_valid(req.annotation_ref, (ri.InternalObjectRef,))
         if parsed.project_id != req.project_id:
             raise InvalidRequest(
                 f"Annotation ref {req.annotation_ref} does not match project id {req.project_id}"
@@ -139,6 +126,12 @@ def validate_feedback_create_req(
         is_valid = AnnotationSpec.model_validate(spec).validate(value)
         if not is_valid:
             raise InvalidRequest("Feedback payload does not match annotation spec")
+    if req.runnable_ref:
+        ensure_ref_is_valid(req.runnable_ref, (ri.InternalOpRef, ri.InternalObjectRef))
+    if req.call_ref:
+        ensure_ref_is_valid(req.call_ref, (ri.InternalCallRef,))
+    if req.trigger_ref:
+        ensure_ref_is_valid(req.trigger_ref, (ri.InternalObjectRef,))
 
 
 MESSAGE_INVALID_FEEDBACK_PURGE = (

@@ -27,7 +27,7 @@ def test_human_feedback_basic(client):
 
     col2 = AnnotationSpec(
         name="Text field #1",
-        field_schema={"type": "string", "max_length": 100},
+        field_schema={"type": "string", "maxLength": 100},
         op_scope=["weave:///entity/project/op/name:digest"],
     )
     ref2 = weave.publish(col2, "my text spec")
@@ -60,7 +60,7 @@ def test_human_feedback_basic(client):
     }
     assert objects.objs[1].val["field_schema"] == {
         "type": "string",
-        "max_length": 100,
+        "maxLength": 100,
     }
 
     # Attempt to add valid and invalid payloads

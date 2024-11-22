@@ -28,7 +28,7 @@ const AnnotationScorerFormSchema = z.object({
     }),
     z.object({
       type: z.literal('string'),
-      max_length: z
+      maxLength: z
         .number()
         .optional()
         .describe('Optional maximum length of the string'),
