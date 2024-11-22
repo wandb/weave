@@ -211,47 +211,42 @@ const ObjectVersionPageInner: React.FC<{
         </Tailwind>
       }
       headerContent={
-        <SimpleKeyValueTable
-          data={{
-            [refExtra ? 'Parent Object' : 'Name']: (
-              <>
-                {objectName}{' '}
+        <Tailwind>
+          <div className="grid grid-cols-3 gap-[8px] text-[14px] w-full">
+            <div className="block">
+              <p className="text-moon-500">Name:</p>
+              <div className="flex items-center">
+                <p className="font-medium">{objectName}</p>
                 {objectVersions.loading ? (
                   <LoadingDots />
                 ) : (
-                  <>
-                    [
+                  <span className="ml-[4px]">
+                    (
                     <ObjectVersionsLink
                       entity={entityName}
                       project={projectName}
-                      filter={{
-                        objectName,
-                      }}
+                      filter={{objectName}}
                       versionCount={objectVersionCount}
                       neverPeek
                       variant="secondary"
                     />
-                    ]
-                  </>
+                    )
+                  </span>
                 )}
-              </>
-            ),
-            Version: <>{objectVersionIndex}</>,
-            ...(refExtra
-              ? {
-                  Subpath: refExtra,
-                }
-              : {}),
-            // 'Type Version': (
-            //   <TypeVersionLink
-            //     entityName={entityName}
-            //     projectName={projectName}
-            //     typeName={typeName}
-            //     version={typeVersionHash}
-            //   />
-            // ),
-          }}
-        />
+              </div>
+            </div>
+            <div className="block">
+              <p className="text-moon-500">Version:</p>
+              <p>{objectVersionIndex}</p>
+            </div>
+            {refExtra && (
+              <div className="block">
+                <p className="text-moon-500">Subpath:</p>
+                <p>{refExtra}</p>
+              </div>
+            )}
+          </div>
+        </Tailwind>
       }
       // menuItems={[
       //   {
