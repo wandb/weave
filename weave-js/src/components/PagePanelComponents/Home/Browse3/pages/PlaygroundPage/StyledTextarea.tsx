@@ -14,7 +14,7 @@ export const StyledTextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
         <textarea
           ref={ref}
           className={classNames(
-            'h-full w-full flex-1',
+            'h-full w-full',
             'p-8 leading-6',
             'focus:outline-none',
             'relative bottom-0 top-0 items-center rounded-sm',
