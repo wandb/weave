@@ -58,9 +58,14 @@ export const ToggleButtonGroup = React.forwardRef<
               icon={icon}
               size={size}
               className={twMerge(
-                size === 'small' && 'gap-2 px-6 py-3 text-sm',
-                size === 'medium' && 'gap-3 px-10 py-4 text-base',
-                size === 'large' && 'gap-2 px-12 py-8 text-base',
+                size === 'small' &&
+                  (icon ? 'gap-4 px-4 py-3 text-sm' : 'px-8 py-3 text-sm'),
+                size === 'medium' &&
+                  (icon ? 'gap-5 px-7 py-4 text-base' : 'px-10 py-4 text-base'),
+                size === 'large' &&
+                  (icon
+                    ? 'gap-6 px-10 py-8 text-base'
+                    : 'px-12 py-8 text-base'),
                 isDisabled && 'pointer-events-none opacity-35',
                 value === optionValue
                   ? 'bg-teal-300/[0.48] text-teal-600 hover:bg-teal-300/[0.48]'
