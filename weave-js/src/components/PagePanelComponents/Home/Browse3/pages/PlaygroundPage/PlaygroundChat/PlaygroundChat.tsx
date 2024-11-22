@@ -116,9 +116,9 @@ export const PlaygroundChat = ({
                 sx={{
                   position: 'absolute',
                   top: '8px',
-                  width: 'calc(100% - 16px)',
-                  left: '8px',
-                  right: '8px',
+                  width: 'calc(100% - 32px)',
+                  left: '16px',
+                  right: '16px',
                   zIndex: 10,
                 }}>
                 <PlaygroundChatTopBar
