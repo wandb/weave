@@ -1,5 +1,6 @@
 import React, {useMemo} from 'react';
 
+import {Icon} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
 import {NotFoundPanel} from '../NotFoundPanel';
@@ -13,14 +14,12 @@ import {
 import {CenteredAnimatedLoader} from './common/Loader';
 import {
   ScrollableTabContent,
-  SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
 import {TabUseOp} from './TabUseOp';
 import {useWFHooks} from './wfReactInterface/context';
 import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
 import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
-import {Icon} from '../../../../Icon';
 
 export const OpVersionPage: React.FC<{
   entity: string;
@@ -77,7 +76,7 @@ const OpVersionPageInner: React.FC<{
       title={opVersionText(opId, versionIndex)}
       headerContent={
         <Tailwind>
-          <div className="grid grid-cols-3 gap-[8px] text-[14px] w-full">
+          <div className="grid w-full grid-cols-3 gap-[8px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name:</p>
               <div className="flex items-center">
@@ -89,18 +88,20 @@ const OpVersionPageInner: React.FC<{
                   }}
                   versionCount={opVersionCount}
                   neverPeek
-                  variant="secondary"
-                >
-                  <div className="flex font-semibold items-center group">
+                  variant="secondary">
+                  <div className="group flex items-center font-semibold">
                     <span>{opId}</span>
                     {opVersions.loading ? (
                       <LoadingDots />
                     ) : (
-                      <span className="ml-[4px]">({opVersionCount} version{opVersionCount !== 1 ? 's' : ''})</span>
+                      <span className="ml-[4px]">
+                        ({opVersionCount} version
+                        {opVersionCount !== 1 ? 's' : ''})
+                      </span>
                     )}
-                    <Icon 
-                      name="forward-next" 
-                      width={16} 
+                    <Icon
+                      name="forward-next"
+                      width={16}
                       height={16}
                       className="ml-[2px] opacity-0 group-hover:opacity-100"
                     />
@@ -115,7 +116,7 @@ const OpVersionPageInner: React.FC<{
             <div className="block">
               <p className="text-moon-500">Calls:</p>
               {!callsStats.loading || opVersionCallCount > 0 ? (
-                <div className="flex items-center group w-max">
+                <div className="group flex w-max items-center">
                   <CallsLink
                     entity={entity}
                     project={project}
@@ -126,11 +127,11 @@ const OpVersionPageInner: React.FC<{
                     neverPeek
                     variant="secondary"
                   />
-                  <Icon 
-                    name="forward-next" 
-                    width={16} 
+                  <Icon
+                    name="forward-next"
+                    width={16}
                     height={16}
-                    className="ml-[2px] text-teal-500 opacity-0 group-hover:opacity-100 hover:hidden"
+                    className="ml-[2px] text-teal-500 opacity-0 hover:hidden group-hover:opacity-100"
                   />
                 </div>
               ) : (

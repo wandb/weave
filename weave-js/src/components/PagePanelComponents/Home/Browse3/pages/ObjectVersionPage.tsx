@@ -212,7 +212,7 @@ const ObjectVersionPageInner: React.FC<{
       }
       headerContent={
         <Tailwind>
-          <div className="grid grid-cols-3 gap-[8px] text-[14px] w-full">
+          <div className="grid w-full grid-cols-3 gap-[8px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name:</p>
               <div className="flex items-center">
@@ -222,18 +222,20 @@ const ObjectVersionPageInner: React.FC<{
                   filter={{objectName}}
                   versionCount={objectVersionCount}
                   neverPeek
-                  variant="secondary"
-                >
-                  <div className="flex font-semibold items-center group">
+                  variant="secondary">
+                  <div className="group flex items-center font-semibold">
                     <span>{objectName}</span>
                     {objectVersions.loading ? (
                       <LoadingDots />
                     ) : (
-                      <span className="ml-[4px]">({objectVersionCount} version{objectVersionCount !== 1 ? 's' : ''})</span>
+                      <span className="ml-[4px]">
+                        ({objectVersionCount} version
+                        {objectVersionCount !== 1 ? 's' : ''})
+                      </span>
                     )}
-                    <Icon 
-                      name="forward-next" 
-                      width={16} 
+                    <Icon
+                      name="forward-next"
+                      width={16}
                       height={16}
                       className="ml-[2px] opacity-0 group-hover:opacity-100"
                     />
