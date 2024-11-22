@@ -2,20 +2,19 @@ import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import React from 'react';
 import {twMerge} from 'tailwind-merge';
 
-import {Button} from '../Button';
-import {IconName} from '../Icon';
-import {Tailwind} from '../Tailwind';
-import {ToggleButtonGroupSizes} from './types';
+import {Button, ButtonSize} from './Button';
+import {IconName} from './Icon';
+import {Tailwind} from './Tailwind';
 
 export type ToggleOption = {
-  label: string;
+  value: string;
   icon?: IconName;
 };
 
 export type ToggleButtonGroupProps = {
   options: ToggleOption[];
   value: string;
-  size: ToggleButtonGroupSizes;
+  size: ButtonSize;
   isDisabled?: boolean;
   onValueChange: (value: string) => void;
 };
@@ -31,6 +30,12 @@ export const ToggleButtonGroup = React.forwardRef<
     return null; // Do not render if there are fewer than two options
   }
 
+  if (!options.some(option => option.value === value)) {
+    console.warn(
+      `Warning: The provided value "${value}" is not one of the options.`
+    );
+  }
+
   const handleValueChange = (newValue: string) => {
     if (newValue !== value) {
       onValueChange(newValue);
@@ -44,11 +49,11 @@ export const ToggleButtonGroup = React.forwardRef<
         onValueChange={handleValueChange}
         className="flex gap-px"
         ref={ref}>
-        {options.map(({label, icon}) => (
+        {options.map(({value: optionValue, icon}) => (
           <ToggleGroup.Item
-            key={label}
-            value={label}
-            disabled={isDisabled || value === label}>
+            key={optionValue}
+            value={optionValue}
+            disabled={isDisabled || value === optionValue}>
             <Button
               icon={icon}
               size={size}
@@ -57,13 +62,13 @@ export const ToggleButtonGroup = React.forwardRef<
                 size === 'medium' && 'gap-3 px-10 py-4 text-base',
                 size === 'large' && 'gap-2 px-12 py-8 text-base',
                 isDisabled && 'pointer-events-none opacity-35',
-                value === label
+                value === optionValue
                   ? 'bg-teal-300/[0.48] text-teal-600 hover:bg-teal-300/[0.48]'
                   : 'hover:bg-oblivion/7 bg-oblivion/5 text-moon-600 hover:text-moon-800',
                 'first:rounded-l-sm', // First button rounded left
                 'last:rounded-r-sm' // Last button rounded right
               )}>
-              {label}
+              {optionValue}
             </Button>
           </ToggleGroup.Item>
         ))}
