@@ -50,6 +50,10 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
+import {
+  convertFeedbackFieldToBackendFilter,
+  parseFeedbackType,
+} from '../../feedback/HumanFeedback/tsHumanFeedback';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
@@ -81,6 +85,7 @@ import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
+  CompareTracesTableButton,
   ExportSelector,
   PaginationButtons,
   RefreshButton,
@@ -100,14 +105,10 @@ import {ManageColumnsButton} from './ManageColumnsButton';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
-export const DEFAULT_COLUMN_VISIBILITY_CALLS = {
-  'attributes.weave.client_version': false,
-  'attributes.weave.source': false,
-  'attributes.weave.os_name': false,
-  'attributes.weave.os_version': false,
-  'attributes.weave.os_release': false,
-  'attributes.weave.sys_version': false,
-};
+export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
+  'attributes.weave',
+  'summary.weave.feedback',
+];
 
 export const ALWAYS_PIN_LEFT_CALLS = ['CustomCheckbox'];
 
@@ -519,6 +520,39 @@ export const CallsTable: FC<{
     project
   );
 
+  // Set default hidden columns to be hidden
+  useEffect(() => {
+    if (!setColumnVisibilityModel || !columnVisibilityModel) {
+      return;
+    }
+    const hiddenColumns: string[] = [];
+    for (const hiddenColPrefix of DEFAULT_HIDDEN_COLUMN_PREFIXES) {
+      const cols = columns.cols.filter(col =>
+        col.field.startsWith(hiddenColPrefix)
+      );
+      hiddenColumns.push(...cols.map(col => col.field));
+    }
+    // Check if we need to update - only update if any annotation columns are missing from the model
+    const needsUpdate = hiddenColumns.some(
+      col => columnVisibilityModel[col] === undefined
+    );
+    if (!needsUpdate) {
+      return;
+    }
+    const hiddenColumnVisiblityFalse = hiddenColumns.reduce((acc, col) => {
+      // Only add columns=false when not already in the model
+      if (columnVisibilityModel[col] === undefined) {
+        acc[col] = false;
+      }
+      return acc;
+    }, {} as Record<string, boolean>);
+
+    setColumnVisibilityModel({
+      ...columnVisibilityModel,
+      ...hiddenColumnVisiblityFalse,
+    });
+  }, [columns.cols, columnVisibilityModel, setColumnVisibilityModel]);
+
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
   const clearSelectedCalls = useCallback(() => {
@@ -662,6 +696,19 @@ export const CallsTable: FC<{
       // not have been determined yet. So skip setting the sort model in this case.
       if (!muiColumns.some(col => col.field.startsWith('output'))) {
         return;
+      }
+
+      // handle feedback conversion from weave summary to backend filter
+      for (const sort of newModel) {
+        if (sort.field.startsWith('summary.weave.feedback')) {
+          const parsed = parseFeedbackType(sort.field);
+          if (parsed) {
+            const backendFilter = convertFeedbackFieldToBackendFilter(
+              parsed.field
+            );
+            sort.field = backendFilter;
+          }
+        }
       }
       setSortModel(newModel);
     },
@@ -814,7 +861,7 @@ export const CallsTable: FC<{
               }}
             />
           )}
-          {isEvaluateTable && (
+          {isEvaluateTable ? (
             <CompareEvaluationsTableButton
               onClick={() => {
                 history.push(
@@ -827,6 +874,15 @@ export const CallsTable: FC<{
                 );
               }}
               disabled={selectedCalls.length === 0}
+            />
+          ) : (
+            <CompareTracesTableButton
+              onClick={() => {
+                history.push(
+                  router.compareCallsUri(entity, project, selectedCalls)
+                );
+              }}
+              disabled={selectedCalls.length < 2}
             />
           )}
           {!isReadonly && selectedCalls.length !== 0 && (

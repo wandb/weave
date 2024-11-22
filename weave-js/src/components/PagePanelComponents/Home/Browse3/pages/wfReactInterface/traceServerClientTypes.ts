@@ -171,6 +171,10 @@ export type Feedback = {
   created_at: string;
   feedback_type: string;
   payload: Record<string, any>;
+  annotation_ref?: string;
+  runnable_ref?: string;
+  call_ref?: string;
+  trigger_ref?: string;
 };
 
 export type FeedbackQuerySuccess = {
@@ -291,6 +295,35 @@ export type TraceFileContentReadRes = {
   content: ArrayBuffer;
 };
 
+export type CompletionsCreateInputs = {
+  model: string;
+  messages: any[];
+  temperature: number;
+  max_tokens: number;
+
+  // These are optional, depending on the LLM provider some accept these some dont
+  stop?: string[];
+  top_p?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+  n?: number;
+  response_format?: {
+    type: string;
+  };
+  tools?: any[];
+};
+
+export type CompletionsCreateReq = {
+  project_id: string;
+  inputs: CompletionsCreateInputs;
+  track_llm_call?: boolean;
+};
+
+export type CompletionsCreateRes = {
+  response: any;
+  weave_call_id?: string;
+};
+
 export enum ContentType {
   csv = 'text/csv',
   tsv = 'text/tab-separated-values',
@@ -306,3 +339,11 @@ export const fileExtensions = {
   [ContentType.any]: 'jsonl',
   [ContentType.json]: 'json',
 };
+
+export type ActionsExecuteBatchReq = {
+  project_id: string;
+  action_ref: string;
+  call_ids: string[];
+};
+
+export type ActionsExecuteBatchRes = {};

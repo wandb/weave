@@ -1,5 +1,29 @@
 import * as z from 'zod';
 
+export const ActionTypeSchema = z.enum(['contains_words', 'llm_judge']);
+export type ActionType = z.infer<typeof ActionTypeSchema>;
+
+export const ModelSchema = z.enum(['gpt-4o', 'gpt-4o-mini']);
+export type Model = z.infer<typeof ModelSchema>;
+
+export const ConfigSchema = z.object({
+  action_type: ActionTypeSchema.optional(),
+  model: ModelSchema.optional(),
+  prompt: z.string().optional(),
+  response_schema: z.record(z.string(), z.any()).optional(),
+  target_words: z.array(z.string()).optional(),
+});
+export type Config = z.infer<typeof ConfigSchema>;
+
+export const AnnotationSpecSchema = z.object({
+  description: z.union([z.null(), z.string()]).optional(),
+  json_schema: z.record(z.string(), z.any()).optional(),
+  name: z.union([z.null(), z.string()]).optional(),
+  op_scope: z.union([z.array(z.string()), z.null()]).optional(),
+  unique_among_creators: z.boolean().optional(),
+});
+export type AnnotationSpec = z.infer<typeof AnnotationSpecSchema>;
+
 export const LeaderboardColumnSchema = z.object({
   evaluation_object_ref: z.string(),
   scorer_name: z.string(),
@@ -24,6 +48,13 @@ export type TestOnlyNestedBaseObject = z.infer<
   typeof TestOnlyNestedBaseObjectSchema
 >;
 
+export const ActionSpecSchema = z.object({
+  config: ConfigSchema,
+  description: z.union([z.null(), z.string()]).optional(),
+  name: z.union([z.null(), z.string()]).optional(),
+});
+export type ActionSpec = z.infer<typeof ActionSpecSchema>;
+
 export const LeaderboardSchema = z.object({
   columns: z.array(LeaderboardColumnSchema),
   description: z.union([z.null(), z.string()]).optional(),
@@ -41,6 +72,8 @@ export const TestOnlyExampleSchema = z.object({
 export type TestOnlyExample = z.infer<typeof TestOnlyExampleSchema>;
 
 export const baseObjectClassRegistry = {
+  ActionSpec: ActionSpecSchema,
+  AnnotationSpec: AnnotationSpecSchema,
   Leaderboard: LeaderboardSchema,
   TestOnlyExample: TestOnlyExampleSchema,
   TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,

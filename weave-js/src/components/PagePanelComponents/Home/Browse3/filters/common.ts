@@ -8,10 +8,10 @@ import {
   GridFilterItem,
   GridFilterModel,
 } from '@mui/x-data-grid-pro';
-import {isWeaveObjectRef} from '@wandb/weave/react';
+import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
 
-import {parseRefMaybe} from '../../Browse2/SmallRef';
+import {parseFeedbackType} from '../feedback/HumanFeedback/tsHumanFeedback';
 import {WEAVE_REF_PREFIX} from '../pages/wfReactInterface/constants';
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
@@ -41,6 +41,15 @@ export const FIELD_LABELS: Record<string, string> = {
 };
 
 export const getFieldLabel = (field: string): string => {
+  if (field.startsWith('feedback.')) {
+    // Here the field is coming from convertFeedbackFieldToBackendFilter
+    // so the field should start with 'feedback.' if feedback
+    const parsed = parseFeedbackType(field);
+    if (parsed === null) {
+      return field;
+    }
+    return parsed.displayName;
+  }
   return FIELD_LABELS[field] ?? field;
 };
 

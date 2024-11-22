@@ -31,12 +31,7 @@ import threading
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-from typing import (
-    Any,
-    Optional,
-    Union,
-    cast,
-)
+from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -50,9 +45,7 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
-from weave.trace_server.base_object_class_util import (
-    process_incoming_object,
-)
+from weave.trace_server.base_object_class_util import process_incoming_object
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -174,7 +167,7 @@ CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
-    "max_memory_usage": 10 * 1024 * 1024 * 1024,  # 10 GiB
+    "max_memory_usage": 16 * 1024 * 1024 * 1024,  # 16 GiB
 }
 
 
@@ -314,6 +307,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # TODO: add support for json extract fields
             # Split out any nested column requests
             columns = [col.split(".")[0] for col in columns]
+
+        # sort the columns such that similar queries are grouped together
+        columns = sorted(columns)
 
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
@@ -1406,6 +1402,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
+
+    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+        # To replace, first purge, then if successful, create.
+        query = tsi.Query(
+            **{
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "id"},
+                        {"$literal": req.feedback_id},
+                    ],
+                }
+            }
+        )
+        purge_request = tsi.FeedbackPurgeReq(
+            project_id=req.project_id,
+            query=query,
+        )
+        self.feedback_purge(purge_request)
+        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
+        create_result = self.feedback_create(create_req)
+        return tsi.FeedbackReplaceRes(
+            id=create_result.id,
+            created_at=create_result.created_at,
+            wb_user_id=create_result.wb_user_id,
+            payload=create_result.payload,
+        )
 
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq

@@ -64,6 +64,7 @@ export const useCallsForQuery = (
     expandedColumns,
     {
       refetchOnDelete: true,
+      includeFeedback: true,
     }
   );
 
@@ -72,7 +73,7 @@ export const useCallsForQuery = (
   });
 
   const callResults = useMemo(() => {
-    return calls.result ?? [];
+    return getFeedbackMerged(calls.result ?? []);
   }, [calls]);
 
   const total = useMemo(() => {
@@ -108,11 +109,12 @@ export const useCallsForQuery = (
     {
       skip: calls.loading,
       includeCosts: true,
+      includeFeedback: true,
     }
   );
 
   const costResults = useMemo(() => {
-    return costs.result ?? [];
+    return getFeedbackMerged(costs.result ?? []);
   }, [costs]);
   const refetch = useCallback(() => {
     calls.refetch();
@@ -121,6 +123,16 @@ export const useCallsForQuery = (
   }, [calls, callsStats, costs]);
 
   return useMemo(() => {
+    if (calls.loading) {
+      return {
+        costsLoading: costs.loading,
+        loading: calls.loading,
+        result: [],
+        total: 0,
+        refetch,
+      };
+    }
+
     return {
       costsLoading: costs.loading,
       loading: calls.loading,
@@ -216,4 +228,35 @@ const convertHighLevelFilterToLowLevelFilter = (
       ? [effectiveFilter.parentId]
       : undefined,
   };
+};
+
+const getFeedbackMerged = (calls: CallSchema[]) => {
+  // for each call, reduce all feedback to the latest feedback of each type
+  return calls.map(c => {
+    if (!c.traceCall?.summary?.weave?.feedback) {
+      return c;
+    }
+    const feedback = c.traceCall?.summary?.weave?.feedback?.reduce(
+      (acc: Record<string, any>, curr: Record<string, any>) => {
+        // keep most recent feedback of each type
+        if (acc[curr.feedback_type]?.created_at > curr.created_at) {
+          return acc;
+        }
+        acc[curr.feedback_type] = curr;
+        return acc;
+      },
+      {}
+    );
+    c.traceCall = {
+      ...c.traceCall,
+      summary: {
+        ...c.traceCall.summary,
+        weave: {
+          ...c.traceCall.summary.weave,
+          feedback,
+        },
+      },
+    };
+    return c;
+  });
 };

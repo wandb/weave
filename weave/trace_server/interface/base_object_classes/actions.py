@@ -1,11 +1,12 @@
 from typing import Any, Literal, Optional, Union
 
+import jsonschema
 from pydantic import BaseModel, Field, field_validator
 
 from weave.trace_server.interface.base_object_classes import base_object_def
 
 
-class LlmJudgeActionSpec(BaseModel):
+class LlmJudgeActionConfig(BaseModel):
     action_type: Literal["llm_judge"] = "llm_judge"
     # TODO: Remove this restriction (probably after initial release. We need to cross
     # reference which LiteLLM models support structured outputs)
@@ -14,20 +15,30 @@ class LlmJudgeActionSpec(BaseModel):
     # Expected to be valid JSON Schema
     response_schema: dict[str, Any]
 
+    @field_validator("response_schema")
+    def validate_response_schema(cls, v: dict) -> dict:
+        try:
+            jsonschema.validate(None, v)
+        except jsonschema.exceptions.SchemaError as e:
+            raise e
+        except jsonschema.exceptions.ValidationError:
+            pass  # we don't care that `None` does not conform
+        return v
 
-class ContainsWordsActionSpec(BaseModel):
+
+class ContainsWordsActionConfig(BaseModel):
     action_type: Literal["contains_words"] = "contains_words"
     target_words: list[str]
 
 
-ActionSpecType = Union[
-    LlmJudgeActionSpec,
-    ContainsWordsActionSpec,
+ActionConfigType = Union[
+    LlmJudgeActionConfig,
+    ContainsWordsActionConfig,
 ]
 
 
-class ActionDefinition(base_object_def.BaseObject):
-    spec: ActionSpecType = Field(..., discriminator="action_type")
+class ActionSpec(base_object_def.BaseObject):
+    config: ActionConfigType = Field(..., discriminator="action_type")
 
     # This is needed because the name field is optional in the base class, but required
     # in the derived class. Pyright doesn't like having a stricter type

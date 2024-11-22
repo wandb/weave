@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import types
 from inspect import getmro, isclass
@@ -33,7 +35,7 @@ class ObjectRecord:
                 return False
         return True
 
-    def map_values(self, fn: Callable) -> "ObjectRecord":
+    def map_values(self, fn: Callable) -> ObjectRecord:
         return ObjectRecord({k: fn(v) for k, v in self.__dict__.items()})
 
 

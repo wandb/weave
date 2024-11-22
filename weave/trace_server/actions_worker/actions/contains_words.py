@@ -2,7 +2,7 @@ import json
 from typing import Any
 
 from weave.trace_server.interface.base_object_classes.actions import (
-    ContainsWordsActionSpec,
+    ContainsWordsActionConfig,
 )
 from weave.trace_server.trace_server_interface import (
     CallSchema,
@@ -12,7 +12,7 @@ from weave.trace_server.trace_server_interface import (
 
 def do_contains_words_action(
     project_id: str,
-    config: ContainsWordsActionSpec,
+    config: ContainsWordsActionConfig,
     call: CallSchema,
     trace_server: TraceServerInterface,
 ) -> Any:
