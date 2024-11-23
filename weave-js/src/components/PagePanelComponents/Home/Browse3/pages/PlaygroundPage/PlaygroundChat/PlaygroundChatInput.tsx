@@ -1,9 +1,5 @@
 import {Box, Divider} from '@mui/material';
-import {
-  MOON_250,
-  MOON_500,
-  TEAL_500,
-} from '@wandb/weave/common/css/color.styles';
+import {MOON_250, MOON_500} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import React, {useState} from 'react';
 

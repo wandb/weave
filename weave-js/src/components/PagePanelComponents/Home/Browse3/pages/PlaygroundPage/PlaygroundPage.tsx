@@ -21,11 +21,7 @@ export const PlaygroundPage = (props: PlaygroundPageProps) => {
       title={
         <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
           Playground
-          <Tag 
-            label="Preview" 
-            color="purple"
-            showIcon={false}
-          />
+          <Tag label="Preview" color="purple" showIcon={false} />
         </Box>
       }
       hideTabsIfSingle
