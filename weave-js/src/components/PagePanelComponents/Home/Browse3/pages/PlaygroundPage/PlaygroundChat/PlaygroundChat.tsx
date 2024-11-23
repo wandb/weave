@@ -171,6 +171,7 @@ export const PlaygroundChat = ({
                       </PlaygroundContext.Provider>
                     )}
                   </div>
+                  {/* Spacer used for leaving room for the input */}
                   <div className="h-[125px] w-full" />
                 </Tailwind>
               </Box>
