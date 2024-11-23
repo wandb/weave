@@ -62,7 +62,10 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
         paddingBottom: '16px',
         paddingTop: '8px',
         backgroundColor: 'white',
-        width: settingsTab !== null ? 'calc(100% - 58px - 320px)' : 'calc(100% - 58px)',
+        width:
+          settingsTab !== null
+            ? 'calc(100% - 58px - 320px)'
+            : 'calc(100% - 58px)',
         zIndex: 100,
       }}>
       <Box
@@ -89,51 +92,51 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
           reset={shouldReset}
         />
         <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
-        <Box sx={{display: 'flex', gap: '8px'}}>
-          {/* TODO: Add image upload */}
-          {/* <Button variant="secondary" size="small" startIcon="photo" /> */}
-        </Box>
-        <Box sx={{display: 'flex', gap: '8px'}}>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              color: MOON_500,
-              fontSize: '12px',
-            }}>
-            Add as
-            <Button
-              className="ml-4 rounded-r-none"
-              variant="secondary"
-              size="medium"
-              active={addMessageRole === 'assistant'}
-              onClick={() => setAddMessageRole('assistant')}>
-              Assistant
-            </Button>
-            <Button
-              className="rounded-l-none"
-              variant="secondary"
-              size="medium"
-              active={addMessageRole === 'user'}
-              onClick={() => setAddMessageRole('user')}>
-              User
-            </Button>
+          <Box sx={{display: 'flex', gap: '8px'}}>
+            {/* TODO: Add image upload */}
+            {/* <Button variant="secondary" size="small" startIcon="photo" /> */}
           </Box>
-          <Button
-            variant="secondary"
-            size="medium"
-            startIcon="add-new"
-            onClick={() => handleAdd(addMessageRole, chatText)}>
-            Add
-          </Button>
-          <Divider orientation="vertical" flexItem sx={{bgcolor: MOON_250}} />
-          <Button
-            size="medium"
-            onClick={() => handleSend(addMessageRole)}
-            disabled={isLoading || chatText.trim() === ''}
-            startIcon={isLoading ? 'loading' : undefined}>
-            {isLoading ? 'Sending...' : 'Send'}
-          </Button>
+          <Box sx={{display: 'flex', gap: '8px'}}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                color: MOON_500,
+                fontSize: '12px',
+              }}>
+              Add as
+              <Button
+                className="ml-4 rounded-r-none"
+                variant="secondary"
+                size="medium"
+                active={addMessageRole === 'assistant'}
+                onClick={() => setAddMessageRole('assistant')}>
+                Assistant
+              </Button>
+              <Button
+                className="rounded-l-none"
+                variant="secondary"
+                size="medium"
+                active={addMessageRole === 'user'}
+                onClick={() => setAddMessageRole('user')}>
+                User
+              </Button>
+            </Box>
+            <Button
+              variant="secondary"
+              size="medium"
+              startIcon="add-new"
+              onClick={() => handleAdd(addMessageRole, chatText)}>
+              Add
+            </Button>
+            <Divider orientation="vertical" flexItem sx={{bgcolor: MOON_250}} />
+            <Button
+              size="medium"
+              onClick={() => handleSend(addMessageRole)}
+              disabled={isLoading || chatText.trim() === ''}
+              startIcon={isLoading ? 'loading' : undefined}>
+              {isLoading ? 'Sending...' : 'Send'}
+            </Button>
           </Box>
         </Box>
       </Box>

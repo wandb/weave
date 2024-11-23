@@ -1,14 +1,14 @@
-import {Box} from '@mui/material';
-import {Button} from '@wandb/weave/components/Button';
-import {Tag} from '@wandb/weave/components/Tag';
-import React, {useState} from 'react';
-import {useHistory} from 'react-router-dom';
 import {
   Dialog,
   DialogActions as MaterialDialogActions,
   DialogContent,
   DialogTitle,
 } from '@material-ui/core';
+import {Box} from '@mui/material';
+import {Button} from '@wandb/weave/components/Button';
+import {Tag} from '@wandb/weave/components/Tag';
+import React, {useState} from 'react';
+import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {CopyableId} from '../../common/Id';

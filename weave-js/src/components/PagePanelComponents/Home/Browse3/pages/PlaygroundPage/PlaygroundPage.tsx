@@ -1,7 +1,7 @@
 import {Box} from '@mui/material';
 import {WeaveLoader} from '@wandb/weave/common/components/WeaveLoader';
-import React, {useEffect, useMemo, useState} from 'react';
 import {Tag} from '@wandb/weave/components/Tag';
+import React, {useEffect, useMemo, useState} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';

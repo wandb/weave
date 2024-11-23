@@ -85,7 +85,7 @@ export const MessagePanel = ({
           'max-w-full': !isUser,
           'max-w-[768px]': isUser,
           'ml-auto py-8': isUser,
-          'mr-auto pt-4 pb-8': !isUser,
+          'mr-auto pb-8 pt-4': !isUser,
           'py-8': hasContent,
         })}
         onMouseEnter={() => setIsHovering(true)}
@@ -127,10 +127,9 @@ export const MessagePanel = ({
               <>
                 {hasContent && (
                   <div
-                    className={classNames(
-                      hasToolCalls ? 'pb-8' : '',
-                      {'px-16': isSystemPrompt || isUser}
-                    )}>
+                    className={classNames(hasToolCalls ? 'pb-8' : '', {
+                      'px-16': isSystemPrompt || isUser,
+                    })}>
                     {_.isString(message.content) ? (
                       <MessagePanelPart
                         value={message.content}
@@ -167,7 +166,7 @@ export const MessagePanel = ({
           {isPlayground && isHovering && !editorHeight && (
             <div
               className={classNames(
-                'absolute flex w-full items-center justify-start -bottom-[24px] right-[4px]',
+                'absolute -bottom-[24px] right-[4px] flex w-full items-center justify-start',
                 isNested ? 'bottom-0' : 'bottom-[-32px]'
               )}>
               <PlaygroundMessagePanelButtons
