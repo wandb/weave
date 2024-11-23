@@ -16,51 +16,66 @@ export const StyledTextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
     React.useEffect(() => {
-      if (!autoGrow || !textareaRef.current) return;
+      if (!autoGrow || !textareaRef.current) {
+        return;
+      }
 
       const adjustHeight = () => {
-        const textarea = textareaRef.current;
-        if (!textarea) return;
-        
-        // Disable resize when autoGrow is true
-        textarea.style.resize = 'none';
-        
-        if (reset || textarea.value === '') {
-          textarea.style.height = 'auto';
+        const textareaElement = textareaRef.current;
+        if (!textareaElement) {
           return;
         }
-        
+
+        // Disable resize when autoGrow is true
+        textareaElement.style.resize = 'none';
+
+        if (reset || textareaElement.value === '') {
+          textareaElement.style.height = 'auto';
+          return;
+        }
+
         // Reset height to allow shrinking
-        textarea.style.height = 'auto';
-        const newHeight = textarea.scrollHeight;
-        
+        textareaElement.style.height = 'auto';
+        const newHeight = textareaElement.scrollHeight;
+
         // Apply max height if specified
         if (maxHeight) {
-          textarea.style.height = `${Math.min(newHeight, typeof maxHeight === 'string' ? parseInt(maxHeight) : maxHeight)}px`;
-          textarea.style.overflowY = newHeight > (typeof maxHeight === 'string' ? parseInt(maxHeight) : maxHeight) ? 'auto' : 'hidden';
+          textareaElement.style.height = `${Math.min(
+            newHeight,
+            typeof maxHeight === 'string' ? parseInt(maxHeight, 10) : maxHeight
+          )}px`;
+          textareaElement.style.overflowY =
+            newHeight >
+            (typeof maxHeight === 'string' ? parseInt(maxHeight, 10) : maxHeight)
+              ? 'auto'
+              : 'hidden';
         } else {
-          textarea.style.height = `${newHeight}px`;
-          textarea.style.overflowY = 'hidden';
+          textareaElement.style.height = `${newHeight}px`;
+          textareaElement.style.overflowY = 'hidden';
         }
       };
 
-      const textarea = textareaRef.current;
-      textarea.addEventListener('input', adjustHeight);
+      const textareaElement = textareaRef.current;
+      textareaElement.addEventListener('input', adjustHeight);
       adjustHeight(); // Initial adjustment
 
-      return () => textarea.removeEventListener('input', adjustHeight);
+      return () => textareaElement.removeEventListener('input', adjustHeight);
     }, [autoGrow, maxHeight, reset]);
 
     return (
       <Tailwind style={{display: 'contents'}}>
         <textarea
-          ref={(element) => {
+          ref={element => {
             if (typeof ref === 'function') {
               ref(element);
             } else if (ref) {
-              (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = element;
+              (
+                ref as React.MutableRefObject<HTMLTextAreaElement | null>
+              ).current = element;
             }
-            (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = element;
+            (
+              textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>
+            ).current = element;
           }}
           className={classNames(
             'h-full w-full',
