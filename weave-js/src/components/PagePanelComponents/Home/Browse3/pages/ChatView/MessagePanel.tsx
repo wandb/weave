@@ -31,7 +31,7 @@ export const MessagePanel = ({
   // and on save the tool call response will be updated and sent to the LLM
   pendingToolResponseId,
 }: MessagePanelProps) => {
-  const [isShowingMore, setIsShowingMore] = useState(!!pendingToolResponseId);
+  const [isShowingMore, setIsShowingMore] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const [hasPendingToolResponse, setHasPendingToolResponse] = useState(false);
@@ -68,6 +68,8 @@ export const MessagePanel = ({
     pendingToolResponseId &&
     !pendingToolResponseIds.includes(pendingToolResponseId)
   ) {
+    // Add the pending tool response id to the list of pending tool response ids
+    // This disables sending a message to the LLM until the tool call response is saved
     setPendingToolResponseIds([
       ...pendingToolResponseIds,
       pendingToolResponseId,
@@ -77,16 +79,22 @@ export const MessagePanel = ({
     message.tool_call_id &&
     pendingToolResponseIds.includes(message.tool_call_id)
   ) {
+    // Remove the pending tool response id from the list of pending tool response ids
+    // This re-enables sending a message to the LLM
     setPendingToolResponseIds(
       pendingToolResponseIds.filter(id => id !== message.tool_call_id)
     );
   }
 
-  if (!isShowingMore && pendingToolResponseIds.length > 0) {
+  if (pendingToolResponseIds.length > 0) {
     message.tool_calls?.forEach(toolCall => {
       if (pendingToolResponseIds.includes(toolCall.id)) {
-        setIsShowingMore(true);
+        // This is to disable this messages retry and edit until the tool call response is saved
         setHasPendingToolResponse(true);
+        // If the message is overflowing and the editor is not already showing, show it
+        if (!isShowingMore && isOverflowing) {
+          setIsShowingMore(true);
+        }
       }
     });
   }

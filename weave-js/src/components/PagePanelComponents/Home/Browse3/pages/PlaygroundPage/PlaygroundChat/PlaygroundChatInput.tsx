@@ -16,7 +16,7 @@ type PlaygroundChatInputProps = {
   isLoading: boolean;
   onSend: (role: PlaygroundMessageRole) => void;
   onAdd: (role: PlaygroundMessageRole, text: string) => void;
-  pendingToolResponseIds: string[];
+  hasPendingToolResponses: boolean;
 };
 
 export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
@@ -25,7 +25,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   isLoading,
   onSend,
   onAdd,
-  pendingToolResponseIds,
+  hasPendingToolResponses,
 }) => {
   const [addMessageRole, setAddMessageRole] =
     useState<PlaygroundMessageRole>('user');
@@ -120,14 +120,12 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
             size="small"
             onClick={() => onSend(addMessageRole)}
             tooltip={
-              pendingToolResponseIds.length > 0
+              hasPendingToolResponses
                 ? 'Waiting for tool call response(s)'
                 : undefined
             }
             disabled={
-              isLoading ||
-              chatText.trim() === '' ||
-              pendingToolResponseIds.length > 0
+              isLoading || chatText.trim() === '' || hasPendingToolResponses
             }
             startIcon={isLoading ? 'loading' : undefined}>
             {isLoading ? 'Sending...' : 'Send'}

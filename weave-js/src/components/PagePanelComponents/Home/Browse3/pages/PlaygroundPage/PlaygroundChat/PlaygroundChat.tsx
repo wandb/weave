@@ -212,9 +212,9 @@ export const PlaygroundChat = ({
         ))}
       </Box>
       <PlaygroundChatInput
-        pendingToolResponseIds={playgroundStates
-          .map(state => state.pendingToolResponseIds)
-          .flat()}
+        hasPendingToolResponses={playgroundStates.some(
+          state => state.pendingToolResponseIds.length > 0
+        )}
         chatText={chatText}
         setChatText={setChatText}
         isLoading={isLoading}
