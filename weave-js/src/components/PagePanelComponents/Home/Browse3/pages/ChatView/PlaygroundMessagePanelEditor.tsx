@@ -67,16 +67,15 @@ export const PlaygroundMessagePanelEditor: React.FC<
   return (
     <div
       className={classNames(
-        'w-full pt-16 text-sm',
+        'w-full pt-16',
         isNested ? 'px-2' : 'px-16'
       )}>
       <StyledTextArea
         value={editedContent}
         onChange={e => setEditedContent(e.target.value)}
-        style={{
-          minHeight: `${editorHeight}px`,
-        }}
-      />
+        autoGrow
+        maxHeight={160}
+/>
       <div className="z-100 mt-8 flex justify-end gap-8">
         <Button variant="quiet" size="medium" onClick={handleCancel}>
           Cancel
