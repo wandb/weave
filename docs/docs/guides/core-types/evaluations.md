@@ -1,6 +1,8 @@
 # Evaluations
 
-Evaluation-driven development helps you reliably iterate on an application. The `Evaluation` class is designed to assess the performance of a `Model` on a given `Dataset` or set of examples using scoring functions.
+To systematically improve your LLM application, it's helpful to test your changes against a consistent dataset of potential inputs so that you can catch regressions and inspect your applications behaviour under different conditions. In Weave, the `Evaluation` class is designed to assess the performance of a `Model` on a test dataset.
+
+In a Weave Evaluation, a set of examples is passed through your application, and the output is scored according to multiple scoring functions. The result provides you with a overview of your application's performance in a rich UI to summarizing individual outputs and scores.
 
 ![Evals hero](../../../static/img/evals-hero.png)
 
@@ -38,23 +40,30 @@ weave.init('intro-example')
 asyncio.run(evaluation.evaluate(function_to_evaluate))
 ```
 
-## Create an Evaluation
+This page describes how to get started with evaluations. 
+## Create an evaluation
 
-To systematically improve your application, it's helpful to test your changes against a consistent dataset of potential inputs so that you catch regressions and can inspect your apps behaviour under different conditions. Using the `Evaluation` class, you can be sure you're comparing apples-to-apples by keeping track of all of the details that you're experimenting and evaluating with.
+To create an evaluation in Weave, follow these steps:
 
-Weave will take each example, pass it through your application and score the output on multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual outputs and scores.
+1. [Define an evaluation dataset](#define-an-evaluation-dataset)
+2. [Define scoring functions](#define-scoring-functions)
 
-### Define an evaluation dataset
+### Create an evaluation dataset
 
-First, define a [Dataset](/guides/core-types/datasets) or list of dictionaries with a collection of examples to be evaluated. These examples are often failure cases that you want to test for, these are similar to unit tests in Test-Driven Development (TDD).
+First, create a test dataset that will be used to evaluate your application. Generally, the dataset should include failure cases that you want to test for, similar to software unit tests in Test-Driven Development (TDD). You have two options to create a dataset:
 
-### Defining scoring functions
+1. Define a [Dataset](/guides/core-types/datasets).
+2. Define a list of dictionaries with a collection of examples to be evaluated. 
 
-Then, create a list of scoring functions. These are used to score each example. Each function should have a `model_output` and optionally, other inputs from your examples, and return a dictionary with the scores.
+### Define scoring functions
 
-Scoring functions need to have a `model_output` keyword argument, but the other arguments are user defined and are taken from the dataset examples. It will only take the necessary keys by using a dictionary key based on the argument name.
+Next, create a list of _Scorers_. Scorers are functions used to score each example. Scorers must have a `model_output` keyword argument. Other arguments are user defined and are taken from the dataset examples. The Scorer will only use the necessary keys by using a dictionary key based on the argument name.
 
-This will take `expected` from the dictionary for scoring.
+When defining Scorers, you can either use one of the many predefined scorers available in Weave, or create your own custom Scorer.
+
+#### Scorer example
+
+In the following example, the `match_score1()` Scorer will take `expected` from the dictionary for scoring.
 
 ```python
 import weave
@@ -73,15 +82,17 @@ def match_score1(expected: str, model_output: dict) -> dict:
     return {'match': expected == model_output['generated_text']}
 ```
 
-### Optional: Define a custom `Scorer` class
+#### Optional: Define a custom `Scorer` class
 
-In some applications we want to create custom `Scorer` classes - where for example a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), specific scoring of each row, and specific calculation of an aggregate score.
+For some applications, you may want to create custom `Scorer` classes. For example, a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), scoring of each row, and calculation of an aggregate score. For more information about creating custom Scorers, see [Create your own Scorers](../evaluation/custom-scorers.md).
 
-See the tutorial on defining a `Scorer` class in the next chapter on [Model-Based Evaluation of RAG applications](/tutorial-rag#optional-defining-a-scorer-class) for more information.
+> For an end-to-end tutorial that involves defining a custom `Scorer` class, see [Model-Based Evaluation of RAG applications](/tutorial-rag#optional-defining-a-scorer-class).
 
 ### Define a Model to evaluate
 
-To evaluate a `Model`, call `evaluate` on it using an `Evaluation`. `Models` are used when you have attributes that you want to experiment with and capture in weave.
+Once your test dataset and Scorers are defined, you can begin the evaluation. To evaluate a `Model`, call `evaluate` on using an `Evaluation`. `Models` are used when you have attributes that you want to experiment with and capture in Weave.
+
+The following example funs `predict()` on each example and scores the output with each scoring function defined in the `scorers` list using the `examples` dataset.
 
 ```python
 from weave import Model, Evaluation
@@ -104,7 +115,7 @@ weave.init('intro-example') # begin tracking results with weave
 asyncio.run(evaluation.evaluate(model))
 ```
 
-This will run `predict` on each example and score the output with each scoring functions.
+
 
 #### Custom Naming
 
