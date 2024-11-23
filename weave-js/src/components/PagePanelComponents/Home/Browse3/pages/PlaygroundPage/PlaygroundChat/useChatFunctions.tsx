@@ -3,7 +3,6 @@ import {SetStateAction} from 'react';
 
 import {Message} from '../../ChatView/types';
 import {OptionalTraceCallSchema, PlaygroundState} from '../types';
-import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
 type TraceCallOutput = {
   choices?: any[];
 };
@@ -33,11 +32,6 @@ export const useChatFunctions = (
           (_: any, index: number) =>
             index !== messageIndex && !responseIndexes?.includes(index)
         );
-
-        // If there are no messages left, add a system message
-        if (newTraceCall.inputs.messages.length === 0) {
-          newTraceCall.inputs.messages = [DEFAULT_SYSTEM_MESSAGE];
-        }
       }
       return newTraceCall;
     });

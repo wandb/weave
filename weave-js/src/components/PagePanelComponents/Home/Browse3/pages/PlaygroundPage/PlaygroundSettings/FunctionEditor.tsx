@@ -63,6 +63,9 @@ export const FunctionEditor: React.FC<FunctionEditorProps> = ({
     }
   };
 
+  const supportsFunctionCalling =
+    LLM_MAX_TOKENS[playgroundState.model]?.supports_function_calling;
+
   const handleDeleteFunction = (functionToDelete: string) => {
     setFunctions(functions.filter(func => func.name !== functionToDelete));
   };
@@ -77,7 +80,7 @@ export const FunctionEditor: React.FC<FunctionEditorProps> = ({
       }}>
       <Box sx={{display: 'flex', gap: '8px', alignItems: 'center'}}>
         Functions
-        {!LLM_MAX_TOKENS[playgroundState.model]?.supports_function_calling && (
+        {!supportsFunctionCalling && (
           <Tooltip title="This model does not support functions">
             <span>
               <Icon name="warning" className="text-sienna-500" />

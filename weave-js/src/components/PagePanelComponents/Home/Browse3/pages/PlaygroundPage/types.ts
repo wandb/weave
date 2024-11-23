@@ -9,6 +9,7 @@ export enum PlaygroundResponseFormats {
 }
 
 export type PlaygroundState = {
+  pendingToolResponseIds: string[];
   traceCall: OptionalTraceCallSchema;
   trackLLMCall: boolean;
   loading: boolean;
@@ -28,3 +29,5 @@ export type PlaygroundState = {
 export type PlaygroundStateKey = keyof PlaygroundState;
 
 export type OptionalTraceCallSchema = Partial<TraceCallSchema>;
+
+export type PlaygroundMessageRole = 'assistant' | 'user' | 'system' | 'tool';

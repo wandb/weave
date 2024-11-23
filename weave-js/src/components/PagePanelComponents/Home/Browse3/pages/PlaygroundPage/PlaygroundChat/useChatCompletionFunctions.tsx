@@ -5,7 +5,7 @@ import {Link} from 'react-router-dom';
 import {Message} from '../../ChatView/types';
 import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
 import {CompletionsCreateRes} from '../../wfReactInterface/traceServerClientTypes';
-import {PlaygroundState} from '../types';
+import {PlaygroundMessageRole, PlaygroundState} from '../types';
 import {getInputFromPlaygroundState} from '../usePlaygroundState';
 import {clearTraceCall} from './useChatFunctions';
 
@@ -57,7 +57,7 @@ export const useChatCompletionFunctions = (
   };
 
   const handleSend = async (
-    role: 'assistant' | 'user' | 'tool',
+    role: PlaygroundMessageRole,
     callIndex?: number,
     content?: string,
     toolCallId?: string
@@ -135,7 +135,7 @@ export const useChatCompletionFunctions = (
 
 // Helper functions
 const createMessage = (
-  role: 'assistant' | 'user' | 'tool',
+  role: PlaygroundMessageRole,
   content: string,
   toolCallId?: string
 ): Message | undefined => {

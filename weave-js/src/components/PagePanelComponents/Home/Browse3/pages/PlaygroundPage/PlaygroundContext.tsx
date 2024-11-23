@@ -1,11 +1,12 @@
 import {createContext, useContext} from 'react';
 
 import {Message} from '../ChatView/types';
+import {PlaygroundMessageRole} from './types';
 
 export type PlaygroundContextType = {
   isPlayground: boolean;
-  setIsRespondingToToolCall: (toolCallIndex: string | null) => void;
-  isRespondingToToolCall: string | null;
+  setPendingToolResponseIds: (toolCallIds: string[]) => void;
+  pendingToolResponseIds: string[];
 
   addMessage: (newMessage: Message) => void;
   editMessage: (messageIndex: number, newMessage: Message) => void;
@@ -16,7 +17,7 @@ export type PlaygroundContextType = {
 
   retry: (messageIndex: number, isChoice?: boolean) => void;
   sendMessage: (
-    role: 'assistant' | 'user' | 'tool',
+    role: PlaygroundMessageRole,
     content: string,
     toolCallId?: string
   ) => void;
@@ -24,8 +25,8 @@ export type PlaygroundContextType = {
 
 const DEFAULT_CONTEXT: PlaygroundContextType = {
   isPlayground: false,
-  setIsRespondingToToolCall: () => {},
-  isRespondingToToolCall: null,
+  setPendingToolResponseIds: () => {},
+  pendingToolResponseIds: [],
 
   addMessage: () => {},
   editMessage: () => {},

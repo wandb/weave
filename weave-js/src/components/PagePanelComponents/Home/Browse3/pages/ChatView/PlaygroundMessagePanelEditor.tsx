@@ -28,7 +28,13 @@ export const PlaygroundMessagePanelEditor: React.FC<
   pendingToolResponseId,
   message,
 }) => {
-  const {sendMessage, editMessage, editChoice} = usePlaygroundContext();
+  const {
+    sendMessage,
+    editMessage,
+    editChoice,
+    pendingToolResponseIds,
+    addMessage,
+  } = usePlaygroundContext();
 
   const initialContent = useMemo(
     () =>
@@ -49,6 +55,12 @@ export const PlaygroundMessagePanelEditor: React.FC<
       editChoice?.(index, {
         content: editedContent,
         role: message.role,
+      });
+    } else if (index === -1 && pendingToolResponseId) {
+      addMessage?.({
+        role: 'tool',
+        content: editedContent,
+        tool_call_id: pendingToolResponseId,
       });
     } else {
       editMessage?.(index, {
@@ -85,13 +97,17 @@ export const PlaygroundMessagePanelEditor: React.FC<
           variant="primary"
           size="small"
           onClick={
-            pendingToolResponseId
-              ? () =>
+            pendingToolResponseId &&
+            pendingToolResponseIds.length === 1 &&
+            pendingToolResponseIds[0] === pendingToolResponseId
+              ? () => {
+                  setEditorHeight(null);
                   sendMessage?.(
                     'tool',
                     editedContent ?? '',
                     pendingToolResponseId
-                  )
+                  );
+                }
               : handleSave
           }>
           Save

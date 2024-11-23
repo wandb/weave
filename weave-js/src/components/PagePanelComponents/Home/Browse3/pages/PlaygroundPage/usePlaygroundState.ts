@@ -3,7 +3,7 @@ import {SetStateAction, useCallback, useState} from 'react';
 
 import {
   findMostSimilarLLMName,
-  LLM_MAX_TOKENS,
+  LLM_MAX_TOKENS_KEYS,
   LLMMaxTokensKey,
 } from './llmMaxTokens';
 import {
@@ -22,6 +22,7 @@ export const DEFAULT_SYSTEM_MESSAGE = {
 };
 
 const DEFAULT_PLAYGROUND_STATE = {
+  pendingToolResponseIds: [],
   traceCall: {
     inputs: {
       messages: [DEFAULT_SYSTEM_MESSAGE],
@@ -112,16 +113,12 @@ export const usePlaygroundState = () => {
           newState.presencePenalty = parseFloat(inputs.presence_penalty);
         }
         if (inputs.model) {
-          if (
-            Object.keys(LLM_MAX_TOKENS).includes(
-              inputs.model as LLMMaxTokensKey
-            )
-          ) {
+          if (LLM_MAX_TOKENS_KEYS.includes(inputs.model as LLMMaxTokensKey)) {
             newState.model = inputs.model as LLMMaxTokensKey;
           } else {
             const closestModel = findMostSimilarLLMName(
               inputs.model,
-              Object.keys(LLM_MAX_TOKENS) as LLMMaxTokensKey[]
+              LLM_MAX_TOKENS_KEYS
             );
             toast(
               `We currently don't support ${inputs.model}, in the playground. We will default to ${closestModel}`

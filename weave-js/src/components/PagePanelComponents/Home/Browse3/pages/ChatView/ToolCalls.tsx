@@ -90,7 +90,7 @@ const OneToolCall = ({toolCall}: OneToolCallProps) => {
           <MessagePanel
             isNested
             pendingToolResponseId={toolCall.response ? undefined : toolCall.id}
-            index={toolCall.response?.original_index ?? 0}
+            index={toolCall.response?.original_index ?? -1}
             key={toolCall.id}
             message={
               toolCall.response ?? {

@@ -6,7 +6,11 @@ import React, {useRef, useState} from 'react';
 import {CallChat} from '../../CallPage/CallChat';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
-import {OptionalTraceCallSchema, PlaygroundState} from '../types';
+import {
+  OptionalTraceCallSchema,
+  PlaygroundMessageRole,
+  PlaygroundState,
+} from '../types';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
@@ -39,9 +43,6 @@ export const PlaygroundChat = ({
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isRespondingToToolCall, setIsRespondingToToolCall] = useState<
-    string | null
-  >(null);
 
   const {handleRetry, handleSend} = useChatCompletionFunctions(
     setPlaygroundStates,
@@ -56,7 +57,7 @@ export const PlaygroundChat = ({
   const {deleteMessage, editMessage, deleteChoice, editChoice, addMessage} =
     useChatFunctions(setPlaygroundStateField);
 
-  const handleAddMessage = (role: 'assistant' | 'user', text: string) => {
+  const handleAddMessage = (role: PlaygroundMessageRole, text: string) => {
     for (let i = 0; i < playgroundStates.length; i++) {
       addMessage(i, {role, content: text});
     }
@@ -159,8 +160,13 @@ export const PlaygroundChat = ({
                       <PlaygroundContext.Provider
                         value={{
                           isPlayground: true,
-                          setIsRespondingToToolCall,
-                          isRespondingToToolCall,
+                          setPendingToolResponseIds: (ids: string[]) =>
+                            setPlaygroundStateField(
+                              idx,
+                              'pendingToolResponseIds',
+                              ids
+                            ),
+                          pendingToolResponseIds: state.pendingToolResponseIds,
                           deleteMessage: (messageIndex, responseIndexes) =>
                             deleteMessage(idx, messageIndex, responseIndexes),
                           editMessage: (messageIndex, newMessage) =>
@@ -173,7 +179,7 @@ export const PlaygroundChat = ({
                           retry: (messageIndex: number, isChoice?: boolean) =>
                             handleRetry(idx, messageIndex, isChoice),
                           sendMessage: (
-                            role: 'assistant' | 'user' | 'tool',
+                            role: PlaygroundMessageRole,
                             content: string,
                             toolCallId?: string
                           ) => {
@@ -206,6 +212,9 @@ export const PlaygroundChat = ({
         ))}
       </Box>
       <PlaygroundChatInput
+        pendingToolResponseIds={playgroundStates
+          .map(state => state.pendingToolResponseIds)
+          .flat()}
         chatText={chatText}
         setChatText={setChatText}
         isLoading={isLoading}

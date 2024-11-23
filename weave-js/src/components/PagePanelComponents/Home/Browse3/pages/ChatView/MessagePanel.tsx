@@ -40,7 +40,7 @@ export const MessagePanel = ({
   );
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const {isPlayground, setIsRespondingToToolCall, isRespondingToToolCall} =
+  const {isPlayground, setPendingToolResponseIds, pendingToolResponseIds} =
     usePlaygroundContext();
 
   useEffect(() => {
@@ -64,13 +64,27 @@ export const MessagePanel = ({
         .filter((idx): idx is number => idx !== undefined)
     : undefined;
 
-  if (isRespondingToToolCall === null && pendingToolResponseId) {
-    setIsRespondingToToolCall(pendingToolResponseId);
+  if (
+    pendingToolResponseId &&
+    !pendingToolResponseIds.includes(pendingToolResponseId)
+  ) {
+    setPendingToolResponseIds([
+      ...pendingToolResponseIds,
+      pendingToolResponseId,
+    ]);
+  } else if (
+    !pendingToolResponseId &&
+    message.tool_call_id &&
+    pendingToolResponseIds.includes(message.tool_call_id)
+  ) {
+    setPendingToolResponseIds(
+      pendingToolResponseIds.filter(id => id !== message.tool_call_id)
+    );
   }
 
-  if (!isShowingMore && isRespondingToToolCall) {
+  if (!isShowingMore && pendingToolResponseIds.length > 0) {
     message.tool_calls?.forEach(toolCall => {
-      if (toolCall.id === isRespondingToToolCall) {
+      if (pendingToolResponseIds.includes(toolCall.id)) {
         setIsShowingMore(true);
         setHasPendingToolResponse(true);
       }

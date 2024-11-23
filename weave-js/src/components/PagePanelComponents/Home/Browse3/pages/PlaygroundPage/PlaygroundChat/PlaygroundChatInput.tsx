@@ -8,14 +8,15 @@ import {Button} from '@wandb/weave/components/Button';
 import React, {useState} from 'react';
 
 import {StyledTextArea} from '../StyledTextarea';
+import {PlaygroundMessageRole} from '../types';
 
 type PlaygroundChatInputProps = {
   chatText: string;
   setChatText: (text: string) => void;
   isLoading: boolean;
-  onSend: (role: 'assistant' | 'user') => void;
-  onAdd: (role: 'assistant' | 'user', text: string) => void;
-  isRespondingToToolCall: number | null;
+  onSend: (role: PlaygroundMessageRole) => void;
+  onAdd: (role: PlaygroundMessageRole, text: string) => void;
+  pendingToolResponseIds: string[];
 };
 
 export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
@@ -24,11 +25,10 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   isLoading,
   onSend,
   onAdd,
-  isRespondingToToolCall,
+  pendingToolResponseIds,
 }) => {
-  const [addMessageRole, setAddMessageRole] = useState<'assistant' | 'user'>(
-    'user'
-  );
+  const [addMessageRole, setAddMessageRole] =
+    useState<PlaygroundMessageRole>('user');
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
@@ -89,6 +89,13 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
               className="ml-4"
               variant="secondary"
               size="small"
+              active={addMessageRole === 'system'}
+              onClick={() => setAddMessageRole('system')}>
+              System
+            </Button>
+            <Button
+              variant="secondary"
+              size="small"
               active={addMessageRole === 'assistant'}
               onClick={() => setAddMessageRole('assistant')}>
               Assistant
@@ -113,12 +120,14 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
             size="small"
             onClick={() => onSend(addMessageRole)}
             tooltip={
-              isRespondingToToolCall !== null
+              pendingToolResponseIds.length > 0
                 ? 'Waiting for tool call response(s)'
                 : undefined
             }
             disabled={
-              isLoading || chatText.trim() === '' || !!isRespondingToToolCall
+              isLoading ||
+              chatText.trim() === '' ||
+              pendingToolResponseIds.length > 0
             }
             startIcon={isLoading ? 'loading' : undefined}>
             {isLoading ? 'Sending...' : 'Send'}
