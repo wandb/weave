@@ -28,7 +28,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
   return (
     <Box
       sx={{
-        padding: '16px',
+        padding: '0px 16px 8px 16px',
         height: '100%',
         borderLeft: `1px solid ${MOON_250}`,
         display: 'flex',
