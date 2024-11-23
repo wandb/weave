@@ -18,12 +18,9 @@ const isMac = () => {
   const platform = navigator.platform || '';
   const userAgent = navigator.userAgent || '';
   const appVersion = navigator.appVersion || '';
-  const checkString = (str: string) =>
-    /Mac|iPhone|iPod|iPad/i.test(str);
+  const checkString = (str: string) => /Mac|iPhone|iPod|iPad/i.test(str);
   return (
-    checkString(platform) ||
-    checkString(userAgent) ||
-    checkString(appVersion)
+    checkString(platform) || checkString(userAgent) || checkString(appVersion)
   );
 };
 
