@@ -14,6 +14,19 @@ type PlaygroundChatInputProps = {
   settingsTab: number | null;
 };
 
+const isMac = () => {
+  const platform = navigator.platform || '';
+  const userAgent = navigator.userAgent || '';
+  const appVersion = navigator.appVersion || '';
+  const checkString = (str: string) =>
+    /Mac|iPhone|iPod|iPad/i.test(str);
+  return (
+    checkString(platform) ||
+    checkString(userAgent) ||
+    checkString(appVersion)
+  );
+};
+
 export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   chatText,
   setChatText,
@@ -76,7 +89,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
             fontSize: '12px',
             color: MOON_500,
           }}>
-          Press CMD + Enter to send
+          Press {isMac() ? 'CMD' : 'Ctrl'} + Enter to send
         </Box>
         <StyledTextArea
           onChange={e => setChatText(e.target.value)}
