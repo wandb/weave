@@ -66,6 +66,7 @@ export const PlaygroundChat = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        overflow: 'hidden', // Rely on inner overflows, not outer page
       }}>
       <Box
         sx={{
@@ -139,6 +140,7 @@ export const PlaygroundChat = ({
                   overflow: 'scroll',
                   paddingTop: '48px', // Height of the top bar
                   paddingX: '16px',
+                  flexGrow: 1,
                 }}>
                 <Tailwind>
                   <div className=" mx-auto h-full min-w-[400px] max-w-[800px] pb-8">
