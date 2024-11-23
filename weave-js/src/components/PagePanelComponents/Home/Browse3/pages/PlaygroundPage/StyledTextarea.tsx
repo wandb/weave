@@ -46,7 +46,9 @@ export const StyledTextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
           )}px`;
           textareaElement.style.overflowY =
             newHeight >
-            (typeof maxHeight === 'string' ? parseInt(maxHeight, 10) : maxHeight)
+            (typeof maxHeight === 'string'
+              ? parseInt(maxHeight, 10)
+              : maxHeight)
               ? 'auto'
               : 'hidden';
         } else {
@@ -55,11 +57,12 @@ export const StyledTextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
         }
       };
 
-      const textareaElement = textareaRef.current;
-      textareaElement.addEventListener('input', adjustHeight);
+      const textareaRefElement = textareaRef.current;
+      textareaRefElement.addEventListener('input', adjustHeight);
       adjustHeight(); // Initial adjustment
 
-      return () => textareaElement.removeEventListener('input', adjustHeight);
+      return () =>
+        textareaRefElement.removeEventListener('input', adjustHeight);
     }, [autoGrow, maxHeight, reset]);
 
     return (
