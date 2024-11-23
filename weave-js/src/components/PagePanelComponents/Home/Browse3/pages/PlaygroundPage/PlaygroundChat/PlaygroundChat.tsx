@@ -169,6 +169,7 @@ export const PlaygroundChat = ({
                       </PlaygroundContext.Provider>
                     )}
                   </div>
+                  <div className="h-[125px] w-full" />
                 </Tailwind>
               </Box>
               <Box

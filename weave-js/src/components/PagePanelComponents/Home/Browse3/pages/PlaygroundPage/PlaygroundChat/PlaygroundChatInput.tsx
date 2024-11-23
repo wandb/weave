@@ -29,11 +29,27 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   const [addMessageRole, setAddMessageRole] = useState<'assistant' | 'user'>(
     'user'
   );
+  const [shouldReset, setShouldReset] = useState(false);
+
+  const handleReset = () => {
+    setShouldReset(true);
+    setTimeout(() => setShouldReset(false), 0);
+  };
+
+  const handleSend = (role: 'assistant' | 'user') => {
+    onSend(role);
+    handleReset();
+  };
+
+  const handleAdd = (role: 'assistant' | 'user', text: string) => {
+    onAdd(role, text);
+    handleReset();
+  };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault(); // Prevent default to avoid newline in textarea
-      onSend(addMessageRole);
+      event.preventDefault();
+      handleSend(addMessageRole);
     }
   };
 
@@ -47,6 +63,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
         paddingTop: '8px',
         backgroundColor: 'white',
         width: settingsTab !== null ? 'calc(100% - 58px - 320px)' : 'calc(100% - 58px)',
+        zIndex: 100,
       }}>
       <Box
         sx={{
@@ -66,6 +83,10 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
           onChange={e => setChatText(e.target.value)}
           value={chatText}
           onKeyDown={handleKeyDown}
+          placeholder="Type your message here..."
+          autoGrow
+          maxHeight={160}
+          reset={shouldReset}
         />
         <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
         <Box sx={{display: 'flex', gap: '8px'}}>
@@ -102,13 +123,13 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
             variant="secondary"
             size="medium"
             startIcon="add-new"
-            onClick={() => onAdd(addMessageRole, chatText)}>
+            onClick={() => handleAdd(addMessageRole, chatText)}>
             Add
           </Button>
           <Divider orientation="vertical" flexItem sx={{bgcolor: MOON_250}} />
           <Button
             size="medium"
-            onClick={() => onSend(addMessageRole)}
+            onClick={() => handleSend(addMessageRole)}
             disabled={isLoading || chatText.trim() === ''}
             startIcon={isLoading ? 'loading' : undefined}>
             {isLoading ? 'Sending...' : 'Send'}
