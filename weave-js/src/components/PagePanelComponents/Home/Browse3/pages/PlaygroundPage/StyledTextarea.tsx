@@ -58,9 +58,9 @@ export const StyledTextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
             if (typeof ref === 'function') {
               ref(element);
             } else if (ref) {
-              ref.current = element;
+              (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = element;
             }
-            textareaRef.current = element;
+            (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = element;
           }}
           className={classNames(
             'h-full w-full',
