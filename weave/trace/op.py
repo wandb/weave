@@ -792,6 +792,7 @@ class DelegatingContextManager:
         self.call = call
         self.should_raise = should_raise
         self.orig_contextmanager = op.resolve_fn(*args, **kwargs)
+        print(f">>> DelegatingContextManager {self.orig_contextmanager=}")
 
         # If the context manager is also iterable...
         self._context_value = None
@@ -875,6 +876,9 @@ class DelegatingContextManager:
         if name not in self.__dict__:
             val = getattr(self._context_value, name)
             print(f">>> DelegatingContextManager.__getattr__ {name=} {val=}")
+            if name == "text_stream":
+                print(f">>> text_stream {val=}")
+                return val
             if hasattr(val, "__iter__") and not isinstance(val, (str, bytes)):
                 print(f">>> WrappedIterable Path {name=} {val=}")
                 return _WrappedIterable(val, self.op.lifecycle_handler, self.call)
