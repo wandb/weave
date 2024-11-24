@@ -831,7 +831,6 @@ class DelegatingContextManager:
         except StopAsyncIteration:
             raise
         self.op.lifecycle_handler.before_yield(self.call, val)
-        self.op.lifecycle_handler.after_yield(self.call, val)
         return val
 
     def __iter__(self):
@@ -845,7 +844,6 @@ class DelegatingContextManager:
         except StopIteration:
             raise
         self.op.lifecycle_handler.before_yield(self.call, val)
-        self.op.lifecycle_handler.after_yield(self.call, val)
         return val
 
     def __enter__(self):
@@ -876,17 +874,18 @@ class DelegatingContextManager:
         # Forward unknown attributes to the original context manager
         if name not in self.__dict__:
             val = getattr(self._context_value, name)
+            print(f">>> DelegatingContextManager.__getattr__ {name=} {val=}")
             if hasattr(val, "__iter__") and not isinstance(val, (str, bytes)):
                 print(f"WrappedIterable Path {name=} {val=}")
-                return _WrappedIterable(val, self.op, self.call)
+                return _WrappedIterable(val, self.op.lifecycle_handler, self.call)
             return val
         return self.__dict__[name]
 
 
 class _WrappedIterable:
-    def __init__(self, iterable: Any, op: Op, call: Call):
+    def __init__(self, iterable: Any, handler: LifecycleHandler, call: Call):
         self.iterable = iterable
-        self.op = op
+        self.handler = handler
         self.call = call
         self._iterator = None
 
@@ -904,8 +903,7 @@ class _WrappedIterable:
             print(f">>> WrappedIterable __next__ {val=}")
         except StopIteration:
             raise
-        self.op.lifecycle_handler.before_yield(self.call, val)
-        self.op.lifecycle_handler.after_yield(self.call, val)
+        self.handler.before_yield(self.call, val)
         print(f"{self.call=}")
         return val
 
@@ -919,8 +917,7 @@ class _WrappedIterable:
             val = await self.iterable.__anext__()
         except StopAsyncIteration:
             raise
-        self.op.lifecycle_handler.before_yield(self.call, val)
-        self.op.lifecycle_handler.after_yield(self.call, val)
+        self.handler.before_yield(self.call, val)
         return val
 
 
@@ -969,7 +966,6 @@ def _wrap_generator(
             for val in x:
                 op.lifecycle_handler.before_yield(call, val)
                 yield val
-                op.lifecycle_handler.after_yield(call, val)
 
     return _wrapped_sync_generator()
 
@@ -985,7 +981,6 @@ async def _wrap_async_generator(
             async for val in await func(*args, **kwargs):
                 op.lifecycle_handler.before_yield(call, val)
                 yield val
-                op.lifecycle_handler.after_yield(call, val)
 
     return _wrapped_async_generator()
 

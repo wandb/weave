@@ -14,8 +14,8 @@ def should_accumulate(call: Call) -> bool:
 
 
 class AnthropicCallback:
-    def after_yield(self, call: Call, value: Any) -> None:
-        print(f">>> AnthropicCallback.after_yield: {call=} {value=}")
+    def before_yield(self, call: Call, value: Any) -> None:
+        print(f">>> AnthropicCallback.before_yield: {call=} {value=}")
         from anthropic.types import (
             ContentBlockDeltaEvent,
             Message,
@@ -65,9 +65,6 @@ class AnthropicCallback:
 
 
 class AnthropicStreamingCallback:
-    # def before_iteration(self, call: Call) -> None:
-    #     call.output = ""
-
     def before_call_start(
         self, inputs: dict, parent: Call | None, attributes: dict | None
     ) -> None:
@@ -75,14 +72,11 @@ class AnthropicStreamingCallback:
             f">>> AnthropicStreamingCallback.before_call_start: {inputs=} {parent=} {attributes=}"
         )
 
-    def before_iteration(self, call: Call) -> None:
-        print(f">>> AnthropicStreamingCallback.before_iteration: {call=}")
-
     def before_yield(self, call: Call, value: Any) -> None:
         print(f">>> AnthropicStreamingCallback.before_yield: {call=} {value=}")
 
-    def after_yield(self, call: Call, value: Any) -> None:
-        print(f">>> AnthropicStreamingCallback.after_yield: {call=} {value=}")
+    def before_yield(self, call: Call, value: Any) -> None:
+        print(f">>> AnthropicStreamingCallback.before_yield: {call=} {value=}")
         from anthropic.lib.streaming._types import MessageStopEvent
 
         if call.output is None:
