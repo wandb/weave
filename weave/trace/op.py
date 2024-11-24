@@ -572,6 +572,7 @@ def op(
     # escape hatch for integrations
     __should_accumulate: Callable[[Call], bool] | None = None,
     __should_use_contextmanager: Callable[[Callable], bool] | None = None,
+    __custom_iterator_wrapper: Callable[[Any], Any] | None = None,
 ) -> Callable[[Callable], Op] | Op:
     """
     A decorator to weave op-ify a function or method.  Works for both sync and async.
@@ -669,6 +670,7 @@ def op(
                         should_raise=True,
                         should_accumulate=__should_accumulate,
                         should_use_contextmanager=__should_use_contextmanager,
+                        custom_iterator_wrapper=__custom_iterator_wrapper,
                     )
                     return res
 
@@ -784,7 +786,7 @@ def as_op(fn: Callable) -> Op:
     return cast(Op, fn)
 
 
-class DelegatingContextManager:
+class WrappedContextManagerSyncGenerator:
     def __init__(self, op: Op, args: Any, kwargs: Any, call: Call, should_raise: bool):
         self.op = op
         self.args = args
@@ -792,11 +794,58 @@ class DelegatingContextManager:
         self.call = call
         self.should_raise = should_raise
         self.orig_contextmanager = op.resolve_fn(*args, **kwargs)
-        print(f">>> DelegatingContextManager {self.orig_contextmanager=}")
 
         # If the context manager is also iterable...
         self._context_value = None
         self._iterator = None
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self._iterator is None:
+            raise TypeError("Context value is not iterable")
+        try:
+            val = next(self._iterator)
+        except StopIteration:
+            raise
+        self.op.lifecycle_handler.before_yield(self.call, val)
+        return val
+
+    def __enter__(self):
+        self._context_value = self.orig_contextmanager.__enter__()
+        if hasattr(self._context_value, "__iter__"):
+            self._iterator = iter(self._context_value)
+            return self
+        return self._context_value
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.op.lifecycle_handler.has_finished:
+            raise OpCallError("Should not call finish more than once")
+
+        boxed_output = box.box(self.call.output)
+        client = weave_client_context.require_weave_client()
+        client.finish_call(self.call, boxed_output, exc_value, op=self.op)
+        # self.op.lifecycle_handler.has_finished = True
+
+        if not call_context.get_current_call():
+            print_call_link(self.call)
+        call_context.pop_call(self.call.id)
+
+        return self.orig_contextmanager.__exit__(exc_type, exc_value, traceback)
+
+
+class WrappedContextManagerAsyncGenerator:
+    def __init__(self, op: Op, args: Any, kwargs: Any, call: Call, should_raise: bool):
+        self.op = op
+        self.args = args
+        self.kwargs = kwargs
+        self.call = call
+        self.should_raise = should_raise
+        self.orig_contextmanager = op.resolve_fn(*args, **kwargs)
+
+        # If the context manager is also iterable...
+        self._context_value = None
         self._aiterator = None
 
     async def __aenter__(self):
@@ -834,96 +883,6 @@ class DelegatingContextManager:
         self.op.lifecycle_handler.before_yield(self.call, val)
         return val
 
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        if self._iterator is None:
-            raise TypeError("Context value is not iterable")
-        try:
-            val = next(self._iterator)
-        except StopIteration:
-            raise
-        self.op.lifecycle_handler.before_yield(self.call, val)
-        return val
-
-    def __enter__(self):
-        print(f">>> Entering context manager {self.op=}")
-        self._context_value = self.orig_contextmanager.__enter__()
-        if hasattr(self._context_value, "__iter__"):
-            self._iterator = iter(self._context_value)
-            return self
-        return self._context_value
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        print(f">>> Exiting context manager {self.op=}")
-        if self.op.lifecycle_handler.has_finished:
-            raise OpCallError("Should not call finish more than once")
-
-        boxed_output = box.box(self.call.output)
-        client = weave_client_context.require_weave_client()
-        client.finish_call(self.call, boxed_output, exc_value, op=self.op)
-        # self.op.lifecycle_handler.has_finished = True
-
-        if not call_context.get_current_call():
-            print_call_link(self.call)
-        call_context.pop_call(self.call.id)
-
-        return self.orig_contextmanager.__exit__(exc_type, exc_value, traceback)
-
-    def __getattr__(self, name: str) -> Any:
-        # Forward unknown attributes to the original context manager
-        if name not in self.__dict__:
-            val = getattr(self._context_value, name)
-            print(f">>> DelegatingContextManager.__getattr__ {name=} {val=}")
-            if name == "text_stream":
-                print(f">>> text_stream {val=}")
-                return val
-            if hasattr(val, "__iter__") and not isinstance(val, (str, bytes)):
-                print(f">>> WrappedIterable Path {name=} {val=}")
-                return _WrappedIterable(val, self.op.lifecycle_handler, self.call)
-            return val
-        return self.__dict__[name]
-
-
-class _WrappedIterable:
-    def __init__(self, iterable: Any, handler: LifecycleHandler, call: Call):
-        self.iterable = iterable
-        self.handler = handler
-        self.call = call
-        self._iterator = None
-
-    def __iter__(self):
-        self._iterator = iter(self.iterable)
-        return self
-
-    def __next__(self):
-        if self._iterator is None:
-            raise TypeError("Iterator not initialized")
-        try:
-            print(f"{self.call=}")
-            print(f">>> WrappedIterable __next__ {self.iterable=}")
-            val = next(self._iterator)
-            print(f">>> WrappedIterable __next__ {val=}")
-        except StopIteration:
-            raise
-        self.handler.before_yield(self.call, val)
-        print(f"{self.call=}")
-        return val
-
-    async def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        if not hasattr(self.iterable, "__aiter__"):
-            raise TypeError("Original iterable is not async iterable")
-        try:
-            val = await self.iterable.__anext__()
-        except StopAsyncIteration:
-            raise
-        self.handler.before_yield(self.call, val)
-        return val
-
 
 @contextmanager
 def _call_context(op: Op, call: Call, should_raise: bool):
@@ -939,15 +898,10 @@ def _call_context(op: Op, call: Call, should_raise: bool):
     finally:
         if op.lifecycle_handler.has_finished:
             raise OpCallError("Should not call finish more than once")
-        print(f">>> before boxing {call.output=}")
         boxed_output = box.box(call.output)
-        print(f">>> after boxing {boxed_output=}")
         op.lifecycle_handler.before_call_finish(call)
         client = weave_client_context.require_weave_client()
         client.finish_call(call, boxed_output, exception, op=op)
-        print(f">>> {call.output=}")
-        print(f">>> {call=}")
-        # op.lifecycle_handler.has_finished = True
 
         if not call_context.get_current_call():
             print_call_link(call)
@@ -962,12 +916,8 @@ def _wrap_generator(
 
     @wraps(func)
     def _wrapped_sync_generator() -> Any:
-        print(f">>> Before call context {op=}")
         with _call_context(op, call, should_raise):
-            print(f">>> Inside call context {op=}")
-            x = func(*args, **kwargs)
-            print(f">>> {x=}")
-            for val in x:
+            for val in func(*args, **kwargs):
                 op.lifecycle_handler.before_yield(call, val)
                 yield val
 
@@ -1056,8 +1006,8 @@ def _exc_op(
     should_raise: bool = False,
     should_accumulate: Callable[[Call], bool] | None = None,
     should_use_contextmanager: Callable[[Callable], bool] | None = None,
+    custom_iterator_wrapper: Callable[[Any], Any] | None = None,
 ) -> tuple[Any, Call]:
-    print(f">>> Executing sync op {op=}")
     func = op.resolve_fn
     call = _placeholder_call()
 
@@ -1090,7 +1040,6 @@ def _exc_op(
 
     is_generator = inspect.isgeneratorfunction(func)
     # rename: should_use_generator_codepath?
-    print(f">>> {should_accumulate=} {should_accumulate(call)=}")
     _should_accumulate = should_accumulate and should_accumulate(call)
     # rename: should_use_contextmanager_codepath?
     _should_use_contextmanager = (
@@ -1098,23 +1047,21 @@ def _exc_op(
     )
 
     if is_generator or _should_accumulate:
-        if _should_use_contextmanager:
-            print(f">>> Using context manager {op=}")
-            res = DelegatingContextManager(op, args, kwargs, call, should_raise)
-            print(f">>> Using context manager {res=}")
+        if custom_iterator_wrapper:
+            res = custom_iterator_wrapper(op, args, kwargs, call, should_raise)
+        elif _should_use_contextmanager:
+            res = WrappedContextManagerSyncGenerator(
+                op, args, kwargs, call, should_raise
+            )
         else:
-            print(f">>> Wrapping generator {op=}")
             res = _wrap_generator(
                 op, args, kwargs, call=call, should_raise=should_raise
             )
-            print(f">>> Wrapped generator {res=}")
     else:
         # regular sync func
         with _call_context(op, call, should_raise):
-            print(f">>> Yielding to {func=}")
             res = func(*args, **kwargs)
             call.output = res
-            print(f">>> Yielded {res=}, {call=}")
     return res, call
 
 

@@ -1,10 +1,13 @@
 import importlib
 from collections.abc import AsyncIterator, Iterator
 from functools import wraps
-from typing import Any, Callable, Union
+from typing import Any, Callable
 
 import weave
-from weave.trace.op_extensions.accumulator import _IteratorWrapper
+from weave.trace.op import (
+    WrappedContextManagerAsyncGenerator,
+    WrappedContextManagerSyncGenerator,
+)
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 from weave.trace.weave_client import Call
 
@@ -15,7 +18,6 @@ def should_accumulate(call: Call) -> bool:
 
 class AnthropicCallback:
     def before_yield(self, call: Call, value: Any) -> None:
-        print(f">>> AnthropicCallback.before_yield: {call=} {value=}")
         from anthropic.types import (
             ContentBlockDeltaEvent,
             Message,
@@ -60,23 +62,9 @@ class AnthropicCallback:
             if hasattr(value, "usage") and value.usage.output_tokens:
                 call.output.usage.output_tokens = value.usage.output_tokens
 
-    def before_call_finish(self, call: Call) -> None:
-        print(f">>> AnthropicCallback.before_call_finish: {call=}")
-
 
 class AnthropicStreamingCallback:
-    def before_call_start(
-        self, inputs: dict, parent: Call | None, attributes: dict | None
-    ) -> None:
-        print(
-            f">>> AnthropicStreamingCallback.before_call_start: {inputs=} {parent=} {attributes=}"
-        )
-
     def before_yield(self, call: Call, value: Any) -> None:
-        print(f">>> AnthropicStreamingCallback.before_yield: {call=} {value=}")
-
-    def before_yield(self, call: Call, value: Any) -> None:
-        print(f">>> AnthropicStreamingCallback.before_yield: {call=} {value=}")
         from anthropic.lib.streaming._types import MessageStopEvent
 
         if call.output is None:
@@ -84,9 +72,6 @@ class AnthropicStreamingCallback:
 
         if isinstance(value, MessageStopEvent):
             call.output = value.message
-
-    def before_call_finish(self, call: Call) -> None:
-        print(f">>> AnthropicStreamingCallback.before_call_finish: {call=}")
 
 
 def create_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
@@ -124,46 +109,28 @@ def create_wrapper_async(name: str) -> Callable[[Callable], Callable]:
     return wrapper
 
 
-## This part of the code is for dealing with the other way
-## of streaming, by calling Messages.stream
-## this has 2 options: event based or text based.
-## This code handles both cases by patching the _IteratorWrapper
-## and adding a text_stream property to it.
-
-
-class AnthropicIteratorWrapper(_IteratorWrapper):
-    def __getattr__(self, name: str) -> Any:
-        """Delegate all other attributes to the wrapped iterator."""
-        if name in [
-            "_iterator_or_ctx_manager",
-            "_on_yield",
-            "_on_error",
-            "_on_close",
-            "_on_finished_called",
-            "_call_on_error_once",
-            "text_stream",
-        ]:
-            return object.__getattribute__(self, name)
-        return getattr(self._iterator_or_ctx_manager, name)
-
-    def __stream_text__(self) -> Union[Iterator[str], AsyncIterator[str]]:
-        if isinstance(self._iterator_or_ctx_manager, AsyncIterator):
-            return self.__async_stream_text__()
-        else:
-            return self.__sync_stream_text__()
-
-    def __sync_stream_text__(self) -> Iterator[str]:  # type: ignore
+class NewAnthropicSyncIteratorWrapper(WrappedContextManagerSyncGenerator):
+    def __stream_text__(self) -> Iterator[str]:
         for chunk in self:  # type: ignore
             if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":  # type: ignore
                 yield chunk.delta.text  # type: ignore
 
-    async def __async_stream_text__(self) -> AsyncIterator[str]:  # type: ignore
+    @property
+    def text_stream(self) -> Iterator[str]:
+        return self.__stream_text__()
+
+
+class NewAnthropicAsyncIteratorWrapper(WrappedContextManagerAsyncGenerator):
+    def __stream_text__(self) -> AsyncIterator[str]:
+        return self.__async_stream_text__()
+
+    async def __async_stream_text__(self) -> AsyncIterator[str]:
         async for chunk in self:  # type: ignore
             if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":  # type: ignore
                 yield chunk.delta.text  # type: ignore
 
     @property
-    def text_stream(self) -> Union[Iterator[str], AsyncIterator[str]]:
+    def text_stream(self) -> AsyncIterator[str]:
         return self.__stream_text__()
 
 
@@ -175,7 +142,23 @@ def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
             callbacks=[AnthropicStreamingCallback()],
             # __should_accumulate=should_accumulate,
             __should_accumulate=lambda _: True,
-            __should_use_contextmanager=lambda _: True,
+            # __should_use_contextmanager=lambda _: True,
+            __custom_iterator_wrapper=NewAnthropicSyncIteratorWrapper,
+        )
+
+    return wrapper
+
+
+def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
+        return weave.op(
+            fn,
+            name=name,
+            callbacks=[AnthropicStreamingCallback()],
+            # __should_accumulate=should_accumulate,
+            __should_accumulate=lambda _: True,
+            # __should_use_contextmanager=lambda _: True,
+            __custom_iterator_wrapper=NewAnthropicAsyncIteratorWrapper,
         )
 
     return wrapper
@@ -202,7 +185,7 @@ anthropic_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("anthropic.resources.messages"),
             "AsyncMessages.stream",
-            create_stream_wrapper(name="anthropic.AsyncMessages.stream"),
+            create_async_stream_wrapper(name="anthropic.AsyncMessages.stream"),
         ),
     ]
 )
