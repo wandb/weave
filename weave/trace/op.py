@@ -571,7 +571,6 @@ def op(
     reducers: list[Reducer] | None = None,
     # escape hatch for integrations
     __should_accumulate: Callable[[Call], bool] | None = None,
-    __should_use_contextmanager: Callable[[Callable], bool] | None = None,
     __custom_iterator_wrapper: Callable[[Any], Any] | None = None,
 ) -> Callable[[Callable], Op] | Op:
     """
@@ -642,7 +641,6 @@ def op(
                         kwargs,
                         should_raise=True,
                         should_accumulate=__should_accumulate,
-                        should_use_contextmanager=__should_use_contextmanager,
                     )
                     return res
             elif is_async_iterable:
@@ -655,7 +653,6 @@ def op(
                         kwargs,
                         should_raise=True,
                         should_accumulate=__should_accumulate,
-                        should_use_contextmanager=__should_use_contextmanager,
                     )
                     async for v in res:
                         yield v
@@ -669,7 +666,6 @@ def op(
                         kwargs,
                         should_raise=True,
                         should_accumulate=__should_accumulate,
-                        should_use_contextmanager=__should_use_contextmanager,
                         custom_iterator_wrapper=__custom_iterator_wrapper,
                     )
                     return res
@@ -946,7 +942,6 @@ async def _exc_op_async(
     weave: WeaveKwargs | None = None,
     should_raise: bool = False,
     should_accumulate: Callable[[Call], bool] | None = None,
-    should_use_contextmanager: Callable[[Callable], bool] | None = None,
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
     call = _placeholder_call()
@@ -978,17 +973,11 @@ async def _exc_op_async(
 
     is_async_iterable = _is_async_iterable(func)
     _should_accumulate = should_accumulate and should_accumulate(call)
-    _should_use_contextmanager = (
-        should_use_contextmanager and should_use_contextmanager(func)
-    )
 
     if is_async_iterable or _should_accumulate:
-        if _should_use_contextmanager:
-            res = ...
-        else:
-            res = await _wrap_async_generator(
-                op, args, kwargs, call=call, should_raise=should_raise
-            )
+        res = await _wrap_async_generator(
+            op, args, kwargs, call=call, should_raise=should_raise
+        )
     else:
         # regular async func
         with _call_context(op, call, should_raise):
@@ -1005,7 +994,6 @@ def _exc_op(
     weave: WeaveKwargs | None = None,
     should_raise: bool = False,
     should_accumulate: Callable[[Call], bool] | None = None,
-    should_use_contextmanager: Callable[[Callable], bool] | None = None,
     custom_iterator_wrapper: Callable[[Any], Any] | None = None,
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
@@ -1041,18 +1029,9 @@ def _exc_op(
     is_generator = inspect.isgeneratorfunction(func)
     # rename: should_use_generator_codepath?
     _should_accumulate = should_accumulate and should_accumulate(call)
-    # rename: should_use_contextmanager_codepath?
-    _should_use_contextmanager = (
-        should_use_contextmanager and should_use_contextmanager(func)
-    )
-
     if is_generator or _should_accumulate:
         if custom_iterator_wrapper:
             res = custom_iterator_wrapper(op, args, kwargs, call, should_raise)
-        elif _should_use_contextmanager:
-            res = WrappedContextManagerSyncGenerator(
-                op, args, kwargs, call, should_raise
-            )
         else:
             res = _wrap_generator(
                 op, args, kwargs, call=call, should_raise=should_raise

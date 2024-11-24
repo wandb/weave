@@ -3,9 +3,9 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
-from weave.trace.op import Op, ProcessedInputs
-from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.op import Op, ProcessedInputs, WrappedContextManagerSyncGenerator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.weave_client import Call
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
@@ -265,17 +265,17 @@ def openai_accumulator(
     return acc
 
 
-# Unlike other integrations, streaming is based on input flag
-def should_use_accumulator(inputs: dict) -> bool:
-    return (
-        isinstance(inputs, dict)
-        and bool(inputs.get("stream"))
-        # This is very critical. When `"X-Stainless-Raw-Response` is true, the response
-        # is an APIResponse object. This is very hard to mock/patch for the streaming use
-        # case, so we don't even try.
-        and not inputs.get("extra_headers", {}).get("X-Stainless-Raw-Response")
-        == "true"
+def should_accumulate(call: Call) -> bool:
+    streaming = call.inputs.get("stream")
+
+    # This is very critical. When `"X-Stainless-Raw-Response` is true, the response
+    # is an APIResponse object. This is very hard to mock/patch for the streaming use
+    # case, so we don't even try.
+    not_raw = (
+        call.inputs.get("extra_headers", {}).get("X-Stainless-Raw-Response") != "true"
     )
+
+    return streaming and not_raw
 
 
 def openai_on_input_handler(
@@ -300,38 +300,167 @@ def openai_on_input_handler(
     return None
 
 
+class OpenAISyncIteratorWrapper(WrappedContextManagerSyncGenerator):
+    pass
+
+
+class OpenAICallback:
+    @staticmethod
+    def _process_chunk(
+        chunk: "ChatCompletionChunk", acc_choices: Optional[list[dict]] = None
+    ) -> list[dict]:
+        """Once the first_chunk is set (acc), take the next chunk and append the message content
+        to the message content of acc or first_chunk.
+        """
+        from openai.types.chat.chat_completion_chunk import (
+            ChoiceDeltaFunctionCall,
+            ChoiceDeltaToolCall,
+            ChoiceDeltaToolCallFunction,
+        )
+
+        if acc_choices is None:
+            acc_choices = []
+
+        for chunk_choice in chunk.choices:
+            for i in range(chunk_choice.index + 1 - len(acc_choices)):
+                acc_choices.append(
+                    {
+                        "index": len(acc_choices),
+                        "delta": {
+                            "content": None,
+                            "function_call": None,
+                            "tool_calls": None,
+                        },
+                        "logprobs": None,
+                        "finish_reason": None,
+                    }
+                )
+            # choice fields
+            choice = acc_choices[chunk_choice.index]
+            if chunk_choice.finish_reason:
+                choice["finish_reason"] = chunk_choice.finish_reason
+            if chunk_choice.logprobs:
+                choice["logprobs"] = chunk_choice.logprobs
+
+            # message
+            if chunk_choice.delta.content:
+                if choice["delta"]["content"] is None:
+                    choice["delta"]["content"] = ""
+                choice["delta"]["content"] += chunk_choice.delta.content  # type: ignore
+            if chunk_choice.delta.role:
+                choice["delta"]["role"] = chunk_choice.delta.role
+
+            # function calling
+            if chunk_choice.delta.function_call:
+                if choice["delta"]["function_call"] is None:
+                    choice["delta"]["function_call"] = ChoiceDeltaFunctionCall(
+                        arguments=chunk_choice.delta.function_call.arguments,
+                        name=chunk_choice.delta.function_call.name,
+                    )
+                else:
+                    choice["delta"]["function_call"]["arguments"] += (
+                        chunk_choice.delta.function_call.arguments
+                    )
+
+            # tool calls
+            if chunk_choice.delta.tool_calls:
+                if choice["delta"]["tool_calls"] is None:
+                    choice["delta"]["tool_calls"] = []
+                    tool_call_delta = chunk_choice.delta.tool_calls[
+                        0
+                    ]  # when streaming, we get one
+                    choice["delta"]["tool_calls"].append(  # type: ignore
+                        ChoiceDeltaToolCall(
+                            id=tool_call_delta.id,
+                            index=tool_call_delta.index,
+                            function=ChoiceDeltaToolCallFunction(
+                                name=tool_call_delta.function.name,  # type: ignore
+                                arguments="",
+                            ),
+                            type=tool_call_delta.type,
+                        )
+                    )
+                else:
+                    tool_call_delta = chunk_choice.delta.tool_calls[0]
+                    if tool_call_delta.index > len(choice["delta"]["tool_calls"]) - 1:
+                        choice["delta"]["tool_calls"].append(
+                            ChoiceDeltaToolCall(
+                                index=tool_call_delta.index,
+                                function=ChoiceDeltaToolCallFunction(
+                                    name=None,
+                                    arguments="",
+                                ),
+                            ).model_dump()
+                        )
+                    tool_call = choice["delta"]["tool_calls"][tool_call_delta.index]
+                    if tool_call_delta.id is not None:
+                        tool_call["id"] = tool_call_delta.id
+                    if tool_call_delta.type is not None:
+                        tool_call["type"] = tool_call_delta.type
+                    if tool_call_delta.function is not None:
+                        if tool_call_delta.function.name is not None:
+                            tool_call["function"]["name"] = (
+                                tool_call_delta.function.name
+                            )
+                        if tool_call_delta.function.arguments is not None:
+                            tool_call["function"]["arguments"] += (
+                                tool_call_delta.function.arguments
+                            )
+
+        return acc_choices
+
+    def before_yield(self, call: Call, value: Any) -> None:
+        from openai.types.chat import ChatCompletionChunk
+
+        if call.output is None:
+            if not hasattr(value, "choices"):
+                raise ValueError("Initial event must contain choices")
+
+            output_choices = self._process_chunk(value)
+            call.output = ChatCompletionChunk(
+                id=value.id,
+                choices=output_choices,
+                created=value.created,
+                model=value.model,
+                object=value.object,
+                system_fingerprint=value.system_fingerprint,
+            )
+            return
+
+        output_choices = self._process_chunk(
+            value, [choice.model_dump() for choice in call.output.choices]
+        )
+        call.output = ChatCompletionChunk(
+            id=call.output.id,
+            choices=output_choices,
+            created=call.output.created,
+            model=call.output.model,
+            object=call.output.object,
+            system_fingerprint=call.output.system_fingerprint,
+        )
+
+        if not value.choices and value.usage:
+            call.output.usage = value.usage
+
+
 def create_wrapper_sync(
     name: str,
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        "We need to do this so we can check if `stream` is used"
-
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
             def _wrapper(*args: Any, **kwargs: Any) -> Any:
-                if bool(kwargs.get("stream")) and kwargs.get("stream_options") is None:
+                if kwargs.get("stream") and not kwargs.get("stream_options"):
                     kwargs["stream_options"] = {"include_usage": True}
-                return fn(
-                    *args, **kwargs
-                )  # This is where the final execution of fn is happening.
+                return fn(*args, **kwargs)
 
             return _wrapper
 
-        def _openai_stream_options_is_set(inputs: dict) -> bool:
-            if inputs.get("stream_options") is not None:
-                return True
-            return False
-
-        op = weave.op()(_add_stream_options(fn))
-        op.name = name  # type: ignore
-        op._set_on_input_handler(openai_on_input_handler)
-        return add_accumulator(
-            op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
-                acc, value, skip_last=not _openai_stream_options_is_set(inputs)
-            ),
-            should_accumulate=should_use_accumulator,
-            on_finish_post_processor=openai_on_finish_post_processor,
+        return weave.op(
+            _add_stream_options(fn),
+            name=name,
+            callbacks=[OpenAICallback()],
+            __should_accumulate=should_accumulate,
         )
 
     return wrapper
@@ -344,32 +473,20 @@ def create_wrapper_async(
     name: str,
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        "We need to do this so we can check if `stream` is used"
-
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
             async def _wrapper(*args: Any, **kwargs: Any) -> Any:
-                if bool(kwargs.get("stream")) and kwargs.get("stream_options") is None:
+                if kwargs.get("stream") and not kwargs.get("stream_options"):
                     kwargs["stream_options"] = {"include_usage": True}
                 return await fn(*args, **kwargs)
 
             return _wrapper
 
-        def _openai_stream_options_is_set(inputs: dict) -> bool:
-            if inputs.get("stream_options") is not None:
-                return True
-            return False
-
-        op = weave.op()(_add_stream_options(fn))
-        op.name = name  # type: ignore
-        op._set_on_input_handler(openai_on_input_handler)
-        return add_accumulator(
-            op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
-                acc, value, skip_last=not _openai_stream_options_is_set(inputs)
-            ),
-            should_accumulate=should_use_accumulator,
-            on_finish_post_processor=openai_on_finish_post_processor,
+        return weave.op(
+            _add_stream_options(fn),
+            name=name,
+            callbacks=[OpenAICallback()],
+            __should_accumulate=should_accumulate,
         )
 
     return wrapper
