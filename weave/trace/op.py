@@ -876,7 +876,7 @@ class DelegatingContextManager:
             val = getattr(self._context_value, name)
             print(f">>> DelegatingContextManager.__getattr__ {name=} {val=}")
             if hasattr(val, "__iter__") and not isinstance(val, (str, bytes)):
-                print(f"WrappedIterable Path {name=} {val=}")
+                print(f">>> WrappedIterable Path {name=} {val=}")
                 return _WrappedIterable(val, self.op.lifecycle_handler, self.call)
             return val
         return self.__dict__[name]
