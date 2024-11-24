@@ -142,7 +142,6 @@ def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
             callbacks=[AnthropicStreamingCallback()],
             # __should_accumulate=should_accumulate,
             __should_accumulate=lambda _: True,
-            # __should_use_contextmanager=lambda _: True,
             __custom_iterator_wrapper=NewAnthropicSyncIteratorWrapper,
         )
 
@@ -155,9 +154,7 @@ def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
             fn,
             name=name,
             callbacks=[AnthropicStreamingCallback()],
-            # __should_accumulate=should_accumulate,
             __should_accumulate=lambda _: True,
-            # __should_use_contextmanager=lambda _: True,
             __custom_iterator_wrapper=NewAnthropicAsyncIteratorWrapper,
         )
 
