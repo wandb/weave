@@ -16,10 +16,10 @@ Evaluating LLM prompts and responses is challenging. The Weave Playground is des
 Get started with the Playground to optimize your LLM interactions and streamline your prompt engineering process and LLM application development.
 
 - [Prerequisites](#prerequisites)
-   - [Add a provider API key](#add-an-api-key)
+   - [Add a provider API key](#add-a-provider-api-key)
    - [Access the Playground](#access-the-playground)
 - [Select an LLM](#select-an-llm)
-- [Adjust LLM parameters](#configure-the-llm)
+- [Adjust LLM parameters](#adjust-llm-parameters)
 - [Add a function](#add-a-function) 
 - [Retry, edit, and delete messages](#retry-edit-and-delete-messages)
 - [Add a new message](#add-a-new-message)
