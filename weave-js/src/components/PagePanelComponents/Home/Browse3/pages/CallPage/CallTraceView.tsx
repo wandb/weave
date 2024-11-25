@@ -399,6 +399,7 @@ export const useCallFlattenedTraceTree = (
     [traceCallsResult, call.traceId]
   );
 
+  const costCols = useMemo(() => ['id'], []);
   const costs = useCalls(
     call.entity,
     call.project,
@@ -407,7 +408,7 @@ export const useCallFlattenedTraceTree = (
     undefined,
     undefined,
     undefined,
-    columns,
+    costCols,
     undefined,
     {
       skip: traceCalls.loading,
