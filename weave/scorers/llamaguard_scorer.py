@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 # https://github.com/meta-llama/llama-recipes/blob/main/src/llama_recipes/inference/prompt_format_utils.py
 # https://github.com/meta-llama/llama-recipes/blob/main/recipes/responsible_ai/llama_guard/llama_guard_text_and_vision_inference.ipynb
-class LlamaGuard(weave.Scorer):
+class LlamaGuard(Scorer):
     """
     Use Meta's LlamaGuard to check if the model output is safe.
 
@@ -96,7 +96,7 @@ class LlamaGuard(weave.Scorer):
         return input_ids
 
     @weave.op
-    def _generate(self, input_ids: "torch.Tensor") -> tuple[str, float]:
+    def _generate(self, input_ids: "Tensor") -> tuple[str, float]:
         prompt_len = input_ids.shape[1]
         llamaguard_output = self._model.generate(
             input_ids=input_ids,
