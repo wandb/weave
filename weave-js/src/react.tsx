@@ -1235,10 +1235,15 @@ export const useNodeWithServerType: typeof useNodeWithServerTypeDoNotCallMeDirec
   };
 
 export const useExpandedNode = (
-  node: NodeOrVoidNode
+  node: NodeOrVoidNode,
+  newVars?: {[key: string]: Node} | null
 ): {loading: boolean; result: NodeOrVoidNode} => {
   const [error, setError] = useState();
-  const {stack} = usePanelContext();
+  const {stack: origStack} = usePanelContext();
+
+  const stack = useMemo(() => {
+    return pushFrame(origStack, newVars ?? {});
+  }, [newVars, origStack]);
 
   let dereffedNode: NodeOrVoidNode;
   ({node, dereffedNode} = useRefEqualExpr(node, stack));
