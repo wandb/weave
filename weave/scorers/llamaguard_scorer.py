@@ -122,7 +122,7 @@ class LlamaGuard(Scorer):
         generated_tokens = llamaguard_output.sequences[:, prompt_len:]
 
         first_token_logits = llamaguard_output.logits[0]
-        first_token_probs = torch.softmax(first_token_logits, dim=-1)
+        first_token_probs = first_token_logits.softmax(dim=-1)
         unsafe_token_id = self._tokenizer.convert_tokens_to_ids("unsafe")
         unsafe_score = first_token_probs[0, unsafe_token_id].item()
 
