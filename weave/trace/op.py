@@ -569,7 +569,7 @@ def op(
     postprocess_output: PostprocessOutputFunc | None = None,
     callbacks: list[Callback] | None = None,
     reducers: list[Reducer] | None = None,
-    # escape hatch for integrations
+    # escape hatch for integrations -- not for general use
     __should_accumulate: Callable[[Call], bool] | None = None,
     __custom_iterator_wrapper: Callable[[Any], Any] | None = None,
 ) -> Callable[[Callable], Op] | Op:
@@ -782,7 +782,13 @@ def as_op(fn: Callable) -> Op:
     return cast(Op, fn)
 
 
-class WrappedContextManagerSyncGenerator:
+class SyncIterableContext:
+    """Wraps an op that returns an iterable contextmanager to add relevant lifecycle hooks.
+
+    This is used for streaming ops, where we want to accumulate the output of the op until
+    the context manager is closed.  This is currently only used for Anthropic streaming ops.
+    """
+
     def __init__(self, op: Op, args: Any, kwargs: Any, call: Call, should_raise: bool):
         self.op = op
         self.args = args
@@ -831,7 +837,13 @@ class WrappedContextManagerSyncGenerator:
         return self.orig_contextmanager.__exit__(exc_type, exc_value, traceback)
 
 
-class WrappedContextManagerAsyncGenerator:
+class AsyncIterableContext:
+    """Wraps an op that returns an async iterable contextmanager to add relevant lifecycle hooks.
+
+    This is used for streaming ops, where we want to accumulate the output of the op until
+    the context manager is closed.  This is currently only used for Anthropic streaming ops.
+    """
+
     def __init__(self, op: Op, args: Any, kwargs: Any, call: Call, should_raise: bool):
         self.op = op
         self.args = args
@@ -1007,8 +1019,6 @@ def _exc_op(
     elif not op._tracing_enabled:
         return func(*args, **kwargs), call
 
-    # TODO: Add back on_input_handler (maybe part of callback?)
-
     # Setup call context
     client = weave_client_context.require_weave_client()
     parent_call = call_context.get_current_call()
@@ -1027,7 +1037,6 @@ def _exc_op(
     )
 
     is_generator = inspect.isgeneratorfunction(func)
-    # rename: should_use_generator_codepath?
     _should_accumulate = should_accumulate and should_accumulate(call)
     if is_generator or _should_accumulate:
         if custom_iterator_wrapper:

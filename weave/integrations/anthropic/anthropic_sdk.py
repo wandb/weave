@@ -4,10 +4,7 @@ from functools import wraps
 from typing import Any, Callable
 
 import weave
-from weave.trace.op import (
-    WrappedContextManagerAsyncGenerator,
-    WrappedContextManagerSyncGenerator,
-)
+from weave.trace.op import AsyncIterableContext, SyncIterableContext
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 from weave.trace.weave_client import Call
 
@@ -76,7 +73,6 @@ class AnthropicStreamingCallback:
 
 def create_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        "We need to do this so we can check if `stream` is used"
         return weave.op(
             fn,
             name=name,
@@ -109,7 +105,7 @@ def create_wrapper_async(name: str) -> Callable[[Callable], Callable]:
     return wrapper
 
 
-class NewAnthropicSyncIteratorWrapper(WrappedContextManagerSyncGenerator):
+class AnthropicSyncIterableContext(SyncIterableContext):
     def __stream_text__(self) -> Iterator[str]:
         for chunk in self:  # type: ignore
             if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":  # type: ignore
@@ -120,7 +116,7 @@ class NewAnthropicSyncIteratorWrapper(WrappedContextManagerSyncGenerator):
         return self.__stream_text__()
 
 
-class NewAnthropicAsyncIteratorWrapper(WrappedContextManagerAsyncGenerator):
+class AnthropicAsyncIterableContext(AsyncIterableContext):
     def __stream_text__(self) -> AsyncIterator[str]:
         return self.__async_stream_text__()
 
@@ -142,7 +138,7 @@ def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
             callbacks=[AnthropicStreamingCallback()],
             # __should_accumulate=should_accumulate,
             __should_accumulate=lambda _: True,
-            __custom_iterator_wrapper=NewAnthropicSyncIteratorWrapper,
+            __custom_iterator_wrapper=AnthropicSyncIterableContext,
         )
 
     return wrapper
@@ -155,7 +151,7 @@ def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
             name=name,
             callbacks=[AnthropicStreamingCallback()],
             __should_accumulate=lambda _: True,
-            __custom_iterator_wrapper=NewAnthropicAsyncIteratorWrapper,
+            __custom_iterator_wrapper=AnthropicAsyncIterableContext,
         )
 
     return wrapper

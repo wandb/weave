@@ -15,6 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 class Callback(Protocol):
+    """A callback that can be registered with an op to handle lifecycle events.
+
+    You can inherit from this class, or implement part of the protocol to add lifecycle
+    hooks to an op.
+    """
+
     def before_call_start(
         self, inputs: dict, parent: Call | None, attributes: dict | None
     ) -> None: ...
@@ -24,6 +30,17 @@ class Callback(Protocol):
 
 
 class Reducer(Protocol, Generic[T, Acc]):
+    """Reducers are callables that take a value and an accumulator and add them together.
+
+    Reducers must have an 'acc' parameter with a default value.
+
+    This is useful when the output of an op is iterable and you want to aggregate the
+    results into a single value.  For example, you might use a reducer to:
+        - Accumulate text chunks into a single string; or
+        - Sum up a list of numbers; or
+        - Collect your generator output into a list.
+    """
+
     def __call__(self, val: T, acc: Acc) -> Acc: ...
 
 
@@ -62,6 +79,12 @@ class DebugCallback:
 
 
 class LifecycleHandler:
+    """Handles running callbacks for lifecycle events.
+
+    NOTE: The handler is unique per op, not per execution.  It's not safe to store
+    execution-level state on the handler.  Instead, you should accumulate on the objects
+    directly (e.g. accumulate into the call.output)."""
+
     def __init__(self, callbacks: list[Callback] | None = None):
         self.callbacks = callbacks or []
         self.has_finished = False
@@ -77,6 +100,8 @@ class LifecycleHandler:
                         f"Error in callback {callback.__class__.__name__}.{event}"
                     )
 
+    # TODO: Convert into actual methods...
+    # Previously this was called on_input_handler
     before_call_start = partialmethod(run_event, "before_call_start")
     before_yield = partialmethod(run_event, "before_yield")
     before_call_finish = partialmethod(run_event, "before_call_finish")
