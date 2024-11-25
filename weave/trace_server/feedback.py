@@ -123,7 +123,7 @@ def validate_feedback_create_req(
         # 3. Validate the payload against the annotation spec
         value = req.payload["value"]
         spec = data.vals[0]
-        is_valid = AnnotationSpec.model_validate(spec).validate(value)
+        is_valid = AnnotationSpec.model_validate(spec).value_is_valid(value)
         if not is_valid:
             raise InvalidRequest("Feedback payload does not match annotation spec")
     if req.runnable_ref:

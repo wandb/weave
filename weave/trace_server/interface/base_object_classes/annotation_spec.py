@@ -1,7 +1,7 @@
 from typing import Any, Optional
 
 import jsonschema
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, create_model, field_validator, model_validator
 from pydantic.fields import FieldInfo
 
 from weave.trace_server.interface.base_object_classes import base_object_def
@@ -51,8 +51,26 @@ class AnnotationSpec(base_object_def.BaseObject):
         field_schema = data["field_schema"]
 
         # Handle Pydantic Field
-        if isinstance(field_schema, FieldInfo):
-            data["field_schema"] = field_schema.json_schema()
+        if isinstance(field_schema, tuple):
+            if len(field_schema) != 2:
+                raise ValueError("Expected a tuple of length 2")
+            annotation, field = field_schema
+            if not isinstance(annotation, type):
+                raise TypeError("Expected annotation to be a type")
+            if not isinstance(field, FieldInfo):
+                raise TypeError("Expected field to be a Pydantic Field")
+
+            # Create a temporary model to leverage Pydantic's schema generation
+            TempModel = create_model("TempModel", field=(annotation, field))
+
+            schema = TempModel.model_json_schema()["properties"]["field"]
+
+            if (
+                "title" in schema and schema["title"] == "Field"
+            ):  # default title for Field
+                schema.pop("title")
+
+            data["field_schema"] = schema
             return data
 
         # Handle Pydantic model
@@ -73,7 +91,7 @@ class AnnotationSpec(base_object_def.BaseObject):
             pass  # we don't care that `None` does not conform
         return schema
 
-    def validate(self, payload: Any) -> bool:
+    def value_is_valid(self, payload: Any) -> bool:
         """
         Validates a payload against this annotation spec's schema.
 
