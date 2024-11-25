@@ -4,6 +4,7 @@
  */
 import React from 'react';
 
+import {maybePluralizeWord} from '../../../../../core/util/string';
 import {parseRef} from '../../../../../react';
 import {UserLink} from '../../../../UserLink';
 import {SmallRef} from '../../Browse2/SmallRef';
@@ -49,11 +50,26 @@ export const CompareGridCellValue = ({
     if (RESOLVED_REF_KEY in value) {
       return <SmallRef objRef={parseRef(value[RESOLVED_REF_KEY])} />;
     }
-    // We don't need to show anything for this row because user can expand it to compare child keys
-    return null;
+    const objSize = Object.keys(value).length;
+    return (
+      <div className="flex items-center gap-4">
+        <ValueViewPrimitive>object</ValueViewPrimitive>{' '}
+        <span>
+          {objSize.toLocaleString()} {maybePluralizeWord(objSize, 'key')}
+        </span>
+      </div>
+    );
   }
   if (valueType === 'array') {
-    return <ValueViewPrimitive>array</ValueViewPrimitive>;
+    const arrSize = value.length;
+    return (
+      <div className="flex items-center gap-4">
+        <ValueViewPrimitive>array</ValueViewPrimitive>{' '}
+        <span>
+          {arrSize.toLocaleString()} {maybePluralizeWord(arrSize, 'item')}
+        </span>
+      </div>
+    );
   }
 
   if (valueType === 'number') {
