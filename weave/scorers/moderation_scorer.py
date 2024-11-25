@@ -51,7 +51,7 @@ class OpenAIModerationScorer(LLMScorer):
             model=self.model_id,
             input=output,
         )
-        reponse = response.results[0]
+        response = response.results[0]
         categories = {
             k: v
             for k, v in response.categories
