@@ -111,7 +111,6 @@ export const addCostsToCallResults = (
           ...call.traceCall,
           summary: {
             ...call.traceCall?.summary,
-            usage: costDict[call.callId].traceCall?.summary?.usage,
             weave: {
               ...call.traceCall?.summary?.weave,
               costs: costDict[call.callId].traceCall?.summary?.weave?.costs,
