@@ -130,18 +130,6 @@ class ContainsSpec(BaseModel):
     case_insensitive: typing.Optional[bool] = False
 
 
-# Update the models to include the recursive types
-LiteralOperation.model_rebuild()
-GetFieldOperator.model_rebuild()
-AndOperation.model_rebuild()
-OrOperation.model_rebuild()
-NotOperation.model_rebuild()
-EqOperation.model_rebuild()
-GtOperation.model_rebuild()
-GteOperation.model_rebuild()
-InOperation.model_rebuild()
-ContainsOperation.model_rebuild()
-
 # Convenience type for all Operands and Operations
 Operation = typing.Union[
     AndOperation,
@@ -153,9 +141,19 @@ Operation = typing.Union[
     InOperation,
     ContainsOperation,
 ]
-Operand = typing.Union[
-    LiteralOperation, GetFieldOperator, ConvertOperation, "Operation"
-]
+Operand = typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, Operation]
+
+# Update the models to include the recursive types
+LiteralOperation.model_rebuild()
+GetFieldOperator.model_rebuild()
+AndOperation.model_rebuild()
+OrOperation.model_rebuild()
+NotOperation.model_rebuild()
+EqOperation.model_rebuild()
+GtOperation.model_rebuild()
+GteOperation.model_rebuild()
+InOperation.model_rebuild()
+ContainsOperation.model_rebuild()
 
 
 class Query(BaseModel):
