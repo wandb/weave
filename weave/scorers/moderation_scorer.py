@@ -110,7 +110,7 @@ class RollingWindowScorer(Scorer):
         """
         attention_mask = (input_ids != 0).long()
         outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)
-        predictions = outputs.argmax(dim=-1).squeeze().tolist()
+        predictions = outputs.logits.argmax(dim=-1).squeeze().tolist()
         if isinstance(predictions, int):
             return [predictions]
         return predictions
@@ -251,7 +251,7 @@ class ToxicScorer(RollingWindowScorer):
         flagged: bool = False
         predictions: list[float] = self.predict(output)
 
-        if (sum(predictions) > self.total_threshold) or any(
+        if (sum(predictions) >= self.total_threshold) or any(
             o >= self.category_threshold for o in predictions
         ):
             flagged = True
