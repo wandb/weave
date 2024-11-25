@@ -116,8 +116,7 @@ class LlamaGuard(Scorer):
             return_dict_in_generate=True,
             pad_token_id=0,
             top_p=None,
-            do_sample=True,
-            temperature=0.0,
+            do_sample=False, # greedy decoding
             output_logits=True,
         )
         generated_tokens = llamaguard_output.sequences[:, prompt_len:]
