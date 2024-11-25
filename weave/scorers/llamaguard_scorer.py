@@ -66,23 +66,6 @@ class LlamaGuard(Scorer):
         )
         self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
 
-    def postprocess(self, output: str, unsafe_score: float) -> dict[str, Any]:
-        """
-        Postprocess the output of the LlamaGuard model. The output is in the following format:
-        "unsafe" if the output is unsafe, otherwise "safe". If unsafe, the category is also returned.
-        Also includes the probability score for "unsafe".
-        """
-        safe = True
-        category = None
-        if "unsafe" in output.lower():
-            safe = False
-
-            match = re.search(r"S(\d+)", output)
-            if match:
-                category_key = f"S{match.group(1)}"
-                category = f"{category_key}: {self._CATEGORY_TYPES.get(category_key)}"
-        return {"safe": safe, "category": category, "unsafe_score": unsafe_score}
-
     @weave.op
     def score_messages(
         self,
@@ -141,6 +124,31 @@ class LlamaGuard(Scorer):
                 "content": prompt,
             }
         ]
+
+    def postprocess(self, output: str, unsafe_score: float) -> dict[str, Any]:
+        """
+        Postprocess the output of the LlamaGuard model. The output is in the following format:
+        "unsafe" if the output is unsafe, otherwise "safe". If unsafe, the category is also returned.
+        Also includes the probability score for "unsafe".
+        """
+        safe = True
+        category = None
+        if "unsafe" in output.lower():
+            safe = False
+            # Extract all S1, S2 etc categories from output
+            matches = re.findall(r"S(\d+)", output)
+            categories = {}
+            if matches:
+                for match in matches:
+                    category_key = f"S{match}"
+                    if category_key in self._CATEGORY_TYPES:
+                        category_name = self._CATEGORY_TYPES[category_key]
+                        categories[category_name] = True
+        return {
+            "safe": safe,
+            "categories": categories if not safe else {},
+            "unsafe_score": unsafe_score
+        }
 
     @weave.op
     def score(
