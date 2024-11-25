@@ -170,13 +170,13 @@ export const useProjectSidebar = (
             key: 'dividerWithinWeave-2',
             isShown: isWeaveOnly,
           },
-          // {
-          //   type: 'button' as const,
-          //   name: 'Prompts',
-          //   slug: 'weave/prompts',
-          //   isShown: showWeaveSidebarItems || isShowAll,
-          //   iconName: IconNames.ForumChatBubble,
-          // },
+          {
+            type: 'button' as const,
+            name: 'Prompts',
+            slug: 'weave/prompts',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.ForumChatBubble,
+          },
           {
             type: 'button' as const,
             name: 'Models',
@@ -213,6 +213,13 @@ export const useProjectSidebar = (
             iconName: IconNames.CubeContainer,
           },
           {
+            type: 'button' as const,
+            name: 'Playground',
+            slug: 'weave/playground',
+            isShown: isWeaveOnly,
+            iconName: IconNames.RobotServiceMember,
+          },
+          {
             type: 'menuPlaceholder' as const,
             // name: 'More',
             // slug: 'moreWeave',
@@ -224,6 +231,7 @@ export const useProjectSidebar = (
               'weave/scorers',
               'weave/operations',
               'weave/objects',
+              'weave/playground',
             ],
           },
         ];
