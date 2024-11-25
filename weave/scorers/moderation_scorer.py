@@ -240,7 +240,7 @@ class ToxicScorer(RollingWindowScorer):
         if not torch.cuda.is_available() and self.device == "cuda":
             raise ValueError("CUDA is not available")
         self._model = AutoModelForSequenceClassification.from_pretrained(
-            self.model_name, device_map=self.device
+            self.model_name, device_map=self.device, trust_remote_code=True
         )
         self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         print(f"Model and tokenizer loaded on {self.device}")
