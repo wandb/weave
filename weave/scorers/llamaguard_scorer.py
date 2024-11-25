@@ -84,7 +84,7 @@ class LlamaGuard(Scorer):
         return {"safe": safe, "category": category, "unsafe_score": unsafe_score}
 
     @weave.op
-    async def score_messages(
+    def score_messages(
         self,
         messages: list[dict[str, Any]],
         categories: Optional[dict[str, str]] = None,
@@ -143,7 +143,7 @@ class LlamaGuard(Scorer):
         ]
 
     @weave.op
-    async def score(
+    def score(
         self,
         output: str,
         categories: Optional[dict[str, str]] = None,
@@ -151,7 +151,7 @@ class LlamaGuard(Scorer):
     ) -> dict[str, Any]:
         excluded_category_keys = excluded_category_keys or []
         messages = self.default_format_messages(prompt=output)
-        response, unsafe_score = await self.score_messages(
+        response, unsafe_score = self.score_messages(
             messages=messages,
             categories=categories,
             excluded_category_keys=excluded_category_keys,
