@@ -166,7 +166,9 @@ const ModFrame: React.FC<{entity: string; project: string; modId: string}> = ({
       title="Weave Mod"
       allow="accelerometer; ambient-light-sensor; autoplay; battery; camera; clipboard-read; clipboard-write; display-capture; document-domain; encrypted-media; fullscreen; geolocation; gyroscope; layout-animations; legacy-image-formats; magnetometer; microphone; midi; oversized-images; payment; picture-in-picture; publickey-credentials-get; sync-xhr; usb; vr; wake-lock; xr-spatial-tracking"
       sandbox="allow-downloads allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-storage-access-by-user-activation"
-      src={`/service-redirect/${entity}/${project}/${encodeURIComponent(
+      src={`${
+        window.WEAVE_CONFIG.WANDB_BASE_URL
+      }/service-redirect/${entity}/${project}/${encodeURIComponent(
         modId
       )}/mod?purl=${purl}`}
     />
