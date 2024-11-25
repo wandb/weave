@@ -127,6 +127,9 @@ class Traceable:
 
 def pydantic_getattribute(self: BaseModel, name: str) -> Any:
     attribute = object.__getattribute__(self, name)
+    if name.startswith("__") and name.endswith("__"):
+        return attribute
+
     if name not in object.__getattribute__(self, "model_fields"):
         return attribute
     if name == "ref":
