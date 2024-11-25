@@ -41,6 +41,16 @@ class LlamaGuard(Scorer):
         "S13": "Elections",
         "S14": "Code Interpreter Abuse",
     }
+    _generate_config: dict[str, Any] = dict(
+            max_new_tokens=20,
+            output_scores=True,
+            return_dict_in_generate=True,
+            pad_token_id=0,
+            top_p=None,
+            do_sample=True,  # greedy decoding
+            temperature=0.1,
+            output_logits=True,
+    )
 
     def model_post_init(self, __context: Any) -> None:
         """
@@ -94,14 +104,7 @@ class LlamaGuard(Scorer):
         prompt_len = input_ids.shape[1]
         llamaguard_output = self._model.generate(
             input_ids=input_ids,
-            max_new_tokens=20,
-            output_scores=True,
-            return_dict_in_generate=True,
-            pad_token_id=0,
-            top_p=None,
-            do_sample=False,  # greedy decoding
-            temperature=None,
-            output_logits=True,
+            **self._generate_config,
         )
         generated_tokens = llamaguard_output.sequences[:, prompt_len:]
 
@@ -133,7 +136,6 @@ class LlamaGuard(Scorer):
         Also includes the probability score for "unsafe".
         """
         safe = True
-        category = None
         if "unsafe" in output.lower():
             safe = False
             # Extract all S1, S2 etc categories from output
