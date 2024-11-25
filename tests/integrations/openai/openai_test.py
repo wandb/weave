@@ -123,7 +123,7 @@ def test_openai_stream_quickstart(client: weave.trace.weave_client.WeaveClient) 
 
     all_content = ""
     for chunk in response:
-        if chunk.choices and chunk.choices[0].delta.content:
+        if chunk.choices[0].delta.content:
             all_content += chunk.choices[0].delta.content
 
     calls = list(client.calls())
@@ -138,7 +138,6 @@ def test_openai_stream_quickstart(client: weave.trace.weave_client.WeaveClient) 
     assert call.started_at < call.ended_at  # type: ignore
 
     output = call.output
-    print(f">>> {output=}")
     assert output["model"] == "gpt-4o-2024-05-13"
     assert output["object"] == "chat.completion"
 
