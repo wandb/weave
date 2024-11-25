@@ -21,7 +21,7 @@ export const PlaygroundPage = (props: PlaygroundPageProps) => {
       title={
         <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
           Playground
-          <Pill label="Preview" color="moon" showIcon={false} />
+          <Pill label="Preview" color="moon" />
         </Box>
       }
       hideTabsIfSingle
