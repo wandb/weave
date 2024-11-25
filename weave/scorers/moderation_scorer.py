@@ -37,20 +37,17 @@ class OpenAIModerationScorer(LLMScorer):
     def validate_openai_client(cls, v: _LLM_CLIENTS) -> _LLM_CLIENTS:
         # Method implementation
         try:
-            from openai import (  # Ensure these are the correct imports
-                AsyncOpenAI,
-                OpenAI,
-            )
+            from openai import AsyncOpenAI
         except ImportError:
             raise ValueError("Install openai to use this scorer")
 
-        if not isinstance(v, (OpenAI, AsyncOpenAI)):
-            raise TypeError("Moderation scoring only works with OpenAI or AsyncOpenAI")
+        if not isinstance(v, AsyncOpenAI):
+            raise TypeError("Moderation scoring only works with AsyncOpenAI")
         return v
 
     @weave.op
-    def score(self, output: Any) -> dict:
-        response = self.client.moderations.create(
+    async def score(self, output: Any) -> dict:
+        response = await self.client.moderations.create(
             model=self.model_id,
             input=output,
         ).results[0]
