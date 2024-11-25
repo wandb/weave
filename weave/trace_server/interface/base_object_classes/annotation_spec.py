@@ -6,11 +6,13 @@ from pydantic.fields import FieldInfo
 
 from weave.trace_server.interface.base_object_classes import base_object_def
 
+SUPPORTED_PRIMITIVES = (int, float, bool, str)
+
 
 class AnnotationSpec(base_object_def.BaseObject):
     field_schema: dict[str, Any] = Field(
         default={},
-        description="Expected to be valid JSON Schema. Can be provided as a dict, a Pydantic model class, or a Pydantic Field",
+        description="Expected to be valid JSON Schema. Can be provided as a dict, a Pydantic model class, a tuple of a primitive type and a Pydantic Field, or primitive type",
         examples=[
             # String feedback
             {"type": "string", "maxLength": 100},
@@ -50,18 +52,25 @@ class AnnotationSpec(base_object_def.BaseObject):
 
         field_schema = data["field_schema"]
 
+        temp_field_tuple = None
         # Handle Pydantic Field
         if isinstance(field_schema, tuple):
             if len(field_schema) != 2:
                 raise ValueError("Expected a tuple of length 2")
             annotation, field = field_schema
-            if not isinstance(annotation, type):
-                raise TypeError("Expected annotation to be a type")
+            if (
+                not isinstance(annotation, type)
+            ) or annotation not in SUPPORTED_PRIMITIVES:
+                raise TypeError("Expected annotation to be a primitive type")
             if not isinstance(field, FieldInfo):
                 raise TypeError("Expected field to be a Pydantic Field")
+            temp_field_tuple = (annotation, field)
+        elif field_schema in SUPPORTED_PRIMITIVES:
+            temp_field_tuple = (field_schema, Field())
 
+        if temp_field_tuple is not None:
             # Create a temporary model to leverage Pydantic's schema generation
-            TempModel = create_model("TempModel", field=(annotation, field))
+            TempModel = create_model("TempModel", field=temp_field_tuple)
 
             schema = TempModel.model_json_schema()["properties"]["field"]
 
