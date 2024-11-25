@@ -85,6 +85,7 @@ import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
+  CompareTracesTableButton,
   ExportSelector,
   PaginationButtons,
   RefreshButton,
@@ -860,7 +861,7 @@ export const CallsTable: FC<{
               }}
             />
           )}
-          {isEvaluateTable && (
+          {isEvaluateTable ? (
             <CompareEvaluationsTableButton
               onClick={() => {
                 history.push(
@@ -873,6 +874,15 @@ export const CallsTable: FC<{
                 );
               }}
               disabled={selectedCalls.length === 0}
+            />
+          ) : (
+            <CompareTracesTableButton
+              onClick={() => {
+                history.push(
+                  router.compareCallsUri(entity, project, selectedCalls)
+                );
+              }}
+              disabled={selectedCalls.length < 2}
             />
           )}
           {!isReadonly && selectedCalls.length !== 0 && (
