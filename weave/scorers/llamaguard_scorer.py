@@ -10,7 +10,9 @@ if TYPE_CHECKING:
     from torch import Tensor
 
 
-class LlamaGuard(Scorer):
+# https://github.com/meta-llama/llama-recipes/blob/main/src/llama_recipes/inference/prompt_format_utils.py
+# https://github.com/meta-llama/llama-recipes/blob/main/recipes/responsible_ai/llama_guard/llama_guard_text_and_vision_inference.ipynb
+class LlamaGuard(weave.Scorer):
     """
     Use Meta's LlamaGuard to check if the model output is safe.
 
@@ -47,8 +49,8 @@ class LlamaGuard(Scorer):
             return_dict_in_generate=True,
             pad_token_id=0,
             top_p=None,
-            do_sample=True,  # greedy decoding
-            temperature=0.1,
+            do_sample=False,  # greedy decoding
+            temperature=None,
             output_logits=True,
     )
 
@@ -77,30 +79,24 @@ class LlamaGuard(Scorer):
         self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
 
     @weave.op
-    def score_messages(
+    def tokenize(
         self,
         messages: list[dict[str, Any]],
         categories: Optional[dict[str, str]] = None,
         excluded_category_keys: Optional[list[str]] = None,
     ) -> tuple[str, float]:
         """Score a list of messages in a conversation."""
-        excluded_category_keys = excluded_category_keys or []
-        if categories is not None:
-            input_ids = self._tokenizer.apply_chat_template(
-                messages,
-                return_tensors="pt",
-                categories=categories,
-                excluded_category_keys=excluded_category_keys,
-            ).to(self.device)
-        else:
-            input_ids = self._tokenizer.apply_chat_template(
-                messages,
-                return_tensors="pt",
-                excluded_category_keys=excluded_category_keys,
-            ).to(self.device)
-        return self._generate(input_ids)
+        input_ids = self._tokenizer.apply_chat_template(
+            messages,
+            return_tensors="pt",
+            categories=categories if categories else {},
+            excluded_category_keys=excluded_category_keys,
+        ).to(self.device)
+        print(self._tokenizer.decode(input_ids[0], skip_special_tokens=False))
+        return input_ids
 
-    def _generate(self, input_ids: "Tensor") -> tuple[str, float]:
+    @weave.op
+    def _generate(self, input_ids: "torch.Tensor") -> tuple[str, float]:
         prompt_len = input_ids.shape[1]
         llamaguard_output = self._model.generate(
             input_ids=input_ids,
@@ -118,17 +114,25 @@ class LlamaGuard(Scorer):
         )
         return response, unsafe_score
 
+    @weave.op
     def default_format_messages(self, prompt: str) -> list[dict[str, Any]]:
         """Override this method to format the prompt in a custom way.
         It should return a list of dictionaries with the following alternative keys: "role" and "content".
         """
-        return [
+        conversation = [
             {
                 "role": "user",
-                "content": prompt,
+                "content": [
+                    {
+                        "type": "text", 
+                        "text": prompt,
+                    },
+                ],
             }
         ]
+        return conversation
 
+    @weave.op
     def postprocess(self, output: str, unsafe_score: float) -> dict[str, Any]:
         """
         Postprocess the output of the LlamaGuard model. The output is in the following format:
@@ -162,9 +166,10 @@ class LlamaGuard(Scorer):
     ) -> dict[str, Any]:
         excluded_category_keys = excluded_category_keys or []
         messages = self.default_format_messages(prompt=output)
-        response, unsafe_score = self.score_messages(
+        input_ids = self.tokenize(
             messages=messages,
             categories=categories,
             excluded_category_keys=excluded_category_keys,
         )
+        response, unsafe_score = self._generate(input_ids)
         return self.postprocess(response, unsafe_score)
