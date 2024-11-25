@@ -17,7 +17,7 @@ export type Config = z.infer<typeof ConfigSchema>;
 
 export const AnnotationSpecSchema = z.object({
   description: z.union([z.null(), z.string()]).optional(),
-  json_schema: z.record(z.string(), z.any()).optional(),
+  field_schema: z.record(z.string(), z.any()).optional(),
   name: z.union([z.null(), z.string()]).optional(),
   op_scope: z.union([z.array(z.string()), z.null()]).optional(),
   unique_among_creators: z.boolean().optional(),

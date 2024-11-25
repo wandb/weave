@@ -4,6 +4,7 @@ import pytest
 
 import weave
 from tests.trace.util import client_is_sqlite
+from weave.flow.annotation_spec import AnnotationSpec
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
@@ -82,8 +83,11 @@ def test_annotation_feedback(client: WeaveClient) -> None:
     column_name = "column_name"
     feedback_type = f"wandb.annotation.{column_name}"
     weave_ref = f"weave:///{project_id}/call/cal_id_123"
-    annotation_ref = f"weave:///{project_id}/object/{column_name}:obj_id_123"
+
     payload = {"value": 1}
+
+    ref = weave.publish(AnnotationSpec(name=column_name, field_schema=int))
+    annotation_ref = ref.uri()
 
     # Case 1: Errors with no name in type (dangle or char len 0)
     with pytest.raises(InvalidRequest):
