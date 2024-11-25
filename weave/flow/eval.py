@@ -116,6 +116,7 @@ class Evaluation(Object):
     scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None
     trials: int = 1
+    streamlit_mode: bool = False
 
     # internal attr to track whether to use the new `output` or old `model_output` key for outputs
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
@@ -466,6 +467,10 @@ class Evaluation(Object):
         dataset = cast(Dataset, self.dataset)
         _rows = dataset.rows
         trial_rows = list(_rows) * self.trials
+        streamlit_progressbar = None
+        if self.streamlit_mode:
+            import streamlit as st
+            streamlit_progressbar = st.progress(0, text=f"Evaluating")
         with Progress() as progress:
             task = progress.add_task("Evaluating", total=len(trial_rows))
             async for example, eval_row in util.async_foreach(
@@ -473,6 +478,14 @@ class Evaluation(Object):
             ):
                 n_complete += 1
                 progress.update(task, advance=1)
+                if self.streamlit_mode:
+                    progress_percentage = min(
+                        100, max(0, int((n_complete / len(trial_rows)) * 100))
+                    )
+                    streamlit_progressbar.progress(
+                        progress_percentage,
+                        text=f"Evaluating ({n_complete} / {len(trial_rows)})",
+                    )
                 # status.update(
                 #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
                 # )
