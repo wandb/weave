@@ -127,6 +127,9 @@ class Traceable:
 
 def pydantic_getattribute(self: BaseModel, name: str) -> Any:
     attribute = object.__getattribute__(self, name)
+
+    # Starting in pydantic 2.10.0, this handling is needed otherwise getattribute will
+    # infinitely recurse.
     if name.startswith("__") and name.endswith("__"):
         return attribute
 
