@@ -498,6 +498,8 @@ class Evaluation(Object):
                     if scorer_name not in eval_row["scores"]:
                         eval_row["scores"][scorer_name] = {}
                 eval_rows.append(eval_row)
+        
+        return EvaluationResults(rows=weave.Table(eval_rows))
 
     @weave.op()
     async def evaluate(self, model: Union[Callable, Model]) -> dict:
