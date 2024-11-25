@@ -569,9 +569,13 @@ def op(
     postprocess_output: PostprocessOutputFunc | None = None,
     callbacks: list[Callback] | None = None,
     reducers: list[Reducer] | None = None,
-    # escape hatch for integrations -- not for general use
+    # == Below are escape hatches for integrations -- not for general use ==
+    # Force op execution down the accumulator path.  This is useful when the decorated
+    # function does not otherwise pass the internal should_accumulate check.
     __should_accumulate: Callable[[Call], bool] | None = None,
-    __custom_iterator_wrapper: Callable[[Any], Any] | None = None,
+    # If the op returns an iterator-like object but it doesn't match the basic iterator
+    # protocol, you can use this to convert it into an iterator that does.
+    __custom_iterator_wrapper: Callable[[Op, Any, Any, Call, bool], Any] | None = None,
 ) -> Callable[[Callable], Op] | Op:
     """
     A decorator to weave op-ify a function or method.  Works for both sync and async.
