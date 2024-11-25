@@ -50,7 +50,8 @@ class OpenAIModerationScorer(LLMScorer):
         response = await self.client.moderations.create(
             model=self.model_id,
             input=output,
-        ).results[0]
+        )
+        reponse = response.results[0]
         categories = {
             k: v
             for k, v in response.categories
