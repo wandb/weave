@@ -10,11 +10,15 @@ import {
   MOON_300,
   MOON_800,
 } from '../../../../../../../../common/css/color.styles';
-import {parseRef, WeaveObjectRef} from '../../../../../../../../react';
+import {
+  parseRef,
+  parseRefMaybe,
+  WeaveObjectRef,
+} from '../../../../../../../../react';
 import {Button} from '../../../../../../../Button';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
-import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
+import {SmallRef} from '../../../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../../../filters/common';
 import {isCustomWeaveTypePayload} from '../../../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../../../typeViews/CustomWeaveTypeDispatcher';
@@ -24,15 +28,18 @@ import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {
   buildCompositeMetricsMap,
   CompositeSummaryMetricGroupForKeyPath,
+  DERIVED_SCORER_REF_PLACEHOLDER,
   resolvePeerDimension,
 } from '../../compositeMetricsUtil';
-import {DERIVED_SCORER_REF_PLACEHOLDER} from '../../compositeMetricsUtil';
 import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {EvaluationComparisonState} from '../../ecpState';
 import {MetricDefinition, MetricValueType} from '../../ecpTypes';
-import {metricDefinitionId} from '../../ecpUtil';
-import {getMetricIds} from '../../ecpUtil';
-import {dimensionUnit, flattenedDimensionPath} from '../../ecpUtil';
+import {
+  dimensionUnit,
+  flattenedDimensionPath,
+  getMetricIds,
+  metricDefinitionId,
+} from '../../ecpUtil';
 import {usePeekCall} from '../../hooks';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {

@@ -1,8 +1,7 @@
-import {isWeaveObjectRef} from '@wandb/weave/react';
+import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
 
 import {flattenObjectPreservingWeaveTypes} from '../../../../Browse2/browse2Util';
-import {parseRefMaybe} from '../../../../Browse2/SmallRef';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../../../pages/common/heuristics';
 import {TraceServerClient} from '../../../pages/wfReactInterface/traceServerClient';
 import {TraceObjSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';

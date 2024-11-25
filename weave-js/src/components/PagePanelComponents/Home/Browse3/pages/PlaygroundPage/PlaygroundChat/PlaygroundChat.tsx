@@ -1,24 +1,27 @@
 import {Box, CircularProgress, Divider} from '@mui/material';
 import {MOON_200} from '@wandb/weave/common/css/color.styles';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {SetStateAction, useState} from 'react';
+import React, {useState} from 'react';
 
+import {CallChat} from '../../CallPage/CallChat';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
-import {PlaygroundState, PlaygroundStateKey} from '../types';
+import {PlaygroundContext} from '../PlaygroundContext';
+import {PlaygroundState} from '../types';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
+import {useChatCompletionFunctions} from './useChatCompletionFunctions';
+import {
+  SetPlaygroundStateFieldFunctionType,
+  useChatFunctions,
+} from './useChatFunctions';
 
 export type PlaygroundChatProps = {
   entity: string;
   project: string;
   setPlaygroundStates: (states: PlaygroundState[]) => void;
   playgroundStates: PlaygroundState[];
-  setPlaygroundStateField: (
-    index: number,
-    field: PlaygroundStateKey,
-    value: SetStateAction<PlaygroundState[PlaygroundStateKey]>
-  ) => void;
+  setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
   setSettingsTab: (callIndex: number | null) => void;
   settingsTab: number | null;
 };
@@ -33,9 +36,27 @@ export const PlaygroundChat = ({
   settingsTab,
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLoading, setIsLoading] = useState(false);
-  const chatPercentWidth = 100 / playgroundStates.length;
+
+  const {handleRetry, handleSend} = useChatCompletionFunctions(
+    setPlaygroundStates,
+    setIsLoading,
+    chatText,
+    playgroundStates,
+    entity,
+    project,
+    setChatText
+  );
+
+  const {deleteMessage, editMessage, deleteChoice, editChoice, addMessage} =
+    useChatFunctions(setPlaygroundStateField);
+
+  const handleAddMessage = (role: 'assistant' | 'user', text: string) => {
+    for (let i = 0; i < playgroundStates.length; i++) {
+      addMessage(i, {role, content: text});
+    }
+    setChatText('');
+  };
 
   return (
     <Box
@@ -89,13 +110,15 @@ export const PlaygroundChat = ({
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
+                position: 'relative',
               }}>
               <Box
                 sx={{
                   position: 'absolute',
                   top: '8px',
-                  left: `calc(${idx * chatPercentWidth}% + 8px)`,
-                  width: `calc(${chatPercentWidth}% - 16px)`,
+                  width: 'calc(100% - 16px)',
+                  left: '8px',
+                  right: '8px',
                   zIndex: 10,
                 }}>
                 <PlaygroundChatTopBar
@@ -118,8 +141,33 @@ export const PlaygroundChat = ({
                   paddingX: '16px',
                 }}>
                 <Tailwind>
-                  <div className="mx-auto h-full min-w-[400px] max-w-[800px] pb-8">
-                    Chat
+                  <div className=" mx-auto h-full min-w-[400px] max-w-[800px] pb-8">
+                    {state.traceCall && (
+                      <PlaygroundContext.Provider
+                        value={{
+                          isPlayground: true,
+                          deleteMessage: (messageIndex, responseIndexes) =>
+                            deleteMessage(idx, messageIndex, responseIndexes),
+                          editMessage: (messageIndex, newMessage) =>
+                            editMessage(idx, messageIndex, newMessage),
+                          deleteChoice: choiceIndex =>
+                            deleteChoice(idx, choiceIndex),
+                          addMessage: newMessage => addMessage(idx, newMessage),
+                          editChoice: (choiceIndex, newChoice) =>
+                            editChoice(idx, choiceIndex, newChoice),
+                          retry: (messageIndex: number, isChoice?: boolean) =>
+                            handleRetry(idx, messageIndex, isChoice),
+                          sendMessage: (
+                            role: 'assistant' | 'user' | 'tool',
+                            content: string,
+                            toolCallId?: string
+                          ) => {
+                            handleSend(role, idx, content, toolCallId);
+                          },
+                        }}>
+                        <CallChat call={state.traceCall as TraceCallSchema} />
+                      </PlaygroundContext.Provider>
+                    )}
                   </div>
                 </Tailwind>
               </Box>
@@ -146,8 +194,8 @@ export const PlaygroundChat = ({
         chatText={chatText}
         setChatText={setChatText}
         isLoading={isLoading}
-        onSend={() => {}}
-        onAdd={() => {}}
+        onSend={handleSend}
+        onAdd={handleAddMessage}
       />
     </Box>
   );

@@ -243,7 +243,12 @@ const useCallsNoExpansion = (
   sortBy?: traceServerTypes.SortBy[],
   query?: Query,
   columns?: string[],
-  opts?: {skip?: boolean; refetchOnDelete?: boolean; includeCosts?: boolean}
+  opts?: {
+    skip?: boolean;
+    refetchOnDelete?: boolean;
+    includeCosts?: boolean;
+    includeFeedback?: boolean;
+  }
 ): Loadable<CallSchema[]> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -276,6 +281,7 @@ const useCallsNoExpansion = (
       query,
       columns,
       include_costs: opts?.includeCosts,
+      include_feedback: opts?.includeFeedback,
     };
     const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -294,6 +300,7 @@ const useCallsNoExpansion = (
     limit,
     opts?.skip,
     opts?.includeCosts,
+    opts?.includeFeedback,
     getTsClient,
     offset,
     sortBy,
@@ -380,7 +387,12 @@ const useCalls = (
   query?: Query,
   columns?: string[],
   expandedRefColumns?: Set<string>,
-  opts?: {skip?: boolean; refetchOnDelete?: boolean; includeCosts?: boolean}
+  opts?: {
+    skip?: boolean;
+    refetchOnDelete?: boolean;
+    includeCosts?: boolean;
+    includeFeedback?: boolean;
+  }
 ): Loadable<CallSchema[]> & Refetchable => {
   const calls = useCallsNoExpansion(
     entity,
@@ -920,7 +932,7 @@ const useRootObjectVersions = (
   filter: ObjectVersionFilter,
   limit?: number,
   metadataOnly?: boolean,
-  opts?: {skip?: boolean}
+  opts?: {skip?: boolean; noAutoRefresh?: boolean}
 ): LoadableWithError<ObjectVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -983,8 +995,11 @@ const useRootObjectVersions = (
     if (opts?.skip) {
       return;
     }
+    if (opts?.noAutoRefresh) {
+      return;
+    }
     return getTsClient().registerOnObjectListener(doFetch);
-  }, [getTsClient, doFetch, opts?.skip]);
+  }, [getTsClient, doFetch, opts?.skip, opts?.noAutoRefresh]);
 
   return useMemo(() => {
     if (opts?.skip) {
