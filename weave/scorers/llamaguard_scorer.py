@@ -92,7 +92,6 @@ class LlamaGuard(Scorer):
             categories=categories if categories else {},
             excluded_category_keys=excluded_category_keys,
         ).to(self.device)
-        print(self._tokenizer.decode(input_ids[0], skip_special_tokens=False))
         return input_ids
 
     @weave.op
