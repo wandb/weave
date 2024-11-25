@@ -639,7 +639,6 @@ def op(
                         cast(Op, wrapper),
                         args,
                         kwargs,
-                        should_raise=True,
                         should_accumulate=__should_accumulate,
                     )
                     return res
@@ -651,9 +650,10 @@ def op(
                         cast(Op, wrapper),
                         args,
                         kwargs,
-                        should_raise=True,
                         should_accumulate=__should_accumulate,
                     )
+                    # We must explicitly write this to force python to recognize
+                    # that the wrapper is an async generator
                     async for v in res:
                         yield v
             else:
@@ -664,7 +664,6 @@ def op(
                         cast(Op, wrapper),
                         args,
                         kwargs,
-                        should_raise=True,
                         should_accumulate=__should_accumulate,
                         custom_iterator_wrapper=__custom_iterator_wrapper,
                     )
@@ -894,6 +893,11 @@ class AsyncIterableContext:
 
 @contextmanager
 def _call_context(op: Op, call: Call, should_raise: bool):
+    """Contextmanager to safely handle errors and finish op calls.
+
+    This is used to wrap the execution of an op, and is used to handle errors and finish
+    the call.
+    """
     try:
         yield
     except Exception as e:
@@ -952,8 +956,9 @@ async def _exc_op_async(
     args: Any,
     kwargs: Any,
     weave: WeaveKwargs | None = None,
-    should_raise: bool = False,
+    should_raise: bool = True,
     should_accumulate: Callable[[Call], bool] | None = None,
+    custom_iterator_wrapper: Callable[[Any], Any] | None = None,
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
     call = _placeholder_call()
@@ -985,11 +990,13 @@ async def _exc_op_async(
 
     is_async_iterable = _is_async_iterable(func)
     _should_accumulate = should_accumulate and should_accumulate(call)
-
     if is_async_iterable or _should_accumulate:
-        res = await _wrap_async_generator(
-            op, args, kwargs, call=call, should_raise=should_raise
-        )
+        if custom_iterator_wrapper:
+            res = await custom_iterator_wrapper(op, args, kwargs, call, should_raise)
+        else:
+            res = await _wrap_async_generator(
+                op, args, kwargs, call=call, should_raise=should_raise
+            )
     else:
         # regular async func
         with _call_context(op, call, should_raise):
@@ -1004,10 +1011,11 @@ def _exc_op(
     args: Any,
     kwargs: Any,
     weave: WeaveKwargs | None = None,
-    should_raise: bool = False,
+    should_raise: bool = True,
     should_accumulate: Callable[[Call], bool] | None = None,
     custom_iterator_wrapper: Callable[[Any], Any] | None = None,
 ) -> tuple[Any, Call]:
+    """Executes an op and calls with its relevant lifecycle hooks."""
     func = op.resolve_fn
     call = _placeholder_call()
 

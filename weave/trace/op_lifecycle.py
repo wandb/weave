@@ -21,6 +21,13 @@ class Callback(Protocol):
     hooks to an op.
     """
 
+    # TODO: Not sure if we should add a ctx object in the signature to store all state?
+    # Then it might look something like:
+    # def before_call_start(self, ctx: dict[str, Any]) -> None: ...
+    # def before_yield(self, ctx: dict[str, Any], value: Any) -> None: ...
+    # def before_call_finish(self, ctx: dict[str, Any]) -> None: ...
+    # def after_error(self, ctx: dict[str, Any], error: Exception) -> None: ...
+
     def before_call_start(
         self, inputs: dict, parent: Call | None, attributes: dict | None
     ) -> None: ...
@@ -87,7 +94,9 @@ class LifecycleHandler:
 
     def __init__(self, callbacks: list[Callback] | None = None):
         self.callbacks = callbacks or []
-        self.has_finished = False
+        self.has_finished = (
+            False  # TODO: This doesn't work atm.  May need to be put into a ctx obj?
+        )
 
     def run_event(self, event: str, *args: Any, **kwargs: Any) -> None:
         for callback in self.callbacks:
