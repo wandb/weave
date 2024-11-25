@@ -28,6 +28,7 @@ from weave.trace.refs import (
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
+from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.sqlite_trace_server import (
     NotFoundError as sqliteNotFoundError,
 )
@@ -88,15 +89,15 @@ def test_table_update(client):
 
     table_create_res = client.server.table_update(
         tsi.TableUpdateReq.model_validate(
-            dict(
-                project_id=client._project_id(),
-                base_digest=table_create_res.digest,
-                updates=[
+            {
+                "project_id": client._project_id(),
+                "base_digest": table_create_res.digest,
+                "updates": [
                     {"insert": {"index": 1, "row": {"val": 4}}},
                     {"pop": {"index": 0}},
                     {"append": {"row": {"val": 5}}},
                 ],
-            )
+            }
         )
     )
     final_data = [*data]
@@ -128,7 +129,7 @@ def test_table_update(client):
 def test_table_append(server):
     table_ref = server.new_table([1, 2, 3])
     new_table_ref, item_id = server.table_append(table_ref, 4)
-    assert list(r.val for r in server.table_query(new_table_ref)) == [1, 2, 3, 4]
+    assert [r.val for r in server.table_query(new_table_ref)] == [1, 2, 3, 4]
 
 
 @pytest.mark.skip()
@@ -137,7 +138,7 @@ def test_table_remove(server):
     table_ref1, item_id2 = server.table_append(table_ref0, 2)
     table_ref2, item_id3 = server.table_append(table_ref1, 3)
     table_ref3 = server.table_remove(table_ref2, item_id2)
-    assert list(r.val for r in server.table_query(table_ref3)) == [1, 3]
+    assert [r.val for r in server.table_query(table_ref3)] == [1, 3]
 
 
 @pytest.mark.skip()
@@ -153,7 +154,7 @@ def test_new_val_with_list(server):
     table_ref = server_val["a"]
     assert isinstance(table_ref, chobj.TableRef)
     table_val = server.table_query(table_ref)
-    assert list(r.val for r in table_val) == [1, 2, 3]
+    assert [r.val for r in table_val] == [1, 2, 3]
 
 
 @pytest.mark.skip()
@@ -674,14 +675,7 @@ def test_save_unknown_type(client):
     obj = SomeUnknownThing(3)
     ref = client._save_object(obj, "my-np-array")
     obj2 = client.get(ref)
-    assert obj2 == {
-        "__class__": {
-            "module": "test_weave_client",
-            "qualname": "test_save_unknown_type.<locals>.SomeUnknownThing",
-            "name": "SomeUnknownThing",
-        },
-        "a": 3,
-    }
+    assert obj2 == repr(obj)
 
 
 def test_save_model(client):
@@ -753,8 +747,8 @@ def test_evaluate(client):
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 
     @weave.op()
-    async def score(target, model_output):
-        return target == model_output
+    async def score(target, output):
+        return target == output
 
     evaluation = Evaluation(
         name="my-eval",
@@ -763,7 +757,7 @@ def test_evaluate(client):
     )
     result = asyncio.run(evaluation.evaluate(model_predict))
     expected_eval_result = {
-        "model_output": {"mean": 9.5},
+        "output": {"mean": 9.5},
         "score": {"true_count": 1, "true_fraction": 0.5},
     }
     assert result == expected_eval_result
@@ -863,8 +857,8 @@ def test_nested_ref_is_inner(client):
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 
     @weave.op()
-    async def score(target, model_output):
-        return target == model_output
+    async def score(target, output):
+        return target == output
 
     evaluation = Evaluation(
         name="my-eval",
@@ -1527,3 +1521,26 @@ async def test_op_calltime_display_name(client):
     assert len(calls) == 1
     call = calls[0]
     assert call.display_name == "custom_display_name"
+
+
+def test_long_display_names_are_elided(client):
+    @weave.op(call_display_name="a" * 2048)
+    def func():
+        pass
+
+    # The display name is correct client side
+    _, call = func.call()
+    assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
+
+    # The display name is correct server side
+    calls = list(func.calls())
+    call = calls[0]
+    assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
+
+    # Calling set_display_name is correct
+    call.set_display_name("b" * 2048)
+    assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
+
+    calls = list(func.calls())
+    call = calls[0]
+    assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH

@@ -1,4 +1,53 @@
 import {Query} from './traceServerClientInterface/query';
+type ExtraKeysAllowed = {
+  [key: string]: any;
+};
+
+type WeaveSummarySchema = {
+  costs?: {[key: string]: LLMCostSchema};
+  latency_ms?: number; // latency in milliseconds
+} & ExtraKeysAllowed;
+
+export type LLMUsageSchema = {
+  // Should collapse prompt and input? Ideally yes, but
+  // back compat is a concern.
+  prompt_tokens?: number;
+  input_tokens?: number;
+  // Should collapse completion and output? Ideally yes, but
+  // back compat is a concern.
+  completion_tokens?: number;
+  output_tokens?: number;
+  requests?: number;
+  total_tokens?: number;
+} & ExtraKeysAllowed;
+
+export type LLMCostSchema = LLMUsageSchema & {
+  loading?: boolean;
+  // Cost for request
+  prompt_tokens_total_cost?: number;
+  completion_tokens_total_cost?: number;
+
+  // Cost per unit
+  prompt_token_cost?: number;
+  completion_token_cost?: number;
+  prompt_token_cost_unit?: string;
+  completion_token_cost_unit?: string;
+
+  effective_date?: string;
+  provider_id?: string;
+  pricing_level?: string;
+  pricing_level_id?: string;
+  created_at?: string;
+  created_by?: string;
+};
+
+type SummaryInsertMap = {
+  usage?: {[key: string]: LLMUsageSchema};
+} & ExtraKeysAllowed;
+
+type SummaryMap = {
+  weave?: WeaveSummarySchema;
+} & SummaryInsertMap;
 
 export type KeyedDictType = {
   [key: string]: any;
@@ -21,13 +70,14 @@ export type TraceCallSchema = {
   // freely assigned to any other variable without any type checking. This way,
   // we can ensure that we handle all possible types.
   output?: unknown;
-  summary?: KeyedDictType;
+  summary?: SummaryMap;
   wb_run_id?: string;
   wb_user_id?: string;
 };
 export type TraceCallReadReq = {
   project_id: string;
   id: string;
+  include_costs?: boolean;
 };
 
 export type TraceCallReadSuccess = {
@@ -60,6 +110,7 @@ export type TraceCallsQueryReq = {
   query?: Query;
   columns?: string[];
   expand_columns?: string[];
+  include_costs?: boolean;
   include_feedback?: boolean;
 };
 
@@ -120,6 +171,10 @@ export type Feedback = {
   created_at: string;
   feedback_type: string;
   payload: Record<string, any>;
+  annotation_ref?: string;
+  runnable_ref?: string;
+  call_ref?: string;
+  trigger_ref?: string;
 };
 
 export type FeedbackQuerySuccess = {
@@ -154,7 +209,10 @@ export type TraceObjQueryReq = {
   metadata_only?: boolean;
 };
 
-export interface TraceObjSchema {
+export interface TraceObjSchema<
+  T extends any = any,
+  OBC extends string = string
+> {
   project_id: string;
   object_id: string;
   created_at: string;
@@ -162,12 +220,14 @@ export interface TraceObjSchema {
   version_index: number;
   is_latest: number;
   kind: 'op' | 'object';
-  base_object_class?: string;
-  val: any;
+  base_object_class?: OBC;
+  val: T;
 }
-export type TraceObjQueryRes = {
-  objs: TraceObjSchema[];
+
+export type TraceObjQueryRes<T extends any = any> = {
+  objs: Array<TraceObjSchema<T>>;
 };
+
 export type TraceObjReadReq = {
   project_id: string;
   object_id: string;
@@ -176,6 +236,19 @@ export type TraceObjReadReq = {
 
 export type TraceObjReadRes = {
   obj: TraceObjSchema;
+};
+
+export type TraceObjCreateReq<T extends any = any> = {
+  obj: {
+    project_id: string;
+    object_id: string;
+    val: T;
+    set_base_object_class?: string;
+  };
+};
+
+export type TraceObjCreateRes = {
+  digest: string;
 };
 
 export type TraceRefsReadBatchReq = {
@@ -222,6 +295,35 @@ export type TraceFileContentReadRes = {
   content: ArrayBuffer;
 };
 
+export type CompletionsCreateInputs = {
+  model: string;
+  messages: any[];
+  temperature: number;
+  max_tokens: number;
+
+  // These are optional, depending on the LLM provider some accept these some dont
+  stop?: string[];
+  top_p?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+  n?: number;
+  response_format?: {
+    type: string;
+  };
+  tools?: any[];
+};
+
+export type CompletionsCreateReq = {
+  project_id: string;
+  inputs: CompletionsCreateInputs;
+  track_llm_call?: boolean;
+};
+
+export type CompletionsCreateRes = {
+  response: any;
+  weave_call_id?: string;
+};
+
 export enum ContentType {
   csv = 'text/csv',
   tsv = 'text/tab-separated-values',
@@ -237,3 +339,11 @@ export const fileExtensions = {
   [ContentType.any]: 'jsonl',
   [ContentType.json]: 'json',
 };
+
+export type ActionsExecuteBatchReq = {
+  project_id: string;
+  action_ref: string;
+  call_ids: string[];
+};
+
+export type ActionsExecuteBatchRes = {};

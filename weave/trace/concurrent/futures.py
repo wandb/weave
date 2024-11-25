@@ -27,13 +27,15 @@ to manage asynchronous tasks:
     result_future = executor.then([future], process_result)
 """
 
+from __future__ import annotations
+
 import atexit
 import concurrent.futures
 import logging
 from concurrent.futures import Future, wait
 from contextvars import ContextVar
 from threading import Lock
-from typing import Any, Callable, List, Optional, TypeVar
+from typing import Any, Callable, TypeVar
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.util import ContextAwareThreadPoolExecutor
@@ -63,16 +65,16 @@ class FutureExecutor:
 
     def __init__(
         self,
-        max_workers: Optional[int] = None,
+        max_workers: int | None = None,
         thread_name_prefix: str = THREAD_NAME_PREFIX,
     ):
         self._max_workers = max_workers
-        self._executor: Optional[ContextAwareThreadPoolExecutor] = None
+        self._executor: ContextAwareThreadPoolExecutor | None = None
         if max_workers != 0:
             self._executor = ContextAwareThreadPoolExecutor(
                 max_workers=max_workers, thread_name_prefix=thread_name_prefix
             )
-        self._active_futures: List[Future] = []
+        self._active_futures: list[Future] = []
         self._active_futures_lock = Lock()
         self._in_thread_context = ContextVar("in_deferred_context", default=False)
         atexit.register(self._shutdown)
@@ -93,15 +95,15 @@ class FutureExecutor:
         """
         return self._safe_submit(f, *args, **kwargs)
 
-    def then(self, futures: List[Future[T]], g: Callable[[List[T]], U]) -> Future[U]:
+    def then(self, futures: list[Future[T]], g: Callable[[list[T]], U]) -> Future[U]:
         """
         Execute a function on the results of a list of futures.
 
         This is useful when the results of one or more futures are needed for further processing.
 
         Args:
-            futures (List[Future[T]]): A list of Future objects.
-            g (Callable[[List[T]], U]): A function that takes the results of the futures and returns a value of type U.
+            futures (list[Future[T]]): A list of Future objects.
+            g (Callable[[list[T]], U]): A function that takes the results of the futures and returns a value of type U.
 
         Returns:
             Future[U]: A new Future object representing the result of applying g to the results of the futures.
@@ -138,7 +140,7 @@ class FutureExecutor:
 
         return result_future
 
-    def flush(self, timeout: Optional[float] = None) -> bool:
+    def flush(self, timeout: float | None = None) -> bool:
         """
         Block until all currently submitted items are complete or timeout is reached.
 
@@ -242,7 +244,7 @@ class FutureExecutor:
             res = f(*args, **kwargs)
             fut.set_result(res)
         except Exception as e:
-            logger.error(f"Task failed: {_format_exception(e)}")
+            logger.exception(f"Task failed: {_format_exception(e)}")
             fut.set_exception(e)
         return fut
 

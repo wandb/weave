@@ -1,10 +1,13 @@
 """The top-level functions for Weave Trace API."""
 
+from __future__ import annotations
+
 import contextlib
 import os
 import threading
 import time
-from typing import Any, Iterator, Optional, Union
+from collections.abc import Iterator
+from typing import Any
 
 # TODO: type_serializers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
@@ -22,12 +25,13 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
+from weave.trace_server.interface.base_object_classes import leaderboard
 
 
 def init(
     project_name: str,
     *,
-    settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
+    settings: UserSettings | dict[str, Any] | None = None,
 ) -> weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
@@ -74,7 +78,7 @@ def local_client() -> Iterator[weave_client.WeaveClient]:
         inited_client.reset()
 
 
-def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
+def publish(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
     """Save and version a python object.
 
     If an object with name already exists, and the content hash of obj does
@@ -108,6 +112,12 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
                 ref.project,
                 ref.name,
                 ref.digest,
+            )
+        elif isinstance(obj, leaderboard.Leaderboard):
+            url = urls.leaderboard_path(
+                ref.entity,
+                ref.project,
+                ref.name,
             )
         # TODO(gst): once frontend has direct dataset/model links
         # elif isinstance(obj, weave_client.Dataset):
@@ -149,15 +159,15 @@ def ref(location: str) -> weave_client.ObjectRef:
 
     uri = parse_uri(location)
     if not isinstance(uri, weave_client.ObjectRef):
-        raise ValueError("Expected an object ref")
+        raise TypeError("Expected an object ref")
     return uri
 
 
-def obj_ref(obj: Any) -> Optional[weave_client.ObjectRef]:
+def obj_ref(obj: Any) -> weave_client.ObjectRef | None:
     return weave_client.get_ref(obj)
 
 
-def output_of(obj: Any) -> Optional[weave_client.Call]:
+def output_of(obj: Any) -> weave_client.Call | None:
     client = weave_client_context.require_weave_client()
 
     ref = obj_ref(obj)
@@ -191,8 +201,8 @@ def attributes(attributes: dict[str, Any]) -> Iterator:
 
 def serve(
     model_ref: ObjectRef,
-    method_name: Optional[str] = None,
-    auth_entity: Optional[str] = None,
+    method_name: str | None = None,
+    auth_entity: str | None = None,
     port: int = 9996,
     thread: bool = False,
 ) -> str:

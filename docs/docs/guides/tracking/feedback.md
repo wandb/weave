@@ -1,3 +1,6 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Feedback
 
 Evaluating LLM applications automatically is challenging. Teams often rely on direct user feedback, particularly from domain experts, who assess the content quality using simple indicators such as thumbs up or down. Developers also actively identify and resolve content issues.
@@ -24,98 +27,156 @@ Access copy-and-paste examples on the "Use" tab of the call details page to mani
 
 ## SDK
 
-Use the Weave Python SDK to programmatically add, remove, and query feedback on calls.
+Use the Weave SDK to programmatically add, remove, and query feedback on calls.
 
 ### Querying a project's feedback
 
-```python
-import weave
-client = weave.init('intro-example')
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+    ```python
+    import weave
+    client = weave.init('intro-example')
 
-# Get all feedback in a project
-all_feedback = client.get_feedback()
+    # Get all feedback in a project
+    all_feedback = client.get_feedback()
 
-# Fetch a specific feedback object by id.
-# Note that the API still returns a collection, which is expected
-# to contain zero or one item(s).
-one_feedback = client.get_feedback("<feedback_uuid>")[0]
+    # Fetch a specific feedback object by id.
+    # Note that the API still returns a collection, which is expected
+    # to contain zero or one item(s).
+    one_feedback = client.get_feedback("<feedback_uuid>")[0]
 
-# Find all feedback objects with a specific reaction. You can specify offset and limit.
-thumbs_up = client.get_feedback(reaction="👍", limit=10)
+    # Find all feedback objects with a specific reaction. You can specify offset and limit.
+    thumbs_up = client.get_feedback(reaction="👍", limit=10)
 
-# After retrieval you can view the details of individual feedback objects.
-for f in client.get_feedback():
-    print(f.id)
-    print(f.created_at)
-    print(f.feedback_type)
-    print(f.payload)
-```
+    # After retrieval you can view the details of individual feedback objects.
+    for f in client.get_feedback():
+        print(f.id)
+        print(f.created_at)
+        print(f.feedback_type)
+        print(f.payload)
+    ```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  </TabItem>
+</Tabs>
 
 ### Adding feedback to a call
 
-```python
-import weave
-client = weave.init('intro-example')
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+    ```python
+    import weave
+    client = weave.init('intro-example')
 
-call = client.get_call("<call_uuid>")
+    call = client.get_call("<call_uuid>")
 
-# Adding an emoji reaction
-call.feedback.add_reaction("👍")
+    # Adding an emoji reaction
+    call.feedback.add_reaction("👍")
 
-# Adding a note
-call.feedback.add_note("this is a note")
+    # Adding a note
+    call.feedback.add_note("this is a note")
 
-# Adding custom key/value pairs.
-# The first argument is a user-defined "type" string.
-# Feedback must be JSON serializable and less than 1kb when serialized.
-call.feedback.add("correctness", { "value": 5 })
-```
+    # Adding custom key/value pairs.
+    # The first argument is a user-defined "type" string.
+    # Feedback must be JSON serializable and less than 1kb when serialized.
+    call.feedback.add("correctness", { "value": 5 })
+    ```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  </TabItem>
+</Tabs>
 
 ### Retrieving the Call UUID
 
 For scenarios where you need to add feedback immediately after a call, you can retrieve the call UUID programmatically during or after the call execution. Here is how to get the UUID of the call from within the operation:
 
-```python
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+    ```python
 
-import weave
-weave.init("uuid")
+    import weave
+    weave.init("uuid")
 
-@weave.op()
-def simple_operation(input_value):
-    # Perform some simple operation
-    output = f"Processed {input_value}"
-    # Get the current call ID
-    current_call = weave.require_current_call()
-    call_id = current_call.id
-    return output, call_id
-```
+    @weave.op()
+    def simple_operation(input_value):
+        # Perform some simple operation
+        output = f"Processed {input_value}"
+        # Get the current call ID
+        current_call = weave.require_current_call()
+        call_id = current_call.id
+        return output, call_id
+    ```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  </TabItem>
+</Tabs>
 
 Additionally, you can use call() method to execute the operation and retrieve the call ID after execution of the function:
 
-```python
-import weave
-weave.init("uuid")
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+    ```python
+    import weave
+    weave.init("uuid")
 
-@weave.op()
-def simple_operation(input_value):
-    return f"Processed {input_value}"
+    @weave.op()
+    def simple_operation(input_value):
+        return f"Processed {input_value}"
 
-# Execute the operation and retrieve the result and call ID
-result, call = simple_operation.call("example input")
-call_id = call.id
-```
+    # Execute the operation and retrieve the result and call ID
+    result, call = simple_operation.call("example input")
+    call_id = call.id
+    ```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  </TabItem>
+</Tabs>
 
 ### Querying feedback on a call
 
-```python
-for f in call.feedback:
-    print(f.id)
-    print(f.feedback_type)
-    print(f.payload)
-```
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+    ```python
+    for f in call.feedback:
+        print(f.id)
+        print(f.feedback_type)
+        print(f.payload)
+    ```
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  </TabItem>
+</Tabs>
 
 ### Deleting feedback from a call
 
-```python
-call.feedback.purge("<feedback_uuid>")
-```
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+    ```python
+    call.feedback.purge("<feedback_uuid>")
+    ```
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  </TabItem>
+</Tabs>

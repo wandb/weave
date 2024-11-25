@@ -1,15 +1,19 @@
 import _ from 'lodash';
 import React from 'react';
 
+import {parseRefMaybe} from '../../../../../../react';
 import {Timestamp} from '../../../../../Timestamp';
 import {UserLink} from '../../../../../UserLink';
-import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
+import {SmallRef} from '../../../Browse2/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {CostTable} from './CostTable';
-import {UsageData} from './TraceUsageStats';
+import {CostTable} from './cost';
 
-const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = ['latency_s', 'usage'];
+const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = [
+  'latency_s',
+  'usage',
+  'weave',
+];
 
 export const CallSummary: React.FC<{
   call: CallSchema;
@@ -29,10 +33,11 @@ export const CallSummary: React.FC<{
         !SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER.includes(k)
     )
   );
+  const costData = call.traceCall?.summary?.weave?.costs;
 
   return (
     <div className="overflow-auto px-16 pt-12">
-      {span.summary.usage && (
+      {costData && (
         <div className="mb-16">
           {/* This styling is similar to what is is SimpleKeyValueTable */}
           <p
@@ -44,7 +49,7 @@ export const CallSummary: React.FC<{
             }}>
             Usage
           </p>
-          <CostTable usage={span.summary.usage as {[key: string]: UsageData}} />
+          <CostTable costs={costData} />
         </div>
       )}
       <SimpleKeyValueTable

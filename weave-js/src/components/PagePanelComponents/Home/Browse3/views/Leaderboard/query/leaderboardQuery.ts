@@ -1,8 +1,7 @@
-import {isWeaveObjectRef} from '@wandb/weave/react';
+import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
 
 import {flattenObjectPreservingWeaveTypes} from '../../../../Browse2/browse2Util';
-import {parseRefMaybe} from '../../../../Browse2/SmallRef';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../../../pages/common/heuristics';
 import {TraceServerClient} from '../../../pages/wfReactInterface/traceServerClient';
 import {TraceObjSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';
@@ -14,7 +13,11 @@ import {
   objectVersionKeyToRefUri,
   opVersionKeyToRefUri,
 } from '../../../pages/wfReactInterface/utilities';
-import {ALL_VALUE, FilterAndGroupSpec} from '../types/leaderboardConfigType';
+import {
+  ALL_VALUE,
+  FilterAndGroupSpec,
+  LeaderboardObjectVal,
+} from '../types/leaderboardConfigType';
 
 export type LeaderboardValueRecord = {
   datasetName: string;
@@ -38,9 +41,12 @@ export type LeaderboardValueRecord = {
   createdAt: Date;
   sourceEvaluationCallId: string;
   sourceEvaluationObjectRef: string;
+  // A bit hacky to denormalize `shouldMinimize` here, but it's convenient
+  // for the caller and not externally visible
+  shouldMinimize?: boolean;
 };
 
-export type GroupableLeaderboardValueRecord = {
+type GroupableLeaderboardValueRecord = {
   modelGroup: string;
   datasetGroup: string;
   scorerGroup: string;
@@ -71,7 +77,7 @@ export type GroupedLeaderboardModelGroup<
   };
 };
 
-export const getEvaluationObjectsForSpec = async (
+const getEvaluationObjectsForSpec = async (
   client: TraceServerClient,
   entity: string,
   project: string,
@@ -112,7 +118,7 @@ export const getEvaluationObjectsForSpec = async (
   return allEvaluationObjectsRes;
 };
 
-export const getLeaderboardGroupableData = async (
+const getLeaderboardGroupableData = async (
   client: TraceServerClient,
   entity: string,
   project: string,
@@ -437,6 +443,7 @@ export const getLeaderboardGroupableData = async (
     .filter(entry => entry.include)
     .map(entry => entry.groupableRow);
 };
+
 export const getLeaderboardData = async (
   client: TraceServerClient,
   entity: string,
@@ -480,4 +487,192 @@ export const getLeaderboardData = async (
   };
 
   return finalData;
+};
+
+export const getPythonLeaderboardData = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
+  columns: LeaderboardObjectVal['columns']
+): Promise<{
+  finalData: GroupedLeaderboardData;
+  evalData: LeaderboardObjectEvalData;
+}> => {
+  const {groupableData, evalData} = await getLeaderboardObjectGroupableData(
+    client,
+    entity,
+    project,
+    columns
+  );
+
+  const finalData: GroupedLeaderboardData = {
+    modelGroups: _.mapValues(
+      _.groupBy(groupableData, 'modelGroup'),
+      modelGroup => {
+        return {
+          datasetGroups: _.mapValues(
+            _.groupBy(modelGroup, 'datasetGroup'),
+            datasetGroup => {
+              return {
+                scorerGroups: _.mapValues(
+                  _.groupBy(datasetGroup, 'scorerGroup'),
+                  scorerGroup => {
+                    return {
+                      metricPathGroups: _.mapValues(
+                        _.groupBy(scorerGroup, 'metricPathGroup'),
+                        metricPathGroup => {
+                          return metricPathGroup.map(row => row.row);
+                        }
+                      ),
+                    };
+                  }
+                ),
+              };
+            }
+          ),
+        };
+      }
+    ),
+  };
+
+  return {finalData, evalData};
+};
+
+export type LeaderboardObjectEvalData = {
+  [evalRefUri: string]: {
+    datasetGroup: string;
+    scorers: {
+      [scorerName: string]: string;
+    };
+  };
+};
+
+const getLeaderboardObjectGroupableData = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
+  columns: LeaderboardObjectVal['columns']
+): Promise<{
+  groupableData: GroupableLeaderboardValueRecord[];
+  evalData: LeaderboardObjectEvalData;
+}> => {
+  const evalObjectRefs = _.uniq(
+    columns.map(col => col.evaluation_object_ref)
+  ).filter(ref => parseRefMaybe(ref)?.scheme === 'weave');
+
+  if (evalObjectRefs.length === 0) {
+    return {groupableData: [], evalData: {}};
+  }
+
+  const evalObjectRefsValsProm = client.readBatch({refs: evalObjectRefs});
+
+  const allEvaluationCallsProm = client.callsStreamQuery({
+    project_id: projectIdFromParts({entity, project}),
+    sort_by: [{field: 'ended_at', direction: 'desc'}],
+    filter: {
+      op_names: [
+        opVersionKeyToRefUri({
+          entity,
+          project,
+          opId: EVALUATE_OP_NAME_POST_PYDANTIC,
+          versionHash: ALL_VALUE,
+        }),
+      ],
+      input_refs: evalObjectRefs,
+    },
+  });
+
+  const evalObjectRefsVals = await evalObjectRefsValsProm;
+  const evalMap = _.zipObject(evalObjectRefs, evalObjectRefsVals.vals);
+
+  const allEvaluationCallsRes = await allEvaluationCallsProm;
+
+  const data: GroupableLeaderboardValueRecord[] = [];
+  const evalData: LeaderboardObjectEvalData = {};
+  allEvaluationCallsRes.calls.forEach(call => {
+    columns.forEach(col => {
+      const evalObjRefUri = call.inputs.self;
+      if (col.evaluation_object_ref === evalObjRefUri) {
+        const evalVal = evalMap[evalObjRefUri];
+        if (evalVal == null) {
+          return;
+        }
+        const modelRefUri = call.inputs.model ?? '';
+        const modelRef = parseRefMaybe(modelRefUri);
+        const datasetRefUri = evalVal.dataset ?? '';
+        const datasetRef = parseRefMaybe(datasetRefUri);
+        if (modelRef?.scheme !== 'weave' || datasetRef?.scheme !== 'weave') {
+          return;
+        }
+        const scorerRefUri = evalVal.scorers.find(
+          (scorer: string) =>
+            parseRefMaybe(scorer ?? '')?.artifactName === col.scorer_name
+        );
+        const scorerRef = parseRefMaybe(scorerRefUri ?? '');
+        if (scorerRef?.scheme !== 'weave') {
+          return;
+        }
+        let value = call.output;
+        if (typeof value !== 'object' || value == null) {
+          value = null;
+        } else {
+          value = (value as any)[col.scorer_name];
+        }
+        col.summary_metric_path.split('.').forEach(part => {
+          if (value == null) {
+            return;
+          }
+          if (_.isArray(value)) {
+            try {
+              const index = parseInt(part, 10);
+              value = value[index];
+            } catch (e) {
+              console.warn('Skipping model latency', call, e);
+              value = null;
+            }
+          } else {
+            value = (value as any)[part];
+          }
+        });
+        const modelGroup = `${modelRef.artifactName}:${modelRef.artifactVersion}`;
+        const datasetGroup = `${datasetRef.artifactName}:${datasetRef.artifactVersion}`;
+        const scorerGroup = `${scorerRef.artifactName}:${scorerRef.artifactVersion}`;
+        const row: GroupableLeaderboardValueRecord = {
+          modelGroup,
+          datasetGroup,
+          scorerGroup,
+          metricPathGroup: col.summary_metric_path,
+          sortKey: -convertISOToDate(call.started_at).getTime(),
+          row: {
+            datasetName: datasetRef.artifactName,
+            datasetVersion: datasetRef.artifactVersion,
+            metricType: 'scorerMetric',
+            scorerName: scorerRef.artifactName,
+            scorerVersion: scorerRef.artifactVersion,
+            metricPath: col.summary_metric_path,
+            metricValue: value as any,
+            modelName: modelRef.artifactName,
+            modelVersion: modelRef.artifactVersion,
+            modelType: modelRef.weaveKind === 'op' ? 'op' : 'object',
+            trials: evalVal.trials,
+            createdAt: convertISOToDate(call.started_at),
+            sourceEvaluationCallId: call.id,
+            sourceEvaluationObjectRef: col.evaluation_object_ref,
+            shouldMinimize: col.should_minimize ?? false,
+          },
+        };
+        data.push(row);
+        if (!(col.evaluation_object_ref in evalData)) {
+          evalData[col.evaluation_object_ref] = {
+            datasetGroup,
+            scorers: {},
+          };
+        }
+        evalData[col.evaluation_object_ref].scorers[scorerRef.artifactName] =
+          scorerGroup;
+      }
+    });
+  });
+
+  return {groupableData: data, evalData};
 };
