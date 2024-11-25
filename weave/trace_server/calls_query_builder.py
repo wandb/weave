@@ -895,3 +895,6 @@ def _safely_format_sql(
     except:
         logger.info(f"Failed to format SQL: {sql}")
         return sql
+
+
+CallsQuery.model_rebuild()
