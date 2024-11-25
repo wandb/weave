@@ -6,21 +6,8 @@ from pydantic import PrivateAttr
 import weave
 from weave.scorers.base_scorer import Scorer
 
-try:
-    import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-except ImportError:
-    import_failed = True
-    print(
-        "The `transformers` package is required to use LlamaGuard, please run `pip install transformers`"
-    )
-
 if TYPE_CHECKING:
     from torch import Tensor
-
-
-# https://github.com/meta-llama/llama-recipes/blob/main/src/llama_recipes/inference/prompt_format_utils.py
-# https://github.com/meta-llama/llama-recipes/blob/main/recipes/responsible_ai/llama_guard/llama_guard_text_and_vision_inference.ipynb
 
 
 class LlamaGuard(Scorer):
@@ -56,8 +43,22 @@ class LlamaGuard(Scorer):
     }
 
     def model_post_init(self, __context: Any) -> None:
+        """
+        Initialize the model and tokenizer. Imports are performed here to ensure they're only
+        loaded when an instance of LlamaGuard is created.
+        """
+        try:
+            import torch
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+        except ImportError as e:
+            raise ImportError(
+                "The `transformers` and `torch` packages are required to use LlamaGuard. "
+                "Please install them by running `pip install transformers torch`."
+            ) from e
+
         if not torch.cuda.is_available() and "cuda" in self.device:
             raise ValueError("CUDA is not available")
+
         self._model = AutoModelForCausalLM.from_pretrained(
             self.model_name,
             device_map=self.device,
@@ -89,7 +90,7 @@ class LlamaGuard(Scorer):
         categories: Optional[dict[str, str]] = None,
         excluded_category_keys: Optional[list[str]] = None,
     ) -> tuple[str, float]:
-        "Score a list of messages in a conversation."
+        """Score a list of messages in a conversation."""
         excluded_category_keys = excluded_category_keys or []
         if categories is not None:
             input_ids = self._tokenizer.apply_chat_template(
