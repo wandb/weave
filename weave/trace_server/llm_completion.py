@@ -1,12 +1,14 @@
+from typing import Optional
+
 from weave.trace_server import trace_server_interface as tsi
 
 
 def lite_llm_completion(
     api_key: str,
     inputs: tsi.CompletionsCreateRequestInputs,
-    aws_access_key_id: str = None,
-    aws_secret_access_key: str = None,
-    aws_region_name: str = None,
+    aws_access_key_id: Optional[str] = None,
+    aws_secret_access_key: Optional[str] = None,
+    aws_region_name: Optional[str] = None,
 ) -> tsi.CompletionsCreateRes:
     import litellm
 
