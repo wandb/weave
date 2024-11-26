@@ -295,7 +295,7 @@ const CallPageInnerVertical: FC<{
     if (callCompleteWithCosts != null) {
       setCurrentCall(callCompleteWithCosts);
     }
-  }, [callComplete]);
+  }, [callCompleteWithCosts]);
 
   const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
