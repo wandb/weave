@@ -524,7 +524,6 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
             code.extend(reducer_deps["code"])
             warnings.extend(reducer_deps["warnings"])
 
-            # Add reducer source
             code.append(get_source_notebook_safe(reducer))
 
     if warnings:
