@@ -5,27 +5,74 @@ import TabItem from '@theme/TabItem';
 
 Evaluating LLM applications automatically is challenging. Teams often rely on direct user feedback, particularly from domain experts, who assess the content quality using simple indicators such as thumbs up or down. Developers also actively identify and resolve content issues.
 
-Weave's feedback feature enables users to provide feedback directly within the Weave UI or through the API. You can add emoji reactions, textual notes, and structured data to calls. This feedback helps compile evaluation datasets, monitor application performance, and collect examples for advanced tasks like fine-tuning.
+Weave's feedback feature enables users to provide feedback directly within the Weave UI or via the API. You can add emoji reactions, textual notes, and structured data to calls. This feedback helps compile evaluation datasets, monitor application performance, and collect examples for advanced tasks like fine-tuning.
 
-## View and Add Feedback within UI
+## Feedback in the UI
 
-Reactions and notes are displayed in a column in the calls grid. Hovering over these indicators provides more detail. Use these buttons to add reactions or notes.
+In the Weave UI, you can add and view feedback from either the [Traces table](#from-the-traces-table), or the call details page.
 
-![Screenshot of calls grid with feedback column](imgs/feedback_calls.png)
+### From the call details page
 
-View and edit feedback in the header of the call details page.
+1. In the Weave UI, navigate to **Traces**.
+2. Find the row for the call that you want to add feedback to.
+3. Open the call details page.
+4. Either [add and view feedback using the icons](#using-the-icons) in the upper right corner of the page, or [use the feedback column](#using-the-feedback-column).
 
-![Screenshot of feedback controls in call details header](imgs/feedback_call_header.png)
+#### Using the Feedback column
 
-View the feedback for a call on the "Feedback" tab of the call details page.
+> **Tip**: The [feedback table in the call details page](#using-the-feedback-column) provides the most comprehensive overview of feedback. Additionally, you can delete notes in the table.
+
+1. In the call details page, click **Feedback**. A table summarizing feedback displays.
+2. ...
+
+#### Using the icons
+
+> **Note**: You can't remove notes using the icons in the call details page. Instead, remove notes [from the Feedback column in the call details page](#using-the-feedback-column).
+
+In the upper right corner of the call page, add or remove a reaction, and add a note:
+  - *To add a reaction*:
+    1. Click the emoji icon. 
+    2. Add a thumbs up, thumbs down, or click the **+** icon for more emojis.
+  - *To add a comment*:
+    1. Click the comment bubble icon. 
+    2. In the text box, add your note. 
+    3. To save the note, press the **Enter** key. You can add additional notes.
+  - *To remove a reaction*:
+    1. Hover over the emoji reaction you want to remove.
+    2. Click the reaction to remove it.
+
+
 
 ![Screenshot of Feedback tab in call details](imgs/feedback_tab.png)
+
+
+### From the Traces table
+
+To add, remove view feedback for a particular call in the Traces table without opening the call details page, do the following:
+
+> **Note**: You can't remove notes from the Trace table. Instead, remove notes [from the Feedback column in the call details page](#using-the-feedback-column).
+
+1. In the Weave UI, navigate to **Traces**.
+2. Find the row for the call that you want to add feedback to.
+3. In the **Feedback** column of the call row, add a reaction and/or a note:
+   - *To add a reaction*:
+     1. Click the emoji icon. 
+     2. Add a thumbs up, thumbs down, or click the **+** icon for more emojis.
+   - *To add a comment*:
+     1. Click the comment bubble icon. 
+     2. In the text box, add your note. 
+     3. To save the note, press the **Enter** key. You can add additional notes.
+   - *To remove a reaction*:
+     1. Hover over the emoji reaction you want to remove.
+     2. Click the reaction to remove it.
+
+![Screenshot of calls grid with feedback column](imgs/feedback_calls.png)
 
 Access copy-and-paste examples on the "Use" tab of the call details page to manipulate the feedback for that call using the SDK.
 
 ![Screenshot of Use tab in call details](imgs/feedback_use.png)
 
-## SDK
+## Feedback in the SDK
 
 Use the Weave SDK to programmatically add, remove, and query feedback on calls.
 
