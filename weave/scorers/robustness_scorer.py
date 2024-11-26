@@ -4,8 +4,6 @@ import string
 from typing import Any, Optional, Union
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
 
 import weave
 from weave.scorers.base_scorer import Scorer
@@ -51,7 +49,7 @@ class RobustnessScorer(Scorer):
     use_exact_match: bool = True
     embedding_model_name: str = "all-MiniLM-L6-v2"
     similarity_metric: str = "cosine"
-    embedding_model: Optional[SentenceTransformer] = None
+    embedding_model: Optional[Any] = None # Delay type hinting to avoid dependency on SentenceTransformer
 
     def model_post_init(self, __context: Any) -> None:
         """
@@ -62,6 +60,14 @@ class RobustnessScorer(Scorer):
         """
         # Load an embedding model for semantic similarity scoring
         if not self.use_exact_match:
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as e:
+                raise ImportError(
+                    "The `SentenceTransformer` and `torch` packages are required to use `RobustnessScorer` with semantic similarity scoring. (`use_exact_match=False`)"
+                    "Please install them by running `pip install sentence-transformers torch`."
+                ) from e
+
             self.embedding_model = SentenceTransformer(self.embedding_model_name)
 
     @weave.op
@@ -294,6 +300,14 @@ class RobustnessScorer(Scorer):
 
         """
         if self.similarity_metric == "cosine":
+            try:
+                from sklearn.metrics.pairwise import cosine_similarity
+            except ImportError as e:
+                raise ImportError(
+                    "The `sklearn` package is required to use `RobustnessScorer` with cosine similarity scoring. (`use_exact_match=False`)"
+                    "Please install it by running `pip install scikit-learn`."
+                ) from e
+
             # Ensure the embedding model is loaded
             if self.embedding_model is None:
                 raise ValueError("Embedding model is not initialized.")
