@@ -216,7 +216,7 @@ Human annotation scorers can also be configured through the API. Each scorer is 
     spec1 = AnnotationSpec(
       name="Temperature",
       description="The perceived temperature of the llm call",
-      json_schema={
+      field_schema={
         "type": "number",
         "minimum": -1,
         "maximum": 1,
@@ -225,7 +225,7 @@ Human annotation scorers can also be configured through the API. Each scorer is 
     spec2 = AnnotationSpec(
       name="Tone",
       description="The tone of the llm response",
-      json_schema={
+      field_schema={
         "type": "string",
         "enum": ["Aggressive", "Neutral", "Polite", "N/A"],
       },
@@ -258,7 +258,7 @@ Building on the previous example, the following code creates a new version of th
     spec1 = AnnotationSpec(
       name="Temperature",
       description="The perceived temperature of the llm call",
-      json_schema={
+      field_schema={
         "type": "integer",  # <<- change type to integer
         "minimum": -1,
         "maximum": 1,
