@@ -249,11 +249,14 @@ const CallPageInnerVertical: FC<{
 
   const tree = useCallFlattenedTraceTree(call, path ?? null);
   const {rows, expandKeys, loading, costLoading, selectedCall} = tree;
-  const callComplete = useCall({
-    entity: selectedCall.entity,
-    project: selectedCall.project,
-    callId: selectedCall.callId,
-  });
+  const callComplete = useCall(
+    {
+      entity: selectedCall.entity,
+      project: selectedCall.project,
+      callId: selectedCall.callId,
+    },
+    {includeCosts: true}
+  );
 
   const assumeCallIsSelectedCall = path == null || path === '';
   const [currentCall, setCurrentCall] = useState(call);
@@ -273,6 +276,21 @@ const CallPageInnerVertical: FC<{
   const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const showPaginationContols = isPeeking && rowIdsConfigured;
+
+  console.log(
+    'callComplete',
+    callComplete.result?.callId,
+    callComplete.result?.traceCall?.summary?.weave?.costs,
+    'selectedCall',
+    selectedCall.callId,
+    selectedCall.traceCall?.summary?.weave?.costs,
+    'call',
+    call.callId,
+    call.traceCall?.summary?.weave?.costs,
+    'currentCall',
+    currentCall.callId,
+    currentCall.traceCall?.summary?.weave?.costs
+  );
 
   const callTabs = useCallTabs(currentCall);
 
