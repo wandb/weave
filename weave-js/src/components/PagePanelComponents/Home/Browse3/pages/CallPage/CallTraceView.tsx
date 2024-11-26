@@ -417,14 +417,11 @@ export const useCallFlattenedTraceTree = (
   );
 
   const costResult = useMemo(() => {
-    return costs.result ?? [];
-  }, [costs.result]);
+    return addCostsToCallResults(traceCallsResult, costs.result ?? []);
+  }, [costs.result, traceCallsResult]);
 
   const traceCallMap = useMemo(() => {
-    const result =
-      costResult.length > 0
-        ? addCostsToCallResults(traceCallsResult, costResult)
-        : traceCallsResult;
+    const result = costResult.length > 0 ? costResult : traceCallsResult;
     return _.keyBy(result, 'callId');
   }, [costResult, traceCallsResult]);
 
