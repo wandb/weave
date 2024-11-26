@@ -484,7 +484,7 @@ export const RefreshButton: FC<{
         size="medium"
         onClick={onClick}
         tooltip="Refresh"
-        icon="randomize-reset-reload"
+        icon="reload-refresh"
       />
     </Box>
   );
