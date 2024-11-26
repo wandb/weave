@@ -1,4 +1,4 @@
-import {gql, useApolloClient} from '@apollo/client';
+import {ApolloClient, gql, useApolloClient} from '@apollo/client';
 import {useEffect, useState} from 'react';
 
 import {isOrgRegistryProjectName} from '../util/artifacts';
@@ -35,21 +35,53 @@ export type ArtifactWeaveReferenceInfo = {
   artifactType: string;
 };
 
+const fetchArtifactWeaveReference = async (
+  apolloClient: ApolloClient<any>,
+  variables: {
+    entityName: string;
+    projectName: string;
+    artifactName: string;
+  }
+): Promise<ArtifactWeaveReferenceInfo | undefined> => {
+  const result = await apolloClient.query({
+    query: ARTIFACT_WEAVE_REF_QUERY as any,
+    variables,
+  });
+
+  const organization = result?.data?.entity?.organization?.name;
+  const artifactType =
+    result?.data?.entity?.project?.artifact?.artifactType?.name;
+
+  // Early returns for invalid cases
+  if (!artifactType) {
+    return undefined;
+  }
+
+  if (!organization && isOrgRegistryProjectName(variables.projectName)) {
+    return undefined;
+  }
+
+  return {
+    orgName: organization,
+    artifactType,
+  };
+};
+
 export const useArtifactWeaveReference = ({
   entityName,
   projectName,
   artifactName,
-  skip,
+  skip = false,
 }: {
   entityName: string;
   projectName: string;
   artifactName: string;
   skip?: boolean;
 }) => {
+  const [loading, setLoading] = useState(!skip);
   const [artInfo, setArtInfo] = useState<ArtifactWeaveReferenceInfo | null>(
     null
   );
-  const [loading, setLoading] = useState(!skip);
   const isMounted = useIsMounted();
   const apolloClient = useApolloClient();
 
@@ -57,44 +89,33 @@ export const useArtifactWeaveReference = ({
     if (skip) {
       return;
     }
-    setLoading(true);
-    apolloClient
-      .query({
-        query: ARTIFACT_WEAVE_REF_QUERY as any,
-        variables: {
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const info = await fetchArtifactWeaveReference(apolloClient, {
           entityName,
           projectName,
           artifactName,
-        },
-      })
-      .then(result => {
-        const organization = result?.data?.entity?.organization?.name;
-        const artifactType =
-          result?.data?.entity?.project?.artifact?.artifactType?.name;
-        if (artifactType == null) {
-          return undefined;
-        }
-        if (organization == null && isOrgRegistryProjectName(projectName)) {
-          return undefined;
-        }
-        const info: ArtifactWeaveReferenceInfo = {
-          orgName: organization,
-          artifactType,
-        };
+        });
+
         if (isMounted()) {
-          setArtInfo(info);
-          setLoading(false);
+          setArtInfo(info ?? null);
         }
-        return info;
-      })
-      .catch(err => {
-        console.error('Error fetching artifact weave reference: ', err);
+      } catch (err) {
+        console.error('Error fetching artifact weave reference:', err);
         if (isMounted()) {
           setArtInfo(null);
+        }
+      } finally {
+        if (isMounted()) {
           setLoading(false);
         }
-        return undefined;
-      });
+      }
+    };
+
+    fetchData();
   }, [skip, entityName, projectName, artifactName, isMounted, apolloClient]);
+
   return {loading, artInfo};
 };
