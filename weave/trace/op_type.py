@@ -510,46 +510,22 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
     code_blocks = []
     warnings = []
 
-    # Get reducers and their dependencies
+    # Get main function dependencies first
+    result = get_code_deps_safe(obj.resolve_fn, artifact)
+    import_code.extend(result["import_code"])
+    code_blocks.extend(result["code"])
+    warnings.extend(result["warnings"])
+
+    # Then get reducers and their dependencies
     for callback in obj.lifecycle_handler.callbacks:
-        if (reducer := getattr(callback, "reducer", None)):
-            # Get reducer dependencies first
+        if reducer := getattr(callback, "reducer", None):
             reducer_deps = get_code_deps_safe(reducer, artifact)
             import_code.extend(reducer_deps["import_code"])
-
-            # Store the class definitions separately
-            class_definitions = []
-            other_code = []
-            for code_block in reducer_deps["code"]:
-                if code_block.strip().startswith("@dataclass"):
-                    class_definitions.append(code_block)
-                else:
-                    other_code.append(code_block)
-
-            # Add class definitions first
-            code_blocks.extend(class_definitions)
-            code_blocks.extend(other_code)
+            code_blocks.extend(reducer_deps["code"])
             warnings.extend(reducer_deps["warnings"])
 
             # Add reducer source
             code_blocks.append(get_source_notebook_safe(reducer))
-
-    # Get main function dependencies
-    result = get_code_deps_safe(obj.resolve_fn, artifact)
-    import_code.extend(result["import_code"])
-
-    # Again, separate class definitions
-    class_definitions = []
-    other_code = []
-    for code_block in result["code"]:
-        if code_block.strip().startswith("@dataclass"):
-            class_definitions.append(code_block)
-        else:
-            other_code.append(code_block)
-
-    # Move any remaining class definitions to the top
-    code_blocks = class_definitions + code_blocks + other_code
-    warnings.extend(result["warnings"])
 
     if warnings:
         message = f"Warning: Incomplete serialization for op {obj}. This op may not be reloadable"
